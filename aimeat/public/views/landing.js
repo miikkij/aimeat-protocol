@@ -84,8 +84,8 @@ import { WelcomeDoor } from '/views/home/welcome-door.js';
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-// The familiar GitHub "Octocat" mark. fill=currentColor so it inherits the link's themed color.
-const GhMark = html`<svg class="gh-mark" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>`;
+// The GitHub mark left with this page's footer (the shell's SiteFooter carries that link now).
+// portal-dev.js and the profile's agents tab keep their own copies of the same drawing.
 
 // An eye, drawn rather than typed: an emoji would render as a different picture on every
 // platform and the house rule keeps emoji out of the UI. currentColor so the accent is set in CSS.
@@ -689,18 +689,10 @@ export default function Landing({ navigate }) {
         </a>
       </p>
 
-      <!-- 7. Footer -->
-      <footer class="ld-footer">
-        <a href="/v1/pricing" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>${tr('landing.footPricing', 'Pricing')}</a>
-        <a href="/v1/help">${tr('landing.footDocs', 'Docs')}</a>
-        <a href="/v1/pricing#own-node" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>${tr('landing.footOwnNode', 'Run your own node')}</a>
-        <a class="ld-gh" href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">${GhMark}GitHub</a>
-        <a href="/v1/portal?view=dev">${tr('landing.footDev', 'For developers')}</a>
-        ${/* The transparency page in the footer as well as the one line above it. A page a
-              visitor cannot find is close to not having one, and the footer is where someone
-              looks for this kind of statement. Header nav stays out of it. */''}
-        <a href="/v1/transparency" onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>${tr('landing.footTransparency', 'AI transparency')}</a>
-      </footer>
+      ${/* The footer this page used to carry (Pricing, Docs, Run your own node, GitHub, For
+            developers, AI transparency) is the shell's SiteFooter now — spa.html renders it
+            under every public view, so those links are on the pricing page and the help page
+            too instead of only here, and there is one footer to edit rather than three. */''}
     </div>
   `;
 }

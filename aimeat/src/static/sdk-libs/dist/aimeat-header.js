@@ -11,8 +11,8 @@
     var THEME_KEY = "aimeat-theme";
     var LANG_KEY = "aimeat-lang";
     var NAV_FALLBACK = {
-      "nav.try": "Try it",
-      "nav.devView": "For Developers",
+      "nav.howItWorks": "How it works",
+      "nav.business": "For your business",
       "nav.help": "Help",
       "nav.apps": "Apps",
       "nav.profile": "Profile",
@@ -178,7 +178,7 @@
       }
       var nav = document.createElement("nav");
       nav.className = "topnav";
-      nav.innerHTML = '<div style="display:flex;align-items:center;gap:20px"><a href="' + nodeHref("/v1/portal") + '" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a><span class="brand-morsels" data-morsels style="display:none"></span></div><div class="topnav-right"><button class="topnav-burger" aria-label="Menu" data-burger>☰</button><div class="topnav-menu" data-menu><a href="' + nodeHref("/v1/classic") + '">' + label("nav.try") + '</a><a href="' + nodeHref("/v1/portal?view=dev") + '">' + label("nav.devView") + '</a><a href="' + nodeHref("/v1/help") + '">' + label("nav.help") + '</a><a href="' + nodeHref("/app-catalog.html") + '" target="_blank" data-auth-only style="display:none">' + label("nav.apps") + '</a><a href="' + nodeHref("/v1/profile") + '" class="profile-link visible" data-auth-only style="display:none">' + label("nav.profile") + '</a><a href="' + nodeHref("/v1/admin") + '" data-operator-only style="display:none">' + label("nav.admin") + '</a><div class="topnav-center"><button class="lang-btn" data-lang="en">EN</button><button class="lang-btn" data-lang="fi">FI</button></div></div><span class="header-auth-slot" id="headerAuth"></span></div>';
+      nav.innerHTML = '<div style="display:flex;align-items:center;gap:20px"><a href="' + nodeHref("/v1/portal") + '" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a><span class="brand-morsels" data-morsels style="display:none"></span></div><div class="topnav-right"><button class="topnav-burger" aria-label="Menu" data-burger>☰</button><div class="topnav-menu" data-menu><a href="' + nodeHref("/v1/how-it-works") + '" data-anon-only>' + label("nav.howItWorks") + '</a><a href="' + nodeHref("/v1/business") + '" data-anon-only>' + label("nav.business") + '</a><a href="' + nodeHref("/v1/help") + '">' + label("nav.help") + '</a><a href="' + nodeHref("/app-catalog.html") + '" target="_blank" data-auth-only style="display:none">' + label("nav.apps") + '</a><a href="' + nodeHref("/v1/profile") + '" class="profile-link visible" data-auth-only style="display:none">' + label("nav.profile") + '</a><a href="' + nodeHref("/v1/admin") + '" data-operator-only style="display:none">' + label("nav.admin") + '</a><div class="topnav-center"><button class="lang-btn" data-lang="en">EN</button><button class="lang-btn" data-lang="fi">FI</button></div></div><span class="header-auth-slot" id="headerAuth"></span></div>';
       return nav;
     }
     function wire(nav, t, lang) {
@@ -205,6 +205,9 @@
       var session = hasSession && window.AIMEAT.auth.getSession ? window.AIMEAT.auth.getSession() : null;
       nav.querySelectorAll("[data-auth-only]").forEach(function(el) {
         el.style.display = session ? "" : "none";
+      });
+      nav.querySelectorAll("[data-anon-only]").forEach(function(el) {
+        el.style.display = session ? "none" : "";
       });
       var isOp = session && session.roles && session.roles.indexOf("operator") !== -1;
       nav.querySelectorAll("[data-operator-only]").forEach(function(el) {

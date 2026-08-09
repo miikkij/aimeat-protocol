@@ -602,6 +602,7 @@
               ? html`<${ErrorBoundary} onRetry=${retryView}><${View} navigate=${navigate} locale=${locale} /></${ErrorBoundary}>`
               : html`<div class="empty"><div class="spinner"></div></div>`
           }
+          ${View && !viewError && html`<${SiteFooter} navigate=${navigate} />`}
         </div>
       `;
     }
@@ -624,14 +625,24 @@
     // `siteKey` entries are apps that belong to THIS node's operator, not protocol surfaces.
     // They render only when the node configured a URL for them (AIMEAT_SITE_* → window.__SITE),
     // so a fresh clone gets a nav without them instead of links into somebody else's apps.
+    //
+    // `when` splits the bar by who is looking (2026-08-09). Signing in used to ADD to a bar that
+    // was already full: eight public links, a "Me" dropdown holding three more, two language
+    // buttons, a bell and a wide gold pill. Fifteen targets on one fixed-height row is what put
+    // the dropdown there in the first place, and the dropdown cost a click on every visit to
+    // Apps, Profile or Admin. The marketing links now leave when a person signs in, which is
+    // what makes room for those three to sit inline with the rest. The header carries where a
+    // person goes often; what is read once lives in the footer (see SiteFooter).
+    //   'anon'  — logged-out only (marketing)
+    //   'auth'  — signed-in only
+    //   absent  — both
+    // Gone from here: `try` pointed at /v1/portal, exactly where the brand link already goes,
+    // so it was the same destination twice; `members` and `devView` moved to the footer.
     const PUBLIC_NAV_LINKS = [
-      { id: 'try',        path: '/v1/portal',          key: 'nav.try' },
-      { id: 'howItWorks', path: '/v1/how-it-works',    key: 'nav.howItWorks', fallback: 'How it works' },
-      { id: 'learn',      siteKey: 'learn',            key: 'nav.learn',      fallback: 'Learn', external: true },
-      { id: 'exchange',   siteKey: 'exchange',         key: 'nav.exchange',   fallback: 'EXCHANGE', external: true },
-      { id: 'business',   path: '/v1/business',        key: 'nav.business',   fallback: 'For your business' },
-      { id: 'members',    path: '/v1/members',         key: 'nav.members',    fallback: 'Members' },
-      { id: 'devView',    path: '/v1/portal?view=dev', key: 'nav.devView',    matchActive: false },
+      { id: 'howItWorks', path: '/v1/how-it-works',    key: 'nav.howItWorks', fallback: 'How it works', when: 'anon' },
+      { id: 'learn',      siteKey: 'learn',            key: 'nav.learn',      fallback: 'Learn', external: true, when: 'anon' },
+      { id: 'exchange',   siteKey: 'exchange',         key: 'nav.exchange',   fallback: 'EXCHANGE', external: true, when: 'anon' },
+      { id: 'business',   path: '/v1/business',        key: 'nav.business',   fallback: 'For your business', when: 'anon' },
       { id: 'help',       path: '/v1/help',            key: 'nav.help' },
     ];
 
@@ -666,9 +677,7 @@
       const session = useSession();
       const [morsels, setMorsels] = useState(null);
       const [menuOpen, setMenuOpen] = useState(false);
-      const [meOpen, setMeOpen] = useState(false);
       const navRef = useRef(null);
-      const meRef = useRef(null);
       // Node feature flags from /v1/site/header-nav. Empty until the fetch resolves,
       // so optional surfaces stay hidden until we positively learn they're enabled (no flash).
       const [features, setFeatures] = useState({});
@@ -678,10 +687,11 @@
 
       // Collapse to the hamburger by MEASUREMENT, not by a guessed pixel width.
       //
-      // How much room the bar needs depends on state, not just on the screen: signing in adds
-      // the Me button, a notification bell and a wide gold pill, and an operator adds Admin
-      // inside Me. A fixed breakpoint cannot know any of that, which is how a 2000px window
-      // ended up with the nav hanging out underneath a 56px-tall bar.
+      // How much room the bar needs depends on state, not just on the screen: signing in swaps
+      // the marketing links for Apps/Profile/Admin, adds a notification bell and a wide gold
+      // pill, and an operator gets one link more than everyone else. A fixed breakpoint cannot
+      // know any of that, which is how a 2000px window ended up with the nav hanging out
+      // underneath a 56px-tall bar.
       //
       // The test has to run with the bar EXPANDED (a collapsed bar always "fits"), so it drops
       // the class, measures, and puts it back in the same frame — no paint happens in between.
@@ -706,16 +716,6 @@
         // Re-measures whenever the bar's contents change: signing in, the operator's Admin
         // link appearing, a different nav config arriving, or the language switching.
       }, [session, locale, navConfig, morsels]);
-
-      // Close the Me dropdown on an outside click, the way every other menu on the page behaves.
-      useEffect(() => {
-        if (!meOpen) return undefined;
-        const onDown = (e) => { if (meRef.current && !meRef.current.contains(e.target)) setMeOpen(false); };
-        const onKey = (e) => { if (e.key === 'Escape') setMeOpen(false); };
-        document.addEventListener('pointerdown', onDown);
-        document.addEventListener('keydown', onKey);
-        return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
-      }, [meOpen]);
 
       // Load operator-configured header nav (public endpoint, no auth needed).
       useEffect(() => {
@@ -759,7 +759,8 @@
 
       const currentPath = location.pathname;
 
-      // Resolve the public links to render: config order, minus hidden, by declared id.
+      // Resolve the public links to render: config order, minus hidden, minus the ones that
+      // belong to the other session state, by declared id.
       const linkById = Object.fromEntries(PUBLIC_NAV_LINKS.map(l => [l.id, l]));
       const hiddenSet = new Set(navConfig.hidden);
       // Operator-owned apps (siteKey) resolve their href from window.__SITE and drop out of
@@ -767,6 +768,7 @@
       const visibleLinks = navConfig.order
         .map(id => linkById[id])
         .filter(l => l && !hiddenSet.has(l.id))
+        .filter(l => (l.when === 'anon' ? !session : l.when === 'auth' ? !!session : true))
         .map(l => (l.siteKey ? { ...l, path: siteLink(l.siteKey) } : l))
         .filter(l => l.path);
 
@@ -784,8 +786,8 @@
               onClick=${() => setMenuOpen(o => !o)}>☰</button>
             <div class="topnav-menu ${menuOpen ? 'open' : ''}">
               <!-- Public links are operator-configurable (visibility + order) via the admin
-                   Portal tab. "Try it" leads to the landing's path cards + app gallery.
-                   Classic stays reachable deeper (landing card B "Start building"). -->
+                   Portal tab. Classic stays reachable deeper (landing card B "Start
+                   building"), and the landing itself is the brand link. -->
               ${visibleLinks.map(link => (link.external
                 ? html`
                   <a href="${link.path}" key=${link.id} target="_blank" rel="noopener"
@@ -796,27 +798,19 @@
                     onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
                     class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
                 `))}
-              <!-- Signing in used to append four more top-level links (Apps, Profile, My
-                   Company, Admin) next to a bell and a wide gold pill, which is what pushed
-                   the bar past its width even on a 2000px screen. They live behind one "Me"
-                   button now; inside the burger sheet the button disappears and the links
-                   simply join the list. -->
+              <!-- Where a signed-in person actually goes, inline with the rest. These sat
+                   behind a "Me" dropdown until 2026-08-09, which cost a click every time and
+                   only existed because the bar was carrying the marketing links at the same
+                   time. Those links are anon-only now, so these three fit on the row. -->
               ${session && html`
-                <div class="topnav-me" ref=${meRef}>
-                  <button type="button" class="topnav-me-btn" aria-haspopup="true" aria-expanded=${meOpen ? 'true' : 'false'}
-                    onClick=${() => setMeOpen(o => !o)}>${t('nav.me') || 'Me'}<span class="chev">▾</span></button>
-                  <div class="topnav-me-menu ${meOpen ? 'open' : ''}">
-                    <a href="/app-catalog.html" target="_blank" onClick=${() => { setMeOpen(false); setMenuOpen(false); }} class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
-                    <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/profile'); setMeOpen(false); setMenuOpen(false); }}>
-                      ${t('nav.profile')}
-                    </a>
-                    ${session.roles && session.roles.includes('operator') && html`
-                      <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/admin'); setMeOpen(false); setMenuOpen(false); }}>
-                        ${t('nav.admin')}
-                      </a>
-                    `}
-                  </div>
-                </div>
+                <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)}
+                  class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
+                <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}"
+                  onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>${t('nav.profile')}</a>
+                ${session.roles && session.roles.includes('operator') && html`
+                  <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}"
+                    onClick=${(e) => { handleNav(e, '/v1/admin'); setMenuOpen(false); }}>${t('nav.admin')}</a>
+                `}
               `}
               <div class="topnav-center">
                 <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>
@@ -827,6 +821,60 @@
             <span class="header-auth-slot" id="headerAuth"></span>
           </div>
         </nav>
+      `;
+    }
+
+    // ── Site Footer ──
+    // The pages a person reads once: pricing, the transparency statement, the developer view,
+    // the member directory. They used to compete for width in the header with the pages a
+    // person uses every day, and the header is the scarcer surface.
+    //
+    // Two rows, two readers. The first is for people. The second is the same five links the
+    // static <footer class="agent-footer"> in this document carries for anything that does not
+    // run JavaScript — that block sits OUTSIDE #app, and since #app is 100dvh and the body
+    // never scrolls, a human has never been able to reach it. The static one stays where it is
+    // (a crawler needs it in the markup); this is the copy a person can click.
+    //
+    // It renders INSIDE .page-content, after the view, so it scrolls with the content. A third
+    // row in the #app flex column would cost vertical space on every screen, and a phone is
+    // where that hurts. Work surfaces (profile, admin, home, the pop-outs) get no footer: a
+    // page you work in is not a page you leave from.
+    const FOOTER_ROUTES = new Set([
+      '/v1/portal', '/v1/pricing', '/v1/how-it-works', '/v1/business',
+      '/v1/members', '/v1/help', '/v1/glossary', '/v1/transparency',
+    ]);
+
+    function SiteFooter({ navigate }) {
+      const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+      const go = (e, path) => { e.preventDefault(); navigate(path); };
+      // The dev view is /v1/portal?view=dev, which shares its path with the landing and renders
+      // its own full-page surface. Match on the query too, or the landing check lets it through.
+      if (!FOOTER_ROUTES.has(location.pathname) || location.search.includes('view=dev')) return null;
+      return html`
+        <footer class="site-footer">
+          <div class="site-footer-row">
+            <a href="/v1/pricing" onClick=${(e) => go(e, '/v1/pricing')}>${tr('footer.pricing', 'Pricing')}</a>
+            <a href="/v1/help" onClick=${(e) => go(e, '/v1/help')}>${tr('nav.help', 'Help')}</a>
+            <a href="/v1/how-it-works" onClick=${(e) => go(e, '/v1/how-it-works')}>${tr('nav.howItWorks', 'How it works')}</a>
+            <a href="/v1/business" onClick=${(e) => go(e, '/v1/business')}>${tr('nav.business', 'For your business')}</a>
+            <a href="/v1/members" onClick=${(e) => go(e, '/v1/members')}>${tr('nav.members', 'Members')}</a>
+            <a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>
+            <a href="/v1/pricing#own-node" onClick=${(e) => go(e, '/v1/pricing#own-node')}>${tr('footer.ownNode', 'Run your own node')}</a>
+            <a href="/v1/transparency" onClick=${(e) => go(e, '/v1/transparency')}>${tr('footer.transparency', 'AI transparency')}</a>
+            <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a>
+          </div>
+          ${/* For machines, and for the person who wants the contract. /v1/spec, /sitemap.md,
+                /llms.txt and /AGENTS.md are served documents rather than SPA routes: opened in
+                the same tab, the router's /v1/ interceptor would match none of them and land
+                the reader on the landing page instead. */''}
+          <div class="site-footer-row site-footer-machine">
+            <a href="/v1/glossary" onClick=${(e) => go(e, '/v1/glossary')}>${tr('footer.glossary', 'Glossary')}</a>
+            <a href="/sitemap.md" target="_blank" rel="noopener">${tr('footer.sitemap', 'Site map')}</a>
+            <a href="/llms.txt" target="_blank" rel="noopener">llms.txt</a>
+            <a href="/AGENTS.md" target="_blank" rel="noopener">AGENTS.md</a>
+            <a href="/v1/spec" target="_blank" rel="noopener">${tr('footer.apiContract', 'API contract')}</a>
+          </div>
+        </footer>
       `;
     }
 

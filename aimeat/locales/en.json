@@ -675,7 +675,6 @@
     }
   },
   "nav": {
-    "try": "Try it",
     "devView": "For Developers",
     "signIn": "Sign In",
     "apps": "Apps",
@@ -690,8 +689,15 @@
     "business": "For your business",
     "learn": "Learn",
     "exchange": "EXCHANGE",
-    "members": "Members",
-    "me": "Me"
+    "members": "Members"
+  },
+  "footer": {
+    "pricing": "Pricing",
+    "ownNode": "Run your own node",
+    "transparency": "AI transparency",
+    "glossary": "Glossary",
+    "sitemap": "Site map",
+    "apiContract": "API contract"
   },
   "hero": {
     "title": "Your data is yours. Your AI works for you.",
@@ -8107,10 +8113,6 @@
     "loop3": "The app goes live at its own address. Share the link.",
     "galleryTitle": "Built with this loop: real apps, try them",
     "builtInChat": "built in an AI chat session",
-    "footPricing": "Pricing",
-    "footDocs": "Docs",
-    "footOwnNode": "Run it on your own server",
-    "footDev": "For developers",
     "agentOnlineOne": "agent online",
     "evExtension": "published an update",
     "evDocument": "A new document was published",
@@ -8848,7 +8850,6 @@
   "transparency.linkGuide": "The operator guide, for running your own node",
   "transparency.ctaBusiness": "For your business →",
   "transparency.ctaPrivacy": "Privacy →",
-  "landing.footTransparency": "AI transparency",
   "landing.transLine": "Content a model wrote here carries a record of how it was made, and a label where a person reads it.",
   "landing.transCta": "How this node marks AI content →",
   "biz.transTitle": "AI transparency your compliance officer can read",

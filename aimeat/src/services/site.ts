@@ -9,6 +9,9 @@
  *   - CONFIG_WHITELIST + TAG_REGEX: safe config keys and the {{...}} tag grammar for substitution
  *
  * @version-history
+ *   v1.3.0 — 2026-08-09 — PUBLIC_NAV_LINK_IDS drops `try` (it pointed at /v1/portal, where the brand
+ *     link already goes) and `devView` (moved to the SPA's site footer). A stored order or hidden
+ *     list naming either is filtered out by getHeaderNav, so no node needs a migration.
  *   v1.2.0 — 2026-07-28 — PUBLIC_NAV_LINK_IDS gains `learn` and `exchange` (operator-owned apps;
  *     the SPA renders them only when AIMEAT_SITE_*_URL is configured). getHeaderNav now slots a
  *     newly-declared link next to its declared neighbour instead of appending it, so shipping a
@@ -55,7 +58,11 @@ const HEADER_NAV_KEY = 'portal/header-nav';
 // `learn` and `exchange` point at apps this node's operator owns; the SPA renders them only
 // when AIMEAT_SITE_LEARN_URL / AIMEAT_SITE_EXCHANGE_URL are set. They are listed here so an
 // operator who HAS them can still reorder or hide them from the Portal tab.
-export const PUBLIC_NAV_LINK_IDS = ['try', 'howItWorks', 'learn', 'exchange', 'business', 'devView', 'help'] as const;
+// All four of these are logged-out links (PUBLIC_NAV_LINKS `when: 'anon'` in spa.html); `help`
+// shows in both states. What a signed-in person needs is not configurable and not here.
+// `try` and `devView` left on 2026-08-09: the first was the brand link's destination under a
+// second name, the second moved to the site footer with `members`.
+export const PUBLIC_NAV_LINK_IDS = ['howItWorks', 'learn', 'exchange', 'business', 'help'] as const;
 
 export interface HeaderNavConfig {
     /** Display order of public link ids (always normalized to cover all known ids). */

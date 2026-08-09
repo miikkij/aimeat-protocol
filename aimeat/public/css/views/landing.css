@@ -123,11 +123,8 @@
    and checkable, and the page it links to is where the limits belong. */
 .ld-transline { margin: 2rem auto 0; max-width: 62ch; text-align: center; color: var(--text-dim); font-size: .88rem; line-height: 1.6; }
 .ld-transline a { color: var(--accent); font-weight: 600; white-space: nowrap; }
-.ld-footer { display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); font-size: .88rem; }
-.ld-footer a { color: var(--text-dim); text-decoration: none; }
-.ld-footer a:hover { color: var(--text); }
-.ld-footer a.ld-gh { display: inline-flex; align-items: center; gap: .4rem; }
-.gh-mark { flex: none; }
+/* .ld-footer / .ld-gh / .gh-mark left with the landing's own footer on 2026-08-09: the shell
+   renders one .site-footer (theme.css) under every public view instead. */
 /* Pricing */
 .ld-pricing .ld-h1 { text-align: center; }
 .ld-pricing .ld-hero-sub { text-align: center; margin-bottom: 1.5rem; }

@@ -22,6 +22,9 @@
  *   Accept negotiation on the JSON route · the openapi and namespace decisions
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=transparency-page
  * @version-history
+ *   v1.2.0 — 2026-08-09 — The footer assertion follows the footer: the landing's `ld-footer` became
+ *     the shell's SiteFooter in spa.html, and the transparency label moved from
+ *     `landing.footTransparency` to `footer.transparency`. Same requirement, new address.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 10b. Three decisions turned from comments into checks:
  *     page routes and their mirrors stay OUT of openapi.yaml, no key returns to the colliding
  *     `aiTransparency.*` namespace, and `/v1/ai-transparency` answers JSON to machines while
@@ -338,12 +341,14 @@ const FORBIDDEN: Array<[string, RegExp]> = [
     });
 
     await test('the footer and landing strings exist in both locales', async () => {
-        for (const k of ['landing.footTransparency', 'landing.transLine', 'landing.transCta']) {
+        for (const k of ['footer.transparency', 'landing.transLine', 'landing.transCta']) {
             assert(k in en && k in fi, `${k} is missing from a locale`);
         }
-        const landing = readFileSync(join(here, '..', 'public', 'views', 'landing.js'), 'utf-8');
-        const footer = landing.slice(landing.indexOf('<footer class="ld-footer"'));
-        assert(footer.includes('/v1/transparency'), 'the landing footer has no transparency link');
+        // The landing's own footer became the shell's SiteFooter (2026-08-09), which renders under
+        // every public view. The requirement is unchanged: a visitor finds this page from a footer.
+        const shell = readFileSync(join(here, '..', 'public', 'spa.html'), 'utf-8');
+        const footer = shell.slice(shell.indexOf('function SiteFooter'));
+        assert(footer.includes('/v1/transparency'), 'the site footer has no transparency link');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

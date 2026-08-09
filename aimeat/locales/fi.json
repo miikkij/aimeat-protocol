@@ -675,7 +675,6 @@
     }
   },
   "nav": {
-    "try": "Kokeile",
     "devView": "Kehittäjille",
     "signIn": "Kirjaudu",
     "apps": "Sovellukset",
@@ -690,8 +689,15 @@
     "business": "Yrityksellesi",
     "learn": "Opi",
     "exchange": "EXCHANGE",
-    "members": "Jäsenet",
-    "me": "Minä"
+    "members": "Jäsenet"
+  },
+  "footer": {
+    "pricing": "Hinnat",
+    "ownNode": "Aja oma node",
+    "transparency": "Tekoälyn läpinäkyvyys",
+    "glossary": "Sanasto",
+    "sitemap": "Sivukartta",
+    "apiContract": "API-sopimus"
   },
   "hero": {
     "title": "Tietosi on sinun. AI:si työskentelee puolestasi.",
@@ -8107,10 +8113,6 @@
     "loop3": "Appi menee liveksi omaan osoitteeseensa. Jaa linkki.",
     "galleryTitle": "Rakennettu tällä loopilla: oikeita appeja, kokeile",
     "builtInChat": "rakennettu AI-chat-sessiossa",
-    "footPricing": "Hinnoittelu",
-    "footDocs": "Dokumentaatio",
-    "footOwnNode": "Aja se omalla palvelimellasi",
-    "footDev": "Kehittäjille",
     "agentOnlineOne": "agentti linjoilla",
     "evExtension": "julkaisi päivityksen",
     "evDocument": "Uusi dokumentti julkaistu",
@@ -8848,7 +8850,6 @@
   "transparency.linkGuide": "Ylläpitäjän ohje oman noden ajamiseen",
   "transparency.ctaBusiness": "Yrityksellesi →",
   "transparency.ctaPrivacy": "Tietosuoja →",
-  "landing.footTransparency": "Tekoälyn läpinäkyvyys",
   "landing.transLine": "Täällä mallin kirjoittama sisältö kantaa mukanaan tiedon siitä, miten se on tehty, ja merkinnän siellä missä ihminen sen lukee.",
   "landing.transCta": "Näin tämä node merkitsee tekoälysisällön →",
   "biz.transTitle": "Tekoälyn läpinäkyvyys, jonka vastuuhenkilösi voi lukea",

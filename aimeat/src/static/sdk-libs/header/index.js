@@ -13,6 +13,10 @@
  *   modalI18n/buildMarkup/wire/refreshSession/init — runs init() on DOM ready.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.1.0 — 2026-08-09 — Same anon/auth split as the SPA header: "How it works" and "For your
+ *     business" (data-anon-only) step aside for Apps/Profile/Admin once there is a session. Drops
+ *     "Try it" (it pointed at /v1/classic, which the landing already leads to) and "For Developers"
+ *     (a site-footer link now). The bar carries at most five targets in either state.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-header.ts (SDK-libs migration Phase 1).
  */
 
@@ -25,7 +29,7 @@ function main() {
   var THEME_KEY = 'aimeat-theme';
   var LANG_KEY = 'aimeat-lang';
   var NAV_FALLBACK = {
-    'nav.try': 'Try it', 'nav.devView': 'For Developers', 'nav.help': 'Help',
+    'nav.howItWorks': 'How it works', 'nav.business': 'For your business', 'nav.help': 'Help',
     'nav.apps': 'Apps', 'nav.profile': 'Profile', 'nav.admin': 'Admin',
     'nav.themeToDark': 'Switch to dark mode', 'nav.themeToLight': 'Switch to light mode',
   };
@@ -153,8 +157,11 @@ function main() {
       '<div class="topnav-right">' +
         '<button class="topnav-burger" aria-label="Menu" data-burger>☰</button>' +
         '<div class="topnav-menu" data-menu>' +
-          '<a href="' + nodeHref('/v1/classic') + '">' + label('nav.try') + '</a>' +
-          '<a href="' + nodeHref('/v1/portal?view=dev') + '">' + label('nav.devView') + '</a>' +
+          // Same split as the SPA header (spa.html PUBLIC_NAV_LINKS `when`): the marketing pages
+          // are for someone who has not signed in, and they step aside for Apps/Profile/Admin the
+          // moment there is a session. One row, five targets at most, in either state.
+          '<a href="' + nodeHref('/v1/how-it-works') + '" data-anon-only>' + label('nav.howItWorks') + '</a>' +
+          '<a href="' + nodeHref('/v1/business') + '" data-anon-only>' + label('nav.business') + '</a>' +
           '<a href="' + nodeHref('/v1/help') + '">' + label('nav.help') + '</a>' +
           '<a href="' + nodeHref('/app-catalog.html') + '" target="_blank" data-auth-only style="display:none">' + label('nav.apps') + '</a>' +
           '<a href="' + nodeHref('/v1/profile') + '" class="profile-link visible" data-auth-only style="display:none">' + label('nav.profile') + '</a>' +
@@ -197,6 +204,9 @@ function main() {
     var session = hasSession && window.AIMEAT.auth.getSession ? window.AIMEAT.auth.getSession() : null;
     nav.querySelectorAll('[data-auth-only]').forEach(function (el) {
       /** @type {HTMLElement} */ (el).style.display = session ? '' : 'none';
+    });
+    nav.querySelectorAll('[data-anon-only]').forEach(function (el) {
+      /** @type {HTMLElement} */ (el).style.display = session ? 'none' : '';
     });
     var isOp = session && session.roles && session.roles.indexOf('operator') !== -1;
     nav.querySelectorAll('[data-operator-only]').forEach(function (el) {

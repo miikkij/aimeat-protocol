@@ -11,6 +11,9 @@
  *            the off path is covered by e2e-secretary-disabled.ts (self-spawns a flag-off server).
  *   v1.2.0 — 2026-07-10 — Drop the features.secretary assertion; the Secretary feature was removed
  *            (the `features` map is now empty). Generic header-nav tests unchanged.
+ *   v1.3.1 — 2026-08-09 — The invalid-id fixture pairs 'bogus' with 'help' instead of 'try'. `try`
+ *            left PUBLIC_NAV_LINK_IDS with the header slim-down, and a fixture of two unknown ids
+ *            would still have passed while proving nothing about mixing a known one with an unknown.
  *   v1.3.0 — 2026-07-30 — Take the known link ids from PUBLIC_NAV_LINK_IDS instead of a hand-copied
  *            list. The copy had fallen two links behind the node (`learn`, `exchange`), failing three
  *            tests over a correct change; and the reorder fixture now covers every id, because the
@@ -181,7 +184,7 @@ console.log('\nValidation');
 await test('PUT /v1/site/header-nav with unknown id → 422', async () => {
     const { status, body } = await json('/v1/site/header-nav', authed({
         method: 'PUT',
-        body: JSON.stringify({ order: ['try', 'bogus'], hidden: [] }),
+        body: JSON.stringify({ order: ['help', 'bogus'], hidden: [] }),
     }));
     assert(status === 422, `expected 422, got ${status}`);
     assert(body.error?.code === 'HEADER_NAV_INVALID', `error code: ${body.error?.code}`);

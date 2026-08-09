@@ -33,15 +33,17 @@ import { swallowed } from '/js/swallowed.js';
 
 // Public header link ids → their nav i18n label key (mirror of PUBLIC_NAV_LINKS in spa.html
 // and PUBLIC_NAV_LINK_IDS in src/services/site.ts). Gated links are not configurable.
+// These are the LOGGED-OUT bar (plus Help, which shows in both states). A signed-in person's
+// links — Apps, Profile, Admin — are forced by the session and role, and the pages that left
+// the header on 2026-08-09 (For Developers, Members) are site-footer links now, so neither set
+// appears here.
 const HEADER_LINK_LABELS = {
-  try: 'nav.try',
   howItWorks: 'nav.howItWorks',
   // learn/exchange render only when this node configured AIMEAT_SITE_LEARN_URL /
   // AIMEAT_SITE_EXCHANGE_URL; hiding them here is a second, independent switch.
   learn: 'nav.learn',
   exchange: 'nav.exchange',
   business: 'nav.business',
-  devView: 'nav.devView',
   help: 'nav.help',
 };
 
