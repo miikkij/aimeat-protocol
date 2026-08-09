@@ -332,7 +332,14 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      flex-shrink: 0;
+      /* Wraps rather than overflowing. The login pill is wide, carries its own inline styles and
+         cannot be shrunk, so a non-wrapping row pushed the create, backup and language buttons
+         past the right edge on a phone, where nothing could reach them. min-width:0 lets the row
+         narrow at all: a flex item defaults to min-width:auto and refuses to go under its
+         content. */
+      flex-wrap: wrap;
+      min-width: 0;
+      flex-shrink: 1;
     }
 
     .icon-btn {
@@ -372,8 +379,9 @@
     }
 
     /* Mount point for the shared golden login pill (/v1/libs/aimeat-auth.js).
-       The pill carries its own inline styles; this just keeps it inline in the bar. */
-    .header-auth-pill { display: inline-flex; align-items: center; }
+       The pill carries its own inline styles; this just keeps it inline in the bar and stops it
+       from setting the row's minimum width. */
+    .header-auth-pill { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; }
 
     #add-btn:hover {
       box-shadow: 0 4px 20px rgba(232, 86, 74, .25);
@@ -1299,6 +1307,18 @@
         min-width: 0;
         order: 3;
         flex-basis: 100%;
+      }
+
+      /* On a phone the pill takes a row of its own and the buttons sit under it, right-aligned.
+         Side by side there is room for the pill only, and the buttons are what a person came for. */
+      .header-actions {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
+      .header-auth-pill {
+        order: -1;
+        width: 100%;
       }
 
       #tag-bar {
