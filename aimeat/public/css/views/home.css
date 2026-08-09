@@ -447,7 +447,7 @@ a.koti-feed-line:hover { text-decoration: underline; }
 }
 .open-items-count {
   display: inline-block; margin-left: 0.35rem; padding: 0 0.4rem;
-  border-radius: 999px; background: var(--surface-2); color: var(--text);
+  border-radius: 999px; background: var(--bg); color: var(--text);
   font-size: 0.72rem; letter-spacing: 0;
 }
 .open-items-list { list-style: none; margin: 0; padding: 0; }
@@ -508,11 +508,13 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-room-save { margin-top: 0.5rem; font-size: 0.8rem; align-self: flex-start; }
 
 @media (max-width: 640px) {
-  /* The row wraps rather than squeezing the title into a column two words wide. */
+  /* The row wraps rather than squeezing the title into a column two words wide, and the title
+     stops short of the corner so it never runs under the dots. What used to be here gave the
+     control width:100% and dropped it onto its own line: measured at 390 the dots sat 64px down
+     and 296px from the right, which is not a corner. The one rule this whole design rests on is
+     that the control is in the same place every time, so it does not get a mobile exception. */
   .open-items-row { flex-wrap: wrap; }
-  /* border-box, or the indent is added ON TOP of the full width and the row runs 12px off a
-     390px screen — measured, not guessed. */
-  .open-items-control { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
+  .open-items-main { padding-right: 2rem; }
 }
 
 /* The card's own corner. Every card that can be acted on puts its dots here, and only here. */
@@ -523,9 +525,9 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-agent-others { display: inline-block; text-decoration: underline; text-underline-offset: 2px; }
 .koti-agent-others:hover { color: var(--text); }
 
-/* A list row owns its corner too, same as a card. */
+/* A list row owns its corner too, same as a card — at every width. */
 .open-items-row { position: relative; }
-.open-items-row .card-menu { position: static; }
+.open-items-row .card-menu { top: 0.35rem; right: 0; }
 
 /* The one-time line that teaches the corner. It is gone for good once the menu has been opened. */
 .koti-teach { margin: 0.75rem 0 0; font-size: 0.82rem; color: var(--muted); line-height: 1.45; }
@@ -533,3 +535,6 @@ a.koti-feed-line:hover { text-decoration: underline; }
 /* Every card that carries the dots needs to be their containing block, or they escape upward to
    whatever ancestor is positioned. Measured once at 263px above the card it belonged to. */
 .koti-step { position: relative; }
+
+/* Who put it here is a second fact, on its own line, so it survives whatever else the row says. */
+.open-items-byai { display: block; margin-top: 0.1rem; color: var(--accent); }

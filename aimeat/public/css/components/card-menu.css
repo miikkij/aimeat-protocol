@@ -19,15 +19,32 @@
 .card-menu-dots {
   display: inline-flex; align-items: center; justify-content: center;
   width: 30px; height: 30px; padding: 0; line-height: 1;
-  background: none; border: 1px solid transparent; border-radius: var(--radius-xs);
-  font-size: 1.15rem; cursor: pointer; color: var(--muted);
-  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-size: 1.15rem; cursor: pointer; color: var(--text);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
-.card-menu-dots:hover { border-color: var(--border); color: var(--text); }
-.card-menu-dots--open { color: var(--warning); }
-.card-menu-dots--working { color: var(--success); animation: card-menu-pulse 1.8s ease-in-out infinite; }
+/* A resting chip, not a bare glyph. Without the fill and the border this read as the ellipsis a
+   truncated string leaves behind, and nobody could tell it was a button until the pointer arrived. */
+.card-menu-dots:hover { border-color: var(--muted); }
+
+/* State is a FILLED SHAPE, not the hue of a glyph. Measured on the first version: amber glyph on
+   card 2.1:1, green 2.5:1, grey 4.8:1 — so a card that WAS on your list read fainter than one that
+   was not, which is the light inverted. A filled chip carries the state at the contrast of the fill
+   and stays legible for anyone who does not separate those hues at all. */
+/* Darker than --warning and --success, and deliberately so. Those tokens are tuned to be read as
+   TEXT on this background; as a filled 30px chip they measured 2.1:1 and 2.43:1 against the page,
+   under the 3:1 a non-text UI component needs to be seen at all. Same hues, enough weight to be a
+   state rather than a tint. Measured after the change, not assumed. */
+.card-menu-dots--open {
+  background: #B45309; border-color: #B45309; color: #FFFFFF;
+}
+.card-menu-dots--working {
+  background: #047857; border-color: #047857; color: #FFFFFF;
+  animation: card-menu-pulse 1.8s ease-in-out infinite;
+}
 /* Working is the one state about this moment rather than a standing fact, so it is the one that moves. */
-@keyframes card-menu-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@keyframes card-menu-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) { .card-menu-dots--working { animation: none; } }
 
 .card-menu-list {
@@ -41,5 +58,5 @@
   background: none; border: 0; text-align: left; cursor: pointer;
   padding: 0.6rem 0.8rem; font-size: 0.88rem; color: var(--text);
 }
-.card-menu-item:hover { background: var(--surface-2); }
+.card-menu-item:hover { background: var(--bg); }
 .card-menu-item + .card-menu-item { border-top: 1px solid var(--border); }

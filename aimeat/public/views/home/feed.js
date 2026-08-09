@@ -120,13 +120,14 @@ const SAVEABLE_ROOMS = {
  * The prompt is one of the menu's rows rather than a button of its own.
  */
 function RoomMenu({ room }) {
-  const cfg = SAVEABLE_ROOMS[room.id];
+  const cfg = SAVEABLE_ROOMS[room.id] ?? { promptRef: null, kind: null };
   const title = tr(`home.rooms.${room.id}.title`, room.id);
   const origin = `home.rooms.${room.id}`;
   const [prompt, setPrompt] = useState('');
   const [item, setItem] = useState(null);
 
   useEffect(() => {
+    if (!cfg.promptRef) return undefined;
     let alive = true;
     apiGet(`/v1/prompts/${cfg.promptRef}`)
       .then(r => { if (alive) setPrompt(r?.data?.prompt || ''); })
@@ -150,12 +151,15 @@ function RoomMenu({ room }) {
 
   const state = item?.status === 'working' ? 'working' : item ? 'open' : 'off';
   const actions = [
-    {
+    // The copy row only exists for a room the node serves a prompt for. The dots themselves exist
+    // on every card: the mat card tells a person "every card has them, always in that same corner",
+    // and three of five rooms having none made that sentence false on its own screen.
+    ...(prompt ? [{
       label: tr('home.rooms.copyPrompt', 'Copy this into your AI chat'),
       doneLabel: tr('home.rooms.copied', 'Copied — paste it in your AI chat'),
       done: true,
       run: async () => { try { await navigator.clipboard.writeText(prompt); } catch (e) { swallowed('home/rooms: copy', e); } },
-    },
+    }] : []),
     {
       label: item
         ? tr('openItems.toggleOff', 'Take it off your open items')
@@ -167,7 +171,6 @@ function RoomMenu({ room }) {
     },
   ];
 
-  if (!prompt) return null;
   return html`<${CardMenu} state=${state} actions=${actions} label=${title} />`;
 }
 
@@ -199,7 +202,7 @@ export function Rooms({ rooms, onEnter }) {
                  answer and the node already serves the prompt. `monetise` promises a UI journey
                  that produces no object, and `messages` is your own post — neither is something
                  an AI hands back later. */''}
-            ${SAVEABLE_ROOMS[room.id] && html`<${RoomMenu} room=${room} />`}
+            <${RoomMenu} room=${room} />
           </a>`)}
       </div>
     </section>`;

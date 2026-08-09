@@ -44,6 +44,23 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 /** The managed prompt that teaches a chat how to work this list. Served, never inlined. */
 const LIST_PROMPT = 'open-items';
 
+
+/**
+ * Where an item came from, in words.
+ *
+ * `origin` is a machine key — "home.rooms.create", "app-catalog" — and it was being printed raw
+ * under every row. It is written for measurement, not for reading, and a person seeing it learns
+ * nothing except that something leaked.
+ */
+function originLabel(origin) {
+  if (!origin) return tr('openItems.yours', 'Yours');
+  const key = `openItems.origin.${origin}`;
+  const named = t(key);
+  if (named && named !== key) return named;
+  // An origin nobody has named yet says nothing rather than saying a key out loud.
+  return tr('openItems.yours', 'Yours');
+}
+
 export function OpenItemsList() {
   const [items, setItems] = useState(null);
   const [prompt, setPrompt] = useState('');
@@ -98,14 +115,18 @@ export function OpenItemsList() {
             <span class="open-items-mark" aria-hidden="true">${i.status === 'working' ? '●' : '○'}</span>
             <div class="open-items-main">
               <div class="open-items-item">${escHtml(i.title)}</div>
+            ${/* WHO put this here is a separate fact from WHAT is happening to it, and it used to be
+                 the last arm of one ternary — so a row the AI switched on stopped saying so the
+                 moment an agent picked it up or it turned out to be a suggestion. Measured: one row
+                 in three said it. Two lines, two facts. */''}
               <div class="open-items-meta">
                 ${i.closes_when
                   ? tr('openItems.suggestion', 'Suggestion — it goes away once this is done')
                   : i.agent
                     ? `${escHtml(String(i.agent).split('#')[0])} ${tr('openItems.isDoing', 'is doing this')}`
-                    : i.by === 'ai'
-                      ? `${tr('openItems.byAi', 'your AI put this here')} · ${timeAgo(i.createdAt)}`
-                      : `${i.origin ? escHtml(i.origin) : tr('openItems.yours', 'Yours')} · ${timeAgo(i.createdAt)}`}
+                    : `${originLabel(i.origin)} · ${timeAgo(i.createdAt)}`}
+                ${i.by === 'ai' && html`
+                  <span class="open-items-byai">${tr('openItems.byAi', 'your AI put this here')}</span>`}
               </div>
             </div>
 

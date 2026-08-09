@@ -3676,4 +3676,8 @@
 }
 
 /* The prompt card owns its corner, like every other card. */
+/* The card owns its corner, and the head stops short of it. Measured before this: the dots
+   overlapped the primary button by 18x18px and hung 12px outside the head, where the card edge
+   clipped them into a smudge. */
 .pf-adk-prompt-card { position: relative; }
+.pf-adk-prompt-head { padding-right: 2.4rem; }
