@@ -27,8 +27,9 @@ logs/**
 # Git worktrees
 .worktrees/
 
-# Claude Code
+# Claude Code (skills under .claude/skills/ ARE tracked)
 .claude/worktrees/
+.claude/settings.local.json
 
 # Generated artifacts
 **/generated/
