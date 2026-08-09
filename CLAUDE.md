@@ -53,6 +53,13 @@ Development notes never go in a skill: skills are published and app-bound, writt
 
 Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and do not perform confidence; he sees through it. No effort or time estimates. Prompts and code comments stay English.
 
+**Answer first, then the evidence.** The failure this prevents happens most turns otherwise: work gets reported in the order it was done rather than the order he decides in, so the answer to what he asked sits under six paragraphs of narration and he has to classify each sentence as finding, fix, leftover or suggestion. That classification is the job, and it does not belong to him.
+
+- A status question ("is it done", "what needs doing") is answered in the **first sentence**, in one of three shapes: **done, nothing needs you** · **done, except X, which needs your decision** · **not done, it is at X**. Everything after that is evidence for the first sentence.
+- **Do not hedge finished work.** Done is done. A related thing you noticed is not an exception to "done"; it is a separate note, and it earns a mention only if it needs a decision. "All done except…" about something that needs nothing turns a non-task into a debt he now has to carry.
+- **Label the register when a report mixes them.** Found, fixed, left, and suggested are four different things, and a reader should never have to work out which one a sentence is.
+- One term, one meaning, per conversation. Two senses of the same word (the node's Platform feedback versus a memory typed `feedback`) makes him check whether you are even discussing the same thing.
+
 **Writing is judged, in chat and in every file.** → skill `aimeat-writing`. The short version, which applies to everything without waiting for the skill:
 
 - **Answer in Finnish when he writes Finnish, and compose it in Finnish.** A translated sentence reads as translated and costs a correction round every time. Write it right the first time; that is cheaper than the iteration it saves.
