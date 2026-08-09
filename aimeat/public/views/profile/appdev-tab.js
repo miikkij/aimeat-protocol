@@ -22,6 +22,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner, KebabMenu } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { OpenItemToggle } from '/components/OpenItemToggle.js';
 import { swallowed } from '/js/swallowed.js';
 import {
   getFlowPromptText, getBuildPromptText, getCuratedPitfalls, getLearnedPitfalls,
@@ -62,6 +63,10 @@ function StartPrompts({ locale, showToast }) {
             ${open === id ? t('profile.appdev.hidePrompt') : t('profile.appdev.showPrompt')}
           </button>
           ${text != null && html`<${CopyButton} text=${text} className="btn-primary" label=${t('common.copyPrompt')} onCopied=${() => showToast(t('profile.appdev.copied'))} />`}
+          ${/* The same state control as everywhere else: building an app is the clearest case of
+               something you decide to do now and get to later, and P12 names this surface. */''}
+          <${OpenItemToggle} title=${title} kind="app" promptRef=${id === 'build' ? 'build-app' : null}
+            origin=${`appdev.${id}`} label=${false} />
         </div>
       </div>
       ${open === id && html`<pre class="pf-adk-prompt-body">${text ?? t('profile.loading')}</pre>`}
