@@ -9,6 +9,12 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.10.0 — 2026-08-09 — aimeat_app_list and aimeat_app_get carry `url`, the app's public
+ *     app-origin address (its own subdomain when it has one, else the shared path form). Both
+ *     served only `download_url`, a node-relative path, so an agent asked to show someone their
+ *     apps had nothing it could hand over: the address existed and the chat surface never saw it.
+ *     Resolved read-only via resolveAppUrls (one subdomain-table read for the whole page) rather
+ *     than appOriginUrl, which would mint a subdomain per app as a side effect of listing.
  *   v1.9.0 — 2026-08-01 — TARGET-058: aimeat_app_publish's UPLOAD mode mints its token through
  *     buildUploadMeta and carries `ai_provenance` / `ai_provenance_id` + `actor`. Phase 4 gave this
  *     tool the parameter and Phase 8 shared the publish, but the presigned branch still hand-wrote
@@ -58,6 +64,7 @@ import { agentFaceKey } from '../services/agent-face.js';
 import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
 import { listSkillsByBinding } from '../services/skills.js';
 import { publishApp } from '../services/app-publish.js';
+import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
@@ -444,6 +451,9 @@ export function registerAppsTools(
             const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
             const downloadsByApp = await storage.getAppDownloadsForApps(refs);
             const forksByApp = await storage.countAppForksForApps(refs);
+            // Public addresses in ONE subdomain-table read for the whole page. Read-only on
+            // purpose: appOriginUrl would mint a subdomain per app, and listing must not write.
+            const urlByApp = await resolveAppUrls(config, storage, apps.map(a => ({ owner: a.ownerName, filename: a.filename })));
 
             const result = apps.map((app) => {
                 const metricKey = `${app.ownerGaii} ${app.filename}`;
@@ -464,6 +474,8 @@ export function registerAppsTools(
                     forkable: !!app.forkable,
                     downloads,
                     forks,
+                    // The address to give a person. Absent when this node runs without an app origin.
+                    url: urlByApp[`${app.ownerName}/${app.filename}`] ?? null,
                     download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                     created_at: app.createdAt,
                 };
@@ -499,6 +511,7 @@ export function registerAppsTools(
             // listing serve for this app. An agent reading an app through MCP must not be the one
             // surface that silently drops how it was made. Absent = UNSTATED, never "human-written".
             const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
+            const urlByApp = await resolveAppUrls(config, storage, [{ owner: app.ownerName, filename: app.filename }]);
 
             return {
                 content: [{
@@ -516,6 +529,8 @@ export function registerAppsTools(
                         forked_from: app.manifest.forkedFrom ?? null,
                         downloads,
                         forks,
+                        // The address to give a person. Absent when this node runs without an app origin.
+                        url: urlByApp[`${app.ownerName}/${app.filename}`] ?? null,
                         download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                         inline_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`,
                         created_at: app.createdAt,

@@ -462,14 +462,14 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_list',
-        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, download URL), with optional category/tag/text filters and an "own apps only" mode. Use to discover apps; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_versions. Publish with aimeat_app_publish.',
+        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_versions. Publish with aimeat_app_publish.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: { query: { type: 'string', description: 'Optional search query.' } },
     },
     {
         name: 'aimeat_app_get',
-        description: 'Get one app\'s detail (manifest, current version number, size, mime type, whether access-protected, download count, and download/inline URLs) identified by its owner and filename. Find owner/filename via aimeat_app_list; for the list of prior versions use aimeat_app_versions.',
+        description: 'Get one app\'s detail (manifest, current version number, size, mime type, whether access-protected, download count, `url` — the app\'s public web address to give a person — and the download/inline URLs) identified by its owner and filename. Find owner/filename via aimeat_app_list; for the list of prior versions use aimeat_app_versions.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },

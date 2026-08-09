@@ -9,6 +9,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.10.0 — 2026-08-09 — The initialize result carries `instructions` (./instructions.ts), per
+ *     surface role. The handshake had never passed one, so an agent connecting to /v1/mcp met a few
+ *     hundred tool descriptions with nothing telling it that aimeat_handbook_get is the way in — the
+ *     operating guide was reachable only by an agent that already guessed it existed.
  *   v1.x — 2026-08-08 — registerCompanyTools: the company registry on the MCP surface.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
@@ -84,6 +88,7 @@ import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
+import { instructionsFor } from './instructions.js';
 import { registerOAuthRoutes } from './oauth.js';
 
 // ── Resource change event bus ──
@@ -134,7 +139,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     ): McpServer {
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
-            { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
+            {
+                capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } },
+                // The orientation an agent reads before it has called anything. Without it a client
+                // meets a few hundred tool descriptions and no indication of where to start, so the
+                // handbook this text points at was reachable only by guessing it existed.
+                instructions: instructionsFor(role),
+            },
         );
 
         // F1: enforce per-agent scopes on the tool surface. We monkeypatch BOTH mcp.tool and

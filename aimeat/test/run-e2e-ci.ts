@@ -147,6 +147,9 @@ const ALL_SUITES = [
     'test/e2e-mcp.ts',
     'test/e2e-mcp-scopes.ts',
     'test/e2e-mcp-v2.ts',
+    // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
+    // way e2e-app-origin does: an app's public address only exists when that flag is set.
+    'test/e2e-mcp-orientation.ts',
     'test/e2e-mcp-boards.ts',
     'test/e2e-mcp-extensions.ts',
     'test/e2e-mcp-knowledge.ts',
