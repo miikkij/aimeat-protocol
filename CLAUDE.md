@@ -1,5 +1,25 @@
 # CLAUDE.md: AIMEAT Protocol
 
+## What this is for
+
+Read this before proposing anything. When a design question is genuinely open, these decide it, and every one of them has cost a rewrite when it was forgotten.
+
+**The goal is that people become AI-native.** Success is someone doing their work through their own AI and finding the system worth having. Logging into a website to type into forms is the fallback, not the destination.
+
+**AI chat is the primary interface, and MCP is the preferred road in.** The web is the machine room: it shows status and holds the controls that genuinely need a screen. So a capability reachable only by clicking is not finished. Design the chat path first, then the surface that shows what happened.
+
+**The data is refined knowledge the user brought and owns.** Ownership is the product. That is why identity, consent and provenance are load-bearing rather than compliance overhead, and why a feature that quietly takes ownership away is wrong even when it is convenient.
+
+**Agents are first-class users.** They arrive through device authorization, the hello-integration flow and the `aimeat-crewai` liaison package, and an agent should be able to do what a person can do. An agent-shaped door added after the fact is a symptom that the feature was designed for a screen.
+
+**People's intelligences come from different vendors and arrive from different directions.** The system's job is to let them share what they know without a migration and without a lock-in. Organisms, workspaces and skills exist for that.
+
+**Knowledge has a lifecycle.** What matters stays relevant; what stopped mattering ages, gets marked, or is cleaned away. A store with no way to forget becomes what this project's own local memory became by 2026-08-09: 1.6 MB that loaded whether or not it applied. Any surface that accumulates knowledge needs an answer to "how does this go stale".
+
+One more, from how this is sold rather than built: lead with what a person gets, not with the protocol.
+
+---
+
 The AIMEAT protocol (AI Memory Exchange and Action Transfer) and its reference implementation. Three parts:
 
 - **The spec.** `openapi.yaml` is the canonical API contract. `docs/AIMEAT-RFC-v4.0-Core-full.md` (generic federatable Core) + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (the aimeat.io platform on top of it). v4.0 reframes the economy as meters rather than currencies and deprecates micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response and boards. It is a conceptual reframe, not an API break.
