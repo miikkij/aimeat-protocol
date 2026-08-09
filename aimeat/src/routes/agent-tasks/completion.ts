@@ -2,6 +2,9 @@
  * @file src/routes/agent-tasks/completion.ts
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-09 — /complete reclaims the runner's live-progress record (reclaimTaskLiveTrace).
+ *     991 such keys had accumulated on aimeat.io, one per finished task, none ever removed. /fail
+ *     deliberately keeps its record: on a failure that is the diagnosis.
  *   Task metadata limit 4 096 → 200 000 bytes — 2026-07-30 — metadata is JSON and 4 KB truncated real payloads.
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)
  */
@@ -24,6 +27,7 @@ import { requireReadiness } from '../../middleware/readiness-gate.js';
 import { notifyAutomationTaskComplete } from '../../services/ecosystem-automation-notify.js';
 import { processAutomationAdvisories } from '../../services/ecosystem-automation-advisories.js';
 import type { TaskRouteHelpers } from './helpers.js';
+import { reclaimTaskLiveTrace } from './helpers.js';
 import { closeIntentsForTask } from '../../services/intents.js';
 
 export function registerTaskCompletionRoutes(
@@ -191,6 +195,11 @@ export function registerTaskCompletionRoutes(
     // If this task was dispatched by a workflow, advance that run (output check → next step).
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
       .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));
+    // The runner's live-progress record is spent now that the task is done: reclaim its key rather
+    // than hold one per completed task forever. Safe to run concurrently with the workflow advance
+    // above — a step's success signal globs the agent's DELIVERABLE keys, never this
+    // `agents.{name}.tasks.{id}.` prefix, so the two never touch the same record.
+    void reclaimTaskLiveTrace(storage, task);
     // B6 — if this task was materialised by an ecosystem-app automation recipe with email:true,
     // email the owner a short report + store an in-app report record. Best-effort + isolated:
     // pass the freshly-updated record (carries the deliverableKey the agent just set).

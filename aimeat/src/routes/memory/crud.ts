@@ -14,6 +14,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
+import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
@@ -157,12 +158,20 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    // Carried out of the new-key branch so the quota alarm below can see it. An UPDATE never grows
+    // the key count, so it stays undefined there and the alarm only weighs the byte dimension.
+    let keyCount: number | undefined;
     if (!existing) {
       // Cheap DB COUNT(DISTINCT key) — NOT listMemory (which loaded every record + value just to
       // count them; that full scan on each new key was a big part of the per-write latency).
-      const keyCount = await storage.countMemory([gaii]);
+      keyCount = await storage.countMemory([gaii]);
       if (keyCount >= MAX_KEYS_PER_AGENT) {
-        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Memory key limit reached (${MAX_KEYS_PER_AGENT}). Delete unused keys first.`));
+        // The remedy this message names matters: the old text said "delete unused keys first", which
+        // sends a caller that hit the wall through one-key-per-small-fact off to delete data instead
+        // of fixing the shape that will refill the space next week. A value holds 1024 kB, so folding
+        // is almost always the right move and deletion almost never is.
+        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
+          `Memory key limit reached (${MAX_KEYS_PER_AGENT}). One value may hold ${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one record holding an array or an object keyed by id, rather than deleting data.`));
         return;
       }
     }
@@ -174,6 +183,15 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
       return;
     }
+
+    // Warn the owner at 80% / 95% of either ceiling, while reshaping is still cheap. Both numbers
+    // are already in hand (the count above, the byte total from checkMemoryQuota), so this costs no
+    // extra query on the write path, and the service throttles per principal per band per day.
+    // Fire-and-forget: a warning must never fail the write it is warning about.
+    void checkMemoryQuotaAlarm(config, storage, gaii, {
+      ...(keyCount !== undefined ? { keyCount: keyCount + 1 } : {}),
+      usedBytes: quotaCheck.currentBytes - existingSize + valueSize,
+    });
 
     // Schema validation (Phase 0.1)
     const validation = await validateMemoryWrite(key, value, storage);

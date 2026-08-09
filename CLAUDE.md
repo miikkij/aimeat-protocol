@@ -101,7 +101,7 @@ grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
 
 ## Gates
 
-- **E2E on both backends.** `postgres-kysely` is the production backend and `sqlite` is the fast local one; both must pass. Run only the suites your change can plausibly affect, then a full sweep (`pnpm test:e2e:postgres-kysely` and `pnpm test:e2e:sqlite`) at the end of a multi-step plan. A failure in an area you touched means not done. A failure elsewhere: confirm it pre-exists on `main`, mention it, leave it. New features ship with E2E tests (happy path plus a failure mode). Never report done without having run them. → `docs/coding-guidelines/testing-requirements.md`
+- **E2E on both backends.** `postgres-kysely` is the production backend and `sqlite` is the fast local one; both must pass. Run the suites your change can plausibly affect — targeted runs are what you owe, and they are enough for Jouni to do acceptance testing. **The full sweep (`pnpm test:e2e:postgres-kysely` + `pnpm test:e2e:sqlite`) is NEVER started on your own initiative:** it takes about two hours, and it runs only after Jouni has looked at the work and approved it, or when he asks for it. If he says to go with lighter testing only, that is the instruction. A failure in an area you touched means not done. A failure elsewhere: confirm it pre-exists on `main`, mention it, leave it. New features ship with E2E tests (happy path plus a failure mode). Never report done without having run them. → `docs/coding-guidelines/testing-requirements.md`
 - **Finished frontend changes are verified by driving a real browser** through the Playwright MCP server. The `.spec.ts` Playwright suite is unreliable: do not write or run it. → skill `aimeat-frontend-verify`
 - **`openapi.yaml` changes in the same commit as the route**, then `pnpm generate:types`.
 - **`locales/en.json` and `locales/fi.json` change together.** Unsure of the Finnish: English text with a `[TODO:fi]` prefix.
@@ -152,6 +152,8 @@ Full guide: `docs/coding-guidelines/extension-memory-architecture.md`.
 - **Apps** call cortex public methods only. Never `callExt`, `readExtMemory`, `/v1/ext/` or `/v1/memory/ext:`.
 
 The extension is sovereign: it decides storage, format and return shape. Cortex trusts the extension API, the app trusts cortex, and no layer bypasses the one below. Common mistakes: `docs/pitfalls.md` §8, plus §5 for translation keys.
+
+**A memory value is a record, not a cell.** One key holds one entity a user can open on its own, or one collection they read as a unit. Never one key per field, and never one key per row of a list that is always rendered together. The budget, measured from `src/config.ts`: **1024 kB per value** and **1000 keys per principal** by default (aimeat.io runs the key ceiling at 100 000, which no other node does, so build against 1000). A whole small database fits in one key, search indexes the scalars inside it to six levels deep on Postgres and at any depth on SQLite, and a key name is a stable address rather than a sentence. The check before shipping anything that writes on a schedule: **if `keys_per_day × 365` exceeds 1000, the shape is wrong** and the per-item keys belong in a per-period record. This cost a 941-key article store sitting next to a working 448 kB key in the same namespace; the full measurement is the **MEMORY KEY SHAPE AUDIT** note in Platform Development Notes.
 
 ## Backend
 

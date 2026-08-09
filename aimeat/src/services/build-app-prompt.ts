@@ -12,6 +12,12 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-09 — ADDITIVE (permission granted 2026-08-09): four memory-SHAPE rules at the top of Data
+ *     Storage — one key per entity or coherent collection, the 1024 kB / 1000-key ceilings with the
+ *     `keys_per_day × 365 > 1000` check, nesting is free for search (depth ≤ 5), and a key name is an
+ *     address not a sentence. Born from the memory-key-shape audit: 21% of the node's keyspace sat in
+ *     one-key-per-small-fact templates and no guidance surface stated either quota. Existing text
+ *     untouched; the "one public key per entry" line at the end of the section is NOT changed here.
  *   2026-08-02 — ADDITIVE: "The node's bottom chrome strip" section + finish-gate check 6. The node
  *     now serves `--aimeat-chrome-bottom` (utils/app-chrome-reserve.ts) and apps lift fixed bottom
  *     UI / pad scrollers by it, so nothing renders under the AI label or the attribution badge.
@@ -178,6 +184,14 @@ export function buildAppPrompt(
 
   // Data storage
   body += '### Data Storage\n';
+  // Shape rules. Added 2026-08-09 after a node-wide audit found 3,628 keys (21% of the keyspace)
+  // in one-key-per-small-fact templates, and found that NO guidance surface stated either quota.
+  // The rules are phrased as checks rather than advice because "use good judgement about keys"
+  // is what produced a 941-key article store next to a 448 kB key in the same namespace.
+  body += '**Decide the SHAPE before the first `set()`.** One key holds one entity the user can open on its own, or one collection they read as a unit. Never one key per field of an entity, and never one key per row of a list your UI always renders together. A high-score table is ONE key holding an array, not one key per score.\n';
+  body += '**The two ceilings, as numbers.** A value may be **1024 kB** serialised, so a whole small database fits in one key. A principal may hold **1000 keys** by default (`AIMEAT_MEMORY_MAX_KEYS`; some nodes raise it, do not count on it). Before you ship, count the keys one day of ordinary use writes: **if `keys_per_day × 365` exceeds 1000, the shape is wrong.** Fold the per-item keys into a per-period collection (`myapp.log.2026-08` holding an array) and split only once `JSON.stringify(value).length` passes ~256 kB.\n';
+  body += '**Nesting is free for search.** Search indexes the key, its dot-separated segments, the tags AND the scalar values inside the record, so an item inside an array inside one key is as findable as a key of its own. Keep data within 5 levels of the value root: on the production backend, scalars nested deeper than 6 levels fall out of the index.\n';
+  body += '**A key name is a stable address, not a sentence.** Lowercase dot-separated segments, each one either a fixed word or an id you can reconstruct from the data. Never a title, a tag label, a write timestamp, or anything a user typed (`myapp.index.by-tag.all conspiracies are real` is a value, not an address).\n';
   body += 'Match the PRIVATE vs SHARED choice from Step 1:\n';
   body += '```javascript\n';
   body += '// PRIVATE — scoped to the logged-in owner, only they can read it:\n';

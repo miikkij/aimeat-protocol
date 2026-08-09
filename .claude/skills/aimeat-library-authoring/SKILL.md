@@ -57,6 +57,13 @@ Server-side, sandboxed. `export default async function(ctx, input) { ... }` per 
   happily sends a bogus credential.
 - `ctx.memory` is the extension's own sovereign `ext:{name}` namespace, and it is **world-readable**.
   "Visible to the operator only" is not something it can express.
+- **A collector writes one key per PERIOD, never one per item fetched.** The namespace carries the
+  same budget as any principal: 1024 kB per value, 1000 keys by default. `ext:halytyskartta-ext` keeps
+  a whole day of alerts in `alerts.byDate.{date}` at a 74 kB median and is fine; `ext:luotain` kept one
+  key per article and reached 1,014 keys, over the shipped ceiling, while a 448 kB `index` key sat in
+  the same namespace proving the megabyte works. The gate before shipping a scheduled collector: if
+  `keys_per_day × 365` exceeds 1000, fold. Carry a `<prefix>.__index` key listing the periods held so
+  a reader finds them without a scan.
 - The sandbox has no `Date.now()` you should trust for reproducibility: take `input.now` or `ctx.now()`.
 
 ## Library packs (vendored third-party)

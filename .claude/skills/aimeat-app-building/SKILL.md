@@ -54,6 +54,27 @@ When editing that prompt or any app-building guidance, verify every API claim ag
 - user data, including translations and settings → `AIMEAT.data.get(key)`, never `getPublic('ext:...')`
 - extension actions → `export default async function(ctx, input) { ... }`
 
+### Memory record shape, decided before the first `set()`
+
+An app that treats memory as a cell-per-fact burns the key budget and gains nothing. The measured
+limits, from `src/config.ts`: **1024 kB per value**, **1000 keys per principal** by default. aimeat.io
+runs the key ceiling at 100 000, which no other node does, so build against 1000.
+
+- One key holds one entity a user can open on its own, or one collection they read as a unit. Never
+  one key per field, never one key per row of a list the UI always renders together. A high-score
+  table is one key holding an array.
+- **The gate: if `keys_per_day × 365` exceeds 1000, the shape is wrong.** Fold per-item keys into a
+  per-period record (`myapp.log.2026-08` holding an array); split only past ~256 kB serialised.
+- Nesting is free for search: the key, its segments, the tags and the scalars inside the value are all
+  indexed. Stay within 5 levels of the value root (Postgres stops collecting past 6).
+- A key name is a stable address, not a sentence: no titles, no tag labels, no user-typed text.
+
+Shared feeds still need one key per **author**, because a user may only write their own namespace.
+That is not a reason for one key per entry: `getPublic(gaii, key)` needs a known key either way, and
+the data SDK has no cross-owner enumeration at all, so the per-entry split buys no discovery.
+
+Background and the numbers: **MEMORY KEY SHAPE AUDIT** in Platform Development Notes.
+
 ## Served browser SDK libs
 
 Loading them is app work; **authoring or fixing one is platform work** and has its own rules (ESM

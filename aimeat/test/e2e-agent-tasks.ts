@@ -304,6 +304,24 @@ await test('9d. Individual todo update rejects nonexistent todoId', async () => 
     assert(status === 404, `expected 404, got ${status}`);
 });
 
+// The runner writes a live-progress record while a task runs. Seeded here so test 10c can prove
+// completion reclaims it (memory-key-shape audit: 991 of these had accumulated on aimeat.io, one
+// per finished task, none ever removed).
+const liveKeyForComplete = `agents.${agentName}.tasks.${queuedTaskId}.live`;
+
+await test('9e. Agent writes a live-progress record while the task runs', async () => {
+    const { status, body } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            key: liveKeyForComplete,
+            value: { state: 'running', phase: 'step 1', elapsed_s: 12 },
+            visibility: 'owner',
+        }),
+    });
+    assert([200, 201].includes(status), `seed live key: ${status}: ${JSON.stringify(body)}`);
+});
+
 await test('10. Complete task (active -> done) with deliverable_key', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/complete`, {
         method: 'POST',
@@ -322,6 +340,37 @@ await test('10b. deliverableKey persists on subsequent reads', async () => {
     });
     assert(status === 200, `status ${status}`);
     assert(body.data.task.deliverableKey === 'agents.dirbot.report', `deliverableKey after read: ${body.data.task.deliverableKey}`);
+});
+
+await test('10c. Completing the task reclaims the live-progress record', async () => {
+    // The reclaim is fired after the response (best-effort, must never fail a completion), so poll
+    // rather than assume it has landed by the time /complete returned.
+    let status = 0;
+    for (let i = 0; i < 20; i++) {
+        ({ status } = await json(`/v1/memory/${encodeURIComponent(liveKeyForComplete)}`, {
+            headers: { Authorization: `Bearer ${agentToken}` },
+        }));
+        if (status === 404) break;
+        await sleep(100);
+    }
+    assert(status === 404, `live key should be reclaimed on completion: got ${status}`);
+});
+
+await test('10d. Completing does NOT touch the deliverable the agent published', async () => {
+    // The reclaim is prefix-scoped to agents.{name}.tasks.{id}. — a deliverable under any other key
+    // must survive it, or completing a task would eat the work it produced.
+    const key = 'agents.dirbot.report';
+    const seed = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key, value: { body: 'the deliverable' }, visibility: 'owner' }),
+    });
+    assert([200, 201].includes(seed.status), `seed deliverable: ${seed.status}`);
+    await sleep(300);
+    const { status } = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `deliverable must survive completion: got ${status}`);
 });
 
 // ─── Phase 4: Fail scenario ───
@@ -356,6 +405,53 @@ await test('11. Fail task', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.task.status === 'failed', `status: ${body.data.task.status}`);
     assert(typeof body.data.task.completedAt === 'string', 'has completedAt');
+});
+
+await test('11b. FAILING a task keeps the live-progress record (it is the diagnosis)', async () => {
+    // Deliberate asymmetry: on 'done' the record says what a finished task already reports, so it is
+    // reclaimed; on 'failed' it is the last thing the agent said before it died, and the event log
+    // does not carry the phase/elapsed detail. Deleting it there would cost the only evidence.
+    const { body: created } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            title: 'Task whose failure must stay diagnosable',
+            description: 'Fails after writing progress',
+            todos: [{ id: 'd-1', order: 1, title: 'Step', environment: 'agent', verification: 'check' }],
+            status: 'queued',
+        }),
+    });
+    const id = created.data.task.id;
+    const liveKey = `agents.${agentName}.tasks.${id}.live`;
+
+    await json(`/v1/agents/${agentName}/tasks/${id}/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const seed = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: liveKey, value: { state: 'running', phase: 'calling the API' }, visibility: 'owner' }),
+    });
+    assert([200, 201].includes(seed.status), `seed live key: ${seed.status}`);
+
+    const failed = await json(`/v1/agents/${agentName}/tasks/${id}/fail`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ message: 'External API unavailable' }),
+    });
+    assert(failed.status === 200, `fail: ${failed.status}`);
+
+    await sleep(400);
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(liveKey)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `live key must survive a FAILURE: got ${status}`);
+    assert(body.data.value.phase === 'calling the API', 'the diagnosis is intact');
+
+    // Cleanup: deleting the task sweeps the record (lifecycle.ts already did this).
+    await json(`/v1/agents/${agentName}/tasks/${id}`, {
+        method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
 });
 
 // ─── Phase 5: Delete ───

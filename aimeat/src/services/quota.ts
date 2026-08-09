@@ -7,6 +7,8 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  *
  * @version-history
+ *   v1.2.0 — 2026-08-09 — enforceExtensionMemoryLimits() raises the 80%/95% quota alarm, and its
+ *     key-limit error names FOLDING rather than deletion as the remedy (memory-key-shape audit).
  *   v1.1.0 — 2026-06-20 — Security (H-5): add enforceExtensionMemoryLimits() so
  *     extension ctx.memory.set respects the per-value-size + per-key-count limits.
  */
@@ -15,6 +17,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 
 // ── Size calculators ──
 
@@ -70,8 +73,14 @@ export async function enforceExtensionMemoryLimits(
     const existing = await storage.getMemory(ownerGaii, key);
     if (!existing) {
         const keyCount = await storage.countMemory([ownerGaii]);   // cheap DB count, not a value load-all
+        // Warn the installer at 80% / 95% while the namespace can still be reshaped. This is the path
+        // an item-per-fetch collector walks, so it is the one that most needs a warning before the wall.
+        void checkMemoryQuotaAlarm(config, storage, ownerGaii, { keyCount: keyCount + 1 });
         if (keyCount >= config.memoryMaxKeysPerAgent) {
-            throw new Error(`QUOTA_EXCEEDED: memory key limit reached (${config.memoryMaxKeysPerAgent}). Delete unused keys first.`);
+            // Same wording as the agent-facing route (routes/memory/crud.ts): name FOLDING as the
+            // remedy, not deletion. An extension that hits this ceiling got there by writing one key
+            // per item fetched, and deleting keys only buys it until the next collection run.
+            throw new Error(`QUOTA_EXCEEDED: memory key limit reached (${config.memoryMaxKeysPerAgent}). One value may hold ${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one record (e.g. one key per period holding that period's array) rather than deleting data.`);
         }
     }
 }
