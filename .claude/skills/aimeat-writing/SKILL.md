@@ -37,6 +37,8 @@ Two more this project keeps producing: **em-dashes** (use a comma, a colon or tw
 **decorative emoji** (only ✓ ✗ → ↩ carry meaning; the rest are noise, and in an app UI they read as
 AI slop; the same rule applies there).
 
+**Speak human.** A term from the system's own vocabulary carries its meaning in the same sentence, or it does not appear. "agentAutonomy is L3 and meta.decisions is alwaysGate" tells the reader nothing; "the agent may write on its own, but decisions and gaps wait for your approval" says the same thing and can be acted on. This applies hardest when reporting to the developer: an identifier, a config key or a status enum is evidence, and the sentence still has to work without it. The same goes for a number: say what it means, not only what it is.
+
 **The self-edit pass**, once the draft exists: read it once for the three patterns above, once for
 adverbs, and once asking of each sentence whether deleting it would lose information. Most
 first-draft closing paragraphs lose nothing.
