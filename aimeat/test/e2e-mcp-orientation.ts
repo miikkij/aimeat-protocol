@@ -10,9 +10,12 @@
  *     - aimeat_app_list and aimeat_app_get carry `url`, absolute, on the app host;
  *     - listing an app whose subdomain mapping is gone falls back to the shared path form and
  *       MINTS NOTHING (the whole reason the lister uses resolveAppUrls and not appOriginUrl);
- *     - a missing app is an error rather than an invented address.
+ *     - a missing app is an error rather than an invented address;
+ *     - prompts/list offers the portal prompt packages and withholds the librarian templates that
+ *       share their group, and prompts/get returns a body with the node values already filled.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-mcp-orientation.ts
  * @version-history
+ *   v1.1.0 — 2026-08-09 — Phase 4: the managed prompts a person picks (MCP prompts primitive).
  *   v1.0.0 — 2026-08-09 — Initial: MCP handshake instructions + the public app URL.
  */
 import * as ed from '@noble/ed25519';
@@ -299,6 +302,58 @@ async function main() {
             const { body } = await v1('tools/call', { name: 'aimeat_app_get', arguments: { owner: ownerName, filename: 'no-such-app.html' } }, 103);
             assert(body.result?.isError === true, `expected isError, got ${JSON.stringify(body.result).slice(0, 200)}`);
             assert(!toolText(body).includes(APP_HOST), `the error names no address: ${toolText(body)}`);
+        });
+
+        // ── Phase 4: the managed prompts a person picks ──
+        console.log('\nPhase 4: the node offers its prompt packages as MCP prompts');
+
+        await test('7. prompts/list offers the portal packages and leaves the service templates out', async () => {
+            const { status, body } = await v1('prompts/list', {}, 200);
+            assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+            const names: string[] = (body.result?.prompts ?? []).map((p: any) => p.name);
+            assert(names.length > 0, `expected prompts, got ${JSON.stringify(body.result)}`);
+            for (const want of ['app-builder-game', 'platform-mcp', 'manifest-architect', 'csm-builder']) {
+                assert(names.includes(want), `offers ${want}; got ${names.join(', ')}`);
+            }
+            // The librarian and living-document templates share the `builders` group with the
+            // packages above, and a person has no use for them: they take a note from a service.
+            for (const internal of ['notebook-classify', 'notebook-plan', 'notebook-distribute', 'living-author']) {
+                assert(!names.includes(internal), `${internal} is node machinery and stays off the picker`);
+            }
+            // Tier handbooks are for the model, and aimeat_handbook_get already serves them.
+            assert(!names.some(n => n.startsWith('tier-')), `no tier handbooks on the picker; got ${names.join(', ')}`);
+        });
+
+        await test('8. a prompt names itself, and asks only for what the node cannot fill', async () => {
+            const { body } = await v1('prompts/list', {}, 201);
+            const entry = (body.result?.prompts ?? []).find((p: any) => p.name === 'platform-app-builder');
+            assert(!!entry, 'platform-app-builder is offered');
+            assert(typeof entry.title === 'string' && entry.title.length > 0, `has a title, got ${JSON.stringify(entry.title)}`);
+            assert(typeof entry.description === 'string' && entry.description.length > 0, 'has a description');
+            const args: string[] = (entry.arguments ?? []).map((a: any) => a.name);
+            // node_url and node_id are things the session knows, so the person is never asked.
+            assert(!args.includes('node_url') && !args.includes('node_id'), `node-known variables stay off the form; got ${args.join(', ')}`);
+            assert(args.includes('agent_count') && args.includes('action_count'), `the rest are offered as arguments; got ${args.join(', ')}`);
+            assert(args.includes('language'), `language is offered so a Finnish body can be asked for; got ${args.join(', ')}`);
+        });
+
+        await test('9. prompts/get returns the body with the node values already substituted', async () => {
+            const { status, body } = await v1('prompts/get', { name: 'platform-mcp', arguments: {} }, 202);
+            assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+            const messages = body.result?.messages ?? [];
+            assert(messages.length > 0, `has messages, got ${JSON.stringify(body.result)}`);
+            const text = messages[0]?.content?.text ?? '';
+            assert(messages[0]?.role === 'user', `the prompt arrives as the person's turn, got ${messages[0]?.role}`);
+            assert(text.includes(BASE), `node_url is filled in, got: ${text.slice(0, 200)}`);
+            assert(!text.includes('{{node_url}}'), 'no placeholder is left for the person to fix');
+        });
+
+        await test('10. a prompt that does not exist is an error about the NAME, not the method', async () => {
+            const { body } = await v1('prompts/get', { name: 'no-such-prompt', arguments: {} }, 203);
+            assert(body.error !== undefined, `expected a JSON-RPC error, got ${JSON.stringify(body).slice(0, 200)}`);
+            // -32601 is "method not found", which is what a server offering no prompts at all
+            // answers. Anything else means prompts/get is served and this one name is unknown.
+            assert(body.error.code !== -32601, `the server serves prompts/get: ${JSON.stringify(body.error)}`);
         });
 
         console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);

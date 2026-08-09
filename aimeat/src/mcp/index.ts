@@ -9,6 +9,11 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.11.0 — 2026-08-09 — The server declares PROMPTS (./prompts-managed.ts): the node's managed
+ *     prompt packages become the primitive a person picks, which is what MCP's prompts primitive is
+ *     for. mcp.prompt had been called nowhere in src/mcp/, so a surface built around prompt-driven
+ *     work offered them only through a tool the model had to think of. createMcpServer is async now,
+ *     since the prompt list comes from storage.
  *   v1.10.0 — 2026-08-09 — The initialize result carries `instructions` (./instructions.ts), per
  *     surface role. The handshake had never passed one, so an agent connecting to /v1/mcp met a few
  *     hundred tool descriptions with nothing telling it that aimeat_handbook_get is the way in — the
@@ -89,6 +94,7 @@ import { registerAgentManagementTools } from './agent-management.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 import { instructionsFor } from './instructions.js';
+import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 
 // ── Resource change event bus ──
@@ -131,12 +137,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     // captured at initialize — otherwise they start answering AUTH_REQUIRED an hour into a session.
     const sessionTokens = new Map<string, { current: string | undefined }>();
 
-    function createMcpServer(
+    async function createMcpServer(
         agentGaii: string,
         scopes: string[],
         role: SurfaceRole | 'all' = 'all',
         getToken: () => string | undefined = () => undefined,
-    ): McpServer {
+    ): Promise<McpServer> {
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             {
@@ -213,6 +219,17 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Restore the original methods and report what scope enforcement did this session.
         patchable.tool = originalTool;
         patchable.registerTool = originalRegisterTool;
+
+        // The node's managed prompts, as the primitive the PERSON picks from (a slash command in
+        // Claude Code) rather than one the model has to think of calling. Registered after the
+        // tool-gate window closes: the gate patches mcp.tool/registerTool, and a prompt is neither.
+        // Awaited here rather than inside that window, so no storage round-trip happens while the
+        // two methods are monkeypatched.
+        const promptCount = await registerManagedPrompts(mcp, storage, config, () => agentGaii);
+        if (promptCount > 0) {
+            logger.info(`[mcp-prompts] ${promptCount} managed prompt(s) offered to ${agentGaii}`);
+        }
+
         if (filteredTools.length > 0) {
             logger.info(
                 `[mcp-scope] ${enforce ? 'filtered' : 'would filter (warn-only)'} ${filteredTools.length} tool(s) for ${agentGaii}`,
@@ -414,7 +431,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         });
 
         const tokenBox: { current: string | undefined } = { current: token };
-        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes, serverRole, () => tokenBox.current);
+        const mcpServer = await createMcpServer(authenticatedGaii, sessionScopes, serverRole, () => tokenBox.current);
 
         transport.onclose = () => {
             if (transport.sessionId) {
