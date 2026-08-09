@@ -1,6 +1,6 @@
 ---
 name: aimeat-library-authoring
-description: How shared code is authored on the AIMEAT platform — served browser SDK libs, cortex libs, sandboxed extensions and library packs — each with its own source layout, build and gate. Use before writing or editing anything under src/static/sdk-libs/, public/cortex-bundled/, src/data/library-packs, public/lib/, an extension manifest, or when deciding where a piece of reusable code belongs.
+description: How shared code is authored on the AIMEAT platform: served browser SDK libs, cortex libs, sandboxed extensions and library packs, each with its own source layout, build and gate. Use before writing or editing anything under src/static/sdk-libs/, public/cortex-bundled/, src/data/library-packs, public/lib/, an extension manifest, or when deciding where a piece of reusable code belongs.
 ---
 
 # Authoring shared code
@@ -27,11 +27,11 @@ sharing code through `_core/`, **under 800 lines per file**, esbuild-bundled to 
 
 - **Never author a served lib as JavaScript inside a TypeScript template string.** That was the old
   `lib-*.ts` / `auth-lib-part*.ts` pattern, removed 2026-07-19. Edit the ESM source and rebuild.
-- **No backticks in a served lib's JSDoc** while any template-string path remains — a stray one
+- **No backticks in a served lib's JSDoc** while any template-string path remains. A stray one
   closes the literal and typecheck fails with TS1005.
 - **The bundle is cached: restart the dev server** or you are testing the previous build.
 - A lib is the right home for behaviour every app would otherwise re-implement. When an app needs
-  something the platform should own, fix the lib rather than the app — the fix then reaches every app.
+  something the platform should own, fix the lib rather than the app; the fix then reaches every app.
 
 ## Cortex libs
 
@@ -51,7 +51,7 @@ Server-side, sandboxed. `export default async function(ctx, input) { ... }` per 
 - **Write manifest schemas in YAML block style.** A flow mapping containing a comma breaks the
   scalar, the rest is read as a new key, and the action schema becomes garbage that fails validation
   as a 500 on install. Parse the manifest locally before uploading.
-- `aimeat_extension_install` does not upsert — pass `update: true` (it survives the presigned path).
+- `aimeat_extension_install` does not upsert: pass `update: true` (it survives the presigned path).
 - There is no `ctx.ai` in the sandbox: a paid AI capability calls the model through `ctx.fetch` with
   a config secret. An unset secret config reads back as a truthy mask, so `if (ctx.config.key)`
   happily sends a bogus credential.

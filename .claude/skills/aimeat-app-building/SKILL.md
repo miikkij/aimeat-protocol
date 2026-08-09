@@ -15,16 +15,16 @@ This is a hard precondition of the build, not an optional preamble, and it comes
 
 Four node-side stores answer almost everything, and they are shared by every session:
 
-- **`aimeat_appdev_overview`** — what apps, extensions and capabilities already exist. Check before building anything.
-- **`aimeat_skill_list`** then **`aimeat_skill_get`** — most published apps carry their own operating guide as a skill (`user:{owner}/{app}-agent-guide`, `cadence-crm`, `operate-exchange`, `node:origami-boards`, …). If you are working on or against a named app, load its skill instead of reconstructing how it works.
-- **App Development Notes** — the dev organism's workspace `fbb51de5-56d5-4143-9871-b998a1187655` / `ws-mslr8u99kzk`, one `appnote` document per app: locked design decisions, prod organism/workspace ids, traps hit while building, open questions the developer still owns. Read the app's note before changing it; write back what the next session would want.
-- **`aimeat_appdev_pitfall_list`** — the app-building trap catalogue (curated plus what other sessions learned).
+- **`aimeat_appdev_overview`**: what apps, extensions and capabilities already exist. Check before building anything.
+- **`aimeat_skill_list`** then **`aimeat_skill_get`**: most published apps carry their own operating guide as a skill (`user:{owner}/{app}-agent-guide`, `cadence-crm`, `operate-exchange`, `node:origami-boards`, …). If you are working on or against a named app, load its skill instead of reconstructing how it works.
+- **App Development Notes**: the dev organism's workspace `fbb51de5-56d5-4143-9871-b998a1187655` / `ws-mslr8u99kzk`, one `appnote` document per app: locked design decisions, prod organism/workspace ids, traps hit while building, open questions the developer still owns. Read the app's note before changing it; write back what the next session would want.
+- **`aimeat_appdev_pitfall_list`**: the app-building trap catalogue (curated plus what other sessions learned).
 
 Where a new lesson goes depends on who needs it, and the three are not interchangeable:
 
 | What you learned | Where it goes |
 |---|---|
-| How to use or operate the app | its skill — **public**, bound with `metadata.binding` |
+| How to use or operate the app | its skill: **public**, bound with `metadata.binding` |
 | How it was built, and what is still open | an **App Development Notes** document |
 | A trap that would bite anyone building here | `aimeat_appdev_pitfall_report` |
 
@@ -61,7 +61,7 @@ source under `src/static/sdk-libs/<name>/`, esbuild bundle, never JS inside a Ty
 string, cached bundle needs a restart). → skill `aimeat-library-authoring`.
 
 The rule that matters from this side: when an app needs behaviour the platform should own, **fix the
-lib, not the app** — the fix then reaches every app instead of one.
+lib, not the app**; the fix then reaches every app instead of one.
 
 ## Removed, do not revive
 

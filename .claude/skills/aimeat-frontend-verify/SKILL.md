@@ -1,6 +1,6 @@
 ---
 name: aimeat-frontend-verify
-description: AIMEAT frontend rules — the styling conventions to write to, and how a finished change is verified by driving a real browser through the Playwright MCP server (three viewports, repaint count, idle network log). Use before writing or editing anything under public/views, public/components, public/js, public/css, public/locales or an HTML page, and again when that change is done or an AIMEAT app has been published.
+description: AIMEAT frontend rules: the styling conventions to write to, and how a finished change is verified by driving a real browser through the Playwright MCP server (three viewports, repaint count, idle network log). Use before writing or editing anything under public/views, public/components, public/js, public/css, public/locales or an HTML page, and again when that change is done or an AIMEAT app has been published.
 ---
 
 # Verifying a finished frontend change
@@ -25,7 +25,7 @@ Run all three and report the numbers.
 
 Then verify the **feature**, not the render: perform the real interaction and confirm the result appears and persists. "It didn't crash" is not a pass.
 
-The same gate is served to app builders in `src/services/build-app-prompt.ts` under "Before you call it done" — keep the two in step.
+The same gate is served to app builders in `src/services/build-app-prompt.ts` under "Before you call it done". Keep the two in step.
 
 ## Styling rules that get caught here
 

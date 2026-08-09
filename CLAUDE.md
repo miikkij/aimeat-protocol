@@ -1,4 +1,4 @@
-# CLAUDE.md — AIMEAT Protocol
+# CLAUDE.md: AIMEAT Protocol
 
 The AIMEAT protocol (AI Memory Exchange and Action Transfer) and its reference implementation. Three parts:
 
@@ -21,7 +21,7 @@ Nothing in this repo describes an individual application, and nothing should. A 
 
 | What you learned | Where it goes |
 |---|---|
-| How to **use or operate** the app | its own skill — public, bound to the app with `metadata.binding` |
+| How to **use or operate** the app | its own skill: public, bound to the app with `metadata.binding` |
 | How it was **built**: locked decisions, prod ids, traps hit, open questions | a document in **App Development Notes** (developer-facing, not public) |
 | A trap that would bite **anyone building an app** here | the appdev KB, via `aimeat_appdev_pitfall_report` |
 
@@ -29,14 +29,21 @@ Development notes never go in a skill: skills are published and app-bound, writt
 
 ## Working with Jouni
 
-Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and do not perform confidence; he sees through it. Answer in Finnish when he writes Finnish, and write Finnish that reads as Finnish rather than translated English. No em-dashes, no decorative emoji (✓ ✗ → ↩ only), no "not X but Y" constructions. Prompts and code comments stay English. No effort or time estimates.
+Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and do not perform confidence; he sees through it. No effort or time estimates. Prompts and code comments stay English.
+
+**Writing is judged, in chat and in every file.** → skill `aimeat-writing`. The short version, which applies to everything without waiting for the skill:
+
+- **Answer in Finnish when he writes Finnish, and compose it in Finnish.** A translated sentence reads as translated and costs a correction round every time. Write it right the first time; that is cheaper than the iteration it saves.
+- **Banned outright:** "delve", "crucial", "pivotal", "tapestry", "foundational", "robust", "seamless", "landscape", "realm", "Here's the thing", "Hope this helps", "After careful consideration", "I wanted to provide a quick update", and "Most people…" openers.
+- **Banned patterns**, which matter more than the word list because they survive a find-and-replace: negative parallelism ("it's not X, it's Y"), the grand pronouncement ("This isn't a budget. It's a statement of intent."), and adverb abuse ("quietly runs", "simply add", "essentially the same").
+- No em-dashes. No decorative emoji (✓ ✗ → ↩ only).
 
 - **Ask before:** spending money or changing AI settings, importing data automatically, touching infrastructure (wsl/docker are off limits), building something not yet agreed.
 - **A locked plan gets finished**, not sliced, and not followed by "next we could".
 - **Name the exact scope of a deletion** before deleting.
 - **Evidence before assertions.** Name the pass-criterion, then verify against it. Verify with real content, not fixtures. Clean up test data fully. A test must fail first.
 - **Reuse what exists** rather than inventing a parallel list, surface or page type. A feature's data is a memory record under a key prefix plus a prompt that reads it; a new MCP tool, route or table needs a reason memory could not cover it.
-- **Do not rewrite prompts that work** — additive changes only, and only when asked.
+- **Do not rewrite prompts that work**: additive changes only, and only when asked.
 
 Tooling that has bitten before: the dev server does not watch backend `src/` (restart for a new route) · Playwright MCP needs `--isolated` and cannot use `file://` · `rm -rf` follows a junction · `cd x && python` can fail silently, so check the exit status · backticks vanish inside `python -c`, use Write instead · a curl argument mangles UTF-8 on Windows, use `--data-binary @file` · Python text mode rewrites a whole file to CRLF.
 
@@ -46,14 +53,14 @@ Git: parallel sessions work in a worktree · never `git add -A` (it sweeps anoth
 
 Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing an organism record or roadmap milestone. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).
 
-**Searching the old notes.** Until 2026-08-09 this project kept everything it learned in local Claude Code memory. That store is now empty; the notes live in `docs/internal/memory-archive/` (gitignored) and are read only when the subject actually comes up: `platform-notes/` (225, node and platform work), `app-memories/` (44, per-app development notes — also documents in the dev organism, which is the shared copy), `originals/` (the pre-condensation snapshot, fullest text). When something behaves oddly and it smells like a trap someone already hit, grep the archive before re-deriving it:
+**Searching the old notes.** Until 2026-08-09 this project kept everything it learned in local Claude Code memory. That store is now empty; the notes live in `docs/internal/memory-archive/` (gitignored) and are read only when the subject actually comes up: `platform-notes/` (225, node and platform work), `app-memories/` (44, per-app development notes, also documents in the dev organism, which is the shared copy), `originals/` (the pre-condensation snapshot, fullest text). When something behaves oddly and it smells like a trap someone already hit, grep the archive before re-deriving it:
 
 ```bash
 grep -ril "<term>" docs/internal/memory-archive/platform-notes    # which notes mention it
 grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
 ```
 
-**Read `memory-archive/README.md` before trusting a hit.** These are point-in-time observations, some months old, and a large part of the archive describes things that no longer exist: 49 notes discuss MongoDB and 21 discuss Prisma, both **removed entirely on 2026-07-16**, and notes about the Generator, Foundry, SSR and four-backend migrations are history in the same way. A hit is a lead that someone met this symptom before, not a fact and never an instruction. Verify against current code, and if what you find is still true and still matters, it belongs in this file, a skill, or the node — not back in memory.
+**Read `memory-archive/README.md` before trusting a hit.** These are point-in-time observations, some months old, and a large part of the archive describes things that no longer exist: 49 notes discuss MongoDB and 21 discuss Prisma, both **removed entirely on 2026-07-16**, and notes about the Generator, Foundry, SSR and four-backend migrations are history in the same way. A hit is a lead that someone met this symptom before, not a fact and never an instruction. Verify against current code, and if what you find is still true and still matters, it belongs in this file, a skill, or the node, not back in memory.
 
 **Test accounts, logins and the browser-verification recipe: `docs/internal/TESTING.md`** (gitignored, so the credentials are not in this file). Four accounts: the prod owner, a second prod identity for anything cross-owner, a third-party prod member for a paying service's member path, and the local dev owner.
 
@@ -202,4 +209,4 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 
 Copy-pasteable agent connect instructions live in `public/views/profile/agents-tab.js` (`buildAgentPrompt()` and `PLATFORMS`). Machine-readable discovery is `src/routes/bootstrap.ts` at `GET /`; managed system prompts are in the DB, served by `src/routes/prompts.ts` at `/v1/prompts/:name`.
 
-Project skills, loaded when the task calls for them: `aimeat-app-building`, `aimeat-library-authoring`, `aimeat-frontend-verify`, `aimeat-organism-records`, `aimeat-imagery`.
+Project skills, loaded when the task calls for them: `aimeat-writing`, `aimeat-app-building`, `aimeat-library-authoring`, `aimeat-frontend-verify`, `aimeat-organism-records`, `aimeat-imagery`.
