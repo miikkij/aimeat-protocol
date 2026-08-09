@@ -216,14 +216,6 @@ When creating/editing `room.target` records in the MACHINE ROOM workspace (org `
 
 **Rule: when a target is born from a DESIGN STUDIO session doc (SESSIO NNN), mirror that doc into `room.design` with the SAME doc id** (note the canonical location at the top of the mirror) before or when publishing the target. Same for any other referenced doc living outside the three resolvable places. FABRIC cards/releases follow the same ref rule. Also: `room.target_event` and `room.release` are **append-only** (a publish over an existing id is refused); `room.target` and `room.card` are updatable but require `expected_version`. Write proper Finnish (ä/ö) in every record field — the node is fully UTF-8; append-only namespaces make orthography mistakes permanent.
 
-## Architecture
-
-- **Runtime:** Node.js 24.x, ESM (`"type": "module"`)
-- **Framework:** Express 5.2.1 — `req.params` returns `string | string[]`, cast with `as string`
-- **Language:** TypeScript 6.0.x, strict, ES2022, NodeNext
-- **Crypto:** @noble/ed25519 3.1, jose 6.2 (EdDSA JWTs)
-- **Package manager:** pnpm · **Port:** 40050
-
 ## Identity Model — GHII / GAII / GEAI (CRITICAL)
 
 **Three** distinct principal types. **Never confuse them.** Full reference (auth paths, aggregation pattern, morsel economy, ownership checks): `docs/coding-guidelines/identity-model.md`. GEAI ecosystem-app reference: `docs/building-an-aimeat-compatible-ecosystem-app.md`.
@@ -273,11 +265,7 @@ File-accepting MCP tools (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat
 All commands from **project root** (root `package.json` proxies to `aimeat/`).
 
 ```bash
-pnpm dev                 # Dev server (auto-reload), port 40050
-pnpm typecheck           # tsc --noEmit (backend: src/, bin/, scripts/)
-pnpm typecheck:frontend  # tsc --noEmit -p tsconfig.frontend.json (checkJs over public/)
 pnpm check:importmap     # verify spa.html importmap ↔ absolute /js|/components|/views imports
-pnpm lint                # eslint src/ public/
 pnpm test:e2e:postgres-kysely  # E2E, PostgreSQL+Kysely (PRIMARY / prod backend — must pass)
 pnpm test:e2e:sqlite     # E2E, SQLite (fast local iteration — must pass)
 pnpm build && pnpm start
@@ -290,6 +278,8 @@ Single suite (preferred during iteration): `cd aimeat && pnpm exec node --env-fi
 **Pre-commit gate:** a committed hook (`.githooks/pre-commit`, activated by the root `prepare` script via `git config core.hooksPath .githooks`) blocks every commit unless `lint` + `typecheck` + `typecheck:frontend` + `check:importmap` + `check:no-max-tokens` + `check:app-catalog` + `check:mcp-tools` pass. The same seven run in CI (`.github/workflows/ci.yml`), which additionally runs the full `pnpm test` (vitest unit suite) after the static checks. E2E/Playwright are NOT in the hook or the fast CI path (too slow / need a DB) — run those per Rule 1. Bypass only in a genuine emergency with `git commit --no-verify`.
 
 ## Code Conventions
+
+**Express 5.2.1** — `req.params` returns `string | string[]`, cast with `as string`.
 
 **Response envelope** — every response uses `success()` / `error()` from `src/middleware/envelope.ts`:
 ```typescript
@@ -304,23 +294,6 @@ res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Resource not found'));
 **Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); **two provider dirs**: **`postgres-kysely`** (pg + Kysely, SQL migrations in `providers/postgres-kysely/migrations/*.sql` run on boot — **the primary prod backend**) and **`sqlite`** (better-sqlite3 — first-class; also serves the in-memory default via `:memory:`). New data types/fields must be added to **both** — see `docs/coding-guidelines/storage-sync.md`. Providers share code by prototype-merge (`Object.assign`).
 
 **Imports** — always use `.js` extensions (ESM): `import { foo } from '../services/foo.js';`
-
-## File Organization
-
-| Directory | Purpose |
-|-----------|---------|
-| `src/auth/` | JWT, keypair generation, auth middleware |
-| `src/middleware/` | Response envelope, rate limiting |
-| `src/routes/` | Express route handlers (one file per domain) |
-| `src/services/` | Business logic (morsel economy, trust scoring) |
-| `src/storage/` | Data layer abstraction + implementations |
-| `src/cli/` | CLI wizards (init wizard) |
-| `src/utils/` | GAII utilities, logger |
-| `locales/` | i18n translations (en.json, fi.json) |
-| `public/views/admin/` | Admin dashboard tabs (Preact + HTM); `shared.js` = shared components |
-| `public/js/services/admin.js` | Admin API service layer |
-| `public/css/views/admin.css` | Admin styles (adm-* prefix) |
-| `test/` | E2E test suite |
 
 ## Frontend
 
