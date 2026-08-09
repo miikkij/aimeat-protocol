@@ -463,6 +463,77 @@ await test('10. aimeat_memory_write reaches the owner\'s live stream on the "mem
         `an MCP memory write must emit the "memory" domain; the owner stream saw ${JSON.stringify(seen)}`);
 });
 
+// ─── Phase 4: expected_version, the optimistic lock (core.ts v1.15.0) ───
+//
+// The REST key route has always refused a stale write with 409 VERSION_CONFLICT. Over MCP the same
+// write was last-write-wins, so an agent could silently overwrite an edit a person had just made in
+// the browser. These four cover both directions: the lock refuses when it should, and omitting it
+// leaves every existing caller working exactly as before.
+console.log('\nPhase 4 — expected_version');
+
+const LOCK_KEY = 'lock.probe.record';
+
+await test('11. expected_version 0 creates a key that does not exist yet', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_memory_write',
+        arguments: { key: LOCK_KEY, value: { round: 1 }, visibility: 'owner', expected_version: 0 },
+    }, 210);
+    assert(body.result?.isError !== true, `create with expected_version 0 must succeed: ${body.result?.content?.[0]?.text}`);
+    assert(JSON.parse(body.result.content[0].text).written === true, 'write reported success');
+});
+
+await test('12. expected_version 0 on an existing key is refused', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_memory_write',
+        arguments: { key: LOCK_KEY, value: { round: 'must not land' }, visibility: 'owner', expected_version: 0 },
+    }, 211);
+    assert(body.result?.isError === true, 'asserting a fresh key over an existing one must be refused');
+    const result = JSON.parse(body.result.content[0].text);
+    assert(result.error === 'VERSION_CONFLICT', `error code: ${result.error}`);
+    assert(result.current_version > 0, `current_version must report the real version, got ${result.current_version}`);
+});
+
+await test('13. a stale expected_version is refused and nothing is written', async () => {
+    const read = await mcpRpc('tools/call', { name: 'aimeat_memory_read', arguments: { key: LOCK_KEY } }, 212);
+    const current = JSON.parse(read.body.result.content[0].text);
+    const version = current.version ?? current.record?.version;
+    assert(typeof version === 'number', `read must expose a version, got ${JSON.stringify(current).slice(0, 200)}`);
+
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_memory_write',
+        arguments: { key: LOCK_KEY, value: { round: 'stale, must not land' }, visibility: 'owner', expected_version: version - 1 },
+    }, 213);
+    assert(body.result?.isError === true, 'a stale version must be refused');
+    const result = JSON.parse(body.result.content[0].text);
+    assert(result.error === 'VERSION_CONFLICT', `error code: ${result.error}`);
+    assert(result.your_version === version - 1 && result.current_version === version,
+        `both versions must be reported: ${JSON.stringify(result)}`);
+
+    // The refusal has to be a refusal, not a warning that wrote anyway.
+    const after = await mcpRpc('tools/call', { name: 'aimeat_memory_read', arguments: { key: LOCK_KEY } }, 214);
+    const value = JSON.parse(after.body.result.content[0].text);
+    assert(JSON.stringify(value).includes('must not land') === false, 'the refused value must not be in the record');
+});
+
+await test('14. the current expected_version succeeds, and omitting it still works', async () => {
+    const read = await mcpRpc('tools/call', { name: 'aimeat_memory_read', arguments: { key: LOCK_KEY } }, 215);
+    const current = JSON.parse(read.body.result.content[0].text);
+    const version = current.version ?? current.record?.version;
+
+    const locked = await mcpRpc('tools/call', {
+        name: 'aimeat_memory_write',
+        arguments: { key: LOCK_KEY, value: { round: 2 }, visibility: 'owner', expected_version: version },
+    }, 216);
+    assert(locked.body.result?.isError !== true, `matching version must succeed: ${locked.body.result?.content?.[0]?.text}`);
+
+    // Backwards compatibility: every caller written before v1.15.0 passes no version at all.
+    const unlocked = await mcpRpc('tools/call', {
+        name: 'aimeat_memory_write',
+        arguments: { key: LOCK_KEY, value: { round: 3 }, visibility: 'owner' },
+    }, 217);
+    assert(unlocked.body.result?.isError !== true, 'omitting expected_version must behave exactly as before');
+});
+
 // ─── Summary ───
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

@@ -217,7 +217,10 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         supportsResponseFormat: true,
         conciseFields: ['key', 'value'],
-        input: { key: { type: 'string', required: true, description: 'Exact memory entry key (hierarchical, slash-separated).' } },
+        input: {
+            key: { type: 'string', required: true, description: 'Exact memory entry key (hierarchical, slash-separated).' },
+            owner_scope: { type: 'boolean', description: "Also look in the OWNER's namespace and your sibling agents', not only your own." },
+        },
     },
     {
         name: 'aimeat_memory_write',
@@ -232,6 +235,8 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
             tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.' },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },
+            owner_scope: { type: 'boolean', description: 'Write under the OWNER instead of yourself. Requires the memory:write-as-owner scope.' },
+            expected_version: { type: 'number', description: 'Optimistic lock: the version you read. Refused with VERSION_CONFLICT if the record changed since. Pass 0 to assert the key does not exist yet. Omit for last-write-wins.' },
         },
     },
     {

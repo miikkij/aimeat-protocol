@@ -68,6 +68,9 @@
  *     against production, a delegated write succeeded into the owner's GHII while answering with the
  *     agent's — for a call whose whole subject is which namespace was written, the one field that
  *     mattered was the one that was wrong.
+ *   v1.15.0 -- 2026-08-09 -- expected_version on aimeat_memory_write. The optimistic lock the REST
+ *     key route enforces was unreachable from MCP, so an agent's write was last-write-wins against
+ *     a person editing the same record. Optional. Reasoning: mcp/memory-version-lock.ts.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -97,6 +100,7 @@ import { registerCoreStorageTools } from './core-storage.js';
 import { logger } from '../utils/logger.js';
 import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
+import { versionConflict } from './memory-version-lock.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -402,10 +406,11 @@ export function registerCoreTools(
             tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
             ttl_hours: z.number().optional().describe('Time-to-live in hours (entry expires after this; omit for no expiry)'),
             owner_scope: flexibleBoolean.optional().describe("Write this under the OWNER instead of yourself, so the owner's own tools read it as theirs. Requires the memory:write-as-owner scope, which your owner grants per agent. Without this flag every write lands in your own namespace exactly as before. Does not change `visibility` — where a record lives and who may read it are separate."),
+            expected_version: z.number().int().nonnegative().optional().describe("Optimistic lock: the `version` you read from this record. The write is refused with VERSION_CONFLICT if the record has changed since, so you never silently overwrite an edit someone else made in between. Pass 0 to assert the key does not exist yet. Omit it and the write proceeds as before (last write wins) — supply it whenever a human or another agent can be editing the same record."),
             ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_memory_write'),
-        async ({ key, value, visibility, group_id, tags, ttl_hours, owner_scope, ai_provenance, ai_provenance_id }) => {
+        async ({ key, value, visibility, group_id, tags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
             // Schema locks apply on EVERY write surface. This tool used to call setMemory directly,
             // making MCP a bypass around strict record schemas + the manifest-format schema (REST
             // returned 422 while the same write sailed through here). Mirror the REST behaviour.
@@ -438,6 +443,12 @@ export function registerCoreTools(
             const writeGaii = target.gaii;
 
             const existing = await storage.getMemory(writeGaii, key);
+
+            // After resolveMcpWriteTarget on purpose: owner_scope lands on the OWNER's copy, so the
+            // version must be compared against that one and never the agent's own.
+            const conflict = versionConflict(expected_version, existing?.version ?? 0, key);
+            if (conflict) return conflict;
+
             // Writing a key the OWNER already holds is not an update: this copy lands in the agent's
             // own namespace and owner-scope reads resolve GHII-first, so the owner's copy wins and
             // this one becomes invisible — including in listings. Silently succeeding here is how
