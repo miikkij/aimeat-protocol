@@ -71,7 +71,7 @@ import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
 import { listSkillsByBinding } from '../services/skills.js';
 import { publishApp } from '../services/app-publish.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
-import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta } from './apps-ui.js';
+import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
@@ -443,8 +443,9 @@ export function registerAppsTools(
             annotations: annotationsFor('aimeat_app_list'),
             // A host that renders MCP Apps shows the card grid; one that does not ignores this
             // field and shows the same JSON it always did. Nothing is lost either way.
-            // Both keys, for the reason spelled out on uiToolMeta.
-            _meta: uiToolMeta(APP_INDEX_UI_URI),
+            // Both keys, for the reason spelled out on uiToolMeta. Omitted entirely on a node that
+            // cannot build the page, so a host is never pointed at a resource that is not there.
+            ...(appUiAvailable() ? { _meta: uiToolMeta(APP_INDEX_UI_URI) } : {}),
         },
         async ({ category, search, tag, own }) => {
             const agentGaii = getAgentGaii();

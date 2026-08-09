@@ -31,6 +31,11 @@
  *   import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta } from './apps-ui.js';
  *   registerAppIndexUi(mcp);
  * @version-history
+ *   v1.1.1 — 2026-08-09 — A node that cannot build the page offers none, instead of throwing from
+ *     the resource handler. Prod had not installed the new dependency yet, and the throw reached
+ *     the person as "Unable to reach AIMEAT": a missing picture took the whole tool call with it.
+ *     appUiAvailable() decides once; without it the tool registers with no `_meta.ui` and no
+ *     resource, so the listing works exactly as it did before this file existed.
  *   v1.1.0 — 2026-08-09 — The page drives the official App class instead of a hand-written
  *     postMessage client. Two hand-rolled versions failed in Claude for undocumented reasons and
  *     neither could be reproduced without it; a bespoke implementation of another project's
@@ -226,12 +231,35 @@ try {
 `;
 
 let cachedPage: string | null = null;
+let pageUnavailable = false;
 
 /** The page, built once. Throws if the library bundle cannot be read or parsed. */
 export function appIndexHtml(): string {
     if (cachedPage) return cachedPage;
     cachedPage = `${PAGE_SHELL}<script type="module">\n${loadAppRuntime()}\n${PAGE_SCRIPT}\n</` + `script>\n</body>\n</html>`;
     return cachedPage;
+}
+
+/**
+ * Whether this node can serve the page at all, decided once and cached.
+ *
+ * The page needs a browser bundle from node_modules, and a node whose deploy has yet to install
+ * the dependency does not have it. That must cost the CHAT ITS PICTURE AND NOTHING ELSE: the first
+ * version threw from the resource handler, so a missing optional asset surfaced to the person as
+ * "Unable to reach AIMEAT" and took the whole tool call with it. An enhancement that can break the
+ * thing it enhances is worse than no enhancement.
+ */
+export function appUiAvailable(): boolean {
+    if (cachedPage) return true;
+    if (pageUnavailable) return false;
+    try {
+        appIndexHtml();
+        return true;
+    } catch (err) {
+        pageUnavailable = true;
+        logger.warn('app-index UI unavailable; aimeat_app_list keeps working without a rendered view', { error: String(err) });
+        return false;
+    }
 }
 
 /**
@@ -243,6 +271,10 @@ export function appIndexHtml(): string {
  * font, image or fetch has to declare its origin here and say why.
  */
 export function registerAppIndexUi(mcp: McpServer): void {
+    // A node that cannot build the page offers no page: no resource, and (via appUiAvailable in
+    // apps.ts) no `_meta.ui` on the tool either, so a host is never pointed at something absent.
+    if (!appUiAvailable()) return;
+
     mcp.registerResource(
         'app-index-ui',
         APP_INDEX_UI_URI,
@@ -250,15 +282,6 @@ export function registerAppIndexUi(mcp: McpServer): void {
             mimeType: APP_UI_MIME,
             description: 'Interactive card grid of the apps published on this node, rendered inside the conversation.',
         },
-        async (uri) => {
-            try {
-                return { contents: [{ uri: uri.toString(), mimeType: APP_UI_MIME, text: appIndexHtml() }] };
-            } catch (err) {
-                // Serving a broken page would render an empty frame, which is the one failure mode
-                // this whole file exists to stop being silent about.
-                logger.error('app-index UI could not be built', { error: String(err) });
-                throw err;
-            }
-        },
+        async (uri) => ({ contents: [{ uri: uri.toString(), mimeType: APP_UI_MIME, text: appIndexHtml() }] }),
     );
 }
