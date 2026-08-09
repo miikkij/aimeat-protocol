@@ -7857,6 +7857,51 @@ paths:
         '200':
           description: The tool table, plus this node's mcp_url
 
+  /v1/prompts/open-items:
+    get:
+      operationId: openItemsPrompt
+      tags: [Prompts]
+      summary: The prompt behind the header's open-items button
+      description: >
+        The ONE prompt for the whole list. It does not contain the items — they go stale the moment
+        they are copied — it tells the chat where to read them, names the skill carrying the
+        per-kind detail, and carries the rule the feature exists for: do nothing before the person
+        says GO. Public, so it can be fetched before a session exists.
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+      responses:
+        '200': { description: The prompt, plus the skill name. }
+
+  /v1/prompts/ai-instructions:
+    get:
+      operationId: aiInstructionsPrompt
+      tags: [Prompts]
+      summary: The block a person pastes into their own AI's settings
+      description: >
+        Built from the organism's ACTUAL structure (id, workspaces), never a template, so an AI
+        reading it knows where things live before it asks. Owner-only, because it names their
+        organism. `?organism=` picks one when there are several.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+        - name: organism
+          in: query
+          schema: { type: string }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+      responses:
+        '200': { description: The block, in each of its paste targets. }
+        '404': { description: No organism yet — the block is built from a real one. }
+
   /v1/prompts/welcome-mat:
     get:
       operationId: getWelcomeMatPrompt

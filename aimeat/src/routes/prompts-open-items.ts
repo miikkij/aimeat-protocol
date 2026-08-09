@@ -1,6 +1,7 @@
 /**
  * @file prompts-open-items.ts
- * @description The home path's two prompts: `open-items` and `welcome-mat`.
+ * @description The home path's three prompts: `open-items`, `welcome-mat` and
+ *   `ai-instructions`.
  *
  *   Their own file because routes/prompts.ts had reached the 800-line limit. They belong together:
  *   both are prompts a person copies out of their home and runs in their own chat, and both are
@@ -11,10 +12,18 @@
  *   difference between an assistant and something that acts on your behalf without asking.
  *
  *   The welcome-mat handler below is moved verbatim; nothing about it changed.
- * @structure registerOpenItemsPrompt(router, config)
- * @usage registerOpenItemsPrompt(router, config);
+ *
+ *   `ai-instructions` was already built and simply unreachable: buildInstructionBlocks() has
+ *   generated the block a person pastes into their AI's own settings since services/hello-mcp.ts
+ *   was written, and it was served from ONE place, an organism's workspace read. A person on the
+ *   home path who has just made their first organism had no way to find it. This is a route to what
+ *   exists, not a feature.
+ * @structure registerOpenItemsPrompt(router, config, storage)
+ * @usage registerOpenItemsPrompt(router, config, storage);
  * @version-history
  *   v1.0.0 — 2026-08-09 — Extracted from routes/prompts.ts on the 800-line limit.
+ *   v1.1.0 — 2026-08-09 — ai-instructions: a route to buildInstructionBlocks(), which had been
+ *     reachable from an organism's workspace read alone.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -22,6 +31,10 @@ import { success } from '../middleware/envelope.js';
 import { optionalAuth } from '../auth/middleware.js';
 import { buildOpenItemsPrompt, OPEN_ITEMS_SKILL } from '../services/open-items-prompt.js';
 import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
+import { buildInstructionBlocks } from '../services/hello-mcp.js';
+import { listWorkspaces } from '../services/structure-overview.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
+import { error } from '../middleware/envelope.js';
 import type { Storage } from '../storage/interface.js';
 
 export function registerOpenItemsPrompt(
@@ -95,8 +108,44 @@ export function registerOpenItemsPrompt(
     ]));
   });
 
-  // GET /v1/prompts/agent-onboard — the front-page agent door (12-ai-rekisteroi.md). A person
-  // copies this into their own AI chat; if that AI can POST, it gets them an account without their
-  // touching the interface. PUBLIC and unauthenticated on purpose — the whole point is that the
-  // person does not have an account yet. ?lang, ?format=txt. MUST be registered before /v1/prompts/:tier.
+  // GET /v1/prompts/ai-instructions — the block a person pastes into their own AI's settings, so it
+  // knows who they are and where their things live without being told again every session. Built
+  // from the organism's ACTUAL structure, never a template. Owner-only: it names their organism.
+  router.get('/v1/prompts/ai-instructions', requireAuth(), requireRole('owner'), async (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    // The organism the person is a member of. `?organism=` picks one when there are several; the
+    // first is the sane default because most people have exactly one.
+    const mine = await storage.listOrganisms({ member: req.auth!.owner });
+    const wanted = typeof req.query.organism === 'string' ? req.query.organism : null;
+    const org = wanted ? mine.find(o => o.id === wanted) : mine[0];
+    if (!org) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        'Make an organism first — the block is built from its real structure, not a template.'));
+      return;
+    }
+    // Active workspaces only: an archived one is not where the next piece of work should land.
+    const workspaces = (await listWorkspaces(storage, org.id))
+      .filter(w => !w.archived)
+      .map(w => ({ id: w.id, name: w.name }));
+    const blocks = buildInstructionBlocks(config,
+      { orgId: org.id, orgName: org.name || org.id, workspaces }, { lang });
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(blocks.chatInstructions);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'ai-instructions',
+      name: 'Tell your AI who you are',
+      description: 'Paste this into your AI chat\'s own instructions. After that it starts every '
+        + 'conversation already knowing your organism and where your work goes, instead of being '
+        + 'told again each time.',
+      lang,
+      organism: { id: org.id, name: org.name || org.id },
+      prompt: blocks.chatInstructions,
+      system_prompt: blocks.chatInstructions,
+      blocks,
+    }, [
+      { description: 'Your open items', method: 'GET', url: '/v1/prompts/open-items' },
+    ]));
+  });
 }
