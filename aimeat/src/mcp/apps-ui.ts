@@ -2,26 +2,39 @@
  * @file apps-ui.ts
  * @description The app index as an MCP App: an interactive card grid the host renders inside the
  *   conversation, instead of the person reading a JSON array of their own apps. Pairs with
- *   aimeat_app_list, which carries `_meta.ui.resourceUri` pointing here (see ./apps.ts).
+ *   aimeat_app_list, whose `_meta` points here (see ./apps.ts).
  *
- *   Two constraints shape the page and are worth stating before anyone edits it:
- *   1. The host renders it in a sandboxed iframe under a deny-by-default CSP, so EVERYTHING is
+ *   Two constraints shape the page, and both cost a deploy before they were understood:
+ *
+ *   1. The host renders it in a sandboxed frame under a deny-by-default CSP, so EVERYTHING is
  *      inline. No external stylesheet, font, image or script, and no fetch. Data arrives over
  *      postMessage. Adding an external load means declaring an origin in `_meta.ui.csp`, which is
  *      a decision, not a detail.
- *   2. The node has no build step for browser assets outside the app-catalog, so this is hand-written
- *      vanilla JS speaking the MCP Apps postMessage dialect directly. The @modelcontextprotocol/
- *      ext-apps `App` class is a convenience wrapper over the same messages; the extension spec
- *      states plainly that implementing them directly is supported.
+ *   2. The postMessage side is the OFFICIAL @modelcontextprotocol/ext-apps App class, inlined,
+ *      never hand-written. Hand-writing it failed twice for reasons no document states: the tool
+ *      `_meta` needs the address under two different keys, and `ui/initialize` takes exactly three
+ *      params with additionalProperties:false, so one stray key voids the request. Both failures
+ *      look identical from outside, an empty frame with no error anywhere, and neither is
+ *      reproducible without a real host. The library is the only party that knows this dialect.
+ *
+ *   The node has no build step for browser assets outside the app-catalog, so the library's
+ *   self-contained browser bundle is read from node_modules at boot and inlined into the page.
+ *   That makes the page large (~350 kB) for one resource read per app-open, which is the price of
+ *   not maintaining a second implementation of somebody else's protocol.
  * @structure
  *   - APP_INDEX_UI_URI — the ui:// address aimeat_app_list points at
  *   - APP_UI_MIME — the MIME type that marks a resource as an MCP App page
- *   - APP_INDEX_HTML — the page itself; exported so a harness can load it in a real browser
+ *   - uiToolMeta() — the tool `_meta` that points a host at a page, under BOTH required keys
+ *   - appIndexHtml() — the page; built once, cached
  *   - registerAppIndexUi() — serves the page as an MCP resource
  * @usage
- *   import { registerAppIndexUi, APP_INDEX_UI_URI } from './apps-ui.js';
+ *   import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta } from './apps-ui.js';
  *   registerAppIndexUi(mcp);
  * @version-history
+ *   v1.1.0 — 2026-08-09 — The page drives the official App class instead of a hand-written
+ *     postMessage client. Two hand-rolled versions failed in Claude for undocumented reasons and
+ *     neither could be reproduced without it; a bespoke implementation of another project's
+ *     dialect is not something this node should own.
  *   v1.0.1 — 2026-08-09 — uiToolMeta: the tool `_meta` carries the FLAT `ui/resourceUri` key
  *     alongside the nested `ui.resourceUri`. With only the nested one Claude mounted the frame and
  *     left it empty, never requesting the page. Found by reading registerAppTool in ext-apps, which
@@ -31,7 +44,10 @@
  *   v1.0.0 — 2026-08-09 — Initial. First MCP App on this node; a pilot on one tool before the rest
  *     of the catalogue is built on it.
  */
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { logger } from '../utils/logger.js';
 
 /** The ui:// address of the app-index page. Referenced by aimeat_app_list's `_meta`. */
 export const APP_INDEX_UI_URI = 'ui://aimeat/app-index.html';
@@ -40,28 +56,47 @@ export const APP_INDEX_UI_URI = 'ui://aimeat/app-index.html';
 export const APP_UI_MIME = 'text/html;profile=mcp-app';
 
 /**
- * The tool `_meta` that points a host at a page. BOTH keys are required, and that is the whole
- * lesson of this file's v1.0.1.
+ * The tool `_meta` that points a host at a page. BOTH keys are required.
  *
  * The extension's own helper (registerAppTool in @modelcontextprotocol/ext-apps) writes the
  * nested `ui.resourceUri` and the flat `ui/resourceUri` and back-fills whichever the caller
  * omitted, so every published example carries both and neither is documented as load-bearing.
  * A host reads the nested form to decide the tool HAS a page (Claude groups it under
  * "Interactive tools" on that alone) and the flat form to fetch it. With only the nested key,
- * the frame mounts and stays empty: no request for the resource is ever made, so the failure
- * looks like a broken page rather than a missing field.
+ * the frame mounts and stays empty: no request for the page is ever made, so the failure looks
+ * like a broken page rather than a missing field.
  */
 export function uiToolMeta(resourceUri: string): Record<string, unknown> {
     return { ui: { resourceUri }, 'ui/resourceUri': resourceUri };
 }
 
 /**
- * The page. Self-contained by necessity (see the file header). It speaks three messages:
- * it asks the host to initialize, tells the host it is ready, and then waits for the tool
- * result the host pushes in. Anything it cannot parse leaves the placeholder text in place,
- * so a shape change shows up as "no apps to show" rather than a blank frame.
+ * The library's browser bundle, rewritten so an inline module can reach its App class.
+ *
+ * The bundle is ESM and ends in one `export { … }` naming its public bindings. An inline
+ * `<script type="module">` cannot be imported from, so that statement is replaced with an
+ * assignment to a global the page's own code reads. The local name behind `App` is a minified
+ * identifier that changes between releases, which is why it is parsed out rather than assumed.
  */
-export const APP_INDEX_HTML = `<!DOCTYPE html>
+function loadAppRuntime(): string {
+    const require = createRequire(import.meta.url);
+    const bundlePath = require.resolve('@modelcontextprotocol/ext-apps/app-with-deps');
+    const source = readFileSync(bundlePath, 'utf8');
+
+    const exportStatement = /export\s*\{([\s\S]*?)\}\s*;?\s*$/.exec(source);
+    if (!exportStatement) throw new Error(`ext-apps bundle has no export statement: ${bundlePath}`);
+
+    const appBinding = exportStatement[1]
+        .split(',')
+        .map(pair => pair.split(/\s+as\s+/).map(s => s.trim()))
+        .find(pair => pair[1] === 'App');
+    if (!appBinding) throw new Error(`ext-apps bundle exports no App: ${bundlePath}`);
+
+    return source.slice(0, exportStatement.index) + `\nglobalThis.__AIMEAT_MCP_APP = ${appBinding[0]};\n`;
+}
+
+/** Styles and markup. The script that drives them is appended in appIndexHtml(). */
+const PAGE_SHELL = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -107,126 +142,100 @@ export const APP_INDEX_HTML = `<!DOCTYPE html>
 <body>
 <h1>Apps <span class="count" id="count"></span></h1>
 <div class="grid" id="grid"><p class="empty" id="empty">Loading your apps…</p></div>
-<script>
-(function () {
-  var PROTOCOL = '2026-01-26';
-  var nextId = 1;
-  var grid = document.getElementById('grid');
-  var empty = document.getElementById('empty');
-  var countEl = document.getElementById('count');
-
-  function send(msg) { window.parent.postMessage(Object.assign({ jsonrpc: '2.0' }, msg), '*'); }
-
-  // The host sizes the frame from this. The official App class sends it on every resize
-  // (autoResize defaults to true), so a page that never sends it leaves the host guessing.
-  function reportSize() {
-    send({
-      method: 'ui/notifications/size-changed',
-      params: {
-        width: Math.ceil(window.innerWidth),
-        height: Math.ceil(document.documentElement.getBoundingClientRect().height),
-      },
-    });
-  }
-  function text(el, value) { el.textContent = value == null ? '' : String(value); return el; }
-  function make(tag, cls) { var el = document.createElement(tag); if (cls) el.className = cls; return el; }
-
-  function render(apps) {
-    grid.textContent = '';
-    if (!apps.length) {
-      grid.appendChild(text(make('p', 'empty'), 'No apps published yet.'));
-      countEl.textContent = '';
-      return;
-    }
-    countEl.textContent = '(' + apps.length + ')';
-    apps.forEach(function (app) {
-      var card = make('div', 'card');
-
-      var top = make('div', 'top');
-      if (app.icon) top.appendChild(text(make('span', 'icon'), app.icon));
-      top.appendChild(text(make('span', 'name'), app.name || app.filename));
-      card.appendChild(top);
-
-      if (app.description) card.appendChild(text(make('p', 'desc'), app.description));
-
-      var tags = (app.tags || []).slice(0, 4);
-      if (app.category) tags.unshift(app.category);
-      if (tags.length) {
-        var row = make('div', 'tags');
-        tags.forEach(function (t) { row.appendChild(text(make('span', 'tag'), t)); });
-        card.appendChild(row);
-      }
-
-      // The address is BOTH a link and visible text. A sandboxed iframe may refuse to open a
-      // new tab, and a person who can read the address can still get there.
-      if (app.url) {
-        var a = make('a', 'open');
-        a.href = app.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
-        card.appendChild(text(a, 'Open'));
-        card.appendChild(text(make('div', 'addr'), app.url));
-      }
-
-      grid.appendChild(card);
-    });
-    reportSize();
-  }
-
-  // The tool answers with one text block holding { apps: [...], total }.
-  function readToolResult(params) {
-    try {
-      var block = (params && params.content || []).filter(function (c) { return c.type === 'text'; })[0];
-      if (!block) return null;
-      var parsed = JSON.parse(block.text);
-      return Array.isArray(parsed.apps) ? parsed.apps : null;
-    } catch (err) { return null; }
-  }
-
-  var initId = nextId++;
-
-  window.addEventListener('message', function (event) {
-    var msg = event.data;
-    if (!msg || msg.jsonrpc !== '2.0') return;
-
-    // The host's answer to ui/initialize. Telling it we are ready is what unlocks everything:
-    // the host sends nothing to a view that has not said it is initialized.
-    if (msg.id === initId) {
-      if (msg.error) { text(empty, 'This view could not start.'); reportSize(); return; }
-      send({ method: 'ui/notifications/initialized', params: {} });
-      reportSize();
-      return;
-    }
-
-    if (msg.method === 'ui/notifications/tool-result') {
-      var apps = readToolResult(msg.params);
-      if (apps) render(apps);
-      else { text(empty, 'No apps to show.'); reportSize(); }
-    }
-  });
-
-  window.addEventListener('resize', reportSize);
-
-  // The params are EXACTLY appInfo + appCapabilities + protocolVersion. The schema sets
-  // additionalProperties:false, so a stray key makes the whole request invalid and the host
-  // answers nothing: no result, so no initialized notification, so no data and a frame that
-  // stays blank. That is what an earlier version of this page did, sending clientInfo and a
-  // capabilities key copied from the core MCP handshake, which this dialect does not have.
-  // (No backticks anywhere below this line: the page is a template literal in a .ts file.)
-  send({
-    id: initId,
-    method: 'ui/initialize',
-    params: {
-      appInfo: { name: 'AIMEAT App Index', version: '1.0.0' },
-      appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
-      protocolVersion: PROTOCOL,
-    },
-  });
-})();
-</script>
-</body>
-</html>`;
+`;
 
 /**
- * Serve the app-index page as an MCP resource. The host fetches it when a tool whose `_meta.ui`
+ * The page's own code. Runs after the library bundle in the same module script, so `App` is
+ * already on globalThis. The handler is attached BEFORE connect(): the host may push the tool
+ * result the moment the handshake completes, and the library warns about handlers that arrive
+ * late. No backticks below this line; this is a template literal in a .ts file.
+ */
+const PAGE_SCRIPT = `
+const App = globalThis.__AIMEAT_MCP_APP;
+const grid = document.getElementById('grid');
+const empty = document.getElementById('empty');
+const countEl = document.getElementById('count');
+
+const text = (el, value) => { el.textContent = value == null ? '' : String(value); return el; };
+const make = (tag, cls) => { const el = document.createElement(tag); if (cls) el.className = cls; return el; };
+
+function render(apps) {
+  grid.textContent = '';
+  if (!apps.length) {
+    grid.appendChild(text(make('p', 'empty'), 'No apps published yet.'));
+    countEl.textContent = '';
+    return;
+  }
+  countEl.textContent = '(' + apps.length + ')';
+  for (const app of apps) {
+    const card = make('div', 'card');
+
+    const top = make('div', 'top');
+    if (app.icon) top.appendChild(text(make('span', 'icon'), app.icon));
+    top.appendChild(text(make('span', 'name'), app.name || app.filename));
+    card.appendChild(top);
+
+    if (app.description) card.appendChild(text(make('p', 'desc'), app.description));
+
+    const tags = (app.tags || []).slice(0, 4);
+    if (app.category) tags.unshift(app.category);
+    if (tags.length) {
+      const row = make('div', 'tags');
+      for (const t of tags) row.appendChild(text(make('span', 'tag'), t));
+      card.appendChild(row);
+    }
+
+    // The address is BOTH a link and visible text. A sandboxed frame may refuse to open a new
+    // tab, and a person who can read the address can still get there.
+    if (app.url) {
+      const a = make('a', 'open');
+      a.href = app.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      card.appendChild(text(a, 'Open'));
+      card.appendChild(text(make('div', 'addr'), app.url));
+    }
+
+    grid.appendChild(card);
+  }
+}
+
+// The tool answers with one text block holding { apps: [...], total }.
+function readToolResult(result) {
+  try {
+    const block = (result?.content || []).find(c => c.type === 'text');
+    if (!block) return null;
+    const parsed = JSON.parse(block.text);
+    return Array.isArray(parsed.apps) ? parsed.apps : null;
+  } catch { return null; }
+}
+
+const app = new App({ name: 'AIMEAT App Index', version: '1.0.0' });
+
+app.ontoolresult = (result) => {
+  const apps = readToolResult(result);
+  if (apps) render(apps);
+  else text(empty, 'No apps to show.');
+};
+
+try {
+  await app.connect();
+} catch (err) {
+  // A page that cannot start says so. The failures this replaced showed nothing at all, which
+  // is what made them cost three deploys to find.
+  text(empty, 'This view could not start: ' + (err && err.message ? err.message : String(err)));
+}
+`;
+
+let cachedPage: string | null = null;
+
+/** The page, built once. Throws if the library bundle cannot be read or parsed. */
+export function appIndexHtml(): string {
+    if (cachedPage) return cachedPage;
+    cachedPage = `${PAGE_SHELL}<script type="module">\n${loadAppRuntime()}\n${PAGE_SCRIPT}\n</` + `script>\n</body>\n</html>`;
+    return cachedPage;
+}
+
+/**
+ * Serve the app-index page as an MCP resource. The host fetches it when a tool whose `_meta`
  * names this address is called, and may fetch it earlier to have the frame ready.
  *
  * No `_meta.ui.csp` is declared, and that is the point: the page loads nothing from anywhere, so
@@ -241,8 +250,15 @@ export function registerAppIndexUi(mcp: McpServer): void {
             mimeType: APP_UI_MIME,
             description: 'Interactive card grid of the apps published on this node, rendered inside the conversation.',
         },
-        async (uri) => ({
-            contents: [{ uri: uri.toString(), mimeType: APP_UI_MIME, text: APP_INDEX_HTML }],
-        }),
+        async (uri) => {
+            try {
+                return { contents: [{ uri: uri.toString(), mimeType: APP_UI_MIME, text: appIndexHtml() }] };
+            } catch (err) {
+                // Serving a broken page would render an empty frame, which is the one failure mode
+                // this whole file exists to stop being silent about.
+                logger.error('app-index UI could not be built', { error: String(err) });
+                throw err;
+            }
+        },
     );
 }

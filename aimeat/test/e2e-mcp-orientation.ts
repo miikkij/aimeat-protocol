@@ -401,22 +401,19 @@ async function main() {
             }
         });
 
-        await test('13b. the page opens the handshake with EXACTLY the three params the host accepts', async () => {
+        await test('13b. the page drives the OFFICIAL client, not a hand-written one', async () => {
             const { body } = await v1('resources/read', { uri: 'ui://aimeat/app-index.html' }, 306);
             const html: string = body.result.contents[0].text;
-            const init = html.slice(html.indexOf("method: 'ui/initialize'"));
-            const params = init.slice(init.indexOf('params: {'), init.indexOf('});'));
-            // McpUiInitializeRequest sets additionalProperties:false and requires these three.
-            // A stray key invalidates the whole request, the host answers nothing, the view never
-            // reports itself initialized, and the frame renders empty with no error anywhere.
-            // The first version of this page sent clientInfo and capabilities, copied from the
-            // core MCP handshake, which this dialect does not have.
-            for (const required of ['appInfo:', 'appCapabilities:', 'protocolVersion:']) {
-                assert(params.includes(required), `ui/initialize params carry ${required} — got ${params}`);
-            }
-            for (const forbidden of ['clientInfo:', 'capabilities: {']) {
-                assert(!params.includes(forbidden), `ui/initialize params reject ${forbidden} — got ${params}`);
-            }
+            // Two hand-written clients shipped before this and both failed in Claude for reasons
+            // no document states, each showing an empty frame and no error. The library is the
+            // only party that knows this dialect, so the guard is that it is present and used.
+            assert(html.includes('globalThis.__AIMEAT_MCP_APP ='), 'the ext-apps bundle is inlined and its App exposed');
+            assert(html.includes('const App = globalThis.__AIMEAT_MCP_APP'), 'the page takes App from the bundle');
+            assert(html.includes('app.connect()'), 'the page lets the library run the handshake');
+            assert(html.includes('ui/initialize'), 'the inlined bundle carries the handshake');
+            // A page that hand-rolls the wire again would post these itself.
+            assert(!html.includes("window.parent.postMessage"), 'no hand-written postMessage client');
+            assert(html.length > 200_000, `the bundle is really inlined, page is ${html.length} bytes`);
         });
 
         await test('14. an unknown ui:// page is an error rather than an empty frame', async () => {
