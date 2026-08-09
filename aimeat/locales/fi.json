@@ -566,6 +566,8 @@
     "myCapabilities": "Omat kyvykkyydet",
     "totalCount": "{count} kyvykkyyttä"
   },
+  "cardMenu.done": "Valmis",
+  "cardMenu.label": "Mitä tälle voi tehdä",
   "cards": {
     "memory": {
       "title": "Muisti",
@@ -2955,6 +2957,7 @@
       "toHome": "Kokeile uutta kotia"
     }
   },
+  "home.rooms.copyPrompt": "Kopioi tämä tekoälychattiisi",
   "imageDeliverable.failed": "Kuvan lataus epäonnistui",
   "imageDeliverable.loading": "Ladataan kuvaa…",
   "imageDeliverable.open": "Avaa koko kuva",

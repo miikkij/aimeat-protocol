@@ -18,14 +18,14 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 6–7).
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 
-import { OpenItemToggle } from '/components/OpenItemToggle.js';
+import { CardMenu } from '/components/CardMenu.js';
+import { listOpenItems, addOpenItem, switchOff } from '/js/services/open-items.js';
 import { apiGet } from '/js/api.js';
-import { PromptCard } from '/components/PromptCard.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -103,19 +103,21 @@ const SAVEABLE_ROOMS = {
  * ONE primary control — "Copy the prompt" — with the state control beside it. That order is the
  * whole point: copying is what people came to do.
  *
- * The state control is the SAME component used everywhere else (OpenItemToggle), in the same place
- * both directions: switch it on here and it is on your open items, come back to this card and
- * switch it off and it is not. It replaced a menu row reading "save for later", which promised a
- * queue things go into and never come out of.
+ * The dots in the top right corner are the SAME control every other card uses (CardMenu), in the
+ * same corner, and their colour is this room's state. One corner learned once, and then every card
+ * in the product answers to it. What used to be here was a grey box repeating the card's own
+ * heading with a "Copy the prompt" button under it, and a naked 10px dot floating in the whitespace
+ * below that.
  *
- * The body starts hidden. A room card is a card, and "show the prompt" is one of the three rows.
+ * The prompt is one of the menu's rows rather than a button of its own.
  */
-function RoomPrompt({ room }) {
+function RoomMenu({ room }) {
   const cfg = SAVEABLE_ROOMS[room.id];
+  const title = tr(`home.rooms.${room.id}.title`, room.id);
+  const origin = `home.rooms.${room.id}`;
   const [prompt, setPrompt] = useState('');
+  const [item, setItem] = useState(null);
 
-  // Fetched when the card appears, so the primary button stays ONE click. The text is never stored
-  // in the intent — only its name — so this is also the only place it is ever read from.
   useEffect(() => {
     let alive = true;
     apiGet(`/v1/prompts/${cfg.promptRef}`)
@@ -124,23 +126,41 @@ function RoomPrompt({ room }) {
     return () => { alive = false; };
   }, [cfg.promptRef]);
 
-  if (!prompt) return null;
+  const find = useCallback(async () => {
+    try {
+      const list = await listOpenItems();
+      setItem(list.find(i => i.origin === origin) ?? null);
+    } catch (e) { swallowed('home/rooms: open items', e); }
+  }, [origin]);
 
-  return html`
-    <div class="koti-room-actions">
-    <${PromptCard}
-      label=${tr(`home.rooms.${room.id}.title`, room.id)}
-      prompt=${prompt}
-      className="btn-outline"
-      copyLabel=${tr('home.rooms.copyPrompt', 'Copy the prompt')}
-      copiedLabel=${tr('home.rooms.copied', 'Copied — paste it in your AI chat')}
-      showPrompt=${false} />
-    <${OpenItemToggle}
-      title=${tr(`home.rooms.${room.id}.title`, room.id)}
-      promptRef=${cfg.promptRef}
-      origin=${`home.rooms.${room.id}`}
-      size="sm" />
-    </div>`;
+  useEffect(() => { find(); }, [find]);
+  useEffect(() => {
+    const handler = () => find();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [find]);
+
+  const state = item?.status === 'working' ? 'working' : item ? 'open' : 'off';
+  const actions = [
+    {
+      label: tr('home.rooms.copyPrompt', 'Copy this into your AI chat'),
+      doneLabel: tr('home.rooms.copied', 'Copied — paste it in your AI chat'),
+      done: true,
+      run: async () => { try { await navigator.clipboard.writeText(prompt); } catch (e) { swallowed('home/rooms: copy', e); } },
+    },
+    {
+      label: item
+        ? tr('openItems.toggleOff', 'Take it off your open items')
+        : tr('openItems.toggleOn', 'Put it on your open items'),
+      run: async () => {
+        if (item) { await switchOff(item.id); setItem(null); }
+        else { setItem(await addOpenItem({ title, prompt_ref: cfg.promptRef, origin })); }
+      },
+    },
+  ];
+
+  if (!prompt) return null;
+  return html`<${CardMenu} state=${state} actions=${actions} label=${title} />`;
 }
 
 export function Rooms({ rooms, onEnter }) {
@@ -171,7 +191,7 @@ export function Rooms({ rooms, onEnter }) {
                  answer and the node already serves the prompt. `monetise` promises a UI journey
                  that produces no object, and `messages` is your own post — neither is something
                  an AI hands back later. */''}
-            ${SAVEABLE_ROOMS[room.id] && html`<${RoomPrompt} room=${room} />`}
+            ${SAVEABLE_ROOMS[room.id] && html`<${RoomMenu} room=${room} />`}
           </a>`)}
       </div>
     </section>`;

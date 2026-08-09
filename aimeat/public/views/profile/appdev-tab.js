@@ -16,13 +16,14 @@
  *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner, KebabMenu } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { OpenItemToggle } from '/components/OpenItemToggle.js';
+import { CardMenu } from '/components/CardMenu.js';
+import { listOpenItems, addOpenItem, switchOff } from '/js/services/open-items.js';
 import { swallowed } from '/js/swallowed.js';
 import {
   getFlowPromptText, getBuildPromptText, getCuratedPitfalls, getLearnedPitfalls,
@@ -63,11 +64,11 @@ function StartPrompts({ locale, showToast }) {
             ${open === id ? t('profile.appdev.hidePrompt') : t('profile.appdev.showPrompt')}
           </button>
           ${text != null && html`<${CopyButton} text=${text} className="btn-primary" label=${t('common.copyPrompt')} onCopied=${() => showToast(t('profile.appdev.copied'))} />`}
-          ${/* The same state control as everywhere else: building an app is the clearest case of
-               something you decide to do now and get to later, and P12 names this surface. */''}
-          <${OpenItemToggle} title=${title} kind="app" promptRef=${id === 'build' ? 'build-app' : null}
-            origin=${`appdev.${id}`} label=${false} />
         </div>
+        ${/* The dots, in the same corner they are in on every other card. Building an app is the
+             clearest case of something you decide to do now and get to later, and P12 names this
+             surface. */''}
+        <${PromptCardMenu} id=${id} title=${title} />
       </div>
       ${open === id && html`<pre class="pf-adk-prompt-body">${text ?? t('profile.loading')}</pre>`}
     </div>`;
@@ -78,6 +79,41 @@ function StartPrompts({ locale, showToast }) {
     ${box('flow', t('profile.appdev.flowPromptTitle'), t('profile.appdev.flowPromptDesc'), flow)}
     ${box('build', t('profile.appdev.buildPromptTitle'), t('profile.appdev.buildPromptDesc'), build)}
   `;
+}
+
+
+/**
+ * The corner menu for one prompt card: what state this piece of work is in, and the one thing you
+ * can do about it from here.
+ */
+function PromptCardMenu({ id, title }) {
+  const [item, setItem] = useState(null);
+  const origin = `appdev.${id}`;
+
+  const find = useCallback(async () => {
+    try {
+      const list = await listOpenItems();
+      setItem(list.find(i => i.origin === origin) ?? null);
+    // eslint-disable-next-line aimeat/no-silent-catch -- the card and its prompt work without the light
+    } catch { /* no light, still a working card */ }
+  }, [origin]);
+
+  useEffect(() => { find(); }, [find]);
+  useEffect(() => {
+    const handler = () => find();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [find]);
+
+  const state = item?.status === 'working' ? 'working' : item ? 'open' : 'off';
+  return html`<${CardMenu} state=${state} label=${title} actions=${[{
+    label: item ? (t('openItems.toggleOff') || 'Take it off your open items')
+                : (t('openItems.toggleOn') || 'Put it on your open items'),
+    run: async () => {
+      if (item) { await switchOff(item.id); setItem(null); }
+      else { setItem(await addOpenItem({ title, kind: 'app', prompt_ref: id === 'build' ? 'build-app' : null, origin })); }
+    },
+  }]} />`;
 }
 
 // ── Section 2: learned pitfalls ────────────────────────────────────────────

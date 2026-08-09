@@ -1,0 +1,45 @@
+/**
+ * @file public/css/components/card-menu.css
+ * @description The dots in the top right corner of a card, and the menu they open.
+ *
+ *   Its own file under css/components/ because that is the directory spa.html actually loads.
+ *   The first attempt appended these rules to css/components.css, which nothing links: the dots
+ *   rendered black and unpositioned, 140px down the card instead of in its corner. A stylesheet
+ *   nobody loads is not a stylesheet.
+ * @version-history
+ *   v1.0.0 — 2026-08-09 — Initial.
+ */
+
+/* ── Card menu: the dots in the top right corner of anything you can act on ────────────────────
+   Always the same corner, on every card, so a person learns it once. The dots ARE the state
+   light: grey is not on your open items, amber is waiting, green and pulsing is somebody working
+   on it right now. Three dots rather than a hamburger because the hamburger already means site
+   navigation in this product's own top bar. */
+.card-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2; }
+.card-menu-dots {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; line-height: 1;
+  background: none; border: 1px solid transparent; border-radius: var(--radius-xs);
+  font-size: 1.15rem; cursor: pointer; color: var(--muted);
+  transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+.card-menu-dots:hover { border-color: var(--border); color: var(--text); }
+.card-menu-dots--open { color: var(--warning); }
+.card-menu-dots--working { color: var(--success); animation: card-menu-pulse 1.8s ease-in-out infinite; }
+/* Working is the one state about this moment rather than a standing fact, so it is the one that moves. */
+@keyframes card-menu-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .card-menu-dots--working { animation: none; } }
+
+.card-menu-list {
+  position: absolute; top: calc(100% + 0.25rem); right: 0; min-width: 14rem;
+  display: flex; flex-direction: column;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18));
+  overflow: hidden;
+}
+.card-menu-item {
+  background: none; border: 0; text-align: left; cursor: pointer;
+  padding: 0.6rem 0.8rem; font-size: 0.88rem; color: var(--text);
+}
+.card-menu-item:hover { background: var(--surface-2); }
+.card-menu-item + .card-menu-item { border-top: 1px solid var(--border); }

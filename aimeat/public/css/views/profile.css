@@ -3674,3 +3674,6 @@
   margin: 2rem 0 0.5rem; padding-top: 1.1rem;
   border-top: 1px solid var(--border);
 }
+
+/* The prompt card owns its corner, like every other card. */
+.pf-adk-prompt-card { position: relative; }

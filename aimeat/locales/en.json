@@ -566,6 +566,8 @@
     "myCapabilities": "My Capabilities",
     "totalCount": "{count} capabilities"
   },
+  "cardMenu.done": "Done",
+  "cardMenu.label": "What you can do with this",
   "cards": {
     "memory": {
       "title": "Memory",
@@ -2955,6 +2957,7 @@
       "toHome": "Try the new home"
     }
   },
+  "home.rooms.copyPrompt": "Copy this into your AI chat",
   "imageDeliverable.failed": "Image failed to load",
   "imageDeliverable.loading": "Loading image…",
   "imageDeliverable.open": "Open full image",

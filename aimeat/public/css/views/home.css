@@ -515,7 +515,9 @@ a.koti-feed-line:hover { text-decoration: underline; }
   .open-items-control { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
 }
 
-.koti-room-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+/* The card's own corner. Every card that can be acted on puts its dots here, and only here. */
+.koti-room { position: relative; }
+
 
 /* The fleet line on the agent card is a link: it names a number you can do something about. */
 .koti-agent-others { display: inline-block; text-decoration: underline; text-underline-offset: 2px; }
