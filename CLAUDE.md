@@ -8,6 +8,17 @@ The AIMEAT protocol (AI Memory Exchange and Action Transfer) and its reference i
 
 **Prompt-driven workflow** is the product's core pattern: the app composes ready-made prompts, the user runs them in their own AI chat and brings results back, earlier results feed later prompts. When adding to such a flow, the work is in the prompt text, not in UI buttons or backend logic.
 
+## Two ways of working, and where each one's knowledge lives
+
+**Platform work** is this repo: the node core and the libs it serves. **Application work** builds *on* the platform: apps live in `aimeat-apps/` and are published to the node. An app may add its own libs, extensions or cortex packs; it does not edit core.
+
+Know which one you are doing, because the knowledge sits in different places and mixing them wastes a session:
+
+- **Platform work** reads `docs/pitfalls.md` (traps by symptom), `docs/known_gaps.md` (deferred, developer-approved only) and `docs/coding-guidelines/`.
+- **Application work** reads the node, which is shared by every session and is the source of truth: `aimeat_appdev_overview` for what already exists, `aimeat_skill_list` + `aimeat_skill_get` for a named app's operating guide (most published apps have one), `aimeat_appdev_pitfall_list` for app-building traps. Start there, per the `aimeat-app-building` skill.
+
+Nothing in this repo describes an individual application, and nothing should. When you learn something durable about one, it belongs in that app's skill or the appdev pitfall KB on the node, where the next session finds it — not in a repo file or a local memory.
+
 ## Ask the developer first
 
 Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing an organism record or roadmap milestone. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).

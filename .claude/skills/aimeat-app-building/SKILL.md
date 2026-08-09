@@ -13,6 +13,12 @@ The moment the task is "build / make / publish an app on AIMEAT":
 
 This is a hard precondition of the build, not an optional preamble, and it comes **before** reading repo source: existing published apps and the KB show which libs and patterns are already proven, so reuse beats re-deriving from lib sources. Skipping it once produced non-theming (hardcoded colours), meta-less, duplicate, low-polish apps.
 
+Three node-side stores answer almost everything, and they are shared by every session:
+
+- **`aimeat_appdev_overview`** — what apps, extensions and capabilities already exist. Check before building anything.
+- **`aimeat_skill_list`** then **`aimeat_skill_get`** — most published apps carry their own operating guide as a skill (`user:{owner}/{app}-agent-guide`, `cadence-crm`, `operate-exchange`, `node:origami-boards`, …). If you are working on or against a named app, load its skill instead of reconstructing how it works.
+- **`aimeat_appdev_pitfall_list`** — the app-building trap catalogue (curated plus what other sessions learned). Read it before the build, and **report a new one with `aimeat_appdev_pitfall_report`** when a bug turns out to be a repeatable trap. That is where app knowledge accumulates; a repo file would only reach this repo.
+
 Non-negotiables that flow enforces:
 
 - Never hardcode theme colours. Light default plus `:root[data-theme="dark"]` CSS variables, or model on `prh.html` with vendored Tailwind `/lib/tailwindcss@4.js` + daisyUI `/lib/daisyui@5.css` + `/lib/aimeat-daisyui-bridge.css`.
