@@ -489,3 +489,5 @@ a.koti-feed-line:hover { text-decoration: underline; }
      390px screen — measured, not guessed. */
   .open-items-control { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
 }
+
+.koti-room-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }

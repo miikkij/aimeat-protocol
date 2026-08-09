@@ -22,6 +22,18 @@ import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
 import { createTask } from '/js/services/agent-tasks.js';
 import { takesTasks } from '/js/services/offers.js';
 
+/**
+ * Tell every surface showing this data that it changed.
+ *
+ * The list and the header count are two components that never meet, and the server's SSE frame is
+ * the wrong thing to wait for after YOUR OWN click: measured in the browser, switching an item off
+ * dropped it from the list while the header went on saying 3. Announcing it locally makes both
+ * follow the same action; SSE still covers the changes somebody else made, which is what it is for.
+ */
+function announce() {
+  window.dispatchEvent(new CustomEvent('aimeat-live-update', { detail: { domain: 'open-items' } }));
+}
+
 /** What is switched on. Satisfied suggestions are already dropped by the server. */
 export async function listOpenItems() {
   const r = await apiGet('/v1/open-items');
@@ -40,18 +52,24 @@ export async function openItemsCount() {
  */
 export async function addOpenItem(input) {
   const r = await apiPost('/v1/open-items', input);
-  return r?.data?.item ?? null;
+  const item = r?.data?.item ?? null;
+  if (item) announce();
+  return item;
 }
 
 export async function patchOpenItem(id, patch) {
   const r = await apiPatch(`/v1/open-items/${encodeURIComponent(id)}`, patch);
-  return r?.data?.item ?? null;
+  const item = r?.data?.item ?? null;
+  if (item) announce();
+  return item;
 }
 
 /** Switch it off. The same control that switched it on, the other way. */
 export async function switchOff(id) {
   const r = await apiDelete(`/v1/open-items/${encodeURIComponent(id)}`);
-  return r?.ok !== false;
+  const ok = r?.ok !== false;
+  if (ok) announce();
+  return ok;
 }
 
 /**

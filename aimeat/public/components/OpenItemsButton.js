@@ -53,12 +53,14 @@ export function OpenItemsButton({ t, onNavigate }) {
   const label = (t?.('openItems.headerLabel') && t('openItems.headerLabel') !== 'openItems.headerLabel')
     ? t('openItems.headerLabel') : 'Open items';
 
+  // The name is an aria-label, not a hidden span. A `.sr-only` span looked equivalent and was not:
+  // that class is not defined in this stylesheet, so the text rendered at full size and pushed the
+  // header 70px past a 390px screen — measured, and exactly the crowding P7 warned about.
   return html`
-    <button type="button" class="open-items-btn" title=${label}
+    <button type="button" class="open-items-btn" title=${label} aria-label=${`${label}: ${count}`}
       onClick=${(e) => { e.preventDefault(); onNavigate?.(LIST_PATH); }}>
       <span class="open-items-btn-mark" aria-hidden="true">○</span>
       <span class="open-items-btn-count">${count}</span>
-      <span class="sr-only">${label}</span>
     </button>`;
 }
 

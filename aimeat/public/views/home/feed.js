@@ -22,7 +22,8 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { addOpenItem, reachableAgents, handToAgent } from '/js/services/open-items.js';
+import { reachableAgents, handToAgent } from '/js/services/open-items.js';
+import { OpenItemToggle } from '/components/OpenItemToggle.js';
 import { apiGet } from '/js/api.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { swallowed } from '/js/swallowed.js';
@@ -99,10 +100,13 @@ const SAVEABLE_ROOMS = {
 /**
  * The prompt block inside a room card: copy it now, look at it first, put it off, or hand it over.
  *
- * ONE primary control — "Copy the prompt" — with a chevron beside it. That order is the whole
- * point: copying is what people came to do, and the three rarer choices live behind the chevron so
- * they cost nothing. A bare "save for later" with no prompt beside it, which is what this was at
- * first, is a verb with no object: there is nothing for it to refer to and no way to explain it.
+ * ONE primary control — "Copy the prompt" — with the state control beside it. That order is the
+ * whole point: copying is what people came to do.
+ *
+ * The state control is the SAME component used everywhere else (OpenItemToggle), in the same place
+ * both directions: switch it on here and it is on your open items, come back to this card and
+ * switch it off and it is not. It replaced a menu row reading "save for later", which promised a
+ * queue things go into and never come out of.
  *
  * The body starts hidden. A room card is a card, and "show the prompt" is one of the three rows.
  */
@@ -123,6 +127,7 @@ function RoomPrompt({ room, agents }) {
   if (!prompt) return null;
 
   return html`
+    <div class="koti-room-actions">
     <${PromptCard}
       label=${tr(`home.rooms.${room.id}.title`, room.id)}
       prompt=${prompt}
@@ -130,16 +135,18 @@ function RoomPrompt({ room, agents }) {
       copyLabel=${tr('home.rooms.copyPrompt', 'Copy the prompt')}
       copiedLabel=${tr('home.rooms.copied', 'Copied — paste it in your AI chat')}
       showPrompt=${false}
-      saveIntent=${() => addOpenItem({
-        title: tr(`home.rooms.${room.id}.title`, room.id),
-        prompt_ref: cfg.promptRef,
-        origin: `home.rooms.${room.id}`,
-      })}
+      extraActions=${[]}
       agents=${agents}
       onGiveToAgent=${(a) => handToAgent(
         { id: null, title: tr(`home.rooms.${room.id}.title`, room.id), prompt_ref: cfg.promptRef },
         a,
-      )} />`;
+      )} />
+    <${OpenItemToggle}
+      title=${tr(`home.rooms.${room.id}.title`, room.id)}
+      promptRef=${cfg.promptRef}
+      origin=${`home.rooms.${room.id}`}
+      size="sm" />
+    </div>`;
 }
 
 export function Rooms({ rooms, onEnter }) {
