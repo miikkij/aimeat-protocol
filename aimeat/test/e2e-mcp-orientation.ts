@@ -359,12 +359,17 @@ async function main() {
         // ── Phase 5: the app index as an MCP App ──
         console.log('\nPhase 5: the app index is a page the host can render in the conversation');
 
-        await test('11. aimeat_app_list points at a ui:// page', async () => {
+        await test('11. aimeat_app_list points at a ui:// page, by BOTH meta keys', async () => {
             const { body } = await v1('tools/list', {}, 300);
             const tool = (body.result?.tools ?? []).find((t: any) => t.name === 'aimeat_app_list');
             assert(!!tool, 'aimeat_app_list is listed');
-            const uri = tool._meta?.ui?.resourceUri;
-            assert(uri === 'ui://aimeat/app-index.html', `_meta.ui.resourceUri, got ${JSON.stringify(tool._meta)}`);
+            const want = 'ui://aimeat/app-index.html';
+            // The nested key is the one the prose names, and it is what makes a host treat the
+            // tool as having a page at all. The flat key is what the host fetches by. Asserting
+            // only the nested one is exactly the gap that let an empty frame ship: Claude grouped
+            // the tool under "Interactive tools" and then never requested the page.
+            assert(tool._meta?.ui?.resourceUri === want, `_meta.ui.resourceUri, got ${JSON.stringify(tool._meta)}`);
+            assert(tool._meta?.['ui/resourceUri'] === want, `_meta["ui/resourceUri"], got ${JSON.stringify(tool._meta)}`);
         });
 
         await test('12. that page is served as an MCP App resource', async () => {

@@ -22,16 +22,38 @@
  *   import { registerAppIndexUi, APP_INDEX_UI_URI } from './apps-ui.js';
  *   registerAppIndexUi(mcp);
  * @version-history
+ *   v1.0.1 — 2026-08-09 — uiToolMeta: the tool `_meta` carries the FLAT `ui/resourceUri` key
+ *     alongside the nested `ui.resourceUri`. With only the nested one Claude mounted the frame and
+ *     left it empty, never requesting the page. Found by reading registerAppTool in ext-apps, which
+ *     writes both and back-fills the missing one, so every example carries both and no document
+ *     says either is required. Caught in a real client and NOT by the e2e, which asserted the
+ *     nested key because that is the one the prose names.
  *   v1.0.0 — 2026-08-09 — Initial. First MCP App on this node; a pilot on one tool before the rest
  *     of the catalogue is built on it.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
-/** The ui:// address of the app-index page. Referenced by aimeat_app_list's `_meta.ui`. */
+/** The ui:// address of the app-index page. Referenced by aimeat_app_list's `_meta`. */
 export const APP_INDEX_UI_URI = 'ui://aimeat/app-index.html';
 
 /** What marks a resource as an MCP App page rather than ordinary HTML. */
 export const APP_UI_MIME = 'text/html;profile=mcp-app';
+
+/**
+ * The tool `_meta` that points a host at a page. BOTH keys are required, and that is the whole
+ * lesson of this file's v1.0.1.
+ *
+ * The extension's own helper (registerAppTool in @modelcontextprotocol/ext-apps) writes the
+ * nested `ui.resourceUri` and the flat `ui/resourceUri` and back-fills whichever the caller
+ * omitted, so every published example carries both and neither is documented as load-bearing.
+ * A host reads the nested form to decide the tool HAS a page (Claude groups it under
+ * "Interactive tools" on that alone) and the flat form to fetch it. With only the nested key,
+ * the frame mounts and stays empty: no request for the resource is ever made, so the failure
+ * looks like a broken page rather than a missing field.
+ */
+export function uiToolMeta(resourceUri: string): Record<string, unknown> {
+    return { ui: { resourceUri }, 'ui/resourceUri': resourceUri };
+}
 
 /**
  * The page. Self-contained by necessity (see the file header). It speaks three messages:
