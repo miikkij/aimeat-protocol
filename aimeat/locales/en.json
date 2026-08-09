@@ -2957,6 +2957,8 @@
       "toHome": "Try the new home"
     }
   },
+  "home.mat.improve": "Make my welcome page better",
+  "home.mat.teachDots": "The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.",
   "home.rooms.copyPrompt": "Copy this into your AI chat",
   "imageDeliverable.failed": "Image failed to load",
   "imageDeliverable.loading": "Loading image…",

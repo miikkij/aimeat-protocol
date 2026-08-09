@@ -522,3 +522,14 @@ a.koti-feed-line:hover { text-decoration: underline; }
 /* The fleet line on the agent card is a link: it names a number you can do something about. */
 .koti-agent-others { display: inline-block; text-decoration: underline; text-underline-offset: 2px; }
 .koti-agent-others:hover { color: var(--text); }
+
+/* A list row owns its corner too, same as a card. */
+.open-items-row { position: relative; }
+.open-items-row .card-menu { position: static; }
+
+/* The one-time line that teaches the corner. It is gone for good once the menu has been opened. */
+.koti-teach { margin: 0.75rem 0 0; font-size: 0.82rem; color: var(--muted); line-height: 1.45; }
+
+/* Every card that carries the dots needs to be their containing block, or they escape upward to
+   whatever ancestor is positioned. Measured once at 263px above the card it belonged to. */
+.koti-step { position: relative; }

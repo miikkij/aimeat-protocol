@@ -45,6 +45,8 @@ export function CardMenu({
   actions = [],
   /** What the dots are, for a screen reader and the tooltip. */
   label = null,
+  /** Called the first time this menu is opened. The mat card uses it to retire its one-time hint. */
+  onOpened = null,
 }) {
   const [open, setOpen] = useState(false);
   const [flash, setFlash] = useState(null);
@@ -81,7 +83,7 @@ export function CardMenu({
       <button type="button"
         class="card-menu-dots card-menu-dots--${state}"
         aria-haspopup="menu" aria-expanded=${open} aria-label=${hint} title=${hint}
-        onClick=${(e) => { stop(e); setOpen(v => !v); }}>
+        onClick=${(e) => { stop(e); if (!open) onOpened?.(); setOpen(v => !v); }}>
         <span aria-hidden="true">⋯</span>
       </button>
       ${open && html`

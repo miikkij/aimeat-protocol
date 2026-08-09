@@ -8,9 +8,13 @@
  *   items either: they go stale the moment they are copied. It tells the AI where to read them, so
  *   what the chat sees is always what is on the list right now.
  *
- *   Rows carry the state control and nothing else. There is no Done and no Remove, because there is
- *   no done and no remove: an item is switched on or it is not, and the control that switches it off
- *   is the same one that switched it on.
+ *   Rows carry the same three dots the cards do, in the same corner, and nothing else. There is no
+ *   Done and no Remove, because there is no done and no remove: an item is switched on or it is not.
+ *
+ *   NO AGENT PICKER. A row once carried a native select listing every reachable agent — seventy of
+ *   them on a real account, an unstyled dropdown taller than the page. Handing work to a named agent
+ *   does not belong in a list whose whole point is that you take it into your own chat, and P20 says
+ *   that chat IS the agent.
  *
  *   A row the AI switched on says so. That is the point where this stops being a to-do list: a
  *   person opens their home and sees that their AI put something there while they were away.
@@ -30,7 +34,8 @@ import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { listOpenItems, switchOff, reachableAgents, handToAgent } from '/js/services/open-items.js';
+import { listOpenItems, switchOff } from '/js/services/open-items.js';
+import { CardMenu } from '/components/CardMenu.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -41,9 +46,7 @@ const LIST_PROMPT = 'open-items';
 
 export function OpenItemsList() {
   const [items, setItems] = useState(null);
-  const [agents, setAgents] = useState([]);
   const [prompt, setPrompt] = useState('');
-  const [busy, setBusy] = useState(null);
 
   const load = useCallback(async () => {
     try { setItems(await listOpenItems()); }
@@ -53,7 +56,6 @@ export function OpenItemsList() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    reachableAgents().then(setAgents).catch(e => swallowed('OpenItemsList: agents', e));
     apiGet(`/v1/prompts/${LIST_PROMPT}`)
       .then(r => setPrompt(r?.data?.prompt || ''))
       .catch(e => swallowed('OpenItemsList: prompt', e));
@@ -67,11 +69,11 @@ export function OpenItemsList() {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
+  // The menu closes itself on the click, so there is no row-level busy state to show: the list
+  // simply reloads under it.
   const act = useCallback(async (id, fn) => {
-    setBusy(id);
     try { await fn(); await load(); }
     catch (e) { swallowed('OpenItemsList: act', e); }
-    finally { setBusy(null); }
   }, [load]);
 
   // Nothing on the list → no block at all. See the file header.
@@ -112,25 +114,11 @@ export function OpenItemsList() {
                  about to withdraw anyway. */''}
             ${!i.closes_when && html`
               <div class="open-items-control">
-                ${agents.length > 0 && !i.agent && html`
-                  <select class="open-items-hand" disabled=${busy === i.id}
-                    onChange=${(e) => {
-                      const a = agents.find(x => (x.gaii || x.name) === e.target.value);
-                      if (a) act(i.id, () => handToAgent(i, a));
-                      e.target.value = '';
-                    }}>
-                    <option value="">${tr('openItems.handTo', 'Hand it to…')}</option>
-                    ${agents.map(a => html`
-                      <option key=${a.gaii || a.name} value=${a.gaii || a.name}>
-                        ${a.display_name || a.name}
-                      </option>`)}
-                  </select>`}
-                <button type="button" class="btn-ghost btn-sm open-items-off"
-                  disabled=${busy === i.id}
-                  title=${tr('openItems.toggleOff', 'Take it off your open items')}
-                  onClick=${() => act(i.id, () => switchOff(i.id))}>
-                  ${tr('openItems.off', 'Take it off')}
-                </button>
+                <${CardMenu} state=${i.status === 'working' ? 'working' : 'open'} label=${i.title}
+                  actions=${[{
+                    label: tr('openItems.off', 'Take it off'),
+                    run: () => act(i.id, () => switchOff(i.id)),
+                  }]} />
               </div>`}
           </li>`)}
       </ul>

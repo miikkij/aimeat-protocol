@@ -2957,6 +2957,8 @@
       "toHome": "Kokeile uutta kotia"
     }
   },
+  "home.mat.improve": "Tee tervetulosivustani parempi",
+  "home.mat.teachDots": "Kortin nurkassa olevat kolme pistettä ovat se, mistä asioita tehdään. Ne ovat joka kortissa, aina samassa nurkassa.",
   "home.rooms.copyPrompt": "Kopioi tämä tekoälychattiisi",
   "imageDeliverable.failed": "Kuvan lataus epäonnistui",
   "imageDeliverable.loading": "Ladataan kuvaa…",
