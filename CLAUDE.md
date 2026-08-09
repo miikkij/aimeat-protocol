@@ -46,6 +46,15 @@ Git: parallel sessions work in a worktree · never `git add -A` (it sweeps anoth
 
 Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing an organism record or roadmap milestone. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).
 
+**Searching the old notes.** Until 2026-08-09 this project kept everything it learned in local Claude Code memory. That store is now empty; the notes live in `docs/internal/memory-archive/` (gitignored) and are read only when the subject actually comes up: `platform-notes/` (225, node and platform work), `app-memories/` (44, per-app development notes — also documents in the dev organism, which is the shared copy), `originals/` (the pre-condensation snapshot, fullest text). When something behaves oddly and it smells like a trap someone already hit, grep the archive before re-deriving it:
+
+```bash
+grep -ril "<term>" docs/internal/memory-archive/platform-notes    # which notes mention it
+grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
+```
+
+They are point-in-time observations, some from months ago: verify against current code before repeating anything as fact. If what you find is still true and still matters, it belongs in this file, a skill, or the node — not back in memory.
+
 **Test accounts, logins and the browser-verification recipe: `docs/internal/TESTING.md`** (gitignored, so the credentials are not in this file). Four accounts: the prod owner, a second prod identity for anything cross-owner, a third-party prod member for a paying service's member path, and the local dev owner.
 
 ## Gates
