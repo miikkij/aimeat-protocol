@@ -491,3 +491,7 @@ a.koti-feed-line:hover { text-decoration: underline; }
 }
 
 .koti-room-actions { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-start; }
+
+/* The fleet line on the agent card is a link: it names a number you can do something about. */
+.koti-agent-others { display: inline-block; text-decoration: underline; text-underline-offset: 2px; }
+.koti-agent-others:hover { color: var(--text); }
