@@ -135,7 +135,24 @@ async function presignedExtensionUrl(opts: { update?: boolean; activate?: boolea
         body: JSON.stringify({ mode: 'presigned', ...body }),
     });
     assert(r.status === 200 && r.body.data?.upload_url, `presigned mint: ${r.status} ${JSON.stringify(r.body)}`);
+    assertPresignedUrlIsAnAddress(r.body.data.upload_url as string);
     return r.body.data.upload_url as string;
+}
+
+/**
+ * A presigned URL is an ADDRESS, never the credential itself.
+ *
+ * It used to be the JWT, so the URL ran to ~1000 characters whose middle section is base64 of the
+ * caller's own metadata. Every agent publishing over MCP has to reproduce that into a shell
+ * command, and a model reproducing base64 of readable English paraphrases it: a real publish
+ * turned "and feature set" into "ja feature set" inside the signature payload and died on
+ * TOKEN_INVALID. Short and opaque is the whole point, so it is asserted rather than assumed.
+ */
+function assertPresignedUrlIsAnAddress(url: string) {
+    const tail = url.slice(url.lastIndexOf('/') + 1);
+    assert(tail.startsWith('u_'), `presigned URL is a handle, got "${tail.slice(0, 40)}…"`);
+    assert(tail.length <= 40, `presigned handle stays short, got ${tail.length} chars`);
+    assert(!tail.includes('.'), 'presigned URL carries no JWT (a dot would mean header.payload.sig)');
 }
 
 async function putZip(url: string, zip: Buffer) {

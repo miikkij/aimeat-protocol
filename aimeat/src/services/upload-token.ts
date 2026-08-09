@@ -32,7 +32,7 @@
  */
 
 import { SignJWT, jwtVerify } from 'jose';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomUUID, randomBytes } from 'node:crypto';
 
 // ── Key management (initialized from jwt.ts node keys) ──
 
@@ -41,6 +41,28 @@ let _publicKey: CryptoKey | null = null;
 
 // Single-use tracking: token hash -> expiry timestamp
 const usedTokens = new Map<string, number>();
+
+/**
+ * Short handle -> the signed token it stands for, with the same expiry.
+ *
+ * THE ADDRESS IS NOT THE TOKEN. A presigned URL used to be the JWT itself, so it ran to about a
+ * thousand characters whose middle section is base64 of the caller's OWN metadata — the app name,
+ * the description, the tags. Every agent that publishes has to reproduce that string exactly into
+ * a shell command, and an LLM reproducing base64 of readable English paraphrases it: one publish
+ * in this codebase's own history turned "and feature set" into "ja feature set" INSIDE the
+ * signature payload and died on TOKEN_INVALID with nothing pointing at the cause.
+ *
+ * A handle has no words to paraphrase and is short enough that a copy error is visible. The JWT
+ * stays the authority; it just stops being the address.
+ *
+ * In memory on purpose, next to usedTokens: this path is already restart-sensitive (the
+ * single-use record has always lived here), and a lost handle behaves exactly like an expired
+ * one — ask for a fresh URL.
+ */
+const handles = new Map<string, { token: string; exp: number }>();
+
+/** Anything shorter than a JWT and starting `u_` is an address, not a token. */
+const HANDLE_RE = /^u_[A-Za-z0-9_-]{10,40}$/;
 
 let _cleanupInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -53,6 +75,9 @@ export function initUploadTokenKeys(privateKey: CryptoKey, publicKey: CryptoKey)
         const now = Math.floor(Date.now() / 1000);
         for (const [hash, exp] of usedTokens) {
             if (exp < now) usedTokens.delete(hash);
+        }
+        for (const [handle, entry] of handles) {
+            if (entry.exp < now) handles.delete(handle);
         }
     }, 5 * 60 * 1000);
 }
@@ -147,7 +172,23 @@ export function buildUploadMeta(
 
 // ── Token generation ──
 
+/**
+ * Mint an upload credential and return the SHORT HANDLE that stands for it.
+ *
+ * Callers paste the return value straight into `${baseUrl}/v1/upload/${token}` as they always
+ * have; what changed is that the value is now an address instead of the whole signed payload.
+ * See the `handles` map above for why. verifyUploadToken accepts either form, so a JWT already
+ * in flight when this shipped still completes.
+ */
 export async function generateUploadToken(payload: UploadTokenPayload, ttlSeconds: number = 3600): Promise<string> {
+    const jwt = await signUploadToken(payload, ttlSeconds);
+    const handle = 'u_' + randomBytes(12).toString('base64url');
+    handles.set(handle, { token: jwt, exp: Math.floor(Date.now() / 1000) + ttlSeconds });
+    return handle;
+}
+
+/** The signed credential itself. Split out so the handle can wrap it without duplicating the mint. */
+async function signUploadToken(payload: UploadTokenPayload, ttlSeconds: number): Promise<string> {
     if (!_privateKey) throw new Error('Upload token keys not initialized');
 
     return new SignJWT({
@@ -175,8 +216,20 @@ function hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
 }
 
-export async function verifyUploadToken(token: string): Promise<VerifiedUploadToken> {
+export async function verifyUploadToken(tokenOrHandle: string): Promise<VerifiedUploadToken> {
     if (!_publicKey) throw new Error('Upload token keys not initialized');
+
+    // An address resolves to the credential it stands for; anything else is treated as the
+    // credential itself, so a JWT minted before handles existed still completes.
+    let token = tokenOrHandle;
+    if (HANDLE_RE.test(tokenOrHandle)) {
+        const entry = handles.get(tokenOrHandle);
+        if (!entry) {
+            throw new UploadTokenError('TOKEN_EXPIRED',
+                'This upload URL is no longer valid (expired, already used, or the node restarted). Request a fresh one rather than editing this address.');
+        }
+        token = entry.token;
+    }
 
     // Single-use check
     const hash = hashToken(token);
@@ -193,7 +246,10 @@ export async function verifyUploadToken(token: string): Promise<VerifiedUploadTo
         if (msg.includes('expired') || msg.includes('exp')) {
             throw new UploadTokenError('TOKEN_EXPIRED', 'Upload token has expired (60 min TTL)');
         }
-        throw new UploadTokenError('TOKEN_INVALID', `Invalid upload token: ${msg}`);
+        // Name the usual cause. A hand-copied URL is how this error is nearly always reached,
+        // and "signature verification failed" leaves the caller with nowhere to go.
+        throw new UploadTokenError('TOKEN_INVALID',
+            `Invalid upload token: ${msg}. If this URL was copied by hand, request a fresh one rather than correcting it.`);
     }
 
     if (payload.typ !== 'upload') {
