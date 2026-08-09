@@ -63,6 +63,9 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 - **A locked plan gets finished**, not sliced, and not followed by "next we could".
 - **Name the exact scope of a deletion** before deleting.
 - **Evidence before assertions.** Name the pass-criterion, then verify against it. Verify with real content, not fixtures. Clean up test data fully. A test must fail first.
+- **Test at the size production actually has.** Ask of every change what grows with the user's data, and get the real number from prod rather than guessing. A green test proved the feature and not the failure: listing every app origin in a CSP header passed with 2 apps and took down every app subdomain at 76, because the header outgrew nginx's 4 kB buffer.
+- **Never claim anything about prod without probing it.** `curl /v1/build` gives the restart time (`parseInt(build,36)`), and grepping a live asset for a marker from the change is the definitive proof. Saying "you are on old code" when the developer had deployed cost trust twice.
+- **Iterate locally, migrate once.** Build against the local dev server and a throwaway target, then take one migration to prod. Seven half-finished deploys onto a live paid extension is the failure this prevents.
 - **Reuse what exists** rather than inventing a parallel list, surface or page type. A feature's data is a memory record under a key prefix plus a prompt that reads it; a new MCP tool, route or table needs a reason memory could not cover it.
 - **Do not rewrite prompts that work**: additive changes only, and only when asked.
 

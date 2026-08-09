@@ -27,6 +27,17 @@ Then verify the **feature**, not the render: perform the real interaction and co
 
 The same gate is served to app builders in `src/services/build-app-prompt.ts` under "Before you call it done". Keep the two in step.
 
+## Four things a metric will never tell you
+
+Automated checks prove overflow, contrast and element counts. They say nothing about these, and all four came from the developer having to point at something visible in a screenshot I had already taken.
+
+1. **Look at the screen a VISITOR lands on first**, not only the inner view you were working on. A missing header or sign-in pill on the first-touch screen passes every metric.
+2. **Check column alignment and the style register**, not just whether an element exists. A per-row grid with an auto column drifts out of line, and an arcade sticker style dropped into a serious tool is wrong even when it renders. The house register is slate and geometric.
+3. **An empty state reads as broken**, not as "nothing has happened yet". Prefer a cumulative counter that is always populated ("this node has X apps, Y organisms, Z agents") over an event feed that can be empty.
+4. **The primary action belongs on the landing surface.** If an app's main use is "copy a prompt for your agent", the button that opens it goes in the hero or toolbar, with the requirements written out in plain language and the prompt visible. A prompt reachable only through a help page makes the whole product look broken while the mechanics work.
+
+**"Mobile-optimised" means using the phone properly, not trimming chrome.** For a focused view (a chat thread, an editor, a wizard) go full screen: lift it out of the profile shell with `position:fixed; inset:0` and hide the shell chrome, handle the on-screen keyboard from the start (`interactive-widget=resizes-content`, a `visualViewport` fallback, `env(safe-area-inset-*)`), and replace a heavy desktop widget with a native-feeling control. Pattern: `docs/frontend-development-guide.md` under Mobile & Responsive UX; traps: `docs/pitfalls.md` §15.
+
 ## Styling rules that get caught here
 
 Full guide: `docs/frontend-development-guide.md`. The ones that recur:
