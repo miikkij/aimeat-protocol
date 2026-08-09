@@ -22,7 +22,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { reachableAgents, handToAgent } from '/js/services/open-items.js';
+
 import { OpenItemToggle } from '/components/OpenItemToggle.js';
 import { apiGet } from '/js/api.js';
 import { PromptCard } from '/components/PromptCard.js';
@@ -110,7 +110,7 @@ const SAVEABLE_ROOMS = {
  *
  * The body starts hidden. A room card is a card, and "show the prompt" is one of the three rows.
  */
-function RoomPrompt({ room, agents }) {
+function RoomPrompt({ room }) {
   const cfg = SAVEABLE_ROOMS[room.id];
   const [prompt, setPrompt] = useState('');
 
@@ -134,13 +134,7 @@ function RoomPrompt({ room, agents }) {
       className="btn-outline"
       copyLabel=${tr('home.rooms.copyPrompt', 'Copy the prompt')}
       copiedLabel=${tr('home.rooms.copied', 'Copied — paste it in your AI chat')}
-      showPrompt=${false}
-      extraActions=${[]}
-      agents=${agents}
-      onGiveToAgent=${(a) => handToAgent(
-        { id: null, title: tr(`home.rooms.${room.id}.title`, room.id), prompt_ref: cfg.promptRef },
-        a,
-      )} />
+      showPrompt=${false} />
     <${OpenItemToggle}
       title=${tr(`home.rooms.${room.id}.title`, room.id)}
       promptRef=${cfg.promptRef}
@@ -150,16 +144,9 @@ function RoomPrompt({ room, agents }) {
 }
 
 export function Rooms({ rooms, onEnter }) {
-  // Who could take this off your hands. Empty is the normal case and simply hides that row —
-  // offering a name that never drains a queue is a graveyard.
-  const [agents, setAgents] = useState([]);
-  useEffect(() => {
-    let alive = true;
-    reachableAgents()
-      .then(list => { if (alive) setAgents(list); })
-      .catch(e => swallowed('home/rooms: agents', e));
-    return () => { alive = false; };
-  }, []);
+  // No agent list here. A room card once offered "Give it to <name>" as one menu row per agent,
+  // and on an account with seventy of them that is a wall of rows in a card about making an app.
+  // Handing work to an agent belongs where the agents are, not inside a prompt.
 
   if (!rooms || !rooms.length) return null;
   return html`
@@ -184,7 +171,7 @@ export function Rooms({ rooms, onEnter }) {
                  answer and the node already serves the prompt. `monetise` promises a UI journey
                  that produces no object, and `messages` is your own post — neither is something
                  an AI hands back later. */''}
-            ${SAVEABLE_ROOMS[room.id] && html`<${RoomPrompt} room=${room} agents=${agents} />`}
+            ${SAVEABLE_ROOMS[room.id] && html`<${RoomPrompt} room=${room} />`}
           </a>`)}
       </div>
     </section>`;

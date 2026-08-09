@@ -465,10 +465,22 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .open-items-control { flex: none; display: flex; align-items: center; gap: 0.35rem; }
 .open-items-hand { font-size: 0.8rem; max-width: 10rem; }
 
-/* The one control that puts something on the list and takes it off again, wherever the thing is. */
-.open-toggle { display: inline-flex; align-items: center; gap: 0.35rem; }
-.open-toggle-mark { color: var(--muted); }
-.open-toggle--on .open-toggle-mark { color: var(--accent); }
+/* The one control that puts something on the list and takes it off again, wherever the thing is.
+   A light, not a button with a sentence on it: it has to read at a glance and it has to be small
+   enough to sit next to anything without taking the card over. */
+.open-toggle {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: none; border: 0; padding: 0.2rem; cursor: pointer; line-height: 1;
+}
+.open-toggle-light {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 1px solid var(--border); background: transparent;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+.open-toggle:hover .open-toggle-light { border-color: var(--muted); }
+.open-toggle--on .open-toggle-light { background: var(--accent); border-color: var(--accent); }
+.open-toggle:disabled { opacity: 0.5; cursor: default; }
+.open-toggle-text { font-size: 0.8rem; color: var(--muted); }
 .open-toggle--on .open-toggle-text { color: var(--text); }
 
 /* The header button. Hidden at zero, so it never shows a badge that has to be explained. */

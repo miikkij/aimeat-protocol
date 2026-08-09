@@ -18,8 +18,8 @@
  *   The component is deliberately ignorant of what it is attached to. It takes a subject and a
  *   callback; an app, a room card and a piece of knowledge all use the identical control, because a
  *   marking that looks different in each place is one a person has to learn four times.
- * @structure OpenItemToggle({ title, kind, promptRef, promptArgs, origin, object, itemId, onChanged,
- *   size, label })
+ * @structure OpenItemToggle({ title, kind, promptRef, promptArgs, origin, object, itemId,
+ *   onChanged, label })
  * @usage
  *   html`<${OpenItemToggle} title=${app.name} kind="app" origin="app-catalog"
  *     object=${{ type: 'app', id: app.id }} onChanged=${reload} />`
@@ -48,9 +48,13 @@ export function OpenItemToggle({
   itemId = null,
   /** (nextItemId | null) => void — the caller keeps the id so the control can toggle back. */
   onChanged = null,
-  size = 'sm',
-  /** Show the words next to the mark. Off in tight rows where the mark alone has to do. */
-  label = true,
+  /**
+   * Show the words next to the light. OFF by default, and that is the point: this is a state
+   * indicator you can flip, roughly a traffic light, not a button with a sentence on it. The first
+   * version shipped a wide labelled button reading "Add to open items" and it dominated every card
+   * it sat on for a control whose whole job is to be small and legible at a glance.
+   */
+  label = false,
 }) {
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState(itemId);
@@ -82,15 +86,17 @@ export function OpenItemToggle({
     }
   }
 
+  const hint = on ? tr('openItems.toggleOff', 'Take it off your open items')
+                  : tr('openItems.toggleOn', 'Put it on your open items');
   return html`
     <button type="button"
-      class="open-toggle ${on ? 'open-toggle--on' : ''} btn-ghost btn-${size}"
+      class="open-toggle ${on ? 'open-toggle--on' : ''} ${label ? 'open-toggle--labelled' : ''}"
       aria-pressed=${on}
+      aria-label=${hint}
       disabled=${busy}
-      title=${on ? tr('openItems.toggleOff', 'Take it off your open items')
-                 : tr('openItems.toggleOn', 'Put it on your open items')}
+      title=${hint}
       onClick=${flip}>
-      <span class="open-toggle-mark" aria-hidden="true">${on ? '●' : '○'}</span>
+      <span class="open-toggle-light" aria-hidden="true"></span>
       ${label && html`<span class="open-toggle-text">
         ${on ? tr('openItems.on', 'Waiting') : tr('openItems.add', 'Add to open items')}
       </span>`}
