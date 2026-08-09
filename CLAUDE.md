@@ -26,7 +26,7 @@ The AIMEAT protocol (AI Memory Exchange and Action Transfer) and its reference i
 - **The node** in `aimeat/`: Node 24, TypeScript, Express 5, port 40050, pnpm. Frontend is a Preact + HTM SPA with no build step (the app-catalog is the one exception, an esbuild build).
 - **`python/aimeat-crewai/`**, a pip-installable CrewAI integration. Part of this repo, with its own version line. When agent-facing capabilities change (offers, workflow signals, onboarding, MCP surface), keep it in sync. The node schema wins on any mismatch.
 
-**Prompt-driven workflow** is the product's core pattern: the app composes ready-made prompts, the user runs them in their own AI chat and brings results back, earlier results feed later prompts. When adding to such a flow, the work is in the prompt text, not in UI buttons or backend logic.
+**Prompt-driven workflow** is the road in for everyone MCP cannot reach, and it ranks under the MCP path above rather than beside it. Some tools connect over MCP (Claude, Claude Code, Codex, Cursor, VS Code); others cannot (a consumer Gemini app, Copilot without Copilot Studio, ChatGPT without a paid Developer mode), and for those the app composes a ready-made prompt, the user runs it in their own chat and brings the result back, with earlier results feeding later prompts. It is free, AI-agnostic, and the user sees everything before it is submitted. When adding to such a flow, the work is in the prompt text, not in UI buttons or backend logic.
 
 ## Two ways of working, and where each one's knowledge lives
 
@@ -34,7 +34,7 @@ The AIMEAT protocol (AI Memory Exchange and Action Transfer) and its reference i
 
 Know which one you are doing, because the knowledge sits in different places and mixing them wastes a session:
 
-- **Platform work** reads `docs/pitfalls.md` (traps by symptom), `docs/known_gaps.md` (deferred, developer-approved only) and `docs/coding-guidelines/`.
+- **Platform work** reads `docs/pitfalls.md` (traps by symptom), `docs/known_gaps.md` (deferred, developer-approved only) and `docs/coding-guidelines/`, plus the **Platform Development Notes** workspace in the dev organism (`fbb51de5-…` / `ws-mslunjvcgxj`, 166 documents) for how a capability was actually built. Design specs and plans live in the **Development** workspace (`ws-mq664uyfz21`); the notes say what shipped, what broke and what is still open.
 - **Application work** reads the node, which is shared by every session and is the source of truth: `aimeat_appdev_overview` for what already exists, `aimeat_skill_list` + `aimeat_skill_get` for a named app's operating guide, the **App Development Notes** workspace in the dev organism (`fbb51de5-…` / `ws-mslr8u99kzk`, one document per app) for how it was built, and `aimeat_appdev_pitfall_list` for app-building traps. Start there, per the `aimeat-app-building` skill.
 
 Nothing in this repo describes an individual application, and nothing should. A durable lesson about one has three possible homes, and they are not interchangeable:
@@ -46,6 +46,8 @@ Nothing in this repo describes an individual application, and nothing should. A 
 | A trap that would bite **anyone building an app** here | the appdev KB, via `aimeat_appdev_pitfall_report` |
 
 Development notes never go in a skill: skills are published and app-bound, written for whoever uses the app. They also never go in a repo file or a local memory, where only this repo or this session can see them.
+
+**Platform knowledge splits the same way.** A rule belongs in this file or a skill. A repeatable trap in platform code belongs in `docs/pitfalls.md`. What a capability's build actually cost, and what it left open, belongs in a **Platform Development Notes** document. The appdev KB on the node is for traps that bite someone building an app on top, which is a different audience.
 
 ## Working with Jouni
 
@@ -62,7 +64,7 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 - **Ask before:** spending money or changing AI settings, importing data automatically, touching infrastructure (wsl/docker are off limits), building something not yet agreed.
 - **A locked plan gets finished**, not sliced, and not followed by "next we could".
 - **Name the exact scope of a deletion** before deleting.
-- **Evidence before assertions.** Name the pass-criterion, then verify against it. Verify with real content, not fixtures. Clean up test data fully. A test must fail first.
+- **Evidence before assertions.** Verify with real content, not fixtures. Clean up test data fully. A test must fail first. The pass-criterion discipline is its own section below.
 - **Test at the size production actually has.** Ask of every change what grows with the user's data, and get the real number from prod rather than guessing. A green test proved the feature and not the failure: listing every app origin in a CSP header passed with 2 apps and took down every app subdomain at 76, because the header outgrew nginx's 4 kB buffer.
 - **Never claim anything about prod without probing it.** `curl /v1/build` gives the restart time (`parseInt(build,36)`), and grepping a live asset for a marker from the change is the definitive proof. Saying "you are on old code" when the developer had deployed cost trust twice.
 - **Iterate locally, migrate once.** Build against the local dev server and a throwaway target, then take one migration to prod. Seven half-finished deploys onto a live paid extension is the failure this prevents.
@@ -77,14 +79,16 @@ Git: parallel sessions work in a worktree · never `git add -A` (it sweeps anoth
 
 Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing an organism record or roadmap milestone. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).
 
-**Searching the old notes.** Until 2026-08-09 this project kept everything it learned in local Claude Code memory. That store is now empty; the notes live in `docs/internal/memory-archive/` (gitignored) and are read only when the subject actually comes up: `platform-notes/` (225, node and platform work), `app-memories/` (44, per-app development notes, also documents in the dev organism, which is the shared copy), `originals/` (the pre-condensation snapshot, fullest text). When something behaves oddly and it smells like a trap someone already hit, grep the archive before re-deriving it:
+**Searching the old notes.** Until 2026-08-09 this project kept everything it learned in local Claude Code memory. That store is empty now and its contents moved to the node, which is where to look first: **Platform Development Notes** (`ws-mslunjvcgxj`, 166 documents) and **App Development Notes** (`ws-mslr8u99kzk`, 44). Both are readable with `aimeat_workspace_read` and searchable with the librarian, and every session sees the same copy.
+
+A local mirror sits in `docs/internal/memory-archive/` (gitignored) for a fast grep when you already know the term: `platform-notes/` (166), `app-memories/` (44), `folded/` (50, now rules in this file or a skill), `deleted/` (9, dead), `originals/` (270, the pre-condensation snapshot with the fullest text). It is a copy, so the node wins on any difference.
 
 ```bash
 grep -ril "<term>" docs/internal/memory-archive/platform-notes    # which notes mention it
 grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
 ```
 
-**Read `memory-archive/README.md` before trusting a hit.** These are point-in-time observations, some months old, and a large part of the archive describes things that no longer exist: 49 notes discuss MongoDB and 21 discuss Prisma, both **removed entirely on 2026-07-16**, and notes about the Generator, Foundry, SSR and four-backend migrations are history in the same way. A hit is a lead that someone met this symptom before, not a fact and never an instruction. Verify against current code, and if what you find is still true and still matters, it belongs in this file, a skill, or the node, not back in memory.
+**Read `memory-archive/README.md` before trusting a hit.** These are point-in-time observations, some months old, and a large part of the archive describes things that no longer exist: 43 notes discuss MongoDB and 19 discuss Prisma, both **removed entirely on 2026-07-16**, and notes about the Generator, Foundry, SSR and four-backend migrations are history in the same way. A hit is a lead that someone met this symptom before, not a fact and never an instruction. Verify against current code, and if what you find is still true and still matters, it belongs in this file, a skill, or the node, not back in memory.
 
 **Test accounts, logins and the browser-verification recipe: `docs/internal/TESTING.md`** (gitignored, so the credentials are not in this file). Four accounts: the prod owner, a second prod identity for anything cross-owner, a third-party prod member for a paying service's member path, and the local dev owner.
 
@@ -95,7 +99,7 @@ grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
 - **`openapi.yaml` changes in the same commit as the route**, then `pnpm generate:types`.
 - **`locales/en.json` and `locales/fi.json` change together.** Unsure of the Finnish: English text with a `[TODO:fi]` prefix.
 - **Security**, on any change to `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, federation, extensions or an AI path: authorize against `resolveIdentity(req.auth!, …)` and never a client-supplied id; keep server-trusted config and secrets out of principal-writable namespaces; route non-constant outbound HTTP through `safeFetch`; gate every mutation with `requireScope`/`requireRole`; verify federation Ed25519 signatures unconditionally. Anything whose safe value differs between localhost and the public internet goes in `.env.example` with a safe public default and a documented local override. Identity-touching features ship with cross-owner and cross-scope "→403" tests. → `docs/coding-guidelines/security-development-dna.md`
-- **Pre-commit hook** (`.githooks/pre-commit`) runs lint, typecheck, typecheck:frontend, check:importmap, check:no-max-tokens, check:app-catalog, check:mcp-tools. It reads the worktree rather than the index, so an uncommitted fix can green it falsely. CI runs the same seven plus the vitest suite.
+- **Pre-commit hook** (`.githooks/pre-commit`) runs fifteen checks: lint, typecheck, typecheck:frontend, typecheck:sdk, check:importmap, check:profile-tabs, check:no-max-tokens, check:openapi, check:app-catalog, check:changelog, check:sdk, check:mcp-tools, check:viewport, check:silent-catch, check:ai-disclosure. It reads the worktree rather than the index, so an uncommitted fix can green it falsely. CI runs the same set plus the vitest suite.
 - **File headers** (`@file`, `@description`, `@version-history`) on the `.ts`/`.js`/`.css` files you touch. Any existing source file shows the format.
 - **No file over 800 lines** (`aimeat/max-file-lines`, an error, so it blocks the commit). When one grows past it, split by **pure extraction**: move a coherent group out to a sibling and change nothing else, so the diff is a move and the tests still prove it. Do not shave comments or version history to squeeze under the limit; that is how a file loses the part explaining why it is the way it is.
 - **Shared code has one home per kind.** Served browser libs, cortex libs, extensions and library packs each have their own authoring rules and their own build. → skill `aimeat-library-authoring`
