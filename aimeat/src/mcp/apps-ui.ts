@@ -182,21 +182,37 @@ function render(apps) {
 
     if (app.description) card.appendChild(text(make('p', 'desc'), app.description));
 
-    const tags = (app.tags || []).slice(0, 4);
-    if (app.category) tags.unshift(app.category);
+    // The category leads, then up to four tags that say something it did not. Plenty of apps
+    // tag themselves with their own category, and printing "game game board-game" reads as a
+    // bug to anyone looking at the card.
+    const rest = (app.tags || []).filter(t => t && t !== app.category).slice(0, 4);
+    const tags = app.category ? [app.category, ...rest] : rest;
     if (tags.length) {
       const row = make('div', 'tags');
       for (const t of tags) row.appendChild(text(make('span', 'tag'), t));
       card.appendChild(row);
     }
 
-    // The address is BOTH a link and visible text. A sandboxed frame may refuse to open a new
-    // tab, and a person who can read the address can still get there.
+    // Opening goes through the HOST, not the frame. A plain target=_blank does nothing here:
+    // the app runs in a sandbox that refuses to navigate or open a window, which is the whole
+    // point of the sandbox. ui/open-link is the door the extension provides for exactly this,
+    // and the anchor stays as the fallback for a host that does not offer it. The address is
+    // also printed, so a person is never stuck with a button that goes nowhere.
     if (app.url) {
+      const url = app.url;
       const a = make('a', 'open');
-      a.href = app.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      a.addEventListener('click', async (event) => {
+        event.preventDefault();
+        try {
+          const { isError } = await mcpApp.openLink({ url });
+          if (isError) window.open(url, '_blank', 'noopener');
+        } catch {
+          window.open(url, '_blank', 'noopener');
+        }
+      });
       card.appendChild(text(a, 'Open'));
-      card.appendChild(text(make('div', 'addr'), app.url));
+      card.appendChild(text(make('div', 'addr'), url));
     }
 
     grid.appendChild(card);
@@ -213,16 +229,16 @@ function readToolResult(result) {
   } catch { return null; }
 }
 
-const app = new App({ name: 'AIMEAT App Index', version: '1.0.0' });
+const mcpApp = new App({ name: 'AIMEAT App Index', version: '1.0.0' });
 
-app.ontoolresult = (result) => {
+mcpApp.ontoolresult = (result) => {
   const apps = readToolResult(result);
   if (apps) render(apps);
   else text(empty, 'No apps to show.');
 };
 
 try {
-  await app.connect();
+  await mcpApp.connect();
 } catch (err) {
   // A page that cannot start says so. The failures this replaced showed nothing at all, which
   // is what made them cost three deploys to find.
