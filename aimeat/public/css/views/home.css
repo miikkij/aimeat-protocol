@@ -465,9 +465,9 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .open-items-control { flex: none; display: flex; align-items: center; gap: 0.35rem; }
 .open-items-hand { font-size: 0.8rem; max-width: 10rem; }
 
-/* The one control that puts something on the list and takes it off again, wherever the thing is.
-   A light, not a button with a sentence on it: it has to read at a glance and it has to be small
-   enough to sit next to anything without taking the card over. */
+/* The light. Three states, because the thing it reports has three (P5): not on the list, waiting,
+   being worked on. It is a light and not a checkbox precisely so the third one can exist — an agent
+   takes an item and the person sees it happen where the thing is. */
 .open-toggle {
   display: inline-flex; align-items: center; gap: 0.4rem;
   background: none; border: 0; padding: 0.2rem; cursor: pointer; line-height: 1;
@@ -478,10 +478,23 @@ a.koti-feed-line:hover { text-decoration: underline; }
   transition: background-color 120ms ease, border-color 120ms ease;
 }
 .open-toggle:hover .open-toggle-light { border-color: var(--muted); }
-.open-toggle--on .open-toggle-light { background: var(--accent); border-color: var(--accent); }
+.open-toggle--open .open-toggle-light { background: var(--warning); border-color: var(--warning); }
+.open-toggle--working .open-toggle-light {
+  background: var(--success); border-color: var(--success);
+  animation: open-toggle-pulse 1.8s ease-in-out infinite;
+}
+/* Somebody is working on it RIGHT NOW: the one state that is about this moment rather than a
+   standing fact, so it is the one that moves. */
+@keyframes open-toggle-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .open-toggle--working .open-toggle-light { animation: none; }
+}
 .open-toggle:disabled { opacity: 0.5; cursor: default; }
 .open-toggle-text { font-size: 0.8rem; color: var(--muted); }
-.open-toggle--on .open-toggle-text { color: var(--text); }
+.open-toggle--open .open-toggle-text, .open-toggle--working .open-toggle-text { color: var(--text); }
 
 /* The header button. Hidden at zero, so it never shows a badge that has to be explained. */
 .open-items-btn {

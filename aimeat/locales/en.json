@@ -4101,6 +4101,7 @@
   "openItems.title": "Open items",
   "openItems.toggleOff": "Take it off your open items",
   "openItems.toggleOn": "Put it on your open items",
+  "openItems.working": "Being worked on",
   "openItems.yours": "Yours",
   "organisms": {
     "title": "Organisms",

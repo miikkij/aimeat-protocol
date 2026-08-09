@@ -4101,6 +4101,7 @@
   "openItems.title": "Avoimet asiat",
   "openItems.toggleOff": "Ota pois avoimista asioista",
   "openItems.toggleOn": "Lisää avoimiin asioihin",
+  "openItems.working": "Työn alla",
   "openItems.yours": "Sinun",
   "organisms": {
     "title": "Organismit",
