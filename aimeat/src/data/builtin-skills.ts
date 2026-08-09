@@ -17,6 +17,10 @@
  *   v1.4.0 -- 2026-07-19 -- aimeat-app-builder (public): the paved path for building apps ON
  *     the node over MCP — spec-first, research-before-building (apps/packs/pitfalls), presigned
  *     publish. Canonical home of the skill formerly shipped only inside the OpenHands runtime image.
+ *   v1.8.0 -- 2026-08-09 -- aimeat-open-items (public): how to work someone's open-items list with
+ *     them. Named by /v1/prompts/open-items, which is where a chat is told to fetch it, so the
+ *     per-kind detail and the GO rule can be corrected centrally rather than in the copies people
+ *     have already pasted into their chats.
  *   v1.3.0 -- 2026-07-16 -- aimeat-game-apps (public): game/creative-canvas apps with the
  *     phaser/pixi/p5 library packs — engine selection, v8/instance-mode idioms, AIMEAT glue.
  *   v1.2.0 -- 2026-07-14 -- aimeat-node-guide app section: the agent-face paragraph (Accept:
@@ -27,6 +31,8 @@
  *   v1.0.0 -- 2026-07-05 -- Initial: 4 runbooks (Skills feature Phase 2b)
  */
 
+import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
+
 export interface BuiltinSkill {
   name: string;
   skillMd: string;
@@ -36,6 +42,7 @@ export interface BuiltinSkill {
 }
 
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
+  OPEN_ITEMS_SKILL_ENTRY,
   {
     name: 'aimeat-node-guide',
     visibility: 'public',
