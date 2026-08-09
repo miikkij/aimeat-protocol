@@ -116,6 +116,18 @@ export const APP_INDEX_HTML = `<!DOCTYPE html>
   var countEl = document.getElementById('count');
 
   function send(msg) { window.parent.postMessage(Object.assign({ jsonrpc: '2.0' }, msg), '*'); }
+
+  // The host sizes the frame from this. The official App class sends it on every resize
+  // (autoResize defaults to true), so a page that never sends it leaves the host guessing.
+  function reportSize() {
+    send({
+      method: 'ui/notifications/size-changed',
+      params: {
+        width: Math.ceil(window.innerWidth),
+        height: Math.ceil(document.documentElement.getBoundingClientRect().height),
+      },
+    });
+  }
   function text(el, value) { el.textContent = value == null ? '' : String(value); return el; }
   function make(tag, cls) { var el = document.createElement(tag); if (cls) el.className = cls; return el; }
 
@@ -156,6 +168,7 @@ export const APP_INDEX_HTML = `<!DOCTYPE html>
 
       grid.appendChild(card);
     });
+    reportSize();
   }
 
   // The tool answers with one text block holding { apps: [...], total }.
@@ -168,32 +181,43 @@ export const APP_INDEX_HTML = `<!DOCTYPE html>
     } catch (err) { return null; }
   }
 
+  var initId = nextId++;
+
   window.addEventListener('message', function (event) {
     var msg = event.data;
     if (!msg || msg.jsonrpc !== '2.0') return;
 
-    // The host's answer to ui/initialize. Telling it we are ready is what unlocks the data:
-    // the host sends nothing before this notification.
-    if (msg.id === 1 && msg.result) {
+    // The host's answer to ui/initialize. Telling it we are ready is what unlocks everything:
+    // the host sends nothing to a view that has not said it is initialized.
+    if (msg.id === initId) {
+      if (msg.error) { text(empty, 'This view could not start.'); reportSize(); return; }
       send({ method: 'ui/notifications/initialized', params: {} });
+      reportSize();
       return;
     }
 
     if (msg.method === 'ui/notifications/tool-result') {
       var apps = readToolResult(msg.params);
       if (apps) render(apps);
-      else text(empty, 'No apps to show.');
+      else { text(empty, 'No apps to show.'); reportSize(); }
     }
   });
 
+  window.addEventListener('resize', reportSize);
+
+  // The params are EXACTLY appInfo + appCapabilities + protocolVersion. The schema sets
+  // additionalProperties:false, so a stray key makes the whole request invalid and the host
+  // answers nothing: no result, so no initialized notification, so no data and a frame that
+  // stays blank. That is what an earlier version of this page did, sending clientInfo and a
+  // capabilities key copied from the core MCP handshake, which this dialect does not have.
+  // (No backticks anywhere below this line: the page is a template literal in a .ts file.)
   send({
-    id: nextId++,
+    id: initId,
     method: 'ui/initialize',
     params: {
-      capabilities: {},
-      clientInfo: { name: 'AIMEAT App Index', version: '1.0.0' },
-      protocolVersion: PROTOCOL,
+      appInfo: { name: 'AIMEAT App Index', version: '1.0.0' },
       appCapabilities: { availableDisplayModes: ['inline', 'fullscreen'] },
+      protocolVersion: PROTOCOL,
     },
   });
 })();

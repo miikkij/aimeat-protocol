@@ -372,6 +372,13 @@ async function main() {
             assert(tool._meta?.['ui/resourceUri'] === want, `_meta["ui/resourceUri"], got ${JSON.stringify(tool._meta)}`);
         });
 
+        await test('11b. the page is discoverable in resources/list, not only by direct read', async () => {
+            const { body } = await v1('resources/list', {}, 304);
+            const entry = (body.result?.resources ?? []).find((r: any) => r.uri === 'ui://aimeat/app-index.html');
+            assert(!!entry, `listed among resources, got ${JSON.stringify((body.result?.resources ?? []).map((r: any) => r.uri))}`);
+            assert(entry.mimeType === 'text/html;profile=mcp-app', `listed with the MCP App mime type, got ${entry.mimeType}`);
+        });
+
         await test('12. that page is served as an MCP App resource', async () => {
             const { status, body } = await v1('resources/read', { uri: 'ui://aimeat/app-index.html' }, 301);
             assert(status === 200, `status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
@@ -391,6 +398,24 @@ async function main() {
             // origin in _meta.ui.csp is the way to add one, and it is a decision worth failing over.
             for (const forbidden of ['src="http', "src='http", 'href="http', "href='http", 'src="//', '@import', 'fetch(']) {
                 assert(!html.includes(forbidden), `page is self-contained; found ${forbidden}`);
+            }
+        });
+
+        await test('13b. the page opens the handshake with EXACTLY the three params the host accepts', async () => {
+            const { body } = await v1('resources/read', { uri: 'ui://aimeat/app-index.html' }, 306);
+            const html: string = body.result.contents[0].text;
+            const init = html.slice(html.indexOf("method: 'ui/initialize'"));
+            const params = init.slice(init.indexOf('params: {'), init.indexOf('});'));
+            // McpUiInitializeRequest sets additionalProperties:false and requires these three.
+            // A stray key invalidates the whole request, the host answers nothing, the view never
+            // reports itself initialized, and the frame renders empty with no error anywhere.
+            // The first version of this page sent clientInfo and capabilities, copied from the
+            // core MCP handshake, which this dialect does not have.
+            for (const required of ['appInfo:', 'appCapabilities:', 'protocolVersion:']) {
+                assert(params.includes(required), `ui/initialize params carry ${required} — got ${params}`);
+            }
+            for (const forbidden of ['clientInfo:', 'capabilities: {']) {
+                assert(!params.includes(forbidden), `ui/initialize params reject ${forbidden} — got ${params}`);
             }
         });
 
