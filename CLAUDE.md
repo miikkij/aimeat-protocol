@@ -35,7 +35,7 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 - **A locked plan gets finished**, not sliced, and not followed by "next we could".
 - **Name the exact scope of a deletion** before deleting.
 - **Evidence before assertions.** Name the pass-criterion, then verify against it. Verify with real content, not fixtures. Clean up test data fully. A test must fail first.
-- **Reuse what exists** rather than inventing a parallel list, surface or page type.
+- **Reuse what exists** rather than inventing a parallel list, surface or page type. A feature's data is a memory record under a key prefix plus a prompt that reads it; a new MCP tool, route or table needs a reason memory could not cover it.
 - **Do not rewrite prompts that work** — additive changes only, and only when asked.
 
 Tooling that has bitten before: the dev server does not watch backend `src/` (restart for a new route) · Playwright MCP needs `--isolated` and cannot use `file://` · `rm -rf` follows a junction · `cd x && python` can fail silently, so check the exit status · backticks vanish inside `python -c`, use Write instead · a curl argument mangles UTF-8 on Windows, use `--data-binary @file` · Python text mode rewrites a whole file to CRLF.
@@ -66,6 +66,8 @@ grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
 - **Security**, on any change to `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, federation, extensions or an AI path: authorize against `resolveIdentity(req.auth!, …)` and never a client-supplied id; keep server-trusted config and secrets out of principal-writable namespaces; route non-constant outbound HTTP through `safeFetch`; gate every mutation with `requireScope`/`requireRole`; verify federation Ed25519 signatures unconditionally. Anything whose safe value differs between localhost and the public internet goes in `.env.example` with a safe public default and a documented local override. Identity-touching features ship with cross-owner and cross-scope "→403" tests. → `docs/coding-guidelines/security-development-dna.md`
 - **Pre-commit hook** (`.githooks/pre-commit`) runs lint, typecheck, typecheck:frontend, check:importmap, check:no-max-tokens, check:app-catalog, check:mcp-tools. It reads the worktree rather than the index, so an uncommitted fix can green it falsely. CI runs the same seven plus the vitest suite.
 - **File headers** (`@file`, `@description`, `@version-history`) on the `.ts`/`.js`/`.css` files you touch. Any existing source file shows the format.
+- **No file over 800 lines** (`aimeat/max-file-lines`, an error, so it blocks the commit). When one grows past it, split by **pure extraction**: move a coherent group out to a sibling and change nothing else, so the diff is a move and the tests still prove it. Do not shave comments or version history to squeeze under the limit; that is how a file loses the part explaining why it is the way it is.
+- **Shared code has one home per kind.** Served browser libs, cortex libs, extensions and library packs each have their own authoring rules and their own build. → skill `aimeat-library-authoring`
 - **Subagents run on Opus.** `model: "opus"` or omit it.
 - **Never `MEAT` as a standalone prefix.** `AimeatConfig`, `AIMEAT_*`, `aimeat-local-001-dev`.
 
@@ -200,4 +202,4 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 
 Copy-pasteable agent connect instructions live in `public/views/profile/agents-tab.js` (`buildAgentPrompt()` and `PLATFORMS`). Machine-readable discovery is `src/routes/bootstrap.ts` at `GET /`; managed system prompts are in the DB, served by `src/routes/prompts.ts` at `/v1/prompts/:name`.
 
-Project skills, loaded when the task calls for them: `aimeat-app-building`, `aimeat-frontend-verify`, `aimeat-organism-records`, `aimeat-imagery`.
+Project skills, loaded when the task calls for them: `aimeat-app-building`, `aimeat-library-authoring`, `aimeat-frontend-verify`, `aimeat-organism-records`, `aimeat-imagery`.

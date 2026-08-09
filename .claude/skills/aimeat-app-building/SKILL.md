@@ -56,9 +56,12 @@ When editing that prompt or any app-building guidance, verify every API claim ag
 
 ## Served browser SDK libs
 
-`/v1/libs/aimeat-*.js` are authored as componentized, JSDoc-typed ESM under `src/static/sdk-libs/<name>/` (DRY via `_core/`, under 800 lines per file), esbuild-bundled to a classic IIFE (`pnpm build:sdk`, guarded by `check:sdk` and `typecheck:sdk`), and served with a per-node config prelude by `src/routes/libs.ts`.
+Loading them is app work; **authoring or fixing one is platform work** and has its own rules (ESM
+source under `src/static/sdk-libs/<name>/`, esbuild bundle, never JS inside a TypeScript template
+string, cached bundle needs a restart). → skill `aimeat-library-authoring`.
 
-Never author a served lib as JavaScript inside a TypeScript template string. Edit the ESM source and rebuild. The bundle is cached, so a restart is needed to see changes. Full plan: `docs/internal/sdk-libs-migration-plan.md`.
+The rule that matters from this side: when an app needs behaviour the platform should own, **fix the
+lib, not the app** — the fix then reaches every app instead of one.
 
 ## Removed, do not revive
 
