@@ -8,7 +8,7 @@ Read this before proposing anything. When a design question is genuinely open, t
 
 **AI chat is the primary interface, and MCP is the preferred road in.** The web is the machine room: it shows status and holds the controls that genuinely need a screen. So a capability reachable only by clicking is not finished. Design the chat path first, then the surface that shows what happened.
 
-**The data is refined knowledge the user brought and owns.** Ownership is the product. That is why identity, consent and provenance are load-bearing rather than compliance overhead, and why a feature that quietly takes ownership away is wrong even when it is convenient.
+**The data is refined knowledge the user brought and owns.** Ownership is the product. That is why identity, consent and provenance are load-bearing rather than compliance overhead, and why a feature that erodes ownership is wrong even when it is convenient.
 
 **Agents are first-class users.** They arrive through device authorization, the hello-integration flow and the `aimeat-crewai` liaison package, and an agent should be able to do what a person can do. An agent-shaped door added after the fact is a symptom that the feature was designed for a screen.
 
