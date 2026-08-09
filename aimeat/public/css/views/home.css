@@ -452,7 +452,14 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-pool-item { font-size: 0.95rem; line-height: 1.35; overflow-wrap: anywhere; }
 .koti-pool-row--done .koti-pool-item { color: var(--muted); text-decoration: line-through; }
 .koti-pool-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
-/* Actions stay out of the way until the row is reached; they are never the point of the line. */
+/* The row's right side is its PROMPT, not a pair of management buttons — 03-pinnat-ja-ui.md.
+   The card is stripped down here: no border of its own, no label, just the control. */
+.koti-pool-control { flex: none; }
+.koti-pool-control .koti-prompt { border: 0; background: none; margin: 0; overflow: visible; }
+.koti-pool-control .koti-prompt-head { border-bottom: 0; padding: 0; }
+.koti-pool-control .koti-prompt-label { display: none; }
+.koti-pool-control .koti-prompt-menu { border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 0.3rem; }
+.koti-pool-control .koti-prompt-body { max-height: 9rem; margin-top: 0.3rem; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .koti-pool-actions { flex: none; display: flex; gap: 0.25rem; }
 .koti-room-save { margin-top: 0.5rem; font-size: 0.8rem; align-self: flex-start; }
 
@@ -461,5 +468,5 @@ a.koti-feed-line:hover { text-decoration: underline; }
   .koti-pool-row { flex-wrap: wrap; }
   /* border-box, or the indent is added ON TOP of the full width and the row runs 12px off a
      390px screen — measured, not guessed. */
-  .koti-pool-actions { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
+  .koti-pool-actions, .koti-pool-control { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
 }

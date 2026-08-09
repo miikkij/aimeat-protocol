@@ -9007,7 +9007,9 @@
         "what": "Viestit ihmisiltä ja omilta agenteiltasi tulevat yhteen paikkaan.",
         "next": "Seuraavaksi: luet mitä siellä jo odottaa, ja vastaat samassa paikassa.",
         "entered": "Menit lukemaan viestisi."
-      }
+      },
+      "copyPrompt": "Kopioi kehote",
+      "copied": "Kopioitu — liitä se tekoälychattiisi"
     },
     "settings": {
       "open": "Asetukset",
@@ -9028,8 +9030,8 @@
     "more": "Lisää",
     "showText": "Näytä kehote",
     "hideText": "Piilota kehote",
-    "save": "Tallenna myöhemmäksi",
-    "saved": "Tallennettu listallesi",
+    "save": "Jää odottamaan",
+    "saved": "Odottaa listallasi",
     "giveTo": "Anna agentille"
   },
   "pool": {
@@ -9038,6 +9040,7 @@
     "isDoing": "tekee tätä",
     "yours": "Sinun",
     "markDone": "Tehty",
-    "remove": "Poista"
+    "remove": "Poista",
+    "waiting": "Odottaa"
   }
 }

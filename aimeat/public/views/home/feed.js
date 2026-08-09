@@ -18,11 +18,13 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 6–7).
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { createIntent } from '/js/services/intents.js';
+import { createIntent, reachableAgents, promoteIntent } from '/js/services/intents.js';
+import { apiGet } from '/js/api.js';
+import { PromptCard } from '/components/PromptCard.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -95,37 +97,63 @@ const SAVEABLE_ROOMS = {
 };
 
 /**
- * "Save it for later" inside a room card.
+ * The prompt block inside a room card: copy it now, look at it first, put it off, or hand it over.
  *
- * The card is an <a> under the SPA's delegated link handler, so this button has to stop the event
- * itself or saving would also mark the room entered and navigate away — the same trap the card's
- * own onClick documents right above.
+ * ONE primary control — "Copy the prompt" — with a chevron beside it. That order is the whole
+ * point: copying is what people came to do, and the three rarer choices live behind the chevron so
+ * they cost nothing. A bare "save for later" with no prompt beside it, which is what this was at
+ * first, is a verb with no object: there is nothing for it to refer to and no way to explain it.
+ *
+ * The body starts hidden. A room card is a card, and "show the prompt" is one of the three rows.
  */
-function SaveForLater({ room }) {
-  const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState(false);
+function RoomPrompt({ room, agents }) {
   const cfg = SAVEABLE_ROOMS[room.id];
+  const [prompt, setPrompt] = useState('');
+
+  // Fetched when the card appears, so the primary button stays ONE click. The text is never stored
+  // in the intent — only its name — so this is also the only place it is ever read from.
+  useEffect(() => {
+    let alive = true;
+    apiGet(`/v1/prompts/${cfg.promptRef}`)
+      .then(r => { if (alive) setPrompt(r?.data?.prompt || ''); })
+      .catch(e => swallowed('home/rooms: prompt fetch', e));
+    return () => { alive = false; };
+  }, [cfg.promptRef]);
+
+  if (!prompt) return null;
+
   return html`
-    <button type="button" class="btn-ghost koti-room-save" disabled=${busy || saved}
-      onClick=${async (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setBusy(true);
-        try {
-          await createIntent({
-            title: tr(cfg.titleKey, room.id),
-            prompt_ref: cfg.promptRef,
-            origin: `home.rooms.${room.id}`,
-          });
-          setSaved(true);
-        } catch (err) { swallowed('home/rooms: save for later', err); }
-        finally { setBusy(false); }
-      }}>
-      ${saved ? tr('prompt.saved', 'Saved to your list') : tr('prompt.save', 'Save for later')}
-    </button>`;
+    <${PromptCard}
+      label=${tr(`home.rooms.${room.id}.title`, room.id)}
+      prompt=${prompt}
+      className="btn-outline"
+      copyLabel=${tr('home.rooms.copyPrompt', 'Copy the prompt')}
+      copiedLabel=${tr('home.rooms.copied', 'Copied — paste it in your AI chat')}
+      showPrompt=${false}
+      saveIntent=${() => createIntent({
+        title: tr(`home.rooms.${room.id}.title`, room.id),
+        prompt_ref: cfg.promptRef,
+        origin: `home.rooms.${room.id}`,
+      })}
+      agents=${agents}
+      onGiveToAgent=${(a) => promoteIntent(
+        { id: null, title: tr(`home.rooms.${room.id}.title`, room.id), prompt_ref: cfg.promptRef },
+        a,
+      )} />`;
 }
 
 export function Rooms({ rooms, onEnter }) {
+  // Who could take this off your hands. Empty is the normal case and simply hides that row —
+  // offering a name that never drains a queue is a graveyard.
+  const [agents, setAgents] = useState([]);
+  useEffect(() => {
+    let alive = true;
+    reachableAgents()
+      .then(list => { if (alive) setAgents(list); })
+      .catch(e => swallowed('home/rooms: agents', e));
+    return () => { alive = false; };
+  }, []);
+
   if (!rooms || !rooms.length) return null;
   return html`
     <section class="koti-rooms">
@@ -149,7 +177,7 @@ export function Rooms({ rooms, onEnter }) {
                  answer and the node already serves the prompt. `monetise` promises a UI journey
                  that produces no object, and `messages` is your own post — neither is something
                  an AI hands back later. */''}
-            ${SAVEABLE_ROOMS[room.id] && html`<${SaveForLater} room=${room} />`}
+            ${SAVEABLE_ROOMS[room.id] && html`<${RoomPrompt} room=${room} agents=${agents} />`}
           </a>`)}
       </div>
     </section>`;

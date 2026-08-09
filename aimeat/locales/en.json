@@ -9007,7 +9007,9 @@
         "what": "Messages from people and from your own agents arrive in one place.",
         "next": "Next: you read what is already waiting, and reply in the same place.",
         "entered": "You went to read your messages."
-      }
+      },
+      "copyPrompt": "Copy the prompt",
+      "copied": "Copied — paste it in your AI chat"
     },
     "settings": {
       "open": "Settings",
@@ -9028,16 +9030,17 @@
     "more": "More",
     "showText": "Show the prompt",
     "hideText": "Hide the prompt",
-    "save": "Save for later",
-    "saved": "Saved to your list",
+    "save": "Leave it waiting",
+    "saved": "Waiting on your list",
     "giveTo": "Give it to"
   },
   "pool": {
-    "title": "What you mean to do",
+    "title": "What you are going to do",
     "suggestion": "Suggestion — it disappears once this is done",
     "isDoing": "is doing this",
     "yours": "Yours",
     "markDone": "Done",
-    "remove": "Remove"
+    "remove": "Remove",
+    "waiting": "Waiting"
   }
 }

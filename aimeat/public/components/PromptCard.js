@@ -46,6 +46,14 @@ export function PromptCard({
   agents = [],
   /** (agentEntry) => Promise */
   onGiveToAgent = null,
+  /**
+   * Extra menu rows, appended after the built-in ones: [{ label, run, disabled }].
+   *
+   * The pool's rows need "Done" and "Remove" in the same place a prompt surface offers "leave it
+   * waiting" — one chevron per row, not a chevron next to two loose buttons. Kept as data rather
+   * than baked in, because this component must not learn what an intent is.
+   */
+  extraActions = [],
   /** Start with the prompt body visible. The four original call sites all did. */
   showPrompt = true,
 }) {
@@ -55,7 +63,7 @@ export function PromptCard({
   const [busy, setBusy] = useState(false);
 
   const canGive = !!onGiveToAgent && agents.length > 0;
-  const hasMenu = !!saveIntent || canGive || !showPrompt;
+  const hasMenu = !!saveIntent || canGive || !showPrompt || extraActions.length > 0;
 
   // The card can sit inside a room card, which is an <a> under the SPA's delegated link handler.
   // Without this, copying also navigates away and marks the room entered — already learned once in
@@ -96,13 +104,19 @@ export function PromptCard({
           ${saveIntent && html`
             <button type="button" class="btn-ghost koti-prompt-menu-item" disabled=${busy || saved}
               onClick=${(e) => { stop(e); run(saveIntent, () => setSaved(true)); }}>
-              ${saved ? tr('prompt.saved', 'Saved to your list') : tr('prompt.save', 'Save for later')}
+              ${saved ? tr('prompt.saved', 'Waiting on your list') : tr('prompt.save', 'Leave it waiting')}
             </button>`}
           ${canGive && agents.map(a => html`
             <button type="button" key=${a.gaii || a.name} class="btn-ghost koti-prompt-menu-item"
               disabled=${busy}
               onClick=${(e) => { stop(e); run(() => onGiveToAgent(a)); }}>
               ${tr('prompt.giveTo', 'Give it to')} ${a.display_name || a.name}
+            </button>`)}
+          ${extraActions.map((a, idx) => html`
+            <button type="button" key=${'x' + idx} class="btn-ghost koti-prompt-menu-item"
+              disabled=${busy || a.disabled}
+              onClick=${(e) => { stop(e); run(a.run); }}>
+              ${a.label}
             </button>`)}
         </div>`}
 
