@@ -13,7 +13,7 @@
  *   behind the chevron, and the chevron only appears when there is something behind it.
  *
  *   "Give it to an agent" appears only when an agent that actually drains a queue exists
- *   (services/intents.js reachableAgents). Offering a name that will sit there forever is a
+ *   (services/open-items.js reachableAgents). Offering a name that will sit there forever is a
  *   graveyard, not a feature.
  * @structure PromptCard({ label, prompt, className, copyLabel, copiedLabel, onCopied,
  *   saveIntent, agents, onGiveToAgent, showPrompt })

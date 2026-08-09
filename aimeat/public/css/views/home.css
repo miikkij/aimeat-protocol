@@ -433,40 +433,59 @@ a.koti-feed-line:hover { text-decoration: underline; }
 /* ── The intent pool: one list of what you mean to do here ────────────────── */
 /* Human-written intents and system suggestions share one list; the second line says which is
    which. Empty renders nothing at all — see components/IntentPool.js. */
-.koti-pool { margin: 1.5rem 0 0; }
-.koti-pool-title {
-  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px;
-  color: var(--muted); font-weight: 700; margin: 0 0 0.6rem;
+/* Open items. One list of what you are going to do here; the prompt that takes the whole list
+   into a chat sits at the TOP, not on every row (P16). Rows carry the state control and nothing
+   else, because on and off are the only two things an item can be (P19). */
+.open-items { margin: 1.5rem 0 0; }
+.open-items-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 0.75rem; flex-wrap: wrap; margin: 0 0 0.6rem;
 }
-.koti-pool-list { list-style: none; margin: 0; padding: 0; }
-.koti-pool-row {
+.open-items-title {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--muted); font-weight: 700; margin: 0;
+}
+.open-items-count {
+  display: inline-block; margin-left: 0.35rem; padding: 0 0.4rem;
+  border-radius: 999px; background: var(--surface-2); color: var(--text);
+  font-size: 0.72rem; letter-spacing: 0;
+}
+.open-items-list { list-style: none; margin: 0; padding: 0; }
+.open-items-row {
   display: flex; align-items: flex-start; gap: 0.7rem;
   padding: 0.6rem 0;
   border-bottom: 1px solid var(--border);
 }
-.koti-pool-row:last-child { border-bottom: 0; }
-.koti-pool-mark { flex: none; width: 1rem; color: var(--muted); line-height: 1.4; }
-.koti-pool-row--done .koti-pool-mark { color: var(--success); }
-.koti-pool-row--working .koti-pool-mark { color: var(--accent); }
-.koti-pool-main { flex: 1 1 auto; min-width: 0; }
-.koti-pool-item { font-size: 0.95rem; line-height: 1.35; overflow-wrap: anywhere; }
-.koti-pool-row--done .koti-pool-item { color: var(--muted); text-decoration: line-through; }
-.koti-pool-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
-/* The row's right side is its PROMPT, not a pair of management buttons — 03-pinnat-ja-ui.md.
-   The card is stripped down here: no border of its own, no label, just the control. */
-.koti-pool-control { flex: none; }
-.koti-pool-control .koti-prompt { border: 0; background: none; margin: 0; overflow: visible; }
-.koti-pool-control .koti-prompt-head { border-bottom: 0; padding: 0; }
-.koti-pool-control .koti-prompt-label { display: none; }
-.koti-pool-control .koti-prompt-menu { border: 1px solid var(--border); border-radius: var(--radius-sm); margin-top: 0.3rem; }
-.koti-pool-control .koti-prompt-body { max-height: 9rem; margin-top: 0.3rem; border: 1px solid var(--border); border-radius: var(--radius-sm); }
-.koti-pool-actions { flex: none; display: flex; gap: 0.25rem; }
+.open-items-row:last-child { border-bottom: 0; }
+.open-items-mark { flex: none; width: 1rem; color: var(--muted); line-height: 1.4; }
+.open-items-row--working .open-items-mark { color: var(--accent); }
+.open-items-main { flex: 1 1 auto; min-width: 0; }
+.open-items-item { font-size: 0.95rem; line-height: 1.35; overflow-wrap: anywhere; }
+.open-items-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+.open-items-control { flex: none; display: flex; align-items: center; gap: 0.35rem; }
+.open-items-hand { font-size: 0.8rem; max-width: 10rem; }
+
+/* The one control that puts something on the list and takes it off again, wherever the thing is. */
+.open-toggle { display: inline-flex; align-items: center; gap: 0.35rem; }
+.open-toggle-mark { color: var(--muted); }
+.open-toggle--on .open-toggle-mark { color: var(--accent); }
+.open-toggle--on .open-toggle-text { color: var(--text); }
+
+/* The header button. Hidden at zero, so it never shows a badge that has to be explained. */
+.open-items-btn {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  background: none; border: 0; cursor: pointer; padding: 0.25rem 0.4rem;
+  color: var(--muted); font-size: 0.85rem;
+}
+.open-items-btn:hover { color: var(--text); }
+.open-items-btn-count { font-weight: 700; color: var(--text); }
+
 .koti-room-save { margin-top: 0.5rem; font-size: 0.8rem; align-self: flex-start; }
 
 @media (max-width: 640px) {
   /* The row wraps rather than squeezing the title into a column two words wide. */
-  .koti-pool-row { flex-wrap: wrap; }
+  .open-items-row { flex-wrap: wrap; }
   /* border-box, or the indent is added ON TOP of the full width and the row runs 12px off a
      390px screen — measured, not guessed. */
-  .koti-pool-actions, .koti-pool-control { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
+  .open-items-control { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
 }

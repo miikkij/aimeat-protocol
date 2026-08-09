@@ -6328,55 +6328,34 @@ paths:
             Error codes: authorization_pending, access_denied, expired_token,
             slow_down, unsupported_grant_type, invalid_request, invalid_grant.
 
-  /v1/intents:
+  /v1/open-items:
     get:
-      operationId: listIntents
+      operationId: listOpenItems
       tags: [Memory]
-      summary: The owner's intent pool
+      summary: The owner's open items
       description: >
-        One list of what the owner means to do here. Each intent is a memory record under the
-        `intent.` prefix in the owner's namespace, so their own agent can read the pool through
-        `GET /v1/memory/{key}?owner_scope=true` without a route of its own. Suggestions whose
+        One list of what the owner is going to do here. The whole list is a single memory record,
+        `open-items.list`, in the owner's namespace, so their own agent reads it with
+        `aimeat_memory_read` + `owner_scope` and writes it with `aimeat_memory_write` +
+        `owner_scope` + `expected_version`, without a route of its own. Suggestions whose
         `closes_when` condition already holds are dropped unless `include=satisfied`; the condition
-        is evaluated on READ and never stored, so a suggestion comes back if the situation unwinds.
+        is evaluated on read and never stored.
       security:
         - BearerAuth: []
       parameters:
         - name: include
           in: query
-          required: false
           schema: { type: string }
           description: Comma-separated. `satisfied` keeps suggestions whose condition already holds.
       responses:
         '200':
-          description: The pool
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          intents:
-                            type: array
-                            items: { $ref: '#/components/schemas/Intent' }
-                          total: { type: integer }
-                          satisfied_hidden:
-                            type: integer
-                            description: >
-                              How many suggestions were dropped as already satisfied, so a client can
-                              say "nothing outstanding" instead of rendering an empty list.
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
+          description: The list.
+        '401': { description: Not authenticated }
+        '403': { description: Owner session required }
     post:
-      operationId: createIntent
+      operationId: addOpenItem
       tags: [Memory]
-      summary: Add an intent to the pool
+      summary: Switch something on
       security:
         - BearerAuth: []
       requestBody:
@@ -6388,63 +6367,59 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 200 }
-                kind:
-                  type: string
-                  nullable: true
-                  description: One of the /v1/discover types; the vocabulary is not reinvented here.
-                  enum: [capability, workflow, knowledge, decision, research, material, company,
-                         offering, document, organism, app, template, skill, memory]
-                prompt_ref:
-                  type: string
-                  nullable: true
-                  description: >
-                    The NAME of a node-served prompt, fetched from /v1/prompts/{name} when needed.
-                    The text is never stored - a snapshot would freeze a fork of a prompt the node
-                    serves precisely so corrections reach the copies people already carry.
-                prompt_args: { type: object, nullable: true }
-                origin:
-                  type: string
-                  nullable: true
-                  description: Which surface seeded this, so it can be measured.
+                kind: { type: string, description: One of the /v1/discover types. }
+                prompt_ref: { type: string, description: A prompt NAME, never prompt text. }
+                prompt_args: { type: object, additionalProperties: true }
+                origin: { type: string, description: Which surface it was switched on from. }
                 object:
                   type: object
-                  nullable: true
                   properties:
                     type: { type: string }
                     id: { type: string }
                 closes_when:
                   type: object
-                  nullable: true
-                  description: For system-suggested steps only. Evaluated on read.
                   properties:
-                    check:
-                      type: string
-                      enum: [hello_mcp, welcome_mat, first_agent]
+                    check: { type: string, enum: [hello_mcp, welcome_mat, first_agent] }
+                by:
+                  type: string
+                  enum: [person, ai]
+                  description: Who switched it on. The surface shows when it was the AI.
       responses:
-        '201':
-          description: Created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          intent: { $ref: '#/components/schemas/Intent' }
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '409':
-          description: The pool is full
-  /v1/intents/{id}:
-    patch:
-      operationId: updateIntent
+        '201': { description: Switched on. }
+        '400': { description: Invalid input }
+        '409': { description: The list is full, or it changed while writing. }
+
+  /v1/open-items/count:
+    get:
+      operationId: openItemsCount
       tags: [Memory]
-      summary: Change an intent
+      summary: How many are switched on
+      description: >
+        One key read, one field. The header asks for this on every page, so it must not pay for the
+        list's payload to show a badge.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: The count. }
+
+  /v1/open-items/stats:
+    get:
+      operationId: openItemsStats
+      tags: [Memory]
+      summary: Does anything on this list get done
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Counts by state, origin and who switched things on. }
+
+  /v1/open-items/{id}:
+    patch:
+      operationId: patchOpenItem
+      tags: [Memory]
+      summary: Change one item
+      description: >
+        Moves a field. Switching an item off is DELETE, not a status: on and off are the two
+        positions of one control, and there is no third state.
       security:
         - BearerAuth: []
       parameters:
@@ -6460,9 +6435,8 @@ paths:
               type: object
               properties:
                 title: { type: string, maxLength: 200 }
-                status: { type: string, enum: [open, working, done] }
-                kind: { type: string, nullable: true }
-                prompt_ref: { type: string, nullable: true }
+                status: { type: string, enum: [open, working] }
+                agent: { type: string, nullable: true }
                 object:
                   type: object
                   nullable: true
@@ -6470,16 +6444,17 @@ paths:
                     type: { type: string }
                     id: { type: string }
       responses:
-        '200':
-          description: Updated
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '200': { description: The item. }
+        '400': { description: Invalid input }
+        '404': { description: No such item }
+        '409': { description: The list changed while writing. }
     delete:
-      operationId: deleteIntent
+      operationId: switchOffOpenItem
       tags: [Memory]
-      summary: Remove an intent
+      summary: Switch it off
+      description: >
+        The same control that switched it on, the other way. A short record stays behind so
+        "does anything on this list get done" has an answer; nothing shows it and nothing ages it.
       security:
         - BearerAuth: []
       parameters:
@@ -6488,10 +6463,10 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
-          description: Removed
-        '404':
-          $ref: '#/components/responses/NotFound'
+        '200': { description: Switched off. }
+        '404': { description: No such item }
+        '409': { description: The list changed while writing. }
+
 
   /v1/agents/verify/info/{userCode}:
     get:

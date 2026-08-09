@@ -33,7 +33,7 @@ import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
-import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
+import { registerOpenItemsPrompt } from './prompts-open-items.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
@@ -322,52 +322,8 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // GET /v1/prompts/welcome-mat — step 1 of the new path (aimeat_remake/03-welcome-mat.md). The
-  // person copies this into their own AI chat and pastes the answer into the box on their home.
-  // Served from the node like build-app because this prompt IS the gate: how many attempts a mat
-  // takes measures the prompt, and when the funnel says it is too hard it has to be fixable from
-  // the server — including for the copies people have already carried into their chats.
-  // ?lang=en|fi, ?variant=full|short, ?format=txt. Public. MUST be registered before /v1/prompts/:tier.
-  router.get('/v1/prompts/welcome-mat', optionalAuth(), async (req, res) => {
-    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
-    const variant = req.query.variant === 'short' ? 'short' as const : 'full' as const;
-    // Fold in the person's own name when we know it, so the page is about someone. Anonymous
-    // callers get the same prompt with the model told to ask for the name instead.
-    let displayName = '';
-    if (req.auth && !req.auth.anonymous && req.auth.owner) {
-      const ghii = await storage.getGHIIByOwner(req.auth.owner);
-      displayName = ghii?.displayName ?? req.auth.owner;
-    }
-    const prompt = buildWelcomeMatPrompt(config, { lang, variant, displayName });
-    if (req.query.format === 'txt') {
-      res.type('text/plain; charset=utf-8').send(prompt);
-      return;
-    }
-    res.json(success(config.nodeId, {
-      id: 'welcome-mat',
-      name: 'Your welcome mat',
-      description: 'Paste into your own AI chat, then paste the answer back into the box on your home. '
-        + 'The answer is one HTML page; it becomes your portfolio, and its metadata says which AI wrote it. '
-        + 'The short variant asks only for a heading and a few paragraphs.',
-      lang,
-      variant,
-      prompt,
-      system_prompt: prompt,
-      // The shorter one, offered alongside so a failed paste has somewhere to go without a
-      // second round trip.
-      fallback_prompt: variant === 'full'
-        ? buildWelcomeMatPrompt(config, { lang, variant: 'short', displayName })
-        : null,
-    }, [
-      { description: 'Paste the answer here', method: 'POST', url: '/v1/home/welcome-mat' },
-      { description: 'Where your home stands', method: 'GET', url: '/v1/home/state' },
-    ]));
-  });
+  registerOpenItemsPrompt(router, config, storage);
 
-  // GET /v1/prompts/agent-onboard — the front-page agent door (12-ai-rekisteroi.md). A person
-  // copies this into their own AI chat; if that AI can POST, it gets them an account without their
-  // touching the interface. PUBLIC and unauthenticated on purpose — the whole point is that the
-  // person does not have an account yet. ?lang, ?format=txt. MUST be registered before /v1/prompts/:tier.
   router.get('/v1/prompts/agent-onboard', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const prompt = buildAgentOnboardPrompt(config, { lang });

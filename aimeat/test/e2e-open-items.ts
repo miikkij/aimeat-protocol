@@ -1,20 +1,22 @@
 /**
- * @file e2e-intents.ts
- * @description The intent pool: the owner's list of what they mean to do here, and who may see it.
+ * @file e2e-open-items.ts
+ * @description Open items: the owner's list of what they are going to do here, and who may see it.
  *
- *   The refusals are the point. An intent pool is a to-do list written in the owner's own words,
- *   living in their memory namespace — so the tests that matter are the ones proving another owner
+ *   The refusals are the point. This list is written in the owner's own words and lives in their
+ *   memory namespace — so the tests that matter are the ones proving another owner
  *   cannot read it, an ecosystem app cannot read it, and the owner's own AGENT can (that last one
- *   is the whole design: the agent reads the pool through the memory route rather than through a
+ *   is the whole design: the agent reads the list through the memory route rather than through a
  *   route of its own, and if it could not, the browsing half of the feature would have to go).
  *
  *   Gate 0.2b from docs/internal/aiepooli/05-checklist.md is Phase 3 here: the route says in its
  *   own comment that it lets same-owner principals opt in, and that had never been run.
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
- *     test/run-e2e-ci.ts --test=intents
+ *     test/run-e2e-ci.ts --test=open-items
  * @version-history
- *   v1.0.0 — 2026-08-09 — Initial (intent pool, phase 1 + gate 0.2b/0.3).
+ *   v1.0.0 — 2026-08-09 — Replaces e2e-intents.ts. One key instead of one record per item, a
+ *     flipped state instead of open→done, and the agent now WRITES the list rather than only
+ *     reading it, so the conflict path is covered too.
  */
 
 import * as ed from '@noble/ed25519';
@@ -79,11 +81,11 @@ let ownerToken = '';
 let strangerToken = '';
 let agentToken = '';
 let ecoToken = '';
-let intentId = '';
-let promotedIntentId = '';
+let itemId = '';
+let promotedItemId = '';
 let promotedTaskId = '';
 
-console.log('\n=== Intent Pool E2E Tests ===\n');
+console.log('\n=== Open Items E2E Tests ===\n');
 console.log('Phase 0: setup');
 
 await test('Register the owner and a stranger', async () => {
@@ -91,17 +93,17 @@ await test('Register the owner and a stranger', async () => {
     strangerToken = await registerOwner(stranger);
 });
 
-console.log('\nPhase 1: the pool itself');
+console.log('\nPhase 1: the list itself');
 
-await test('an empty pool is an empty list, not an error', async () => {
-    const r = await json('/v1/intents', auth(ownerToken));
+await test('an empty list is an empty list, not an error', async () => {
+    const r = await json('/v1/open-items', auth(ownerToken));
     assert(r.status === 200, `list ${r.status}: ${JSON.stringify(r.body.error)}`);
-    assert(Array.isArray(r.body.data.intents) && r.body.data.intents.length === 0,
-        `expected an empty pool, got ${JSON.stringify(r.body.data.intents)}`);
+    assert(Array.isArray(r.body.data.items) && r.body.data.items.length === 0,
+        `expected an empty list, got ${JSON.stringify(r.body.data.items)}`);
 });
 
-await test('create an intent', async () => {
-    const r = await json('/v1/intents', auth(ownerToken, {
+await test('switch something on', async () => {
+    const r = await json('/v1/open-items', auth(ownerToken, {
         method: 'POST',
         body: JSON.stringify({
             title: 'Uudista tervetulomatto', kind: 'document',
@@ -109,49 +111,66 @@ await test('create an intent', async () => {
         }),
     }));
     assert(r.status === 201, `create ${r.status}: ${JSON.stringify(r.body.error)}`);
-    const i = r.body.data.intent;
-    intentId = i.id;
+    const i = r.body.data.item;
+    itemId = i.id;
     assert(!!i.id && i.status === 'open', `bad shape: ${JSON.stringify(i)}`);
     assert(i.prompt_ref === 'welcome-mat', 'prompt_ref is a NAME, kept as given');
-    assert(i.origin === 'home.rooms.create', 'origin is recorded — it is how we learn where intents come from');
+    assert(i.origin === 'home.rooms.create', 'origin is recorded — it is how we learn where items come from');
 });
 
 await test('THE PROMPT TEXT IS NOT STORED — only its name', async () => {
-    const r = await json(`/v1/memory/${encodeURIComponent(`intent.${intentId}`)}`, auth(ownerToken));
+    const r = await json('/v1/memory/open-items.list', auth(ownerToken));
     assert(r.status === 200, `read record ${r.status}`);
     const raw = JSON.stringify(r.body.data.value);
     assert(raw.includes('welcome-mat'), 'the name is there');
     assert(raw.length < 1000, `the record should be small; a stored prompt would blow it up: ${raw.length} chars`);
 });
 
-await test('the record carries the tags the pool relies on, and NO ttl', async () => {
-    const r = await json(`/v1/memory/${encodeURIComponent(`intent.${intentId}`)}`, auth(ownerToken));
+await test('the record carries the tags the list relies on, and NO ttl', async () => {
+    const r = await json('/v1/memory/open-items.list', auth(ownerToken));
     const e = r.body.data;
-    assert(Array.isArray(e.tags) && e.tags.includes('intent') && e.tags.includes('intent:open'),
+    assert(Array.isArray(e.tags) && e.tags.includes('open-items'),
         `tags: ${JSON.stringify(e.tags)}`);
     assert(e.visibility === 'owner', `visibility should be owner, got ${e.visibility}`);
-    // A pool that empties itself in 90 days is worse than no pool.
-    assert(!e.expires_at && !e.ttl_hours, `an intent must not expire: ${JSON.stringify(e)}`);
+    // A list that empties itself in 90 days is worse than no list.
+    assert(!e.expires_at && !e.ttl_hours, `the list must not expire: ${JSON.stringify(e)}`);
 });
 
 await test('list it back', async () => {
-    const r = await json('/v1/intents', auth(ownerToken));
-    assert(r.body.data.intents.length === 1, `expected 1, got ${r.body.data.intents.length}`);
-    assert(r.body.data.intents[0].id === intentId, 'the same intent comes back');
+    const r = await json('/v1/open-items', auth(ownerToken));
+    assert(r.body.data.items.length === 1, `expected 1, got ${r.body.data.items.length}`);
+    assert(r.body.data.items[0].id === itemId, 'the same item comes back');
 });
 
-await test('move it to done', async () => {
-    const r = await json(`/v1/intents/${intentId}`, auth(ownerToken, {
+await test('THERE IS NO DONE — status done is refused, switching off is DELETE', async () => {
+    const r = await json(`/v1/open-items/${itemId}`, auth(ownerToken, {
         method: 'PATCH', body: JSON.stringify({ status: 'done' }),
     }));
-    assert(r.status === 200, `patch ${r.status}: ${JSON.stringify(r.body.error)}`);
-    assert(r.body.data.intent.status === 'done', 'status moved');
-    const mem = await json(`/v1/memory/${encodeURIComponent(`intent.${intentId}`)}`, auth(ownerToken));
-    assert(mem.body.data.tags.includes('intent:done'), `the tag follows the status: ${JSON.stringify(mem.body.data.tags)}`);
+    assert(r.status === 400, `done must not be a status, got ${r.status}`);
+});
+
+await test('switch it off: it leaves the list, and a record of it stays', async () => {
+    const off = await json(`/v1/open-items/${itemId}`, auth(ownerToken, { method: 'DELETE' }));
+    assert(off.status === 200, `switch off ${off.status}: ${JSON.stringify(off.body.error)}`);
+    const list = await json('/v1/open-items', auth(ownerToken));
+    assert(list.body.data.items.length === 0, 'it is off the list');
+    // "Does anything here get done" must still have an answer.
+    const stats = await json('/v1/open-items/stats', auth(ownerToken));
+    assert(stats.body.data.closed === 1, `the closed record must survive: ${JSON.stringify(stats.body.data)}`);
+    assert(stats.body.data.open === 0, 'and it is not counted as open');
+});
+
+await test('switch something on again, so the rest of the run has an item', async () => {
+    const r = await json('/v1/open-items', auth(ownerToken, {
+        method: 'POST',
+        body: JSON.stringify({ title: 'Uudista tervetulomatto', prompt_ref: 'welcome-mat', origin: 'home.rooms.create' }),
+    }));
+    assert(r.status === 201, `create ${r.status}`);
+    itemId = r.body.data.item.id;
 });
 
 await test('a bad kind is refused, with the vocabulary named', async () => {
-    const r = await json('/v1/intents', auth(ownerToken, {
+    const r = await json('/v1/open-items', auth(ownerToken, {
         method: 'POST', body: JSON.stringify({ title: 'x', kind: 'invented-type' }),
     }));
     assert(r.status === 400, `expected 400, got ${r.status}`);
@@ -159,37 +178,37 @@ await test('a bad kind is refused, with the vocabulary named', async () => {
 });
 
 await test('a title is required', async () => {
-    const r = await json('/v1/intents', auth(ownerToken, { method: 'POST', body: JSON.stringify({}) }));
+    const r = await json('/v1/open-items', auth(ownerToken, { method: 'POST', body: JSON.stringify({}) }));
     assert(r.status === 400, `expected 400, got ${r.status}`);
 });
 
-console.log('\nPhase 2: whose pool it is');
+console.log('\nPhase 2: whose list it is');
 
-await test("REFUSAL: another owner cannot read this pool", async () => {
-    const r = await json('/v1/intents', auth(strangerToken));
-    assert(r.status === 200, `the stranger has their own pool: ${r.status}`);
-    assert(r.body.data.intents.length === 0,
-        `a stranger must see NOTHING of another owner's pool, saw ${r.body.data.intents.length}`);
+await test("REFUSAL: another owner cannot read this list", async () => {
+    const r = await json('/v1/open-items', auth(strangerToken));
+    assert(r.status === 200, `the stranger has their own list: ${r.status}`);
+    assert(r.body.data.items.length === 0,
+        `a stranger must see NOTHING of another owner's list, saw ${r.body.data.items.length}`);
 });
 
-await test("REFUSAL: another owner cannot patch or delete this intent", async () => {
-    const p = await json(`/v1/intents/${intentId}`, auth(strangerToken, {
+await test("REFUSAL: another owner cannot patch or switch off this item", async () => {
+    const p = await json(`/v1/open-items/${itemId}`, auth(strangerToken, {
         method: 'PATCH', body: JSON.stringify({ title: 'hijacked' }),
     }));
     assert(p.status === 404, `patch by a stranger must 404, got ${p.status}`);
-    const d = await json(`/v1/intents/${intentId}`, auth(strangerToken, { method: 'DELETE' }));
+    const d = await json(`/v1/open-items/${itemId}`, auth(strangerToken, { method: 'DELETE' }));
     assert(d.status === 404, `delete by a stranger must 404, got ${d.status}`);
-    // …and the intent is untouched.
-    const mine = await json('/v1/intents', auth(ownerToken));
-    assert(mine.body.data.intents[0].title === 'Uudista tervetulomatto', 'the title survived');
+    // …and the item is untouched.
+    const mine = await json('/v1/open-items', auth(ownerToken));
+    assert(mine.body.data.items[0].title === 'Uudista tervetulomatto', 'the title survived');
 });
 
-await test('REFUSAL: no session, no pool', async () => {
-    const r = await json('/v1/intents');
+await test('REFUSAL: no session, no list', async () => {
+    const r = await json('/v1/open-items');
     assert(r.status === 401, `expected 401, got ${r.status}`);
 });
 
-console.log('\nPhase 3: GATE 0.2b — can the owner\'s own agent read the pool?');
+console.log('\nPhase 3: GATE 0.2b — can the owner\'s own agent read the list?');
 
 await test("the owner's agent gets a token", async () => {
     const a = await json('/v1/agents/device-authorize', {
@@ -213,41 +232,43 @@ await test("the owner's agent gets a token", async () => {
     agentToken = creds.access_token;
 });
 
-await test('WITHOUT owner_scope the agent sees its own namespace, and the pool is not in it', async () => {
-    const r = await json(`/v1/memory/${encodeURIComponent(`intent.${intentId}`)}`, auth(agentToken));
+await test('WITHOUT owner_scope the agent sees its own namespace, and the list is not in it', async () => {
+    const r = await json('/v1/memory/open-items.list', auth(agentToken));
     assert(r.status !== 200, `the agent must not get the owner's record by default, got ${r.status}`);
 });
 
-await test('THE GATE: with owner_scope=true the agent CAN read the pool record', async () => {
+await test('THE GATE: with owner_scope=true the agent CAN read the list record', async () => {
     // If this refuses, the browsing half of the design falls away and is not worked around.
-    const r = await json(`/v1/memory/${encodeURIComponent(`intent.${intentId}`)}?owner_scope=true`, auth(agentToken));
+    const r = await json('/v1/memory/open-items.list?owner_scope=true', auth(agentToken));
     assert(r.status === 200,
         `GATE 0.2b FAILED: the route claims to let same-owner principals opt in, got ${r.status}: ${JSON.stringify(r.body.error)}`);
-    assert(r.body.data.value.title === 'Uudista tervetulomatto',
-        `the agent read the wrong thing: ${JSON.stringify(r.body.data.value)}`);
+    const readItems = r.body.data.value?.items ?? [];
+    assert(readItems.some((i: any) => i.title === 'Uudista tervetulomatto'),
+        `the agent read the wrong thing: ${JSON.stringify(r.body.data.value).slice(0, 300)}`);
 });
 
-await test('and can LIST the pool the same way', async () => {
-    const r = await json('/v1/memory?owner_scope=true&prefix=intent.', auth(agentToken));
-    assert(r.status === 200, `list ${r.status}: ${JSON.stringify(r.body.error)}`);
-    const keys = (r.body.data.items ?? []).map((e: any) => e.key);
-    assert(keys.includes(`intent.${intentId}`), `the pool should be listable: ${JSON.stringify(keys)}`);
+await test('one read gives the agent the WHOLE list, not a scan', async () => {
+    const r = await json('/v1/memory/open-items.list?owner_scope=true', auth(agentToken));
+    assert(r.status === 200, `read ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const items = r.body.data.value?.items ?? [];
+    assert(Array.isArray(items) && items.some((i: any) => i.id === itemId),
+        `the list should arrive in one read: ${JSON.stringify(items).slice(0, 300)}`);
 });
 
-await test('REFUSAL: the agent may not use the owner-only intents route', async () => {
-    const r = await json('/v1/intents', auth(agentToken));
+await test('REFUSAL: the agent may not use the owner-only route', async () => {
+    const r = await json('/v1/open-items', auth(agentToken));
     assert(r.status === 403 || r.status === 401,
         `an agent token must not reach the owner route, got ${r.status}`);
 });
 
-console.log('\nPhase 3b: GATE 0.3 — an ecosystem app must NOT reach the pool');
+console.log('\nPhase 3b: GATE 0.3 — an ecosystem app must NOT reach the list');
 
 await test('an ecosystem app is onboarded with memory scopes and its own data area', async () => {
-    // Deliberately generous: memory:read AND a data area. The point is that neither buys the pool.
+    // Deliberately generous: memory:read AND a data area. The point is that neither buys the list.
     const hello = await json('/v1/ecosystem-apps/hello', {
         method: 'POST',
         body: JSON.stringify({
-            owner, app: 'pool-peeker', display_name: 'Pool Peeker',
+            owner, app: 'list-peeker', display_name: 'List Peeker',
             public_key: 'MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=',
             scopes: ['memory:read', 'memory:write'],
             data_areas: [{ area: 'memory', pattern: 'service.peeker.*', rights: ['read', 'write'] }],
@@ -269,33 +290,31 @@ await test('an ecosystem app is onboarded with memory scopes and its own data ar
     ecoToken = tok.body.access_token;
 });
 
-await test('GATE 0.3: owner_scope does NOT broaden an ecosystem app to the pool', async () => {
+await test('GATE 0.3: owner_scope does NOT broaden an ecosystem app to the list', async () => {
     // The whole point of owner_scope for an agent is the whole danger of it for an eco app: a GEAI
     // is fenced to its data areas, and this flag must not be the way around that fence.
-    const list = await json('/v1/memory?owner_scope=true&prefix=intent.', auth(ecoToken));
+    const list = await json('/v1/memory?owner_scope=true&prefix=open-items.', auth(ecoToken));
     const keys = (list.body.data?.items ?? []).map((e: any) => e.key);
     assert(keys.length === 0,
-        `an ecosystem app reached the owner's pool: ${JSON.stringify(keys)}`);
+        `an ecosystem app reached the owner's list: ${JSON.stringify(keys)}`);
 });
 
-await test('GATE 0.3: nor can it read one intent by key', async () => {
-    const openIntent = (await json('/v1/intents', auth(ownerToken))).body.data.intents[0];
-    assert(!!openIntent, 'there is an intent to try for');
-    const r = await json(`/v1/memory/${encodeURIComponent(`intent.${openIntent.id}`)}?owner_scope=true`, auth(ecoToken));
+await test('GATE 0.3: nor can it read the list by key', async () => {
+    const r = await json('/v1/memory/open-items.list?owner_scope=true', auth(ecoToken));
     assert(r.status !== 200,
-        `an ecosystem app read an owner intent: ${r.status} ${JSON.stringify(r.body.data)}`);
+        `an ecosystem app read the owner's list: ${r.status} ${JSON.stringify(r.body.data)}`);
 });
 
 await test('GATE 0.3: and the owner-only route refuses it outright', async () => {
-    const r = await json('/v1/intents', auth(ecoToken));
+    const r = await json('/v1/open-items', auth(ecoToken));
     assert(r.status === 403 || r.status === 401, `expected a refusal, got ${r.status}`);
 });
 
 await test('GATE 0.3: owner_scope is not a way past the data-area fence AT ALL', async () => {
-    // The pool is only the key that happened to catch this. A GEAI is fenced to its granted data
+    // The list is only the key that happened to catch this. A GEAI is fenced to its granted data
     // areas, so `owner_scope` must not hand it ANY owner key outside them — the same flag that is
     // correct for an agent is the whole danger for an app the owner fenced on purpose.
-    const secret = 'e2e.intents.not-your-business';
+    const secret = 'e2e.open-items.not-your-business';
     const w = await json('/v1/memory', auth(ownerToken, {
         method: 'POST', body: JSON.stringify({ key: secret, value: { pin: 4242 }, visibility: 'private' }),
     }));
@@ -309,80 +328,80 @@ console.log('\nPhase 4: closes_when is evaluated on READ, never stored');
 
 await test('a suggestion whose condition is already true is not offered', async () => {
     // first_agent is true — the owner has just connected 'pool-reader'.
-    const r = await json('/v1/intents', auth(ownerToken, {
+    const r = await json('/v1/open-items', auth(ownerToken, {
         method: 'POST',
         body: JSON.stringify({ title: 'Kytke ensimmäinen agentti', closes_when: { check: 'first_agent' } }),
     }));
     assert(r.status === 201, `create ${r.status}`);
-    const list = await json('/v1/intents', auth(ownerToken));
-    const titles = list.body.data.intents.map((i: any) => i.title);
+    const list = await json('/v1/open-items', auth(ownerToken));
+    const titles = list.body.data.items.map((i: any) => i.title);
     assert(!titles.includes('Kytke ensimmäinen agentti'),
         `a satisfied suggestion must not be offered: ${JSON.stringify(titles)}`);
     assert(list.body.data.satisfied_hidden >= 1, 'the count says one was hidden, so an empty list can be explained');
 });
 
 await test('…but it is still THERE, not written done', async () => {
-    const r = await json('/v1/intents?include=satisfied', auth(ownerToken));
-    const found = r.body.data.intents.find((i: any) => i.title === 'Kytke ensimmäinen agentti');
+    const r = await json('/v1/open-items?include=satisfied', auth(ownerToken));
+    const found = r.body.data.items.find((i: any) => i.title === 'Kytke ensimmäinen agentti');
     assert(!!found, 'the record still exists');
     assert(found.satisfied === true, 'it reports itself satisfied');
     assert(found.status === 'open', `its stored status is untouched — a suggestion is not "done": ${found.status}`);
 });
 
 await test('a suggestion whose condition is FALSE is offered', async () => {
-    const r = await json('/v1/intents', auth(ownerToken, {
+    const r = await json('/v1/open-items', auth(ownerToken, {
         method: 'POST',
         body: JSON.stringify({ title: 'Tee tervetulomatto', closes_when: { check: 'welcome_mat' } }),
     }));
     assert(r.status === 201, `create ${r.status}`);
-    const list = await json('/v1/intents', auth(ownerToken));
-    const titles = list.body.data.intents.map((i: any) => i.title);
+    const list = await json('/v1/open-items', auth(ownerToken));
+    const titles = list.body.data.items.map((i: any) => i.title);
     assert(titles.includes('Tee tervetulomatto'), `an unmet suggestion belongs on the list: ${JSON.stringify(titles)}`);
 });
 
 await test('an invented check is refused', async () => {
-    const r = await json('/v1/intents', auth(ownerToken, {
+    const r = await json('/v1/open-items', auth(ownerToken, {
         method: 'POST', body: JSON.stringify({ title: 'x', closes_when: { check: 'make_me_rich' } }),
     }));
     assert(r.status === 400, `expected 400, got ${r.status}`);
 });
 
-console.log('\nPhase 4b: promotion — an intent handed to an agent');
+console.log('\nPhase 4b: an item handed to an agent');
 
-await test('a task carries the intent key, and the intent carries the task', async () => {
-    const made = await json('/v1/intents', auth(ownerToken, {
+await test('a task carries the item reference, and the item carries the task', async () => {
+    const made = await json('/v1/open-items', auth(ownerToken, {
         method: 'POST', body: JSON.stringify({ title: 'Tee ensimmäinen appi', prompt_ref: 'build-app' }),
     }));
     assert(made.status === 201, `create ${made.status}`);
-    promotedIntentId = made.body.data.intent.id;
+    promotedItemId = made.body.data.item.id;
 
     const task = await json('/v1/agents/pool-reader/tasks', auth(ownerToken, {
         method: 'POST',
         body: JSON.stringify({
-            title: 'Tee ensimmäinen appi', description: 'From the pool', status: 'queued',
-            resources: { memory_keys: [`intent.${promotedIntentId}`] },
+            title: 'Tee ensimmäinen appi', description: 'From the list', status: 'queued',
+            resources: { memory_keys: [`open-items.list#${promotedItemId}`] },
         }),
     }));
     assert(task.status === 201 || task.status === 200, `task ${task.status}: ${JSON.stringify(task.body.error)}`);
     promotedTaskId = task.body.data.task?.id ?? task.body.data.id;
     assert(!!promotedTaskId, `no task id: ${JSON.stringify(task.body.data)}`);
 
-    // The link the plan calls a NEW read path: nothing read this field before the pool did.
+    // The link the plan calls a NEW read path: nothing read this field before the list did.
     const read = await json(`/v1/agents/pool-reader/tasks/${promotedTaskId}`, auth(ownerToken));
     const keys = read.body.data.task?.resources?.memoryKeys ?? read.body.data.task?.resources?.memory_keys ?? [];
-    assert(keys.includes(`intent.${promotedIntentId}`),
-        `the task must say which intent it came from: ${JSON.stringify(read.body.data.task?.resources)}`);
+    assert(keys.includes(`open-items.list#${promotedItemId}`),
+        `the task must say which item it came from: ${JSON.stringify(read.body.data.task?.resources)}`);
 
-    const patched = await json(`/v1/intents/${promotedIntentId}`, auth(ownerToken, {
+    const patched = await json(`/v1/open-items/${promotedItemId}`, auth(ownerToken, {
         method: 'PATCH',
-        body: JSON.stringify({ status: 'working', agent: `pool-reader#${owner}@${NODE_ID}`, taskId: promotedTaskId }),
+        body: JSON.stringify({ status: 'working', agent: `pool-reader#${owner}@${NODE_ID}` }),
     }));
     assert(patched.status === 200, `patch ${patched.status}`);
-    assert(patched.body.data.intent.taskId === promotedTaskId, 'the intent points back at the task');
+    assert(patched.body.data.item.status === 'working', 'the item shows somebody is on it');
 });
 
 await test('COMPLETING THE TASK CLOSES THE INTENT — the server does it, not the agent', async () => {
-    // A queued task is started before it can be completed; the pool changes nothing about that.
+    // A queued task is started before it can be completed; the list changes nothing about that.
     // The OWNER starts it — an agent may not start its own work, which is the point of the gate.
     const started = await json(`/v1/agents/pool-reader/tasks/${promotedTaskId}/start`, auth(ownerToken, {
         method: 'POST', body: JSON.stringify({}),
@@ -395,34 +414,71 @@ await test('COMPLETING THE TASK CLOSES THE INTENT — the server does it, not th
 
     // The close is best-effort and fired after the response, so give it a moment before reading.
     await new Promise(r => setTimeout(r, 250));
-    const list = await json('/v1/intents?include=satisfied', auth(ownerToken));
-    const it = list.body.data.intents.find((i: any) => i.id === promotedIntentId);
-    assert(!!it, 'the intent still exists');
-    assert(it.status === 'done',
-        `a completed task must close its intent, status is ${it.status}`);
+    const list = await json('/v1/open-items?include=satisfied', auth(ownerToken));
+    const it = list.body.data.items.find((i: any) => i.id === promotedItemId);
+    assert(!it, 'a completed task must take its item OFF the list');
+    const stats = await json('/v1/open-items/stats', auth(ownerToken));
+    assert(stats.body.data.closedByAgent >= 1,
+        `and the close must be attributed to the agent: ${JSON.stringify(stats.body.data)}`);
 });
 
-await test('the agent never wrote the pool itself — it still cannot', async () => {
+await test('an agent WITHOUT memory:write-as-owner cannot write the list', async () => {
     const w = await json('/v1/memory', auth(agentToken, {
         method: 'POST',
-        body: JSON.stringify({ key: `intent.${promotedIntentId}`, value: { title: 'hijacked' }, owner_scope: true }),
+        body: JSON.stringify({ key: 'open-items.list', value: { items: [] }, owner_scope: true }),
     }));
     assert(w.status === 403,
-        `an agent without memory:write-as-owner must not write the owner's pool, got ${w.status}`);
+        `the scope is what buys this, and this agent does not hold it, got ${w.status}`);
 });
 
 console.log('\nPhase 5: removal');
 
-await test('delete removes it from the pool', async () => {
-    const d = await json(`/v1/intents/${intentId}`, auth(ownerToken, { method: 'DELETE' }));
+await test('DELETE takes it off the list', async () => {
+    const d = await json(`/v1/open-items/${itemId}`, auth(ownerToken, { method: 'DELETE' }));
     assert(d.status === 200, `delete ${d.status}`);
-    const list = await json('/v1/intents?include=satisfied', auth(ownerToken));
-    assert(!list.body.data.intents.some((i: any) => i.id === intentId), 'it is gone');
+    const list = await json('/v1/open-items?include=satisfied', auth(ownerToken));
+    assert(!list.body.data.items.some((i: any) => i.id === itemId), 'it is gone');
 });
 
-await test('deleting it twice is a 404, not a second success', async () => {
-    const d = await json(`/v1/intents/${intentId}`, auth(ownerToken, { method: 'DELETE' }));
+await test('switching it off twice is a 404, not a second success', async () => {
+    const d = await json(`/v1/open-items/${itemId}`, auth(ownerToken, { method: 'DELETE' }));
     assert(d.status === 404, `expected 404, got ${d.status}`);
+});
+
+console.log('\nPhase 6: three writers, one key');
+
+await test('the whole list is ONE record, not one per item', async () => {
+    for (const title of ['a', 'b', 'c']) {
+        const r = await json('/v1/open-items', auth(ownerToken, {
+            method: 'POST', body: JSON.stringify({ title }),
+        }));
+        assert(r.status === 201, `create ${title}: ${r.status}`);
+    }
+    const keys = (await json('/v1/memory?prefix=open-items.', auth(ownerToken))).body.data.items ?? [];
+    assert(keys.length === 1,
+        `three items must live in ONE key, found ${keys.length}: ${JSON.stringify(keys.map((k: any) => k.key))}`);
+});
+
+await test('a stale write is refused rather than overwriting what somebody else just did', async () => {
+    const before = await json('/v1/memory/open-items.list', auth(ownerToken));
+    const staleVersion = before.body.data.version;
+    assert(typeof staleVersion === 'number', `the record must carry a version: ${JSON.stringify(before.body.data)}`);
+
+    const added = await json('/v1/open-items', auth(ownerToken, {
+        method: 'POST', body: JSON.stringify({ title: 'added in between' }),
+    }));
+    assert(added.status === 201, `create ${added.status}`);
+
+    const clobber = await json('/v1/memory/open-items.list', auth(ownerToken, {
+        method: 'PUT',
+        body: JSON.stringify({ value: { version: 1, items: [], closed: [] }, version: staleVersion }),
+    }));
+    assert(clobber.status === 409,
+        `a stale write must be refused, got ${clobber.status}: ${JSON.stringify(clobber.body)}`);
+
+    const after = await json('/v1/open-items', auth(ownerToken));
+    assert(after.body.data.items.some((i: any) => i.title === 'added in between'),
+        'the write that got there first must still be on the list');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

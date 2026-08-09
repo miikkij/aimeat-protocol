@@ -1,0 +1,140 @@
+/**
+ * @file public/components/OpenItemsList.js
+ * @description The open items list: what you are going to do here, and the one prompt that takes the
+ *   whole thing into your AI chat.
+ *
+ *   ONE prompt, at the top, not one per row. An earlier version gave every row its own copy button
+ *   and that made a screen of six buttons with no obvious next move. The prompt does not contain the
+ *   items either: they go stale the moment they are copied. It tells the AI where to read them, so
+ *   what the chat sees is always what is on the list right now.
+ *
+ *   Rows carry the state control and nothing else. There is no Done and no Remove, because there is
+ *   no done and no remove: an item is switched on or it is not, and the control that switches it off
+ *   is the same one that switched it on.
+ *
+ *   A row the AI switched on says so. That is the point where this stops being a to-do list: a
+ *   person opens their home and sees that their AI put something there while they were away.
+ *
+ *   EMPTY RENDERS NOTHING. Not a heading with an encouraging sentence under it: an empty state reads
+ *   as broken, and "you have no open items" is exactly that.
+ * @structure OpenItemsList({ compact })
+ * @usage html`<${OpenItemsList} />`
+ * @version-history
+ *   v1.0.0 — 2026-08-09 — Replaces components/IntentPool.js. One prompt at the top instead of one
+ *     per row, a state control instead of Done/Remove, and the AI's own rows are marked.
+ */
+import { h } from 'preact';
+import { useState, useEffect, useCallback } from 'preact/hooks';
+import htm from 'htm';
+import { t } from '/js/i18n.js';
+import { escHtml, timeAgo } from '/js/utils.js';
+import { apiGet } from '/js/api.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { listOpenItems, switchOff, reachableAgents, handToAgent } from '/js/services/open-items.js';
+import { swallowed } from '/js/swallowed.js';
+
+const html = htm.bind(h);
+const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/** The managed prompt that teaches a chat how to work this list. Served, never inlined. */
+const LIST_PROMPT = 'open-items';
+
+export function OpenItemsList() {
+  const [items, setItems] = useState(null);
+  const [agents, setAgents] = useState([]);
+  const [prompt, setPrompt] = useState('');
+  const [busy, setBusy] = useState(null);
+
+  const load = useCallback(async () => {
+    try { setItems(await listOpenItems()); }
+    catch (e) { swallowed('OpenItemsList: load', e); setItems([]); }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    reachableAgents().then(setAgents).catch(e => swallowed('OpenItemsList: agents', e));
+    apiGet(`/v1/prompts/${LIST_PROMPT}`)
+      .then(r => setPrompt(r?.data?.prompt || ''))
+      .catch(e => swallowed('OpenItemsList: prompt', e));
+  }, []);
+
+  // Every surface showing server data re-fetches on this. It matters more here than anywhere: the
+  // AI switches these on and off while the person is looking at the page.
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [load]);
+
+  const act = useCallback(async (id, fn) => {
+    setBusy(id);
+    try { await fn(); await load(); }
+    catch (e) { swallowed('OpenItemsList: act', e); }
+    finally { setBusy(null); }
+  }, [load]);
+
+  // Nothing on the list → no block at all. See the file header.
+  if (!items || items.length === 0) return null;
+
+  return html`
+    <section class="open-items">
+      <div class="open-items-head">
+        <h3 class="open-items-title">
+          ${tr('openItems.title', 'Open items')} <span class="open-items-count">${items.length}</span>
+        </h3>
+        <${CopyButton}
+          text=${prompt}
+          className="btn-primary btn-sm"
+          label=${tr('openItems.copyPrompt', 'Take these into your AI chat')}
+          copiedLabel=${tr('openItems.copied', 'Copied — paste it in your chat')} />
+      </div>
+
+      <ul class="open-items-list">
+        ${items.map(i => html`
+          <li key=${i.id} class="open-items-row open-items-row--${i.status}">
+            <span class="open-items-mark" aria-hidden="true">${i.status === 'working' ? '●' : '○'}</span>
+            <div class="open-items-main">
+              <div class="open-items-item">${escHtml(i.title)}</div>
+              <div class="open-items-meta">
+                ${i.closes_when
+                  ? tr('openItems.suggestion', 'Suggestion — it goes away once this is done')
+                  : i.agent
+                    ? `${escHtml(String(i.agent).split('#')[0])} ${tr('openItems.isDoing', 'is doing this')}`
+                    : i.by === 'ai'
+                      ? `${tr('openItems.byAi', 'your AI put this here')} · ${timeAgo(i.createdAt)}`
+                      : `${i.origin ? escHtml(i.origin) : tr('openItems.yours', 'Yours')} · ${timeAgo(i.createdAt)}`}
+              </div>
+            </div>
+
+            ${/* A suggestion gets no control: it goes away by itself when its condition is true,
+                 so offering to switch it off invites a person to act on something the node is
+                 about to withdraw anyway. */''}
+            ${!i.closes_when && html`
+              <div class="open-items-control">
+                ${agents.length > 0 && !i.agent && html`
+                  <select class="open-items-hand" disabled=${busy === i.id}
+                    onChange=${(e) => {
+                      const a = agents.find(x => (x.gaii || x.name) === e.target.value);
+                      if (a) act(i.id, () => handToAgent(i, a));
+                      e.target.value = '';
+                    }}>
+                    <option value="">${tr('openItems.handTo', 'Hand it to…')}</option>
+                    ${agents.map(a => html`
+                      <option key=${a.gaii || a.name} value=${a.gaii || a.name}>
+                        ${a.display_name || a.name}
+                      </option>`)}
+                  </select>`}
+                <button type="button" class="btn-ghost btn-sm open-items-off"
+                  disabled=${busy === i.id}
+                  title=${tr('openItems.toggleOff', 'Take it off your open items')}
+                  onClick=${() => act(i.id, () => switchOff(i.id))}>
+                  ${tr('openItems.off', 'Take it off')}
+                </button>
+              </div>`}
+          </li>`)}
+      </ul>
+    </section>`;
+}
+
+export default OpenItemsList;

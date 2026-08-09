@@ -204,10 +204,12 @@
       "/components/offer-card-view.js": "/components/offer-card-view.js",
       "/components/Mermaid.js": "/components/Mermaid.js",
       "/components/NotificationBell.js": "/components/NotificationBell.js",
+      "/components/OpenItemsButton.js": "/components/OpenItemsButton.js",
+      "/components/OpenItemsList.js": "/components/OpenItemsList.js",
+      "/components/OpenItemToggle.js": "/components/OpenItemToggle.js",
+      "/js/services/open-items.js": "/js/services/open-items.js",
       "/components/CopyButton.js": "/components/CopyButton.js",
       "/components/PromptCard.js": "/components/PromptCard.js",
-      "/components/IntentPool.js": "/components/IntentPool.js",
-      "/js/services/intents.js": "/js/services/intents.js",
       "/components/Toast.js": "/components/Toast.js",
       "/components/ContactCard.js": "/components/ContactCard.js",
       "/components/Spinner.js": "/components/Spinner.js",
@@ -351,6 +353,7 @@
     import { initThemeSystem } from '/js/theme.js';
     import { siteLink } from '/js/site.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
+    import { OpenItemsButton } from '/components/OpenItemsButton.js';
     import { useSession } from '/js/use-session.js';
     import { CommandPalette } from '/views/command-palette.js';
     import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
@@ -817,6 +820,7 @@
                 <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onClick=${() => handleLangSwitch('fi')}>FI</button>
               </div>
             </div>
+            ${session && html`<${OpenItemsButton} t=${t} onNavigate=${(p) => navigate(p)} />`}
             ${session && html`<${NotificationBell} t=${t} onNavigate=${(p) => navigate(p)} />`}
             <span class="header-auth-slot" id="headerAuth"></span>
           </div>

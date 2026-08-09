@@ -28,7 +28,7 @@ import { notifyAutomationTaskComplete } from '../../services/ecosystem-automatio
 import { processAutomationAdvisories } from '../../services/ecosystem-automation-advisories.js';
 import type { TaskRouteHelpers } from './helpers.js';
 import { reclaimTaskLiveTrace } from './helpers.js';
-import { closeIntentsForTask } from '../../services/intents.js';
+import { closeItemsForTask } from '../../services/open-items.js';
 
 export function registerTaskCompletionRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -173,8 +173,8 @@ export function registerTaskCompletionRoutes(
     // the agent never writes into the owner's namespace, so the pool's one indirect write is this,
     // and it happens on the evidence of a completed task rather than on the agent's say-so.
     // Best-effort and isolated — a pool that cannot be updated must not fail a real completion.
-    void closeIntentsForTask(storage, config, task)
-      .catch(e => logger.error('closing the intent behind a task failed', { taskId: id, error: String(e) }));
+    void closeItemsForTask(storage, config, task)
+      .catch(e => logger.error('switching off the open item behind a task failed', { taskId: id, error: String(e) }));
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks', resolve(req));

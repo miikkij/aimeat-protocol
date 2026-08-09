@@ -22,7 +22,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { createIntent, reachableAgents, promoteIntent } from '/js/services/intents.js';
+import { addOpenItem, reachableAgents, handToAgent } from '/js/services/open-items.js';
 import { apiGet } from '/js/api.js';
 import { PromptCard } from '/components/PromptCard.js';
 import { swallowed } from '/js/swallowed.js';
@@ -130,13 +130,13 @@ function RoomPrompt({ room, agents }) {
       copyLabel=${tr('home.rooms.copyPrompt', 'Copy the prompt')}
       copiedLabel=${tr('home.rooms.copied', 'Copied — paste it in your AI chat')}
       showPrompt=${false}
-      saveIntent=${() => createIntent({
+      saveIntent=${() => addOpenItem({
         title: tr(`home.rooms.${room.id}.title`, room.id),
         prompt_ref: cfg.promptRef,
         origin: `home.rooms.${room.id}`,
       })}
       agents=${agents}
-      onGiveToAgent=${(a) => promoteIntent(
+      onGiveToAgent=${(a) => handToAgent(
         { id: null, title: tr(`home.rooms.${room.id}.title`, room.id), prompt_ref: cfg.promptRef },
         a,
       )} />`;
