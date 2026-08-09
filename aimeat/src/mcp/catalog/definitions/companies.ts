@@ -88,4 +88,13 @@ export const companyTools: AimeatToolDefinition[] = [
             html: { type: 'string', required: true, description: 'The complete HTML document to serve at the company address.' },
         },
     },
+    {
+        name: 'aimeat_portfolio_publish',
+        description: "Publish this person's own welcome page — the page at their address, which is also their portfolio. Use it when they ask you to make their page, improve it, or change what it says: you write the HTML and publish it, they never copy or paste anything. Send the WHOLE document (doctype through </html>); it is served as-is on an isolated, session-less origin, so everything it needs must be inside it or loaded from this node. Style it with the node's theme variables rather than hardcoded colours so it follows light and dark mode. Re-publishing replaces the previous page, so read what is there first if they asked for a change rather than a rewrite. This is the person's page; the company equivalent is aimeat_company_portfolio_publish.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            html: { type: 'string', required: true, description: "The complete HTML document to serve as this person's welcome page." },
+        },
+    },
 ];

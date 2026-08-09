@@ -260,6 +260,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_company_update: { title: 'Update Company Details', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_company_front_page: { title: 'Set Company Front Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_company_portfolio_publish: { title: 'Publish Company Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_portfolio_publish: { title: 'Publish Your Welcome Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Contacts (address book) ──
     aimeat_contact_list: { title: 'List Contacts', readOnlyHint: true },

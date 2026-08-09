@@ -88,6 +88,7 @@ import { registerAgentMessageTools } from './agent-messages.js';
 import { registerDmMessageTools } from './dm-messages.js';
 import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
+import { registerPortfolioTools } from './portfolio.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
@@ -212,6 +213,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);
         registerContactTools(mcp, storage, config, () => agentGaii);
         registerCompanyTools(mcp, storage, config, () => agentGaii);
+        registerPortfolioTools(mcp, storage, config, () => agentGaii);
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
