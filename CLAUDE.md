@@ -46,6 +46,8 @@ Git: parallel sessions work in a worktree · never `git add -A` (it sweeps anoth
 
 Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing an organism record or roadmap milestone. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).
 
+**Test accounts, logins and the browser-verification recipe: `docs/internal/TESTING.md`** (gitignored, so the credentials are not in this file). Four accounts: the prod owner, a second prod identity for anything cross-owner, a third-party prod member for a paying service's member path, and the local dev owner.
+
 ## Gates
 
 - **E2E on both backends.** `postgres-kysely` is the production backend and `sqlite` is the fast local one; both must pass. Run only the suites your change can plausibly affect, then a full sweep (`pnpm test:e2e:postgres-kysely` and `pnpm test:e2e:sqlite`) at the end of a multi-step plan. A failure in an area you touched means not done. A failure elsewhere: confirm it pre-exists on `main`, mention it, leave it. New features ship with E2E tests (happy path plus a failure mode). Never report done without having run them. → `docs/coding-guidelines/testing-requirements.md`
