@@ -521,6 +521,28 @@ export const ownerMethods = {
     }));
   },
 
+  async createMemoryIfAbsent(this: SqliteStorage, record: MemoryRecord): Promise<MemoryRecord | null> {
+    // ON CONFLICT DO NOTHING makes the create a compare-and-swap against "the key does not exist".
+    // changes === 0 means another writer got there first, and the caller re-reads and merges rather
+    // than overwriting a subtree it never saw.
+    const valueStr = JSON.stringify(record.value);
+    const result = this.db.prepare(
+      `INSERT INTO memory (ownerGaii, key, value, visibility, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(ownerGaii, key) DO NOTHING`
+    ).run(
+      record.ownerGaii, record.key,
+      valueStr, record.visibility, record.workspaceRef ?? null,
+      JSON.stringify(record.tags), record.ttlHours,
+      record.version, record.createdAt, record.updatedAt,
+      record.flagCount ?? 0,
+      record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
+      record.trackable ? 1 : 0, Buffer.byteLength(valueStr, 'utf8'),
+      record.aiProvenanceId ?? null,
+    );
+    return result.changes === 0 ? null : record;
+  },
+
   async setMemoryIfVersion(this: SqliteStorage, record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
     const valueStr = JSON.stringify(record.value);
     const result = this.db.prepare(

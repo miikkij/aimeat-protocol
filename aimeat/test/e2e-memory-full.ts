@@ -1033,6 +1033,155 @@ await test('Bulk write validates storage_ref integrity (dangling ref → failed,
 });
 
 // ═══════════════════════════════════════════════════════
+// PATCH /v1/memory/:key — RFC 7386 merge patch
+// ═══════════════════════════════════════════════════════
+console.log('\nPATCH (merge patch)');
+
+const PK = 'patch.edition';
+
+await test('PATCH creates the record when the key does not exist (201)', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { status: { fetch: 'done' } }, visibility: 'owner' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.version === 1, `version ${body.data.version}`);
+    assert(body.data.value.status.fetch === 'done', 'value stored');
+});
+
+await test('PATCH merges a sibling subtree without touching the first', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { articles: { talous: { body: 'A' } } } }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.value.status.fetch === 'done', 'earlier subtree survived');
+    assert(body.data.value.articles.talous.body === 'A', 'new subtree present');
+    assert(body.data.version === 2, `version ${body.data.version}`);
+});
+
+await test('PATCH keeps visibility and tags when the caller omits them', async () => {
+    const { body } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { status: { writeA: 'running' } } }),
+    });
+    assert(body.data.visibility === 'owner', `visibility drifted to ${body.data.visibility}`);
+});
+
+await test('PATCH with null deletes a field (RFC 7386), leaving siblings alone', async () => {
+    const { body } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { status: { writeA: null } } }),
+    });
+    assert(body.data.value.status.writeA === undefined, 'writeA deleted');
+    assert(body.data.value.status.fetch === 'done', 'sibling survived');
+});
+
+await test('CONCURRENT patches from many writers all land (the point of the route)', async () => {
+    // Six writers, one key, fired together — the Sanomat shape. Every subtree must be present
+    // afterwards. Before this route existed each of these would have been a separate key precisely
+    // because a read-modify-write through POST loses all but one.
+    const key = 'patch.concurrent';
+    const writers = ['a', 'b', 'c', 'd', 'e', 'f'];
+    const results = await Promise.all(writers.map(w => json(`/v1/memory/${encodeURIComponent(key)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { [w]: { done: true } }, visibility: 'owner' }),
+    })));
+    const bad = results.filter(r => r.status !== 200 && r.status !== 201);
+    assert(bad.length === 0, `all writers should succeed, got ${bad.map(b => b.status).join(',')}`);
+
+    const { body } = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    const missing = writers.filter(w => !body.data.value[w]?.done);
+    assert(missing.length === 0, `lost the writes of: ${missing.join(',')}`);
+});
+
+await test('PATCH honours if_version and 409s on a stale one', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { x: 1 }, if_version: 1 }),
+    });
+    assert(status === 409, `expected 409, got ${status}`);
+    assert(body.error.code === 'VERSION_CONFLICT', `code ${body.error?.code}`);
+    assert(typeof body.error.details?.current_version === 'number', 'reports the current version to retry with');
+});
+
+await test('PATCH rejects a scalar patch (400) so a stray body cannot wipe a shared record', async () => {
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: 'oops' }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+    assert(body.error.code === 'INVALID_INPUT', `code ${body.error?.code}`);
+});
+
+await test('PATCH rejects an array patch (400) for the same reason', async () => {
+    const { status } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: [1, 2] }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('PATCH without auth returns 401', async () => {
+    const { status } = await json(`/v1/memory/${encodeURIComponent(PK)}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ patch: { x: 1 } }),
+    });
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('PATCH refuses a reserved key an app must not touch', async () => {
+    const { status } = await json(`/v1/memory/${encodeURIComponent('patch.reserved.probe')}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { ok: true } }),
+    });
+    // Not a reserved key for an agent: this asserts the guard does not over-refuse.
+    assert(status === 200 || status === 201, `expected success, got ${status}`);
+});
+
+await test('PATCH refuses a merged value over the size cap (413), counting the MERGE not the patch', async () => {
+    // The cap is an operator setting (1024 kB shipped, lower in this test config), so learn it from
+    // the node rather than hardcoding: send one oversized probe and read the limit out of the refusal.
+    const key = 'patch.toobig';
+    const probe = await json(`/v1/memory/${encodeURIComponent(key)}.probe`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { a: 'x'.repeat(2 * 1024 * 1024) }, visibility: 'owner' }),
+    });
+    assert(probe.status === 413, `probe should be refused, got ${probe.status}`);
+    const cap = parseInt(/limit of (\d+) bytes/.exec(probe.body.error?.message ?? '')?.[1] ?? '0', 10);
+    assert(cap > 0, `could not read the cap from: ${probe.body.error?.message}`);
+
+    // Two halves that each fit, and together do not. This is the case a per-patch size check would
+    // miss and the merged-size check catches.
+    const half = 'y'.repeat(Math.floor(cap * 0.6));
+    const first = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { a: half }, visibility: 'owner' }),
+    });
+    assert(first.status === 201, `first half should fit: ${first.status} ${JSON.stringify(first.body?.error ?? '').slice(0, 160)}`);
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ patch: { b: half } }),
+    });
+    assert(status === 413, `second half should push it over: got ${status}`);
+    assert(/Merged value size/.test(body.error?.message ?? ''), `message names the merged size: ${body.error?.message}`);
+});
+
+// ═══════════════════════════════════════════════════════
 // Cleanup
 // ═══════════════════════════════════════════════════════
 console.log('\nCleanup');

@@ -75,6 +75,16 @@ export interface MemoryRepository {
   setMemory(record: MemoryRecord): Promise<MemoryRecord>;
   /** Atomically update memory only if the current version matches expectedVersion. Returns null on conflict. */
   setMemoryIfVersion?(record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null>;
+  /**
+   * Atomically INSERT a record only if the key does not exist yet. Returns null when another writer
+   * created it first, so the caller can re-read and merge instead of clobbering.
+   *
+   * The companion to setMemoryIfVersion, which can only UPDATE. Together they close the read-merge-write
+   * loop that PATCH /v1/memory/:key runs: CAS covers every write after the first, and this covers the
+   * first, where there is no version to compare against. Without it the create is last-write-wins and
+   * two agents starting the same shared record at the same moment lose one of their subtrees.
+   */
+  createMemoryIfAbsent?(record: MemoryRecord): Promise<MemoryRecord | null>;
   getMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
   /**
    * BULK PRIMITIVE — read MANY keys under ONE owner in a single `key IN (…)` query (data-access

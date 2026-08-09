@@ -101,6 +101,26 @@ export const memoryMethods = {
     return record;
   },
 
+  async createMemoryIfAbsent(this: PostgresKyselyStorage, record: MemoryRecord): Promise<MemoryRecord | null> {
+    // The create half of the compare-and-swap pair. onConflict doNothing means the unique index on
+    // (ownerGaii, key) decides the winner, so two writers racing to start the same shared record
+    // cannot both think they created it — the loser gets null and re-reads to merge.
+    const res = await this.db.insertInto('Memory').values({
+      ownerGaii: record.ownerGaii, key: record.key,
+      value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [],
+      workspaceRef: record.workspaceRef ?? null, ttlHours: record.ttlHours,
+      version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
+      flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null,
+      trackable: record.trackable ?? false,
+      byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
+      aiProvenanceId: record.aiProvenanceId ?? null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
+      .onConflict(oc => oc.columns(['ownerGaii', 'key']).doNothing())
+      .executeTakeFirst();
+    return (res.numInsertedOrUpdatedRows ?? 0n) > 0n ? record : null;
+  },
+
   async setMemoryIfVersion(this: PostgresKyselyStorage, record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
     // Atomic compare-and-swap: lock the row FOR UPDATE inside one transaction so two concurrent writers
     // at the same version are serialised — the first bumps to N+1 and commits, the second re-reads N+1,

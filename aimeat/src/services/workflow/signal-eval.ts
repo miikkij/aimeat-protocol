@@ -110,10 +110,34 @@ function getByPath(obj: unknown, path: string): unknown {
 
 // ── deterministic leaf ───────────────────────────────────────────────────────────
 async function evalDeterministic(sig: DeterministicSignal, ctx: SignalEvalCtx): Promise<SignalResult> {
-  // count_nonempty operates over a glob; the rest over a single key (glob allowed, first match used).
+  // count_nonempty counts either KEYS matching a glob, or ENTRIES inside one record at `path`.
+  //
+  // The path form exists because counting keys is what forced a pipeline to shard. A step that says
+  // "at least 12 articles" used to be expressible only as "at least 12 keys matching article.*", so
+  // consolidating those twelve keys into one record broke the step's own gate and the pipeline could
+  // not be fixed without breaking its verification. Same op on purpose rather than a new one: the
+  // watchdog's slow-vs-stuck rule sums `count_nonempty` leaves to tell "still filling" from "stuck",
+  // and a consolidated pipeline must not lose that signal just for changing shape.
   if (sig.op === 'count_nonempty') {
+    if (sig.path) {
+      const keyTmpl = sig.key ?? sig.key_glob;
+      if (!keyTmpl) return { ok: false, observed: { error: 'count_nonempty with path requires key' } };
+      const key = templateKey(keyTmpl, ctx.vars);
+      const rec = sig.key ? await ctx.read(key) : (await ctx.listGlob(key))[0] ?? null;
+      if (!rec) return { ok: false, observed: { op: 'count_nonempty', key, path: sig.path, min: sig.min, count: 0, error: 'missing' } };
+      const j = asJson(rec.value);
+      if (!j.ok) return { ok: false, observed: { op: 'count_nonempty', key, path: sig.path, min: sig.min, count: 0, error: 'invalid json' } };
+      const at = getByPath(j.parsed, sig.path);
+      // An object counts its non-empty VALUES (articles keyed by category); an array counts its
+      // non-empty elements. Anything else is not a collection and counts as nothing, rather than
+      // silently passing a step that was meant to check for twelve of something.
+      const count = Array.isArray(at)
+        ? at.filter(isNonEmpty).length
+        : (at && typeof at === 'object' ? Object.values(at as Record<string, unknown>).filter(isNonEmpty).length : 0);
+      return { ok: count >= sig.min, observed: { op: 'count_nonempty', key, path: sig.path, min: sig.min, count } };
+    }
     const glob = sig.key_glob ?? sig.key;
-    if (!glob) return { ok: false, observed: { error: 'count_nonempty requires key_glob' } };
+    if (!glob) return { ok: false, observed: { error: 'count_nonempty requires key_glob or path' } };
     const recs = await ctx.listGlob(templateKey(glob, ctx.vars));
     const count = recs.filter(r => isNonEmpty(r.value)).length;
     return { ok: count >= sig.min, observed: { op: 'count_nonempty', min: sig.min, count } };

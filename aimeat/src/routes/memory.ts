@@ -46,6 +46,7 @@ import { registerCrudRoutes } from './memory/crud.js';
 import { registerBulkRoutes } from './memory/bulk.js';
 import { registerFederationRoutes } from './memory/federation.js';
 import { registerFilesRoutes } from './memory/files.js';
+import { registerPatchRoutes } from './memory/patch.js';
 import { registerKeyRoutes } from './memory/key.js';
 
 export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void, peers?: Map<string, import('../services/federation.js').PeerInfo>): Router {
@@ -92,6 +93,8 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   registerBulkRoutes(router, ctx);        // export, import, bulk-delete, bundle, discover, copy
   registerFederationRoutes(router, ctx);  // pull, push-home, list-home, list-remote, pull-remote
   registerFilesRoutes(router, ctx);       // /v1/memory/files (upload, visibility, tags, list, get, delete)
+  // AFTER files (which owns PATCH /v1/memory/files/:key) and before the /:gaii/:key capture.
+  registerPatchRoutes(router, ctx);       // PATCH /v1/memory/:key (RFC 7386 merge patch)
   registerKeyRoutes(router, ctx);         // /v1/memory/:key (get/delete/put), cors, /v1/memory/:gaii/:key
 
   return router;

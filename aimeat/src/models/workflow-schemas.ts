@@ -52,7 +52,10 @@ export type DeterministicSignal =
   | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'exists' }
   | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'nonempty' }
   | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'json_valid' }
-  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'count_nonempty'; min: number }
+  // `path` counts the non-empty entries INSIDE one record (an object's values, or an array's
+  // elements) instead of counting matching keys. Added 2026-08-09 so a pipeline can consolidate its
+  // per-item keys into one record without breaking the very step that verifies it.
+  | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'count_nonempty'; min: number; path?: string }
   | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'json_schema'; schema: Record<string, unknown> }
   | { kind: 'deterministic'; key?: string; key_glob?: string; op: 'json_field'; path: string; min?: number; equals?: unknown; nonempty?: boolean };
 
@@ -75,7 +78,7 @@ const DeterministicLeafSchema = z.discriminatedUnion('op', [
   z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('exists') }),
   z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('nonempty') }),
   z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('json_valid') }),
-  z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('count_nonempty'), min: z.number().int().nonnegative() }),
+  z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('count_nonempty'), min: z.number().int().nonnegative(), path: z.string().min(1).max(200).optional() }),
   z.object({ kind: z.literal('deterministic'), ...leafTarget, op: z.literal('json_schema'), schema: z.record(z.string(), z.unknown()) }),
   z.object({
     kind: z.literal('deterministic'), ...leafTarget, op: z.literal('json_field'),

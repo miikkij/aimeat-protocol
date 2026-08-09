@@ -47,6 +47,63 @@ describe('deterministic leaves', () => {
     expect((await evaluateSignal(sig3, ctxFrom(store))).ok).toBe(false);
   });
 
+  // The path form (2026-08-09). Without it a step that means "at least 12 articles" can only be
+  // written as "at least 12 KEYS matching article.*", which is what pinned Sanomat at 44 keys per
+  // edition: consolidating them would have broken the step that verifies the consolidation.
+  it('count_nonempty + path: counts the non-empty VALUES of an object inside one record', async () => {
+    const store = {
+      'news.2026-08-09.evening': {
+        status: { fetch: 'done' },
+        articles: { talous: { body: 'a' }, tiede: { body: 'b' }, urheilu: { body: 'c' } },
+      },
+    };
+    const two: Signal = { kind: 'deterministic', key: 'news.2026-08-09.evening', op: 'count_nonempty', min: 2, path: 'articles' };
+    expect((await evaluateSignal(two, ctxFrom(store))).ok).toBe(true);
+    const four: Signal = { kind: 'deterministic', key: 'news.2026-08-09.evening', op: 'count_nonempty', min: 4, path: 'articles' };
+    expect((await evaluateSignal(four, ctxFrom(store))).ok).toBe(false);
+  });
+
+  it('count_nonempty + path: an empty entry does not count towards the minimum', async () => {
+    const store = { rec: { articles: { a: { body: 'x' }, b: {}, c: '' } } };
+    const sig: Signal = { kind: 'deterministic', key: 'rec', op: 'count_nonempty', min: 2, path: 'articles' };
+    expect((await evaluateSignal(sig, ctxFrom(store))).ok).toBe(false);
+  });
+
+  it('count_nonempty + path: counts array elements too', async () => {
+    const store = { rec: { items: ['a', '', 'c'] } };
+    const sig: Signal = { kind: 'deterministic', key: 'rec', op: 'count_nonempty', min: 2, path: 'items' };
+    expect((await evaluateSignal(sig, ctxFrom(store))).ok).toBe(true);
+  });
+
+  it('count_nonempty + path: a missing record fails rather than counting as zero-and-passing', async () => {
+    const sig: Signal = { kind: 'deterministic', key: 'gone', op: 'count_nonempty', min: 0, path: 'articles' };
+    const r = await evaluateSignal(sig, ctxFrom({}));
+    expect(r.ok).toBe(false);
+    expect((r.observed as { error?: string }).error).toBe('missing');
+  });
+
+  it('count_nonempty + path: a non-collection at the path counts as nothing, not as a pass', async () => {
+    const store = { rec: { articles: 'not a collection' } };
+    const sig: Signal = { kind: 'deterministic', key: 'rec', op: 'count_nonempty', min: 1, path: 'articles' };
+    expect((await evaluateSignal(sig, ctxFrom(store))).ok).toBe(false);
+  });
+
+  it('count_nonempty + path: still feeds the watchdog progress sum', async () => {
+    // Same op on purpose: a consolidated pipeline must keep the slow-vs-stuck signal it had while
+    // it was sharded, or the watchdog starts calling every long step "stuck".
+    const store = { rec: { articles: { a: 1, b: 2 } } };
+    const { observed } = await evaluateSignal(
+      { kind: 'deterministic', key: 'rec', op: 'count_nonempty', min: 5, path: 'articles' }, ctxFrom(store));
+    expect(extractProgress(observed)).toEqual({ count: 2, min: 5 });
+  });
+
+  it('count_nonempty + path: templates {var} in the key like every other leaf', async () => {
+    const store = { 'news.2026-08-09.evening': { articles: { a: 1, b: 2 } } };
+    const sig: Signal = { kind: 'deterministic', key: 'news.{date}.{edition}', op: 'count_nonempty', min: 2, path: 'articles' };
+    const r = await evaluateSignal(sig, ctxFrom(store, { vars: { date: '2026-08-09', edition: 'evening' } }));
+    expect(r.ok).toBe(true);
+  });
+
   it('json_valid: object passes, malformed string fails', async () => {
     const store = { obj: { a: 1 }, str: '{"a":1}', bad: 'not json' };
     expect((await evaluateSignal({ kind: 'deterministic', key: 'obj', op: 'json_valid' }, ctxFrom(store))).ok).toBe(true);

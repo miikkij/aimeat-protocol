@@ -9103,6 +9103,84 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '404':
           $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: patchMemory
+      summary: Merge-patch a memory entry
+      description: >
+        Apply a JSON Merge Patch (RFC 7386) to one record, so several principals can each own a
+        subtree of the same key without losing each other's writes. The node reads, merges, and
+        compare-and-swaps; a writer that loses the swap re-reads and re-merges, so its subtree lands
+        on top of the winner's rather than over it. Creates the record when the key does not exist.
+
+
+        Merge rules are RFC 7386: an object merges key by key, `null` DELETES that key, and a scalar
+        or array REPLACES wholesale (arrays are never merged element-wise — that would make two
+        concurrent appends reorder each other). A non-object `patch` is rejected with 400 rather than
+        replacing the whole record, which RFC 7386 would otherwise allow: on a shared record one
+        malformed body would wipe every other writer's subtree. Use PUT or POST to replace.
+
+
+        `visibility`, `tags` and `ttl_hours` are optional and the record keeps its existing values
+        when they are omitted, because a writer that owns one subtree has no business restating the
+        whole record's metadata. Size, quota, reserved-key, data-area and schema checks all run
+        against the MERGED value.
+      tags: [Memory]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patch]
+              properties:
+                patch:
+                  type: object
+                  additionalProperties: true
+                  description: >
+                    The merge patch. Must be an object. Send only the subtree you own.
+                if_version:
+                  type: integer
+                  minimum: 0
+                  description: >
+                    Optional compare-and-set. Apply only if the record is at this version; 0 asserts
+                    the key does not exist yet. Omit for the normal merge behaviour, which retries
+                    instead of failing.
+                visibility:
+                  type: string
+                  enum: [private, owner, group, members, public]
+                tags:
+                  type: array
+                  items:
+                    type: string
+                ttl_hours:
+                  type: number
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: >
+            VERSION_CONFLICT — either `if_version` did not match, or the record kept changing under
+            the merge retries. The payload carries the current version to retry with.
+        '413':
+          description: >
+            QUOTA_EXCEEDED — the MERGED value exceeds the per-value size cap, or the principal is at
+            its key or byte quota.
+        '422':
+          description: SCHEMA_VALIDATION_FAILED — the merged value does not match the key's schema.
 
   /v1/memory/search:
     get:
