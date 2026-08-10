@@ -1,35 +1,18 @@
 /**
- * Consul config service tests (no live Consul required — tests pure logic).
- * Run with: npx tsx test/consul-config.test.ts
+ * @file consul-config.test.ts
+ * @description The Consul config service's pure logic — no live Consul needed.
+ * @usage pnpm test -- consul-config
+ * @version-history
+ *   v1.1.0 — 2026-08-10 — Moved from test/ to test/unit/ and put on vitest, same reason as
+ *     config-loader.test.ts next door: vitest's include covers test/unit/** only, so a file
+ *     named `.test.ts` anywhere else runs in no runner and says nothing about it.
+ *   v1.0.0 — 2026-xx-xx — Initial (standalone script).
  */
 
+import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
-import { createConsulConfigService, applyConsulValues } from '../src/services/consul-config.js';
-import type { AimeatConfig } from '../src/config.js';
-
-let passed = 0;
-let failed = 0;
-
-function test(name: string, fn: () => void | Promise<void>) {
-  try {
-    const result = fn();
-    if (result instanceof Promise) {
-      result.then(() => {
-        passed++;
-        console.log(`  ✓ ${name}`);
-      }).catch(err => {
-        failed++;
-        console.error(`  ✗ ${name}: ${err.message}`);
-      });
-    } else {
-      passed++;
-      console.log(`  ✓ ${name}`);
-    }
-  } catch (err: any) {
-    failed++;
-    console.error(`  ✗ ${name}: ${err.message}`);
-  }
-}
+import { createConsulConfigService, applyConsulValues } from '../../src/services/consul-config.js';
+import type { AimeatConfig } from '../../src/config.js';
 
 // Mock config factory
 function mockConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
@@ -61,7 +44,6 @@ function mockConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
   } as AimeatConfig;
 }
 
-console.log('\n── Consul Config Service ──');
 
 test('createConsulConfigService returns null when disabled', () => {
   const config = mockConfig({ consulEnabled: false });
@@ -80,7 +62,6 @@ test('createConsulConfigService returns service when enabled', () => {
   assert.ok(typeof service!.health === 'function', 'has health');
 });
 
-console.log('\n── applyConsulValues ──');
 
 test('applyConsulValues applies mutable fields', () => {
   const config = mockConfig({ welcomeBonus: 100 });
@@ -155,8 +136,3 @@ test('applyConsulValues type-parses float correctly', () => {
   assert.equal(config.burnRate, 0.5);
 });
 
-// ── Summary ──
-setTimeout(() => {
-  console.log(`\n── Results: ${passed} passed, ${failed} failed ──\n`);
-  process.exit(failed > 0 ? 1 : 0);
-}, 500);

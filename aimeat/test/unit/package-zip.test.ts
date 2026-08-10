@@ -1,20 +1,28 @@
 /**
- * @file e2e-package-zip.ts
- * @description E2E tests for the package ZIP serialization/deserialization service.
- *   Tests buildZip and parseZip including security validation (magic bytes,
- *   size limits, path traversal, zip bomb detection, manifest validation).
+ * @file package-zip.test.ts
+ * @description The package ZIP serialization/deserialization service — buildZip and parseZip,
+ *   including the security validation (magic bytes, size limits, path traversal, zip bomb
+ *   detection, manifest validation).
  * @structure
  *   - buildZip tests: valid ZIP output
  *   - parseZip tests: rejection of invalid/malicious inputs, round-trip, full parse
+ * @usage pnpm test -- package-zip
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Moved from test/e2e-package-zip.ts to test/unit/ and switched from
+ *     node:test to vitest. It was never an E2E — it calls the service directly and needs no
+ *     server — and it sat between the two runners: run-e2e-ci.ts lists suites by name and never
+ *     listed it, while vitest's include covers test/unit/** only. Seven assertions about path
+ *     traversal and zip bombs therefore ran nowhere. (e2e-zip-security.ts covers the same ground
+ *     over HTTP and has been registered all along, so this was duplication rather than a bare
+ *     gap — but silent duplication reads as coverage.)
  *   v1.0.0 — 2026-03-20 — Initial implementation
  */
 
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import assert from 'node:assert/strict';
 import { ZipArchive } from 'archiver';
-import { buildZip, parseZip, ZipValidationError } from '../src/services/package-zip.js';
-import type { PackageRecord } from '../src/storage/interface.js';
+import { buildZip, parseZip, ZipValidationError } from '../../src/services/package-zip.js';
+import type { PackageRecord } from '../../src/storage/interface.js';
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -1,8 +1,17 @@
 /**
- * Unit tests for the config system: config-schema, config-loader, and config-provenance.
- * Run with: npx tsx test/config-loader.test.ts
+ * @file config-loader.test.ts
+ * @description The config system: config-schema, config-loader and config-provenance.
+ * @usage pnpm test -- config-loader
+ * @version-history
+ *   v1.1.0 — 2026-08-10 — Moved from test/ to test/unit/ and put on vitest. It was named
+ *     `.test.ts` and carried its own hand-rolled harness, but vitest's include covers
+ *     test/unit/** and nothing else, so 30 assertions about how this node reads its own
+ *     configuration ran in no runner at all. The old harness also swallowed async failures: it
+ *     counted them in a .catch() that a 500 ms setTimeout raced against process.exit.
+ *   v1.0.0 — 2026-xx-xx — Initial (standalone script).
  */
 
+import { it as test } from 'vitest';
 import assert from 'node:assert/strict';
 import { writeFileSync, unlinkSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -19,33 +28,7 @@ import {
   isImmutable,
   parseConfigValue,
   serializeConfigValue,
-} from '../src/services/config-schema.js';
-
-let passed = 0;
-let failed = 0;
-
-function test(name: string, fn: () => void | Promise<void>) {
-  try {
-    const result = fn();
-    if (result instanceof Promise) {
-      result.then(() => {
-        passed++;
-        console.log(`  ✓ ${name}`);
-      }).catch(err => {
-        failed++;
-        console.error(`  ✗ ${name}: ${err.message}`);
-      });
-    } else {
-      passed++;
-      console.log(`  ✓ ${name}`);
-    }
-  } catch (err: any) {
-    failed++;
-    console.error(`  ✗ ${name}: ${err.message}`);
-  }
-}
-
-console.log('\n── Config Schema ──');
+} from '../../src/services/config-schema.js';
 
 test('MUTABLE_CONFIG_MAP only contains non-immutable fields', () => {
   for (const [, field] of Object.entries(MUTABLE_CONFIG_MAP)) {
@@ -81,7 +64,6 @@ test('isImmutable("unknown.field") → true (safe default)', () => {
   assert.equal(isImmutable('unknown.field.that.doesnt.exist'), true);
 });
 
-console.log('\n── Serialization ──');
 
 test('parseConfigValue("number", "100") → 100', () => {
   const field = CONFIG_FIELDS.find(f => f.type === 'number')!;
@@ -126,9 +108,8 @@ test('serializeConfigValue("hello") → "hello"', () => {
 
 // ── Config Loader Tests ──
 
-console.log('\n── Config Loader ──');
 
-import { loadFileSource, flattenToStrings } from '../src/services/config-loader.js';
+import { loadFileSource, flattenToStrings } from '../../src/services/config-loader.js';
 
 test('flattenToStrings from flat object', () => {
   const result = flattenToStrings({ foo: 'bar', count: 42 });
@@ -175,9 +156,8 @@ test('loadFileSource returns null for missing file', () => {
 
 // ── Config Provenance Tests ──
 
-console.log('\n── Config Provenance ──');
 
-import { ConfigProvenance } from '../src/services/config-provenance.js';
+import { ConfigProvenance } from '../../src/services/config-provenance.js';
 
 test('initDefaults sets all to "default"', () => {
   const prov = new ConfigProvenance();
@@ -261,10 +241,3 @@ test('getAll returns full provenance map', () => {
   assert.equal(all['c'], 'default');
 });
 
-// ── Summary ──
-
-// Use setTimeout to wait for any async tests
-setTimeout(() => {
-  console.log(`\n── Results: ${passed} passed, ${failed} failed ──\n`);
-  process.exit(failed > 0 ? 1 : 0);
-}, 500);
