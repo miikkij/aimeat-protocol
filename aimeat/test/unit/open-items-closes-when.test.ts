@@ -1,19 +1,22 @@
 /**
- * @file test/unit/intents-closes-when.test.ts
- * @description The three conditions a system-suggested intent can close itself on, each asserted in
- *   BOTH directions.
+ * @file test/unit/open-items-closes-when.test.ts
+ * @description The three conditions a system-suggested open item can close itself on, each asserted
+ *   in BOTH directions.
  *
  *   These are evaluated on read and never stored, which is the whole point: a suggestion whose
  *   situation unwinds — the agent is deleted, the portfolio page is removed — has to come back.
  *   A stored "done" could not do that, and would quietly leave the person believing a step was
  *   handled when it no longer is. So the false direction matters as much as the true one, and both
  *   are here for all three.
- * @usage pnpm test -- intents-closes-when
+ * @usage pnpm test -- open-items-closes-when
  * @version-history
  *   v1.0.0 — 2026-08-09 — Initial (intent pool, checklist 1.7).
+ *   v1.1.0 — 2026-08-10 — Follow the code: the intent pool became open items and `intents.ts` was
+ *     deleted, but this file kept importing it, so vitest could not even load it and the whole file
+ *     ran nowhere while reporting nothing. Renamed with the concept and pointed at open-items.ts.
  */
 import { describe, it, expect } from 'vitest';
-import { evaluateCloses, CLOSES_CHECKS } from '../../src/services/intents.js';
+import { evaluateCloses, CLOSES_CHECKS } from '../../src/services/open-items.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 

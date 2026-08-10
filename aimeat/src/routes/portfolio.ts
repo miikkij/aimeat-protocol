@@ -6,6 +6,11 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.6.0 — 2026-08-10 — PUT /v1/portfolio/upload also accepts application/json { html }. The
+ *     raw text/html body is what a browser sends and what this route was built for, but the
+ *     connector has one JSON dispatch point for every request, so an agent served locally could
+ *     not reach this route at all — which is why aimeat_portfolio_publish reached the agent
+ *     surface with no connector half. Raw uploads behave exactly as before.
  *   v1.5.0 — 2026-08-09 — PUT /v1/portfolio/config MERGES onto the stored config instead of
  *     replacing it. A partial PUT from any surface silently dropped every field it did not
  *     send; the welcome-mat path next door has always merged, and the two disagreeing is how
@@ -348,6 +353,8 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
   /**
    * PUT /v1/portfolio/upload
    * Upload portfolio HTML file (owner auth, stores under agent's storage).
+   * Two content types, one behaviour: `text/html` with the document as the raw body (what the
+   * browser sends), or `application/json` with `{ "html": "..." }`.
    */
   router.put('/v1/portfolio/upload', requireAuth(), async (req, res) => {
     const ownerName = req.auth!.owner;
@@ -357,16 +364,32 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     const target = await portfolioWriteGaii(storage, ownerName, config.nodeId);
 
     const contentType = req.headers['content-type'] ?? '';
-    if (!contentType.includes('text/html')) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Content-Type must be text/html'));
+    const isJson = contentType.includes('application/json');
+    if (!contentType.includes('text/html') && !isJson) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'Content-Type must be text/html (raw body) or application/json with an "html" field'));
       return;
     }
 
-    const chunks: Buffer[] = [];
-    for await (const chunk of req) {
-      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+    let fileData: Buffer;
+    if (isJson) {
+      // The JSON door is what an agent can actually reach. The connector speaks JSON over one
+      // dispatch point, including the tunnel, so a raw text/html PUT is not a request it can make
+      // — and aimeat_portfolio_publish sat on the agent surface with no connector half because of
+      // it. Same shape as aimeat_company_portfolio_publish, which has taken { html } all along.
+      const html = (req.body as { html?: unknown } | undefined)?.html;
+      if (typeof html !== 'string' || html.length === 0) {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'html is required and must be a non-empty string'));
+        return;
+      }
+      fileData = Buffer.from(html, 'utf8');
+    } else {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+      }
+      fileData = Buffer.concat(chunks);
     }
-    const fileData = Buffer.concat(chunks);
 
     const maxBytes = (config.portfolioMaxSizeKb ?? 512) * 1024;
     if (fileData.length > maxBytes) {

@@ -40308,8 +40308,10 @@ paths:
       summary: Upload the portfolio HTML file
       description: |
         Uploads (upserts) the owner's portfolio HTML as a public storage file
-        (`portfolio/index.html`). The request body is the raw HTML with
-        `Content-Type: text/html`; size is capped by the node's `portfolioMaxSizeKb` config
+        (`portfolio/index.html`). Two ways to send the document, with identical results: the raw
+        HTML with `Content-Type: text/html` (what a browser sends), or
+        `application/json` with an `html` field (what an MCP agent sends, via
+        `aimeat_portfolio_publish`). Size is capped by the node's `portfolioMaxSizeKb` config
         (default 512 KB). Requires owner auth.
 
         Stored under the owner's first agent when they have one, and under their GHII when they
@@ -40325,6 +40327,14 @@ paths:
             schema:
               type: string
               description: Raw portfolio HTML document.
+          application/json:
+            schema:
+              type: object
+              required: [html]
+              properties:
+                html:
+                  type: string
+                  description: The complete HTML document to serve as the welcome page.
       responses:
         '200':
           description: File uploaded

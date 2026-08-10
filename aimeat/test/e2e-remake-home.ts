@@ -21,6 +21,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-home
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Cover the JSON door on PUT /v1/portfolio/upload (happy path read back
+ *     through the public endpoint, plus the missing-field refusal). It is the only shape an MCP
+ *     agent can send, so without it aimeat_portfolio_publish had no connector half.
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 2–3).
  */
 
@@ -291,6 +294,40 @@ await test('PUT /v1/portfolio/upload works for an owner with NO agent (was 400 N
     assert(res.status === 200, `upload without an agent must succeed, got ${res.status}`);
     const cfg = await json('/v1/portfolio/config', auth(t));
     assert(cfg.status === 200, `config read ${cfg.status}`);
+});
+
+await test('The same upload as JSON { html } — the door an MCP agent can reach', async () => {
+    // The connector has one JSON dispatch point for every request, tunnel included, so a raw
+    // text/html PUT is not a request it can make. Without this door aimeat_portfolio_publish sat
+    // on the agent surface with no way to carry it out.
+    const name = `hmjson${stamp}`;
+    const t = await registerOwner(name);
+    const html = '<!doctype html><html><head><title>t</title></head><body><h1>json upload</h1></body></html>';
+    const up = await json('/v1/portfolio/upload', auth(t, { method: 'PUT', body: JSON.stringify({ html }) }));
+    assert(up.status === 200, `json upload ${up.status}: ${JSON.stringify(up.body.error)}`);
+
+    // The file and the switch are two things: uploading a page does not publish it, and the public
+    // reader refuses until the owner has turned the portfolio on.
+    const cfg = await json('/v1/portfolio/config', auth(t, { method: 'PUT', body: JSON.stringify({ enabled: true }) }));
+    assert(cfg.status === 200, `enable ${cfg.status}: ${JSON.stringify(cfg.body.error)}`);
+
+    // Read it back through the public door: an accepted write that serves nothing is not a publish.
+    const { status, body } = await json(`/v1/portfolio/data/${name}`);
+    assert(status === 200, `portfolio read ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data.has_html === true, 'the page must be found');
+    assert(String(body.data.portfolio_html).includes('<h1>json upload</h1>'), 'and it must be the page that was sent');
+});
+
+await test('FAILURE MODE: JSON with no html field is refused, and the refusal says which field', async () => {
+    // The message matters as much as the status here. "Content-Type must be text/html" is also a
+    // 400 INVALID_INPUT, so a test that checked only the code would pass against a node that had
+    // never accepted JSON at all, and would prove nothing about this door.
+    const t = await registerOwner(`hmjbad${stamp}`);
+    const { status, body } = await json('/v1/portfolio/upload',
+        auth(t, { method: 'PUT', body: JSON.stringify({ page: 'wrong field name' }) }));
+    assert(status === 400, `expected 400, got ${status}`);
+    assert(body.error.code === 'INVALID_INPUT', `code: ${body.error?.code}`);
+    assert(/html is required/.test(body.error.message), `the refusal must name the field, got: ${body.error?.message}`);
 });
 
 await test('A mat made BEFORE an agent stays visible AFTER one arrives', async () => {

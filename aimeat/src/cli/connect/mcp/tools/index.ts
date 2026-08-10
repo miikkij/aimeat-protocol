@@ -46,6 +46,7 @@ import { registerCommerceTools } from './commerce.js';
 import { registerExchangeTools } from './exchange.js';
 import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
+import { registerPortfolioTools } from './portfolio.js';
 import { registerOperatorTools } from './operator.js';
 
 export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -82,5 +83,6 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerExchangeTools(mcp, registry);
   registerContactTools(mcp, registry);
   registerCompanyTools(mcp, registry);
+  registerPortfolioTools(mcp, registry);
   registerOperatorTools(mcp, registry);
 }

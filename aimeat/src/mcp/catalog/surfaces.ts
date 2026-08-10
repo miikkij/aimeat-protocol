@@ -19,6 +19,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-08-10 — Place aimeat_portfolio_publish on `agent`. It shipped into the catalog with no
+ *     surface, so no v2 client could call the one tool that writes the person's own welcome page.
+ *     It sits beside aimeat_company_portfolio_publish, which is the same act for a company.
  *   2026-07-28 — The `enterprise` surface becomes `commerce` (/v2/mcp/commerce): the edition seam is
  *     gone, so the surface is named after what it does — sell and get paid — and its allowlist is
  *     fixed rather than extendable at boot.
@@ -79,6 +82,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread',
         'aimeat_company_list', 'aimeat_company_create', 'aimeat_company_update',
         'aimeat_company_front_page', 'aimeat_company_portfolio_publish',
+        // The person's own welcome page, beside the company one: same act, different owner.
+        'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email',
         'aimeat_feedback_send', 'aimeat_feedback_inbox',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
