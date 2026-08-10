@@ -5,6 +5,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-08-10 — Both handlers resolve the gated app through resolveGatedApp instead of
+ *     reading config.app directly.
  *   v1.6.0 — 2026-08-10 — Both handlers take their sandbox context from buildExtensionCtx instead
  *                         of assembling ~210 lines apiece. No behaviour change on this road; the
  *                         point is that the other three roads now get the same guards.
@@ -35,6 +37,7 @@ import { getMember, accountOf } from '../../services/app-members.js';
 import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
+import { resolveGatedApp } from './permissions.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail } from '../../services/extension-ctx.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../../services/call-timing.js';
@@ -90,7 +93,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // rather than opening a lookup the sandbox could call. An extension declares which app it
       // gates with `config: { app: owner/file.html }`; without that it gets null and keeps whatever
       // membership model it already had.
-      const gatedApp = typeof ext.config?.app === 'string' ? ext.config.app : null;
+      const gatedApp = resolveGatedApp(ext);
       const callerAccount = accountOf(callerGaii);
       const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
       const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;
@@ -253,7 +256,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // rather than opening a lookup the sandbox could call. An extension declares which app it
       // gates with `config: { app: owner/file.html }`; without that it gets null and keeps whatever
       // membership model it already had.
-      const gatedApp = typeof ext.config?.app === 'string' ? ext.config.app : null;
+      const gatedApp = resolveGatedApp(ext);
       const callerAccount = accountOf(callerGaii);
       const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
       const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;

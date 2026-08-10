@@ -650,6 +650,7 @@ export interface AimeatConfig {
   extensionTimeoutMs: number;
   extensionMaxApiCalls: number;
   extensionMaxDebitPerCall: number;
+  extensionMaxPayMorsels: number;
   /**
    * Morsels burned per METERED call when the capability declares no toll of its own — the node-wide
    * pacing floor. Applies on every metered path (app tools, exchange runs, agent work, raw extension

@@ -8,6 +8,8 @@
  *   free (non-commercial) public call; refund-on-throw; and install-time C1/no-mint validation.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-paywall.ts
  * @version-history
+ *   v1.1.0 — 2026-08-10 — The unaffordable action is priced at 9 999 rather than 10 million. What
+ *     the test needs is a price above the welcome bonus (100), and the node now caps manifest prices.
  *   v1.0.0 — 2026-07-17 — Initial (Phase 4 — morsel paywall runtime proof)
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -62,7 +64,10 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', commercial: { payMorsels: 5 } },
     { id: 'tollcall', method: 'POST', path: '/tollcall', script: 'echo', tollMorsels: 2 },
     { id: 'moneycall', method: 'POST', path: '/moneycall', script: 'echo', commercial: { payMoney: { amount: 500000, currency: 'EUR' } } },
-    { id: 'expensivecall', method: 'POST', path: '/expensivecall', script: 'echo', commercial: { payMorsels: 10_000_000 } },
+    // Priced far above a welcome bonus (100) to prove the insufficient-balance 402, but under
+    // the node's manifest price ceiling — the point is that the caller cannot afford it, not that
+    // the number is astronomical.
+    { id: 'expensivecall', method: 'POST', path: '/expensivecall', script: 'echo', commercial: { payMorsels: 9_999 } },
     { id: 'paidthrow', method: 'POST', path: '/paidthrow', script: 'boom', commercial: { payMorsels: 3 } },
   ],
   config: { public_access: { default: true } },

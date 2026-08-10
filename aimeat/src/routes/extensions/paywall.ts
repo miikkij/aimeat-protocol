@@ -11,6 +11,9 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.7.0 — 2026-08-10 — The carry plan is looked up only for an app the extension's installer
+ *     owns. It read config.app straight through, so a manifest could put its callers on somebody
+ *     else's carry plan.
  *   v1.6.0 — 2026-08-10 — Takes a PaywallResponder rather than an Express Response, so a door with
  *                         no HTTP response can call the same gate. It was Express-shaped, the MCP
  *                         tool could not call it, and so called none of it.
@@ -43,6 +46,7 @@ import { consumeInternalPass } from './internal-pass.js';
 import { appSpendRefusal } from '../../services/metered-access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
+import { resolveGatedApp } from './permissions.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
@@ -187,7 +191,7 @@ export async function enforcePaywall(args: {
   //
   //     `open` (the default) leaves this alone: anybody may call, a member is carried and pays
   //     nothing, everybody else pays. Membership is the free tier, not the door.
-  const gatedApp = typeof ext.config?.app === 'string' ? ext.config.app : null;
+  const gatedApp = resolveGatedApp(ext);
   const appPlan = gatedApp ? await getCarryPlan(storage, gatedApp) : null;
   if (gatedApp) {
     if (appPlan?.access === 'members-only') {

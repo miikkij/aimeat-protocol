@@ -3,6 +3,9 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-10 — config.app must name the installer's own app, and a manifest price and
+ *                         toll are bounded. Naming somebody else's app made a private roster a
+ *                         per-call oracle; "non-negative integer" admitted 2^31 as a price.
  *   v1.4.0 — 2026-08-10 — metadata.name is validated. The name IS the memory address, and the other
  *                         half of it (the instance id) has always been validated; this half was not,
  *                         so `victim.probe` addressed the `probe` instance of `victim`.
@@ -153,9 +156,15 @@ function validateManifestShape(
  * result on any violation, or `null` when valid. Enforces M1 by construction: morsels are revenue
  * only inside `commercial.payMorsels`.
  */
-export function validateActionPricing(action: Record<string, unknown>, actionId: string): ExtBuildResult | null {
+export function validateActionPricing(action: Record<string, unknown>, actionId: string, config: AimeatConfig): ExtBuildResult | null {
   if (action.tollMorsels !== undefined && !isNonNegInt(action.tollMorsels)) {
     return fail(`Action "${actionId}": tollMorsels must be a non-negative integer`);
+  }
+  // A toll BURNS the caller's morsels and returns nothing, which is exactly what
+  // ctx.wallet.consume does, so it answers to the same ceiling. Unbounded, a manifest could name a
+  // number that empties whoever calls it once.
+  if (isNonNegInt(action.tollMorsels) && action.tollMorsels > config.extensionMaxDebitPerCall) {
+    return fail(`Action "${actionId}": tollMorsels ${action.tollMorsels} exceeds this node's per-call burn ceiling of ${config.extensionMaxDebitPerCall}`);
   }
   const commercial = action.commercial as Record<string, unknown> | undefined;
   if (commercial === undefined) return null;
@@ -165,6 +174,12 @@ export function validateActionPricing(action: Record<string, unknown>, actionId:
   const payMorsels = commercial.payMorsels ?? 0;
   if (!isNonNegInt(payMorsels)) {
     return fail(`Action "${actionId}": commercial.payMorsels must be a non-negative integer`);
+  }
+  // A price is revenue and the caller has to hold the balance, so this is a sanity bound rather
+  // than a spend control. It exists because an agent invoking a capability does not necessarily
+  // read the price first, and "non-negative integer" admitted 2^31.
+  if (payMorsels > config.extensionMaxPayMorsels) {
+    return fail(`Action "${actionId}": commercial.payMorsels ${payMorsels} exceeds this node's ceiling of ${config.extensionMaxPayMorsels}`);
   }
   const payMoney = commercial.payMoney as Record<string, unknown> | undefined;
   if (payMoney !== undefined) {
@@ -327,7 +342,7 @@ export function buildExtensionRecordFromManifest(
         message: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` };
     }
     // Pricing (design: notes doc-r6tyr3o). tollMorsels = anti-abuse burn; commercial = revenue.
-    const pricingErr = validateActionPricing(action, action.id as string);
+    const pricingErr = validateActionPricing(action, action.id as string, config);
     if (pricingErr) return pricingErr;
   }
 
@@ -360,6 +375,27 @@ export function buildExtensionRecordFromManifest(
   // ciphertext taken from somewhere it should not have been.
   const { config: manifestConfig, stripped: strippedEncrypted } = stripClientEncryptedValues(nodeOwnedStripped);
   const strippedConfigKeys = [...strippedNodeKeys, ...strippedEncrypted];
+
+  // `config: { app: owner/file.html }` names the app whose membership this extension enforces, and
+  // the node then reads that app's roster on the extension's behalf — the caller's role on every
+  // invoke, and the carry plan on the paywall. Naming somebody else's app turns a deliberately
+  // private roster into a per-call oracle, and puts the caller on that owner's carry plan. The owner
+  // half has to be the installer. All 8 extensions declaring `app` on aimeat.io already are.
+  // At this point config entries are still in descriptor form (`app: { default: 'owner/x.html' }`);
+  // the flatten to a bare value happens further down, where the record is assembled.
+  const rawApp = manifestConfig?.app;
+  const declaredApp = (rawApp && typeof rawApp === 'object' && 'default' in rawApp)
+    ? (rawApp as Record<string, unknown>).default
+    : rawApp;
+  if (typeof declaredApp === 'string' && declaredApp.length) {
+    const appOwner = (declaredApp.split('/')[0] ?? '').toLowerCase();
+    const installer = installedBy.toLowerCase().split('@')[0].split('#').pop() ?? '';
+    if (appOwner !== installer) {
+      return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+        message: `config.app "${declaredApp}" names an app owned by "${appOwner}", and this extension `
+          + `is being installed by "${installer}". An extension can only gate its own installer's app.` };
+    }
+  }
   const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
   const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
   const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;

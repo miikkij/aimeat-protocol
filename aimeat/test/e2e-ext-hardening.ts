@@ -337,6 +337,49 @@ async function run() {
       `the refused migration deleted the existing component (read back ${survived.status})`);
   });
 
+  // ── 3d. Gating somebody else's app ─────────────────────────────────────────────────────────
+  await test('an extension cannot declare that it gates another owner\'s app', async () => {
+    // `config: { app: owner/file.html }` names the app whose membership this extension enforces, and
+    // the node reads that roster on the extension's behalf: the caller's role on every invoke, and
+    // the carry plan on the paywall. Naming somebody else's app turns a private roster into a
+    // per-call oracle, and puts the caller on that owner's carry plan.
+    const mine = await install(ownerA.token, `appgateok${Date.now()}`, { app: { default: `${ownerA.name}/dashboard.html` } });
+    assert(mine.status === 201, `gating my own app must still install, got ${mine.status}: ${JSON.stringify(mine.body?.error)}`);
+
+    const theirs = await install(ownerA.token, `appgatebad${Date.now()}`, { app: { default: `${ownerB.name}/dashboard.html` } });
+    assert(theirs.status === 400,
+      `naming another owner's app must be refused, got ${theirs.status}: ${JSON.stringify(theirs.body?.data ?? theirs.body?.error)}`);
+  });
+
+  // ── 3e. A price nobody meant to type ───────────────────────────────────────────────────────
+  await test('a manifest price and toll are bounded by the node\'s ceilings', async () => {
+    const priced = await installManifest(ownerA.token, {
+      metadata: { name: `pricecap${Date.now()}`, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+      actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo', commercial: { payMorsels: 100_000_000 } }],
+      limits: { timeout_ms: 5000, max_api_calls: 1 },
+    }, { echo: ECHO });
+    assert(priced.status === 400,
+      `a price of 100 million morsels must be refused, got ${priced.status}: ${JSON.stringify(priced.body?.data)}`);
+
+    // A toll BURNS the caller's morsels and returns nothing, so it answers to the burn ceiling
+    // (extensionMaxDebitPerCall, 100 by default) rather than the price one.
+    const tolled = await installManifest(ownerA.token, {
+      metadata: { name: `tollcap${Date.now()}`, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+      actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo', tollMorsels: 5_000 }],
+      limits: { timeout_ms: 5000, max_api_calls: 1 },
+    }, { echo: ECHO });
+    assert(tolled.status === 400,
+      `a 5000-morsel burn per call must be refused, got ${tolled.status}: ${JSON.stringify(tolled.body?.data)}`);
+
+    // And an ordinary price still installs, so the ceiling is a bound and not a ban.
+    const ok = await installManifest(ownerA.token, {
+      metadata: { name: `priceok${Date.now()}`, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+      actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo', commercial: { payMorsels: 5 }, tollMorsels: 2 }],
+      limits: { timeout_ms: 5000, max_api_calls: 1 },
+    }, { echo: ECHO });
+    assert(ok.status === 201, `an ordinary price must still install, got ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+  });
+
   // ── 4. Reading somebody else's source ──────────────────────────────────────────────────────
   await test('a second owner cannot read another owner\'s action source', async () => {
     const name = `hardsrc${Date.now()}`;

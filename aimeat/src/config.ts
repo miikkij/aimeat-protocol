@@ -23,6 +23,9 @@
  *     for url-validator, add securityPostureWarnings() startup self-check. See security-development-dna.md.
  *   v1.5.1 -- 2026-08-01 -- Pure extraction: missingOperatorConfig / operatorTypeLabel moved to
  *     config-operator.ts (max-file-lines) and are re-exported here, so no importer changes.
+ *   v1.6.0 -- 2026-08-10 -- extensionMaxPayMorsels: a ceiling on the price an action may put on
+ *     itself in its manifest. securityPostureWarnings moved to config-posture.ts by pure
+ *     extraction when this file reached the 800-line limit; it is re-exported from here.
  *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 3: AIMEAT_AI_LABEL_PUBLIC (strict|light|off, `off`
  *     refused + coerced to `strict` on a public node, reported by securityPostureWarnings) and
  *     AIMEAT_AI_SUPERVISORY_NAME/_URL (the AI market-surveillance authority, distinct from the
@@ -118,28 +121,9 @@ function isPrivateHost(baseUrl: string): boolean {
   return false;
 }
 
-/**
- * Startup posture self-check. When the resolved security profile is `public`, return a list of
- * unsafe-combination warnings so being insecure on the internet is a conscious operator choice,
- * not an accident. Warn-only by contract (the caller logs them) — never throws, so an operator can
- * still run any combination deliberately. Empty list on a `local` node. See security-development-dna.md.
- */
-export function securityPostureWarnings(config: AimeatConfig): string[] {
-  const w: string[] = [];
-  if (config.securityProfile !== 'public') return w;
-  if (config.anonymousMode) w.push('AIMEAT_ANONYMOUS=true — anyone can act as the shared anonymous identity.');
-  if (config.allowPrivateEgress) w.push('AIMEAT_ALLOW_PRIVATE_EGRESS=true — server-side fetches can reach loopback/internal services (SSRF).');
-  if (config.federationOpenJoin) w.push('AIMEAT_FEDERATION_OPEN_JOIN=true — any peer can federate without operator approval.');
-  if (!config.encryptionKey) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
-  if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil footgun.');
-  if (config.statsAccess === 'public') w.push('AIMEAT_STATS_ACCESS=public — internal metrics are exposed to anyone.');
-  // Not "you chose something unsafe" but "your choice was not honoured" — the one entry here that
-  // reports a coercion rather than a risk, so an operator who set it never believes it took effect.
-  if (process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase() === 'off') {
-    w.push('AIMEAT_AI_LABEL_PUBLIC=off was REFUSED and reset to `strict` — a publicly reachable node may not hide the visible AI label (EU AI Act Art. 50). Use `light` to label only what the law requires.');
-  }
-  return w;
-}
+// Moved to config-posture.ts when this file hit the line limit. Re-exported so the dozen
+// modules that import it from here keep working; the move was not meant to be visible.
+export { securityPostureWarnings } from './config-posture.js';
 
 export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const { configPath, cliOverrides } = options ?? {};
@@ -584,6 +568,13 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionTimeoutMs: parseInt(process.env.AIMEAT_EXT_TIMEOUT_MS ?? '5000', 10),
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '500', 10),
     extensionMaxDebitPerCall: parseInt(process.env.AIMEAT_EXT_MAX_DEBIT ?? '100', 10),
+    // Ceiling on a PRICE an action may put on itself in its manifest (commercial.payMorsels).
+    // A price is revenue and the caller must hold the balance, so this is a sanity bound rather
+    // than a spend control: it stops a manifest asking for a number nobody meant to type, and an
+    // agent invoking a capability does not necessarily read the price before it calls. The burn
+    // side (tollMorsels) is bounded by extensionMaxDebitPerCall instead, since a burn takes the
+    // morsels and gives nothing back.
+    extensionMaxPayMorsels: parseInt(process.env.AIMEAT_EXT_MAX_PAY_MORSELS ?? '10000', 10),
     // Morsels burned per metered call when the capability declares no toll of its own. Morsels
     // replenish daily with a hard ceiling, so a non-zero value puts an absolute rate floor under
     // every capability — including money-priced ones, whose only other brake is the buyer's budget.
