@@ -50,6 +50,17 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  */
 const SEED = 43;
 
+/**
+ * The number that actually matters. A READ through storage is the same read whichever door asks;
+ * a WRITE is where the two implementations drift, because a write carries a gate, a validation and
+ * a side effect that one copy can forget. 29 of the 43 files write. Reported separately so progress
+ * on the risky half is visible even while the file-level count sits still.
+ */
+const WRITE_SEED = 28;
+
+/** Storage methods that change something. Everything else is a read. */
+const WRITEISH = /^(create|set|update|delete|add|remove|insert|upsert|write|debit|credit|transfer|enqueue|revoke|grant|mint|save|publish|archive|deactivate|activate|link|unlink)/i;
+
 function walk(dir: string, out: string[] = []): string[] {
     if (!existsSync(dir)) return out;
     for (const entry of readdirSync(dir)) {
@@ -78,12 +89,22 @@ function main(): void {
     }
 
     const count = offenders.length;
+    const writers = offenders.filter(o => o.calls.some(c => WRITEISH.test(c)));
     console.log('');
     console.log('  One capability, one implementation — MCP files doing the work themselves');
     console.log('  ' + '─'.repeat(62));
     console.log(`  tool-surface files calling storage directly  ${String(count).padStart(4)}`);
     console.log(`  seeded on 2026-08-10                         ${String(SEED).padStart(4)}`);
     console.log('');
+    console.log(`  of those, files that WRITE                   ${String(writers.length).padStart(4)}`);
+    console.log(`  seeded on 2026-08-10                         ${String(WRITE_SEED).padStart(4)}`);
+    console.log('');
+
+    if (writers.length > WRITE_SEED) {
+        console.error(`✖ ${writers.length} files write through storage directly, above the seeded ${WRITE_SEED}.`);
+        if (strict) process.exit(1);
+        return;
+    }
 
     if (count > SEED) {
         console.log('  NEW since the seed — these are the ones to look at:');

@@ -17,12 +17,12 @@
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { grantConsent, revokeConsent } from '../services/consent-write.js';
 
 export function registerConsentTools(
     mcp: McpServer,
@@ -31,6 +31,9 @@ export function registerConsentTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's own scopes. The gate lives inside the shared service, not only in the
+     *  registration filter, so a door that forgets to register cannot also forget to check. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -102,35 +105,25 @@ export function registerConsentTools(
         },
         annotationsFor('aimeat_consent_grant'),
         async ({ target_gaii, scope, data_pattern, purpose, ttl_hours }) => {
-            const ghii = ownerGhii();
-
-            // Quota check
-            const existing = await storage.listConsents(ghii);
-            if (existing.length >= 100) {
-                return {
-                    content: [{ type: 'text' as const, text: 'Quota exceeded: maximum 100 consent records' }],
-                    isError: true,
-                };
-            }
-
-            const now = new Date().toISOString();
-            const expires = ttl_hours != null
-                ? new Date(Date.now() + ttl_hours * 3_600_000).toISOString()
-                : null;
-
-            const id = randomBytes(16).toString('hex');
-            const consent = await storage.createConsent({
-                id,
-                ownerGaii: ghii,
-                dataPattern: data_pattern,
+            // ONE implementation (services/consent-write.ts). This tool used to build the record
+            // itself, which is why it accepted a recipient no access check will ever match, wrote no
+            // audit entry, and never refreshed the federation directory — three things the REST door
+            // has always done for the same operation.
+            const granted = await grantConsent({ storage, config }, {
+                ownerGaii: ownerGhii(),
+                scopes: sessionScopes,
+                roles: ['agent'],
+            }, {
                 recipient: target_gaii,
+                dataPattern: data_pattern,
                 purpose,
                 scope,
-                expires,
-                status: 'active',
-                grantedAt: now,
-                revokedAt: null,
+                expires: ttl_hours != null ? new Date(Date.now() + ttl_hours * 3_600_000).toISOString() : null,
             });
+            if (!granted.ok) {
+                return { content: [{ type: 'text' as const, text: `${granted.code}: ${granted.message}` }], isError: true };
+            }
+            const consent = granted.value;
 
             emitResourceListChanged(agentGaii);
 
@@ -186,18 +179,17 @@ export function registerConsentTools(
         },
         annotationsFor('aimeat_consent_revoke'),
         async ({ consent_id }) => {
-            const consent = await storage.getConsent(consent_id);
-            if (!consent) {
-                return { content: [{ type: 'text' as const, text: 'Consent not found' }], isError: true };
+            // Same function the REST door calls: it owns the ownership check, the audit entry and
+            // the directory refresh, so this door cannot be the one that forgets one of them.
+            const revoked = await revokeConsent({ storage, config }, {
+                ownerGaii: ownerGhii(),
+                scopes: sessionScopes,
+                roles: ['agent'],
+            }, consent_id);
+            if (!revoked.ok) {
+                return { content: [{ type: 'text' as const, text: `${revoked.code}: ${revoked.message}` }], isError: true };
             }
-
-            const ghii = ownerGhii();
-            if (consent.ownerGaii !== ghii) {
-                return { content: [{ type: 'text' as const, text: 'Only the consent owner can revoke' }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-            await storage.updateConsent(consent_id, { status: 'revoked', revokedAt: now });
+            const now = revoked.value.revokedAt;
 
             emitResourceUpdated(agentGaii, `aimeat://consent/${encodeURIComponent(consent_id)}`);
 

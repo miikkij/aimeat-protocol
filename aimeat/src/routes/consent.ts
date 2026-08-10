@@ -14,7 +14,6 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
@@ -23,7 +22,7 @@ import type { StatsCollector } from '../services/stats.js';
 import { emitChange } from '../services/event-bus.js';
 import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { auditDataAccess } from '../services/consent.js';
+import { grantConsent, revokeConsent } from '../services/consent-write.js';
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
 import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 
@@ -43,59 +42,21 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
             metadata,
         } = req.body ?? {};
 
-        if (!data_pattern || !recipient || !purpose) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'data_pattern, recipient, and purpose are required'));
-            return;
-        }
+    // ONE implementation (services/consent-write.ts): the recipient shapes, the quota, the record,
+    // the audit entry and the directory refresh. The MCP tool calls the same function, which is how
+    // it stopped accepting recipients nothing matches and started leaving an audit trail.
+    const granted = await grantConsent({ storage, config, onDirectoryChange }, {
+      ownerGaii,
+      scopes: req.auth!.scopes ?? [],
+      roles: req.auth!.roles,
+    }, { recipient, dataPattern: data_pattern, purpose, scope, expires, metadata });
+    if (!granted.ok) {
+      res.status(granted.status).json(error(config.nodeId, granted.code, granted.message));
+      return;
+    }
+    const consent = granted.value;
 
-        // Validate recipient format
-        const validRecipientPatterns = [
-            /^\*$/,                           // Wildcard
-            /^organism\.\S+$/,                // Organism
-            /^ghii:\S+@\S+$/,                // GHII user
-            /^domain:\S+$/,                   // Domain glob
-            /^node:\S+$/,                     // Specific node
-            /^[^*][^:]*#[^@]+@.+$/,          // Specific GAII (agent#owner@node)
-            /^[^#@*:]+@[^@]+$/,              // Short GAII (owner@node)
-        ];
-        if (!validRecipientPatterns.some(p => p.test(recipient))) {
-            res.status(400).json(error(config.nodeId, 'INVALID_RECIPIENT',
-                'recipient must be "*", a GAII, or prefixed with "organism.", "ghii:", "domain:", or "node:"'));
-            return;
-        }
-
-        // Quota check: max 100 consents per owner
-        const existing = await storage.listConsents(ownerGaii);
-        if (existing.length >= 100) {
-            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', 'Maximum 100 consent records per owner'));
-            return;
-        }
-
-        const now = new Date().toISOString();
-        const consent = await storage.createConsent({
-            id: uuidv4(),
-            ownerGaii,
-            dataPattern: data_pattern,
-            recipient,
-            purpose,
-            scope,
-            expires,
-            status: 'active',
-            grantedAt: now,
-            revokedAt: null,
-            metadata,
-        });
-
-        stats?.increment('consent_grants');
-
-        // Audit the consent mutation (buffered, off the request path). Mutations + denials
-        // are the only things the audit trail keeps now (allowed reads are no longer logged).
-        await auditDataAccess(storage, consent.id, ownerGaii, consent.recipient, consent.dataPattern, 'grant', true);
-
-        // Notify directory of federation consent changes (Phase 1.4 — event-driven refresh)
-        if (consent.scope === 'federation' && onDirectoryChange) {
-            onDirectoryChange();
-        }
+    stats?.increment('consent_grants');
 
         res.status(201).json(success(config.nodeId, {
             id: consent.id,
@@ -229,30 +190,19 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     // DELETE /v1/consent/:id — Revoke consent (soft-delete: sets status to 'revoked')
     router.delete('/v1/consent/:id', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const id = req.params.id as string;
-        const consent = await storage.getConsent(id);
+    // Same function: it owns the ownership check, the audit entry and the directory refresh.
+    const revoked = await revokeConsent({ storage, config, onDirectoryChange }, {
+      ownerGaii: resolve(req),
+      scopes: req.auth!.scopes ?? [],
+      roles: req.auth!.roles,
+    }, id);
+    if (!revoked.ok) {
+      res.status(revoked.status).json(error(config.nodeId, revoked.code, revoked.message));
+      return;
+    }
+    const now = revoked.value.revokedAt;
 
-        if (!consent) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Consent not found: ${id}`));
-            return;
-        }
-
-        if (consent.ownerGaii !== resolve(req)) {
-            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the consent owner can revoke'));
-            return;
-        }
-
-        const now = new Date().toISOString();
-        await storage.updateConsent(id, { status: 'revoked', revokedAt: now });
-
-        stats?.increment('consent_revocations');
-
-        // Audit the consent mutation (buffered, off the request path).
-        await auditDataAccess(storage, id, consent.ownerGaii, consent.recipient, consent.dataPattern, 'revoke', true);
-
-        // Notify directory of federation consent revocation (Phase 1.4 — event-driven refresh)
-        if (consent.scope === 'federation' && onDirectoryChange) {
-            onDirectoryChange();
-        }
+    stats?.increment('consent_revocations');
 
         res.json(success(config.nodeId, {
             status: 'revoked',
