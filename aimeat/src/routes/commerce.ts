@@ -14,6 +14,8 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.6.0 — 2026-08-10 — Security audit H-3: pass the completing principal to completeSession so the
+ *     spend gate can see it.
  *   v1.5.0 — 2026-08-06 — Hold rail (TINKI phase 1): POST/GET /v1/commerce/holds,
  *     GET /:id, POST /:id/capture (seller, partial allowed), POST /:id/release
  *   v1.4.0 — 2026-07-28 — Stripe credentials are set here (PUT/DELETE /v1/commerce/payout/stripe)
@@ -439,7 +441,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
       const xPayment = decodeXPayment(req.header('X-PAYMENT') ?? undefined);
       const handlerId = parsed.data.payment?.handler ?? (xPayment ? X402_HANDLER_ID : undefined);
       const instrument = xPayment ?? parsed.data.payment?.instrument;
-      const completed = await completeSession(storage, config, session, handlerId, instrument, callerJwt);
+      const completed = await completeSession(storage, config, session, handlerId, instrument, callerJwt, req.auth ? { roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
       res.json(success(config.nodeId, { session: completed }, [
         { description: 'Wallet balance', method: 'GET', url: '/v1/wallet' },
       ]));

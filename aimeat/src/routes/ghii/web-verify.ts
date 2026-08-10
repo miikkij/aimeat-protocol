@@ -4,6 +4,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-10 — Security audit H-1: both unauthenticated mints stamp the agent's own
+ *     scopes. Omitting `scopes` made issueJWT default to ['*'], so proving control of a mailbox
+ *     returned a wildcard credential over the whole account.
  *   v1.2.0 — 2026-07-19 — register-web enforces the email gate (EMAIL_REQUIRED when the operator requires a
  *     verified email) and refuses an email already verified elsewhere (EMAIL_TAKEN) at registration.
  *   v1.1.0 — 2026-07-19 — emailHash is now a VERIFIED-email binding: register-web no longer stamps it at
@@ -342,11 +345,16 @@ export function registerWebVerifyRoutes(
         if (ownerRecord?.roles.includes('owner')) roles.push('owner');
         if (ownerRecord?.roles.includes('operator')) roles.push('operator');
 
+        // SECURITY (audit H-1): this token is minted on an UNAUTHENTICATED route — whoever holds the
+        // verification id and the emailed code gets it. Leaving `scopes` off made issueJWT default it
+        // to ['*'], so the answer to "prove you own this mailbox" was a wildcard credential over the
+        // whole account. Stamp the agent's own scopes instead, the same set every other door gives it.
         const token = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,
             node: config.nodeId,
             roles,
+            scopes: agent.defaultScopes ?? config.defaultAgentScopes,
         }, config.jwtTtlSeconds);
 
         // SECURITY: Prevent caching of response containing private key
@@ -486,11 +494,14 @@ export function registerWebVerifyRoutes(
         if (ownerRecord?.roles.includes('owner')) roles.push('owner');
         if (ownerRecord?.roles.includes('operator')) roles.push('operator');
 
+        // SECURITY (audit H-1): same as the verify-email mint above — an unauthenticated route must
+        // not hand out a wildcard credential by omission. The agent's own scopes are the grant.
         const jwtToken = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,
             node: config.nodeId,
             roles,
+            scopes: agent.defaultScopes ?? config.defaultAgentScopes,
         }, config.jwtTtlSeconds);
 
         // SECURITY: Prevent caching of response containing private keys

@@ -766,6 +766,89 @@ await test('33. Outbound UCP profile fetch carries a verifiable Web Bot Auth sig
     }
 });
 
+// ── The spend permission at the one place money leaves the buyer (2026-08 audit H-3) ──
+// `appSpendRefusal` enforces the `contract:spend` scope and the per-app ceiling, and its docblock
+// says it must run "at EVERY place that actually charges". All four completion doors went straight
+// to handler.collect(), which debits the buyer GHII — and an app-grant token's `sub` IS that GHII.
+// So an app the owner approved for reading notes could spend their balance. The gate lives in
+// completeSession now, which is the single door money actually passes through.
+{
+    const APP_FILE = `spendtest-${Date.now()}.html`;
+    const REDIRECT = 'http://localhost:9912/callback';
+    const verifier = Buffer.from(`${Date.now()}-spend-verifier-padding`).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+
+    /** Publish an app owned by the BUYER, then run authorize→consent→token for the given scope. */
+    async function buyerAppToken(scope: string): Promise<string> {
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: auth(buyer.token),
+            body: JSON.stringify({
+                filename: APP_FILE, name: 'Spend Test', description: 'H-3 regression',
+                category: 'tool', content: Buffer.from('<html><body>spend</body></html>').toString('base64'),
+            }),
+        });
+        assert(pub.status === 200 || pub.status === 201 || pub.status === 409, `publish app ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+        const q = new URLSearchParams({
+            app: `${buyer.name}/${APP_FILE}`, response_type: 'code', scope,
+            redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+        });
+        const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+        const loc = res.headers.get('location') ?? '';
+        const rid = decodeURIComponent(/req=([^&]+)/.exec(loc)?.[1] ?? '');
+        assert(!!rid, `no request id in ${loc}`);
+        const con = await json('/v1/app-grants/authorize-consent', {
+            method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ request_id: rid }),
+        });
+        const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+        const tok = await json('/v1/app-grants/token', {
+            method: 'POST',
+            body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+        });
+        assert(!!tok.body.data?.access_token, `token: ${JSON.stringify(tok.body)}`);
+        return tok.body.data.access_token;
+    }
+
+    async function openSession(token: string): Promise<string> {
+        const r = await json('/v1/commerce/checkout-sessions', {
+            method: 'POST', headers: auth(token),
+            body: JSON.stringify({ items: [{ kind: 'offer', agent: vendorGaii, offer_id: BASE_OFFERS[0].id, quantity: 1 }] }),
+        });
+        assert(r.status === 201, `open session ${r.status}: ${JSON.stringify(r.body.error)}`);
+        return r.body.data.session.id;
+    }
+
+    await test('20. An app WITHOUT contract:spend cannot complete a checkout (H-3)', async () => {
+        const narrow = await buyerAppToken('memory:read');
+        const sid = await openSession(buyer.token);
+        const before = await balance(buyer.token);
+        const r = await json(`/v1/commerce/checkout-sessions/${sid}/complete`, {
+            method: 'POST', headers: auth(narrow), body: JSON.stringify({}),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+        assert(r.body.error?.code === 'SCOPE_REQUIRED', `code: ${JSON.stringify(r.body.error)}`);
+        assert(await balance(buyer.token) === before, 'the buyer must not be charged by a refused app');
+    });
+
+    await test('21. An app WITH contract:spend completes normally (the gate is a scope, not a ban)', async () => {
+        const spender = await buyerAppToken('memory:read contract:spend');
+        const sid = await openSession(buyer.token);
+        const before = await balance(buyer.token);
+        const r = await json(`/v1/commerce/checkout-sessions/${sid}/complete`, {
+            method: 'POST', headers: auth(spender), body: JSON.stringify({}),
+        });
+        assert(r.status === 200, `expected 200 with contract:spend, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+        assert(await balance(buyer.token) < before, 'the granted app did charge the buyer');
+    });
+
+    await test('22. The owner\'s own session still completes (the gate only sees app tokens)', async () => {
+        const sid = await openSession(buyer.token);
+        const r = await json(`/v1/commerce/checkout-sessions/${sid}/complete`, {
+            method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}),
+        });
+        assert(r.status === 200, `owner complete must still work, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+    });
+}
+
 console.log(`\n${'═'.repeat(50)}`);
 console.log(`Commerce E2E: ${passed} passed, ${failed} failed (${passed + failed} total)`);
 console.log('═'.repeat(50));

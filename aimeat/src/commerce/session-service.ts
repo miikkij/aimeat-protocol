@@ -13,6 +13,9 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   v2.3.0 — 2026-08-10 — Security audit H-3: completeSession asks appSpendRefusal before collecting.
+ *     It is the one place money leaves the buyer, and all four completion doors (REST, UCP, ACP, MCP)
+ *     reached handler.collect() without the spend scope or the per-app ceiling ever being checked.
  *   v2.2.0 — 2026-07-14 — createFulfillmentTask extracted to fulfillment.ts so the app-tool task
  *     path shares it (TARGET-034 phase B)
  *   v2.1.0 — 2026-07-14 — Fulfill seam: a sellable's custom fulfill() (app-tool capability invoke)
@@ -31,6 +34,7 @@ import { getSellableResolver, type SellableRef } from './sellable-resolvers.js';
 import { CommerceError } from './errors.js';
 import { createFulfillmentTask } from './fulfillment.js';
 import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
+import { appSpendRefusal } from '../services/metered-access.js';
 import { isMoneyCurrency, percentFee } from './money.js';
 import { logger } from '../utils/logger.js';
 import { readSplit, computeSplit, type DynamicDesignation } from './beneficiary-split.js';
@@ -295,8 +299,25 @@ export async function completeSession(
   /** The buyer's bearer token from the completing request — custom fulfillments (app-tool
    *  capability invokes) authenticate with it; the default TASK path ignores it. */
   callerJwt?: string,
+  /** The completing principal. Present for every door that a granted app can reach; see the spend
+   *  gate below. Omitted only where no external principal can be the caller. */
+  caller?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null,
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
+
+  // SECURITY (audit H-3): this is the one place money leaves the buyer, so it is the one place the
+  // spend permission has to be asked. `appSpendRefusal` enforces the `contract:spend` scope and the
+  // per-app ceiling the owner set, and its own docblock says it must run "at EVERY place that
+  // actually charges" — yet the four completion doors (REST, UCP, ACP, MCP) went straight to
+  // handler.collect(), which debits the buyer GHII. Because an app-grant token resolves to the
+  // owner's GHII, an app the owner approved for reading their notes could spend their balance.
+  // Asking here rather than in each door is deliberate: a fifth door cannot forget it.
+  const spendRefusal = await appSpendRefusal(storage, caller ?? null);
+  if (spendRefusal) {
+    throw spendRefusal.kind === 'scope_required'
+      ? new CommerceError('SCOPE_REQUIRED', 403, `This app was not granted the "${spendRefusal.scope}" permission, so it cannot spend on your behalf.`)
+      : new CommerceError('APP_SPEND_CAP_REACHED', 403, `This app has reached the spending limit you set for it (${spendRefusal.capMorsels} morsels).`);
+  }
   if (Date.now() > new Date(session.expiresAt).getTime()) {
     session.status = 'expired';
     session.updatedAt = new Date().toISOString();

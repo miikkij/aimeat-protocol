@@ -161,7 +161,9 @@ await test('Register agent 1', async () => {
             name: 'mem-agent-1',
             owner: ownerName,
             capabilities: ['memory'],
-            scopes: ['memory:read', 'memory:write', 'memory:delete'],
+            // storage:* because this suite's bundle test uploads a file: POST /v1/memory/files enforces
+            // storage:write since the 2026-08 audit (H-12), matching the /v1/storage twin over the same store.
+            scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write'],
             model: 'test',
         }),
     });
@@ -190,7 +192,9 @@ await test('Register agent 2', async () => {
             name: 'mem-agent-2',
             owner: ownerName,
             capabilities: ['memory'],
-            scopes: ['memory:read', 'memory:write', 'memory:delete'],
+            // storage:* because this suite's bundle test uploads a file: POST /v1/memory/files enforces
+            // storage:write since the 2026-08 audit (H-12), matching the /v1/storage twin over the same store.
+            scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write'],
             model: 'test',
         }),
     });

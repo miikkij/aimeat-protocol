@@ -2,6 +2,8 @@
  * @file src/routes/memory/bulk.ts
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-11: export and bundle enforce memory:read, matching the
+ *     list and single-key reads. They returned full values to any token in the owner bucket.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
@@ -126,7 +128,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // GET /v1/memory/export — download all of the caller's memory entries (full values) as a JSON
   // backup. Owner sessions export across their GHII + agents + ecosystem apps (owner-scope); agent
   // sessions export their own keyspace. Optional ?prefix= scopes the export to one namespace.
-  router.get('/v1/memory/export', requireAuth(), async (req, res) => {
+  router.get('/v1/memory/export', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;
@@ -312,7 +314,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Backs the "collection cart" export: a pointer-free bundle of the caller's OWN data (GHII + owned
   // agents). Each item must be owned by the caller or one of their agents; anything else is skipped
   // and recorded in manifest.json. Body: { items: [{ kind:'memory'|'file', key, owner_gaii? }] }.
-  router.post('/v1/memory/bundle', requireAuth(), async (req, res) => {
+  router.post('/v1/memory/bundle', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const body = req.body ?? {};
     const items = Array.isArray(body.items) ? body.items : [];
     if (items.length === 0) {

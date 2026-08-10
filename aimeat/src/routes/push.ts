@@ -9,6 +9,8 @@
  *   - GET    /v1/push/vapid-key  — public VAPID key (no auth)
  * @usage app.use(pushRouter(config, storage, pushService));
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-8: the subscription endpoint goes through validateOutboundUrl.
+ *     It is a URL the node POSTs every notification to, unattended, and it was stored verbatim.
  *   v1.0.0 — 2026-04-15 — Initial push subscription routes.
  *   v1.1.0 — 2026-07-02 — Test push deep-links to /v1/profile?tab=notifications (the old
  *     /v1/portal/human/dashboard target never existed as a route).
@@ -18,6 +20,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from '../services/push.js';
 import { requireAuth } from '../auth/middleware.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 
@@ -31,6 +34,16 @@ export function pushRouter(config: AimeatConfig, storage: Storage, pushService: 
       const { endpoint, keys } = req.body;
       if (!endpoint || !keys?.p256dh || !keys?.auth) {
         res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Missing endpoint or keys (p256dh, auth)'));
+        return;
+      }
+      // SECURITY (audit H-8): the endpoint is a URL this node will POST to, repeatedly, unattended,
+      // with the body of every notification the owner receives. It was stored verbatim, so the
+      // subscribe route was an unvalidated outbound target: point it at an internal address and the
+      // node reaches it on the caller's behalf. Same guard as every other non-constant outbound URL.
+      const endpointCheck = await validateOutboundUrl(String(endpoint));
+      if (!endpointCheck.valid) {
+        res.status(400).json(error(config.nodeId, 'INVALID_ENDPOINT',
+          `That push endpoint is not a valid destination: ${endpointCheck.reason}`));
         return;
       }
       const record = await pushService.subscribe(ownerName, { endpoint, keys });

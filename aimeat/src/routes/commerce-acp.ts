@@ -16,6 +16,7 @@
  *   - GET  /acp/v1/checkout_sessions/:id          read (buyer only)
  *   - POST /acp/v1/checkout_sessions/:id/complete ({ payment_data: { provider?, handler?, token? } })
  * @version-history
+ *   v1.4.0 — 2026-08-10 — Security audit H-3: pass the completing principal to completeSession.
  *   v1.3.0 — 2026-07-14 — Feed app-tool scan extracted to the shared app-tool-catalog enumerator +
  *     dedicated GET /v1/commerce/tools catalog endpoint (TARGET-034 phase D)
  *   v1.2.0 — 2026-07-14 — Feed lists unbound priced tools too (task path) + per-product
@@ -276,6 +277,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
         handlerFor(parsed.data.payment_data),
         parsed.data.payment_data?.token,
         callerJwt,
+        req.auth ? { roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null,
       );
       res.json(toAcpSession(completed));
     } catch (err) { sendAcpError(res, config, err); }

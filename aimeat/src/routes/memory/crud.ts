@@ -2,6 +2,7 @@
  * @file src/routes/memory/crud.ts
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-11: search enforces memory:read like its siblings.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  *   v1.1.0 — 2026-07-14 — Perf: ?include=meta uses a META fast path (listMemoryMeta / owner-scope meta)
  *     that never loads or serialises values; used_bytes sums the stored byteSize.
@@ -495,7 +496,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
   // GET /v1/memory/search — search memory entries (MUST be before :key to avoid capture)
   // Owner sessions search across all their agents' memory
-  router.get('/v1/memory/search', requireAuth(), async (req, res) => {
+  router.get('/v1/memory/search', requireAuth(), requireExternalPrincipal(), requireScope('memory:read'), async (req, res) => {
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let gaii = req.auth!.sub;
     const agentParam = req.query.agent as string | undefined;

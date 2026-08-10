@@ -3,6 +3,8 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-12: upload, visibility and download enforce storage:write /
+ *     storage:read, matching the /v1/storage twin over the same store. This route was the unscoped way in.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  *   v1.1.0 — 2026-07-31 — POST accepts `mode: 'presigned'` and mints an upload URL, so a file no
  *     longer has to fit inside a JSON body. Inline base64 was the ONLY way in, and this route is not
@@ -13,7 +15,7 @@
 import type { Router } from 'express';
 import type { StorageFileRecord } from '../../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
-import { requireAuth, requireRole, requireExternalPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { checkStorageQuota, chargeOverage } from '../../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
@@ -30,7 +32,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // ── /v1/memory/files — File storage (MUST be before :key routes) ──
 
   // POST /v1/memory/files — upload file (presigned URL, or inline base64 JSON body)
-  router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), async (req, res) => {
+  router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
     const gaii = resolve(req);
     const { key, content, mime_type, visibility, tags, workspaceRef, workspace_refs, mode, group_id } = req.body ?? {};
 
@@ -136,7 +138,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
   // PATCH /v1/memory/files/:key/visibility — update file visibility
   // Registered BEFORE generic :key PATCH to avoid Express matching "key/visibility" as a single param
-  router.patch('/v1/memory/files/:key/visibility', requireAuth(), requireExternalPrincipal(), async (req, res) => {
+  router.patch('/v1/memory/files/:key/visibility', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
     const { visibility, workspaceRef, workspace_refs } = req.body ?? {};
@@ -246,7 +248,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   });
 
   // GET /v1/memory/files/:key — download file
-  router.get('/v1/memory/files/:key', requireAuth(), requireExternalPrincipal(), async (req, res) => {
+  router.get('/v1/memory/files/:key', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
     const gaii = resolve(req);
     const key = req.params.key as string;
     const file = await storage.getStorageFile(gaii, key);

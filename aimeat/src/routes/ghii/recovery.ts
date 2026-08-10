@@ -4,6 +4,9 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-5: changing notificationEmail un-verifies it. The
+ *     unauthenticated reset flow mails its code to that address and gates only on emailVerifiedAt,
+ *     a mark from the PREVIOUS address, so repointing it was an account-takeover step.
  *   v1.1.0 — 2026-07-19 — email/confirm refuses an email already verified on another account
  *     (EMAIL_TAKEN) — upholding one-email-per-account-per-node ahead of the DB unique index.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/ghii.ts (max-file-lines)
@@ -71,9 +74,21 @@ export function registerRecoveryRoutes(
             verifiedAt: null,
         });
 
-        // Store notificationEmail on GHII so we know what email to associate after confirmation
+        // Store notificationEmail on GHII so we know what email to associate after confirmation.
+        //
+        // SECURITY (audit H-5): POST /v1/ghii/password/reset-request mails its code to
+        // notificationEmail and gates only on emailVerifiedAt being set — a mark left over from the
+        // PREVIOUS address. Writing a new address while that mark stands hands the account to
+        // whoever controls the new mailbox, which is why this endpoint was an account-takeover step
+        // rather than a settings change. Pointing the address somewhere new therefore un-verifies
+        // it, and the recovery rail stays closed until the code below is confirmed. Re-sending to
+        // the address already verified changes nothing.
         const ghii = `${ownerName}@${config.nodeId}`;
-        await storage.updateGHII(ghii, { notificationEmail: normalizedEmail });
+        const emailChanged = ghiiRecord.emailHash !== emailHash;
+        await storage.updateGHII(ghii, {
+            notificationEmail: normalizedEmail,
+            ...(emailChanged ? { emailVerifiedAt: undefined, magicLinkEnabled: false } : {}),
+        });
 
         // Send verification email if service is available
         if (emailService?.enabled) {

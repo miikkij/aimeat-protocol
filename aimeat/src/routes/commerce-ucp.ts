@@ -13,6 +13,7 @@
  *   - PATCH /ucp/v1/checkout-sessions/:id        update line_items OR { cancel: true }
  *   - POST  /ucp/v1/checkout-sessions/:id/complete  ({ payment: { handler?, instrument? } })
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-3: pass the completing principal to completeSession.
  *   v1.1.0 — 2026-07-14 — app-tool item ids ("app-tool:<owner>/<appId>:<tool>") + inline ref form
  *     + caller JWT threaded into completeSession (TARGET-034 phase A)
  *   v1.0.0 — 2026-07-13 — Initial UCP adapter (TARGET-033 phase 4)
@@ -216,7 +217,7 @@ export function commerceUcpRouter(config: AimeatConfig, storage: Storage): Route
     try {
       const session = await loadOwnSession(req);
       const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
-      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt);
+      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt, req.auth ? { roles: req.auth.roles, scopes: req.auth.scopes ?? [], appGrantId: req.auth.app_grant ?? null } : null);
       res.json(ucpEnvelope(UCP_CAPABILITIES, { checkout_session: toUcpSession(completed) }));
     } catch (err) { sendUcpError(res, config, err); }
   });

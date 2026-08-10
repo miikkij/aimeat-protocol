@@ -710,6 +710,23 @@ await test('Cleanup — delete Owner B (cascade)', async () => {
     assert(body.ok === true, `delete owner B: ${JSON.stringify(body.error)}`);
 });
 
+// ── Push subscription endpoint is an outbound target (2026-08 audit H-8) ──
+// The endpoint is a URL this node POSTs to, repeatedly and unattended, carrying the body of every
+// notification the owner receives. It was stored verbatim, so subscribing was an unvalidated
+// outbound destination. It now goes through the same validateOutboundUrl every other non-constant
+// outbound URL uses. Any principal of the owner may still subscribe; the destination must be real.
+for (const bad of ['not-a-url', 'ftp://evil.example/hook', 'file:///etc/passwd']) {
+    await test(`push subscribe refuses a non-http(s) endpoint (${bad.slice(0, 22)}) (H-8)`, async () => {
+        const { status, body } = await json('/v1/push/subscribe', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${ownerAToken}` },
+            body: JSON.stringify({ endpoint: bad, keys: { p256dh: 'x', auth: 'y' } }),
+        });
+        assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body).slice(0, 160)}`);
+        assert(body.error?.code === 'INVALID_ENDPOINT', `code: ${JSON.stringify(body.error)}`);
+    });
+}
+
 await test('Cleanup — delete Owner A (cascade)', async () => {
     const { body } = await json(`/v1/owners/${ownerAName}`, {
         method: 'DELETE',

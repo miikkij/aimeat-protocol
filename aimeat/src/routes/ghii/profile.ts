@@ -4,11 +4,14 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-5: a new notification_email arrives unverified, so the
+ *     recovery rail stays closed until it is confirmed. Any principal of the owner may still set it.
  *   v1.1.0 — 2026-07-16 — GET /v1/ghii/list resolves the directory opt-in with ONE cross-owner key-IN read
  *     (getMemoryByKeysAnyOwner) instead of a getMemory per listed user (Phase 3).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/ghii.ts (max-file-lines)
  */
 import type { Router } from 'express';
+import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
@@ -221,7 +224,21 @@ export function registerProfileRoutes(
         if (typeof bio === 'string') updates.bio = bio;
         if (typeof avatar === 'string') updates.avatar = avatar;
         if (typeof locale === 'string') updates.locale = locale;
-        if (typeof notification_email === 'string') updates.notificationEmail = notification_email;
+        // SECURITY (audit H-5): the recovery address is not ordinary profile data. The unauthenticated
+        // password-reset flow mails its code to notificationEmail and gates only on emailVerifiedAt,
+        // a mark left from the PREVIOUS address, so repointing it here used to be a complete
+        // account-takeover step. Any principal of the owner may still set it (an agent updating the
+        // person's details is the point of this platform), but a new address arrives UNVERIFIED and
+        // the recovery rail stays closed until POST /v1/ghii/email/verify confirms it.
+        if (typeof notification_email === 'string') {
+            const normalized = notification_email.toLowerCase().trim();
+            updates.notificationEmail = notification_email;
+            const newHash = normalized ? createHash('sha256').update(normalized).digest('hex') : '';
+            if (ghiiRecord.emailHash !== newHash) {
+                updates.emailVerifiedAt = undefined;
+                updates.magicLinkEnabled = false;
+            }
+        }
 
         // Directory opt-in (the member "phone book"). Stored as an owner-controlled memory key
         // rather than a profile column: default OFF (unlisted), and only GET /v1/ghii/list entries

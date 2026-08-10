@@ -343,6 +343,69 @@ async function main() {
         assert(grants.length === 1, `expected exactly 1 live grant after re-grant, got ${grants.length}`);
     });
 
+    // ── Scope parity across the twin routes (2026-08 audit H-11, H-12) ──
+    // An app-grant token's `sub` IS the owner's GHII, so requireScope is the only thing standing
+    // between a narrowly consented app and the owner's whole keyspace. The list and single-key reads
+    // enforced memory:read; export, search and bundle enforced nothing, and the /v1/memory/files
+    // trio was an unscoped twin of /v1/storage over the same file store. A token holding one
+    // unrelated scope must be refused by all six, and the owner's own session must be unaffected.
+    let narrowToken = '';
+    await test('mint an app token with ONLY catalogue:read (no memory, no storage)', async () => {
+        const d = await grantAppToken('catalogue:read');
+        narrowToken = d.access_token;
+        assert(!!narrowToken, 'got a token');
+    });
+
+    for (const [label, path] of [
+        ['GET /v1/memory/export', '/v1/memory/export'],
+        ['GET /v1/memory/search', '/v1/memory/search?q=a'],
+    ] as const) {
+        await test(`app without memory:read is refused by ${label} (H-11)`, async () => {
+            const r = await json(path, { headers: { Authorization: `Bearer ${narrowToken}` } });
+            assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+        });
+    }
+
+    await test('app without memory:read is refused by POST /v1/memory/bundle (H-11)', async () => {
+        const r = await json('/v1/memory/bundle', {
+            method: 'POST', headers: { Authorization: `Bearer ${narrowToken}` },
+            body: JSON.stringify({ keys: ['anything'] }),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
+    await test('app without storage:write is refused by POST /v1/memory/files (H-12)', async () => {
+        const r = await json('/v1/memory/files', {
+            method: 'POST', headers: { Authorization: `Bearer ${narrowToken}` },
+            body: JSON.stringify({ key: 'x.txt', data: 'aGk=', content_type: 'text/plain' }),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
+    await test('app without storage:read is refused by GET /v1/memory/files/:key (H-12)', async () => {
+        const r = await json('/v1/memory/files/x.txt', { headers: { Authorization: `Bearer ${narrowToken}` } });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
+    await test('app without storage:write is refused by PATCH .../visibility (H-12)', async () => {
+        const r = await json('/v1/memory/files/x.txt/visibility', {
+            method: 'PATCH', headers: { Authorization: `Bearer ${narrowToken}` },
+            body: JSON.stringify({ visibility: 'public' }),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
+    await test('the OWNER is unaffected by the new scope gates (export still 200)', async () => {
+        const r = await json('/v1/memory/export', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(r.status === 200, `owner export must still work, got ${r.status}`);
+    });
+
+    await test('an app WITH memory:read still reaches export (the gate is a scope, not a ban)', async () => {
+        const d = await grantAppToken('memory:read');
+        const r = await json('/v1/memory/export', { headers: { Authorization: `Bearer ${d.access_token}` } });
+        assert(r.status === 200, `expected 200 with memory:read, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
     console.log('\n─────────────────────────────────────');
     console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
     if (failed === 0) console.log('✅ All tests passed!');
