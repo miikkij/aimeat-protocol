@@ -143,6 +143,33 @@ async function run() {
       `greeting reads as ${JSON.stringify(cfg.greeting)} — a manifest-declared __secretKeys is being honoured`);
   });
 
+  await test('a real schedules: section still produces __schedules', async () => {
+    // The guard above removes __-prefixed keys from the manifest's `config:` block. The node then
+    // writes __schedules itself from the manifest's own `schedules:` section, which is the only
+    // legitimate producer. 27 extensions in production depend on that, so prove the strip did not
+    // take the real one with the forged one.
+    const name = `hardsched${Date.now()}`;
+    const res = await json('/v1/extensions', {
+      method: 'POST', headers: auth(ownerA.token),
+      body: JSON.stringify({
+        manifest: JSON.stringify({
+          metadata: { name, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+          actions: [{ id: 'ping', method: 'POST', path: '/ping', script: 'echo' }],
+          schedules: [{ id: 'ping-scheduled', cron: '0 2 * * *', action: 'ping', input: {}, description: 'Scheduled: ping', instance_scope: false }],
+          config: { greeting: { default: 'hi' } },
+          limits: { timeout_ms: 5000, max_api_calls: 1 },
+        }),
+        scripts: { echo: ECHO },
+      }),
+    });
+    assert(res.status === 201, `install ${res.status}: ${JSON.stringify(res.body?.error)}`);
+    const cfg = await storedConfig(name, ownerA.token);
+    const scheds = cfg.__schedules as Array<Record<string, unknown>> | undefined;
+    assert(Array.isArray(scheds) && scheds.length === 1,
+      `the node must still write __schedules from the manifest's schedules: section, got ${JSON.stringify(cfg.__schedules)}`);
+    assert(scheds[0].id === 'ping-scheduled', `wrong schedule stored: ${JSON.stringify(scheds[0])}`);
+  });
+
   // ── 3. A submitted ciphertext ──────────────────────────────────────────────────────────────
   await test('a manifest cannot submit a value that is already encrypted', async () => {
     const name = `hardenc${Date.now()}`;

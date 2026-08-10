@@ -19,17 +19,17 @@
  *   v1.5.0 — 2026-07-19 — aimeat_extension_install gains update:true (in-place upsert preserving
  *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
  *     closes pitfall ext/extension-install-no-upsert
- *   v1.6.0 — 2026-08-05 — aimeat_extension_invoke ctx gains files (makeExtensionFiles, parity with
  *   v1.7.0 — 2026-08-10 — The sandbox context comes from buildExtensionCtx, and the paywall runs
  *                         here too. This door executed the script without asking, so a priced
- *                         action was free through a tool call and metered over HTTP.
+ *                         action was free through a tool call and metered over HTTP. The wallet is
+ *                         the shared one, so the per-call debit ceiling applies here as well.
+ *   v1.6.0 — 2026-08-05 — aimeat_extension_invoke ctx gains files (makeExtensionFiles, parity with
  *     the REST door): file-storing actions (universe render/checkpoint) no longer answer
  *     UNAVAILABLE over MCP
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
 import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields, prepareSecretConfigForWrite } from '../services/extension-secrets.js';
@@ -37,7 +37,7 @@ import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
-import { buildExtensionCtx, buildExtensionNotify, unavailableEmail } from '../services/extension-ctx.js';
+import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail } from '../services/extension-ctx.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
 import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -246,31 +246,10 @@ export function registerExtensionsTools(
                     callerOwner: parseGAII(agentGaii)?.owner,
                     extName: ext.name,
                 }),
-                wallet: {
-                    consume: async (amount: number, reason: string) => {
-                        // SECURITY: reject non-positive/non-finite amounts — a negative amount would mint morsels (CR-1).
-                        if (!Number.isFinite(amount) || amount <= 0) {
-                            return { success: false, error: 'INVALID_AMOUNT: consume amount must be a positive number' };
-                        }
-                        const debited = await storage.debitBalance(agentGaii, amount);
-                        if (!debited) return { success: false, error: 'Insufficient balance' };
-                        await storage.addTransaction({
-                            id: `ext-tx-${randomUUID()}`,
-                            gaii: agentGaii,
-                            type: 'extension_consume',
-                            amount: -amount,
-                            trackingCode: `ext:${ext.name}:${reason}`,
-                            timestamp: new Date().toISOString(),
-                        });
-                        return { success: true };
-                    },
-                    getBalance: async () => {
-                        const parsed = parseGAII(agentGaii);
-                        if (!parsed) return 0;
-                        const ghii = await storage.getGHIIByOwner(parsed.owner);
-                        return ghii?.morselBalance ?? 0;
-                    },
-                },
+                // The shared wallet, so this door has the per-call debit ceiling too. Its own copy
+                // refused a negative amount but had no ceiling, which is the guard that bounds how
+                // much a single call can take from the caller's balance.
+                wallet: buildExtensionWallet({ config, storage, callerGaii: agentGaii, extName: ext.name }),
                 notify: buildExtensionNotify({
                     storage, config, extName: ext.name,
                     recipientGaii: agentGaii,
