@@ -27,6 +27,7 @@ import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { mergeConstraintDefaults } from '../services/schedule-constraints.js';
 import { emitChange } from '../services/event-bus.js';
+import { checkScheduleGate } from '../services/schedule-gate.js';
 
 export function registerAgentScheduleTools(
   mcp: McpServer,
@@ -35,6 +36,8 @@ export function registerAgentScheduleTools(
   getAgentGaii: () => string,
   _emitResourceUpdated: (agentGaii: string, uri: string) => void,
   _emitResourceListChanged: (agentGaii: string) => void,
+  /** The session's own scopes, for the per-kind gate in services/schedule-gate.ts. */
+  sessionScopes: string[] = [],
 ): void {
   const agentGaii = getAgentGaii();
   const parsed = parseGAII(agentGaii);
@@ -73,6 +76,16 @@ export function registerAgentScheduleTools(
     annotationsFor('aimeat_schedule_create'),
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
+
+      // The same gate POST /v1/schedules applies (services/schedule-gate.ts). This tool applied
+      // none of it: any kind for any caller, and any string as a cron. An MCP session is an agent,
+      // never an owner session, so the per-kind scope is checked rather than bypassed.
+      const gateRefusal = checkScheduleGate(
+        { kind: a.kind, cron: a.cron, timezone: a.timezone },
+        { isOwnerSession: false, scopes: sessionScopes },
+      );
+      if (gateRefusal) return err(`${gateRefusal.code}: ${gateRefusal.message}`);
+
       const now = new Date().toISOString();
       const id = randomUUID();
       const targetName = a.kind === 'agent_task' ? (a.target_agent ?? selfName) : selfName;

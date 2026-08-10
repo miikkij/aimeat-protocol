@@ -73,25 +73,12 @@ import { resolveIdentity, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from '../services/schedule-constraints.js';
 import { logger } from '../utils/logger.js';
+import { checkScheduleGate, isValidCron } from '../services/schedule-gate.js';
 
 type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish';
-const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'connections-publish'];
 
-/** Validate a cron expression (or the @activate sentinel) using croner. */
-function isValidCron(cron: string, timezone?: string): boolean {
-  if (cron === '@activate') return true;
-  try {
-    const opts: { timezone?: string; paused?: boolean } = { paused: true };
-    if (timezone) opts.timezone = timezone;
-    const c = new Cron(cron, opts);
-    const ok = !!c.nextRun();
-    c.stop();
-    return ok;
-  } catch (err) {
-    logger.warn('schedules: suppressed failure, continuing', { error: String(err) });
-    return false;
-  }
-}
+// isValidCron moved to services/schedule-gate.ts on 2026-08-10 so the MCP door judges a cron
+// expression the same way this one does. Imported above.
 
 /** Parse a query timestamp: absent → fallback, invalid → null (caller 400s). */
 function parseWhen(q: unknown, fallback: Date): Date | null {
@@ -200,25 +187,16 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   ): Promise<{ record?: ScheduledJobRecord; status?: number; code?: string; message?: string }> {
     const owner = ownerGhii(req);
     const kind = body.kind as ScheduleKind;
-    if (!VALID_KINDS.includes(kind)) {
-      return { status: 400, code: 'INVALID_KIND', message: `kind must be one of: ${VALID_KINDS.join(', ')}` };
-    }
-    // Per-kind scope enforcement (SECURITY): owner sessions act for all their agents (scope bypass),
-    // but a scoped principal (an H-2 app grant, or a narrowly-scoped agent) must hold the scope for the
-    // capability the schedule DRIVES — otherwise a memory:write-only app could cron the owner's AI
-    // budget (kind:'ai') or materialise tasks into the owner's agent queues (kind:'agent_task').
-    const kindScope: Partial<Record<ScheduleKind, string>> = {
-      ai: 'ai:use', agent_task: 'task:write', 'connections-publish': 'connections:use',
-    };
-    const needScope = kindScope[kind];
-    if (needScope && !isOwnerSession(req)) {
-      const scopes = req.auth!.scopes ?? [];
-      const domain = needScope.split(':')[0];
-      const hasScope = scopes.includes('*') || scopes.includes(needScope) || scopes.includes(`${domain}:*`);
-      if (!hasScope) {
-        return { status: 403, code: 'SCOPE_DENIED', message: `Creating a "${kind}" schedule requires the "${needScope}" scope.` };
-      }
-    }
+    // The gate lives in services/schedule-gate.ts, because the MCP tool creates schedules too and
+    // applied none of this: any kind for any caller, and any string as a cron expression. A schedule
+    // is the one record that keeps acting after the call that made it, so the caller has to hold the
+    // scope for the capability it DRIVES — a memory:write-only app must not be able to cron the
+    // owner's AI budget. Owner sessions bypass, exactly as requireScope lets them.
+    const gateRefusal = checkScheduleGate(
+      { kind, cron: typeof body.cron === 'string' ? body.cron : '', timezone: typeof body.timezone === 'string' ? body.timezone : undefined },
+      { isOwnerSession: isOwnerSession(req), scopes: req.auth!.scopes ?? [] },
+    );
+    if (gateRefusal) return gateRefusal;
     if (kind === 'connections-publish') {
       const bad = await checkConnectionsPublishInput(owner, body.input);
       if (bad) return bad;
@@ -226,9 +204,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
 
     const cron = typeof body.cron === 'string' ? body.cron : '';
     const timezone = typeof body.timezone === 'string' ? body.timezone : undefined;
-    if (!cron || !isValidCron(cron, timezone)) {
-      return { status: 400, code: 'INVALID_CRON', message: 'cron is missing or invalid' };
-    }
+    // Kind, scope and cron were all checked by checkScheduleGate above.
 
     // Target agent = the path param when present, else a body field. Accept
     // agent_name / target_agent / agent as aliases (target_agent mirrors the MCP
