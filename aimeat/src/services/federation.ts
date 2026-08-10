@@ -9,6 +9,8 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-13/H-14: LIVENESS_RECOVERABLE and OPERATOR_PARKED, the peer
+ *     statuses a liveness signal may lift and the ones only an operator may leave.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -33,6 +35,17 @@ const CACHE_TTL_MS = 5 * 60_000;
 
 /** Consecutive failure counter per peer (for health tracking). */
 const peerFailures = new Map<string, number>();
+
+/** Peer statuses a liveness signal (ping/heartbeat) may lift back to active. A peer parked by an
+ * operator decision (depeering, suspended) or still in admission (pending, approved) is NOT here:
+ * proving you are up is not the same as being welcome. Audit H-14.
+ */
+/** Peer statuses that only an operator action may leave. A key exchange, a heartbeat or any other
+ * peer-driven request must not lift a peer out of these. Audit H-13.
+ */
+export const OPERATOR_PARKED = new Set(['depeering', 'suspended']);
+
+export const LIVENESS_RECOVERABLE = new Set(['active', 'degraded', 'offline', 'unreachable']);
 
 export interface PeerInfo {
     nodeId: string;

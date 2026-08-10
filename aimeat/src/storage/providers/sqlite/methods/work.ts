@@ -258,6 +258,13 @@ export const workMethods = {
     return rows.reverse().map(r => this.deserializeTransaction(r));
   },
 
+  async findTransactionByTrackingCode(this: SqliteStorage, gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null> {
+    const row = this.db.prepare(
+      'SELECT * FROM wallet_transactions WHERE gaii = ? AND trackingCode = ? AND type = ? LIMIT 1'
+    ).get(gaii, trackingCode, type) as Record<string, unknown> | undefined;
+    return row ? this.deserializeTransaction(row) : null;
+  },
+
   async listAllTransactions(this: SqliteStorage, limit = 10000): Promise<WalletTransaction[]> {
     const rows = this.db.prepare('SELECT * FROM wallet_transactions ORDER BY timestamp DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeTransaction(r));

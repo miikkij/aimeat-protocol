@@ -67,15 +67,21 @@ await test('1. /.well-known/aimeat carries software_version + features_enabled +
 
 console.log('\nPhase 1 — Peer version stamped from heartbeat ping');
 const PEER = 'aimeat-peer-001-niremote';
+// The ping is signed by the peer (audit H-14), so the peer record needs its public key and the
+// test needs the private half. Without this the ping is refused, which is the point of the fix.
+const peerPrivBytes = ed.utils.randomSecretKey();
+const peerPubB64 = Buffer.from(await ed.getPublicKeyAsync(peerPrivBytes)).toString('base64');
 await test('2. add a peer + activate', async () => {
-  const add = await json('/v1/federation/peers', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ node_id: PEER, url: 'http://localhost:49980' }) });
+  const add = await json('/v1/federation/peers', { method: 'POST', headers: auth(ownerToken), body: JSON.stringify({ node_id: PEER, url: 'http://localhost:49980', public_key: peerPubB64 }) });
   assert(add.status === 201, `add: ${add.status} ${JSON.stringify(add.body)}`);
   const act = await json(`/v1/federation/peers/${PEER}`, { method: 'PUT', headers: auth(ownerToken), body: JSON.stringify({ status: 'active' }) });
   assert(act.body.ok, `activate: ${JSON.stringify(act.body)}`);
 });
 
 await test('3. a ping advertising software_version stamps the peer record', async () => {
-  const ping = await json('/v1/federation/ping', { method: 'POST', body: JSON.stringify({ node_id: PEER, software_version: '9.9.9', timestamp: new Date().toISOString() }) });
+  const pingPayload = { node_id: PEER, timestamp: new Date().toISOString(), version: 'v1', software_version: '9.9.9', stats: { agents_active: 0 } };
+  const pingSig = Buffer.from(await ed.signAsync(new TextEncoder().encode(JSON.stringify(pingPayload)), peerPrivBytes)).toString('base64');
+  const ping = await json('/v1/federation/ping', { method: 'POST', body: JSON.stringify({ ...pingPayload, signature: pingSig }) });
   assert(ping.body.ok === true || ping.body.data?.pong, `ping: ${JSON.stringify(ping.body)}`);
   const peers = await json('/v1/federation/peers', { headers: auth(ownerToken) });
   const p = peers.body.data.peers.find((x: any) => x.node_id === PEER);

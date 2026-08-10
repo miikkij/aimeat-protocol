@@ -3,6 +3,8 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-14: heartbeat refuses a missing signature instead of skipping
+ *     verification, and recovers status only from a liveness state.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
  */
 
@@ -13,7 +15,7 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { PeeringDecisionSchema, validateBody } from '../../models/schemas.js';
-import type { PeerInfo } from '../../services/federation.js';
+import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
@@ -137,25 +139,32 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         if (from_node_id && peers.has(from_node_id)) {
             const peer = peers.get(from_node_id)!;
 
-            // SECURITY: Verify heartbeat signature if peer has a public key
-            if (peer.publicKey && signature) {
-                const messageToVerify = `${from_node_id}${timestamp}`;
-                let valid: boolean;
-                try {
-                    valid = await verify(peer.publicKey, messageToVerify, signature);
-                } catch (err) {
-                  logger.warn('peers: suppressed failure, continuing', { error: String(err) });
-                    valid = false;
-                }
-                if (!valid) {
-                    res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE',
-                        'Heartbeat signature verification failed'));
-                    return;
-                }
+            // SECURITY (audit H-14): the check used to read `if (peer.publicKey && signature)`, so
+            // omitting the signature skipped it entirely — the one thing an attacker controls was
+            // also the switch that turned verification off. A missing signature is a refusal now.
+            if (!signature || !peer.publicKey) {
+                res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
+                    'Heartbeat requires a signature from a peer with a known public key'));
+                return;
+            }
+            const messageToVerify = `${from_node_id}${timestamp}`;
+            let valid: boolean;
+            try {
+                valid = await verify(peer.publicKey, messageToVerify, signature);
+            } catch (err) {
+              logger.warn('peers: suppressed failure, continuing', { error: String(err) });
+                valid = false;
+            }
+            if (!valid) {
+                res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE',
+                    'Heartbeat signature verification failed'));
+                return;
             }
 
             peer.lastSeen = new Date().toISOString();
-            peer.status = 'active';
+            // Liveness recovers a peer from a liveness state, never from an operator decision
+            // (depeering, suspended) or an admission state (pending, approved). Same rule as ping.
+            if (LIVENESS_RECOVERABLE.has(peer.status)) peer.status = 'active';
         }
 
         res.json(success(config.nodeId, {

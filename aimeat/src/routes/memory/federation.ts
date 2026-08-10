@@ -2,6 +2,8 @@
  * @file src/routes/memory/federation.ts
  * @description Federated memory browsing routes: pull, push-home, list-home (federated sessions) + list-remote, pull-remote (home users). Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-15: list-home and list-remote sign the peer memory-list request
+ *     with this node's key, matching the verification the receiving end now performs.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
@@ -11,10 +13,25 @@ import { success, error } from '../../middleware/envelope.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange } from '../../services/event-bus.js';
+import { sign } from '../../auth/keypair.js';
 import type { MemoryRouteCtx } from './shared.js';
 
 export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, peers, resolve } = ctx;
+
+  /**
+   * Sign a peer-to-peer memory-list request with this node's key. The receiving node verifies it
+   * against the key it already holds for us (audit H-15): the inventory it answers with names every
+   * key a person owns, and the `requesting_node` field alone never proved anything, because the
+   * federation directory publishes every node id. Returns the body to POST, signature included.
+   */
+  async function signedListBody(gaii: string): Promise<Record<string, unknown>> {
+    const timestamp = new Date().toISOString();
+    const body: Record<string, unknown> = { requesting_node: config.nodeId, gaii, timestamp };
+    const nodeKey = await storage.getNodeKey();
+    if (nodeKey) body.signature = await sign(nodeKey.privateKey, JSON.stringify({ requesting_node: config.nodeId, gaii, timestamp }));
+    return body;
+  }
 
   // ── /v1/memory/pull — Copy a memory entry from home node to local (federated sessions) ──
   router.post('/v1/memory/pull', requireAuth(), async (req, res) => {
@@ -241,7 +258,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
           'Content-Type': 'application/json',
           'X-Source-Node': config.nodeId,
         },
-        body: JSON.stringify({ requesting_node: config.nodeId, gaii: ownerGhii }),
+        body: JSON.stringify(await signedListBody(ownerGhii)),
         signal: AbortSignal.timeout(config.federationTimeoutMs),
       });
 
@@ -307,7 +324,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
           'Content-Type': 'application/json',
           'X-Source-Node': config.nodeId,
         },
-        body: JSON.stringify({ requesting_node: config.nodeId, gaii }),
+        body: JSON.stringify(await signedListBody(gaii)),
         signal: AbortSignal.timeout(config.federationTimeoutMs),
       });
 

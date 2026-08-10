@@ -9,6 +9,9 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit (June H-4, unchanged since June): the replay guard looks the
+ *     tracking code up exactly instead of scanning the last fifty transactions, a window a busy
+ *     account scrolls past, after which a validly signed settlement could be credited twice.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -101,11 +104,14 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             return;
         }
 
-        // Prevent replay attacks: check if tracking code was already settled
-        const existingTxns = await storage.getTransactions(gaii);
-        const duplicate = existingTxns.find((t: { trackingCode?: string; type: string }) =>
-            t.trackingCode === `settle:${tracking_code}` && t.type === 'federation_settlement',
-        );
+        // Prevent replay attacks: look the tracking code up EXACTLY.
+        //
+        // SECURITY (audit, the June H-4 finding, unchanged since June): this used to read
+        // `getTransactions(gaii)`, whose limit defaults to 50, and scan that window. On any account
+        // with fifty newer transactions the original settlement had scrolled out of it, so a
+        // replayed settlement — still validly signed, so it passes every check above — was credited
+        // a second time. An indexed lookup by (gaii, trackingCode, type) has no window to fall out of.
+        const duplicate = await storage.findTransactionByTrackingCode(gaii, `settle:${tracking_code}`, 'federation_settlement');
         if (duplicate) {
             res.status(409).json(error(config.nodeId, 'CONFLICT',
                 `Settlement already processed for tracking code ${tracking_code}`));

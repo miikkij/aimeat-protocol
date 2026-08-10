@@ -12,6 +12,8 @@
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  *
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit: genesis catalogue ingest refuses a missing signature. The gate
+ *     read `if (signature && ...)`, so omitting it wrote straight into the publicly served catalogue.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -296,14 +298,19 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                 return;
             }
 
-            // Verify signature if peer has a public key
-            if (signature && genesisPeer.publicKey) {
-                const payload = JSON.stringify({ source_node, entries: ingestEntries, csms: ingestCsms, catalogue_hash });
-                const isValid = await verify(genesisPeer.publicKey, payload, signature);
-                if (!isValid) {
-                    res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on genesis catalogue ingest'));
-                    return;
-                }
+            // SECURITY (audit, the July F-series): this used to read `if (signature && ...)`, so a
+            // caller who simply omitted the signature skipped verification and wrote straight into
+            // the catalogue this node serves publicly. The absent signature is a refusal now.
+            if (!signature || !genesisPeer.publicKey) {
+                res.status(401).json(error(config.nodeId, 'UNAUTHORIZED',
+                    'Genesis catalogue ingest requires a signature from a genesis peer with a known public key'));
+                return;
+            }
+            const payload = JSON.stringify({ source_node, entries: ingestEntries, csms: ingestCsms, catalogue_hash });
+            const isValid = await verify(genesisPeer.publicKey, payload, signature);
+            if (!isValid) {
+                res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on genesis catalogue ingest'));
+                return;
             }
 
             const now = new Date().toISOString();

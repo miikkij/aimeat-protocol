@@ -3,6 +3,9 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Security audit H-13/H-14: ping verifies the signature the heartbeat client has
+ *     always sent and only lifts a peer out of a LIVENESS state; key-exchange refuses to re-admit a peer
+ *     an operator parked, and admits with the key from the approved peering request rather than the body.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
  */
 
@@ -13,7 +16,7 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { returnEscrow } from '../../services/morsel.js';
 import { logger } from '../../utils/logger.js';
-import type { PeerInfo } from '../../services/federation.js';
+import { LIVENESS_RECOVERABLE, OPERATOR_PARKED, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -166,13 +169,35 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
 
     // POST /v1/federation/ping — federation health check (used by peers)
     router.post('/v1/federation/ping', async (req, res) => {
-        const { from_node, node_id, software_version } = req.body ?? {};
+        const { from_node, node_id, software_version, signature, timestamp, version, stats } = req.body ?? {};
         const fromId = (from_node || node_id) as string | undefined;
 
         if (fromId && peers.has(fromId)) {
             const peer = peers.get(fromId)!;
+            // SECURITY (audit H-14): a liveness signal used to be taken on the body's word alone, and
+            // it wrote `status = 'active'`. So one unauthenticated request from anywhere on the
+            // internet cancelled a de-peering the operator had started. The heartbeat client has
+            // always signed this payload (services/federation.ts) — the receiving end simply never
+            // looked. It looks now, over exactly the fields the client signs.
+            const pingPayload = JSON.stringify({ node_id: fromId, timestamp, version, software_version, stats });
+            let pingValid = false;
+            if (typeof signature === 'string' && peer.publicKey) {
+                try {
+                    pingValid = await verify(peer.publicKey, pingPayload, signature);
+                } catch (err) {
+                    logger.warn('Federation ping: signature verification threw, treating as invalid', { peer: fromId, error: String(err) });
+                    pingValid = false;
+                }
+            }
+            if (!pingValid) {
+                res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing or invalid signature on federation ping'));
+                return;
+            }
             peer.lastSeen = new Date().toISOString();
-            peer.status = 'active';
+            // A liveness signal proves the peer is up. It does not undo a decision about whether we
+            // want to talk to it: `depeering`, `suspended`, `pending` and `approved` are states an
+            // operator or an admission flow put the peer in, and only that flow may leave them.
+            if (LIVENESS_RECOVERABLE.has(peer.status)) peer.status = 'active';
             // Federation version visibility: record the peer's advertised AIMEAT version.
             if (typeof software_version === 'string') peer.softwareVersion = software_version;
             storage.saveFederationPeer(peer).catch(err => { logger.warn('fromId: continuing after a suppressed failure', { error: String(err) }); });
@@ -213,6 +238,19 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
 
         // Find or auto-add the sender as a peer (bidirectional peering)
         let peer = [...peers.values()].find(p => p.nodeId === node_id);
+
+        // SECURITY (audit H-13): a peer the operator parked does not walk back in through a key
+        // exchange. De-peering never deletes the peering request, so the old approval sat there as a
+        // permanent re-admission ticket: the branch below fired for any status that was not
+        // active/approved, re-created the peer at tier `member`, and took the public key from the
+        // REQUEST BODY. Whoever knew the node id (the federation directory publishes it) could come
+        // back with a key of their own choosing and then sign settlements this node would verify.
+        if (peer && OPERATOR_PARKED.has(peer.status)) {
+            res.status(403).json(error(config.nodeId, 'PEER_PARKED',
+                `Node ${node_id} is ${peer.status} on this node. An operator must re-admit it; a key exchange cannot.`));
+            return;
+        }
+
         if (!peer || (peer.status !== 'active' && peer.status !== 'approved')) {
             // Auto-add ONLY when there is an operator-approved peering request from this node.
             // SECURITY (F1): never derive admission/trust from the request BODY (e.g. node_url ===
@@ -221,7 +259,15 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             // established through the signed introduce → operator-approval flow like any other peer.
             const senderUrl = node_url as string | undefined;
             const requests = await storage.listPeeringRequests();
-            const hasApprovedRequest = requests.some(r => r.fromNodeId === node_id && (r.status === 'approved' || r.status === 'auto_approved'));
+            const approvedRequest = requests.find(r => r.fromNodeId === node_id && (r.status === 'approved' || r.status === 'auto_approved'));
+            const hasApprovedRequest = !!approvedRequest;
+
+            // The approval is for the node whose key the operator saw at introduce time. When that
+            // key is on file it is the one that is trusted, not the one this request carries: an
+            // approval must not become a blank cheque for whatever key turns up later. A caller
+            // presenting a different key gets admitted with the ESTABLISHED one, which they cannot
+            // sign for, so the re-admission is worthless to anyone but the real node.
+            const admittedKey = approvedRequest?.publicKey || (node_public_key as string);
 
             if (hasApprovedRequest && senderUrl) {
                 const now = new Date().toISOString();
@@ -229,7 +275,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
                 const newPeer: PeerInfo = {
                     nodeId: node_id,
                     url: senderUrl,
-                    publicKey: node_public_key,
+                    publicKey: admittedKey,
                     status: 'active',
                     addedAt: now,
                     lastSeen: now,

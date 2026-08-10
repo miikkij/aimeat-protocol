@@ -304,8 +304,29 @@ await test('F1: key-exchange with the SAME established key still succeeds (stead
     assert(body?.data?.accepted === true, `expected accepted:true, got ${JSON.stringify(body?.data)}`);
 });
 
-await test('11. Heartbeat', async () => {
+await test('11. Heartbeat (signed: audit H-14 refuses an unsigned one)', async () => {
+    // The signature covers `${from_node_id}${timestamp}` and is verified against the peer's stored
+    // key. The old gate read `if (peer.publicKey && signature)`, so omitting the signature turned
+    // verification off. It is a refusal now, which makes this test the protocol it always described.
+    const hbTimestamp = new Date().toISOString();
+    const hbMessage = `${directPeerNodeId}${hbTimestamp}`;
+    const hbSig = Buffer.from(await ed.signAsync(new TextEncoder().encode(hbMessage), directPeerPrivKeyBytes)).toString('base64');
     const { body } = await json('/v1/federation/heartbeat', {
+        method: 'POST',
+        body: JSON.stringify({
+            from_node_id: directPeerNodeId,
+            timestamp: hbTimestamp,
+            status: 'healthy',
+            signature: hbSig,
+        }),
+    });
+    assert(body.ok === true, 'ok');
+    assert(body.data.node_id === NODE_ID, `node_id: ${body.data.node_id}`);
+    assert(body.data.status === 'healthy', `status: ${body.data.status}`);
+});
+
+await test('11b. An UNSIGNED heartbeat from a known peer is refused (H-14)', async () => {
+    const { status, body } = await json('/v1/federation/heartbeat', {
         method: 'POST',
         body: JSON.stringify({
             from_node_id: directPeerNodeId,
@@ -313,9 +334,7 @@ await test('11. Heartbeat', async () => {
             status: 'healthy',
         }),
     });
-    assert(body.ok === true, 'ok');
-    assert(body.data.node_id === NODE_ID, `node_id: ${body.data.node_id}`);
-    assert(body.data.status === 'healthy', `status: ${body.data.status}`);
+    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body).slice(0, 160)}`);
 });
 
 // ─── Phase 3: Data Replication & Catalogue Sync ───

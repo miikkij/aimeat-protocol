@@ -55,6 +55,12 @@ export const walletMethods = {
     const rows = await this.db.selectFrom('Transaction').selectAll().where('gaii', '=', gaii).orderBy('timestamp', 'desc').limit(limit).execute();
     return rows.map(mapTx);
   },
+  async findTransactionByTrackingCode(this: PostgresKyselyStorage, gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null> {
+    const r = await this.db.selectFrom('Transaction').selectAll()
+      .where('gaii', '=', gaii).where('trackingCode', '=', trackingCode).where('type', '=', type)
+      .executeTakeFirst();
+    return r ? mapTx(r) : null;
+  },
   async listAllTransactions(this: PostgresKyselyStorage, limit = 10000): Promise<WalletTransaction[]> {
     const rows = await this.db.selectFrom('Transaction').selectAll().orderBy('timestamp', 'desc').limit(Math.min(limit, 10000)).execute();
     return rows.map(mapTx);
