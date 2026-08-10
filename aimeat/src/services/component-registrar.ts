@@ -13,6 +13,11 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.3.0 — 2026-08-10 — An extension component goes through buildExtensionRecordFromManifest, the
+ *     same builder POST /v1/extensions uses. This file had its own, lenient one, so a component
+ *     registered here skipped every gate the front door applies — and the content is not always a
+ *     published package's: apply-migration takes it from the request body. Adds
+ *     validateComponentContent() so a caller can refuse bad content BEFORE deleting the old.
  *   v1.0.0 — 2026-03-15 — initial implementation
  *   v1.1.0 — 2026-03-16 — fix memory component key management: use manifest key
  *     instead of prefix-based lookup for delete/fetch; store keys as-is without
@@ -22,6 +27,8 @@
  */
 
 import { createHash } from 'node:crypto';
+import type { AimeatConfig } from '../config.js';
+import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from '../routes/extensions/manifest.js';
 import YAML from 'yaml';
 import type { Storage, PackageComponentType, CortexComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
@@ -38,6 +45,8 @@ export interface ComponentRegistrationResult {
 }
 
 export interface ComponentRegistrationInput {
+  /** Node config: the extension builder needs it for limit ceilings and currency validation. */
+  config: AimeatConfig;
   componentId: string;
   type: PackageComponentType;
   registeredAs: string;
@@ -130,6 +139,44 @@ function rewriteComponentRefs(
   return out;
 }
 
+// ── Pre-flight validation ────────────────────────────────────────────
+
+/**
+ * Can this content be registered as this component type? Answers WITHOUT touching storage.
+ *
+ * The migration flow deletes the existing component and then registers the new one, which was safe
+ * only while registration accepted anything. It does not any more: an extension component now goes
+ * through the same manifest builder as POST /v1/extensions, so a caller-supplied `content` that the
+ * builder refuses would leave the old component deleted and nothing in its place. Callers check
+ * this first, before they delete.
+ *
+ * Only `extension` has anything to check today. Every other type returns ok, so a caller can run
+ * this unconditionally.
+ */
+export function validateComponentContent(
+  type: PackageComponentType,
+  content: string,
+  registeredAs: string,
+  config: AimeatConfig,
+  owner: string,
+): { ok: true } | { ok: false; error: string } {
+  if (type !== 'extension') return { ok: true };
+
+  let parsed: { manifest?: string; scripts?: Record<string, string> };
+  try { parsed = JSON.parse(content); }
+  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
+  catch { parsed = { manifest: content }; }
+
+  const built = buildExtensionRecordFromManifest(
+    parsed.manifest ?? '', parsed.scripts ?? {}, config, owner, new Date().toISOString(), false,
+  );
+  if (!built.ok) return { ok: false, error: `${built.code}: ${built.message}` };
+  if (!EXT_NAME_PATTERN.test(registeredAs)) {
+    return { ok: false, error: `INVALID_NAME: "${registeredAs}" is not a valid extension name` };
+  }
+  return { ok: true };
+}
+
 // ── Register component ───────────────────────────────────────────────
 
 /** Register a single component in its native storage repository */
@@ -137,7 +184,7 @@ export async function registerComponent(
   storage: Storage,
   input: ComponentRegistrationInput,
 ): Promise<ComponentRegistrationResult> {
-  const { componentId, type, registeredAs, content, label, owner, ownerGaii, packageName } = input;
+  const { config, componentId, type, registeredAs, content, label, owner, ownerGaii, packageName } = input;
   const now = new Date().toISOString();
   // Set inside cortex / extension cases below; surfaced in the result so the
   // installer can build a "originalShortName → registeredAs" map for app rewrites.
@@ -177,39 +224,43 @@ export async function registerComponent(
         // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
         catch { parsed = { manifest: content }; }
 
-        const manifest = parsed.manifest ?? '';
-        const scripts = parsed.scripts ?? {};
+        // ONE builder, the same one POST /v1/extensions uses. This branch used to parse the manifest
+        // itself and write `config: meta.config` straight through — a second, lenient implementation
+        // of install that applied none of the gates the first one has. That mattered because the
+        // content does not always come from a published package: routes/instances/migration.ts takes
+        // it from the request body under `custom` and `replace`, so an ordinary owner could register
+        // an extension with a config of their choosing, active, past everything the front door
+        // checks. Whatever the manifest builder refuses, this refuses.
+        //
+        // installerIsOperator is false here on purpose. A package's extension component has no
+        // business granting itself emailPolicy, and none of the seeded packages tries to.
+        const built = buildExtensionRecordFromManifest(
+          parsed.manifest ?? '', parsed.scripts ?? {}, config, owner, now, false,
+        );
+        if (!built.ok) {
+          return { success: false, componentId, registeredAs, error: `${built.code}: ${built.message}` };
+        }
+        originalShortName = built.record.name;
 
-        let meta: Record<string, unknown> = {};
-        try { meta = (YAML.parse(manifest) as Record<string, unknown>) ?? {}; }
-        catch (err) { logger.warn('serviceType: use defaults', { error: String(err) }); }
-
-        const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
-        originalShortName = (metadata.name as string) || undefined;
-        const actionsRaw = (meta.actions ?? []) as Array<Record<string, unknown>>;
-
-        const actions = actionsRaw.map(a => ({
-          id: (a.id as string) ?? '',
-          method: (a.method as string) ?? 'POST',
-          path: (a.path as string) ?? '',
-          inputSchema: (a.input_schema ?? a.inputSchema ?? {}) as Record<string, unknown>,
-          outputSchema: (a.output_schema ?? a.outputSchema ?? {}) as Record<string, unknown>,
-          scriptContent: scripts[(a.script as string) ?? ''] ?? '',
-        }));
+        // The record is stored under the package's generated name, not the manifest's own, and the
+        // stored name IS the memory address (`ext:{name}` / `ext:{name}.{instanceId}`). The builder
+        // validated metadata.name; this is the one that ends up in the namespace, so it is checked
+        // with the same pattern rather than trusted for being generated.
+        if (!EXT_NAME_PATTERN.test(registeredAs)) {
+          return {
+            success: false, componentId, registeredAs,
+            error: `INVALID_NAME: "${registeredAs}" is not a valid extension name (lowercase letters, `
+              + 'digits and hyphens, 3 to 128 characters). The name becomes this extension\'s memory address.',
+          };
+        }
 
         await storage.createExtension({
+          ...built.record,
           name: registeredAs,
-          version: (metadata.version as string) ?? '1.0.0',
-          description: (metadata.description as string) ?? label,
-          author: (metadata.author as string) ?? owner,
+          description: built.record.description || label,
+          // A package component is live as soon as its package is installed; there is no separate
+          // activate step in that flow.
           status: 'active',
-          requiredApis: (meta.required_apis as string[]) ?? [],
-          actions,
-          config: (meta.config ?? {}) as Record<string, unknown>,
-          limits: { memoryMb: 64, timeoutMs: 30000, maxApiCalls: 100 },
-          federation: { advertise: false, capabilities: [] },
-          installedBy: owner,
-          installedAt: now,
         });
         break;
       }

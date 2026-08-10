@@ -13,6 +13,9 @@
  *   - Phase 7: Auth & Validation
  *   - Phase 8: Template Moderation Lifecycle
  * @version-history
+ *   v1.4.0 — 2026-08-10 — The extension components in the fixture carry a real manifest. They were a
+ *     bare JS snippet, which only installed because the package registrar defaulted every missing
+ *     field; that registrar now uses the same builder as POST /v1/extensions.
  *   v1.0.0 — 2026-03-15 — initial test suite
  *   v1.1.0 — 2026-03-15 — add dry_run tests, fix YAML export assertion, fix draft install assertion
  *   v1.2.0 — 2026-03-15 — add config validation tests (component count limit, package size limit)
@@ -209,7 +212,7 @@ await test('Create package (POST /v1/packages)', async () => {
       visibility: 'public',
       components: [
         { id: 'csm-main', type: 'csm', label: 'Main CSM', content: '{"fields":[]}', dependencies: [] },
-        { id: 'ext-helper', type: 'extension', label: 'Helper Extension', content: 'function helper(){}', dependencies: ['csm-main'] },
+        { id: 'ext-helper', type: 'extension', label: 'Helper Extension', content: "{\"manifest\":\"metadata:\\n  name: pkg-ext-helper\\n  version: 1.0.0\\n  description: Helper extension used by the packages E2E fixture\\n  author: e2e\\nactions:\\n  - id: helper\\n    method: POST\\n    path: /helper\\n    script: helper\",\"scripts\":{\"helper\":\"export default async function(ctx, input){ return { v: '1.0.0' }; }\"}}", dependencies: ['csm-main'] },
       ],
     }),
   });
@@ -349,7 +352,7 @@ await test('Publish new version (POST /v1/packages/:groupId/versions)', async ()
       status: 'draft',
       components: [
         { id: 'csm-main', type: 'csm', label: 'Main CSM v2', content: '{"fields":["name"]}', dependencies: [] },
-        { id: 'ext-helper', type: 'extension', label: 'Helper Extension v2', content: 'function helper(){ return true; }', dependencies: ['csm-main'] },
+        { id: 'ext-helper', type: 'extension', label: 'Helper Extension v2', content: "{\"manifest\":\"metadata:\\n  name: pkg-ext-helper\\n  version: 2.0.0\\n  description: Helper extension used by the packages E2E fixture\\n  author: e2e\\nactions:\\n  - id: helper\\n    method: POST\\n    path: /helper\\n    script: helper\",\"scripts\":{\"helper\":\"export default async function(ctx, input){ return { v: '2.0.0' }; }\"}}", dependencies: ['csm-main'] },
         { id: 'app-ui', type: 'app', label: 'UI App', content: '<div>hello</div>', dependencies: ['csm-main'] },
       ],
     }),
@@ -620,7 +623,7 @@ await test('Create v3 with changed components', async () => {
       status: 'published',
       components: [
         { id: 'csm-main', type: 'csm', label: 'Main CSM v3', content: '{"fields":["name","email","phone"]}', dependencies: [] },
-        { id: 'ext-helper', type: 'extension', label: 'Helper Extension v3', content: 'function helper(){ return {v:3}; }', dependencies: ['csm-main'] },
+        { id: 'ext-helper', type: 'extension', label: 'Helper Extension v3', content: "{\"manifest\":\"metadata:\\n  name: pkg-ext-helper\\n  version: 3.0.0\\n  description: Helper extension used by the packages E2E fixture\\n  author: e2e\\nactions:\\n  - id: helper\\n    method: POST\\n    path: /helper\\n    script: helper\",\"scripts\":{\"helper\":\"export default async function(ctx, input){ return { v: '3.0.0' }; }\"}}", dependencies: ['csm-main'] },
         { id: 'app-ui', type: 'app', label: 'UI App v3', content: '<div>hello v3</div>', dependencies: ['csm-main'] },
         { id: 'cortex-ai', type: 'cortex', label: 'AI Cortex', content: 'cortex config here', dependencies: ['csm-main'] },
       ],

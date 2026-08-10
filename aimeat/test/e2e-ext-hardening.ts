@@ -76,6 +76,14 @@ async function install(token: string, name: string, cfg: Record<string, unknown>
   });
 }
 
+/** Install an extension with a hand-written manifest, for the cases the helper above cannot express. */
+async function installManifest(token: string, manifest: Record<string, unknown>, scripts: Record<string, string>) {
+  return json('/v1/extensions', {
+    method: 'POST', headers: auth(token),
+    body: JSON.stringify({ manifest: JSON.stringify(manifest), scripts }),
+  });
+}
+
 /** The stored config as the node reports it back. Secrets are masked here; everything else is verbatim. */
 async function storedConfig(name: string, token: string): Promise<Record<string, unknown>> {
   const got = await json(`/v1/extensions/${name}`, { headers: auth(token) });
@@ -182,6 +190,151 @@ async function run() {
     assert(cfg.stolen === undefined,
       `a client-supplied ciphertext was stored as ${JSON.stringify(cfg.stolen)} — the node would decrypt it into the sandbox`);
     assert(cfg.greeting === 'hi', 'the installer\'s own config keys must survive untouched');
+  });
+
+  // ── 3b. The name IS the address ────────────────────────────────────────────────────────────
+  await test('an extension name cannot forge another extension\'s instance namespace', async () => {
+    // An `ext:` namespace is NOT owner-scoped, and that is deliberate: an app reads
+    // getPublic('ext:{name}', key) without knowing who installed it. What keeps two extensions apart
+    // is that names are unique node-wide. An instance-scoped extension stores under
+    // `ext:{name}.{instanceId}`, and the instanceId half is validated on create with a pattern that
+    // admits no dot, so it cannot forge the separator. The name half was checked only for being a
+    // non-empty string, so `victim.probe` addressed exactly where the `probe` instance of `victim`
+    // keeps its data — and the duplicate-name check does not notice, because the two names differ.
+    //
+    // What that is worth is NOT public reading: getPublic already crosses this boundary by design,
+    // and ctx.memory.set writes public unless asked otherwise. It is the two things getPublic cannot
+    // do — read a PRIVATE value, and WRITE — which this test therefore checks.
+    const base = `victim${Date.now()}`;
+
+    const victim = await installManifest(ownerA.token, {
+      metadata: { name: base, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+      actions: [
+        { id: 'put', method: 'POST', path: '/put', script: 'put' },
+        { id: 'read', method: 'POST', path: '/read', script: 'read' },
+      ],
+      instances: { supported: true, config_per_instance: { properties: {} } },
+      limits: { timeout_ms: 5000, max_api_calls: 1 },
+    }, {
+      put: 'export default async function(ctx){ await ctx.memory.set("tenant-secret", { value: "owner A only" }, { visibility: "private" }); return { written: true }; }',
+      read: 'export default async function(ctx){ return { held: await ctx.memory.get("tenant-secret") }; }',
+    });
+    assert(victim.status === 201, `victim install ${victim.status}: ${JSON.stringify(victim.body?.error)}`);
+
+    const act = await json(`/v1/extensions/${base}/activate`, { method: 'POST', headers: auth(ownerA.token), body: '{}' });
+    assert(act.status === 200, `victim activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
+
+    const inst = await json(`/v1/extensions/${base}/instances`, {
+      method: 'POST', headers: auth(ownerA.token),
+      body: JSON.stringify({ id: 'probe', config: {} }),
+    });
+    assert(inst.status === 201 || inst.status === 200, `instance create ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+
+    const wrote = await json(`/v1/ext/${base}/probe/put`, { method: 'POST', headers: auth(ownerA.token), body: '{}' });
+    assert(wrote.status === 200, `victim write ${wrote.status}: ${JSON.stringify(wrote.body?.error)}`);
+
+    // Owner B now asks for the name that IS that instance's address. Their script does the two
+    // things a public read cannot: get() ignores visibility, and set() overwrites.
+    const forged = await installManifest(ownerB.token, {
+      metadata: { name: `${base}.probe`, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+      actions: [{ id: 'raid', method: 'POST', path: '/raid', script: 'raid' }],
+      limits: { timeout_ms: 5000, max_api_calls: 1 },
+    }, {
+      raid: 'export default async function(ctx){ const stolen = await ctx.memory.get("tenant-secret");'
+        + ' await ctx.memory.set("tenant-secret", { value: "overwritten by owner B" });'
+        + ' const viaPublic = await ctx.memory.getPublic("ext:' + base + '.probe", "tenant-secret");'
+        + ' return { stolen, viaPublic }; }',
+    });
+
+    if (forged.status === 201) {
+      await json(`/v1/extensions/${base}.probe/activate`, { method: 'POST', headers: auth(ownerB.token), body: '{}' });
+      const raid = await json(`/v1/ext/${base}.probe/raid`, { method: 'POST', headers: auth(ownerB.token), body: '{}' });
+      const out = raid.body?.data?.result ?? raid.body?.data ?? {};
+      const after = await json(`/v1/ext/${base}/probe/read`, { method: 'POST', headers: auth(ownerA.token), body: '{}' });
+      const held = (after.body?.data?.result ?? after.body?.data ?? {}).held;
+      assert(false, 'a dotted extension name installed (201). '
+        + `Private read: ${JSON.stringify(out.stolen)} (getPublic on the same key returned ${JSON.stringify(out.viaPublic)}, `
+        + 'so this is beyond what the public road gives). '
+        + `Owner A's instance now holds ${JSON.stringify(held)}.`);
+    }
+    assert(forged.status === 400,
+      `an extension name carrying the instance separator must be refused, got ${forged.status}`);
+  });
+
+  // ── 3c. The other door into the same room ──────────────────────────────────────────────────
+  await test('a package migration cannot register an extension past the manifest gates', async () => {
+    // services/component-registrar.ts had its own manifest→ExtensionRecord builder, so a component
+    // registered through the package flow skipped everything routes/extensions/manifest.ts checks.
+    // That was not only package content: apply-migration takes `content` from the request body under
+    // `custom` and `replace`, gated on owning the INSTANCE and nothing about what is inside. So the
+    // emailPolicy gate above, and the name gate below it, were both reachable around.
+    const pkgs = await json('/v1/packages');
+    assert(pkgs.status === 200, `list packages ${pkgs.status}`);
+    const withExt = (pkgs.body.data.packages ?? []).find((p: Record<string, unknown>) =>
+      ((p.components ?? []) as Array<{ type?: string }>).some(c => c.type === 'extension'));
+    assert(!!withExt, 'this test needs a published package carrying an extension component (the node seeds two at boot)');
+
+    const inst = await json(`/v1/packages/${encodeURIComponent(withExt.packageGroupId)}/install`, {
+      method: 'POST', headers: auth(ownerA.token),
+      body: JSON.stringify({ label: `hardening ${Date.now()}` }),
+    });
+    assert(inst.status === 201, `install package ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    const instanceId = inst.body.data.id as string;
+    const extComp = (withExt.components as Array<{ id: string; type: string }>).find(c => c.type === 'extension')!;
+
+    const forgedManifest = JSON.stringify({
+      manifest: [
+        'metadata:',
+        '  name: migrated-raider',
+        '  version: 1.0.0',
+        '  description: registered through the migration door',
+        '  author: e2e',
+        'config:',
+        '  emailPolicy: unrestricted',
+        'actions:',
+        '  - id: send',
+        '    method: POST',
+        '    path: /send',
+        '    script: send',
+      ].join('\n'),
+      scripts: { send: 'export default async function(ctx){ return { sent: await ctx.email("stranger@example.com", "hi", "hi") }; }' },
+    });
+
+    const applied = await json(`/v1/instances/${instanceId}/apply-migration`, {
+      method: 'POST', headers: auth(ownerA.token),
+      body: JSON.stringify({
+        targetVersion: withExt.version,
+        components: [{ componentId: extComp.id, action: 'custom', content: forgedManifest }],
+      }),
+    });
+    assert(applied.status === 200, `migration ${applied.status}: ${JSON.stringify(applied.body?.error)}`);
+
+    // The manifest itself is well formed, so it applies. What must not survive is the config key:
+    // the same strip the front door does, on this road too.
+    const registered = (inst.body.data.installedComponents ?? [])
+      .find((c: { componentId: string }) => c.componentId === extComp.id) as { registeredAs?: string } | undefined;
+    assert(!!registered?.registeredAs, 'the install should report the registered name of the extension component');
+    const after = await json(`/v1/extensions/${registered!.registeredAs}`, { headers: auth(ownerA.token) });
+    assert(after.status === 200, `read back ${after.status}`);
+    const cfg = (after.body.data.extension.config ?? {}) as Record<string, unknown>;
+    assert(cfg.emailPolicy === undefined,
+      `the migration door wrote emailPolicy=${JSON.stringify(cfg.emailPolicy)} — the package flow is a second install path with none of the gates`);
+
+    // And content the front door would refuse outright is refused here too, rather than registered
+    // by a lenient second parser. The old component has to survive that refusal: this road deletes
+    // before it registers, so a rejection after the delete would leave nothing behind.
+    const junk = await json(`/v1/instances/${instanceId}/apply-migration`, {
+      method: 'POST', headers: auth(ownerA.token),
+      body: JSON.stringify({
+        targetVersion: withExt.version,
+        components: [{ componentId: extComp.id, action: 'custom', content: 'function helper(){}' }],
+      }),
+    });
+    assert(junk.status === 400,
+      `content that is not a manifest must be refused, got ${junk.status}: ${JSON.stringify(junk.body?.data ?? junk.body?.error)}`);
+    const survived = await json(`/v1/extensions/${registered!.registeredAs}`, { headers: auth(ownerA.token) });
+    assert(survived.status === 200,
+      `the refused migration deleted the existing component (read back ${survived.status})`);
   });
 
   // ── 4. Reading somebody else's source ──────────────────────────────────────────────────────

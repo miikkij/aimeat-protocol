@@ -4,6 +4,7 @@
  *   real component registration via native storage APIs, @activate-cron firing, rollback on failure).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Passes node config to registerComponent (the extension builder needs it).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/instances.ts (max-file-lines)
  */
 
@@ -152,6 +153,7 @@ export function registerInstallRoutes(
       const registeredAs = planned.registeredAs;
 
       const result = await registerComponent(storage, {
+            config,
         componentId: comp.id,
         type: comp.type,
         registeredAs,

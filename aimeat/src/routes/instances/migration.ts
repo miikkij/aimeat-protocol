@@ -4,6 +4,9 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — replace/custom validate the supplied content before anything is deleted.
+ *     This road deletes the existing component and then registers the new one, which was safe only
+ *     while registration accepted anything; it does not any more.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/instances.ts (max-file-lines)
  */
 
@@ -14,7 +17,7 @@ import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import {
-  registerComponent,
+  registerComponent, validateComponentContent,
   deleteComponent,
   fetchComponentContent,
   computeHash,
@@ -227,6 +230,24 @@ export function registerMigrationRoutes(
       }
 
       const targetComp = targetCompMap.get(compId);
+
+      // Check the content BEFORE anything is deleted. `replace` and `custom` both delete the
+      // existing component and then register the new one, and an extension component now goes
+      // through the full manifest builder — so content this node will not accept must be refused
+      // here, while the old component is still there. Body-supplied content is exactly the case:
+      // `content` above comes from the request.
+      if (actionType === 'replace' || actionType === 'custom') {
+        const existingComp = existingMap.get(compId);
+        const proposed = content ?? targetComp?.content ?? '';
+        const compType = targetComp?.type ?? existingComp?.type ?? 'csm';
+        const regAs = existingComp?.registeredAs ?? `${targetPkg.name}-${owner}-${compId}`;
+        const check = validateComponentContent(compType, proposed, regAs, config, owner);
+        if (!check.ok) {
+          res.status(400).json(error(config.nodeId, 'INVALID_COMPONENT',
+            `Component "${compId}" was not applied: ${check.error}`));
+          return;
+        }
+      }
       const existing = existingMap.get(compId);
 
       switch (actionType) {
@@ -241,6 +262,7 @@ export function registerMigrationRoutes(
           }
 
           const result = await registerComponent(storage, {
+            config,
             componentId: compId,
             type: targetComp?.type ?? existing?.type ?? 'csm',
             registeredAs,
@@ -287,6 +309,7 @@ export function registerMigrationRoutes(
           }
 
           await registerComponent(storage, {
+            config,
             componentId: compId,
             type: targetComp?.type ?? existing?.type ?? 'csm',
             registeredAs,
@@ -316,6 +339,7 @@ export function registerMigrationRoutes(
             const registeredAs = `${targetPkg.name}-${owner}-${compId}`;
 
             await registerComponent(storage, {
+            config,
               componentId: compId,
               type: targetComp.type,
               registeredAs,

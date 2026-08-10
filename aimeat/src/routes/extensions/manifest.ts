@@ -3,6 +3,9 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-10 — metadata.name is validated. The name IS the memory address, and the other
+ *                         half of it (the instance id) has always been validated; this half was not,
+ *                         so `victim.probe` addressed the `probe` instance of `victim`.
  *   v1.3.0 — 2026-08-10 — A manifest can no longer set the node's own config keys. __-prefixed
  *                         ones are written from validated sections; emailPolicy needs an operator,
  *                         which the code reading it always assumed and nothing checked.
@@ -232,6 +235,29 @@ export function validateActionPricing(action: Record<string, unknown>, actionId:
  */
 const NODE_OWNED_CONFIG_KEYS = ['emailPolicy'];
 
+/**
+ * An extension's name IS its memory address, so it has to be as tightly shaped as the other half of
+ * that address. An instance-scoped extension stores under `ext:{name}.{instanceId}`, and a plain one
+ * under `ext:{name}`. The instanceId half has been validated on create since it existed
+ * (routes/extensions/instances.ts) with exactly this pattern, which admits no dot and therefore
+ * cannot forge the separator. The name half was checked only for being a non-empty string.
+ *
+ * So an extension named `victim.probe` addressed `ext:victim.probe` — the same place the `probe`
+ * instance of the `victim` extension keeps its tenant's data. The duplicate-name check does not
+ * notice, because `victim.probe` and `victim` are different names. One owner could read and write
+ * another owner's instance memory by choosing a name, through the ordinary install route, with two
+ * calls and no special role. Proved in test/e2e-ext-hardening.ts before this pattern existed.
+ *
+ * The charset is the security property, not the length: `.` and `:` are what carry meaning in a
+ * namespace, and neither is admitted. The length is generous on purpose — the package flow generates
+ * names like `{package}-{owner}-{shortId}-{componentId}`, which reached 66 characters on the very
+ * first seeded package, and the storage column is unbounded TEXT. A borrowed 64-character cap would
+ * have refused every package install while protecting nothing.
+ *
+ * All 63 extensions on aimeat.io satisfy this, so nothing in production has to be renamed.
+ */
+export const EXT_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{1,126}[a-z0-9]$/;
+
 /** Strip the keys an installer must not set. Operator installs keep `emailPolicy`, which is what
  *  "operator-granted" meant; everything `__`-prefixed goes regardless of who is installing. */
 export function stripNodeOwnedConfig(
@@ -279,6 +305,12 @@ export function buildExtensionRecordFromManifest(
   if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
     return { ok: false, status: 400, code: 'INVALID_MANIFEST',
       message: 'metadata.name, metadata.version, metadata.description, and metadata.author are required' };
+  }
+  if (!EXT_NAME_PATTERN.test(metadata.name as string)) {
+    return { ok: false, status: 400, code: 'INVALID_MANIFEST',
+      message: `metadata.name "${String(metadata.name)}" is not a valid extension name. Use lowercase `
+        + 'letters, digits and hyphens, 3 to 128 characters, starting and ending with a letter or digit. '
+        + 'The name becomes this extension\'s memory address, so it cannot contain a separator.' };
   }
 
   const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
