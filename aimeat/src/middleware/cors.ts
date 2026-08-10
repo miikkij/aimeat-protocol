@@ -5,6 +5,7 @@
  *   and short-circuits preflight OPTIONS with 204/403. Anonymous mode allows all origins.
  *
  * @structure
+ *   - COOKIE_AUTHED_PATHS / isCookieAuthedPath(): the routes the wildcard must not reach
  *   - corsMiddleware(config, getStorage): the Express RequestHandler
  *   - resolveAllowedOrigins(): walks memory/agent/GHII/node scopes for the effective allowlist
  *   - extractMemoryKey(): parses /v1/memory[/cors]/:key paths for key-level origin overrides
@@ -12,12 +13,32 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-10 — Security audit C-1: the wildcard no longer reaches the three routes that
+ *     authenticate with the `aimeat_rt` cookie and return a credential. App origins are same-site
+ *     with the apex, so the cookie is sent; reflecting their origin with credentials let a published
+ *     app read a token minted for a visiting owner. An explicitly listed origin still passes.
  */
 
 import type { RequestHandler, Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * Routes that authenticate with the host-only `aimeat_rt` cookie and return a usable credential.
+ * They are same-origin calls from the apex SPA or from the apex silent-SSO bridge page, so no
+ * legitimate caller needs a cross-origin CORS grant here. Kept as exact paths (not a `/v1/auth/`
+ * prefix) so signature-authenticated doors like POST /v1/auth/token keep working from a browser.
+ */
+const COOKIE_AUTHED_PATHS = new Set([
+    '/v1/auth/app-grant-silent',
+    '/v1/auth/refresh',
+    '/v1/auth/revoke',
+]);
+
+function isCookieAuthedPath(path: string): boolean {
+    return COOKIE_AUTHED_PATHS.has(path.replace(/\/+$/, '') || path);
+}
 
 export function corsMiddleware(config: AimeatConfig, getStorage?: () => Storage | null): RequestHandler {
     return async (req, res, next) => {
@@ -45,7 +66,17 @@ export function corsMiddleware(config: AimeatConfig, getStorage?: () => Storage 
         const storage = getStorage?.() ?? null;
         const allowed = await resolveAllowedOrigins(req, config, storage);
 
-        if (allowed.includes('*') || allowed.includes(origin)) {
+        // SECURITY (C-1): the wildcard is a protocol decision — AIMEAT accepts requests from any
+        // origin because apps attach from arbitrary browser origins, and the API is Bearer-token
+        // based. That reasoning does not extend to the handful of routes that authenticate with the
+        // `aimeat_rt` COOKIE and hand back a token, because the app origin family is same-site with
+        // the apex: `SameSite=Strict` sends the cookie, and reflecting the caller's origin with
+        // credentials would then let any published app READ the response. Those routes require an
+        // origin the operator listed explicitly; the wildcard does not reach them.
+        const explicitlyAllowed = allowed.includes(origin);
+        const permitted = explicitlyAllowed || (allowed.includes('*') && !isCookieAuthedPath(req.path));
+
+        if (permitted) {
             setCorsHeaders(res, origin);
             res.setHeader('Access-Control-Allow-Credentials', 'true');
             res.setHeader('Vary', 'Origin');
@@ -53,7 +84,7 @@ export function corsMiddleware(config: AimeatConfig, getStorage?: () => Storage 
         // If origin not allowed, we omit CORS headers — browser will block the response
 
         if (req.method === 'OPTIONS') {
-            if (allowed.includes('*') || allowed.includes(origin)) {
+            if (permitted) {
                 res.setHeader('Access-Control-Max-Age', '3600');
                 res.status(204).end();
             } else {

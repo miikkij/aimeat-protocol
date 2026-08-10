@@ -66,7 +66,10 @@ export function registerWorkspaceTransferTool(
                 if (!entry) return fail('Workspace not found');
                 const role = await roleOf(organism_id);
                 if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
-                const { buffer, filename } = await exportWorkspace(storage, config, { orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString() });
+                const { buffer, filename } = await exportWorkspace(storage, config, {
+                    orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString(),
+                    isOrgManager: role === 'creator' || role === 'admin',
+                });
                 if (buffer.length > MAX_INLINE_EXPORT_BYTES) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
                 return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') });
             }

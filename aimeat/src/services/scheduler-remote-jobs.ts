@@ -4,6 +4,10 @@
  *   non-core, non-agent_task kinds. Extracted from scheduler.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from scheduler.ts (max-file-lines)
+ *   v1.1.0 — 2026-08-10 — Security audit C-2: an `ai` job refuses an input namespace outside its
+ *     owner. The namespace came from the create body and went straight into the raw composite-key
+ *     lookup, so any registered account could read another owner's private memory verbatim through
+ *     a prompt. The routes refuse it now too; this covers jobs stored before that gate existed.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
@@ -11,7 +15,7 @@ import type { JobRunResult } from './scheduler.js';
 import { completeForOwner } from './ai-completion.js';
 import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
-import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
+import { parseGaiiLoose, buildGEAI, isSameOwner } from '../utils/gaii.js';
 
 /**
  * `ai` kind: gather predefined input memory keys, compose the prompt, run a
@@ -35,7 +39,15 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
   const parts: string[] = [cfg.prompt];
   for (let i = 0; i < inputKeys.length; i++) {
     const key = inputKeys[i];
-    const ns = cfg.inputNamespaces?.[i] || owner;
+    const ns: string = cfg.inputNamespaces?.[i] || owner;
+    // SECURITY (C-2): getMemory is the raw composite-key lookup — it applies no visibility or consent
+    // check — and the value below is pasted into a prompt whose output the job owner keeps. A
+    // namespace belonging to anyone else is therefore a verbatim read of their private memory. The
+    // create and patch routes refuse one, and this refuses it again at run time, which is what
+    // covers jobs stored before that gate existed.
+    if (ns !== owner && !isSameOwner(ns, owner)) {
+      throw new Error(`AI job "${job.id}" names an input namespace outside its owner: ${ns}`);
+    }
     const rec = await storage.getMemory(ns, key);
     reads.push(ns === owner ? key : `${ns}::${key}`);
     const valueText = rec == null

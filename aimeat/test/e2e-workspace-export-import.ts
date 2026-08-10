@@ -6,6 +6,10 @@
  *   key) and the re-created image all come back, and the re-locked schema still validates writes.
  * @version-history
  *   v1.0.0 — 2026-06-09 — Initial: export → import round-trip.
+ *   v1.2.0 — 2026-08-10 — Security audit C-5: test 9 asserted that a member's bundle carries the
+ *     creator's PRIVATE-manifest workspace, on the belief that a member reads every workspace live.
+ *     Test 9b measures that belief and it is false, so the bundle must not carry it either. Test 9
+ *     now covers both directions with a second, members-readable workspace.
  *   v1.1.0 — 2026-07-10 — Tests 9-10: organism export by an active NON-creator member (aggregated
  *     registry + member-read bounding, proven by an import round-trip) and non-member → 403.
  */
@@ -40,6 +44,7 @@ console.log('\n=== AIMEAT Workspace Export/Import E2E ===\n');
 let token = '', ownerName = '';
 let orgId = '';
 const WS = 'ws-exp1';
+const WS_SHARED = 'ws-exp2';
 const imgKey = () => `organism.${orgId}.w.${WS}.img.pic1`;
 
 await test('Setup owner + org + workspace (manifest, schema, record, document w/ image)', async () => {
@@ -52,7 +57,7 @@ await test('Setup owner + org + workspace (manifest, schema, record, document w/
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(token), body: JSON.stringify({ name: 'Exp Org', type: 'project', join_policy: 'open', visibility: 'public' }) });
     orgId = o.body.data.organism.id;
     // registry + manifest + schema
-    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: WS, name: 'Backup Me', createdAt: ts, createdBy: ownerName }] }, visibility: 'private' }) });
+    await json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: WS, name: 'Backup Me', createdAt: ts, createdBy: ownerName }, { id: WS_SHARED, name: 'Shared With Members', createdAt: ts, createdBy: ownerName }] }, visibility: 'private' }) });
     const manifest = { manifestVersion: '1.0', id: orgId, name: 'Backup Me', kind: 'project', status: 'active', objectTypes: [
         { name: 'item', schemaRef: 'schema:item@1', namespace: 'shared.items', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' },
         { name: 'doc', schemaRef: 'schema:doc@1', namespace: 'shared.docs', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'document' },
@@ -152,7 +157,39 @@ await test('8. organism import → a NEW organism with the workspace restored', 
 // ── Member (non-creator) organism export: the gate is any ACTIVE member, the per-creator registry
 // is aggregated, and the bundle carries the creator's records (which the member reads live) ──
 let memberToken = '', memberName = '';
-await test('9. an active MEMBER (not the creator) exports the organism — bundle contains the creator\'s workspace + records', async () => {
+// A second workspace by the same creator, this one readable by the organism's members. It is what
+// keeps test 9 honest in both directions: the bundle must carry this one and must not carry the
+// private-manifest ws-exp1. Without it, "the member's bundle is empty" would pass for the wrong
+// reason and the per-creator registry aggregation (the v1.1.0 fix) would stop being covered.
+await test('Setup: the creator adds a second workspace whose manifest is readable by members', async () => {
+    const ts = new Date().toISOString();
+    const man = await json('/v1/memory', {
+        method: 'POST', headers: auth(token),
+        body: JSON.stringify({
+            key: `organism.${orgId}.w.${WS_SHARED}.meta.manifest`,
+            value: { manifestVersion: '1.0', id: orgId, name: 'Shared With Members', kind: 'project', status: 'active', objectTypes: [
+                { name: 'item', schemaRef: 'schema:item@1', namespace: 'shared.items', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' },
+            ] },
+            visibility: 'members',
+        }),
+    });
+    assert(man.status === 200 || man.status === 201, `shared manifest ${man.status}: ${JSON.stringify(man.body.error)}`);
+    await json('/v1/memory', {
+        method: 'POST', headers: auth(token),
+        body: JSON.stringify({
+            key: `organism.${orgId}.w.${WS_SHARED}.shared.items.s1.latest`,
+            value: { id: 's1', title: 'Shared item' }, visibility: 'members',
+        }),
+    });
+});
+
+// SECURITY (C-5, 2026-08 audit): this test used to assert the opposite for ws-exp1, on the belief
+// (stated in its own comment, never measured) that an active member reads every workspace live. Test
+// 9b measures it: they do not. Membership of an organism is not access to every workspace in it, and
+// the bundle carries what the member can read live — which is the shared workspace, not the private
+// one. The v1.1.0 guarantee this test was written for, that the per-creator registry is aggregated
+// so a non-creator's bundle is not empty, is still covered: WS_SHARED comes back.
+await test('9. an active MEMBER (not the creator) exports the organism — readable workspace in, private one out', async () => {
     memberName = `wsexpm${Date.now()}`;
     let reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: memberName, display_name: 'WS Member', password: 'WsExp1234' }) });
     for (let i = 0; reg.status === 429 && i < 8; i++) {
@@ -169,18 +206,38 @@ await test('9. an active MEMBER (not the creator) exports the organism — bundl
     const res = await fetch(`${BASE}/v1/organisms/${orgId}/export`, { headers: auth(memberToken) });
     assert(res.status === 200, `member export ${res.status}`);
     const memberZip = Buffer.from(await res.arrayBuffer());
-    // ZIP entry names are stored uncompressed — the creator-made workspace must be in the bundle
-    // (the per-creator registry is aggregated; reading only the member's own registry gave []).
-    assert(memberZip.includes(`workspaces/${WS}/workspace.json`), 'member bundle contains the creator-made workspace');
+    // ZIP entry names are stored uncompressed, so the bundle's contents are readable straight off the
+    // buffer. The creator-made workspace the member CAN read must be in it (the per-creator registry
+    // is aggregated; reading only the member's own registry gave []).
+    assert(memberZip.includes(`workspaces/${WS_SHARED}/workspace.json`), 'member bundle contains the readable creator-made workspace');
+    assert(!memberZip.includes(`workspaces/${WS}/workspace.json`),
+        'member bundle must NOT contain the workspace whose manifest the member cannot read (C-5)');
 
-    // Round-trip: importing the member's bundle restores the creator's records — proof the export
-    // carries content the member can read live but does not own.
+    // Round-trip: importing the member's bundle restores the creator's records from the readable
+    // workspace — proof the export carries content the member can read live but does not own.
     const imp = await fetch(`${BASE}/v1/organisms/import`, { method: 'POST', headers: { ...auth(memberToken), 'Content-Type': 'application/zip' }, body: memberZip });
     const impBody = await imp.json() as any;
     assert(imp.status === 201, `member import ${imp.status}: ${JSON.stringify(impBody.error)}`);
     const wsId = impBody.data.workspaces?.[0]?.ws;
     const r = await json(`/v1/organisms/${impBody.data.organism_id}/workspace?ws=${wsId}`, { headers: auth(memberToken) });
-    assert((r.body.data.objects?.item || []).some((o: any) => o.id === 'i1'), 'creator record present in the member round-trip');
+    assert((r.body.data.objects?.item || []).some((o: any) => o.id === 's1'), 'creator record present in the member round-trip');
+    assert(!(r.body.data.objects?.item || []).some((o: any) => o.id === 'i1'),
+        'the private workspace\'s record must not appear anywhere in the member round-trip (C-5)');
+});
+
+// SECURITY (C-5, 2026-08 audit): the ground truth test 9 assumed and never measured. The export
+// route promises the bundle carries "only what the member can already read live", so what the member
+// reads live IS the contract. The creator's manifest here is visibility:'private' with no consent
+// grant, and the live read gates on exactly that record (routes/organisms/workspace-read.ts:116-126,
+// then serves the workspace all-or-nothing at :133). If this assertion holds, the bundle must not
+// carry that workspace either.
+await test('9b. the same member reading that workspace LIVE gets nothing (the export contract)', async () => {
+    const r = await json(`/v1/organisms/${orgId}/workspace?ws=${WS}`, { headers: auth(memberToken) });
+    const items = r.body?.data?.objects?.item ?? [];
+    const manifest = r.body?.data?.manifest ?? null;
+    assert(!items.some((o: any) => o.id === 'i1'),
+        `member reads the creator's private-manifest workspace LIVE, so the export is not a leak: ${JSON.stringify(items).slice(0, 200)}`);
+    assert(manifest === null, `member reads the creator's private manifest LIVE: ${JSON.stringify(manifest).slice(0, 200)}`);
 });
 
 await test('10. a NON-member cannot export the organism (403)', async () => {

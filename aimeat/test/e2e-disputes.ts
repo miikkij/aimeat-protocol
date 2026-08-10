@@ -415,6 +415,32 @@ await test('12. Provider offers partial refund', async () => {
     assert(body.data.offer.refund_morsels === 5, `refund: ${body.data.offer.refund_morsels}`);
 });
 
+// SECURITY (C-3, 2026-08 audit): `refund_morsels` was validated as any positive integer and then
+// credited with an unconditional creditBalance, so an offer larger than the escrow minted the
+// difference out of nothing. Both sides of a dispute are cheap for one person to control, which made
+// this an unbounded mint. The escrow is the ceiling, and the balance must not move on a refusal.
+await test('12b. Partial refund above the escrow is refused and mints nothing (C-3)', async () => {
+    const tc = trackingCodes[2];
+    const { body: beforeWallet } = await json('/v1/wallet', {
+        headers: { Authorization: `Bearer ${requesterToken}` },
+    });
+    const before = Number(beforeWallet.data.balance);
+
+    const { status, body } = await json(`/v1/work/${tc}/offer-partial`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${providerToken}` },
+        body: JSON.stringify({ refund_morsels: 1_000_000, message: 'mint attempt' }),
+    });
+    assert(status === 400, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'REFUND_EXCEEDS_ESCROW', `code: ${JSON.stringify(body.error)}`);
+
+    const { body: afterWallet } = await json('/v1/wallet', {
+        headers: { Authorization: `Bearer ${requesterToken}` },
+    });
+    assert(Number(afterWallet.data.balance) === before,
+        `requester balance moved on a refused offer: ${before} -> ${afterWallet.data.balance}`);
+});
+
 await test('13. Requester accepts partial', async () => {
     const tc = trackingCodes[2];
     const { status, body } = await json(`/v1/work/${tc}/accept-partial`, {

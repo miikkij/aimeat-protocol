@@ -29,6 +29,10 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   v1.4.0 — 2026-08-10 — Security audit C-2: an `ai` schedule's `input_namespaces` may only name the
+ *     owner's own identities, checked on create and on patch. The executor reads each namespace with
+ *     the raw composite-key lookup and pastes the value into the prompt, so an unchecked entry was a
+ *     verbatim cross-owner read of private memory by anyone who could register an account.
  *   v1.3.0 — 2026-07-27 — Only the extension's owner may put its actions on a clock: the scheduler runs
  *     as a system caller, so a cron on someone else's extension is a standing unpriced call on their
  *     capability with no door where a price could be asked.
@@ -65,7 +69,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from '../services/schedule-constraints.js';
 import { logger } from '../utils/logger.js';
@@ -114,6 +118,23 @@ function sanitizeConstraints(raw: unknown): ScheduleConstraint[] | undefined {
     });
   }
   return out.length ? out : undefined;
+}
+
+/**
+ * SECURITY (C-2): the first namespace in `input_namespaces` that does not belong to the job's owner,
+ * or null when every entry is theirs. An `ai` job reads each namespace with the raw composite-key
+ * lookup and pastes the value into the prompt, so an unchecked entry here is a verbatim read of
+ * another owner's private memory. Owner GHII, the owner's agents (`bot#alice@node`) and their
+ * ecosystem apps (`eco:app#alice@node`) all parse to the same owner and are allowed; anything else
+ * is refused. A non-array or empty value is fine — the executor then defaults to the owner.
+ */
+function foreignNamespace(ownerIdentity: string, raw: unknown): string | null {
+  if (!Array.isArray(raw)) return null;
+  for (const entry of raw) {
+    if (typeof entry !== 'string' || !entry) continue;   // falsy entries fall back to the owner
+    if (!isSameOwner(entry, ownerIdentity)) return entry;
+  }
+  return null;
 }
 
 export function schedulesRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
@@ -285,6 +306,13 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     } else if (kind === 'ai') {
       const prompt = typeof body.prompt === 'string' ? body.prompt : '';
       if (!prompt) return { status: 400, code: 'INVALID_AI_JOB', message: 'prompt is required for ai schedules' };
+      const foreign = foreignNamespace(owner, body.input_namespaces);
+      if (foreign) {
+        return {
+          status: 403, code: 'NAMESPACE_DENIED',
+          message: `input_namespaces may only name your own identities; "${foreign}" is not one of yours.`,
+        };
+      }
       base.input = {
         inputKeys: Array.isArray(body.input_keys) ? body.input_keys : [],
         inputNamespaces: Array.isArray(body.input_namespaces) ? body.input_namespaces : undefined,
@@ -587,6 +615,17 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       if (job.type === 'connections-publish') {
         const bad = await checkConnectionsPublishInput(ownerGhii(req), body.input);
         if (bad) { res.status(bad.status).json(error(config.nodeId, bad.code, bad.message)); return; }
+      }
+      // Same rule as create for an `ai` job's input namespaces, and for the same reason: a gate that
+      // only runs on create is walked around by editing the schedule afterwards.
+      if (job.type === 'ai') {
+        const patch = body.input as { inputNamespaces?: unknown; input_namespaces?: unknown };
+        const foreign = foreignNamespace(job.ownerScope ?? ownerGhii(req), patch.inputNamespaces ?? patch.input_namespaces);
+        if (foreign) {
+          res.status(403).json(error(config.nodeId, 'NAMESPACE_DENIED',
+            `input_namespaces may only name your own identities; "${foreign}" is not one of yours.`));
+          return;
+        }
       }
       updates.input = body.input as Record<string, unknown>;
     }

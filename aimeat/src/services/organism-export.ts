@@ -39,6 +39,13 @@ export async function exportOrganism(
   // all members, or a promoted admin / transferred creator exports an empty bundle.
   const wss = await listOrganismWorkspaceEntries(storage, orgId);
 
+  // SECURITY (C-5): an org manager (creator/admin) reads every workspace live, so their bundle
+  // carries every workspace. For everyone else collectWorkspace decides per workspace and throws on
+  // the ones they cannot read, which the loop below already skips.
+  const membership = await storage.getMembership(orgId, exporterGaii.split('@')[0].split('#').pop() ?? '');
+  const isOrgManager = membership?.status === 'active'
+    && (membership.role === 'creator' || membership.role === 'admin');
+
   const orgJson: Record<string, unknown> = {
     aimeatOrganismExport: ORG_EXPORT_VERSION,
     exportedAt,
@@ -61,7 +68,7 @@ export async function exportOrganism(
   let count = 0;
   for (const w of wss) {
     try {
-      const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, exportedAt });
+      const { json, images } = await collectWorkspace(storage, config, { orgId, ws: w.id, exporterGaii, exportedAt, isOrgManager });
       const folder = `workspaces/${w.id}`;
       for (const [name, data] of images) archive.append(data, { name: `${folder}/${name}` });
       archive.append(JSON.stringify(json, null, 2), { name: `${folder}/workspace.json` });

@@ -89,8 +89,8 @@ async function assignSub(operatorToken: string, sub: string, target: string): Pr
     assert(r.status === 201, `assign ${sub}: ${r.status} ${JSON.stringify(r.body)}`);
 }
 /** Call the silent bridge endpoint as the apex bridge would: with the session cookie + app origin. */
-async function silent(origin: string, scope: string, cookie: string | null) {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+async function silent(origin: string, scope: string, cookie: string | null, extraHeaders: Record<string, string> = {}) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extraHeaders };
     if (cookie) headers['Cookie'] = `aimeat_rt=${encodeURIComponent(cookie)}`;
     const res = await fetch(`${BASE}/v1/auth/app-grant-silent?origin=${encodeURIComponent(origin)}&scope=${encodeURIComponent(scope)}`, { headers });
     const body = await res.json() as any;
@@ -201,6 +201,32 @@ async function main() {
         await test('unknown subdomain → unknown_app', async () => {
             const r = await silent(`https://nope.${APP_HOST}`, 'memory:read', A.rt);
             assert(r.ok === false && r.error === 'unknown_app', `expected unknown_app, got ${JSON.stringify(r)}`);
+        });
+
+        // SECURITY (C-1, 2026-08 audit): the app identity comes from `?origin=`, a value the caller
+        // writes, and the endpoint reads the session cookie. App origins are SAME-SITE with the apex,
+        // so SameSite=Strict sends the cookie: without a caller check, owner B's app could name an app
+        // owner A owns and read back a token minted for A. `Sec-Fetch-Site` separates the apex bridge
+        // (same-origin) from an app origin (same-site), and neither header can be set from script.
+        await test('an app origin calling the bridge directly → bad_caller, no token (C-1)', async () => {
+            const r = await silent(ORIGIN_A, 'memory:read memory:write', A.rt, {
+                'Sec-Fetch-Site': 'same-site',
+                'Origin': `https://evil.${APP_HOST}`,
+            });
+            assert(r.ok === false && r.error === 'bad_caller', `expected bad_caller, got ${JSON.stringify(r)}`);
+            assert(!r.access_token, 'no token may be issued to a non-apex caller');
+        });
+        await test('a cross-site page calling the bridge → bad_caller (C-1)', async () => {
+            const r = await silent(ORIGIN_A, 'memory:read', A.rt, { 'Sec-Fetch-Site': 'cross-site' });
+            assert(r.ok === false && r.error === 'bad_caller', `expected bad_caller, got ${JSON.stringify(r)}`);
+        });
+        await test('an Origin header that is not the apex → bad_caller (C-1)', async () => {
+            const r = await silent(ORIGIN_A, 'memory:read', A.rt, { 'Origin': `https://evil.${APP_HOST}` });
+            assert(r.ok === false && r.error === 'bad_caller', `expected bad_caller, got ${JSON.stringify(r)}`);
+        });
+        await test('the apex bridge page itself still gets its token (C-1 does not break the flow)', async () => {
+            const r = await silent(ORIGIN_A, 'memory:read', A.rt, { 'Sec-Fetch-Site': 'same-origin', 'Origin': BASE });
+            assert(r.ok === true && !!r.access_token, `apex bridge must still work, got ${JSON.stringify(r)}`);
         });
 
         console.log('\nPhase 3: Wiring — shim injected, bridge framable only by app origins');

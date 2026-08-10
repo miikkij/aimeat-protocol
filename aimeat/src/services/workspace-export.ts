@@ -17,14 +17,29 @@
  *   v1.1.0 -- 2026-07-10 -- An owner-level exporter with ACTIVE organism membership captures every
  *     record (matching the live human-member read model); per-record consent bounding stays for
  *     agent (GAII) exporters. Cross-member records used to vanish from every export silently.
+ *   v1.2.0 — 2026-08-10 — Security audit C-5: a WORKSPACE-level read gate in front of the record loop.
+ *     v1.1.0 matched the live read model for records inside a workspace and skipped the decision the
+ *     live path makes first, which is whether this exporter may read this workspace at all, so the
+ *     organism bundle handed every active member workspaces the workspace list reports to them as
+ *     `access: 'none'`. An org manager still reads all; everyone else gets the manifest's own gate.
  */
 import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
+import { isSameOwner } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 export const WS_EXPORT_VERSION = '1.0';
+
+/** The exporter may not read this workspace. Thrown rather than returned so the organism bundle,
+ *  which walks every workspace, keeps its existing "skip what the exporter cannot read" behaviour. */
+export class WorkspaceNotReadableError extends Error {
+  constructor(public readonly orgId: string, public readonly ws: string) {
+    super(`Workspace "${ws}" is not readable by this exporter`);
+    this.name = 'WorkspaceNotReadableError';
+  }
+}
 
 export interface ExportObject { namespace: string; id: string; role: string; value: unknown; visibility: string; createdAt: string; updatedAt: string; version: number }
 export interface ExportImage { key: string; file: string; mimeType: string; visibility: string }
@@ -52,7 +67,7 @@ const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 export async function collectWorkspace(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string },
+  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean },
 ): Promise<{ json: WorkspaceExportJson; images: Map<string, Buffer> }> {
   const { orgId, ws, exporterGaii, exportedAt } = opts;
   const root = `organism.${orgId}.w.${ws}`;
@@ -69,6 +84,28 @@ export async function collectWorkspace(
   }
 
   const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 10000 });
+
+  // SECURITY (C-5): membership of the organism is not access to every workspace in it. The live read
+  // decides per workspace, on its manifest record — an org manager reads all, the manifest's own
+  // owner reads theirs, anyone else needs authorizeRead to allow it (routes/organisms/shared.ts
+  // canReadWsManifest, and workspace-read.ts, which then serves the workspace all-or-nothing). The
+  // bundle export used to skip that decision entirely and hand every active member every workspace,
+  // including ones the organism's own workspace list reports to them as `access: 'none'`. Refusing
+  // here is what makes the route's promise true: the bundle carries what the member can read live.
+  const manifestRec = items.find(r => r.key === `${root}.meta.manifest`) ?? null;
+  let canReadWorkspace = opts.isOrgManager === true;
+  if (!canReadWorkspace && manifestRec) {
+    canReadWorkspace = manifestRec.ownerGaii === exporterGaii || isSameOwner(manifestRec.ownerGaii, exporterGaii);
+    if (!canReadWorkspace) {
+      const d = await authorizeRead(storage, config, {
+        ownerGaii: manifestRec.ownerGaii, accessorGaii: exporterGaii, resourceKey: manifestRec.key,
+        visibility: manifestRec.visibility, groupId: manifestRec.groupId, action: 'read',
+      });
+      canReadWorkspace = d.allowed;
+    }
+  }
+  if (!canReadWorkspace) throw new WorkspaceNotReadableError(orgId, ws);
+
   const readable: MemoryRecord[] = [];
   for (const r of items) {
     if (isActiveMemberOwner || r.ownerGaii === exporterGaii) { readable.push(r); continue; }
@@ -141,7 +178,7 @@ export async function collectWorkspace(
 export async function exportWorkspace(
   storage: Storage,
   config: AimeatConfig,
-  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string },
+  opts: { orgId: string; ws: string; exporterGaii: string; exportedAt: string; isOrgManager?: boolean },
 ): Promise<{ buffer: Buffer; filename: string }> {
   const { json, images } = await collectWorkspace(storage, config, opts);
   const archive = new ZipArchive({ zlib: { level: 6 } });

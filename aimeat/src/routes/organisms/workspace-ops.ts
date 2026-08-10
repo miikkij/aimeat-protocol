@@ -571,6 +571,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     }
     const { buffer, filename } = await exportWorkspace(storage, config, {
       orgId: id, ws, exporterGaii: resolveIdentity(req.auth!, config.nodeId), exportedAt: new Date().toISOString(),
+      isOrgManager: role === 'creator' || role === 'admin',
     });
     // Programmatic/MCP callers can request the ZIP as base64 JSON (size-capped to keep it out of an
     // agent's context); the UI downloads the binary directly.

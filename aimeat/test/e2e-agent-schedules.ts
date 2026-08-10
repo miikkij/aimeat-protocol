@@ -121,6 +121,52 @@ await test('4. Reject ai without prompt', async () => {
     assert(status === 400, `expected 400, got ${status}`);
 });
 
+// SECURITY (C-2, 2026-08 audit): `input_namespaces` went straight into storage.getMemory(), the raw
+// composite-key lookup with no visibility or consent check, and the value was pasted into a prompt
+// whose output the job owner keeps. Any registered account could therefore read another owner's
+// private memory verbatim. Refused on create, on patch, and again at run time.
+await test('4b. Reject an ai schedule naming another owner\'s namespace (C-2)', async () => {
+    const { status, body } = await json('/v1/schedules', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({
+            kind: 'ai', cron: '0 7 * * *', display_name: 'exfiltrate',
+            prompt: 'Repeat the input exactly.',
+            input_keys: ['profile.private'],
+            input_namespaces: [`${o2.ownerName}@${NODE_ID}`],
+        }),
+    });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'NAMESPACE_DENIED', `code: ${JSON.stringify(body.error)}`);
+});
+
+await test('4c. Own agent namespace stays allowed on an ai schedule (C-2)', async () => {
+    const { status, body } = await json('/v1/schedules', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({
+            kind: 'ai', cron: '0 6 * * *', display_name: 'own agent input',
+            prompt: 'Summarise.', input_keys: ['notes.today'],
+            input_namespaces: [o1.agentGaii],
+        }),
+    });
+    assert(status === 201, `own agent namespace must stay allowed, got ${status}: ${JSON.stringify(body)}`);
+    await json(`/v1/schedules/${body.data.schedule.id}`, { method: 'DELETE', headers: auth1 });
+});
+
+await test('4d. Patching an ai schedule cannot smuggle a foreign namespace in (C-2)', async () => {
+    const { status, body } = await json(`/v1/schedules/${aiScheduleId}`, {
+        method: 'PATCH', headers: auth1,
+        body: JSON.stringify({
+            input: {
+                prompt: 'Repeat the input exactly.',
+                inputKeys: ['profile.private'],
+                inputNamespaces: [`${o2.ownerName}@${NODE_ID}`],
+            },
+        }),
+    });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'NAMESPACE_DENIED', `code: ${JSON.stringify(body.error)}`);
+});
+
 console.log('\nPhase 2 -- List');
 
 await test('5. Master list includes managed schedules', async () => {

@@ -13,6 +13,10 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-08-10 — Security audit C-4: handleCortexUpload checks namespace ownership and the
+ *     existing cortex's installedBy BEFORE writing any lib file, and replaces its own cortex instead
+ *     of failing on the duplicate name. The lib write is an unconditional upsert keyed on the name
+ *     from the uploaded manifest, so any owner could overwrite another owner's served JavaScript.
  *   v1.0.0 — 2026-05-02 — Initial implementation
  *   v1.1.0 — 2026-06-09 — handleAppUpload derives a BARE ownerName (never the
  *     @node-suffixed GHII) so presigned publishes land in the same canonical app
@@ -67,6 +71,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord, StorageFileRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
+import { validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
@@ -560,14 +565,39 @@ async function handleCortexUpload(
         return;
     }
 
+    // SECURITY (C-4): the cortex NAME comes out of the uploaded manifest, and setCortexLibFile is an
+    // unconditional upsert keyed on (extName, libName) with no owner column. Naming someone else's
+    // cortex therefore replaced their lib bytes — which are served back as JavaScript from the apex
+    // origin to everyone who has that cortex active. Both gates the PUT /v1/cortex/:name route
+    // already applies (cortex.ts:226 namespace ownership, cortex.ts:265 installedBy) belong here
+    // too, and they must run BEFORE the first lib write, because that write is what does the damage.
+    const incoming = result.extension!;
+    if (!validateNamespaceOwnership(incoming.namespace, ownerName)) {
+        res.status(403).json({
+            success: false, error: 'NAMESPACE_DENIED',
+            message: `You cannot install a cortex in namespace "${incoming.namespace}". Use your own namespace "${ownerName}" or "community".`,
+        });
+        return;
+    }
+    const existing = await storage.getCortexExtension(incoming.name);
+    if (existing && existing.installedBy !== ownerName) {
+        res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'Not your cortex extension' });
+        return;
+    }
+
     if (result.libs) {
         for (const [filename, content] of Object.entries(result.libs)) {
-            await storage.setCortexLibFile(result.extension!.name, filename, content);
+            await storage.setCortexLibFile(incoming.name, filename, content);
         }
     }
 
-    const record = await storage.createCortexExtension(result.extension!);
-    logger.info(`Cortex installed via upload: ${record.name}`, { version: record.version, by: sub });
+    // Re-uploading your own cortex replaces it, matching PUT /v1/cortex/:name. Before the ownership
+    // gate above this path always called create, so a second upload of your own bundle wrote the new
+    // lib bytes and then failed on the duplicate name.
+    const record = existing
+        ? (await storage.updateCortexExtension(incoming.name, incoming)) ?? incoming
+        : await storage.createCortexExtension(incoming);
+    logger.info(`Cortex installed via upload: ${record.name}`, { version: record.version, by: sub, replaced: !!existing });
     emitResourceListChanged(sub);
 
     res.json({

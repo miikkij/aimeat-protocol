@@ -17,6 +17,11 @@
  *     POST /token, GET /v1/app-grants, DELETE /v1/app-grants/:grantId
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.8.0 — 2026-08-10 — Security audit C-1: the silent bridge now refuses any caller that is not the
+ *     apex page. It reads the session cookie and takes the app's identity from `?origin=`, and app
+ *     origins are same-site with the apex, so any published app could ask for, and read back, a
+ *     scoped token minted for a visiting owner. `Sec-Fetch-Site` separates the apex bridge
+ *     (`same-origin`) from an app origin (`same-site`); both header names are script-forbidden.
  *   v1.4.0 — 2026-07-28 — `contract:spend` + a per-app ceiling (PATCH /:grantId/spend-cap). Reading your
  *     data and buying with your money are separate favours, and the useful answer to the second is an
  *     amount rather than a yes. The token now carries the app's own id so the caller can be NAMED.
@@ -178,6 +183,13 @@ function verifyPkce(codeVerifier: string, codeChallenge: string, method: 'S256' 
   if (method === 'plain') return codeVerifier === codeChallenge;
   const computed = createHash('sha256').update(codeVerifier).digest('base64url');
   return computed === codeChallenge;
+}
+
+/** The node's own origin (scheme + host + port), lowercased — what a same-origin caller's `Origin`
+ *  header says when it is present. '' when baseUrl is unparseable, which then matches nothing. */
+function apexOrigin(config: AimeatConfig): string {
+  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer: an unparseable baseUrl has no origin
+  try { return new URL(config.baseUrl).origin.toLowerCase(); } catch { return ''; }
 }
 
 export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -432,6 +444,20 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
   router.get('/v1/auth/app-grant-silent', async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'no-store');
     const reply = (data: Record<string, unknown>) => res.json(success(config.nodeId, data));
+
+    // SECURITY (C-1): this endpoint turns the session COOKIE into a scoped token, and it takes the
+    // app's identity from `?origin=` — a value the caller writes. Only the apex bridge page may call
+    // it. App origins are `<sub>.apps.<apex>`, i.e. the SAME SITE as the apex, so `SameSite=Strict`
+    // does not fence them: without this check any published app could fetch the bridge endpoint
+    // credentialed, name an app the visiting owner owns, and read back a token for that owner.
+    // `Sec-Fetch-Site` distinguishes exactly the two cases — the apex bridge sends `same-origin`,
+    // an app origin sends `same-site`. Both header names are forbidden to scripts, so a browser
+    // caller cannot forge them; a non-browser caller sends neither and carries no cookie to steal,
+    // so absence stays allowed (curl, the E2E suites, an agent's HTTP client).
+    const fetchSite = String(req.headers['sec-fetch-site'] ?? '').toLowerCase();
+    if (fetchSite && fetchSite !== 'same-origin') return reply({ ok: false, error: 'bad_caller' });
+    const callerOrigin = String(req.headers.origin ?? '').toLowerCase();
+    if (callerOrigin && callerOrigin !== apexOrigin(config)) return reply({ ok: false, error: 'bad_caller' });
 
     const appHost = (config.appHost || '').toLowerCase();
     const portfolioHost = (config.portfolioOriginEnabled ? (config.portfolioHost || '') : '').toLowerCase();

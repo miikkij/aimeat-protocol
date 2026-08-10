@@ -10,6 +10,10 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-10 — Security audit C-3: a partial refund is bounded by the escrow, refused at
+ *     the offer and clamped again at accept. `refund_morsels` was validated as any positive integer
+ *     and credited unconditionally, so a provider and a requester the same person controls could
+ *     mint an arbitrary balance out of a trivially cheap piece of work.
  */
 import { Router } from 'express';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -239,6 +243,17 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         const { refund_morsels, message } = req.body ?? {};
 
+        // SECURITY (C-3): the offer names an amount that `accept-partial` later credits with an
+        // unconditional creditBalance. The schema bounds it to a positive integer and nothing bounds
+        // it above, so an offer larger than the escrow mints the difference out of nothing — and both
+        // sides of a dispute are cheap for one person to control. The escrow is the ceiling.
+        const escrowed = work.cost.inEscrow;
+        if (typeof refund_morsels === 'number' && refund_morsels > escrowed) {
+            res.status(400).json(error(config.nodeId, 'REFUND_EXCEEDS_ESCROW',
+                `A partial refund cannot exceed the ${escrowed} morsels held in escrow for this work.`));
+            return;
+        }
+
         await appendAuditEntry(storage, dispute.id, 'partial_offer', req.auth!.sub, { refund_morsels, message });
 
         res.json(success(config.nodeId, { dispute_id: dispute.id, offer: { refund_morsels, message } }, [
@@ -282,7 +297,11 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         // Find the last partial_offer in audit log
         const auditLog = await storage.getDisputeAuditLog(dispute.id);
         const lastOffer = [...auditLog].reverse().find(e => e.event === 'partial_offer');
-        const refundAmount = lastOffer ? (lastOffer.data.refund_morsels as number) : 0;
+        const offered = lastOffer ? Number(lastOffer.data.refund_morsels) : 0;
+        // SECURITY (C-3): clamped again on the way out of the audit log, not only on the way in. The
+        // offer route refuses an over-escrow amount, but this reads a value stored earlier — including
+        // rows written before that gate existed — and it is the line that actually moves the money.
+        const refundAmount = Number.isFinite(offered) ? Math.max(0, Math.min(offered, work.cost.inEscrow)) : 0;
 
         if (refundAmount > 0) {
             await returnEscrow(storage, work, refundAmount);

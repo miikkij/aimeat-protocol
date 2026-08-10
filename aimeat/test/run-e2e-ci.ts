@@ -283,6 +283,7 @@ const ALL_SUITES = [
     'test/e2e-workflows-human.ts',
     'test/e2e-public-activity.ts',
     'test/e2e-public-totals.ts',
+    'test/e2e-cortex-upload-ownership.ts',
 ];
 
 const PORT = process.env.AIMEAT_PORT ?? '40251';
