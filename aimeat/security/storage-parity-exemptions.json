@@ -1,0 +1,16 @@
+{
+  "note": "Owner-scoped tables not cleared by one or both deletion cascades. Seeded from the state on 2026-08-10 so the gate can only ratchet down. A deleted username is released for reuse (decision 2026-08-10), so anything left here is inheritable by the next registrant.",
+  "exempt": {
+    "MemoryVersion": "Seeded 2026-08-10. Owner-scoped by ownerGaii and not cleared in neither provider. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "Flag": "Seeded 2026-08-10. Owner-scoped by flaggedBy and not cleared in postgres-kysely. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "Purchase": "Seeded 2026-08-10. Owner-scoped by buyerOwner/sellerOwner and not cleared in postgres-kysely. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "AppPurchase": "Seeded 2026-08-10. Owner-scoped by buyerOwner/sellerOwner and not cleared in neither provider. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "EcoAuth": "Seeded 2026-08-10. Owner-scoped by ownerName and not cleared in sqlite. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "OwnerAgentDefault": "Seeded 2026-08-10. Owner-scoped by ownerGaii and not cleared in neither provider. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "AgentActivity": "Seeded 2026-08-10. Owner-scoped by agentGaii and not cleared in postgres-kysely. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "AgentUsageEvent": "Seeded 2026-08-10. Owner-scoped by agentGaii and not cleared in neither provider. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "AgentUsageDaily": "Seeded 2026-08-10. Owner-scoped by agentGaii and not cleared in neither provider. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "TelemetryEvent": "Seeded 2026-08-10. Owner-scoped by agentGaii and not cleared in postgres-kysely. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate).",
+    "AgentMessage": "Seeded 2026-08-10. Owner-scoped by agentGaii and not cleared in postgres-kysely. Decide: add it to the cascade, or record here why the row must outlive its owner (an immutable ledger entry, a counterparty's copy, an anonymised aggregate)."
+  }
+}

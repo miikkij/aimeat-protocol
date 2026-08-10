@@ -44,6 +44,92 @@
  * Tool -> required scope, mirroring the REST requireScope() gate for the SAME operation.
  * Verified against src/routes/{memory,boards,wallet,work,actions,consent}.ts.
  */
+/**
+ * Tools that change state and deliberately need no scope, each with the reason. The gate in
+ * scripts/audit-mcp-tools.ts fails on any mutating tool that is in neither TOOL_SCOPES nor this set,
+ * so "this needs no scope" becomes a decision someone wrote down rather than the default that
+ * silence produces. Before the August 2026 audit, 73 mutating tools sat in that silence, and
+ * scopeAllowsTool() reads a missing entry as permission.
+ *
+ * Seeded 2026-08-10 with the tools that were unmapped at that moment. An entry here is a promise to
+ * come back to it: the set may shrink, and every removal is either a real scope or a real refusal.
+ */
+export const SCOPE_EXEMPT_TOOLS = new Set<string>([
+    'aimeat_admin_mint',
+    'aimeat_agent_capabilities_report',
+    'aimeat_agent_mode_set',
+    'aimeat_agent_tags_set',
+    'aimeat_agent_telemetry_report',
+    'aimeat_app_delete',
+    'aimeat_app_draft_discard',
+    'aimeat_app_draft_publish',
+    'aimeat_app_draft_save',
+    'aimeat_app_fork',
+    'aimeat_app_publish',
+    'aimeat_capabilities_create',
+    'aimeat_capabilities_delete',
+    'aimeat_capabilities_invoke',
+    'aimeat_capabilities_update',
+    'aimeat_capabilities_vouch',
+    'aimeat_extension_install',
+    'aimeat_extension_invoke',
+    'aimeat_feedback_send',
+    'aimeat_flag_report',
+    'aimeat_group_add_member',
+    'aimeat_group_create',
+    'aimeat_group_remove_member',
+    'aimeat_instance_create',
+    'aimeat_knowledge_contribute',
+    'aimeat_message_send',
+    'aimeat_onboarding_confirm_directives_read',
+    'aimeat_onboarding_confirm_skill_installed',
+    'aimeat_onboarding_declare_services',
+    'aimeat_onboarding_identify_platform',
+    'aimeat_operator_agent_configure',
+    'aimeat_operator_ai_config',
+    'aimeat_organism_archive',
+    'aimeat_organism_create',
+    'aimeat_organism_import',
+    'aimeat_organism_invitation_cancel',
+    'aimeat_organism_invitation_email_cancel',
+    'aimeat_organism_invitation_respond',
+    'aimeat_organism_invitation_update',
+    'aimeat_organism_invite',
+    'aimeat_organism_invite_email',
+    'aimeat_organism_join',
+    'aimeat_organism_leave',
+    'aimeat_organism_member_add',
+    'aimeat_organism_update',
+    'aimeat_portfolio_publish',
+    'aimeat_schedule_create',
+    'aimeat_schedule_delete',
+    'aimeat_schedule_report_internal',
+    'aimeat_schedule_update',
+    'aimeat_skill_link',
+    'aimeat_skill_publish',
+    'aimeat_skill_unlink',
+    'aimeat_storage_upload',
+    'aimeat_task_complete',
+    'aimeat_task_create',
+    'aimeat_task_event',
+    'aimeat_task_fail',
+    'aimeat_task_propose_todos',
+    'aimeat_task_request_changes',
+    'aimeat_task_todo',
+    'aimeat_workflow_answer',
+    'aimeat_workspace_access',
+    'aimeat_workspace_comment',
+    'aimeat_workspace_create',
+    'aimeat_workspace_member_grant',
+    'aimeat_workspace_member_revoke',
+    'aimeat_workspace_object_delete',
+    'aimeat_workspace_publish',
+    'aimeat_workspace_revert_to_draft',
+    'aimeat_workspace_transfer',
+    'aimeat_workspace_update',
+    'aimeat_workspace_write',
+]);
+
 export const TOOL_SCOPES: Record<string, string> = {
     // Memory (GET /v1/memory/:key → memory:read; POST/PUT → memory:write)
     aimeat_memory_read: 'memory:read',

@@ -123,7 +123,14 @@
     "perf:bench:backends": "node --import tsx tools/perf-bench/bench-backends.ts",
     "sync:viewport": "tsx scripts/embed-viewport.ts",
     "check:viewport": "tsx scripts/embed-viewport.ts --check",
-    "check:theme": "tsx tools/theme-contrast.ts"
+    "check:theme": "tsx tools/theme-contrast.ts",
+    "check:route-scopes": "tsx scripts/check-route-scopes.ts --strict",
+    "check:route-scopes:report": "tsx scripts/check-route-scopes.ts",
+    "check:outbound-fetch": "tsx scripts/check-outbound-fetch.ts --strict",
+    "check:trusted-keys": "tsx scripts/check-trusted-keys.ts --strict",
+    "check:ext-entrypoints": "tsx scripts/check-ext-entrypoints.ts",
+    "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
+    "check:audit-gates": "pnpm check:route-scopes && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints"
   },
   "keywords": [
     "aimeat",

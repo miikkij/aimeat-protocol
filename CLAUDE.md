@@ -159,6 +159,8 @@ The extension is sovereign: it decides storage, format and return shape. Cortex 
 
 **Protocol only, no server-side rendering.** Routes in `src/routes/` are generic reusable API endpoints. Never `res.send('<html>...')` or build HTML in a handler. The test for a new route is "would a second, different service use this?"; if not, it does not belong, and no per-service backend files. UIs are client-side SPAs or static files. The admin dashboard is the single legacy exception. If data is already available through an existing API, do not wrap it.
 
+**One capability, one implementation, whatever the interface.** An MCP tool declares its own name, description and parameters, because the protocol requires that. It does not do the work itself: it calls the same route or the same service function REST calls, so the scope check, the validation and the provenance happen where they were written once. A tool that reaches `storage.*` directly is a second implementation, and needs a written reason. This rule exists because the same defect has already been fixed three separate times inside one MCP tool (`aimeat_memory_write`: schema locks, write target, provenance), each time in one place while the other surface kept the old behaviour, and the August 2026 audit then found two more of the same kind.
+
 - **Response envelope:** `success()` / `error()` from `src/middleware/envelope.ts`.
   ```typescript
   res.json(success(config.nodeId, { data: 'here' }, [{ description: 'Next', method: 'GET', url: '/v1/endpoint' }]));

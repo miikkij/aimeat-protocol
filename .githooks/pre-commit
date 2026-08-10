@@ -15,6 +15,10 @@
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
 #  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
+#  12. Route authorization gates        — pnpm check:route-scopes
+#  13. Outbound fetch through safeFetch — pnpm check:outbound-fetch
+#  14. Server-trusted memory keys       — pnpm check:trusted-keys
+#  15. Owner-scoped tables vs cascades  — pnpm check:storage-parity
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -71,4 +75,20 @@ pnpm -s check:silent-catch -- --strict
 echo "[pre-commit] AI disclosure gates: one LLM path, one publish path, labels intact (check:ai-disclosure)…"
 pnpm -s check:ai-disclosure
 
+
+# ── August 2026 audit gates ──────────────────────────────────────────────────
+# Each is a ratchet seeded with that day's count: the gate fails only on a NEW
+# offender, so the backlog is visible, countable, and can only shrink. The
+# seeds live in aimeat/security/*.json with a reason per entry.
+echo "[pre-commit] Route authorization gates (check:route-scopes)…"
+pnpm -s check:route-scopes
+
+echo "[pre-commit] Outbound fetch goes through safeFetch (check:outbound-fetch)…"
+pnpm -s check:outbound-fetch
+
+echo "[pre-commit] Server-trusted memory keys are guarded (check:trusted-keys)…"
+pnpm -s check:trusted-keys
+
+echo "[pre-commit] Owner-scoped tables are in both deletion cascades (check:storage-parity)…"
+pnpm -s check:storage-parity
 echo "[pre-commit] ✓ all checks passed"

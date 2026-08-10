@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { CONNECT_CLI_TOOLS } from '../src/cli/connect/tool-call.js';
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from '../src/mcp/catalog/definitions.js';
 import { TOOL_ANNOTATIONS } from '../src/mcp/annotations.js';
+import { TOOL_SCOPES, SCOPE_EXEMPT_TOOLS } from '../src/mcp/catalog/scopes.js';
 
 interface SurfaceConfig {
     id: 'server' | 'connector';
@@ -235,6 +236,26 @@ const serverTools = await collectTools(surfaces[0]);
 const connectorTools = await collectTools(surfaces[1]);
 const report = buildReport(serverTools, connectorTools);
 
+/**
+ * Tools annotated as changing state that carry no TOOL_SCOPES entry and no written exemption.
+ * These are the ones an agent reaches over MCP holding scopes that would refuse it over REST.
+ */
+function mutatingToolsWithoutScope(): string[] {
+    return Object.entries(TOOL_ANNOTATIONS)
+        .filter(([name, a]) => a.readOnlyHint === false && !TOOL_SCOPES[name] && !SCOPE_EXEMPT_TOOLS.has(name))
+        .map(([name]) => name)
+        .sort();
+}
+
+/** The same question for the tools that say they are irreversible. Strictly a subset, reported
+ *  separately because "delete without a scope" deserves its own line in the failure. */
+function destructiveToolsWithoutScope(): string[] {
+    return Object.entries(TOOL_ANNOTATIONS)
+        .filter(([name, a]) => a.destructiveHint === true && !TOOL_SCOPES[name] && !SCOPE_EXEMPT_TOOLS.has(name))
+        .map(([name]) => name)
+        .sort();
+}
+
 if (process.argv.includes('--json')) {
     console.log(JSON.stringify(report, null, 2));
 } else if (process.argv.includes('--check')) {
@@ -248,6 +269,14 @@ if (process.argv.includes('--json')) {
         connectorMcpWithoutCatalog: report.catalog.connectorMcpWithoutCatalog,
         registeredWithoutAnnotation: report.annotations.registeredWithoutAnnotation,
         annotationWithoutRegistration: report.annotations.annotationWithoutRegistration,
+        // Authorization drift (August 2026 audit, systemic pattern 2). The MCP surface is a SECOND
+        // implementation of the REST surface, and its scope map was built by mirroring what REST did
+        // at the time — so a REST gap was copied here automatically, and a later REST fix never
+        // reached it. scopeAllowsTool() returns true for an unmapped tool, which makes a missing
+        // entry a permission rather than an omission. A tool that changes state either names the
+        // scope it needs or says in SCOPE_EXEMPT_TOOLS why it needs none.
+        mutatingWithoutScope: mutatingToolsWithoutScope(),
+        destructiveWithoutScope: destructiveToolsWithoutScope(),
     };
     const offenders = Object.entries(drift).filter(([, v]) => v.length > 0);
     if (offenders.length === 0) {

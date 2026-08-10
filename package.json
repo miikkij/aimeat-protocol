@@ -70,6 +70,12 @@
     "sync:viewport": "cd aimeat && pnpm sync:viewport",
     "check:viewport": "cd aimeat && pnpm check:viewport",
     "check:theme": "cd aimeat && pnpm check:theme",
-    "check:js-syntax": "cd aimeat && pnpm check:js-syntax"
+    "check:js-syntax": "cd aimeat && pnpm check:js-syntax",
+    "check:route-scopes": "cd aimeat && pnpm check:route-scopes",
+    "check:outbound-fetch": "cd aimeat && pnpm check:outbound-fetch",
+    "check:trusted-keys": "cd aimeat && pnpm check:trusted-keys",
+    "check:ext-entrypoints": "cd aimeat && pnpm check:ext-entrypoints",
+    "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
+    "check:audit-gates": "cd aimeat && pnpm check:audit-gates"
   }
 }
