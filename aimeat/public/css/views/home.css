@@ -457,8 +457,6 @@ a.koti-feed-line:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--border);
 }
 .open-items-row:last-child { border-bottom: 0; }
-.open-items-mark { flex: none; width: 1rem; color: var(--muted); line-height: 1.4; }
-.open-items-row--working .open-items-mark { color: var(--accent); }
 .open-items-main { flex: 1 1 auto; min-width: 0; }
 .open-items-item { font-size: 0.95rem; line-height: 1.35; overflow-wrap: anywhere; }
 .open-items-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }

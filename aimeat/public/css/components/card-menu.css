@@ -32,15 +32,17 @@
    card 2.1:1, green 2.5:1, grey 4.8:1 — so a card that WAS on your list read fainter than one that
    was not, which is the light inverted. A filled chip carries the state at the contrast of the fill
    and stays legible for anyone who does not separate those hues at all. */
-/* Darker than --warning and --success, and deliberately so. Those tokens are tuned to be read as
-   TEXT on this background; as a filled 30px chip they measured 2.1:1 and 2.43:1 against the page,
-   under the 3:1 a non-text UI component needs to be seen at all. Same hues, enough weight to be a
-   state rather than a tint. Measured after the change, not assumed. */
+/* A light tint, a strong border and dark ink — not a saturated fill.
+   The first attempt used --warning and --success straight and measured 2.1:1 and 2.43:1 as a 30px
+   chip, under the 3:1 a non-text component needs. The second darkened them to #B45309 and #047857,
+   which cleared 4.8 and 5.25 and stopped looking like amber and green: it read as brown, and brown
+   reads as a warning rather than as "waiting". Contrast comes from the border and the ink here, so
+   the hue survives being legible. */
 .card-menu-dots--open {
-  background: #B45309; border-color: #B45309; color: #FFFFFF;
+  background: #FEF3C7; border-color: #B45309; color: #78350F;
 }
 .card-menu-dots--working {
-  background: #047857; border-color: #047857; color: #FFFFFF;
+  background: #D1FAE5; border-color: #047857; color: #065F46;
   animation: card-menu-pulse 1.8s ease-in-out infinite;
 }
 /* Working is the one state about this moment rather than a standing fact, so it is the one that moves. */

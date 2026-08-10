@@ -112,7 +112,9 @@ export function OpenItemsList() {
       <ul class="open-items-list">
         ${items.map(i => html`
           <li key=${i.id} class="open-items-row open-items-row--${i.status}">
-            <span class="open-items-mark" aria-hidden="true">${i.status === 'working' ? '●' : '○'}</span>
+            ${/* No second state mark. There used to be a ring on the left AND the dots on the
+                 right, and on a working row they disagreed: coral circle, green dots, one item.
+                 One state, one place, and the place is the corner every card uses. */''}
             <div class="open-items-main">
               <div class="open-items-item">${escHtml(i.title)}</div>
             ${/* WHO put this here is a separate fact from WHAT is happening to it, and it used to be
