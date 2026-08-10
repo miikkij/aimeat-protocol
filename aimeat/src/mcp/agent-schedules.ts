@@ -128,6 +128,14 @@ export function registerAgentScheduleTools(
         if (!a.extension_name || !a.action_id) return err('extension_name and action_id are required for extension schedules');
         const ext = await storage.getExtension(a.extension_name);
         if (!ext) return err(`Extension "${a.extension_name}" not found`);
+        // Only the extension's OWNER may put its actions on a clock. The scheduler runs the action
+        // as a system caller, so a cron on somebody else's extension is a standing unpriced call on
+        // their capability, their API keys and their quota, with no door where a price could be
+        // asked. POST /v1/schedules has refused this since 2026-07-27; this tool checked only that
+        // the extension EXISTS, so the hole REST closed stayed open on the agent surface. Same
+        // wording as the route: "not found" rather than "not yours", because which extensions exist
+        // is not a stranger's business either.
+        if (ext.installedBy !== owner) return err(`Extension "${a.extension_name}" not found`);
         record.extensionName = a.extension_name;
         record.actionId = a.action_id;
       }
