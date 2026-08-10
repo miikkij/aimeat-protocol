@@ -5623,7 +5623,8 @@
             "write": "Accept marketplace offers, place bids and take on paid work."
           },
           "ext": {
-            "write": "Switch on, configure and remove the extensions that run on your account."
+            "write": "Switch on, configure and remove the extensions that run on your account.",
+            "invoke": "Run the extensions installed on your account. Does not include installing or removing them."
           },
           "finance": {
             "read": "Read your bookkeeping: invoices, receipts, VAT reports and exports.",
@@ -5645,7 +5646,9 @@
             "send": "Send you a notification in the app and on your phone. The recipient is always you."
           },
           "organism": {
-            "read": "Read the published content of the shared spaces you belong to."
+            "read": "Read the published content of the shared spaces you belong to.",
+            "write": "Create shared spaces, write and publish documents in them, and comment.",
+            "invite": "Let other people in: invite members and hand out access to a shared space."
           },
           "outbound": {
             "send": "Send email from your company address to your saved contacts."
@@ -5680,6 +5683,16 @@
           "workflow": {
             "read": "See your automations and their run history.",
             "write": "Create, change and run your automations."
+          },
+          "agent": {
+            "write": "Change the settings of your OTHER agents: what mode they run in and how they are tagged."
+          },
+          "app": {
+            "write": "Publish and update apps on your account, including saving and publishing drafts.",
+            "manage": "Delete an app for good, or fork one. Kept separate from publishing because it cannot be undone."
+          },
+          "capability": {
+            "write": "Offer, change and withdraw the services you sell to others. These speak in your name."
           }
         },
         "domainAi": "AI",

@@ -64,8 +64,11 @@ const editorScopes = new Set<string>(
 const NOT_AN_AGENT_CHECKBOX: Record<string, string> = {
     'contract:spend': 'app sessions only — appSpendRefusal returns null for any non-app principal (services/metered-access.ts)',
     'events:emit': "ecosystem apps only — requireRole('ecosystem') runs first (routes/ecosystem-events.ts)",
-    'organism:write': "agents pass by ROLE via requireRoleOrScope('agent', …), so the tick binds only apps and eco apps",
-    'organism:invite': 'agent-relevant only for join CODES; the email-invite routes admit any agent by role',
+    // organism:write and organism:invite were here until 2026-08-10, on the true observation that a
+    // REST agent passed by ROLE so the tick bound only apps and eco apps. Step 3a ended that: the
+    // MCP workspace and invitation tools now carry these scopes, and an MCP tool is REGISTERED or
+    // not according to them, so unticking the box takes the tool away from the agent. The reason
+    // expired when the enforcement moved, which is what this list is for catching.
     'knowledge:read': 'live-update notifications only — no knowledge route is scope-gated',
 };
 

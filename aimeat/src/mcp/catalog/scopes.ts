@@ -19,6 +19,9 @@
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
  *   v1.x — 2026-08-08 — aimeat_company_* ride company:read / company:write.
+ *   v1.6.0 -- 2026-08-10 -- 55 mutating tools get the scope they need, and SCOPE_EXEMPT_TOOLS
+ *     shrinks from 73 to 18. Seven new scope words, handed to existing agents at boot by
+ *     services/scope-vocabulary-migration.ts so an entry here does not delete their tools.
  *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 4: a note on why `provenance:write` is NOT in
  *     TOOL_SCOPES. It gates a PARAMETER, not a tool, and hiding nine tools from an agent that merely
  *     cannot assert authorship would be the wrong trade — the honest default needs no permission.
@@ -55,82 +58,134 @@
  * come back to it: the set may shrink, and every removal is either a real scope or a real refusal.
  */
 export const SCOPE_EXEMPT_TOOLS = new Set<string>([
-    'aimeat_admin_mint',
-    'aimeat_agent_capabilities_report',
-    'aimeat_agent_mode_set',
-    'aimeat_agent_tags_set',
-    'aimeat_agent_telemetry_report',
-    'aimeat_app_delete',
-    'aimeat_app_draft_discard',
-    'aimeat_app_draft_publish',
-    'aimeat_app_draft_save',
-    'aimeat_app_fork',
-    'aimeat_app_publish',
-    'aimeat_capabilities_create',
-    'aimeat_capabilities_delete',
-    'aimeat_capabilities_invoke',
-    'aimeat_capabilities_update',
-    'aimeat_capabilities_vouch',
-    'aimeat_extension_install',
-    'aimeat_extension_invoke',
-    'aimeat_feedback_send',
-    'aimeat_flag_report',
-    'aimeat_group_add_member',
-    'aimeat_group_create',
-    'aimeat_group_remove_member',
-    'aimeat_instance_create',
-    'aimeat_knowledge_contribute',
-    'aimeat_message_send',
-    'aimeat_onboarding_confirm_directives_read',
-    'aimeat_onboarding_confirm_skill_installed',
-    'aimeat_onboarding_declare_services',
-    'aimeat_onboarding_identify_platform',
-    'aimeat_operator_agent_configure',
-    'aimeat_operator_ai_config',
-    'aimeat_organism_archive',
-    'aimeat_organism_create',
-    'aimeat_organism_import',
-    'aimeat_organism_invitation_cancel',
-    'aimeat_organism_invitation_email_cancel',
-    'aimeat_organism_invitation_respond',
-    'aimeat_organism_invitation_update',
-    'aimeat_organism_invite',
-    'aimeat_organism_invite_email',
-    'aimeat_organism_join',
-    'aimeat_organism_leave',
-    'aimeat_organism_member_add',
-    'aimeat_organism_update',
-    'aimeat_portfolio_publish',
-    'aimeat_schedule_create',
-    'aimeat_schedule_delete',
-    'aimeat_schedule_report_internal',
-    'aimeat_schedule_update',
-    'aimeat_skill_link',
-    'aimeat_skill_publish',
-    'aimeat_skill_unlink',
-    'aimeat_storage_upload',
-    'aimeat_task_complete',
-    'aimeat_task_create',
-    'aimeat_task_event',
-    'aimeat_task_fail',
-    'aimeat_task_propose_todos',
-    'aimeat_task_request_changes',
-    'aimeat_task_todo',
-    'aimeat_workflow_answer',
-    'aimeat_workspace_access',
-    'aimeat_workspace_comment',
-    'aimeat_workspace_create',
-    'aimeat_workspace_member_grant',
-    'aimeat_workspace_member_revoke',
-    'aimeat_workspace_object_delete',
-    'aimeat_workspace_publish',
-    'aimeat_workspace_revert_to_draft',
-    'aimeat_workspace_transfer',
-    'aimeat_workspace_update',
-    'aimeat_workspace_write',
+    'aimeat_admin_mint',                             // gated in the handler on the operator role, not by a scope
+    'aimeat_agent_capabilities_report',              // Identity is resolved once from the session at agent-capabilities
+    'aimeat_agent_telemetry_report',                 // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
+    'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope
+    'aimeat_feedback_send',                          // Sender is the session identity: feedback
+    'aimeat_instance_create',                        // owner comes from ownerName() derived from the session GAII (chat-instances
+    'aimeat_message_send',                           // agentGaii and senderGaii are both the session identity (agent-messages
+    'aimeat_onboarding_confirm_directives_read',     // agentGaii from the session closure (agent-onboarding
+    'aimeat_onboarding_confirm_skill_installed',     // Same identity path as the rest of the onboarding set — agentGaii from the session closure (agent-onboarding
+    'aimeat_onboarding_declare_services',            // agentGaii from the session closure (agent-onboarding
+    'aimeat_onboarding_identify_platform',           // Every onboarding tool passes the session closure `agentGaii` (agent-onboarding
+    'aimeat_organism_invitation_respond',            // It acts only on the caller's own pending invitation — membership is looked up by getOwnerName() at organisms-n
+    'aimeat_task_complete',                          // isOwnTask() at agent-tasks
+    'aimeat_task_event',                             // isOwnTask() at agent-tasks
+    'aimeat_task_fail',                              // isOwnTask() at agent-tasks
+    'aimeat_task_propose_todos',                     // Authorization is isOwnTask(), defined at agent-tasks
+    'aimeat_task_request_changes',                   // It is never registered on the server /v1/mcp: it sits in V2_EXCLUDED (src/mcp/catalog/surfaces
+    'aimeat_task_todo',                              // isOwnTask() at agent-tasks
 ]);
 
 export const TOOL_SCOPES: Record<string, string> = {
+    // ── August 2026 audit, step 3a ───────────────────────────────────────────────────────────────
+    // 73 mutating tools had no entry here, and scopeAllowsTool() reads a missing entry as PERMISSION,
+    // so any agent holding any single scope could call all of them. These 55 now say what they need.
+    //
+    // Adding an entry does not start refusing a call — it REMOVES the tool from an agent whose
+    // scopes do not carry the word (mcp/index.ts wraps mcp.tool). Every agent that existed on
+    // 2026-08-10 was therefore granted the new words at boot, once, by
+    // services/scope-vocabulary-migration.ts. Without that this is changelog 1.33.1 again, where
+    // every agent tagging itself got ACCESS_DENIED and discovery broke fleet-wide.
+    //
+    // The words themselves are new and appear in the owner's agent editor
+    // (public/views/profile/agents/scope-model.js), so any of them can be taken away.
+    // Reconfigure ANOTHER of the owner's agents. An agent describing itself needs nothing;
+    // reaching sideways at a sibling principal with its own identity and trust score does.
+    aimeat_agent_mode_set:                    'agent:write',
+    aimeat_agent_tags_set:                    'agent:write',
+    aimeat_operator_agent_configure:          'agent:write',
+
+    // The destructive half: delete an app. Split from write because shipping an update and
+    // removing the thing are different risks.
+    aimeat_app_delete:                        'app:manage',
+
+    // Publish or update an app under the owner's account, including drafts.
+    aimeat_app_draft_discard:                 'app:write',
+    aimeat_app_draft_publish:                 'app:write',
+    aimeat_app_draft_save:                    'app:write',
+    aimeat_app_fork:                          'app:write',
+    aimeat_app_publish:                       'app:write',
+
+    // A capability is how this account offers work to others, so writing one speaks in the
+    // owner's name.
+    aimeat_capabilities_create:               'capability:write',
+    aimeat_capabilities_delete:               'capability:write',
+    aimeat_capabilities_update:               'capability:write',
+
+    // A sharing group IS a consent boundary: who may read what.
+    aimeat_group_add_member:                  'consent:manage',
+    aimeat_group_create:                      'consent:manage',
+    aimeat_group_remove_member:               'consent:manage',
+
+    // RUN an installed extension's action. Separate from ext:write, which is about which
+    // extensions exist — using a capability is not the same as installing one.
+    aimeat_extension_invoke:                  'ext:invoke',
+
+    // Install, activate, deactivate or delete an extension.
+    aimeat_extension_install:                 'ext:write',
+
+    // Removes a stored record.
+    aimeat_workspace_object_delete:           'memory:delete',
+
+    // These write memory records underneath, whatever the tool is called: a workspace
+    // document, a skill manifest, a schedule report, a knowledge contribution.
+    aimeat_knowledge_contribute:              'memory:write',
+    aimeat_schedule_delete:                   'memory:write',
+    aimeat_schedule_report_internal:          'memory:write',
+    aimeat_skill_link:                        'memory:write',
+    aimeat_skill_publish:                     'memory:write',
+    aimeat_skill_unlink:                      'memory:write',
+    aimeat_workspace_publish:                 'memory:write',
+    aimeat_workspace_revert_to_draft:         'memory:write',
+    aimeat_workspace_write:                   'memory:write',
+
+    // Writes keys the server itself trusts (openrouter.*, ai-usage.*, profile.*).
+    aimeat_operator_ai_config:                'memory:write-reserved',
+
+    // Changes WHO ELSE can read the owner's knowledge. A different promise than changing
+    // the knowledge, which is why it is not organism:write.
+    aimeat_organism_invitation_cancel:        'organism:invite',
+    aimeat_organism_invitation_email_cancel:  'organism:invite',
+    aimeat_organism_invitation_update:        'organism:invite',
+    aimeat_organism_invite:                   'organism:invite',
+    aimeat_organism_invite_email:             'organism:invite',
+    aimeat_organism_member_add:               'organism:invite',
+    aimeat_workspace_access:                  'organism:invite',
+    aimeat_workspace_member_grant:            'organism:invite',
+    aimeat_workspace_member_revoke:           'organism:invite',
+
+    // Create a workspace, write and publish in one, comment, transfer.
+    aimeat_organism_archive:                  'organism:write',
+    aimeat_organism_create:                   'organism:write',
+    aimeat_organism_import:                   'organism:write',
+    aimeat_organism_leave:                    'organism:write',
+    aimeat_organism_update:                   'organism:write',
+    aimeat_workspace_comment:                 'organism:write',
+    aimeat_workspace_create:                  'organism:write',
+    aimeat_workspace_transfer:                'organism:write',
+    aimeat_workspace_update:                  'organism:write',
+
+    // Writes something other people see under the owner's name.
+    aimeat_flag_report:                       'social:write',
+    aimeat_organism_join:                     'social:write',
+
+    // Stores a file.
+    aimeat_portfolio_publish:                 'storage:write',
+    aimeat_storage_upload:                    'storage:write',
+
+    // Creates work that will run.
+    aimeat_schedule_create:                   'task:write',
+    aimeat_task_create:                       'task:write',
+
+    // Asks somebody else to do work, which can cost.
+    aimeat_capabilities_invoke:               'work:request',
+
+    // Changes something that runs on its own afterwards.
+    aimeat_schedule_update:                   'workflow:write',
+    aimeat_workflow_answer:                   'workflow:write',
+
     // Memory (GET /v1/memory/:key → memory:read; POST/PUT → memory:write)
     aimeat_memory_read: 'memory:read',
     aimeat_memory_list: 'memory:read',

@@ -16,6 +16,9 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Three new domains (agent, app, capability) plus organism:write,
+ *     organism:invite and ext:invoke. These name things an agent could already do with no
+ *     permission at all, because the MCP scope table read silence as consent.
  *   v1.0.0 — 2026-08-08 — Split out of scope-config.js so the wildcard round trip is testable.
  *   v1.1.0 — 2026-08-08 — The vocabulary caught up with the node, and the round trip stopped losing
  *     things. 17 scopes the node enforces had no row — bookkeeping, outgoing email, automations,
@@ -84,14 +87,37 @@ export const SCOPE_DOMAINS = [
   { key: 'notifications', permissions: ['send'] },
   { key: 'exchange',  permissions: ['read', 'write', 'grant', 'beneficiary'] },
   { key: 'commerce',  permissions: ['sell', 'buy'] },
-  { key: 'organism',  permissions: ['read'] },
+  // organism:read   — see the organisms and workspaces this agent's owner belongs to
+  // organism:write  — create a workspace, write and publish documents in one, comment, revert
+  // organism:invite — hand somebody else access: invite a member, grant or revoke a workspace role.
+  //                   Separate from write because it changes WHO ELSE can read the owner's knowledge,
+  //                   which is a different promise than changing the knowledge.
+  { key: 'organism',  permissions: ['read', 'write', 'invite'] },
   { key: 'provenance', permissions: ['write'] },
   // cortex:write — install/activate/deactivate/delete cortex libraries (browser-side UI)
   // ext:write    — activate/deactivate/delete extensions, manage instances (server-side WASM)
   // Note: extension INSTALL is requireAuth-only at the route (agents can push code that stays
   // inert until ext:write activates it). Cortex INSTALL requires cortex:write.
   { key: 'cortex',    permissions: ['write'] },
-  { key: 'ext',       permissions: ['write'] },
+  { key: 'ext',       permissions: ['write', 'invoke'] },
+
+  // ── Added 2026-08-10 (August 2026 audit, step 3a) ────────────────────────────────────────────
+  // These name things an agent could already do with no permission at all, because the MCP surface
+  // reads a missing entry in its scope table as permission rather than as an omission. Adding the
+  // words is what lets an owner see them and take them away.
+  //
+  // agent:write — reconfigure ANOTHER of the owner's agents: its mode, its tags. Not its own
+  //               record, which needs nothing — an agent describing itself is answering about
+  //               itself. This is the one that reaches sideways, at a sibling principal with its
+  //               own identity and its own trust score.
+  // app:write   — publish or update an app under the owner's account, and save or publish a draft.
+  // app:manage  — the destructive half: delete an app, fork one, remove a template. Split from
+  //               write because publishing an update and deleting the thing are different risks.
+  // capability:write — create, update, delete or vouch for a published capability. A capability is
+  //               how this account offers work to others, so writing one speaks in the owner's name.
+  { key: 'agent',      permissions: ['write'] },
+  { key: 'app',        permissions: ['write', 'manage'] },
+  { key: 'capability', permissions: ['write'] },
 ];
 
 export const SCOPE_TEMPLATES = {

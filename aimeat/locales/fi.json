@@ -5623,7 +5623,8 @@
             "write": "Hyväksy markkinapaikan tarjouksia, tee tarjouksia ja ota vastaan maksullisia töitä."
           },
           "ext": {
-            "write": "Ota käyttöön, konfiguroi ja poista tililläsi ajettavia laajennuksia."
+            "write": "Ota käyttöön, konfiguroi ja poista tililläsi ajettavia laajennuksia.",
+            "invoke": "Aja tilillesi asennettuja laajennuksia. Ei oikeutta asentaa tai poistaa niitä."
           },
           "finance": {
             "read": "Lue kirjanpitosi: laskut, kuitit, alv-raportit ja viennit.",
@@ -5645,7 +5646,9 @@
             "send": "Lähetä sinulle ilmoitus sovellukseen ja puhelimeesi. Vastaanottaja on aina sinä."
           },
           "organism": {
-            "read": "Lue niiden jaettujen tilojen julkaistu sisältö joihin kuulut."
+            "read": "Lue niiden jaettujen tilojen julkaistu sisältö joihin kuulut.",
+            "write": "Luo jaettuja tiloja, kirjoita ja julkaise niissä dokumentteja sekä kommentoi.",
+            "invite": "Päästä muita mukaan: kutsu jäseniä ja jaa pääsy jaettuun tilaan."
           },
           "outbound": {
             "send": "Lähetä sähköpostia yrityksesi osoitteesta tallennetuille yhteystiedoillesi."
@@ -5680,6 +5683,16 @@
           "workflow": {
             "read": "Näe automaatiosi ja niiden ajohistoria.",
             "write": "Luo, muuta ja aja automaatioitasi."
+          },
+          "agent": {
+            "write": "Muuta muiden agenttiesi asetuksia: missä tilassa ne toimivat ja millä tunnisteilla."
+          },
+          "app": {
+            "write": "Julkaise ja päivitä tilisi sovelluksia, luonnokset mukaan lukien.",
+            "manage": "Poista sovellus lopullisesti tai haaroita se. Erillään julkaisusta, koska poistoa ei voi perua."
+          },
+          "capability": {
+            "write": "Tarjoa, muuta ja vedä pois palveluita joita myyt muille. Ne puhuvat sinun nimissäsi."
           }
         },
         "domainAi": "Tekoäly",
