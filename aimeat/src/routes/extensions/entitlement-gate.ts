@@ -13,6 +13,7 @@
  *   directly rather than fabricate a `Response` to reach it, which is what the previous shape forced.
  * @structure settleMeteredCoordinate (express adapter) · settleViaEntitlement (ext wrapper)
  * @version-history
+ *   v2.1.0 — 2026-08-10 — res widened to PaywallResponder (Express Response still satisfies it).
  *   v2.0.0 — 2026-07-28 — Reduced to an adapter: the sequence lives in services/metered-access.ts, so
  *     the owner-free rule now applies on every door instead of three of them.
  *   v1.4.0 — 2026-07-27 — Grants settle through this same gate at price 0: the pacing burn moves to the
@@ -23,7 +24,7 @@
  *   v1.1.0 — 2026-07-20 — Wire the money unit to the accrual rail (real EUR/USD); split morsel/money settlement.
  *   v1.0.0 — 2026-07-20 — Initial G2 gateway: entitlement authorise + morsel settlement + platform rake.
  */
-import type { Response } from 'express';
+import type { PaywallResponder } from './metered-response.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ExtensionRecord } from '../../storage/interface.js';
 import { authoriseMeteredCall } from '../../services/metered-access.js';
@@ -41,7 +42,7 @@ type ExtAction = ExtensionRecord['actions'][number];
  */
 export async function settleMeteredCoordinate(args: {
   config: AimeatConfig; storage: Storage; coordExt: string; coordAction: string; label: string;
-  callerGaii: string; res: Response;
+  callerGaii: string; res: PaywallResponder;
   /** The selling owner, when the coordinate does not name one (a raw extension action). */
   providerOwner?: string | null;
   /** The session behind the request, so the chokepoint can check what it is permitted to spend. */
@@ -64,7 +65,7 @@ export async function settleMeteredCoordinate(args: {
 
 /** Settle a raw extension invoke (the ext-action wrapper), or return `null` to fall through. */
 export async function settleViaEntitlement(args: {
-  config: AimeatConfig; storage: Storage; ext: ExtensionRecord; action: ExtAction; callerGaii: string; res: Response;
+  config: AimeatConfig; storage: Storage; ext: ExtensionRecord; action: ExtAction; callerGaii: string; res: PaywallResponder;
   session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
 }): Promise<PaywallOutcome | null> {
   return settleMeteredCoordinate({

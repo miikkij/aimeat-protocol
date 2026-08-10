@@ -111,6 +111,15 @@ jobs:
         working-directory: aimeat
         run: pnpm check:ai-disclosure
 
+      # The August 2026 audit gates. Each is a ratchet seeded with that day's count, so it fails only
+      # on a NEW offender: route authorization, outbound fetch through safeFetch, server-trusted
+      # memory keys, owner-scoped tables in both deletion cascades, and every sandbox entry point
+      # taking its capability object from the shared builder. They went into the pre-commit hook
+      # first, which `--no-verify` walks straight past; this is the copy that guards the branch.
+      - name: Security ratchets (check:audit-gates)
+        working-directory: aimeat
+        run: pnpm check:audit-gates
+
       - name: Unit tests (vitest)
         working-directory: aimeat
         run: pnpm test

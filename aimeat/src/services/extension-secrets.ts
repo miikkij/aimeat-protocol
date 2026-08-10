@@ -15,6 +15,9 @@
  *   services/scheduler.ts (decrypt before a scheduled action runs)
  * @version-history
  *   v1.0.0 — 2026-06-24 — Initial: encrypted secret config fields for extensions (Secretary P5 S-C)
+ *   v1.1.0 — 2026-08-10 — stripClientEncryptedValues: a value arriving already wrapped in
+ *                         { encrypted } is dropped at the door. Only this node mints those, and
+ *                         encryptSecretFields passes an already-encrypted value straight through.
  */
 
 import { encrypt, decrypt } from './encryption.js';
@@ -60,11 +63,44 @@ export function getInstanceSecretKeys(ext: Pick<ExtensionRecord, 'instances'>): 
 }
 
 /**
+ * Drop any value a client submitted already wearing the `{ encrypted: … }` shape.
+ *
+ * Only this node produces those, and only from a plaintext value it just encrypted with its own
+ * key. `encryptSecretFields` skips a value that is already encrypted, which is right for the one
+ * legitimate producer (`preserveMaskedSecrets` carrying a stored secret forward) and wrong for
+ * anything arriving from outside: a submitted ciphertext would be stored verbatim and decrypted
+ * with the node key on the way into the sandbox, so a ciphertext lifted from somewhere else would
+ * be handed over in the clear to whoever submitted it.
+ *
+ * Reachability, stated plainly: no API surface returns a secret's ciphertext today. Single-extension
+ * and instance reads mask secrets, and the list route omits config entirely. This closes the door
+ * before a backup, an export or a future field makes the ciphertext obtainable, and it removes an
+ * invariant that only held because of where the callers happened to be.
+ *
+ * Applied at the door, to what the CLIENT sent, before any merge with stored values.
+ */
+export function stripClientEncryptedValues(
+  configObj: Record<string, unknown> | undefined,
+): { config: Record<string, unknown> | undefined; stripped: string[] } {
+  if (!configObj) return { config: configObj, stripped: [] };
+  const stripped: string[] = [];
+  const kept: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(configObj)) {
+    if (isEncryptedValue(v)) { stripped.push(k); continue; }
+    kept[k] = v;
+  }
+  return { config: kept, stripped };
+}
+
+/**
  * Encrypt the secret-typed fields of a config object. Each plaintext string secret becomes
  * `{ encrypted: 'iv:tag:ct' }`. Values that are already encrypted, empty, the mask sentinel,
  * or not strings are passed through unchanged. Returns `null` if a plaintext secret value is
  * present but no encryption key is configured (caller should 503) — secrets are never stored
  * plaintext.
+ *
+ * The already-encrypted pass-through is for `preserveMaskedSecrets` carrying a stored value
+ * forward. Anything arriving from a client goes through stripClientEncryptedValues first.
  */
 export function encryptSecretFields(
   configObj: Record<string, unknown>,

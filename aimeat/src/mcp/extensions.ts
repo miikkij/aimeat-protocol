@@ -20,6 +20,9 @@
  *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
  *     closes pitfall ext/extension-install-no-upsert
  *   v1.6.0 — 2026-08-05 — aimeat_extension_invoke ctx gains files (makeExtensionFiles, parity with
+ *   v1.7.0 — 2026-08-10 — The sandbox context comes from buildExtensionCtx, and the paywall runs
+ *                         here too. This door executed the script without asking, so a priced
+ *                         action was free through a tool call and metered over HTTP.
  *     the REST door): file-storing actions (universe render/checkpoint) no longer answer
  *     UNAVAILABLE over MCP
  */
@@ -34,16 +37,15 @@ import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
+import { buildExtensionCtx, buildExtensionNotify, unavailableEmail } from '../services/extension-ctx.js';
+import { enforcePaywall } from '../routes/extensions/paywall.js';
+import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { notify } from '../services/notify.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
-import { enforceExtensionMemoryLimits } from '../services/quota.js';
 import { makeExtensionFiles } from '../services/extension-files.js';
-import { extensionCrossNotify, safeNotificationLink } from '../services/extension-notify.js';
-import { safeFetch } from '../utils/url-validator.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
@@ -201,73 +203,43 @@ export function registerExtensionsTools(
                 ? `ext:${ext.name}.${instance_id}`
                 : `ext:${ext.name}`;
 
-            // Build ExtensionCtx for execution
-            const ctx: ExtensionCtx = {
-                memory: {
-                    get: async (key) => {
-                        const record = await storage.getMemory(extMemoryOwner, key);
-                        return record ? record.value : null;
-                    },
-                    set: async (key, value) => {
-                        await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
-                        const existing = await storage.getMemory(extMemoryOwner, key);
-                        const now = new Date().toISOString();
-                        await storage.setMemory({
-                            key,
-                            ownerGaii: extMemoryOwner,
-                            value,
-                            visibility: 'public',
-                            tags: [],
-                            ttlHours: null,
-                            version: existing ? existing.version + 1 : 1,
-                            createdAt: existing ? existing.createdAt : now,
-                            updatedAt: now,
-                        });
-                    },
-                    search: async (prefix) => {
-                        const records = await storage.listMemory(extMemoryOwner, { prefix });
-                        return records.map(r => ({ key: r.key, value: r.value }));
-                    },
-                    delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
-                    getPublic: async (namespace, key) => {
-                        let record = await storage.getMemory(namespace, key);
-                        if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
-                            const agents = await storage.getAgentsByOwner(namespace);
-                            // One IN query for `key` across the owner's agents (was getMemory per
-                            // agent). First agent (original order) with the key; visibility checked after.
-                            const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
-                            const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
-                            for (const agent of agents) {
-                                const r = byGaii.get(agent.gaii);
-                                if (r) { record = r; break; }
-                            }
-                        }
-                        return (record && record.visibility === 'public') ? record.value : null;
-                    },
+            // The paywall, over MCP too. Cross-owner invocation is intended here (an extension is a
+            // sellable capability, and getExtension resolves by name across owners), so the paywall
+            // is what makes it safe: the owner and their own principals are free, everyone else
+            // pays or holds an entitlement. This tool executed the script without asking, so a
+            // priced action was free through a tool call and metered over HTTP.
+            const refusal = createRefusalRecorder();
+            const pay = await enforcePaywall({
+                config, storage, ext, action, callerGaii: agentGaii, res: refusal,
+                // An MCP session is an agent acting for its owner: no pay token, no internal pass,
+                // no named app tool, and no app grant that would need spend permission.
+                session: { roles: ['agent'], scopes: [], appGrantId: null },
+            });
+            if (!pay.ok) {
+                return { content: [{ type: 'text' as const, text: refusal.refusal ? refusalText(refusal.refusal) : 'The call was refused.' }], isError: true };
+            }
+
+            // One builder for the sandbox context (services/extension-ctx.ts). Building it here by
+            // hand is how this door came to differ from the HTTP one in four ways at once: no
+            // charset detection beyond the header, a memory.set that ignored a request for a private
+            // value and wrote public regardless, no email, and no paywall above.
+            const ctx: ExtensionCtx = buildExtensionCtx({
+                config, storage, extMemoryOwner,
+                caller: {
+                    gaii: agentGaii,
+                    owner: parseGAII(agentGaii)?.owner ?? agentGaii,
+                    roles: ['agent'],
                 },
-                fetch: async (url, opts) => {
-                    // safeFetch validates the URL and re-validates every redirect hop (SSRF guard).
-                    const resp = await safeFetch(url, {
-                        method: opts?.method || 'GET',
-                        headers: opts?.headers,
-                        body: opts?.body,
-                        signal: AbortSignal.timeout(30_000),
-                    });
-                    const buf = await resp.arrayBuffer();
-                    const ct = resp.headers.get('content-type') || '';
-                    const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
-                    const charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : 'utf-8';
-                    const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
-                    const text = decoder.decode(buf);
-                    const headers: Record<string, string> = {};
-                    resp.headers.forEach((v, k) => { headers[k] = v; });
-                    return { status: resp.status, ok: resp.ok, text, headers };
-                },
-                // Same ctx.files the REST door builds (routes/extensions/actions.ts): reads are
-                // authorized as the caller, writes land in the caller's own storage under
-                // ext/{name}/. Without it, any action that stores a file (e.g. a rendered SVG)
-                // works over REST but answers UNAVAILABLE over MCP — which door you came through
-                // decided whether the capability existed.
+                // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
+                extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
+                instance: instance_id ? {
+                    id: instance_id,
+                    config: decryptSecretFields((await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config)),
+                } : undefined,
+                logPrefix: `[ext:${ext.name}${instance_id ? ':' + instance_id : ''}]`,
+                // Same ctx.files the REST door builds: reads are authorized as the caller, writes
+                // land in the caller's own storage under ext/{name}/. Without it, an action that
+                // stores a file works over REST and answers UNAVAILABLE over MCP.
                 files: makeExtensionFiles({
                     config, storage,
                     callerGaii: agentGaii,
@@ -299,83 +271,16 @@ export function registerExtensionsTools(
                         return ghii?.morselBalance ?? 0;
                     },
                 },
-                consent: {
-                    check: async (gaii, scope) => {
-                        const consents = await storage.listConsents(gaii, { status: 'active' });
-                        return consents.some(c => c.purpose === scope);
-                    },
-                    require: async (gaii, scope) => {
-                        const consents = await storage.listConsents(gaii, { status: 'active' });
-                        if (!consents.some(c => c.purpose === scope)) {
-                            throw new Error(`CONSENT_REQUIRED: ${scope}`);
-                        }
-                    },
-                },
-                trust: {
-                    getScore: async (gaii: string) => {
-                        const agent = await storage.getAgent(gaii);
-                        return agent?.trustScore ?? 0;
-                    },
-                },
-                caller: {
-                    gaii: agentGaii,
-                    owner: parseGAII(agentGaii)?.owner ?? agentGaii,
-                    roles: ['agent'],
-                },
-                // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
-                config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
-                ...(instance_id ? {
-                    instance: {
-                        id: instance_id,
-                        config: decryptSecretFields((await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config)),
-                    },
-                } : {}),
-                log: {
-                    info: (msg, data) => logger.info(`[ext:${ext.name}${instance_id ? ':' + instance_id : ''}] ${msg}`, data),
-                    warn: (msg, data) => logger.warn(`[ext:${ext.name}${instance_id ? ':' + instance_id : ''}] ${msg}`, data),
-                    error: (msg, data) => logger.error(`[ext:${ext.name}${instance_id ? ':' + instance_id : ''}] ${msg}`, data),
-                },
-                notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string; link?: string }) => {
-                    if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
-                    const parsed = parseGAII(agentGaii);
-                    if (!parsed) return false;
-                    const key = `notifications.${parsed.owner}`;
-                    const existing = await storage.getMemory(agentGaii, key);
-                    const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
-                    list.push({
-                        id: randomUUID(),
-                        message,
-                        title: opts?.title || ext.name,
-                        priority: opts?.priority || 'normal',
-                        channel: opts?.channel || 'extension',
-                        source: ext.name,
-                        read: false,
-                        createdAt: new Date().toISOString(),
-                    });
-                    const trimmed = list.slice(-100);
-                    await storage.setMemory({
-                        key,
-                        ownerGaii: agentGaii,
-                        value: trimmed,
-                        visibility: 'private',
-                        tags: ['notifications'],
-                        ttlHours: null,
-                        version: (existing?.version || 0) + 1,
-                        createdAt: existing?.createdAt || new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                    });
-                    // Also surface it where the owner actually looks: the header bell + web push,
-                    // deep-linked to the Extensions tab.
-                    void notify(storage, `${parsed.owner}@${config.nodeId}`, {
-                        type: 'extension', title: opts?.title || ext.name, body: message, link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
-                    });
-                    return true;
-                },
-                email: async (_to: string, _subject: string, _body: string) => {
-                    logger.warn(`[ext:${ext.name}] Email not available via MCP`);
-                    return false;
-                },
-            };
+                notify: buildExtensionNotify({
+                    storage, config, extName: ext.name,
+                    recipientGaii: agentGaii,
+                    recipientOwner: parseGAII(agentGaii)?.owner ?? agentGaii,
+                }),
+                // No SMTP identity belongs to an MCP session. Refusing with a logged false is the
+                // behaviour every extension was written against; an absent capability would turn
+                // ctx.email(...) into a TypeError inside the guest.
+                email: unavailableEmail(ext.name, 'not available via MCP'),
+            });
 
             try {
                 const limits = {

@@ -13,8 +13,9 @@
  * @structure respondMeteredRefusal · meteredRefusalText
  * @version-history
  *   v1.0.0 — 2026-07-28 — Split out when the metered chokepoint stopped writing HTTP itself.
+ *   v1.1.0 — 2026-08-10 — PaywallResponder + createRefusalRecorder: a refusal can be captured
+ *                         instead of sent, for a caller that answers in another protocol.
  */
-import type { Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
@@ -75,8 +76,42 @@ export function meteredRefusalText(outcome: Refusal, label: string): { status: n
   }
 }
 
+/**
+ * Where a refusal is written. An Express `Response` satisfies this as it stands, so an HTTP door
+ * passes `res` unchanged; a door with no HTTP response of its own passes a recorder and renders the
+ * same refusal in its own shape.
+ *
+ * This exists so the paywall stays ONE implementation. It was Express-shaped, the MCP tool could not
+ * call it, and so the MCP tool called none of it: a priced action invoked over MCP was free of
+ * charge, and the entitlement check for a cross-owner call was skipped along with it. Which door a
+ * caller knocked at should not decide whether they pay.
+ */
+export interface PaywallResponder {
+  status(code: number): { json(body: unknown): unknown };
+}
+
+/** A PaywallResponder for a door with no HTTP response: it keeps the refusal instead of sending it,
+ *  so the caller can render the same status and message in its own protocol. */
+export function createRefusalRecorder(): PaywallResponder & { refusal: { status: number; body: unknown } | null } {
+  const rec = {
+    refusal: null as { status: number; body: unknown } | null,
+    status(code: number) {
+      return { json(body: unknown) { rec.refusal = { status: code, body }; return body; } };
+    },
+  };
+  return rec;
+}
+
+/** Human-readable text for a recorded refusal, for a door that answers in prose rather than JSON. */
+export function refusalText(refusal: { status: number; body: unknown }): string {
+  const b = refusal.body as { error?: { code?: string; message?: string } } | undefined;
+  const code = b?.error?.code ?? 'REFUSED';
+  const message = b?.error?.message ?? 'The call was refused.';
+  return `${code} (${refusal.status}): ${message}`;
+}
+
 /** Send a refusal. Payment-shaped refusals carry the x402 challenge; a rate limit and a failure do not. */
-export function respondMeteredRefusal(config: AimeatConfig, res: Response, outcome: Refusal, label: string): void {
+export function respondMeteredRefusal(config: AimeatConfig, res: PaywallResponder, outcome: Refusal, label: string): void {
   const { status, code, message } = meteredRefusalText(outcome, label);
   const body = error(config.nodeId, code, message);
   res.status(status).json(status === 402 ? { ...body, ...paymentChallenge(config) } : body);

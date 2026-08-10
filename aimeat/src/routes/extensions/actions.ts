@@ -5,6 +5,10 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-10 — Both handlers take their sandbox context from buildExtensionCtx instead
+ *                         of assembling ~210 lines apiece. No behaviour change on this road; the
+ *                         point is that the other three roads now get the same guards.
+ *     refund-on-throw wrap (priced raw calls; design notes doc-r6tyr3o)
  *   v1.5.0 — 2026-07-30 — Accrue the provider's beneficiary shares after a delivered call, and strip
  *     the capability's `_revenue` designation key from what the buyer is shown.
  *   v1.4.0 — 2026-07-27 — Forward `x-aimeat-app-tool` to the paywall, so a caller holding contracts for
@@ -12,16 +16,13 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — ctx.memory.getPublic owner-agent fallback batches into one listMemoryForOwners
  *   v1.2.0 — 2026-07-17 — Per-call paywall (enforcePaywall) before execute in both handlers +
- *     refund-on-throw wrap (priced raw calls; design notes doc-r6tyr3o)
  */
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { notify } from '../../services/notify.js';
 import { executeExtensionAction, EXT_HASH_REFERENCE_JS } from '../../services/extension-runtime.js';
 import type { ExtensionCtx } from '../../services/extension-runtime.js';
 
@@ -29,16 +30,14 @@ import type { ExtensionCtx } from '../../services/extension-runtime.js';
 const aimeatHashRef: (s: string) => string =
   new Function(`${EXT_HASH_REFERENCE_JS}; return aimeatHash;`)() as (s: string) => string;
 import { makeExtensionFiles } from '../../services/extension-files.js';
-import { extensionCrossNotify, safeNotificationLink } from '../../services/extension-notify.js';
 import { logger } from '../../utils/logger.js';
 import { getMember, accountOf } from '../../services/app-members.js';
 import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
+import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail } from '../../services/extension-ctx.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../../services/call-timing.js';
-import { safeFetch } from '../../utils/url-validator.js';
-import { enforceExtensionMemoryLimits } from '../../services/quota.js';
 import { getEncryptionKey } from '../../services/encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from '../../services/extension-secrets.js';
 import type { EmailService } from '../../services/email.js';
@@ -138,151 +137,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // because ext:{name} is already unique and owner-scoping breaks client reads
       // (apps call getPublic('ext:{name}', key) without knowing the owner suffix).
       const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
-      const ctx: ExtensionCtx = {
-        memory: {
-          get: async (key) => {
-            const record = await storage.getMemory(extMemoryOwner, key);
-            return record ? record.value : null;
-          },
-          set: async (key, value, opts) => {
-            await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
-            const existing = await storage.getMemory(extMemoryOwner, key);
-            const now = new Date().toISOString();
-            await storage.setMemory({
-              key,
-              ownerGaii: extMemoryOwner,
-              value,
-              visibility: opts?.visibility === 'private' ? 'private' : 'public',
-              tags: [],
-              ttlHours: null,
-              version: existing ? existing.version + 1 : 1,
-              createdAt: existing ? existing.createdAt : now,
-              updatedAt: now,
-            });
-          },
-          search: async (prefix) => {
-            const records = await storage.listMemory(extMemoryOwner, { prefix });
-            return records.map(r => ({ key: r.key, value: r.value }));
-          },
-          delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
-          getPublic: async (namespace, key) => {
-            // Try direct namespace lookup first
-            let record = await storage.getMemory(namespace, key);
-            // If not found and namespace looks like an owner name (no @ or #),
-            // resolve to the owner's default agent GAII and retry
-            if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
-              const agents = await storage.getAgentsByOwner(namespace);
-              // One IN query for `key` across the owner's agents (was getMemory per agent). Pick the
-              // first agent (original order) that has the key — visibility is checked after.
-              const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
-              const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
-              for (const agent of agents) {
-                const r = byGaii.get(agent.gaii);
-                if (r) { record = r; break; }
-              }
-            }
-            return (record && record.visibility === 'public') ? record.value : null;
-          },
-        },
-        fetch: async (url, opts) => {
-          // safeFetch validates the URL and re-validates every redirect hop (SSRF guard).
-          const resp = await safeFetch(url, {
-            method: opts?.method || 'GET',
-            headers: opts?.headers,
-            body: opts?.body,
-            signal: AbortSignal.timeout(30_000),
-          });
-          // Always read raw bytes first so we can detect charset from multiple sources
-          const buf = await resp.arrayBuffer();
-          const ct = resp.headers.get('content-type') || '';
-          const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
-          let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : '';
-
-          // If Content-Type didn't specify charset, peek at XML/HTML prolog for encoding declaration
-          if (!charset) {
-            const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
-            const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
-            const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
-            charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
-          }
-
-          // Guard against mislabeled encoding: if declared non-UTF-8 but bytes are valid
-          // UTF-8 multibyte (e.g. Cloudflare transcoding), trust the bytes over the label
-          if (charset && charset !== 'utf-8' && charset !== 'utf8') {
-            const bytes = new Uint8Array(buf);
-            let hasMultibyte = false;
-            for (let i = 0; i < bytes.length - 1; i++) {
-              if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) {
-                hasMultibyte = true; break;
-              }
-              if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
-                  (bytes[i + 1] & 0xC0) === 0x80 && (bytes[i + 2] & 0xC0) === 0x80) {
-                hasMultibyte = true; break;
-              }
-            }
-            if (hasMultibyte) charset = 'utf-8';
-          }
-
-          const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
-          const text = decoder.decode(buf);
-          const headers: Record<string, string> = {};
-          resp.headers.forEach((v, k) => { headers[k] = v; });
-          return { status: resp.status, ok: resp.ok, text, headers };
-        },
-        wallet: {
-          consume: async (amount: number, reason: string) => {
-            // SECURITY: reject non-positive/non-finite amounts — a negative amount would mint morsels (CR-1).
-            if (!Number.isFinite(amount) || amount <= 0) {
-              throw new Error('INVALID_AMOUNT: consume amount must be a positive number');
-            }
-            if (amount > config.extensionMaxDebitPerCall) {
-              throw new Error(`DEBIT_LIMIT: max ${config.extensionMaxDebitPerCall} morsels per call`);
-            }
-            const debited = await storage.debitBalance(callerGaii, amount);
-            if (!debited) return { success: false, error: 'Insufficient balance' };
-            await storage.addTransaction({
-              id: `ext-tx-${randomUUID()}`,
-              gaii: callerGaii,
-              type: 'extension_consume',
-              amount: -amount,
-              trackingCode: `ext:${ext.name}:${instanceId}:${reason}`,
-              timestamp: new Date().toISOString(),
-            });
-            return { success: true };
-          },
-          getBalance: async () => {
-            const parsed = (await import('../../utils/gaii.js')).parseGAII(callerGaii);
-            if (!parsed) return 0;
-            const ghii = await storage.getGHIIByOwner(parsed.owner);
-            return ghii?.morselBalance ?? 0;
-          },
-        },
-        consent: {
-          check: async (gaii, scope) => {
-            const consents = await storage.listConsents(gaii, { status: 'active' });
-            return consents.some(c => c.purpose === scope);
-          },
-          require: async (gaii, scope) => {
-            const consents = await storage.listConsents(gaii, { status: 'active' });
-            if (!consents.some(c => c.purpose === scope)) {
-              throw new Error(`CONSENT_REQUIRED: ${scope}`);
-            }
-          },
-        },
-        trust: {
-          getScore: async (gaii: string) => {
-            const agent = await storage.getAgent(gaii);
-            return agent?.trustScore ?? 0;
-          },
-        },
-        // The file half of the sandbox, authorized AS the caller (read) and landing in the
-        // caller's own storage under ext/{name}/ (write). Without it every byte-shaped capability
-        // has to move its bytes through the arguments and the result.
-        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
+      const ctx: ExtensionCtx = buildExtensionCtx({
+        config, storage, extMemoryOwner,
         caller: {
-          gaii: callerGaii,
-          owner: req.auth!.owner,
-          roles: req.auth!.roles,
+          gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
           // handed in. A gate needs the role, but the roster is private and must stay that way, so
           // the node reads it here rather than opening a lookup the sandbox could call. An
@@ -291,10 +149,12 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           member: appMember,
           isAppOwner,
         },
-        // Buy a capability from ANOTHER provider, on this extension's owner's account. The other half
-        // of a supply chain: the user pays the app, the app pays its supplier, and the difference is
-        // the owner's margin. Bills the extension's owner, never the caller — the person calling this
-        // app has no relationship with whoever it buys from and should not acquire one.
+        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
+        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
+        instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config)) },
+        logPrefix: `[ext:${ext.name}:${instanceId}]`,
+        wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name, trackingScope: instanceId }),
+        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
         buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
           const { buyForExtension } = await import('../../services/extension-purchase.js');
           return buyForExtension({
@@ -304,50 +164,15 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
             correlationId: req.header('x-aimeat-correlation') ?? null,
           });
         },
-        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
-        config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
-        instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config)) },
-        log: {
-          info: (msg, data) => logger.info(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
-          warn: (msg, data) => logger.warn(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
-          error: (msg, data) => logger.error(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
-        },
-        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string; link?: string }) => {
-          if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
-          const key = `notifications.${req.auth!.owner}`;
-          const existing = await storage.getMemory(callerGaii, key);
-          const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
-          list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
-          const trimmed = list.slice(-100);
-          await storage.setMemory({ key, ownerGaii: callerGaii, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
-          // Also surface it where the owner actually looks: the header bell + web push,
-          // deep-linked to the Extensions tab.
-          void notify(storage, `${req.auth!.owner}@${config.nodeId}`, {
-            type: 'extension', title: opts?.title || ext.name, body: message, link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
-          });
-          return true;
-        },
-        email: async (to: string, subject: string, body: string) => {
-          if (!emailService?.enabled) { logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`); return false; }
-          // Tier 2: operator-granted unrestricted
-          if (ext.config?.emailPolicy === 'unrestricted') {
-            return emailService.sendNotification(to, subject, body);
-          }
-          const callerGhiiId = `${req.auth!.owner}@${config.nodeId}`;
-          const ghiiRec = await storage.getGHII(callerGhiiId);
-          // Tier 0: self-only (caller's own verified email)
-          if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
-            return emailService.sendNotification(to, subject, body);
-          }
-          // Tier 1: check consent for extension_email
-          const consents = await storage.listConsents(callerGhiiId, { status: 'active' });
-          if (consents.some(c => c.purpose === 'extension_email' && c.dataPattern === `ext:${ext.name}`)) {
-            return emailService.sendNotification(to, subject, body);
-          }
-          logger.warn(`[ext:${ext.name}] Email blocked: no authorization for recipient`);
-          return false;
-        },
-      };
+        notify: buildExtensionNotify({
+          storage, config, extName: ext.name,
+          recipientGaii: callerGaii, recipientOwner: req.auth!.owner as string,
+        }),
+        email: buildExtensionEmail({
+          storage, config, extName: ext.name, extConfig: ext.config,
+          ownerName: req.auth!.owner as string, emailService,
+        }),
+      });
 
       // Execute the action in the sandbox
       // Cap at system maximum; floor at minimum useful value
@@ -459,156 +284,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // Extension memory uses a flat namespace (ext:{name}) so apps can
       // read data via getPublic('ext:{name}', key) without knowing the owner.
       const extMemoryOwner = `ext:${ext.name}`;
-      const ctx: ExtensionCtx = {
-        memory: {
-          get: async (key) => {
-            const record = await storage.getMemory(extMemoryOwner, key);
-            return record ? record.value : null;
-          },
-          set: async (key, value, opts) => {
-            await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
-            const existing = await storage.getMemory(extMemoryOwner, key);
-            const now = new Date().toISOString();
-            await storage.setMemory({
-              key,
-              ownerGaii: extMemoryOwner,
-              value,
-              visibility: opts?.visibility === 'private' ? 'private' : 'public',
-              tags: [],
-              ttlHours: null,
-              version: existing ? existing.version + 1 : 1,
-              createdAt: existing ? existing.createdAt : now,
-              updatedAt: now,
-            });
-          },
-          search: async (prefix) => {
-            const records = await storage.listMemory(extMemoryOwner, { prefix });
-            return records.map(r => ({ key: r.key, value: r.value }));
-          },
-          delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
-          // Read public data from another extension's namespace (read-only cross-extension access)
-          getPublic: async (namespace, key) => {
-            // Try direct namespace lookup first
-            let record = await storage.getMemory(namespace, key);
-            // If not found and namespace looks like an owner name (no @ or #),
-            // resolve to the owner's default agent GAII and retry
-            if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
-              const agents = await storage.getAgentsByOwner(namespace);
-              // One IN query for `key` across the owner's agents (was getMemory per agent). Pick the
-              // first agent (original order) that has the key — visibility is checked after.
-              const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
-              const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
-              for (const agent of agents) {
-                const r = byGaii.get(agent.gaii);
-                if (r) { record = r; break; }
-              }
-            }
-            return (record && record.visibility === 'public') ? record.value : null;
-          },
-        },
-        fetch: async (url, opts) => {
-          // safeFetch validates the URL and re-validates every redirect hop (SSRF guard).
-          const resp = await safeFetch(url, {
-            method: opts?.method || 'GET',
-            headers: opts?.headers,
-            body: opts?.body,
-            signal: AbortSignal.timeout(30_000),
-          });
-          // Always read raw bytes first so we can detect charset from multiple sources
-          const buf = await resp.arrayBuffer();
-          const ct = resp.headers.get('content-type') || '';
-          const ctCharsetMatch = /charset=([^\s;]+)/i.exec(ct);
-          let charset = ctCharsetMatch ? ctCharsetMatch[1].toLowerCase() : '';
-
-          // If Content-Type didn't specify charset, peek at XML/HTML prolog for encoding declaration
-          if (!charset) {
-            const peek = new TextDecoder('ascii').decode(buf.slice(0, 512));
-            const xmlMatch = /encoding=['"]([^'"]+)['"]/i.exec(peek);
-            const metaMatch = /<meta[^>]+charset=["']?([^\s"';>]+)/i.exec(peek);
-            charset = (xmlMatch?.[1] || metaMatch?.[1] || 'utf-8').toLowerCase();
-          }
-
-          // Guard against mislabeled encoding: if declared non-UTF-8 but bytes are valid
-          // UTF-8 multibyte (e.g. Cloudflare transcoding), trust the bytes over the label
-          if (charset && charset !== 'utf-8' && charset !== 'utf8') {
-            const bytes = new Uint8Array(buf);
-            let hasMultibyte = false;
-            for (let i = 0; i < bytes.length - 1; i++) {
-              if (bytes[i] >= 0xC2 && bytes[i] <= 0xDF && (bytes[i + 1] & 0xC0) === 0x80) {
-                hasMultibyte = true; break;
-              }
-              if (bytes[i] >= 0xE0 && bytes[i] <= 0xEF && i + 2 < bytes.length &&
-                  (bytes[i + 1] & 0xC0) === 0x80 && (bytes[i + 2] & 0xC0) === 0x80) {
-                hasMultibyte = true; break;
-              }
-            }
-            if (hasMultibyte) charset = 'utf-8';
-          }
-
-          const decoder = new TextDecoder(charset === 'utf8' ? 'utf-8' : charset);
-          const text = decoder.decode(buf);
-          const headers: Record<string, string> = {};
-          resp.headers.forEach((v, k) => { headers[k] = v; });
-          return { status: resp.status, ok: resp.ok, text, headers };
-        },
-        wallet: {
-          // SECURITY: Extensions can only debit the calling agent's own balance
-          consume: async (amount: number, reason: string) => {
-            // SECURITY: reject non-positive/non-finite amounts — a negative amount would mint morsels (CR-1).
-            if (!Number.isFinite(amount) || amount <= 0) {
-              throw new Error('INVALID_AMOUNT: consume amount must be a positive number');
-            }
-            if (amount > config.extensionMaxDebitPerCall) {
-              throw new Error(`DEBIT_LIMIT: max ${config.extensionMaxDebitPerCall} morsels per call`);
-            }
-            const debited = await storage.debitBalance(callerGaii, amount);
-            if (!debited) return { success: false, error: 'Insufficient balance' };
-            await storage.addTransaction({
-              id: `ext-tx-${randomUUID()}`,
-              gaii: callerGaii,
-              type: 'extension_consume',
-              amount: -amount,
-              trackingCode: `ext:${ext.name}:${reason}`,
-              timestamp: new Date().toISOString(),
-            });
-            return { success: true };
-          },
-          // SECURITY: Extensions can only read the calling agent's own balance
-          getBalance: async () => {
-            const parsed = (await import('../../utils/gaii.js')).parseGAII(callerGaii);
-            if (!parsed) return 0;
-            const ghii = await storage.getGHIIByOwner(parsed.owner);
-            return ghii?.morselBalance ?? 0;
-          },
-          // hold, release, transfer REMOVED — extensions cannot move other agents' funds
-        },
-        consent: {
-          check: async (gaii, scope) => {
-            const consents = await storage.listConsents(gaii, { status: 'active' });
-            return consents.some(c => c.purpose === scope);
-          },
-          require: async (gaii, scope) => {
-            const consents = await storage.listConsents(gaii, { status: 'active' });
-            if (!consents.some(c => c.purpose === scope)) {
-              throw new Error(`CONSENT_REQUIRED: ${scope}`);
-            }
-          },
-        },
-        trust: {
-          getScore: async (gaii: string) => {
-            const agent = await storage.getAgent(gaii);
-            return agent?.trustScore ?? 0;
-          },
-          // trust.adjust removed — trust scores are system-computed only
-        },
-        // The file half of the sandbox, authorized AS the caller (read) and landing in the
-        // caller's own storage under ext/{name}/ (write). Without it every byte-shaped capability
-        // has to move its bytes through the arguments and the result.
-        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
+      const ctx: ExtensionCtx = buildExtensionCtx({
+        config, storage, extMemoryOwner,
         caller: {
-          gaii: callerGaii,
-          owner: req.auth!.owner,
-          roles: req.auth!.roles,
+          gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
           // handed in. A gate needs the role, but the roster is private and must stay that way, so
           // the node reads it here rather than opening a lookup the sandbox could call. An
@@ -617,10 +296,11 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           member: appMember,
           isAppOwner,
         },
-        // Buy a capability from ANOTHER provider, on this extension's owner's account. The other half
-        // of a supply chain: the user pays the app, the app pays its supplier, and the difference is
-        // the owner's margin. Bills the extension's owner, never the caller — the person calling this
-        // app has no relationship with whoever it buys from and should not acquire one.
+        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
+        extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
+        logPrefix: `[ext:${ext.name}]`,
+        wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name }),
+        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
         buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
           const { buyForExtension } = await import('../../services/extension-purchase.js');
           return buyForExtension({
@@ -630,49 +310,15 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
             correlationId: req.header('x-aimeat-correlation') ?? null,
           });
         },
-        // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
-        config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
-        log: {
-          info: (msg, data) => logger.info(`[ext:${ext.name}] ${msg}`, data),
-          warn: (msg, data) => logger.warn(`[ext:${ext.name}] ${msg}`, data),
-          error: (msg, data) => logger.error(`[ext:${ext.name}] ${msg}`, data),
-        },
-        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string; link?: string }) => {
-          if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
-          const key = `notifications.${req.auth!.owner}`;
-          const existing = await storage.getMemory(callerGaii, key);
-          const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
-          list.push({ id: randomUUID(), message, title: opts?.title || ext.name, priority: opts?.priority || 'normal', channel: opts?.channel || 'extension', source: ext.name, read: false, createdAt: new Date().toISOString() });
-          const trimmed = list.slice(-100);
-          await storage.setMemory({ key, ownerGaii: callerGaii, value: trimmed, visibility: 'private', tags: ['notifications'], ttlHours: null, version: (existing?.version || 0) + 1, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() });
-          // Also surface it where the owner actually looks: the header bell + web push,
-          // deep-linked to the Extensions tab.
-          void notify(storage, `${req.auth!.owner}@${config.nodeId}`, {
-            type: 'extension', title: opts?.title || ext.name, body: message, link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
-          });
-          return true;
-        },
-        email: async (to: string, subject: string, body: string) => {
-          if (!emailService?.enabled) { logger.warn(`[ext:${ext.name}] Email not available (SMTP not configured)`); return false; }
-          // Tier 2: operator-granted unrestricted
-          if (ext.config?.emailPolicy === 'unrestricted') {
-            return emailService.sendNotification(to, subject, body);
-          }
-          const callerGhiiId = `${req.auth!.owner}@${config.nodeId}`;
-          const ghiiRec = await storage.getGHII(callerGhiiId);
-          // Tier 0: self-only (caller's own verified email)
-          if (ghiiRec?.notificationEmail === to && ghiiRec.emailVerifiedAt) {
-            return emailService.sendNotification(to, subject, body);
-          }
-          // Tier 1: check consent for extension_email
-          const consents = await storage.listConsents(callerGhiiId, { status: 'active' });
-          if (consents.some(c => c.purpose === 'extension_email' && c.dataPattern === `ext:${ext.name}`)) {
-            return emailService.sendNotification(to, subject, body);
-          }
-          logger.warn(`[ext:${ext.name}] Email blocked: no authorization for recipient`);
-          return false;
-        },
-      };
+        notify: buildExtensionNotify({
+          storage, config, extName: ext.name,
+          recipientGaii: callerGaii, recipientOwner: req.auth!.owner as string,
+        }),
+        email: buildExtensionEmail({
+          storage, config, extName: ext.name, extConfig: ext.config,
+          ownerName: req.auth!.owner as string, emailService,
+        }),
+      });
 
       // Execute the action in the sandbox
       // Cap at system maximum; floor at minimum useful value

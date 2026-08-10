@@ -19,6 +19,8 @@
  *   const paced = await burnPacingToll({ config, storage, callerGaii, providerOwner, label, toll, res });
  *   if (!paced.ok) return { ok: false };   // 402 already sent
  * @version-history
+ *   v1.4.0 — 2026-08-10 — res widened to PaywallResponder (Express Response still satisfies it).
+ *     money-only contract is paced too (it previously had no morsel brake of any kind).
  *   v1.3.0 — 2026-07-28 — The burn moved to services/metered-settlement.ts so the chokepoint can
  *     reach it without an Express response; this is a wrapper over it, not a second implementation.
  *   v1.2.0 — 2026-07-27 — The burn is filed under the OWNER whose balance moved, with the caller named
@@ -27,9 +29,8 @@
  *     member carried by a provider is not paying half a price they were told was covered — and dropping
  *     the burn instead would hand them the one thing a money budget cannot bound.
  *   v1.0.0 — 2026-07-25 — Extracted from the extension paywall and moved to the shared chokepoint, so a
- *     money-only contract is paced too (it previously had no morsel brake of any kind).
  */
-import type { Response } from 'express';
+import type { PaywallResponder } from './metered-response.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
@@ -62,7 +63,7 @@ export function resolvePacingToll(config: AimeatConfig, declared: number | undef
  */
 export async function burnPacingToll(args: {
   config: AimeatConfig; storage: Storage; callerGaii: string; providerOwner: string | null;
-  label: string; toll: number; res: Response;
+  label: string; toll: number; res: PaywallResponder;
 }): Promise<{ ok: boolean }> {
   const { config, storage, callerGaii, providerOwner, label, toll, res } = args;
   if (toll <= 0) return { ok: true };

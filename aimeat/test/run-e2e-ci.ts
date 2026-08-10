@@ -90,6 +90,9 @@ const ALL_SUITES = [
     'test/e2e-extensions.ts',
     'test/e2e-ext-paywall.ts',
     'test/e2e-ext-files.ts',
+    // The gates the August 2026 audit added around extensions: what a manifest may declare,
+    // and who may read an action's source. Each test names the thing that used to be possible.
+    'test/e2e-ext-hardening.ts',
     // Self-spawns its own node with AIMEAT_PACING_TOLL_DEFAULT set: the feature IS the node-wide
     // default, so it cannot be proven on the shared server.
     'test/e2e-pacing.ts',

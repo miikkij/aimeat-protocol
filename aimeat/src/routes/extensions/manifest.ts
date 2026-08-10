@@ -3,6 +3,9 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-10 — A manifest can no longer set the node's own config keys. __-prefixed
+ *                         ones are written from validated sections; emailPolicy needs an operator,
+ *                         which the code reading it always assumed and nothing checked.
  *   v1.2.0 — 2026-07-26 — validateManifestShape: type-check every field the builder later reads as a
  *     string. `(a.method as string).toUpperCase()` on a mis-typed field threw a TypeError out of the
  *     builder, which the presigned-upload router turned into a bare 500 with no mention of the
@@ -14,7 +17,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { parse as parseYaml } from 'yaml';
-import { SECRET_KEYS_FIELD, computeManifestSecretKeys } from '../../services/extension-secrets.js';
+import { SECRET_KEYS_FIELD, computeManifestSecretKeys, stripClientEncryptedValues } from '../../services/extension-secrets.js';
 import { MONEY_CURRENCIES } from '../../commerce/money.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
@@ -210,12 +213,53 @@ export function validateActionPricing(action: Record<string, unknown>, actionId:
  * permission — those are caller-specific (create vs. update). The caller supplies the lifecycle
  * fields (installedBy/installedAt); status defaults to 'inactive'.
  */
+/**
+ * Config keys the NODE owns, which an installer's manifest must never set.
+ *
+ * `__`-prefixed keys are the node's own namespace inside `ext.config`: `__schedules` is what makes
+ * the scheduler run this extension on a clock, and `__secretKeys` is what tells the runtime which
+ * fields to decrypt before the VM. Both are written below from validated manifest sections. An
+ * installer writing them directly bypasses that validation, and a declared-but-untrue `__secretKeys`
+ * points the decrypt step at plaintext.
+ *
+ * `emailPolicy` is the one that mattered. `'unrestricted'` lifts the email capability's recipient
+ * check entirely, and the code that reads it has always called that operator-granted. Nothing
+ * enforced it: config comes only from the manifest, and installing needs `requireAuth()` plus
+ * whatever `extInstallRole` says, which defaults to `owner`. So on a node with more than one
+ * account, anyone who could install an extension could send mail to any address under the node's
+ * own SMTP identity. On a personal node the installer IS the operator, which is why this held for
+ * as long as it did.
+ */
+const NODE_OWNED_CONFIG_KEYS = ['emailPolicy'];
+
+/** Strip the keys an installer must not set. Operator installs keep `emailPolicy`, which is what
+ *  "operator-granted" meant; everything `__`-prefixed goes regardless of who is installing. */
+export function stripNodeOwnedConfig(
+  manifestConfig: Record<string, unknown> | undefined,
+  installerIsOperator: boolean,
+): { config: Record<string, unknown> | undefined; stripped: string[] } {
+  if (!manifestConfig) return { config: manifestConfig, stripped: [] };
+  const stripped: string[] = [];
+  const kept: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(manifestConfig)) {
+    if (k.startsWith('__') || (!installerIsOperator && NODE_OWNED_CONFIG_KEYS.includes(k))) {
+      stripped.push(k);
+      continue;
+    }
+    kept[k] = v;
+  }
+  return { config: kept, stripped };
+}
+
 export function buildExtensionRecordFromManifest(
   manifestYaml: string | undefined,
   scripts: Record<string, string> | undefined,
   config: AimeatConfig,
   installedBy: string,
   installedAt: string,
+  /** Did the principal installing this hold the operator role? Decides whether the manifest may
+   *  set `emailPolicy`. Defaults to false, so a caller that forgets gets the safe answer. */
+  installerIsOperator = false,
 ): ExtBuildResult {
   if (!manifestYaml || typeof manifestYaml !== 'string') {
     return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'manifest (YAML string) is required' };
@@ -274,7 +318,16 @@ export function buildExtensionRecordFromManifest(
     }
   }
 
-  const manifestConfig = manifest.config as Record<string, unknown> | undefined;
+  // Strip the node's own config keys before anything reads them, so the rest of this function sees
+  // only what an installer is allowed to declare. What was removed goes back as a warning: the
+  // author learns their manifest lost a key instead of wondering why it has no effect.
+  const { config: nodeOwnedStripped, stripped: strippedNodeKeys } =
+    stripNodeOwnedConfig(manifest.config as Record<string, unknown> | undefined, installerIsOperator);
+  // And a value that arrives already encrypted: only this node mints those, from a plaintext it
+  // just encrypted with its own key, so one submitted from outside is either meaningless or a
+  // ciphertext taken from somewhere it should not have been.
+  const { config: manifestConfig, stripped: strippedEncrypted } = stripClientEncryptedValues(nodeOwnedStripped);
+  const strippedConfigKeys = [...strippedNodeKeys, ...strippedEncrypted];
   const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
   const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
   const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
@@ -374,5 +427,11 @@ export function buildExtensionRecordFromManifest(
   // Non-blocking: the extension installs either way, the author just learns now instead of in
   // production. See SANDBOX_CAPABILITY_WARNINGS.
   const warnings = scanSandboxCapabilityWarnings(scripts);
+  if (strippedConfigKeys.length) {
+    warnings.push(
+      `config: ignored ${strippedConfigKeys.join(', ')} — these keys belong to the node and cannot be `
+      + 'set from a manifest. __-prefixed keys are written from the manifest\'s own schedules and '
+      + 'secret fields; emailPolicy is granted by the node operator.');
+  }
   return warnings.length ? { ok: true, record, warnings } : { ok: true, record };
 }

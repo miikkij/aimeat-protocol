@@ -19,6 +19,7 @@
 #  13. Outbound fetch through safeFetch — pnpm check:outbound-fetch
 #  14. Server-trusted memory keys       — pnpm check:trusted-keys
 #  15. Owner-scoped tables vs cascades  — pnpm check:storage-parity
+#  16. Sandbox entry points on builder — pnpm check:ext-entrypoints
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -91,4 +92,9 @@ pnpm -s check:trusted-keys
 
 echo "[pre-commit] Owner-scoped tables are in both deletion cascades (check:storage-parity)…"
 pnpm -s check:storage-parity
+
+
+echo "[pre-commit] Extension sandbox entry points use the shared context builder (check:ext-entrypoints)…"
+pnpm -s check:ext-entrypoints
+
 echo "[pre-commit] ✓ all checks passed"

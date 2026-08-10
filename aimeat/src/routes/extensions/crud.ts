@@ -5,6 +5,9 @@
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
+ *   v1.1.0 — 2026-08-10 — GET :name/actions/:actionId checks installedBy, as the PATCH beside it
+ *                         always has. It returns scriptContent, and the ext:write scope was the
+ *                         only thing in front of it — which an owner session bypasses.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -109,7 +112,12 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       });
 
       // Validate the payload + build the record (shared with PUT upsert).
-      const built = buildExtensionRecordFromManifest(manifestYaml, scripts, config, req.auth!.owner, new Date().toISOString());
+      // The last argument decides whether this manifest may set emailPolicy. Only an operator
+      // grants unrestricted email, which is what the capability always claimed and never checked.
+      const built = buildExtensionRecordFromManifest(
+        manifestYaml, scripts, config, req.auth!.owner, new Date().toISOString(),
+        req.auth!.roles.includes('operator'),
+      );
       if (!built.ok) {
         res.status(built.status).json(error(config.nodeId, built.code, built.message));
         return;
@@ -203,6 +211,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         manifestYaml, scripts, config,
         existing ? existing.installedBy : req.auth!.owner,
         existing ? existing.installedAt : new Date().toISOString(),
+        req.auth!.roles.includes('operator'),
       );
       if (!built.ok) {
         res.status(built.status).json(error(config.nodeId, built.code, built.message));
@@ -403,6 +412,15 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const ext = await storage.getExtension(name);
       if (!ext) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${name}" not found`));
+        return;
+      }
+      // Same gate the PATCH below has carried all along. This returns scriptContent — the whole
+      // implementation of somebody's extension, secrets it reads and API it calls included — and
+      // the only thing standing in front of it was the ext:write scope, which an owner session
+      // bypasses. So any account on the node could read any other account's source. The write was
+      // gated and the read was not, on the same resource, in the same file.
+      if (!canManageInstalledExt(req, config, ext.installedBy)) {
+        res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE', 'Not authorized'));
         return;
       }
       const action = ext.actions.find(a => a.id === actionId);

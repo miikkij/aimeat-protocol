@@ -1,22 +1,27 @@
 /**
  * @file scripts/check-ext-entrypoints.ts
- * @description Every road into the extension sandbox applies the same guards. `executeExtensionAction`
- *   is reached from several places and each caller assembles the sandbox's capability object by hand,
- *   so nothing in the engine's signature requires a guard to have run. The August 2026 audit found
- *   five findings that are each one missing line in one of those copies: MCP invoke skipping the
- *   paywall and the toll, MCP install skipping both quotas, the scheduler skipping the memory quota
- *   (the June H-5 fix landed on REST and MCP only), the scheduler using a bare fetch where the others
- *   use safeFetch, and the email escape existing in triplicate.
+ * @description Every road into the extension sandbox gets its capability object from the same
+ *   builder. `executeExtensionAction` is reached from four places, and until 2026-08-10 each one
+ *   assembled that object by hand: roughly 200 lines apiece, never the same twice. The August 2026
+ *   audit found one omission per copy — the scheduler with no memory quota and a bare fetch instead
+ *   of safeFetch, MCP with no paywall and no per-call debit ceiling, and the email authorization
+ *   rule written out three times.
  *
- *   This is the cheap half of the fix. The durable half is step 4: one services/extension-ctx.ts that
- *   builds the context with the guards already applied, after which this check is replaced by an
- *   ESLint rule that forbids building the context anywhere else.
- * @structure REQUIRED: the guards a file invoking the sandbox must also import. main(): report/gate.
+ *   What this checks NOW is the shape that fixed it: a file that runs extension code takes its
+ *   context from `buildExtensionCtx` (services/extension-ctx.ts), which carries the memory quota,
+ *   safeFetch and the email rule inside it, and calls `enforcePaywall` unless it is a road with
+ *   nobody to charge. The companion rule is `aimeat/no-adhoc-extension-ctx`, which forbids building
+ *   the context anywhere else; this script is the other half, catching a NEW entry point that skips
+ *   the builder altogether by calling the engine directly.
+ * @structure PAYWALL_EXEMPT: roads with no payer, each with the reason. main(): report/gate.
  * @usage
  *   cd aimeat && pnpm check:ext-entrypoints            # report
  *   cd aimeat && pnpm check:ext-entrypoints --strict   # the hook/CI gate
  * @version-history
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, systemic pattern 4).
+ *   v1.1.0 — 2026-08-10 — Step 4 landed: the invariant is now "get the context from the builder"
+ *                         rather than "import the guards here", since the guards moved inside it.
+ *                         Gating from this version — every entry point complies.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -24,16 +29,19 @@ import { join, relative } from 'node:path';
 const ROOT = process.cwd();
 const SRC = join(ROOT, 'src');
 
-/** The guards that belong on every path that runs extension code, and what each one stops. */
-const REQUIRED: { symbol: string; why: string }[] = [
-    { symbol: 'enforcePaywall', why: 'members-only access, entitlement settlement, pacing toll, morsel charge' },
-    { symbol: 'enforceExtensionMemoryLimits', why: 'per-value size and per-key count quota (June H-5)' },
-];
+/** The builder every entry point must take its sandbox context from. */
+const BUILDER = 'buildExtensionCtx';
 
-/** Files that reach the sandbox but legitimately need no guard, each with the reason. */
-const EXEMPT: Record<string, string> = {
+/** Roads that genuinely have nobody to charge, each with the reason. */
+const PAYWALL_EXEMPT: Record<string, string> = {
+    'src/services/scheduler-extension-job.ts':
+        'a scheduled run has no caller and no payer; the installing owner is not charged for their own clock',
+};
+
+/** Files that mention the engine but do not run it. */
+const NOT_A_CALLER: Record<string, string> = {
     'src/services/extension-runtime.ts': 'the engine itself, not a caller',
-    'src/generated/api-types.ts': 'generated OpenAPI types; the name appears as a schema string, not a call',
+    'src/generated/api-types.ts': 'generated OpenAPI types; the name appears as a schema string',
 };
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -46,48 +54,70 @@ function walk(dir: string, out: string[] = []): string[] {
     return out;
 }
 
+/** Drop comments before matching. Every file here documents the sandbox it touches, and a docblock
+ *  showing `executeExtensionAction(script, ctx, …)` is prose, not an entry point. */
+function stripComments(source: string): string {
+    return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[^\n]*?\/\/.*$/gm, m => m.replace(/\/\/.*$/, ''));
+}
+
 function main(): void {
     const strict = process.argv.includes('--strict');
-    const offenders: { file: string; missing: string[] }[] = [];
+    const offenders: { file: string; problems: string[] }[] = [];
+    const exempted: string[] = [];
     let callers = 0;
 
     for (const file of walk(SRC)) {
-        const source = readFileSync(file, 'utf-8');
-        if (!/\bexecuteExtensionAction\b/.test(source)) continue;
+        const source = stripComments(readFileSync(file, 'utf-8'));
+        // An actual call, not a mention in a comment or a docblock.
+        if (!/\bexecuteExtensionAction\s*\(/.test(source)) continue;
         const rel = relative(ROOT, file).replace(/\\/g, '/');
-        if (EXEMPT[rel]) continue;
+        if (NOT_A_CALLER[rel]) continue;
         callers++;
-        const missing = REQUIRED.filter(r => !new RegExp(`\\b${r.symbol}\\b`).test(source)).map(r => r.symbol);
-        if (missing.length) offenders.push({ file: rel, missing });
+
+        const problems: string[] = [];
+        if (!new RegExp(`\\b${BUILDER}\\s*\\(`).test(source)) {
+            problems.push(
+                `builds its own sandbox context — call ${BUILDER}() from services/extension-ctx.js, which `
+                + 'carries the memory quota, safeFetch and the email authorization rule');
+        }
+        if (!/\benforcePaywall\s*\(/.test(source)) {
+            if (PAYWALL_EXEMPT[rel]) exempted.push(`${rel} — ${PAYWALL_EXEMPT[rel]}`);
+            else problems.push(
+                'runs extension code without enforcePaywall — a priced action is free through this door, '
+                + 'and a cross-owner call skips the entitlement check with it');
+        }
+        if (problems.length) offenders.push({ file: rel, problems });
     }
 
     console.log('');
     console.log('  Extension sandbox entry points — one road, one set of guards');
     console.log('  ' + '─'.repeat(62));
     console.log(`  callers into the sandbox  ${String(callers).padStart(4)}`);
-    console.log(`  missing a guard           ${String(offenders.length).padStart(4)}`);
+    console.log(`  paywall-exempt by design  ${String(exempted.length).padStart(4)}`);
+    console.log(`  non-compliant             ${String(offenders.length).padStart(4)}`);
     console.log('');
+
+    for (const e of exempted) console.log(`    (exempt) ${e}`);
+    if (exempted.length) console.log('');
 
     if (offenders.length) {
         for (const o of offenders) {
             console.log(`    ${o.file}`);
-            for (const sym of o.missing) {
-                const why = REQUIRED.find(r => r.symbol === sym)!.why;
-                console.log(`      missing ${sym} — ${why}`);
-            }
+            for (const p of o.problems) console.log(`      ${p}`);
         }
         console.log('');
-        console.log('  Running extension code without these means the installing owner pays for a call');
-        console.log('  nobody was charged for, or an unbounded write. Import and call the guard, or move');
-        console.log('  this path onto the shared context builder.');
+        console.log('  A guard that lives at the call site is a guard the next call site will not have.');
+        console.log('  That is how four copies of this context ended up missing four different things.');
         console.log('');
     }
 
     if (strict && offenders.length) {
-        console.error(`✖ ${offenders.length} sandbox entry point(s) missing a guard.`);
+        console.error(`✖ ${offenders.length} sandbox entry point(s) not on the shared builder.`);
         process.exit(1);
     }
-    console.log(offenders.length ? '  (report only — pass --strict to gate)' : '  ✓ every sandbox entry point carries the guards');
+    console.log(offenders.length
+        ? '  (report only — pass --strict to gate)'
+        : '  ✓ every sandbox entry point takes its context from the shared builder');
 }
 
 main();

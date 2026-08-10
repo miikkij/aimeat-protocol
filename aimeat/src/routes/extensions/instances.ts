@@ -4,6 +4,8 @@
  *   public per-instance translations. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
+ *   v1.1.0 — 2026-08-10 — Instance config is stripped of client-supplied ciphertext before the
+ *                         merge with stored secrets.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -14,7 +16,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { getEncryptionKey } from '../../services/encryption.js';
 import {
-  getInstanceSecretKeys, encryptSecretFields, maskSecretFields, preserveMaskedSecrets,
+  getInstanceSecretKeys, encryptSecretFields, maskSecretFields, preserveMaskedSecrets, stripClientEncryptedValues,
 } from '../../services/extension-secrets.js';
 import { canManageInstalledExt } from './permissions.js';
 
@@ -71,7 +73,11 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
 
       // Encrypt any per-instance `type: 'secret'` config values (bring-your-own-key per tenant).
       const instSecretKeys = getInstanceSecretKeys(ext);
-      const encInstConfig = encryptSecretFields(instanceConfig ?? {}, instSecretKeys, getEncryptionKey(config));
+      // A submitted value already wearing the { encrypted } shape is dropped: only the node mints
+      // those, and encryptSecretFields would store an outside one verbatim and later decrypt it
+      // with the node key straight into the sandbox.
+      const { config: cleanInstanceConfig } = stripClientEncryptedValues(instanceConfig ?? {});
+      const encInstConfig = encryptSecretFields(cleanInstanceConfig ?? {}, instSecretKeys, getEncryptionKey(config));
       if (encInstConfig === null) {
         res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
           'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to store secret instance config.'));
@@ -207,7 +213,10 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       const instSecretKeys = getInstanceSecretKeys(ext);
       if (newConfig !== undefined) {
         // Carry forward existing encrypted secrets the masked UI didn't resubmit, then encrypt.
-        const merged = preserveMaskedSecrets(newConfig, instance.config, instSecretKeys);
+        // Strip client-supplied ciphertext BEFORE the merge, so the only encrypted values in play
+        // are the stored ones this carries forward.
+        const { config: cleanNewConfig } = stripClientEncryptedValues(newConfig);
+        const merged = preserveMaskedSecrets(cleanNewConfig ?? {}, instance.config, instSecretKeys);
         const encInstConfig = encryptSecretFields(merged, instSecretKeys, getEncryptionKey(config));
         if (encInstConfig === null) {
           res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',

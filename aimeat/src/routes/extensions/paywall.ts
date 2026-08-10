@@ -11,6 +11,9 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.6.0 — 2026-08-10 — Takes a PaywallResponder rather than an Express Response, so a door with
+ *                         no HTTP response can call the same gate. It was Express-shaped, the MCP
+ *                         tool could not call it, and so called none of it.
  *   v1.5.0 — 2026-07-28 — The sequence moved to services/metered-access.ts; this door's job is to name
  *     the product. A right that exists but is exhausted is still resolved, so the caller is told their
  *     budget is spent rather than told to take a contract they already hold.
@@ -24,7 +27,7 @@
  *   v1.0.0 — 2026-07-17 — Initial (Phase 2: owner-free + toll + morsel payment; money → 402)
  */
 import { randomUUID } from 'node:crypto';
-import type { Response } from 'express';
+import type { PaywallResponder } from './metered-response.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
@@ -135,7 +138,7 @@ export async function enforcePaywall(args: {
   ext: ExtensionRecord;
   action: ExtAction;
   callerGaii: string;
-  res: Response;
+  res: PaywallResponder;
   /** `x-aimeat-pay-token` header — a one-time token minted by a settled ext-call checkout (D1). */
   payToken?: string;
   /** `x-aimeat-internal-pass` header — this call was already settled by the app-tool route. */
