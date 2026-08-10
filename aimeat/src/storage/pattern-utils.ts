@@ -8,6 +8,10 @@
  * @usage
  *   import { consentMatchPattern } from '../storage/pattern-utils.js';
  * @version-history
+ *   v1.2.0 -- 2026-08-10 -- matchWildcardPattern understands a trailing '*' glued to a prefix
+ *     ('chart:*'), which is how every cortex manifest writes a schema key_pattern. It split on '.'
+ *     only, so those patterns matched nothing and every schema a cortex pack declared validated
+ *     nothing — silently, because an unmatched schema means the write simply goes through.
  *   v1.1.0 -- 2026-06-07 -- consentMatchPattern is now slash-aware (G13): '.' and '/' are both
  *     literal structural separators, '*' = one segment (spans neither), so slash-keyed grants
  *     like 'packages/{id}/*' and 'storage:images/*' resolve. Strictly non-widening vs v1.0.0.
@@ -15,11 +19,24 @@
 
 /**
  * Wildcard pattern matching for schema key patterns.
- * Supports '*' (one segment) and '**' (rest of key).
+ * Supports '*' (one segment), '**' (rest of key), and a trailing '*' glued to a prefix.
  * Example: 'profile.*.interests' matches 'profile.alice.interests'
  *          'iot.**' matches 'iot.temperature.living-room'
+ *          'chart:*' matches 'chart:sales-2026'
  */
 export function matchWildcardPattern(pattern: string, key: string): boolean {
+  // A trailing '*' that is NOT its own dot-segment — 'chart:*', 'recipe:*', 'drawing:*'. Every
+  // cortex manifest has written schema key_pattern this way since the first pack, and the segment
+  // walk below cannot express it: splitting on '.' leaves 'chart:*' as a single part that equals
+  // no key, so the pattern matched nothing and the schema it carried validated nothing. Handled
+  // here as a literal prefix. The guard is deliberately narrow — the '*' must be the only one and
+  // the last character, and must not follow a '.' — so every dot-form ('profile.*', 'iot.**',
+  // 'profile.*.interests') still goes through the walk unchanged.
+  const star = pattern.indexOf('*');
+  if (star > 0 && star === pattern.length - 1 && pattern[star - 1] !== '.') {
+    return key.startsWith(pattern.slice(0, -1));
+  }
+
   const patternParts = pattern.split('.');
   const keyParts = key.split('.');
 
