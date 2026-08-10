@@ -2,6 +2,8 @@
  * @file src/routes/memory/crud.ts
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — POST /v1/memory calls services/memory-write.ts, the same function the MCP
+ *     tool calls. The scope gate lives inside it as well as in this route's middleware.
  *   v1.1.0 — 2026-08-10 — Security audit H-11: search enforces memory:read like its siblings.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  *   v1.1.0 — 2026-07-14 — Perf: ?include=meta uses a META fast path (listMemoryMeta / owner-scope meta)
@@ -11,15 +13,15 @@
 import type { Router } from 'express';
 import type { MemoryRecord } from '../../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
+import { writeMemoryRecord } from '../../services/memory-write.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
-import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
-import { parseGaiiLoose, ownerGhiiOf } from '../../utils/gaii.js';
+import { parseGaiiLoose } from '../../utils/gaii.js';
 import { cached, TTL } from '../../services/cache.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
@@ -31,8 +33,7 @@ import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
-import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
-import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
+import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
@@ -68,7 +69,6 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Opt-in per request: "write this under the OWNER, not me". Gated by memory:write-as-owner.
     const ownerScopeWrite = (req.body ?? {}).owner_scope === true;
 
-    const now = new Date().toISOString();
     // Owner sessions use GHII identity (owner@nodeId) for memory storage. An agent lands under its
     // own GAII unless it asked for the owner namespace AND holds the scope (see owner-target.ts).
     const target = resolveWriteTarget(req, config, ownerScopeWrite);
@@ -194,54 +194,38 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       usedBytes: quotaCheck.currentBytes - existingSize + valueSize,
     });
 
-    // Schema validation (Phase 0.1)
-    const validation = await validateMemoryWrite(key, value, storage);
-    if (!validation.valid) {
-      res.status(422).json(error(config.nodeId, 'SCHEMA_VALIDATION_FAILED',
-        'Value does not match the schema for this key', 422, {
-        key,
-        violations: validation.errors,
-        schema_url: `/v1/memory/${encodeURIComponent(validation.schemaKey!)}/schema`,
-      }));
-      return;
-    }
-
-    // MINT-3 (TARGET-058). A non-human principal that says nothing about what it wrote is stamped
-    // by the node: silence from an agent must NOT read as "a human wrote it". An owner writing
-    // through their own token is presumed human and is never stamped. Attached, not inherited — a
-    // new value is new content, so an overwrite drops the previous record's id rather than carrying
-    // a statement forward onto bytes it was never about.
-    // An explicitly supplied record wins — that is the publish path: `/v1/ai/complete` hands back a
-    // private record in `meta.provenance` and attaching it here is what makes it resolvable. It is
-    // resolved against the caller's OWN account, so nobody can publish someone else's statement.
-    const aiProvenanceId =
-      await resolveAttachableProvenanceId(storage, ownerGhiiOf(gaii), ai_provenance_id)
-      ?? await stampAgentWrite(storage, {
-        principal: gaii,
-        content: memoryContentBytes(value),
-        pipeline: 'memory.write',
-        surface: { visibility: vis as MemoryRecord['visibility'], humanAudience: true },
-        labelPolicy: config.aiLabelPublic,
-        nodeId: config.nodeId,
-        baseUrl: config.baseUrl,
-        enabled: config.aiProvenance,
-      });
-
-    const record = await storage.setMemory({
+    // ONE implementation. services/memory-write.ts owns the schema lock, the version check, the
+    // provenance stamp, the record shape and the change event — the same sequence the MCP tool runs,
+    // because it is the same capability. What stays here is this door's own business: the quota
+    // alarm and workspace pre-checks above, the replication enqueue and the envelope below.
+    //
+    // The scope gate is inside the service AS WELL as in this route's middleware. That is deliberate
+    // belt-and-braces: requireScope('memory:write') is what an HTTP reader sees, and the service
+    // check is what a future fourth door gets whether it remembers or not.
+    const written = await writeMemoryRecord({ storage, config }, {
+      principal: gaii,
+      targetGaii: gaii,
+      scopes: req.auth!.scopes ?? [],
+      roles: req.auth!.roles,
+    }, {
       key,
-      ownerGaii: gaii,
       value,
-      ...(aiProvenanceId ? { aiProvenanceId } : {}),
       visibility: vis as MemoryRecord['visibility'],
       tags: Array.isArray(tags) ? tags : [],
       ttlHours: ttl_hours ?? null,
-      version: existing ? existing.version + 1 : 1,
-      createdAt: existing?.createdAt ?? now,
-      updatedAt: now,
       ...(vis === 'group' && group_id ? { groupId: group_id } : {}),
-      // 'workspace' = readable by members of one or more "<org>/<ws>" (parity with storage files).
       ...(vis === 'workspace' ? { workspaceRef: normalizeWorkspaceRefs(workspace_refs, workspace_ref) } : {}),
+      declaredProvenanceId: ai_provenance_id,
+      pipeline: 'memory.write',
+      // This route always writes to the caller's own resolved identity, so there is no owner copy to
+      // shadow and the check has nothing to find.
+      ownerScoped: true,
     });
+    if (!written.ok) {
+      res.status(written.status).json(error(config.nodeId, written.code, written.message, written.status, written.details));
+      return;
+    }
+    const record = written.record;
 
     // C.3: Event-driven replication queue integration
     if (peers) {

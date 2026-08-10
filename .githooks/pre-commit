@@ -20,6 +20,7 @@
 #  14. Server-trusted memory keys       — pnpm check:trusted-keys
 #  15. Owner-scoped tables vs cascades  — pnpm check:storage-parity
 #  16. Sandbox entry points on builder — pnpm check:ext-entrypoints
+#  17. One capability one impl       — pnpm check:shared-impl
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -96,5 +97,8 @@ pnpm -s check:storage-parity
 
 echo "[pre-commit] Extension sandbox entry points use the shared context builder (check:ext-entrypoints)…"
 pnpm -s check:ext-entrypoints
+
+echo "[pre-commit] MCP tools call what REST calls (check:shared-impl)…"
+pnpm -s check:shared-impl
 
 echo "[pre-commit] ✓ all checks passed"

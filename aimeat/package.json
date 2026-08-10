@@ -129,8 +129,9 @@
     "check:outbound-fetch": "tsx scripts/check-outbound-fetch.ts --strict",
     "check:trusted-keys": "tsx scripts/check-trusted-keys.ts --strict",
     "check:ext-entrypoints": "tsx scripts/check-ext-entrypoints.ts --strict",
+    "check:shared-impl": "tsx scripts/check-shared-implementation.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
-    "check:audit-gates": "pnpm check:route-scopes && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints"
+    "check:audit-gates": "pnpm check:route-scopes && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl"
   },
   "keywords": [
     "aimeat",

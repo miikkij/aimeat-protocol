@@ -7,6 +7,9 @@
  * @structure initNodeKeys / issueJWT / verifyJWT / generateSessionId / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.2.0 — 2026-08-10 — Fails closed at both ends: issueJWT writes [] rather than ['*'] when the
+ *     caller omits scopes, and verifyJWT reads a missing claim the same way. issueJWT has always
+ *     written the claim, so no token in circulation lacks it.
  *   v1.1.0 — 2026-06-14 — Add optional `eco_app` claim for GEAI (ecosystem app) sessions.
  */
 import { SignJWT, jwtVerify } from 'jose';
@@ -51,7 +54,7 @@ export interface JWTPayload {
   owner: string;
   node: string;
   roles: string[];
-  scopes?: string[];  // omitted = ['*'] for backward compat
+  scopes?: string[];  // omitted = [] — an agent token that says nothing may do nothing
   mcp_client?: string; // OAuth client name for MCP sessions (e.g. "Claude", "Cursor")
   federated?: boolean;  // true for federated login sessions
   homeNode?: string;    // home node ID for federated sessions
@@ -74,7 +77,12 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     owner: payload.owner,
     node: payload.node,
     roles: payload.roles,
-    scopes: payload.scopes ?? ['*'],
+    // Fail closed. This was `?? ['*']`, so forgetting the field minted a credential over the whole
+    // account — which is how proving control of a mailbox returned a wildcard token, and how every
+    // MCP OAuth session came back as one. An owner or operator session is unaffected either way,
+    // because requireScope lets those through on the role; an AGENT token with no scopes can do
+    // nothing, which is the right answer to "the caller did not say what this is for".
+    scopes: payload.scopes ?? [],
     ...(payload.mcp_client ? { mcp_client: payload.mcp_client } : {}),
     ...(payload.federated ? { federated: true } : {}),
     ...(payload.homeNode ? { homeNode: payload.homeNode } : {}),
@@ -127,7 +135,9 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       node: payload.node as string,
       roles: payload.roles as string[],
       exp: payload.exp as number,
-      scopes: (payload.scopes as string[]) ?? ['*'],
+      // The other end of the same door. issueJWT has always written this claim, so a token
+      // without one is not an old token — it is not one of ours.
+      scopes: (payload.scopes as string[]) ?? [],
       sessionId: payload.jti as string | undefined,
       mcp_client: payload.mcp_client as string | undefined,
       federated: (payload.federated as boolean) ?? false,

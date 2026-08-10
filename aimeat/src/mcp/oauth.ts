@@ -10,6 +10,8 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-08-10 — Both mints stamp the agent's own scopes. Omitting them meant a wildcard,
+ *     so every MCP OAuth session ignored the per-tool scope filter written for exactly that surface.
  *   v1.4.0 — 2026-07-28 — /.well-known/oauth-protected-resource answers per ORIGIN
  *     (services/protected-resource.ts): an app origin names itself, its app and its declared
  *     scopes instead of the apex MCP endpoint. Apex response unchanged.
@@ -362,11 +364,17 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             }
 
             // Issue access + refresh tokens (JWT-based access token)
+            // The agent's OWN scopes, stamped explicitly. Omitting them used to mean
+            // issueJWT's `?? ['*']` default, so every MCP OAuth session was a wildcard — which
+            // makes the per-tool scope filter in catalog/scopes.ts decorative on exactly the
+            // surface it was written for.
+            const codeAgent = await storage.getAgent(authCode.gaii);
             const accessToken = await issueJWT({
                 sub: authCode.gaii,
                 owner: authCode.owner,
                 node: config.nodeId,
                 roles: authCode.roles,
+                scopes: codeAgent?.defaultScopes ?? config.defaultAgentScopes,
                 mcp_client: authCode.clientName || client_id,
             }, config.jwtTtlSeconds);
 
@@ -411,11 +419,14 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             // Rotate: revoke old, issue new
             await storage.deleteOAuthRefreshToken(hashToken(refresh_token));
 
+            // A refresh must not widen what the original grant carried.
+            const refreshAgent = await storage.getAgent(existing.gaii);
             const newAccessToken = await issueJWT({
                 sub: existing.gaii,
                 owner: existing.owner,
                 node: config.nodeId,
                 roles: existing.roles,
+                scopes: refreshAgent?.defaultScopes ?? config.defaultAgentScopes,
             }, config.jwtTtlSeconds);
 
             const newRefreshTok = randomBytes(32).toString('hex');

@@ -9,6 +9,9 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.13.0 — 2026-08-10 — aimeat_memory_write calls services/memory-write.ts. It had the same
+ *     defect fixed inside it three separate times — schema locks, the write target, the provenance
+ *     stamp — because it reimplemented what POST /v1/memory does instead of calling it.
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
  *   v1.1.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -80,12 +83,10 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
-import { emitChange } from '../services/event-bus.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from './catalog/shape.js';
-import { validateMemoryWrite } from '../services/schema-validator.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
@@ -93,14 +94,14 @@ import { notInYourNamespace, shadowedByOwnerCopy, OWNER_SCOPE_LIST_NOTE } from '
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance, readProvenanceMany } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
-import { memoryContentBytes } from '../routes/memory/shared.js';
 import { registerCoreAdminTools } from './core-admin.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { logger } from '../utils/logger.js';
 import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
+import { writeMemoryRecord } from '../services/memory-write.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -411,27 +412,13 @@ export function registerCoreTools(
         },
         annotationsFor('aimeat_memory_write'),
         async ({ key, value, visibility, group_id, tags, ttl_hours, owner_scope, expected_version, ai_provenance, ai_provenance_id }) => {
-            // Schema locks apply on EVERY write surface. This tool used to call setMemory directly,
-            // making MCP a bypass around strict record schemas + the manifest-format schema (REST
-            // returned 422 while the same write sailed through here). Mirror the REST behaviour.
-            const validation = await validateMemoryWrite(key, value, storage);
-            if (!validation.valid) {
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({
-                            error: 'SCHEMA_VALIDATION_FAILED',
-                            message: 'Value does not match the schema for this key',
-                            key,
-                            violations: validation.errors,
-                            schema_url: `/v1/memory/${encodeURIComponent(validation.schemaKey!)}/schema`,
-                        }, null, 2),
-                    }],
-                    isError: true,
-                };
-            }
-            // Where this write lands. Default is unchanged: the agent's own namespace. Decided in
-            // routes/memory/owner-target.ts, the same module the REST path uses.
+            // ONE implementation, and it is not this one. services/memory-write.ts owns the scope
+            // gate, the schema lock, the version check, the shadowing warning, the provenance stamp,
+            // the record shape and the change event — because every one of those had to be fixed
+            // here separately after it was already right on the REST side.
+            //
+            // What stays: parsing the tool's own parameters, resolving where the write lands, and
+            // rendering the answer as text. Those are this door's business and nobody else's.
             const parsedWrite = parseGAII(agentGaii);
             const target = resolveMcpWriteTarget({
                 agentGaii, ownerName: parsedWrite?.owner ?? null, nodeId: config.nodeId,
@@ -442,70 +429,41 @@ export function registerCoreTools(
             }
             const writeGaii = target.gaii;
 
-            const existing = await storage.getMemory(writeGaii, key);
-
-            // After resolveMcpWriteTarget on purpose: owner_scope lands on the OWNER's copy, so the
-            // version must be compared against that one and never the agent's own.
-            const conflict = versionConflict(expected_version, existing?.version ?? 0, key);
-            if (conflict) return conflict;
-
-            // Writing a key the OWNER already holds is not an update: this copy lands in the agent's
-            // own namespace and owner-scope reads resolve GHII-first, so the owner's copy wins and
-            // this one becomes invisible — including in listings. Silently succeeding here is how
-            // "I saved it" turns into "the app never showed it". Warn, do not refuse: writing your
-            // own copy is legitimate, it just is not a way to update someone else's record.
-            let shadowedBy: string | null = null;
-            if (!existing && !owner_scope) {
-                const parsedW = parseGAII(agentGaii);
-                if (parsedW) {
-                    const ownerCopy = await storage.getMemory(`${parsedW.owner}@${config.nodeId}`, key);
-                    if (ownerCopy) shadowedBy = ownerCopy.ownerGaii;
-                }
-            }
-            // TARGET-058. This tool wrote straight to storage, so an agent writing through MCP left a
-            // record with NO provenance at all — while the same write over REST /v1/memory was
-            // stamped. The MCP hop is exactly where the information is lost if it is not carried, so
-            // it goes through the same one decision function the REST path uses: attach what the
-            // caller already holds, honour what it declares, otherwise Mint-3.
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,   // provenance names WHO WROTE it, not whose namespace it lands in
-                content: memoryContentBytes(value),
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
-                pipeline: 'mcp.memory_write',
-                surface: { visibility, humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
-            });
-            const record = await storage.setMemory({
-                key,
-                ownerGaii: writeGaii,
-                value,
-                ...(aiProvenanceId ? { aiProvenanceId } : {}),
-                visibility,
+            const written = await writeMemoryRecord({ storage, config }, {
+                principal: agentGaii,
+                targetGaii: writeGaii,
+                scopes: sessionScopes,
+                roles: ['agent'],
+            }, {
+                key, value, visibility,
                 groupId: visibility === 'group' ? group_id : undefined,
                 tags,
                 ttlHours: ttl_hours ?? null,
-                version: existing ? existing.version + 1 : 1,
-                createdAt: existing?.createdAt ?? new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
+                expectedVersion: expected_version,
+                declaredProvenanceId: ai_provenance_id,
+                declaredProvenance: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.memory_write',
+                ownerScoped: owner_scope === true,
             });
-            emitResourceUpdated(agentGaii, `aimeat://memory/${encodeURIComponent(key)}`);
-            if (!existing) emitResourceListChanged(agentGaii);
-            // The SSE `memory` domain, which every REST write path already emits (24 call sites in
-            // src/routes/memory/). This one did not, so a write made over MCP reached storage and
-            // no live consumer ever heard about it: an app watching its owner's memory saw the
-            // agent's work only if the human reloaded. Every other MCP surface here emits — agents,
-            // scheduler, organisms, commerce, operator-config — and memory was the gap.
-            //
-            // No ownerGaii argument, matching the REST paths: an omitted owner is a global
-            // broadcast, and the SSE layer's own scope check (DOMAIN_SCOPE requires memory:read)
-            // decides who is entitled to hear it. Passing the AGENT's GAII here would scope the
-            // event to the agent's own streams and hide it from the owner's, which is the reverse
-            // of what an owner-visible write means.
-            emitChange('memory');
+
+            if (!written.ok) {
+                // A version conflict has answered in this exact shape since the lock existed, and an
+                // agent parses it. The shared service reports the same facts under its own names, so
+                // this door renders them back into the contract it published.
+                if (written.code === 'VERSION_CONFLICT') {
+                    const d = written.details as { currentVersion: number; expectedVersion: number };
+                    return versionConflict(d.expectedVersion, d.currentVersion, key)!;
+                }
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({ error: written.code, message: written.message, ...(written.details as object ?? {}) }, null, 2),
+                    }],
+                    isError: true,
+                };
+            }
+            const { record, shadowedBy } = written;
+            const aiProvenanceId = record.aiProvenanceId;
             return {
                 content: [{
                     type: 'text' as const,

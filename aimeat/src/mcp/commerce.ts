@@ -18,6 +18,7 @@
  * @version-history
  *   Limits aligned with the raised model schemas -- 2026-07-30 -- the tool kept its own max(40) on
  *     `tools`, which shadowed the manifest's raised 200 and refused a 41st tool anyway.
+ *   v1.1.0 — 2026-08-10 — The fulfillment re-issue carries the agent's own scopes.
  *   v1.0.0 — 2026-07-14 — Initial commerce MCP surface (PSP, app-tools, offer pricing, checkout)
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -331,8 +332,15 @@ export function registerCommerceTools(
                 // buyer's token. The MCP layer holds no forwardable bearer, so mint a SHORT-LIVED
                 // token for the CALLING AGENT ITSELF (same sub/owner/roles as its session — the
                 // node is the token authority; this is re-issuance, not privilege escalation).
+                // The agent's own scopes ride along. Omitting them meant a wildcard, so a
+                // round trip through fulfillment handed back more authority than the session held.
+                const fulfilAgent = await storage.getAgent(agentGaii);
                 const callerJwt = await issueJWT(
-                    { sub: agentGaii, owner, node: config.nodeId, roles: ['agent'], mcp_client: 'mcp-commerce-fulfillment' },
+                    {
+                        sub: agentGaii, owner, node: config.nodeId, roles: ['agent'],
+                        scopes: fulfilAgent?.defaultScopes ?? config.defaultAgentScopes,
+                        mcp_client: 'mcp-commerce-fulfillment',
+                    },
                     120,
                 );
                 const completed = await completeSession(storage, config, session, handler, undefined, callerJwt);
