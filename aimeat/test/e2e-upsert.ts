@@ -5,6 +5,10 @@
  *   mid-upsert), init re-runs so new behaviour goes live, no quota slot consumed on update,
  *   identical bytes are a 200 no-op, and create-via-PUT works.
  * @version-history
+ *   v1.1.0 — 2026-08-10 — The "no new quota slot consumed" assertion counts THIS owner's
+ *     extensions instead of the node-wide total. The node seeds its own bundled packs at boot, so
+ *     the total moved between the two list calls whenever seeding was still in flight, and the
+ *     suite reported a quota leak that had not happened.
  *   v1.0.0 — 2026-06-05 — Initial: cortex + extension upsert acceptance suite.
  */
 import * as ed from '@noble/ed25519';
@@ -192,10 +196,24 @@ await test('Seed-data from A is live (greeting = hello A)', async () => {
   assert(body.data.value.text === 'hello A', `greeting: ${JSON.stringify(body.data.value)}`);
 });
 
+/**
+ * How many cortex extensions THIS owner has installed.
+ *
+ * `data.total` is node-wide, and the node seeds its own bundled packs at boot, so that number
+ * moves under the suite's feet: measured 11 at the start of one run and 8 at the start of the
+ * next, on the same code. The claim being tested — "an upsert consumes no new quota slot" — is
+ * about one owner, so it is counted per owner. The node-wide read made this assertion fail
+ * whenever boot seeding happened to land inside the two list calls.
+ */
+function ownCortexCount(listBody: any): number {
+  const exts = (listBody?.data?.extensions ?? []) as Array<{ installed_by?: string }>;
+  return exts.filter(e => e.installed_by === ownerName).length;
+}
+
 let cortexCountBefore = 0;
 await test('PUT cortex c with libs A′ — no 404 during the call, serves A′, init re-ran, count unchanged', async () => {
   const listBefore = await json('/v1/cortex', { headers: ownerHdr() });
-  cortexCountBefore = listBefore.body.data.total;
+  cortexCountBefore = ownCortexCount(listBefore.body);
 
   // Hammer GET /libs concurrently for the whole duration of the PUT; assert zero 404s.
   let saw404 = false;
@@ -236,7 +254,8 @@ await test('PUT cortex c with libs A′ — no 404 during the call, serves A′,
 
   // No new quota slot consumed
   const listAfter = await json('/v1/cortex', { headers: ownerHdr() });
-  assert(listAfter.body.data.total === cortexCountBefore, `count changed: ${cortexCountBefore} → ${listAfter.body.data.total}`);
+  assert(ownCortexCount(listAfter.body) === cortexCountBefore,
+    `this owner's cortex count changed: ${cortexCountBefore} → ${ownCortexCount(listAfter.body)}`);
 });
 
 await test('Init actually re-ran: seed-data now reflects A′ (greeting = hello B)', async () => {

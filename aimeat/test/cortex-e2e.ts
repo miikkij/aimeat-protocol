@@ -297,7 +297,7 @@ await test('List shows installed extension', async () => {
   const recipe = exts.find((e: any) => e.name === RECIPE_EXT);
   assert(recipe, `found ${RECIPE_EXT}`);
   assert(recipe.status === 'inactive', `status: ${recipe.status}`);
-  assert(recipe.namespace === 'test', `namespace: ${recipe.namespace}`);
+  assert(recipe.namespace === 'community', `namespace: ${recipe.namespace}`);
 });
 
 await test('Activate extension → status: active', async () => {
@@ -581,12 +581,15 @@ await test('Lib file is served with correct Content-Type', async () => {
   assert(text.includes('RecipeCard'), 'contains RecipeCard export');
 });
 
-await test('Lib has cache headers', async () => {
+await test('Lib is served no-cache, because the URL has no version in it', async () => {
+  // PUT /v1/cortex/:name swaps libs in place at the same address, so a day-long max-age would
+  // serve yesterday's code to everyone who had already loaded the page. The route says no-cache
+  // deliberately; this test used to demand `public, max-age=86400` and was simply older than the
+  // decision.
   const res = await rawFetch(`/v1/cortex/${RECIPE_ENC}/libs/recipe-ui.js`);
   assert(res.status === 200, `status ${res.status}`);
   const cache = res.headers.get('cache-control') ?? '';
-  assert(cache.includes('public'), `cache-control: ${cache}`);
-  assert(cache.includes('max-age=86400'), `max-age in cache-control: ${cache}`);
+  assert(cache.includes('no-cache'), `cache-control: ${cache}`);
 });
 
 await test('Non-existent lib returns 404', async () => {

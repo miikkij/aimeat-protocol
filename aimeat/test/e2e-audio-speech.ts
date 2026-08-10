@@ -49,11 +49,14 @@ await test('GET /v1/libs/aimeat-audio.js returns JavaScript', async () => {
     assert(body.length > 10000, `Expected >10KB, got ${body.length} bytes`);
 });
 
-await test('audio.js is valid JavaScript (IIFE structure)', async () => {
+await test('audio.js is wrapped in an IIFE (nothing leaks to global scope)', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-audio.js`);
-    const body = await res.text();
-    assert(body.trim().endsWith(');'), 'Should end with );');
-    assert(body.includes('(function(global)'), 'Should start with IIFE');
+    const body = (await res.text()).trim();
+    // `pnpm build:sdk` emits an esbuild IIFE bundle, `(() => { … })();`. This used to look for
+    // `(function(global)`, the hand-written wrapper that build replaced — so the assertion was
+    // testing the old shape of a file that had not been written by hand for a long time.
+    assert(/\(\(\)\s*=>\s*\{/.test(body), 'Should open an arrow IIFE');
+    assert(body.endsWith('})();'), `Should close the IIFE, got: ${JSON.stringify(body.slice(-24))}`);
 });
 
 // ── Speech library endpoint ──

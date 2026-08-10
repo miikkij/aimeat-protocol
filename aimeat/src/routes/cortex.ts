@@ -736,7 +736,9 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // ── GET /v1/cortex/:name/libs/:libName.js — serve JS lib file (public, cacheable) ──
+  // ── GET /v1/cortex/:name/libs/:libName.js — serve JS lib file (public, no-cache) ──
+  // The address carries no version, and PUT /v1/cortex/:name swaps libs in place at that same
+  // address, so anything cacheable here would serve yesterday's code after a redeploy.
   router.get('/v1/cortex/:name/libs/:libFile', async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
     const libFile = req.params.libFile as string;

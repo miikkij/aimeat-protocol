@@ -2,7 +2,7 @@ apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
   name: project-tracker
-  namespace: test
+  namespace: community
   description: "Project and task tracking extension with status workflows and time estimates"
   author: test
   tags: [projects, tasks, productivity, kanban]

@@ -23,6 +23,12 @@
  *   v1.7.0 -- 2026-08-07 -- Add e2e-remake-funnel.ts (remake phase 0: onboarding.track separation)
  *            e2e-remake-home.ts (remake phases 2-3: the welcome mat gate) and
  *            e2e-registration-invites.ts (remake phase 4b: the agent door).
+ *   v1.8.0 -- 2026-08-10 -- Register the three suites that were in no runner at all: cortex-e2e.ts,
+ *            e2e-profile-tabs.ts and e2e-audio-speech.ts. Between them 160 assertions had been
+ *            executing nowhere, in one case for a month, and each was a handful of stale
+ *            expectations away from green. Nothing here was "disabled": there is one list, and a
+ *            file that is not on it is silent rather than skipped, which is why nobody noticed.
+ *            e2e-email.ts stays out, with its documented reason below.
  *   v1.6.0 -- 2026-07-30 -- A suite that never RAN no longer renders as a tick. One with a syntax
  *            error exits non-zero having reported nothing, so `failed` was 0 and the row printed
  *            "OK 0 0 0" -- which reads as "nothing to test here" rather than "this never compiled".
@@ -230,6 +236,9 @@ const ALL_SUITES = [
     'test/e2e-projects.ts',
     'test/e2e-portal.ts',
     'test/e2e-header-nav.ts',
+    // Every API call the profile tabs make, 111 assertions of it. Registered in no runner since it
+    // was written, which is also why 13 `assert(status < 500)` lines survived inside it.
+    'test/e2e-profile-tabs.ts',
     'test/e2e-security.ts',
     'test/e2e-memory-namespaces.ts',
     'test/e2e-presigned-meta.ts',
@@ -239,7 +248,15 @@ const ALL_SUITES = [
     'test/e2e-capabilities.ts',
     'test/e2e-upload.ts',
     'test/cortex-ui-e2e.ts',
+    // The cortex CORE suite, as opposed to cortex-ui above. Left out on 2026-07-10 over "2
+    // pre-existing unrelated fails" and never picked back up, so 43 assertions about install,
+    // lifecycle, schemas, prompts and cross-owner refusal ran nowhere for a month. One of those
+    // two fails was real: a schema key_pattern of the form `chart:*` matched nothing, so every
+    // schema a cortex pack declared validated nothing.
+    'test/cortex-e2e.ts',
     'test/openrouter.ts',
+    // The audio/speech served libs and their sample files — also registered nowhere until now.
+    'test/e2e-audio-speech.ts',
     'test/e2e-ai-transcribe.ts',
     'test/e2e-message-transcript.ts',
     'test/ai.ts',

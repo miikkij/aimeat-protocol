@@ -750,7 +750,13 @@ await test('POST /v1/apps — upload app', async () => {
     const content = Buffer.from('<html><body>E2E Test App</body></html>').toString('base64');
     const { body } = await authJson('/v1/apps', agentToken, {
         method: 'POST',
-        body: JSON.stringify({ filename: 'e2e-test.html', content, mime_type: 'text/html' }),
+        // A NEW app must carry a description: the catalogue and the landing wall both show one,
+        // and there is nowhere to get it from later. Only new apps — a re-publish carries the
+        // stored one forward.
+        body: JSON.stringify({
+            filename: 'e2e-test.html', content, mime_type: 'text/html',
+            description: 'A one-page test app used by the profile-tab E2E suite.',
+        }),
     });
     assert(body.ok === true, `upload app: ${JSON.stringify(body.error)}`);
 });

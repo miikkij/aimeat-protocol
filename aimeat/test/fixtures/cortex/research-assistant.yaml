@@ -2,7 +2,7 @@ apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
   name: research-assistant
-  namespace: test
+  namespace: community
   description: "Research workflow assistant with academic domain ontology and structured prompts"
   author: test
   tags: [research, academic, knowledge, citations]

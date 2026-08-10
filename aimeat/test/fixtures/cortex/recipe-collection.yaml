@@ -2,7 +2,7 @@ apiVersion: cortex.aimeat.org/v1
 kind: Extension
 metadata:
   name: recipe-collection
-  namespace: test
+  namespace: community
   description: "A recipe management extension with full CRUD, community boards, and semantic categorisation"
   author: test
   tags: [recipes, cooking, food, community]
