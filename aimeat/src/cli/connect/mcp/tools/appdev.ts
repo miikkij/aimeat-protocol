@@ -6,8 +6,15 @@
  *   the same set locally. Thin REST proxies: dedicated /v1/appdev/* routes where they exist, and the
  *   generic POST /v1/memory (memory:write authz unchanged) for the report/propose/proof memory records
  *   the server MCP writes directly (the manifest side-index those tools also maintain is a server-only
- *   nicety the shell path skips). iam_define is pure-local computation (no node round-trip).
+ *   nicety the shell path skips). The proof attach reads before it writes, because that ledger is
+ *   append-only. iam_define is pure-local computation (no node round-trip).
+ * @structure registerAppdevTools() -- one mcp.tool() per appdev capability. The proof attach delegates
+ *   to attachProofOverHttp() in tool-call-defs-apps.ts, which the shell path calls as well.
+ * @usage registerAppdevTools(mcp, registry);
  * @version-history
+ *   v1.1.0 -- 2026-08-11 -- proof_attach takes the node's own parameters (subject_type, verdict,
+ *     evidence, test_set, tokens) and appends a ContributionProof to the ledger instead of setting a
+ *     one-entry array in a shape the reader ignores. The append itself is shared with the shell door.
  *   v1.0.0 -- 2026-07-19 -- Initial: appdev_overview, pitfall report/list/delete, proof_attach,
  *     app_template propose/list/get/delete, iam_define — connector-surface coverage.
  */
@@ -19,6 +26,7 @@ import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { defineAppIam } from '../../../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../../../services/iam/model.js';
 import type { CommandDef } from '../../../../services/iam/app-commands.js';
+import { attachProofOverHttp } from '../../tool-call-defs-apps.js';
 
 const kebab = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
@@ -82,20 +90,19 @@ export function registerAppdevTools(mcp: McpServer, registry: AgentRegistry): vo
     }));
   });
 
-  // Attach a self-reported acceleration proof — server MCP appends to libpack.proofs.{id}; the connector
-  // sets that public record via POST /v1/memory (best-effort: it sets rather than appends).
+  // Attach a self-reported acceleration proof. The capability is services/contribution-proofs.ts and
+  // has no REST route, so both connector doors run the same append over /v1/memory: attachProofOverHttp().
   mcp.tool('aimeat_appdev_proof_attach', descriptionFor('aimeat_appdev_proof_attach'), {
-    subject_id: z.string().describe('The library-pack / template id the proof is about.'),
-    model: z.string().describe('YOUR OWN model id (self-identify; indicative).'),
-    summary: z.string().describe('What you built with it and the outcome.'),
-    evidence: z.string().optional().describe('A link or app ref backing the claim.'),
-  }, annotationsFor('aimeat_appdev_proof_attach'), async ({ subject_id, model, summary, evidence }) => {
-    const proof: Record<string, unknown> = { model: model.trim().toLowerCase(), summary, created: new Date().toISOString(), ...(evidence ? { evidence } : {}) };
-    return out(await client.post('/v1/memory', {
-      key: `libpack.proofs.${subject_id}`,
-      value: { packId: subject_id, proofs: [proof] },
-      visibility: 'public',
-      tags: ['libpack-proofs'],
+    subject_type: z.enum(['library_pack', 'app_template']).describe('library_pack = a COMMUNITY pack you own (your public cortex lib); app_template = one of your template proposals.'),
+    subject_id: z.string().min(1).max(80).describe('The community pack id (cortex name) or template proposal id.'),
+    model: z.string().min(1).max(64).describe('YOUR OWN model id (self-identify; indicative).'),
+    verdict: z.enum(['pass', 'fail']).describe('Did the pack or template accelerate the run. Honest fails make your passes credible.'),
+    evidence: z.string().min(3).max(500).describe('URL or node storage/memory ref pointing at the run evidence.'),
+    test_set: z.string().max(120).optional().describe('Repeatable test-set identifier, when one was used.'),
+    tokens: z.number().int().min(0).optional().describe('Output tokens the run consumed, when known.'),
+  }, annotationsFor('aimeat_appdev_proof_attach'), async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
+    return out(await attachProofOverHttp(client, {
+      subjectType: subject_type, subjectId: subject_id, model, verdict, evidence, testSet: test_set, tokens,
     }));
   });
 

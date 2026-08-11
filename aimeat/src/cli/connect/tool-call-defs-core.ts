@@ -1,7 +1,17 @@
 /**
  * @file cli/connect/tool-call-defs-core.ts
  * @description Memory, discovery, work, wallet, board, storage, admin, capabilities, catalogue, consent, flag, group, instance, knowledge and skill connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
+ * @structure
+ *   - knowledgeContributeUnreachable() -- the one refusal both connector doors serve for the knowledge
+ *     entry write, which this node exposes over MCP only
+ *   - coreTools[] -- the shell handler table registered by tool-call.ts
+ * @usage
+ *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   v1.2.0 -- 2026-08-11 -- aimeat_knowledge_contribute stops posting {entry_key, content} to
+ *     POST /v1/knowledge/:id/contribute. That route shares a package with an organism and answered
+ *     400 MISSING_FIELDS for every one of these calls, so the tool has never worked. It now says
+ *     where the capability lives instead of failing on a route that was never its own.
  *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_memory_write forwards `ai_provenance_id` into
  *     the write body. The inline `ai_provenance` declaration is handled once, for every tool in this
  *     table, by withProvenanceCarrying() in tool-call.ts.
@@ -9,6 +19,47 @@
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredArray } from './tool-call-helpers.js';
+import type { ApiResponse } from './api-client.js';
+
+/**
+ * Appended to the catalog description on both connector doors. An agent that learns this from the
+ * tool list spends no call finding it out, and the sentence is short enough that it does not bury
+ * what the tool is for.
+ */
+export const KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE =
+    ' CONNECTOR LIMIT: this write has no HTTP route, so calling it here refuses and tells you where to '
+    + 'run it instead. The knowledge read tools (list, get, links) work normally.';
+
+/**
+ * Adding an entry to a knowledge package, from a connector that speaks HTTP and nothing else.
+ *
+ * The capability is services/knowledge-package-entry.ts, reachable through the node's MCP tool
+ * `aimeat_knowledge_contribute` and through no route at all. The name collides with one that does
+ * exist: POST /v1/knowledge/:id/contribute shares a WHOLE package with an organism and requires
+ * `organism_id`, which is why both connector doors posted `{entry_key, content}` at it and got
+ * 400 MISSING_FIELDS every time since the day they were written.
+ *
+ * Emulating the capability here (write the entry record, then append the manifest's index line over
+ * POST /v1/memory) would put the reserved-package guard, the JSON-or-text decision, the tag and
+ * visibility inheritance and the index line in a published npm package, second copies of rules that
+ * live in the service. That is the drift this whole exercise is undoing. So the tool says what is
+ * true, and the door itself is the developer's call.
+ */
+export function knowledgeContributeUnreachable(): ApiResponse {
+    return {
+        ok: false,
+        error: {
+            code: 'NO_HTTP_ROUTE',
+            message: 'Adding an entry to a knowledge package is not reachable over HTTP on this node, '
+                + 'and the connector only speaks HTTP. POST /v1/knowledge/{id}/contribute is a different '
+                + 'capability: it shares a whole package with an organism and requires organism_id. '
+                + 'Run aimeat_knowledge_contribute against the node MCP endpoint ({node_url}/v1/mcp) to '
+                + 'add the entry, or write the entry record yourself with aimeat_memory_write under '
+                + 'packages/{package_id}/{entry_key}, which stores the content but leaves the package '
+                + 'manifest without an index line for it.',
+        },
+    };
+}
 
 export const coreTools: ConnectCliToolDefinition[] = [
     {
@@ -329,11 +380,13 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.get(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}`),
     },
     {
+        // No HTTP door for the entry write on this node. See knowledgeContributeUnreachable() above:
+        // the route of the same name is the organism-sharing capability and rejected this body.
+        // (`description` and `input` here are documentation: `connect tools` and `connect schema`
+        // both read the shared catalog, which is also where this tool's real input schema lives.)
         name: 'aimeat_knowledge_contribute',
-        handler: ({ client }, input) => client.post(`/v1/knowledge/${encodeURIComponent(requiredString(input, 'id'))}/contribute`, {
-            entry_key: requiredString(input, 'entry_key'),
-            content: requiredString(input, 'content'),
-        }),
+        description: 'Add or update an entry in an existing knowledge package.' + KNOWLEDGE_CONTRIBUTE_CONNECTOR_NOTE,
+        handler: () => Promise.resolve(knowledgeContributeUnreachable()),
     },
     {
         name: 'aimeat_knowledge_links',

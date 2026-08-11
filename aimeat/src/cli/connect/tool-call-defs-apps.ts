@@ -1,7 +1,17 @@
 /**
  * @file cli/connect/tool-call-defs-apps.ts
  * @description App-fork, IAM, organism-archive, workspace-transfer, wallet, app, extension, cortex and workflow connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
+ * @structure
+ *   - attachProofOverHttp() -- the acceleration-proof attach, over the doors a connector has. Shared
+ *     with the connector's MCP registration (mcp/tools/appdev.ts) so the two cannot drift.
+ *   - appTools[] -- the shell handler table registered by tool-call.ts
+ * @usage
+ *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.2.0 -- 2026-08-11 -- proof_attach APPENDS to the ledger instead of replacing it, writes the
+ *     ContributionProof shape routes/library-packs.ts actually reads, and lands in the owner
+ *     namespace where services/contribution-proofs.ts keeps both records. The append logic is
+ *     attachProofOverHttp(), shared with the connector's MCP door.
  *   v1.1.0 -- 2026-07-19 -- Connector reachability: shell handlers for app drafts, appdev overview/
  *     pitfalls/templates/proofs, commerce (psp/app-tools/offer/checkout) and workflow answer/pending —
  *     thin REST proxies (dedicated routes where they exist; the generic /v1/memory + agents/offers
@@ -10,10 +20,118 @@
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalArray, requiredRecord, optionalRecord } from './tool-call-helpers.js';
-import type { ApiResponse } from './api-client.js';
+import type { AimeatClient, ApiResponse } from './api-client.js';
 import { defineAppIam } from '../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../services/iam/model.js';
 import type { CommandDef } from '../../services/iam/app-commands.js';
+import type { ContributionProof } from '../../models/contribution-proof.js';
+
+/** What a caller states about one run, in the connector's own wire vocabulary. */
+export interface ProofAttachInput {
+    subjectType: 'library_pack' | 'app_template';
+    subjectId: string;
+    model: string;
+    verdict: 'pass' | 'fail';
+    evidence: string;
+    testSet?: string;
+    tokens?: number;
+}
+
+/** The ledger's address, by subject: a community pack's proofs record, or the proposal manifest. */
+const proofLedgerKey = (input: ProofAttachInput): string => input.subjectType === 'library_pack'
+    ? `libpack.proofs.${input.subjectId}`
+    : `template.catalog.${input.subjectId}.manifest`;
+
+const refuse = (code: string, message: string): ApiResponse => ({ ok: false, error: { code, message } });
+
+const DUPLICATE_PROOF_MESSAGE =
+    'Duplicate proof (same model + test set + date). The ledger is append-only, one entry per run.';
+
+/**
+ * Attach one self-reported acceleration proof, over the doors a connector has.
+ *
+ * The capability itself is services/contribution-proofs.ts, and there is no REST route for it, so
+ * this reaches the same two records through GET/POST /v1/memory. Three things it fixes, all of which
+ * failed silently:
+ *
+ * 1. It SET the record. A second proof for the same pack deleted the first, and the call returned 200.
+ * 2. It wrote `{model, summary, created}`. routes/library-packs.ts counts `verdict === 'pass'` over
+ *    ContributionProof records, so a connector-written proof could never reach `proven_models`, which
+ *    is the one place a proof is meant to show up.
+ * 3. It wrote under the calling agent's own GAII. Both records belong to the OWNER GHII
+ *    (services/contribution-proofs.ts, services/app-template-proposals.ts), and a second ledger for
+ *    the same pack hides the first: the reader keys proofs by packId, last record read wins.
+ *
+ * The append costs a read, so this path needs `memory:read` as well as the tool's `memory:write`.
+ */
+export async function attachProofOverHttp(client: AimeatClient, input: ProofAttachInput): Promise<ApiResponse> {
+    const key = proofLedgerKey(input);
+    // owner_scope on the read as well: the ledger sits under the owner GHII, and `soft=1` turns a
+    // first-ever proof into an empty read rather than a 404 the caller would report as a failure.
+    const read = await client.get(`/v1/memory/${encodeURIComponent(key)}?owner_scope=true&soft=1`);
+    if (read.ok === false) return read;
+    const record = (read.data ?? {}) as { exists?: boolean; value?: unknown; visibility?: string; tags?: string[] };
+    const stored = record.exists === true ? record.value : null;
+
+    const now = new Date().toISOString();
+    const proof: ContributionProof = {
+        model: input.model.trim().toLowerCase(),
+        verdict: input.verdict,
+        evidence: input.evidence,
+        ...(input.testSet ? { testSet: input.testSet } : {}),
+        ...(typeof input.tokens === 'number' ? { tokens: input.tokens } : {}),
+        date: now.slice(0, 10),
+        selfReported: true,
+    };
+    // The ledger contract the node states and the tool description promises: append-only, one entry
+    // per run, a repeat of (model, test set, date) refused. Source of truth is
+    // services/contribution-proofs.ts; this door emulates it because it cannot call it.
+    const duplicateOf = (list: ContributionProof[]): boolean => list.some(p =>
+        p.model === proof.model && (p.testSet ?? '') === (proof.testSet ?? '') && p.date === proof.date);
+    const answer = (total: number): ApiResponse => ({
+        ok: true,
+        data: {
+            attached: true, subject_type: input.subjectType, subject_id: input.subjectId,
+            proofs_total: total, self_reported: true,
+        },
+    });
+
+    if (input.subjectType === 'library_pack') {
+        const ledger = (stored ?? {}) as { proofs?: unknown };
+        const proofs = (Array.isArray(ledger.proofs) ? [...ledger.proofs] : []) as ContributionProof[];
+        if (duplicateOf(proofs)) return refuse('DUPLICATE_PROOF', DUPLICATE_PROOF_MESSAGE);
+        proofs.push(proof);
+        const written = await client.post('/v1/memory', {
+            key,
+            value: { packId: input.subjectId, proofs },
+            visibility: 'public',
+            tags: ['libpack-proofs'],
+            owner_scope: true,
+        });
+        return written.ok === false ? written : answer(proofs.length);
+    }
+
+    // app_template: the proof rides in the caller's own proposal manifest, which must already exist.
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) {
+        return refuse('NOT_FOUND', `Template proposal not found: ${input.subjectId}`);
+    }
+    const manifest = { ...(stored as JsonObject) };
+    const proofs = (Array.isArray(manifest.proofs) ? [...manifest.proofs] : []) as ContributionProof[];
+    if (duplicateOf(proofs)) return refuse('DUPLICATE_PROOF', DUPLICATE_PROOF_MESSAGE);
+    proofs.push(proof);
+    manifest.proofs = proofs;
+    manifest.updatedAt = now;
+    const written = await client.post('/v1/memory', {
+        key,
+        value: manifest,
+        // The proposal's visibility and tags are the proposal's business. This write appends a proof,
+        // it leaves who may read the proposal where the proposal put it.
+        visibility: record.visibility ?? 'private',
+        tags: record.tags ?? [],
+        owner_scope: true,
+    });
+    return written.ok === false ? written : answer(proofs.length);
+}
 
 export const appTools: ConnectCliToolDefinition[] = [
     {
@@ -370,30 +488,37 @@ export const appTools: ConnectCliToolDefinition[] = [
         },
     },
     {
-        // Attach a self-reported acceleration proof to a library pack / template. No dedicated REST route
-        // (server MCP appends to the libpack.proofs.{id} memory record), so the shell proxy sets that same
-        // public record via POST /v1/memory (best-effort: it sets rather than appends).
+        // Attach a self-reported acceleration proof to a community library pack or one of your own
+        // template proposals. No dedicated REST route exists, so the append runs over GET/POST
+        // /v1/memory in attachProofOverHttp() above, which the connector's MCP door calls as well.
         name: 'aimeat_appdev_proof_attach',
-        description: 'Attach a self-reported acceleration proof (which model built what, how fast) to a library pack or template.',
+        description: 'Attach a self-reported acceleration proof (model, pass/fail, evidence) to a community library pack you own or one of your app-template proposals. Append-only: a repeat of the same model + test set + date is refused.',
         input: {
-            subject_id: { type: 'string', required: true, description: 'The library-pack / template id the proof is about.' },
+            subject_type: { type: 'string', required: true, enum: ['library_pack', 'app_template'], description: 'What the proof attaches to.' },
+            subject_id: { type: 'string', required: true, description: 'Community pack id (cortex name) or template proposal id.' },
             model: { type: 'string', required: true, description: 'YOUR OWN model id (self-identify; indicative).' },
-            summary: { type: 'string', required: true, description: 'What you built with it and the outcome.' },
-            evidence: { type: 'string', description: 'A link or app ref backing the claim.' },
+            verdict: { type: 'string', required: true, enum: ['pass', 'fail'], description: 'Did it accelerate the run. Honest fails make your passes credible.' },
+            evidence: { type: 'string', required: true, description: 'URL or node storage/memory ref pointing at the run evidence.' },
+            test_set: { type: 'string', description: 'Repeatable test-set id, when one was used.' },
+            tokens: { type: 'number', description: 'Output tokens the run consumed, when known.' },
         },
         handler: ({ client }, input) => {
-            const subjectId = requiredString(input, 'subject_id');
-            const proof: JsonObject = {
-                model: requiredString(input, 'model').trim().toLowerCase(),
-                summary: requiredString(input, 'summary'),
-                created: new Date().toISOString(),
-            };
-            const evidence = optionalString(input, 'evidence'); if (evidence) proof.evidence = evidence;
-            return client.post('/v1/memory', {
-                key: `libpack.proofs.${subjectId}`,
-                value: { packId: subjectId, proofs: [proof] },
-                visibility: 'public',
-                tags: ['libpack-proofs'],
+            const subjectType = requiredString(input, 'subject_type');
+            const verdict = requiredString(input, 'verdict');
+            if (subjectType !== 'library_pack' && subjectType !== 'app_template') {
+                return Promise.resolve(refuse('INVALID_INPUT', 'subject_type must be "library_pack" or "app_template"'));
+            }
+            if (verdict !== 'pass' && verdict !== 'fail') {
+                return Promise.resolve(refuse('INVALID_INPUT', 'verdict must be "pass" or "fail"'));
+            }
+            return attachProofOverHttp(client, {
+                subjectType,
+                subjectId: requiredString(input, 'subject_id'),
+                model: requiredString(input, 'model'),
+                verdict,
+                evidence: requiredString(input, 'evidence'),
+                testSet: optionalString(input, 'test_set'),
+                tokens: optionalNumber(input, 'tokens'),
             });
         },
     },
