@@ -106,7 +106,7 @@ export const identityMethods = {
    */
   async deleteOwner(this: PostgresKyselyStorage, name: string): Promise<boolean> {
     try {
-      return await this.db.transaction().execute(trx => deleteOwnerCascade(trx, name));
+      return await this.transaction(() => deleteOwnerCascade(this.db, name));
     } catch (err) { throw dbError('deleteOwner', err); }
   },
 
@@ -182,9 +182,9 @@ export const identityMethods = {
    *  tasks, messages, telemetry, directives, OAuth tokens and webhook log behind. */
   async deleteAgent(this: PostgresKyselyStorage, gaii: string): Promise<boolean> {
     try {
-      return await this.db.transaction().execute(async (trx) => {
-        await cascadeDeleteIdentityData(trx, gaii);
-        const r = await trx.deleteFrom('Agent').where('gaii', '=', gaii).executeTakeFirst();
+      return await this.transaction(async () => {
+        await cascadeDeleteIdentityData(this.db, gaii);
+        const r = await this.db.deleteFrom('Agent').where('gaii', '=', gaii).executeTakeFirst();
         return Number(r.numDeletedRows ?? 0) > 0;
       });
     } catch (err) { throw dbError('deleteAgent', err); }

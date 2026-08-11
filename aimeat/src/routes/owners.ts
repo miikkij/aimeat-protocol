@@ -28,7 +28,7 @@ import { executeHooks } from '../services/hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
-import { evictAgentTelemetry } from '../services/telemetry-buffer.js';
+import { eraseOwner } from '../services/owner-erasure.js';
 import { logger } from '../utils/logger.js';
 import { registerOwnerExportRoute } from './owners/export.js';
 
@@ -245,96 +245,14 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Cascade delete: agents, GHII-level data, owner record
-    const agents = await storage.getAgentsByOwner(name);
-    const ghii = `${name}@${config.nodeId}`;
-    const deletionLog: string[] = [];
-
-    // 1. Cancel in-flight work and return escrow for all agents
-    for (const agent of agents) {
-      evictAgentTelemetry(agent.gaii);
-      const providerWork = await storage.listWorkByProvider(agent.gaii);
-      const requesterWork = await storage.listWorkByRequester(agent.gaii);
-      for (const w of [...providerWork, ...requesterWork]) {
-        if (['pending', 'accepted', 'in_progress'].includes(w.status)) {
-          await storage.updateWork(w.trackingCode, { status: 'cancelled', updatedAt: new Date().toISOString() });
-          if (w.cost.inEscrow > 0) {
-            await storage.creditBalance(w.requesterGaii, w.cost.total);
-          }
-        }
-      }
-    }
-
-    // 2. Delete GHII-level data (not covered by per-agent cascade)
-    // Memory stored under GHII directly
-    try { await storage.deleteAllMemory(ghii); deletionLog.push('ghii_memory'); } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Consents granted by the GHII identity
-    try {
-      const ghiiConsents = await storage.listConsents(ghii, {});
-      for (const c of ghiiConsents) await storage.deleteConsent(c.id);
-      if (ghiiConsents.length) deletionLog.push(`consents:${ghiiConsents.length}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Organism memberships
-    try {
-      const memberships = await storage.listMembershipsByGhii(ghii);
-      for (const m of memberships) await storage.deleteMembership(m.id);
-      if (memberships.length) deletionLog.push(`memberships:${memberships.length}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Matches (stored by GHII, not agent GAII)
-    try { await storage.deleteMatchesByProfile(ghii); deletionLog.push('matches'); } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Sessions
-    try { await storage.revokeAllSessions(name); deletionLog.push('sessions'); } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Capabilities registered by this owner
-    try {
-      const caps = await storage.listCapabilitiesByOwner(ghii);
-      for (const c of caps) await storage.deleteCapability(c.id);
-      if (caps.length) deletionLog.push(`capabilities:${caps.length}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Scheduled jobs owned by this user
-    try {
-      const jobs = await storage.listScheduledJobs({});
-      const ownerJobs = jobs.filter(j => j.createdBy === ghii || j.createdBy === name);
-      for (const j of ownerJobs) await storage.deleteScheduledJob(j.id);
-      if (ownerJobs.length) deletionLog.push(`scheduled_jobs:${ownerJobs.length}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Device auth records
-    try {
-      await storage.deleteDeviceAuthByOwner(name);
-      deletionLog.push('device_auth');
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Apps published by this owner
-    try {
-      const { apps } = await storage.listApps({ ownerGaii: ghii });
-      for (const a of apps) await storage.deleteApp(ghii, a.filename);
-      if (apps.length) deletionLog.push(`apps:${apps.length}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Extension instances created by this owner
-    try {
-      const count = await storage.deleteExtensionInstancesByOwner(ghii);
-      // Also try bare owner name (some instances may use it as createdBy)
-      const count2 = await storage.deleteExtensionInstancesByOwner(name);
-      if (count + count2) deletionLog.push(`ext_instances:${count + count2}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Knowledge links contributed by this owner
-    try {
-      const count = await storage.deleteLinksByContributor(ghii);
-      if (count) deletionLog.push(`knowledge_links:${count}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-    // Knowledge reviews by this operator
-    try {
-      const count = await storage.deleteReviewsByOperator(ghii);
-      if (count) deletionLog.push(`knowledge_reviews:${count}`);
-    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
-
-    // 3. Per-agent cascade + agent deletion (handled by storage.deleteOwner internally)
-    // The storage provider's deleteOwner cascades: agent data, GHII records,
-    // personal nodes, push subs, listings, purchases, chat instances, email verifications
-    await storage.deleteOwner(name);
+    // The whole erasure lives in one service function, in one transaction, so a failure between
+    // steps cannot leave the account half-deleted and a second door can reach it. GAP-001.
+    const { agentsDeleted, deletionLog } = await eraseOwner(storage, config.nodeId, name);
 
     res.json(success(config.nodeId, {
       deleted: true,
       owner: name,
-      agents_deleted: agents.length,
+      agents_deleted: agentsDeleted,
       deletion_log: deletionLog,
     }));
     emitChange('owners');

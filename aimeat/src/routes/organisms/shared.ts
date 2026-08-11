@@ -60,46 +60,10 @@ export async function readOrganismConfig(
     return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
 }
 
-/**
- * Who may write in which namespace of a workspace: `meta.*` is the organism's own structure — its
- * manifest, its config, the roster of spaces — so only a creator or an admin may change it. Every
- * other namespace is content, and membership is enough.
- *
- * Module-level rather than a closure since 2026-08-11: the MCP workspace tools publish and revert
- * too, and they checked membership only. Any member's agent could publish over the manifest or the
- * config, and the config is where the gates are written.
- */
-export function canWriteNamespaceRule(role: string, namespace: string): boolean {
-  return namespace.startsWith('meta.') ? (role === 'creator' || role === 'admin') : true;
-}
-
-
-export function roleSatisfies(approverRole: string, membershipRole: string): boolean {
-  if (approverRole === 'member') return true;                                  // any active member
-  if (approverRole === 'admin') return membershipRole === 'creator' || membershipRole === 'admin';
-  if (approverRole === 'owner') return membershipRole === 'creator';           // the organism owner
-  return false;
-}
-
-/** Freshest of two records for the same key: higher version wins, then newer updatedAt. Guards workspace
- *  reads/writes against a key that has forked into duplicate-owner copies (a GHII + a legacy agent GAII). */
-export function fresherRec(a: MemoryRecord | null | undefined, b: MemoryRecord): MemoryRecord {
-  if (!a) return b;
-  if (b.version !== a.version) return b.version > a.version ? b : a;
-  return (b.updatedAt ?? '') >= (a.updatedAt ?? '') ? b : a;
-}
-/** The member GHII behind any identity: `agent#owner@node` → `owner@node`; a bare GHII is returned as-is.
- *  Workspace current-state records (.draft/.latest) are owned by this so a key never forks per-agent. */
-function ownerGhiiOf(identity: string): string {
-  return identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity;
-}
-/** Delete every copy of `key` NOT owned by `keepOwner` — collapses a forked key back to a single owner. */
-async function collapseKeyTo(storage: Storage, key: string, keepOwner: string): Promise<void> {
-  const { items } = await storage.listAllMemory({ prefix: key, limit: 20 });
-  await Promise.all(items
-    .filter(r => r.key === key && r.ownerGaii !== keepOwner)
-    .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(err => { logger.warn('collapseKeyTo: best-effort collapse', { error: String(err) }); })));
-}
+// Moved to ./record-helpers.ts on 2026-08-11 (max-file-lines). Re-exported so every existing
+// import of these from ./shared.js keeps resolving, including src/mcp/workspaces.ts.
+export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo } from './record-helpers.js';
+import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule } from './record-helpers.js';
 
 export type ShareAccess = 'open' | 'password' | 'account';
 export type ShareMeta = {
@@ -388,9 +352,18 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       results.push({ instance, ok: true, version: n });
     }
 
-    // ONE bulk upsert (every version + latest), then ONE bulk delete (consumed drafts + collapsed copies).
-    if (toUpsert.length) { if (storage.bulkSetMemory) await storage.bulkSetMemory(toUpsert); else for (const r of toUpsert) await storage.setMemory(r); }
-    if (toDelete.length) { if (storage.bulkDeleteMemory) await storage.bulkDeleteMemory(toDelete); else for (const r of toDelete) await storage.deleteMemory(r.ownerGaii, r.key); }
+    // ONE bulk upsert (every version + latest), then ONE bulk delete (consumed drafts + collapsed
+    // copies) — both inside ONE transaction. Publishing a record writes its new version, moves
+    // .latest, prunes history past the retention window and consumes the draft; a failure between
+    // those left a version with no .latest, or a consumed draft whose publish never landed. The
+    // fallback loops (a backend without the bulk primitive) are N separate statements, which is
+    // exactly the case that needed the boundary most.
+    if (toUpsert.length || toDelete.length) {
+      await storage.transaction(async () => {
+        if (toUpsert.length) { if (storage.bulkSetMemory) await storage.bulkSetMemory(toUpsert); else for (const r of toUpsert) await storage.setMemory(r); }
+        if (toDelete.length) { if (storage.bulkDeleteMemory) await storage.bulkDeleteMemory(toDelete); else for (const r of toDelete) await storage.deleteMemory(r.ownerGaii, r.key); }
+      });
+    }
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     for (const e of toEmit) emitMemoryWritten(e.owner, e.key);
     return { results };

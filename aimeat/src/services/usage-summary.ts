@@ -27,6 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { cached, invalidateKey, TTL } from './cache.js';
 import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
+import { runInReadScope } from '../storage/read-scope/read-scope.js';
 
 /** How long a computed summary stays fresh. A minute of staleness is fine for a dashboard and keeps
  *  the full-scan byte computations off the request hot path on repeated visits. */
@@ -155,7 +156,11 @@ export async function getOwnerUsageSummary(
   return cached(
     usageKey(ownerName),
     USAGE_CACHE_TTL_MS,
-    () => computeOwnerUsageSummary(config, storage, ownerName),
+    // A read scope around the whole recompute: it fans across agents, memory, files and the ledger,
+    // and loadOwnerAgents was already written to read through an IdentityMap — it just never had one
+    // bound, so every call fell through to a direct read. Nested under an outer scope (the home
+    // dashboard opens one) this joins it rather than starting a second.
+    () => runInReadScope(() => computeOwnerUsageSummary(config, storage, ownerName)),
     usageTags(ownerName),
   );
 }

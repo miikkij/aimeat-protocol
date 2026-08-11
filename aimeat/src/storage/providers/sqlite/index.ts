@@ -23,10 +23,15 @@
  *     negative-amount morsel minting (0 still allowed — free/0-cost work escrow).
  *   v1.4.0 — 2026-06-20 — Add app_grants CRUD (owner-issued app authorizations →
  *     agent tokens; refresh-hash lookup, list-by-owner, rotate/revoke).
+ *   v1.6.0 — 2026-08-11 — Storage.transaction(): BEGIN/COMMIT/ROLLBACK, transactions serialised
+ *     against each other, and an async-context guard so a write started outside an open
+ *     transaction waits rather than landing inside it. SQLite gives the process one connection,
+ *     so without the guard another request's write would be discarded by somebody else's rollback.
  *   v1.5.0 — 2026-07-13 — Split the method bodies into ./methods/<group>.ts modules
  *     (prototype-assignment + interface-merge) so every file is ≤800 lines; bodies
  *     are byte-identical, `db`/`chunkedUploads` widened to public for the groups.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -55,10 +60,29 @@ import { financeMethods } from './methods/finance.js';
 import { outboundMethods } from './methods/outbound.js';
 import { companyMethods } from './methods/companies.js';
 
+/**
+ * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
+ * transaction or a bystander that merely started while one was open. A global flag cannot: both
+ * run in the same process on the same connection.
+ */
+const txContext = new AsyncLocalStorage<SqliteStorage>();
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional class+interface merge: the interface below declares the methods Object.assign installs on the prototype.
 export class SqliteStorage {
   db: Database.Database;
   chunkedUploads = new Map<string, ChunkedUploadRecord>();
+
+  /**
+   * Depth of the transaction open on this instance. SQLite gives the whole process ONE connection, so
+   * a transaction here is process-wide: this counter is what tells an inner call it is already inside
+   * one (join, do not re-BEGIN) and what tells the write guard below to let it through.
+   */
+  private txDepth = 0;
+  /**
+   * Transactions run one at a time. Without this two concurrent operations would interleave their
+   * statements inside a single BEGIN and one ROLLBACK would discard the other's work.
+   */
+  private txQueue: Promise<unknown> = Promise.resolve();
 
   constructor(dbPath: string) {
     mkdirSync(dirname(dbPath), { recursive: true });
@@ -69,9 +93,80 @@ export class SqliteStorage {
     initializeSchema(this.db);
   }
 
+  /**
+   * True when the CALLER is running inside this instance's open transaction. The async-context
+   * marker, not the depth counter, is what distinguishes "a step of the transaction" from "another
+   * request that happens to be running while it is open" — and only the second one must wait.
+   */
+  get insideTransaction(): boolean {
+    return txContext.getStore() === this;
+  }
+
+  /** Resolves when no transaction is open. Awaited by every async write made from outside one. */
+  waitForNoTransaction(): Promise<unknown> {
+    return this.txQueue;
+  }
+
+  /**
+   * Run `fn` in one transaction. Nested calls join the open one. See the contract on
+   * `Storage.transaction`; the SQLite-specific part of it is enforced here rather than trusted:
+   * transactions are serialised against each other, and `guardWrites` below makes an async write
+   * started outside the transaction wait until it commits instead of landing inside it.
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.insideTransaction) return fn();
+    const run = async (): Promise<T> => {
+      this.txDepth = 1;
+      this.db.exec('BEGIN');
+      try {
+        const out = await txContext.run(this, fn);
+        this.db.exec('COMMIT');
+        return out;
+      } catch (err) {
+        // A ROLLBACK that itself fails means the BEGIN never took, so there is nothing to undo. The
+        // caller's error below is the real one and must not be replaced by this one.
+        // eslint-disable-next-line aimeat/no-silent-catch -- see above: nothing was open to roll back
+        try { this.db.exec('ROLLBACK'); } catch { /* nothing was open */ }
+        throw err;
+      } finally {
+        this.txDepth = 0;
+      }
+    };
+    // Queue behind any transaction already running, whether it succeeded or threw.
+    const mine = this.txQueue.then(run, run);
+    this.txQueue = mine.then(() => undefined, () => undefined);
+    return mine;
+  }
+
   /** Close the database connection */
   close(): void {
     this.db.close();
+  }
+}
+
+/**
+ * Make every ASYNC write on the prototype wait while a transaction is open. better-sqlite3 runs each
+ * statement synchronously, so the only way another request's write lands inside somebody else's
+ * transaction is by being scheduled at an `await` boundary — which is exactly what this closes. A
+ * call made from INSIDE the transaction passes straight through, or it would wait on the
+ * transaction that is waiting on it.
+ *
+ * Only async functions are wrapped: several internal helpers (cascadeDeleteAgentData, the
+ * deserialize* mappers) are synchronous and callers depend on that, and wrapping them would turn a
+ * plain value into a promise.
+ */
+const WRITE_METHOD = /^(create|set|update|delete|add|remove|insert|upsert|write|debit|credit|transfer|enqueue|revoke|grant|mint|save|publish|archive|deactivate|activate|link|unlink|bulk|record|append|clear|reset|mark|increment|decrement)/;
+
+function guardWrites(proto: Record<string, unknown>): void {
+  for (const name of Object.keys(proto)) {
+    if (!WRITE_METHOD.test(name)) continue;
+    const fn = proto[name];
+    if (typeof fn !== 'function' || fn.constructor.name !== 'AsyncFunction') continue;
+    const original = fn as (this: SqliteStorage, ...args: unknown[]) => Promise<unknown>;
+    proto[name] = async function (this: SqliteStorage, ...args: unknown[]): Promise<unknown> {
+      if (!this.insideTransaction) await this.waitForNoTransaction();
+      return original.apply(this, args);
+    };
   }
 }
 
@@ -104,3 +199,6 @@ Object.assign(
   outboundMethods,
   companyMethods,
 );
+
+// Applied after the merge so it wraps every method group, including any added later.
+guardWrites(SqliteStorage.prototype as unknown as Record<string, unknown>);

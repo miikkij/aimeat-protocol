@@ -205,4 +205,94 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect(s, `${name} must return the same set as ${first[0]}`).toEqual(first[1]);
         }
     }, 60_000);
+
+    it('a transaction that throws leaves NOTHING behind, on every provider', async () => {
+        for (const { name, storage } of provs) {
+            const owner = `conftx2${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const { ghii } = await seedOwner(storage, owner);
+            const now = new Date().toISOString();
+            const boom = new Error('second step fails');
+
+            await expect(storage.transaction(async () => {
+                await storage.setMemory({
+                    key: 'tx.first', ownerGaii: ghii, value: { step: 1 }, visibility: 'private',
+                    tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+                });
+                await storage.addTransaction({ id: `tx-${randomUUID()}`, gaii: ghii, type: 'earned', amount: 7, timestamp: now });
+                throw boom;
+            })).rejects.toThrow('second step fails');
+
+            // Both steps must be gone. Without a real transaction the first write is committed on its
+            // own and this is the assertion that fails.
+            expect(await storage.getMemory(ghii, 'tx.first'), `${name}: the first write survived the rollback`).toBeNull();
+            const sevens = (await storage.getTransactions(ghii)).filter(t => t.amount === 7);
+            expect(sevens.length, `${name}: the second write survived the rollback`).toBe(0);
+
+            await storage.deleteOwner(owner);
+        }
+    }, 60_000);
+
+    it('a transaction that succeeds commits every step, and nesting joins rather than nests', async () => {
+        for (const { name, storage } of provs) {
+            const owner = `conftx3${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const { ghii } = await seedOwner(storage, owner);
+            const now = new Date().toISOString();
+
+            const out = await storage.transaction(async () => {
+                await storage.setMemory({
+                    key: 'tx.outer', ownerGaii: ghii, value: { step: 1 }, visibility: 'private',
+                    tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+                });
+                // A service function calling another service function: the inner call must join, not
+                // open a second transaction (Postgres would error, SQLite would deadlock on its queue).
+                return storage.transaction(async () => {
+                    await storage.setMemory({
+                        key: 'tx.inner', ownerGaii: ghii, value: { step: 2 }, visibility: 'private',
+                        tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+                    });
+                    return 'done';
+                });
+            });
+
+            expect(out, `${name}: the return value comes back through both levels`).toBe('done');
+            expect(await storage.getMemory(ghii, 'tx.outer'), `${name}: outer write committed`).not.toBeNull();
+            expect(await storage.getMemory(ghii, 'tx.inner'), `${name}: inner write committed`).not.toBeNull();
+
+            await storage.deleteOwner(owner);
+        }
+    }, 60_000);
+
+    it('a write started outside an open transaction is not swallowed by its rollback', async () => {
+        for (const { name, storage } of provs) {
+            const owner = `conftx4${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const { ghii } = await seedOwner(storage, owner);
+            const now = new Date().toISOString();
+
+            // Start the transaction WITHOUT awaiting it, so the write below runs in this test's async
+            // context — a real second request, not a step of the transaction. SQLite runs the whole
+            // process on one connection, so without the guard that write lands inside the open BEGIN
+            // and is discarded by its rollback.
+            const tx = storage.transaction(async () => {
+                await new Promise(r => setImmediate(r));
+                await storage.setMemory({
+                    key: 'tx.doomed', ownerGaii: ghii, value: {}, visibility: 'private',
+                    tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+                });
+                await new Promise(r => setImmediate(r));
+                throw new Error('rolled back');
+            }).catch(() => { /* the rejection is the point; the assertions are below */ });
+
+            const outsider = storage.setMemory({
+                key: 'tx.outsider', ownerGaii: ghii, value: { from: 'another request' }, visibility: 'private',
+                tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+            });
+            await tx;
+            await outsider;
+
+            expect(await storage.getMemory(ghii, 'tx.doomed'), `${name}: the rolled-back write survived`).toBeNull();
+            expect(await storage.getMemory(ghii, 'tx.outsider'), `${name}: an unrelated write was rolled back with it`).not.toBeNull();
+
+            await storage.deleteOwner(owner);
+        }
+    }, 60_000);
 });

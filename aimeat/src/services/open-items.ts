@@ -44,6 +44,7 @@ import type { Storage } from '../storage/interface.js';
 import { getOwnerScopeMemory } from './owner-memory.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from '../routes/portfolio.js';
 import { HELLO_MCP_KEY } from './hello-mcp.js';
+import { loadOwnerAgents } from './db/owner-identity.js';
 
 /** The one key. Named for what a person calls it, because their AI reads this name aloud. */
 export const OPEN_ITEMS_KEY = 'open-items.list';
@@ -268,7 +269,7 @@ export async function evaluateCloses(
             return false;
         }
         case 'first_agent':
-            return (await storage.getAgentsByOwner(owner)).length > 0;
+            return (await loadOwnerAgents(storage, owner)).length > 0;
         default:
             return false;
     }

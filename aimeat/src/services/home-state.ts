@@ -42,6 +42,8 @@ import { portfolioReadGaiis, PORTFOLIO_HTML_KEY, portfolioStandaloneUrl } from '
 import { logger } from '../utils/logger.js';
 import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
 import type { AgentOnboardingRecord } from '../storage/types/agents-messaging.js';
+import { loadOwnerAgents } from './db/owner-identity.js';
+import { runInReadScope } from '../storage/read-scope/read-scope.js';
 
 /**
  * The steps, in the order a person meets them. `better-app` exists only on branch B and is what
@@ -127,10 +129,18 @@ const str = (o: Record<string, unknown>, k: string): string | null =>
 export async function readHomeState(
     storage: Storage, config: AimeatConfig, owner: string,
 ): Promise<HomeState> {
+    return runInReadScope(() => readHomeStateInScope(storage, config, owner));
+}
+
+/** The body. Split out so the read scope above wraps the WHOLE composite: the agent list is read
+ *  once here and reused by anything else composed into the same request. */
+async function readHomeStateInScope(
+    storage: Storage, config: AimeatConfig, owner: string,
+): Promise<HomeState> {
     const ghii = `${owner}@${config.nodeId}`;
     const [ghiiRecord, agents, markers] = await Promise.all([
         storage.getGHIIByOwner(owner),
-        storage.getAgentsByOwner(owner),
+        loadOwnerAgents(storage, owner),
         storage.listMemoryForOwners([ghii], { prefix: 'onboarding.' }),
     ]);
 

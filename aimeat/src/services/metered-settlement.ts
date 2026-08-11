@@ -132,22 +132,33 @@ async function settleMorsels(args: Args): Promise<SettlementResult> {
   const track = `exchange:${product.ext}:${product.action}:${ent.contractRef}`;
   const ts = new Date().toISOString();
 
-  if (price > 0) {
-    if (!await storage.debitBalance(caller, price)) return { kind: 'insufficient', needed: price };
-    if (providerCut > 0) {
-      if (!await storage.creditBalance(ent.providerGhii, providerCut)) {
-        await storage.creditBalance(caller, price);
-        logger.error('[metered-settlement] provider credit failed; refunded caller', { label: product.label, provider: ent.providerGhii });
-        return { kind: 'failed', reason: 'provider_credit_failed' };
+  // The whole settlement is ONE transaction: debit, provider credit, both ledger rows, the
+  // marketplace fee and the spend commit land together or not at all. Before this a crash between
+  // them could leave a caller debited with no provider credit and no ledger row to find it by.
+  // The hand-written refund below is kept deliberately: it handles a provider credit that REPORTS
+  // failure (a business outcome the transaction cannot see), and with the rollback around it the two
+  // agree rather than conflict.
+  let earlyExit: SettlementResult | null = null;
+  await storage.transaction(async () => {
+    if (price > 0) {
+      if (!await storage.debitBalance(caller, price)) { earlyExit = { kind: 'insufficient', needed: price }; return; }
+      if (providerCut > 0) {
+        if (!await storage.creditBalance(ent.providerGhii, providerCut)) {
+          await storage.creditBalance(caller, price);
+          logger.error('[metered-settlement] provider credit failed; refunded caller', { label: product.label, provider: ent.providerGhii });
+          earlyExit = { kind: 'failed', reason: 'provider_credit_failed' };
+          return;
+        }
+        await storage.addTransaction({ id: `xchg-earn-${randomUUID()}`, gaii: ent.providerGhii, type: 'extension_earn', amount: providerCut, counterpartyGaii: caller, trackingCode: track, initiatorGaii: caller, timestamp: ts });
       }
-      await storage.addTransaction({ id: `xchg-earn-${randomUUID()}`, gaii: ent.providerGhii, type: 'extension_earn', amount: providerCut, counterpartyGaii: caller, trackingCode: track, initiatorGaii: caller, timestamp: ts });
+      // Filed under the human whose balance moved; the caller is named beside it.
+      await storage.addTransaction({ id: `xchg-pay-${randomUUID()}`, gaii: ownerGhiiOf(caller), type: 'extension_pay', amount: -price, counterpartyGaii: ent.providerGhii, trackingCode: track, initiatorGaii: caller, timestamp: ts });
+      await settleMarketplaceFee(storage, config, { fee, payerGhii: ownerGhiiOf(caller), trackingCode: track, source: 'exchange' });
     }
-    // Filed under the human whose balance moved; the caller is named beside it.
-    await storage.addTransaction({ id: `xchg-pay-${randomUUID()}`, gaii: ownerGhiiOf(caller), type: 'extension_pay', amount: -price, counterpartyGaii: ent.providerGhii, trackingCode: track, initiatorGaii: caller, timestamp: ts });
-    await settleMarketplaceFee(storage, config, { fee, payerGhii: ownerGhiiOf(caller), trackingCode: track, source: 'exchange' });
-  }
 
-  await commitSpend(storage, ent, price, newPricing, caller);
+    await commitSpend(storage, ent, price, newPricing, caller);
+  });
+  if (earlyExit) return earlyExit;
   return {
     kind: 'settled', charged: price,
     // MORSELS ARE NEVER SHARED. They are the node's pacing meter: they bound how often a capability

@@ -126,7 +126,8 @@ export const memoryMethods = {
     // at the same version are serialised — the first bumps to N+1 and commits, the second re-reads N+1,
     // sees it no longer equals its expectedVersion, and gets a conflict (null). A plain read-then-write
     // (as setMemory does) lets both pass the version check and both succeed.
-    return this.db.transaction().execute(async (trx) => {
+    return this.transaction(async () => {
+      const trx = this.db;
       const existing = await trx.selectFrom('Memory').selectAll()
         .where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).forUpdate().executeTakeFirst();
       if (!existing || existing.version !== expectedVersion) return null;

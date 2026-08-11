@@ -56,5 +56,10 @@ export function getCurrentReadScope(): ReadScope | undefined {
  * storage read, so the same service code works either way.
  */
 export function runInReadScope<T>(fn: () => Promise<T>): Promise<T> {
+  // Nesting JOINS rather than replacing. A composite that opens a scope may be called from another
+  // that already opened one (the home dashboard composes the usage summary); starting a second would
+  // hand it an empty map and re-read everything the outer had already loaded — the exact cost this
+  // exists to remove.
+  if (scopeStore.getStore()) return fn();
   return scopeStore.run(new ReadScope(), fn);
 }

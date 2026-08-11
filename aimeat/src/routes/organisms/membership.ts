@@ -132,26 +132,31 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     }
 
     const now = new Date().toISOString();
-    await storage.updateJoinRequest(requestId, {
-      status: decision,
-      reviewedBy: ghii,
-      reviewedAt: now,
-    });
+    // One decision, three rows: the request's verdict, the membership it creates and the organism's
+    // member list. A failure between them left a request marked approved with no membership, or a
+    // membership the organism did not list.
+    await storage.transaction(async () => {
+      await storage.updateJoinRequest(requestId, {
+        status: decision,
+        reviewedBy: ghii,
+        reviewedAt: now,
+      });
 
-    if (decision === 'approved') {
-      await storage.createMembership({
-        id: uuidv4(),
-        organismId: id,
-        ghii: request.ghii,
-        role: 'member',
-        status: 'active',
-        joinedAt: now,
-      });
-      await storage.updateOrganism(id, {
-        members: [...organism.members, request.ghii],
-        updatedAt: now,
-      });
-    }
+      if (decision === 'approved') {
+        await storage.createMembership({
+          id: uuidv4(),
+          organismId: id,
+          ghii: request.ghii,
+          role: 'member',
+          status: 'active',
+          joinedAt: now,
+        });
+        await storage.updateOrganism(id, {
+          members: [...organism.members, request.ghii],
+          updatedAt: now,
+        });
+      }
+    });
 
     // Notify the requester of the decision so it surfaces in their bell.
     await notify(storage, `${request.ghii}@${config.nodeId}`, {
@@ -379,11 +384,14 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
 
     const callerMembership = await storage.getMembership(id, callerGhii);
     const now = new Date().toISOString();
-    // Promote the new creator, demote the old one to admin.
-    await storage.updateMembership(targetMembership.id, { role: 'creator' });
-    if (callerMembership) await storage.updateMembership(callerMembership.id, { role: 'admin' });
+    // Promote the new creator, demote the old one to admin. All three writes together: half of this
+    // leaves an organism with two creators or none, and nobody able to fix it.
     const admins = [...new Set([...organism.admins.filter(a => a !== to), callerGhii])];
-    await storage.updateOrganism(id, { creatorGhii: to, admins, updatedAt: now });
+    await storage.transaction(async () => {
+      await storage.updateMembership(targetMembership.id, { role: 'creator' });
+      if (callerMembership) await storage.updateMembership(callerMembership.id, { role: 'admin' });
+      await storage.updateOrganism(id, { creatorGhii: to, admins, updatedAt: now });
+    });
 
     await notify(storage, `${to}@${config.nodeId}`, {
       type: 'organism_ownership_transferred',

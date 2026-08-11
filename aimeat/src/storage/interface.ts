@@ -122,4 +122,33 @@ export interface Storage extends
   FinanceRepository,
   OutboundRepository,
   CompanyRepository,
-  StatsRepository { }
+  StatsRepository {
+  /**
+   * Run `fn` inside ONE database transaction: every storage call made underneath it commits together
+   * or not at all. Binding is ambient — the ordinary `storage.setX()` calls inside `fn` join the open
+   * transaction without being handed anything — so an existing multi-step operation becomes atomic by
+   * being wrapped, with no change to the calls themselves.
+   *
+   * WHERE IT BELONGS. In the service function that owns a whole operation, which is the same place
+   * REST and MCP both call. Not in a route (two doors would each need their own), and not around a
+   * single write (one write is already atomic).
+   *
+   * THE CONTRACT, and it is load-bearing on SQLite. Inside `fn`, do storage calls and nothing else:
+   * no HTTP, no file I/O, no AI calls, no long waits. SQLite runs the whole process on one connection,
+   * so an open transaction is process-wide; the implementation serialises transactions and makes other
+   * async writes wait, but a callback that parks on the network holds every other writer for that long.
+   * Postgres takes its own pooled connection and does not have this constraint — write to the stricter
+   * one, since SQLite is the desktop's only backend and the local default.
+   *
+   * NESTING joins rather than nests: calling `transaction()` inside an open one runs `fn` in the
+   * transaction already open, so a service function is safe to call from another one.
+   *
+   * @example
+   * await storage.transaction(async () => {
+   *   await storage.debitBalance(buyer, price);
+   *   await storage.createPurchase(receipt);
+   *   await storage.setMemory(provenanceRecord);
+   * });
+   */
+  transaction<T>(fn: () => Promise<T>): Promise<T>;
+}

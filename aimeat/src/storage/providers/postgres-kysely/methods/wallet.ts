@@ -98,7 +98,8 @@ export const walletMethods = {
     if (!Number.isFinite(amount) || amount < 0) return 0;
     const ghii = await resolveGhii(this.db, gaii);
     if (!ghii) return 0;
-    return this.db.transaction().execute(async (trx) => {
+    return this.transaction(async () => {
+      const trx = this.db;
       const row = await trx.selectFrom('Ghii').select('morselBalance').where('ghii', '=', ghii).forUpdate().executeTakeFirst();
       if (!row) return 0;
       const oldBalance = row.morselBalance ?? 0;
@@ -116,7 +117,8 @@ export const walletMethods = {
     const toGhii = await resolveGhii(this.db, toGaii);
     if (!fromGhii || !toGhii) return false;
     if (fromGhii === toGhii) return true; // Same owner — no-op
-    return this.db.transaction().execute(async (trx) => {
+    return this.transaction(async () => {
+      const trx = this.db;
       const debit = await trx.updateTable('Ghii')
         .set({ morselBalance: sql`COALESCE("morselBalance", 0) - ${amount}` })
         .where('ghii', '=', fromGhii).where(sql<boolean>`COALESCE("morselBalance", 0) >= ${amount}`)

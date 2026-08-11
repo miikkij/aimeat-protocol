@@ -8,12 +8,16 @@
  *   a not-yet-implemented method is absent from the prototype and throws when called — its E2E suite
  *   stays red until that domain lands. Memory is the first domain (graduated from the Phase-4 adapter).
  * @structure
- *   - class PostgresKyselyStorage: db + pool + ready + close
+ *   - trxStore: AsyncLocalStorage holding the open transaction for the current async context
+ *   - class PostgresKyselyStorage: rootDb + db getter + transaction() + pool + ready + close
  *   - interface PostgresKyselyStorage extends Storage, PgKyselyInternals (declaration merge)
  *   - Object.assign(prototype, memoryMethods, …future groups)
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: provider skeleton + migration runner + memory domain.
+ *   v1.1.0 — 2026-08-11 — Storage.transaction(): `db` becomes a getter over an AsyncLocalStorage-
+ *     bound transaction, so every existing `this.db` call joins an open one without being changed.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { Kysely, PostgresDialect } from 'kysely';
 import pg from 'pg';
 import type { ChunkedUploadRecord, MemoryRecord, Storage } from '../../interface.js';
@@ -73,9 +77,18 @@ interface PgKyselyInternals {
   _rawMemory(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
 }
 
+/**
+ * The transaction open for the current async context, if any. Every method reads the handle through
+ * the `db` getter below, so a call made inside `transaction()` joins that transaction without being
+ * handed anything — which is what lets an existing multi-step operation become atomic by being
+ * wrapped, instead of by threading a `tx` argument through 783 call sites.
+ */
+const trxStore = new AsyncLocalStorage<Kysely<DB>>();
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional class+interface merge: the interface below declares the methods Object.assign installs on the prototype.
 export class PostgresKyselyStorage {
-  readonly db: Kysely<DB>;
+  /** The pooled root handle. Use `db` instead: it returns the open transaction when there is one. */
+  readonly rootDb: Kysely<DB>;
   readonly pool: pg.Pool;
   /** Resolves once the schema migrations have been applied — awaited by the storage factory. */
   readonly ready: Promise<void>;
@@ -84,12 +97,27 @@ export class PostgresKyselyStorage {
 
   constructor(connectionString: string) {
     this.pool = new pg.Pool({ connectionString, max: 20 });
-    this.db = new Kysely<DB>({ dialect: new PostgresDialect({ pool: this.pool }) });
+    this.rootDb = new Kysely<DB>({ dialect: new PostgresDialect({ pool: this.pool }) });
     this.ready = runMigrations(this.pool);
   }
 
+  /** The handle every method uses: the transaction bound to this async context, else the pool. */
+  get db(): Kysely<DB> {
+    return trxStore.getStore() ?? this.rootDb;
+  }
+
+  /**
+   * Run `fn` in one transaction on a dedicated pooled connection. Nested calls join the open
+   * transaction rather than opening a second one, so a service function stays safe to call from
+   * another. See the contract on `Storage.transaction`.
+   */
+  async transaction<T>(fn: () => Promise<T>): Promise<T> {
+    if (trxStore.getStore()) return fn();
+    return this.rootDb.transaction().execute(trx => trxStore.run(trx, fn));
+  }
+
   async close(): Promise<void> {
-    await this.db.destroy();   // ends the pool too
+    await this.rootDb.destroy();   // ends the pool too
   }
 }
 
