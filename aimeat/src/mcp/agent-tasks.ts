@@ -31,6 +31,7 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
+import { readinessRefusal } from '../middleware/readiness-gate.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
@@ -358,6 +359,12 @@ export function registerAgentTaskTools(
         },
         annotationsFor('aimeat_task_event'),
         async ({ task_id, type, message, details }) => {
+            // The readiness bar POST /v1/agent-tasks/:id/events applies. It was middleware, so this
+            // door had none: an agent below the standard level was refused over HTTP and wrote the
+            // same events freely here.
+            const notReady = await readinessRefusal(storage, agentGaii, 'standard');
+            if (notReady) return { content: [{ type: 'text' as const, text: `READINESS_INSUFFICIENT: ${notReady}` }], isError: true };
+
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
 

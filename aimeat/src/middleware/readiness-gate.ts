@@ -22,6 +22,37 @@ function levelIndex(level: string): number {
   return idx >= 0 ? idx : 0;
 }
 
+/**
+ * The same rule without an Express request, so a surface that has none can apply it.
+ *
+ * The MCP task tools had no readiness gate at all: an agent below the standard bar was refused by
+ * POST /v1/agent-tasks/:id/events and wrote the same events freely through aimeat_task_event. The
+ * gate was middleware, and middleware does not reach the other door — which is what
+ * aimeat/no-express-in-service exists to stop.
+ *
+ * Returns a refusal message, or null when the agent may proceed. A non-agent principal, an agent
+ * with no onboarding record, and one still onboarding all pass, exactly as the middleware lets them.
+ */
+export async function readinessRefusal(
+  storage: Storage,
+  agentGaii: string,
+  minLevel: ReadinessLevel,
+): Promise<string | null> {
+  const onboarding = await storage.getOnboarding(agentGaii);
+  if (!onboarding || onboarding.status !== 'completed') return null;
+
+  if (onboarding.readinessOverride) {
+    const now = new Date().toISOString();
+    if (onboarding.readinessOverride.expiresAt > now
+      && levelIndex(onboarding.readinessOverride.level) >= levelIndex(minLevel)) return null;
+  }
+
+  const effectiveLevel = onboarding.readinessLevel ?? 'basic';
+  return levelIndex(effectiveLevel) < levelIndex(minLevel)
+    ? `Agent readiness level '${minLevel}' required, current level is '${effectiveLevel}'.`
+    : null;
+}
+
 export function requireReadiness(
   minLevel: ReadinessLevel,
   config: AimeatConfig,
