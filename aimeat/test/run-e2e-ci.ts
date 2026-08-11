@@ -93,6 +93,10 @@ const ALL_SUITES = [
     // The gates the August 2026 audit added around extensions: what a manifest may declare,
     // and who may read an action's source. Each test names the thing that used to be possible.
     'test/e2e-ext-hardening.ts',
+    // Two owners, two MCP sessions, and owner B trying every door that was open until
+    // 2026-08-11. Every one of those gates passed the existing suites on its first run, which is
+    // the finding rather than the reassurance: nothing had ever asked.
+    'test/e2e-mcp-cross-owner.ts',
     // Self-spawns its own node with AIMEAT_PACING_TOLL_DEFAULT set: the feature IS the node-wide
     // default, so it cannot be proven on the shared server.
     'test/e2e-pacing.ts',
