@@ -44,6 +44,13 @@ export function registerPortfolioTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
 ): void {
+    // The operator's kill switch, honoured here too. server-bootstrap/routes-loader.ts mounts
+    // the whole portfolio router only when config.portfolioEnabled is true, so on a node with the
+    // feature off there is no upload route at all. This tool registered regardless, so an agent
+    // could still write portfolio/index.html as a PUBLIC storage file under the owner's namespace
+    // and be handed a /p/{owner} address the node does not serve.
+    if (!config.portfolioEnabled) return;
+
     mcp.tool(
         'aimeat_portfolio_publish',
         descriptionFor('aimeat_portfolio_publish'),

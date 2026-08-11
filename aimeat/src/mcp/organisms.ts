@@ -477,8 +477,18 @@ export function registerOrganismsTools(
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = getOwnerName();
-            // Creator/admin only — archiving is a structural, destructive-adjacent op.
-            const isAdmin = organism.creatorGhii === ownerName || organism.admins.includes(ownerName) || organism.agentGaiis.includes(agentGaii);
+            // Creator/admin only — archiving is a structural, destructive-adjacent op that hides
+            // content from every AI-facing surface.
+            //
+            // An ATTACHED organism agent is deliberately NOT enough, and used to be: attaching one
+            // needs only that its owner be a member (routes/organisms/membership.ts), so any plain
+            // member's agent could archive the whole organism, a workspace or a single record over
+            // MCP. The HTTP door maps an attached agent to role 'member' and then demands creator or
+            // admin (routes/organisms/shared.ts memberRole), which refuses it. The role also comes
+            // from an ACTIVE membership row there, so it is read the same way here.
+            const membership = await storage.getMembership(organism_id, ownerName);
+            const role = membership?.status === 'active' ? membership.role : null;
+            const isAdmin = role === 'creator' || role === 'admin';
             if (!isAdmin) return { content: [{ type: 'text' as const, text: `Only the creator or an admin can ${action} organism content` }], isError: true };
             // Validate required fields per level (mirrors the REST validator).
             if ((level === 'workspace' || level === 'space' || level === 'record') && !ws) return { content: [{ type: 'text' as const, text: 'ws is required for workspace/space/record' }], isError: true };

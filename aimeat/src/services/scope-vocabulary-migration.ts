@@ -25,6 +25,9 @@
  *   // fire-and-forget at boot, after storage is ready
  *   migrateAgentScopeVocabulary(storage).catch(err => logger.error(…));
  * @version-history
+ *   v1.1.0 — 2026-08-11 — CONDITIONAL_SCOPES: a word handed only to agents already holding the
+ *     one it replaces. The four beneficiary tools moved from commerce:sell to the word REST
+ *     always required, and that must not widen anyone's reach.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3a: the vocabulary, and not breaking anyone).
  */
 import type { Storage } from '../storage/interface.js';
@@ -53,6 +56,25 @@ export const GRANDFATHERED_SCOPES = [
 ] as const;
 
 /**
+ * Words granted only to agents that ALREADY hold the word they are replacing.
+ *
+ * The four beneficiary tools asked for commerce:sell on the tool surface and exchange:beneficiary on
+ * the HTTP one — not stricter or looser, simply not the same gate, so an owner who withheld
+ * exchange:beneficiary still had an agent that could give away their revenue, and an agent granted
+ * exchange:beneficiary could not see the tools at all. Aligning the tools to the REST word would
+ * silently remove them from every selling agent, so the word is handed to exactly the agents that
+ * could already reach those tools and to nobody else. That preserves the reach they had; it does not
+ * hand a money-moving permission to an agent that never had it.
+ */
+export const CONDITIONAL_SCOPES: ReadonlyArray<{ grant: string; when: string; why: string }> = [
+    {
+        grant: 'exchange:beneficiary',
+        when: 'commerce:sell',
+        why: 'the four beneficiary tools moved from commerce:sell to the word REST already required',
+    },
+];
+
+/**
  * Add the new words to every agent that does not already hold them. Idempotent: a second run finds
  * nothing to do. Returns the number of agents actually updated, for the boot log.
  */
@@ -66,7 +88,10 @@ export async function migrateAgentScopeVocabulary(storage: Storage): Promise<num
         // defaultScopes is minted from config.defaultAgentScopes, which is a separate decision.
         if (!Array.isArray(held) || held.includes('*')) continue;
 
-        const missing = GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
+        const missing: string[] = GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
+        for (const c of CONDITIONAL_SCOPES) {
+            if (held.includes(c.when) && !held.includes(c.grant)) missing.push(c.grant);
+        }
         if (!missing.length) continue;
 
         await storage.updateAgent(agent.gaii, { defaultScopes: [...held, ...missing] });

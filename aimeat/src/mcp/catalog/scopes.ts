@@ -305,12 +305,21 @@ export const TOOL_SCOPES: Record<string, string> = {
     // READING what you are owed is a wallet question, not a selling one: a beneficiary is usually
     // not a seller at all, and gating their own receivables behind commerce:sell would mean an
     // account could be owed money it had no way to see.
-    aimeat_commerce_beneficiary_split_set: 'commerce:sell',
-    aimeat_commerce_beneficiary_splits: 'commerce:sell',
-    aimeat_commerce_beneficiary_release: 'commerce:sell',
+    // The word REST asks for on the same four operations (routes/commerce-beneficiaries.ts:187,
+    // :250, :314, :444). They used to ask for commerce:sell here — not stricter or looser, simply a
+    // different gate, so an owner who withheld exchange:beneficiary still had an agent that could
+    // give their revenue away, and an agent granted exchange:beneficiary could not see the tools.
+    // services/scope-vocabulary-migration.ts hands the word to agents already holding commerce:sell,
+    // so nothing loses a tool it had and nothing gains one it did not.
+    aimeat_commerce_beneficiary_split_set: 'exchange:beneficiary',
+    aimeat_commerce_beneficiary_splits: 'exchange:beneficiary',
+    aimeat_commerce_beneficiary_release: 'exchange:beneficiary',
     // Paying moves value out of the owner's own wallet, so it sits with the seller-side config
     // rather than with the reads.
-    aimeat_commerce_beneficiary_payout: 'commerce:sell',
+    // POST /v1/commerce/beneficiary/payout asks for exchange:beneficiary (:444); the quote GET asks
+    // for wallet:read (:411). One tool covers both, so it takes the write word — a caller who may
+    // only read a quote can use the earnings tool, which is already gated on wallet:read.
+    aimeat_commerce_beneficiary_payout: 'exchange:beneficiary',
     aimeat_commerce_beneficiary_earnings: 'wallet:read',
     // The approval gate is operator-only at the handler; the scope keeps a narrow agent from even
     // seeing the tool, so it is not offered to somebody who could never use it.

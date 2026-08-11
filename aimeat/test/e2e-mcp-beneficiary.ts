@@ -161,13 +161,18 @@ await test('Setup: operator, provider, beneficiary and consumer, each with an MC
     consumer = await setupOwner('cons');
     benef = await setupOwner('ben');
 
-    opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read']);
+    opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read', 'exchange:beneficiary']);
     // ext:invoke is separate from ext:write since the 2026-08-10 scope work: publishing an extension
     // and running one are different promises, and running one can spend the caller's morsels. An
     // agent that does both needs both words. (The REST invoke route asks for no scope at all, so
     // this door is deliberately the stricter of the two.)
-    provAgent = await agentSession(provider.token, provider.name, 'prova', ['commerce:sell', 'wallet:read', 'ext:write', 'ext:invoke']);
-    benefAgent = await agentSession(benef.token, benef.name, 'bena', ['wallet:read']);
+    // exchange:beneficiary is the word BOTH doors now ask for on split_set/splits/release/payout —
+    // REST always did (routes/commerce-beneficiaries.ts), and the tools asked for commerce:sell,
+    // which is a different gate rather than a stricter one. Existing agents were handed the word at
+    // boot by services/scope-vocabulary-migration.ts when they already held commerce:sell; an agent
+    // created here with an explicit list gets exactly what it asks for.
+    provAgent = await agentSession(provider.token, provider.name, 'prova', ['commerce:sell', 'exchange:beneficiary', 'wallet:read', 'ext:write', 'ext:invoke']);
+    benefAgent = await agentSession(benef.token, benef.name, 'bena', ['wallet:read', 'exchange:beneficiary']);
     narrowAgent = await agentSession(provider.token, provider.name, 'narrow', ['memory:read']);
 
     const inst = await json('/v1/extensions', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ manifest: manifest(EXT), scripts: SCRIPTS }) });
