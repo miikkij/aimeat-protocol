@@ -18,6 +18,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.7.0 -- 2026-08-11 -- scopeAllowsTool delegates to utils/scope-coverage.ts scopeIsCovered
+ *     instead of retelling the wildcard rule. The retelling had lost the memory:write-reserved
+ *     exception, so an agent holding '*' got aimeat_operator_ai_config registered.
  *   v1.x — 2026-08-08 — aimeat_company_* ride company:read / company:write.
  *   v1.6.0 -- 2026-08-10 -- 55 mutating tools get the scope they need, and SCOPE_EXEMPT_TOOLS
  *     shrinks from 73 to 18. Seven new scope words, handed to existing agents at boot by
@@ -42,6 +45,7 @@
  *   v1.1.0 -- 2026-06-23 -- Add the `secretary` scope profile (Secretary feature Phase 0).
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
+import { scopeIsCovered } from '../../utils/scope-coverage.js';
 
 /**
  * Tool -> required scope, mirroring the REST requireScope() gate for the SAME operation.
@@ -346,17 +350,21 @@ export function requiredScopeForTool(toolName: string): string | undefined {
 }
 
 /**
- * Whether an agent holding `scopes` may use `toolName`. Wildcard semantics mirror
- * auth/middleware.ts:requireScope — global '*', domain wildcard 'memory:*', and exact match.
- * Ungated tools (no entry in the static or dynamic map) are always allowed.
+ * Whether an agent holding `scopes` may use `toolName`. The wildcard rule is NOT written out here:
+ * it is scopeIsCovered() in utils/scope-coverage.ts, the same function requireScope and the agent
+ * permission dialog answer to. Ungated tools (no entry in the static or dynamic map) are allowed.
+ *
+ * This used to be a second copy of the rule, and the copy had lost the exception that matters:
+ * memory:write-reserved is deliberately outside every wildcard, because '*' is the one-click Full
+ * access template and the reserved keys are the ones the server itself trusts. The copy answered
+ * yes to '*', so an agent holding Full access got aimeat_operator_ai_config registered and could
+ * raise the owner's daily AI budget, while the same agent posting the same key to /v1/memory was
+ * refused RESERVED_KEY. One rule, one place, so the exception cannot be lost again.
  */
 export function scopeAllowsTool(scopes: string[], toolName: string): boolean {
     const required = TOOL_SCOPES[toolName];
     if (!required) return true;
-    if (scopes.includes('*')) return true;
-    if (scopes.includes(required)) return true;
-    const domain = required.split(':')[0];
-    return scopes.includes(`${domain}:*`);
+    return scopeIsCovered(scopes, required);
 }
 
 /**

@@ -13,6 +13,9 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-08-11 — handleCortexUpload enforces cortexMaxInstalled on a new name. Omitting the
+ *     manifest is the documented way to install anything over ~1 kB, and it was the one road past
+ *     the node's install ceiling that both manifest-carrying doors apply.
  *   v1.5.0 — 2026-08-10 — Security audit C-4: handleCortexUpload checks namespace ownership and the
  *     existing cortex's installedBy BEFORE writing any lib file, and replaces its own cortex instead
  *     of failing on the duplicate name. The lib write is an unconditional upsert keyed on the name
@@ -593,6 +596,21 @@ async function handleCortexUpload(
     if (existing && existing.installedBy !== ownerName) {
         res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'Not your cortex extension' });
         return;
+    }
+
+    // The node's install ceiling. Both manifest-carrying doors (POST /v1/cortex and the inline
+    // branch of aimeat_cortex_install) refuse at cortexMaxInstalled; this one did not, which made
+    // omitting the manifest — the documented way to install anything over ~1 kB — the unmetered
+    // road past the limit. Replacing your own cortex adds nothing, so only a new name is counted.
+    if (!existing) {
+        const installed = await storage.listCortexExtensions();
+        if (installed.length >= config.cortexMaxInstalled) {
+            res.status(413).json({
+                success: false, error: 'QUOTA_EXCEEDED',
+                message: `Maximum ${config.cortexMaxInstalled} cortex extensions allowed. Uninstall unused extensions first.`,
+            });
+            return;
+        }
     }
 
     if (result.libs) {

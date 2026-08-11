@@ -25,6 +25,9 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — sandboxLimits(): the memory/timeout/API-call arithmetic, which both doors
+ *     had written out themselves. The MCP copy used max(declared, cap), turning the node ceiling
+ *     into a floor.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 4: one sandbox context, one set of guards).
  */
 import { randomUUID } from 'node:crypto';
@@ -256,6 +259,27 @@ export function unavailableEmail(extName: string, reason: string): NonNullable<E
     return async () => {
         logger.warn(`[ext:${extName}] Email not available (${reason})`);
         return false;
+    };
+}
+
+/**
+ * How much memory, time and outbound calls one action may have. The declared numbers are a request,
+ * the node's configured maxima are the answer, and the small floors keep a manifest that asks for
+ * nothing from getting a sandbox too small to start in.
+ *
+ * The order of min and max is the whole point. The MCP door computed max(declared, cap), which turns
+ * the node ceiling into a FLOOR: an extension declaring a 60-second timeout got 60 seconds, and every
+ * extension got at least the node maximum memory and API budget. Written once here so the ceiling
+ * stays a ceiling on every road into the sandbox.
+ */
+export function sandboxLimits(
+    declared: { memoryMb: number; timeoutMs: number; maxApiCalls: number },
+    config: AimeatConfig,
+): { memoryMb: number; timeoutMs: number; maxApiCalls: number } {
+    return {
+        memoryMb: Math.min(Math.max(declared.memoryMb, 16), config.extensionMaxMemoryMb),
+        timeoutMs: Math.min(Math.max(declared.timeoutMs, 1000), config.extensionTimeoutMs),
+        maxApiCalls: Math.min(Math.max(declared.maxApiCalls, 10), config.extensionMaxApiCalls),
     };
 }
 

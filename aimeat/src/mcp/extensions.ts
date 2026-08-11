@@ -19,6 +19,9 @@
  *   v1.5.0 — 2026-07-19 — aimeat_extension_install gains update:true (in-place upsert preserving
  *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
  *     closes pitfall ext/extension-install-no-upsert
+ *   v1.8.0 — 2026-08-11 — The install ceilings (node-wide and per-owner) that POST/PUT /v1/extensions
+ *     have always applied, the shared ownership rule instead of a local copy that read an empty
+ *     installedBy as permission, and sandboxLimits for the invoke path.
  *   v1.7.0 — 2026-08-10 — The sandbox context comes from buildExtensionCtx, and the paywall runs
  *                         here too. This door executed the script without asking, so a priced
  *                         action was free through a tool call and metered over HTTP. The wallet is
@@ -37,7 +40,7 @@ import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
-import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail } from '../services/extension-ctx.js';
+import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail, sandboxLimits } from '../services/extension-ctx.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
 import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -62,6 +65,21 @@ export function registerExtensionsTools(
     sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
+
+    /**
+     * The caller, in the shape canManageExtensionAs() and the install caps expect.
+     *
+     * The role stays 'agent' and nothing else. An MCP session is always an agent record
+     * (mcp/index.ts:346), and the current connect path — device authorization — issues a token
+     * carrying exactly ['agent'] (routes/agents/device-auth.ts:152). Reading the owner's roles here
+     * would hand an operator's agent an operator's reach on this door, which is a loosening no
+     * token in the modern flow asks for. Written once so the four call sites cannot drift apart.
+     */
+    function resolveCaller(): { owner: string; roles: string[]; scopes: string[] } {
+        const owner = parseGAII(getAgentGaii())?.owner
+            ?? (getAgentGaii().includes('@') ? getAgentGaii().split('@')[0] : 'mcp-agent');
+        return { owner, roles: ['agent'], scopes: sessionScopes };
+    }
 
     // ── Resource: extension details ──
     mcp.registerResource(
@@ -265,11 +283,7 @@ export function registerExtensionsTools(
             });
 
             try {
-                const limits = {
-                    memoryMb: Math.max(ext.limits.memoryMb, config.extensionMaxMemoryMb),
-                    timeoutMs: Math.max(ext.limits.timeoutMs, config.extensionTimeoutMs),
-                    maxApiCalls: Math.max(ext.limits.maxApiCalls, config.extensionMaxApiCalls),
-                };
+                const limits = sandboxLimits(ext.limits, config);
                 const raw = await executeExtensionAction(action.scriptContent, ctx, input ?? {}, limits);
 
                 emitResourceUpdated(agentGaii, `aimeat://extensions/${encodeURIComponent(extension_name)}`);
@@ -367,8 +381,8 @@ export function registerExtensionsTools(
             // and the ZIP upload path use. This tool used to carry its own thinner copy, which is how
             // ODPS descriptors, commercial plans, instances validation and manifest field type-checking
             // ended up applying on some install paths and not others.
-            const callerOwner = parseGAII(getAgentGaii())?.owner
-                ?? (getAgentGaii().includes('@') ? getAgentGaii().split('@')[0] : 'mcp-agent');
+            const caller = resolveCaller();
+            const callerOwner = caller.owner;
             const built = buildExtensionRecordFromManifest(
                 manifestYaml, scripts, config, callerOwner, new Date().toISOString(),
             );
@@ -379,10 +393,7 @@ export function registerExtensionsTools(
             // is warn-only when AIMEAT_MCP_ENFORCE_SCOPES=false, and in that mode this tool installed
             // executable extension code with no permission check at all. routes/extensions/crud.ts
             // checks it in the handler for the same reason.
-            if (!canManageExtensionAs(
-                { owner: callerOwner, roles: ['agent'], scopes: sessionScopes },
-                config, callerOwner,
-            )) {
+            if (!canManageExtensionAs(caller, config, callerOwner)) {
                 return { content: [{ type: 'text' as const, text: 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
             }
 
@@ -394,9 +405,30 @@ export function registerExtensionsTools(
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" is already installed — pass update: true to upsert it in place (activation status and its ext: memory are preserved), or delete + reinstall.` }], isError: true };
             }
             if (existingExt && update) {
-                // Only the installing owner may update their extension in place.
-                if (existingExt.installedBy && existingExt.installedBy !== callerOwner) {
-                    return { content: [{ type: 'text' as const, text: `Extension "${name}" was installed by "${existingExt.installedBy}" — only the installing owner may update it` }], isError: true };
+                // Only the installing owner may update their extension in place. The rule is the
+                // shared one, not a local retelling of it: the local version read an EMPTY
+                // installedBy as permission, so an imported or legacy record could be overwritten
+                // in place by any agent holding ext:write. canManageExtensionAs compares owners
+                // directly, which refuses an empty installer to everyone but an operator.
+                if (!canManageExtensionAs(caller, config, existingExt.installedBy)) {
+                    return { content: [{ type: 'text' as const, text: `Extension "${name}" was installed by "${existingExt.installedBy || 'an unknown installer'}" — only the installing owner may update it` }], isError: true };
+                }
+            }
+
+            // The node-wide and per-owner install ceilings, which POST and PUT /v1/extensions have
+            // always applied (routes/extensions/crud.ts:128-146). This tool had neither, so the
+            // agent door was an unlimited road past both. Only a NEW name adds to the count; an
+            // in-place update replaces what is already there.
+            if (!existingExt) {
+                const installed = await storage.listExtensions();
+                if (installed.length >= config.extensionMaxInstalled) {
+                    return { content: [{ type: 'text' as const, text: `LIMIT_EXCEEDED: maximum ${config.extensionMaxInstalled} extensions allowed on this node` }], isError: true };
+                }
+                if (!caller.roles.includes('operator')) {
+                    const mine = installed.filter(e => e.installedBy === callerOwner);
+                    if (mine.length >= config.maxExtensionsPerOwner) {
+                        return { content: [{ type: 'text' as const, text: `EXTENSION_LIMIT: maximum ${config.maxExtensionsPerOwner} extensions per owner` }], isError: true };
+                    }
                 }
             }
 
@@ -508,10 +540,7 @@ export function registerExtensionsTools(
             // another owner's. routes/extensions/crud.ts has refused that since it was written, via
             // canManageInstalledExt; that function needed an Express request, so the surface without
             // one never called it. Same rule, same wording: not found rather than not yours.
-            if (!canManageExtensionAs(
-                { owner: parseGAII(getAgentGaii())?.owner ?? '', roles: ['agent'], scopes: sessionScopes },
-                config, ext.installedBy,
-            )) {
+            if (!canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
@@ -559,10 +588,7 @@ export function registerExtensionsTools(
             // another owner's. routes/extensions/crud.ts has refused that since it was written, via
             // canManageInstalledExt; that function needed an Express request, so the surface without
             // one never called it. Same rule, same wording: not found rather than not yours.
-            if (!canManageExtensionAs(
-                { owner: parseGAII(getAgentGaii())?.owner ?? '', roles: ['agent'], scopes: sessionScopes },
-                config, ext.installedBy,
-            )) {
+            if (!canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
@@ -602,10 +628,7 @@ export function registerExtensionsTools(
             // another owner's. routes/extensions/crud.ts has refused that since it was written, via
             // canManageInstalledExt; that function needed an Express request, so the surface without
             // one never called it. Same rule, same wording: not found rather than not yours.
-            if (!canManageExtensionAs(
-                { owner: parseGAII(getAgentGaii())?.owner ?? '', roles: ['agent'], scopes: sessionScopes },
-                config, ext.installedBy,
-            )) {
+            if (!canManageExtensionAs(resolveCaller(), config, ext.installedBy)) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 

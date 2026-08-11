@@ -126,8 +126,8 @@ async function setupParty(prefix: string): Promise<Party> {
     return { owner, ownerToken, agentGaii, mcpToken: tok.body.access_token };
 }
 
-/** Ask aimeat_cortex_install (no manifest) for a presigned cortex upload URL, as this party. */
-async function cortexUploadUrl(p: Party): Promise<string> {
+/** Call aimeat_cortex_install as this party and return the tool's own answer. */
+async function mcpCortexInstall(p: Party, args: Record<string, unknown>): Promise<{ isError: boolean; text: string }> {
     let sessionId = '';
     const rpc = async (method: string, params: Record<string, any>, id: number) => {
         const res = await fetch(`${BASE}/v1/mcp`, {
@@ -148,8 +148,14 @@ async function cortexUploadUrl(p: Party): Promise<string> {
         protocolVersion: '2025-03-26', capabilities: {},
         clientInfo: { name: 'C-4 regression', version: '1.0.0' },
     }, 1);
-    const call = await rpc('tools/call', { name: 'aimeat_cortex_install', arguments: {} }, 2);
-    const text = call?.result?.content?.[0]?.text ?? '{}';
+    const call = await rpc('tools/call', { name: 'aimeat_cortex_install', arguments: args }, 2);
+    const text = call?.result?.content?.[0]?.text ?? JSON.stringify(call?.error ?? call ?? {});
+    return { isError: call?.result?.isError === true || call?.error !== undefined, text };
+}
+
+/** Ask aimeat_cortex_install (no manifest) for a presigned cortex upload URL, as this party. */
+async function cortexUploadUrl(p: Party): Promise<string> {
+    const { text } = await mcpCortexInstall(p, {});
     const parsed = JSON.parse(text);
     assert(typeof parsed.upload_url === 'string', `no upload_url: ${text}`);
     return parsed.upload_url;
@@ -249,7 +255,41 @@ await test('Owner B CAN re-upload their own cortex (replace, not a duplicate-nam
     assert(status === 200, `re-upload status ${status}: ${JSON.stringify(body)}`);
 });
 
+// ── The same squat, through the INLINE branch of the same tool ─────────────────────────────────
+// The presigned road was fixed on 2026-08-10 and the inline road was not, so passing the manifest
+// as a string instead of zipping it walked around the gate this whole file was written for. The
+// namespace comes out of the caller's own manifest and cortex lib files are served as JavaScript
+// from the apex origin, so claiming a namespace you do not own is claiming someone else's front
+// door. POST /v1/cortex has refused it since the feature shipped.
+const inlineSquat = `c4-inline-squat-${Date.now()}`;
+await test('Owner B CANNOT install into A\'s namespace with an INLINE manifest over MCP', async () => {
+    const r = await mcpCortexInstall(B, {
+        manifest: manifestFor(inlineSquat, A.owner, LIB),
+        libs: { [LIB]: EVIL_LIB },
+    });
+    assert(r.isError, `expected a refusal, got: ${r.text.slice(0, 300)}`);
+    assert(/namespace/i.test(r.text), `expected the refusal to name the namespace, got: ${r.text.slice(0, 300)}`);
+
+    const after = await json(`/v1/cortex/${encodeURIComponent(inlineSquat)}`, {
+        headers: { Authorization: `Bearer ${B.ownerToken}` },
+    });
+    assert(after.status === 404, `nothing may have been created, got ${after.status}`);
+});
+
+// The positive control. "B was refused" proves nothing on its own: a tool that is not registered,
+// a malformed manifest and a working gate all produce isError. This is the same call into B's OWN
+// namespace, and it has to succeed.
+const inlineOwn = `c4-inline-own-${Date.now()}`;
+await test('Owner B CAN install an inline cortex into their own namespace (the gate is not a ban)', async () => {
+    const r = await mcpCortexInstall(B, {
+        manifest: manifestFor(inlineOwn, B.owner, LIB),
+        libs: { [LIB]: "export function hello() { return 'inline, from owner B'; }" },
+    });
+    assert(!r.isError, `own inline install was refused: ${r.text.slice(0, 300)}`);
+});
+
 console.log('\nCleanup');
+await json(`/v1/cortex/${encodeURIComponent(inlineOwn)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
 await json(`/v1/cortex/${VICTIM_ENC}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } });
 await json(`/v1/cortex/${encodeURIComponent(ownName)}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } });
 await json(`/v1/owners/${A.owner}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } });

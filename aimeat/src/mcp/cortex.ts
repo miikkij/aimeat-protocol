@@ -12,13 +12,16 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-08-11 -- The inline install branch checks namespace ownership, which the HTTP door
+ *     and the presigned road both do. Cortex lib files are served as JavaScript from the apex origin,
+ *     so a fresh name inside another owner's namespace was a squat on their front door.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseCortexManifest } from '../services/cortex-manifest.js';
+import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { runCapabilityAggregation } from '../services/capability-aggregator.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
@@ -160,6 +163,25 @@ export function registerCortexTools(
             }
 
             const ext = result.extension;
+
+            // The namespace comes out of the uploaded manifest, and cortex lib files are served back
+            // as JavaScript from the apex origin. Claiming a namespace you do not own is therefore
+            // squatting on someone else's front door. POST /v1/cortex has refused it since the
+            // feature shipped and the presigned upload path was fixed for it on 2026-08-10; this
+            // branch had no check at all, so a fresh name inside another owner's namespace sailed
+            // through. Operators may use any namespace, and an agent token carries the operator role
+            // when its owner holds it (routes/auth.ts:265-267), so the role is read the same way.
+            const ownerRec = await storage.getOwner(callerOwner);
+            if (!ownerRec?.roles.includes('operator') && !validateNamespaceOwnership(ext.namespace, ownerName)) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: `You cannot install a cortex in namespace "${ext.namespace}". `
+                            + `Use your own namespace "${ownerName}" or "community".`,
+                    }],
+                    isError: true,
+                };
+            }
 
             // Installing over an existing cortex extension is an UPDATE, and only its installer may
             // make one. routes/cortex.ts:265 refuses a mismatch on its own update path; this tool had

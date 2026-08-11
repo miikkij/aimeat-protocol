@@ -38,7 +38,7 @@ import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import { resolveGatedApp } from './permissions.js';
-import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail } from '../../services/extension-ctx.js';
+import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from '../../services/extension-ctx.js';
 import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../../services/call-timing.js';
 import { getEncryptionKey } from '../../services/encryption.js';
@@ -177,13 +177,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         }),
       });
 
-      // Execute the action in the sandbox
-      // Cap at system maximum; floor at minimum useful value
-      const limits = {
-        memoryMb: Math.min(Math.max(ext.limits.memoryMb, 16), config.extensionMaxMemoryMb),
-        timeoutMs: Math.min(Math.max(ext.limits.timeoutMs, 1000), config.extensionTimeoutMs),
-        maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
-      };
+      // Execute the action in the sandbox. services/extension-ctx.ts owns the arithmetic.
+      const limits = sandboxLimits(ext.limits, config);
       let result;
       // Time the DELIVERY, not the gate: what a buyer experiences is how long the answer takes, and a
       // provider can only commit to a service level from what was actually measured (call-timing.ts).
@@ -323,13 +318,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         }),
       });
 
-      // Execute the action in the sandbox
-      // Cap at system maximum; floor at minimum useful value
-      const limits = {
-        memoryMb: Math.min(Math.max(ext.limits.memoryMb, 16), config.extensionMaxMemoryMb),
-        timeoutMs: Math.min(Math.max(ext.limits.timeoutMs, 1000), config.extensionTimeoutMs),
-        maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
-      };
+      // Execute the action in the sandbox. services/extension-ctx.ts owns the arithmetic.
+      const limits = sandboxLimits(ext.limits, config);
       let result;
       // Time the DELIVERY, not the gate: what a buyer experiences is how long the answer takes, and a
       // provider can only commit to a service level from what was actually measured (call-timing.ts).
