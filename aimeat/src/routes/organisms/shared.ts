@@ -42,6 +42,20 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { logger } from '../../utils/logger.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
+/**
+ * Who may write in which namespace of a workspace: `meta.*` is the organism's own structure — its
+ * manifest, its config, the roster of spaces — so only a creator or an admin may change it. Every
+ * other namespace is content, and membership is enough.
+ *
+ * Module-level rather than a closure since 2026-08-11: the MCP workspace tools publish and revert
+ * too, and they checked membership only. Any member's agent could publish over the manifest or the
+ * config, and the config is where the gates are written.
+ */
+export function canWriteNamespaceRule(role: string, namespace: string): boolean {
+  return namespace.startsWith('meta.') ? (role === 'creator' || role === 'admin') : true;
+}
+
+
 export function roleSatisfies(approverRole: string, membershipRole: string): boolean {
   if (approverRole === 'member') return true;                                  // any active member
   if (approverRole === 'admin') return membershipRole === 'creator' || membershipRole === 'admin';
@@ -147,9 +161,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
   };
 
-  // meta.* writes require admin/creator; shared.* (and others) need only membership.
-  const canWriteNamespace = (role: string, namespace: string): boolean =>
-    namespace.startsWith('meta.') ? (role === 'creator' || role === 'admin') : true;
+  // Delegates to the module-level rule below, which the MCP workspace tools also use.
+  const canWriteNamespace = canWriteNamespaceRule;
 
   // Publish a draft: snapshot organism.{id}.{ns}.{instance}.draft → a new .version.N and .latest.
   // Schema-validated (the draft must be a valid object). Returns the new version number.

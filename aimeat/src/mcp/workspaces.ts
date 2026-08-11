@@ -102,6 +102,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
+import { canWriteNamespaceRule } from '../routes/organisms/shared.js';
+import { isKeyArchived } from '../services/archive.js';
 import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -173,6 +175,33 @@ export function registerWorkspaceTools(
         if (org.agentGaiis?.includes(agentGaii)) return null;
         const m = await storage.getMembership(orgId, ownerName);
         return m && m.status === 'active' ? null : 'Not an active member of this organism';
+    }
+
+    /**
+     * The caller's role in an organism, for the meta.* rule. denyReason answers "may they be here at
+     * all"; this answers "may they change the structure", and the two are different questions —
+     * publishing over the manifest or the config is not the same act as writing a document.
+     *
+     * An organism AGENT (org.agentGaiis) acts for the organism itself and is treated as a member;
+     * it does not inherit creator or admin, so it cannot publish into meta.* either.
+     */
+    async function memberRoleOf(orgId: string): Promise<'creator' | 'admin' | 'member' | null> {
+        const m = await storage.getMembership(orgId, ownerName);
+        if (m && m.status === 'active') return m.role;
+        const org = await storage.getOrganism(orgId);
+        return org?.agentGaiis?.includes(agentGaii) ? 'member' : null;
+    }
+
+    /**
+     * Is this key inside something the owner archived? Archived is read-only, and it means it on
+     * every surface. These tools checked nothing, so an archived workspace kept accepting drafts,
+     * publishes and structure edits through an agent while the web door refused them with 409.
+     */
+    async function archivedRefusal(key: string): Promise<string | null> {
+        const guard = await isKeyArchived(storage, key);
+        return guard.archived
+            ? `This ${guard.level} is archived (read-only). Unarchive it before writing.`
+            : null;
     }
 
     /** Pick the freshest of two records for the same key: higher version wins, then newer updatedAt.
@@ -516,6 +545,12 @@ export function registerWorkspaceTools(
         annotationsFor('aimeat_workspace_publish'),
         async ({ organism_id, ws, namespace, id, expected_version }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const role = await memberRoleOf(organism_id);
+            if (!role || !canWriteNamespaceRule(role, namespace)) {
+                return fail('Admin/creator role required to publish in a meta.* namespace');
+            }
+            const archived = await archivedRefusal(`${wsRoot(organism_id, ws)}.`);
+            if (archived) return fail(archived);
             const cfg = await storage.getMemory(ownerGhii, `organism.${organism_id}.meta.config`);
             const gate = (cfg?.value as { gates?: { publish?: { enabled?: boolean } } } | undefined)?.gates?.publish?.enabled;
             if (gate) return fail('Publishing requires human approval (the publish gate is on). Leave it as a draft for the owner to review and publish.');
@@ -587,6 +622,10 @@ export function registerWorkspaceTools(
         annotationsFor('aimeat_workspace_revert_to_draft'),
         async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
+            const revertRole = await memberRoleOf(organism_id);
+            if (!revertRole || !canWriteNamespaceRule(revertRole, namespace)) {
+                return fail('Admin/creator role required to reopen a meta.* record');
+            }
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
             // Reopening needs only .draft/.latest/bare — never the `.version.N` history values.
             const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
