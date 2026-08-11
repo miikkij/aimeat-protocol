@@ -4,14 +4,15 @@
  *   existing fat `Storage` provider. This is the coexistence bridge — the new
  *   Service → Repository → Adapter stack runs on top of the SAME storage the routes use today, so the
  *   framework can land with ZERO behaviour change. Each primitive is a thin pass-through to the
- *   equivalent `Storage` method; the two composite primitives that have no direct 1:1 (getByOwners,
- *   bulkUpsert, bulkDelete, withTransaction) are expressed in terms of existing methods and will be
- *   replaced by real per-backend primitives in later phases (bulk write / ACID transaction).
+ *   equivalent `Storage` method; the composite primitives that have no direct 1:1 (getByOwners,
+ *   bulkUpsert, bulkDelete) are expressed in terms of existing methods.
  *
  * @structure LegacyMemoryAdapter — constructor(storage); one method per adapter primitive
  * @usage const adapter = new LegacyMemoryAdapter(storage);
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 0 scaffolding: wraps Storage, no behaviour change.
+ *   v1.1.0 — 2026-08-11 — Dropped `withTransaction`. It was `return fn()`, nothing called it, and its
+ *     presence implied an atomicity guarantee the adapter never provided.
  */
 import type { MemoryRecord, Storage } from '../interface.js';
 import type {
@@ -159,14 +160,5 @@ export class LegacyMemoryAdapter implements MemoryStorageAdapter {
 
   history(ownerGaii: string, key: string, opts?: { limit?: number }): Promise<MemoryVersionRecord[]> {
     return this.storage.listMemoryHistory(ownerGaii, key, opts);
-  }
-
-  // ── Transaction seam ───────────────────────────────────────────────
-
-  /** Phase 0: runs the callback directly — the fat provider offers no transaction at this seam, and the
-   *  wrapped operations are already individually consistent. Per-backend adapters (Phase 4) implement a
-   *  real ACID transaction here so a multi-row operation commits atomically. */
-  withTransaction<T>(fn: () => Promise<T>): Promise<T> {
-    return fn();
   }
 }

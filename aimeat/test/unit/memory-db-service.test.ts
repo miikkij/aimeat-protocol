@@ -3,16 +3,17 @@
  * @description Phase 0 parity + framework tests for the data-access redesign scaffolding. Proves the new
  *   Service → Repository → Adapter stack returns byte-for-byte the same results as the current
  *   services/owner-memory.ts helpers over the SAME SqliteStorage (coexistence, zero behaviour change),
- *   and unit-tests the UnitOfWork primitives (IdentityMap memoisation, BatchLoader tick coalescing).
+ *   and unit-tests the read-scope primitive (IdentityMap memoisation).
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 0 scaffolding tests.
+ *   v1.1.0 — 2026-08-11 — Dropped the BatchLoader tests with the class they covered: nothing in src
+ *     ever called `uow.loader()`, so this suite was proving an unreachable class worked.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AgentRecord, MemoryRecord } from '../../src/storage/interface.js';
 import { createMemoryDbService, MemoryRepository } from '../../src/services/db/index.js';
 import { IdentityMap } from '../../src/storage/uow/identity-map.js';
-import { BatchLoader } from '../../src/storage/uow/batch-loader.js';
 import {
   listOwnerScopeMemory,
   listOwnerScopeMemoryMeta,
@@ -298,27 +299,3 @@ describe('IdentityMap', () => {
   });
 });
 
-describe('BatchLoader', () => {
-  it('coalesces same-tick loads into ONE batch call', async () => {
-    const batches: string[][] = [];
-    const loader = new BatchLoader<string, string>(async (keys) => {
-      batches.push([...keys]);
-      return keys.map(k => k.toUpperCase());
-    });
-    const [a, b, c] = await Promise.all([loader.load('a'), loader.load('b'), loader.load('a')]);
-    expect([a, b, c]).toEqual(['A', 'B', 'A']);
-    expect(batches).toHaveLength(1);        // one round-trip for all three loads
-    expect(batches[0].sort()).toEqual(['a', 'b']); // 'a' deduped by cache
-  });
-
-  it('separate ticks produce separate batches', async () => {
-    const batches: number[] = [];
-    const loader = new BatchLoader<number, number>(async (keys) => {
-      batches.push(keys.length);
-      return keys.map(k => k * 2);
-    }, { cache: false });
-    expect(await loader.load(1)).toBe(2);
-    expect(await loader.load(2)).toBe(4);
-    expect(batches).toEqual([1, 1]);
-  });
-});

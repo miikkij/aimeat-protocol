@@ -14,7 +14,6 @@
  *
  * @structure
  *   - ListOpts / CountOpts / KeyPrefixOpts: the query-shaping option bags (subset of the old Storage opts)
- *   - Transactor: the withTransaction seam (UnitOfWork consumes this)
  *   - MemoryStorageAdapter: the primitive set (read / cross-owner read / meta / aggregate / write / bulk / search)
  *
  * @usage
@@ -23,6 +22,8 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 0 scaffolding: contract defined; wraps existing Storage (coexist).
+ *   v1.1.0 — 2026-08-11 — Dropped the `Transactor` seam. Its only implementation was `return fn()`
+ *     and nothing consumed it, so the contract advertised a transaction boundary that did not exist.
  */
 import type { ArchiveFilter, MemoryRecord } from '../interface.js';
 import type {
@@ -71,22 +72,15 @@ export interface MemoryRef {
 }
 
 /**
- * The transaction seam. A UnitOfWork runs a multi-step operation inside `withTransaction` so shared
- * entities are staged and committed atomically. Phase 0's legacy adapter runs the callback directly
- * (no real transaction — the fat provider offers none at this seam); per-backend adapters (Phase 4)
- * implement a real ACID transaction here. Kept as its own interface so the UnitOfWork depends on the
- * capability, not on the whole adapter.
- */
-export interface Transactor {
-  withTransaction<T>(fn: () => Promise<T>): Promise<T>;
-}
-
-/**
  * The memory-domain storage adapter — the thin primitive set. Every method maps to at most one
  * round-trip per backend. Composition (owner-scope union, dedup, quota orchestration) lives ABOVE
  * this, in the repository/service. Do not add business logic or cross-domain reads here.
+ *
+ * NO transaction seam. There was one (`Transactor.withTransaction`), its only implementation ran the
+ * callback directly, nothing called it, and it was removed on 2026-08-11. Multi-step atomicity is
+ * `Storage.transaction()`'s job, one level down, where both backends can implement it for real.
  */
-export interface MemoryStorageAdapter extends Transactor {
+export interface MemoryStorageAdapter {
   // ── Point + cross-owner reads ──────────────────────────────────────
   /** One row by exact (ownerGaii, key). */
   getByKey(ownerGaii: string, key: string): Promise<MemoryRecord | null>;
