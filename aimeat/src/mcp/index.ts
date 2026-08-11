@@ -182,7 +182,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
         registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
         registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);

@@ -33,7 +33,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { writeMemoryRecord } from '../services/memory-write.js';
 
 /** An entry reference stored in a knowledge-package manifest's `entries` list. */
 interface KnowledgeEntryRef {
@@ -60,6 +60,8 @@ export function registerKnowledgeTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's own scopes, for the gate inside writeMemoryRecord. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -276,36 +278,36 @@ export function registerKnowledgeTools(
             // content most likely to be model-written and most likely to be read back later as if it
             // were established fact, which is exactly why the origin has to survive the hop.
             const visibility = existing?.visibility ?? 'owner';
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content,
-                declaredId: ai_provenance_id,
-                // `model` has meant "which model this knowledge came from" on this tool since long
-                // before provenance existed, so an agent that names it has told us something real.
-                // Fold it into the declaration rather than making them say it twice — and only as a
-                // fallback, so an explicit ai_provenance.model still wins.
-                declared: toDeclaredProvenance(ai_provenance)
-                    ?? (model?.trim() ? { level: 'ai-generated', model: model.trim() } : undefined),
-                pipeline: 'mcp.knowledge_contribute',
-                surface: { visibility, humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
-            });
 
-            await storage.setMemory({
+            // ONE implementation (services/memory-write.ts). A knowledge entry is a memory record,
+            // and writing it straight to storage meant it had none of what a memory record gets:
+            // no value-size limit, no key ceiling, no byte budget, no archive guard, no schema lock,
+            // and no live-update event. Every quota this node advertises was reachable around by
+            // contributing knowledge instead of writing memory.
+            //
+            // `model` has meant "which model this knowledge came from" on this tool since long
+            // before provenance existed, so an agent that names it has told us something real. It is
+            // folded into the declaration as a fallback, so an explicit ai_provenance.model wins.
+            const written = await writeMemoryRecord({ storage, config }, {
+                principal: agentGaii,
+                targetGaii: agentGaii,
+                scopes: sessionScopes,
+                roles: ['agent'],
+            }, {
                 key: fullEntryKey,
-                ownerGaii: agentGaii,
                 value,
-                ...(aiProvenanceId ? { aiProvenanceId } : {}),
                 visibility,
                 tags,
-                ttlHours: null,
-                version: (existing?.version ?? 0) + 1,
-                createdAt: existing?.createdAt ?? now,
-                updatedAt: now,
+                declaredProvenanceId: ai_provenance_id,
+                declaredProvenance: toDeclaredProvenance(ai_provenance)
+                    ?? (model?.trim() ? { level: 'ai-generated', model: model.trim() } : undefined),
+                pipeline: 'mcp.knowledge_contribute',
+                ownerScoped: true,
             });
+            if (!written.ok) {
+                return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}` }], isError: true };
+            }
+            const aiProvenanceId = written.record.aiProvenanceId;
 
             // Update manifest's entries list if entry is new
             const manifestValue = manifest.value as KnowledgeManifestValue;
