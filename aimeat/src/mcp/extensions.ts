@@ -19,6 +19,10 @@
  *   v1.5.0 — 2026-07-19 — aimeat_extension_install gains update:true (in-place upsert preserving
  *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
  *     closes pitfall ext/extension-install-no-upsert
+ *   v1.9.0 — 2026-08-11 — The two money steps that ran after the paywall on the HTTP door only:
+ *     the refund when a paid script throws, and the accrual of the provider's beneficiary
+ *     designation. The same failure cost the buyer through one door and nothing through the
+ *     other, and a promised revenue share was credited for HTTP calls and not for agent calls.
  *   v1.8.0 — 2026-08-11 — The install ceilings (node-wide and per-owner) that POST/PUT /v1/extensions
  *     have always applied, the shared ownership rule instead of a local copy that read an empty
  *     installedBy as permission, and sandboxLimits for the invoke path.
@@ -289,12 +293,16 @@ export function registerExtensionsTools(
 
                 emitResourceUpdated(agentGaii, `aimeat://extensions/${encodeURIComponent(extension_name)}`);
 
-                // This door does NOT settle, so it accrues nothing — but it must still strip the
-                // provider's beneficiary designation. The key is the seller's commercial business,
-                // not a fact about the answer, and the REST door has always removed it. Leaving it
-                // here would mean which door you came through decided whether you saw who the
-                // seller shares its margin with.
-                const { result } = takeDesignations(raw);
+                // The designation is stripped either way — the key is the seller's commercial
+                // business, not a fact about the answer, and the REST door has always removed it.
+                // What this door used to skip was ACCRUING it: a seller who promised a third party
+                // a share of their revenue got that share credited for calls that came over HTTP
+                // and nothing for calls that came through an agent, which is the same money and a
+                // different answer. An internal hop accrues nothing here, because the upstream door
+                // holds the settlement and is the only one that can.
+                const shared = pay.upstream ? { designations: [], result: raw } : takeDesignations(raw);
+                if (pay.accrue) await pay.accrue(shared.designations);
+                const result = shared.result;
 
                 return {
                     content: [{
@@ -303,6 +311,10 @@ export function registerExtensionsTools(
                     }],
                 };
             } catch (err) {
+                // Never keep payment for a call that did not deliver. The HTTP door has refunded on
+                // a script throw since the paywall existed; this one charged and kept it, so the
+                // same failure cost the buyer money through one door and nothing through the other.
+                if (pay.refund) await pay.refund();
                 const message = (err as Error).message;
                 logger.error(`MCP extension action failed: ${extension_name}/${action_id}`, { error: message, caller: agentGaii });
                 return {

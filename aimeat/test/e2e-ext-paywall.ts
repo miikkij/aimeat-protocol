@@ -200,5 +200,104 @@ await test('Install validation: commercial:{} (C1) and payMorsels:-1 rejected 40
   assert(r2.status === 400, `negative payMorsels should reject, got ${r2.status}`);
 });
 
+// ── The same money question, through the agent door ──────────────────────────────────────────────
+//
+// The paywall runs on both doors since 2026-08-10, but two things after it lived only in the HTTP
+// handler: the REFUND when a paid script throws, and the ACCRUAL of the provider's beneficiary
+// designation. So the same failure cost the buyer money through one door and nothing through the
+// other, and a seller who promised a third party a share got it credited for HTTP calls and not for
+// agent calls. Same money, different answer, decided by which road the call came down.
+
+/** An MCP session for an agent under `ownerToken`, with the scopes the invoke door asks for. */
+async function mcpSessionFor(ownerToken: string, ownerName: string, label: string) {
+  const ag = await json('/v1/agents', {
+    method: 'POST', headers: auth(ownerToken),
+    body: JSON.stringify({ name: label, owner: ownerName, capabilities: ['extensions'], model: 'gpt-4o',
+      scopes: ['ext:invoke', 'wallet:read'] }),
+  });
+  assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body?.error)}`);
+  const gaii = ag.body.data.agent.gaii as string;
+  const key = ag.body.data.private_key as string;
+
+  const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'paywall mcp', redirect_uris: [] }) });
+  const ts = new Date().toISOString();
+  const params = new URLSearchParams({
+    response_type: 'code', client_id: client.body.client_id, gaii,
+    signature: await sign(key, gaii + NODE_ID + ts), timestamp: ts,
+  });
+  const authRes = await json(`/v1/mcp/authorize?${params}`);
+  const tok = await json('/v1/mcp/token', {
+    method: 'POST',
+    body: JSON.stringify({ grant_type: 'authorization_code', code: authRes.body.code,
+      client_id: client.body.client_id, client_secret: client.body.client_secret }),
+  });
+  assert(tok.status === 200, `mcp token ${tok.status}: ${JSON.stringify(tok.body)}`);
+
+  let sessionId = '';
+  let nextId = 1;
+  const rpc = async (method: string, p: Record<string, any> = {}) => {
+    const id = nextId++;
+    const res = await fetch(`${BASE}/v1/mcp`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+        Authorization: `Bearer ${tok.body.access_token}`,
+        ...(sessionId ? { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id, method, params: p }),
+    });
+    const sid = res.headers.get('mcp-session-id');
+    if (sid) sessionId = sid;
+    const ct = res.headers.get('content-type') ?? '';
+    if (!ct.includes('text/event-stream')) return await res.json() as any;
+    for (const evt of (await res.text()).split('\n\n')) {
+      for (const line of evt.split('\n')) {
+        if (!line.startsWith('data: ')) continue;
+        try { const m = JSON.parse(line.slice(6)); if (m.id === id) return m; } catch { /* partial */ }
+      }
+    }
+    return {};
+  };
+  await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'paywall mcp e2e', version: '1.0.0' } });
+  await fetch(`${BASE}/v1/mcp`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+      Authorization: `Bearer ${tok.body.access_token}`, 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26',
+    },
+    body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }),
+  });
+  return {
+    async call(name: string, args: Record<string, unknown>) {
+      const body = await rpc('tools/call', { name, arguments: args });
+      const text = body?.result?.content?.[0]?.text ?? JSON.stringify(body?.error ?? body ?? {});
+      return { isError: body?.result?.isError === true || body?.error !== undefined, text };
+    },
+  };
+}
+
+await test('MCP: a paid action whose script throws refunds the caller, as the HTTP door does', async () => {
+  const s = await mcpSessionFor(caller.token, caller.name, 'pwbot');
+  const cb = await balance(caller.token);
+  const ob = await balance(owner.token);
+
+  const r = await s.call('aimeat_extension_invoke', { extension_name: EXT, action_id: 'paidthrow', input: {} });
+  assert(r.isError, `the throwing action must report failure, got: ${r.text.slice(0, 200)}`);
+
+  assert(await balance(caller.token) === cb,
+    `the caller was not refunded after the script threw: ${cb} -> ${await balance(caller.token)}`);
+  assert(await balance(owner.token) === ob,
+    'the owner must not be left holding revenue for an undelivered call');
+});
+
+await test('MCP: the same action delivering DOES charge, so the refund above is not a free call', async () => {
+  const s = await mcpSessionFor(caller.token, caller.name, 'pwbot2');
+  const cb = await balance(caller.token);
+  const r = await s.call('aimeat_extension_invoke', { extension_name: EXT, action_id: 'paidcall', input: {} });
+  assert(!r.isError, `the paid action should succeed: ${r.text.slice(0, 200)}`);
+  assert(await balance(caller.token) < cb,
+    'a delivered paid call must cost the caller — otherwise the refund test proves nothing');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
