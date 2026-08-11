@@ -415,7 +415,11 @@ export function registerExchangeTools(
                 consumerGaii, appId: n.appId, providerGhii: `${extRec.installedBy}@${config.nodeId}`,
                 ext: bid.ext, action: bid.action, capabilityLabel: `${bid.ext}/${bid.action}`,
                 unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
-                capUnits: capCap, contractRef: `bid:${bid.bidId}`, createdBy: owner, carrySpend: existing,
+                // The pacing toll the ACTION declares for itself, which this door dropped. The same
+                // contract accepted over HTTP carries it (routes/exchange-market.ts:616), so the
+                // same capability burned morsels per call through one door and not the other.
+                capUnits: capCap, contractRef: `bid:${bid.bidId}`, tollMorsels: act.tollMorsels ?? null,
+                createdBy: owner, carrySpend: existing,
             });
             bid.state = 'accepted'; await putBid(storage, bid);
             n.state = 'matched'; n.updatedAt = new Date().toISOString(); await putNeed(storage, n);

@@ -47,6 +47,7 @@ import {
 } from '../services/exchange-proposals.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
+import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../routes/extensions/metered-response.js';
 import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput } from '../models/app-tool-schemas.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
@@ -170,9 +171,16 @@ export function registerExchangeRunTools(
                 // own HTTP surface and meets the raw paywall, which cannot know which product was bought —
                 // so it billed the same contract a second time. One call, one settlement, whichever twin
                 // of this route the caller reached (the REST WebMCP path carries the same pass).
+                const startedAt = Date.now();
                 const invoked = await invokeCapability(config, storage, cap,
                     applyLockedInput(toolDef, (input ?? {}) as Record<string, unknown>),
                     callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool));
+                // Measured, so the provider can propose a service commitment from evidence rather
+                // than from a guess (services/call-timing.ts). The REST twin has recorded this since
+                // it was written, so a capability's published p50/p95 described its HTTP traffic only
+                // — and an agent calling the same tool contributed nothing to the number a buyer
+                // reads before committing.
+                recordCallDuration(storage, ent.providerGhii, coordExt, tool, Date.now() - startedAt);
                 // Delivered → book whoever the provider owes a share of this call, out of their own cut.
                 const shared = takeDesignations(invoked.result);
                 if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
