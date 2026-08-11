@@ -32,6 +32,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
+import { commissionFingerprint } from '../routes/agent-tasks/dedupe.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
@@ -94,6 +95,19 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ error: fileResult.error.message, code: fileResult.error.code }, null, 2) }], isError: true };
             }
 
+            // One live commission per (agent, fingerprint), as POST /v1/agent-tasks does. Without
+            // it, a repeated delegation over MCP queues duplicate runs the owner pays for, and the
+            // row carries no dedupeKey so nothing downstream can collapse them either. An agent
+            // retrying after a timeout is the ordinary case, not the exotic one.
+            const dedupeKey = commissionFingerprint(targetGaii, undefined, title, description);
+            const live = await storage.findLiveTaskByDedupeKey(targetGaii, dedupeKey);
+            if (live) {
+                return { content: [{ type: 'text' as const, text: JSON.stringify({
+                    deduplicated: true, task_id: live.id, status: live.status,
+                    note: 'An identical commission is already live for this agent; the existing one is returned instead of queueing a second.',
+                }, null, 2) }] };
+            }
+
             const now = new Date().toISOString();
             const id = randomUUID();
             const record: AgentTaskRecord = {
@@ -108,6 +122,7 @@ export function registerAgentTaskTools(
                 ...(fileResult.files.length ? { resources: { files: fileResult.files } } : {}),
                 todos: [],
                 status: (status ?? 'queued') as AgentTaskRecord['status'],
+                dedupeKey,
                 createdAt: now,
                 updatedAt: now,
             };
