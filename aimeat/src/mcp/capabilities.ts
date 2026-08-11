@@ -129,6 +129,11 @@ export function registerCapabilitiesTools(
             name: z.string().describe('Human-readable capability name'),
             summary: z.string().describe('Brief description of what this capability does'),
             callable: z.boolean().optional().describe('Whether this capability can be invoked directly'),
+            status: z.enum(['draft', 'active']).optional().describe(
+                'draft = created but listed to nobody; active = listed. Default draft, the same as POST /v1/capabilities — '
+                + 'so nothing reaches the catalogue that the owner did not mean to put there. Publish it later with '
+                + 'aimeat_capabilities_update({ id, status: "active" }). On a moderated node a PUBLIC capability goes to '
+                + 'pending_review whichever you ask for; that gate is not this field.'),
             visibility: z.enum(['private', 'public']).optional().describe('Visibility: private (default) or public'),
             tags: z.array(z.string()).optional().describe('Tags for discovery and filtering'),
             inputSchema: z.record(z.string(), z.unknown()).optional().describe('JSON Schema for input validation'),
@@ -160,11 +165,11 @@ export function registerCapabilitiesTools(
             const record: CapabilityRecord = {
                 ...buildCapabilityRecord({
                     ownerGhii, schemaHash, now,
-                    // The one field the two doors genuinely differ on: the web door parks a new
-                    // capability as a draft for the owner to review, this one publishes it live.
-                    // A product decision, recorded in the drift map, and not a copied line — which
-                    // is why it is the argument and the other twenty-nine fields are not.
-                    status: moderatedStatus(config, args.visibility, false, 'active'),
+                    // The caller says which state. Default 'draft', the same as POST /v1/capabilities:
+                    // a capability an agent creates no longer appears in the catalogue the instant it
+                    // is written. moderatedStatus still overrides it to pending_review for a PUBLIC
+                    // capability on a moderated node — that gate is separate and not the caller's.
+                    status: moderatedStatus(config, args.visibility, false, args.status ?? 'draft'),
                 }, {
                     id: args.id, name: args.name, summary: args.summary, visibility: args.visibility,
                     callable: args.callable, inputSchema: args.inputSchema, outputSchema: args.outputSchema,
@@ -194,6 +199,9 @@ export function registerCapabilitiesTools(
             summary: z.string().optional().describe('Updated summary'),
             tags: z.array(z.string()).optional().describe('Updated tags'),
             visibility: z.enum(['private', 'public']).optional().describe('Updated visibility'),
+            status: z.enum(['draft', 'active', 'deprecated', 'disabled']).optional().describe(
+                'Publish a draft with "active", take it out of the catalogue with "draft", or retire it with '
+                + '"deprecated" / "disabled". Without this an agent could create a capability and never publish it.'),
             usage: z.string().optional().describe('Updated usage instructions'),
             whenToUse: z.string().optional().describe('Updated guidance on when to use'),
             whenNotToUse: z.string().optional().describe('Updated guidance on when NOT to use'),
@@ -213,6 +221,13 @@ export function registerCapabilitiesTools(
             if (args.summary !== undefined) updates.summary = args.summary;
             if (args.tags !== undefined) updates.tags = args.tags;
             if (args.visibility !== undefined) updates.visibility = args.visibility;
+            // Asking for 'active' on a PUBLIC capability still lands on pending_review when the node
+            // moderates — the same rule the create path applies, from the same function.
+            if (args.status !== undefined) {
+                updates.status = args.status === 'active'
+                    ? moderatedStatus(config, args.visibility ?? cap.visibility, false, 'active')
+                    : args.status;
+            }
             if (args.usage !== undefined) updates.usage = args.usage;
             if (args.whenToUse !== undefined) updates.whenToUse = args.whenToUse;
             if (args.whenNotToUse !== undefined) updates.whenNotToUse = args.whenNotToUse;

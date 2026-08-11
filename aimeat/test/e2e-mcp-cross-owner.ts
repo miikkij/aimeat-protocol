@@ -269,6 +269,43 @@ async function run() {
 
     // ── A private board ─────────────────────────────────────────────────────────────────────
     let boardId = '';
+    await test('a capability an agent creates is a DRAFT, and the agent can publish it itself', async () => {
+        // Until 2026-08-11 the two ways of creating a capability disagreed: POST /v1/capabilities
+        // made a draft for the owner to publish, aimeat_capabilities_create made it live the instant
+        // it was written. Same act, two answers to "is this listed now".
+        //
+        // The default is now the REST one — a draft, listed to nobody — and the tool takes `status`
+        // so a caller that genuinely wants it live says so. aimeat_capabilities_update takes
+        // `status` too, because a default of 'draft' with no way to publish would leave an agent
+        // unable to finish what it started.
+        const id = `capstate${Date.now()}`;
+        const made = await callTool(A.session, 'aimeat_capabilities_create', {
+            id, name: 'state probe', summary: 'capability state e2e', visibility: 'private', usage: 'test only',
+        });
+        if (made.isError) {
+            assert(/PUBLISHING_DISABLED/i.test(made.text),
+                `create failed for an unexpected reason: ${made.text.slice(0, 200)}`);
+            return;   // publishing is off on this node; the sibling test below proves that policy
+        }
+        assert(JSON.parse(made.text).status === 'draft',
+            `a new capability must be a draft: ${made.text.slice(0, 200)}`);
+
+        const published = await callTool(A.session, 'aimeat_capabilities_update', { id, status: 'active' });
+        assert(!published.isError, `the agent could not publish its own draft: ${published.text.slice(0, 200)}`);
+
+        const back = await callTool(A.session, 'aimeat_capabilities_get', { id });
+        assert(/"status":\s*"active"/.test(back.text),
+            `the capability did not go active: ${back.text.slice(0, 250)}`);
+
+        // And asking for active up front still works, for a caller that means it.
+        const live = await callTool(A.session, 'aimeat_capabilities_create', {
+            id: `${id}live`, name: 'state probe live', summary: 'capability state e2e',
+            visibility: 'private', usage: 'test only', status: 'active',
+        });
+        assert(!live.isError && JSON.parse(live.text).status === 'active',
+            `an explicit active was not honoured: ${live.text.slice(0, 200)}`);
+    });
+
     await test('owner B cannot post into owner A\'s PRIVATE board', async () => {
         // 97f463c6. aimeat_board_post never loaded the board, so it had no access check at all.
         const made = await callTool(A.session, 'aimeat_board_create', {

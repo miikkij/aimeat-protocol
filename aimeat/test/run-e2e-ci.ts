@@ -423,6 +423,11 @@ async function startServer(): Promise<ChildProcess> {
         // one more account does not cascade into unrelated failures. No suite asserts this 429.
         AIMEAT_REGISTRATION_RATE_LIMIT_MAX: process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*',
+        // Capability publishing is 'disabled' by default in prod, so every capability assertion in
+        // the suites either exercised the disabled policy or returned early having proven nothing.
+        // 'self_only' lets an owner publish their own, which is what the suites are actually about;
+        // e2e-mcp-cross-owner still asserts the disabled branch when a node has it off.
+        AIMEAT_CAPABILITY_PUBLISHING: process.env.AIMEAT_CAPABILITY_PUBLISHING ?? 'self_only',
         // Connector forward tunnel is opt-in (off by default in prod); enable it
         // for every e2e run so the tunnel suites work in CI too (the .env.test.*
         // files are gitignored, so they can't carry this for CI).
