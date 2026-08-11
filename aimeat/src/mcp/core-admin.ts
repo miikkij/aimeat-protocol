@@ -9,6 +9,10 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — aimeat_admin_mint calls services/morsel.ts mintMorsels, the same function
+ *     POST /v1/admin/mint calls. The two copies computed the daily cap, credited the balance and
+ *     wrote the ledger row separately, and had already drifted apart on what they told the live
+ *     wallet stream. (August 2026 audit step 8.)
  *   v1.0.0 — 2026-07-13 — Extracted from src/mcp/core.ts (max-file-lines); no behavior change
  */
 
@@ -19,7 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
+import { mintMorsels } from '../services/morsel.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -145,32 +149,15 @@ export function registerCoreAdminTools(
         annotationsFor('aimeat_admin_mint'),
         async ({ gaii, amount }) => {
             if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
-            const agent = await storage.getAgent(gaii);
-            if (!agent) return { content: [{ type: 'text' as const, text: `Agent not found: ${gaii}` }], isError: true };
-
-            const dayStart = new Date(); dayStart.setUTCHours(0, 0, 0, 0);
-            const allTx = await storage.listAllTransactions();
-            const mintedToday = allTx
-                .filter(tx => tx.type === 'mint' && new Date(tx.timestamp) >= dayStart)
-                .reduce((sum, tx) => sum + tx.amount, 0);
-            if (mintedToday + amount > config.maxOperatorMintPerDay) {
-                return { content: [{ type: 'text' as const, text: `Daily mint cap (${config.maxOperatorMintPerDay}) would be exceeded. Already minted ${mintedToday} today.` }], isError: true };
+            // ONE implementation (services/morsel.ts mintMorsels). This tool carried its own copy of
+            // the cap arithmetic, the credit and the ledger row, which is a second answer to "how
+            // much has been minted today" sitting next to the HTTP one.
+            const minted = await mintMorsels({ storage, config }, agentGaii, gaii, amount);
+            if (!minted.ok) {
+                return { content: [{ type: 'text' as const, text: `${minted.code}: ${minted.message}` }], isError: true };
             }
-
-            await storage.creditBalance(gaii, amount);
-            emitChange('config');
-            emitChange('wallet');
-            const { randomBytes: rb } = await import('node:crypto');
-            await storage.addTransaction({
-                id: `tx-${Date.now()}-${rb(4).toString('hex')}`,
-                gaii, type: 'mint', amount,
-                counterpartyGaii: agentGaii,
-                timestamp: new Date().toISOString(),
-            });
             emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
-            const mintedAgentRecord = await storage.getAgent(gaii);
-            const mintedGhii = mintedAgentRecord ? await storage.getGHIIByOwner(mintedAgentRecord.owner) : null;
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: amount, new_balance: mintedGhii?.morselBalance ?? 0 }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: minted.minted, new_balance: minted.newBalance }, null, 2) }] };
         },
     );
 }

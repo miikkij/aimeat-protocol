@@ -9,6 +9,12 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v2.0.0 — 2026-08-11 — Install, activate, deactivate and delete go through
+ *     services/extension-lifecycle.ts instead of calling storage here. Four side effects the HTTP
+ *     door has always had were missing on this one: deleting removed the row and left the scheduled
+ *     jobs and the whole ext: namespace behind, activating never registered the manifest's schedules
+ *     or ran its @activate jobs, deactivating left the cron firing, and a redeploy of an identical
+ *     manifest re-ran the extension's initialisation instead of answering "unchanged".
  *   v1.0.0 — 2026-03-21 — Initial creation: 2 tools + 1 resource for extension management via MCP
  *   v1.1.0 — 2026-05-02 — Add 5 lifecycle tools: install, activate, deactivate, delete, get
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -38,11 +44,10 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
-import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
-import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields, prepareSecretConfigForWrite } from '../services/extension-secrets.js';
+import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields } from '../services/extension-secrets.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
 import { buildExtensionCtx, buildExtensionWallet, buildExtensionNotify, unavailableEmail, sandboxLimits } from '../services/extension-ctx.js';
 import { enforcePaywall } from '../routes/extensions/paywall.js';
@@ -51,15 +56,15 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { canManageExtensionAs } from '../routes/extensions/permissions.js';
-import { upsertExtensionInPlace } from '../services/extension-upsert.js';
+import {
+    writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
+} from '../services/extension-lifecycle.js';
 import { getActiveScheduler } from '../services/scheduler.js';
-import { extensionInstallRefusal } from '../services/install-quotas.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { makeExtensionFiles } from '../services/extension-files.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 
 export function registerExtensionsTools(
@@ -415,6 +420,7 @@ export function registerExtensionsTools(
 
             const record = built.record;
             const name = record.name;
+            const scheduler = getActiveScheduler();
 
             const existingExt = await storage.getExtension(name);
             if (existingExt && !update) {
@@ -431,79 +437,41 @@ export function registerExtensionsTools(
                 }
             }
 
-            // The node-wide and per-owner install ceilings, from the one place that holds them
-            // (services/install-quotas.ts). This tool had neither, so the agent door was an
-            // unlimited road past both — and writing them out HERE would have been the same
-            // mistake in the other direction. Only a NEW name counts; an in-place update replaces
-            // what is already there.
-            if (!existingExt) {
-                const overQuota = await extensionInstallRefusal({ storage, config }, callerOwner, caller.roles.includes('operator'));
-                if (overQuota) return { content: [{ type: 'text' as const, text: `${overQuota.code}: ${overQuota.message}` }], isError: true };
-            }
-
-            // Encrypt secrets before any write, as POST/PUT /v1/extensions do. This path wrote config straight to storage, so a `type: secret` value was persisted in the clear and served unauthenticated.
-            const preparedConfig = prepareSecretConfigForWrite(record.config, existingExt?.config, getEncryptionKey(config));
-            if (preparedConfig === null) {
-                return {
-                    content: [{ type: 'text' as const, text: 'ENCRYPTION_NOT_CONFIGURED: this manifest declares a secret config field but the node has no encryption key. Set AIMEAT_ENCRYPTION_KEY or drop the secret field; a secret is never stored in plaintext.' }],
-                    isError: true,
-                };
-            }
-            record.config = preparedConfig;
-
             try {
-                let result: ExtensionRecord;
-                let action: 'installed' | 'updated';
-                if (existingExt) {
-                    // The whole upsert is services/extension-upsert.ts: the field swap, the EXCHANGE
-                    // re-projection, and — for an ACTIVE extension — re-registering its schedules
-                    // from the new manifest and re-running its @activate jobs. This tool used to do
-                    // only the swap and said so in its own answer, so an agent redeploying an active
-                    // extension left the OLD schedules running against the new code.
-                    const upserted = await upsertExtensionInPlace(
-                        { storage, config, scheduler: getActiveScheduler() }, name, record,
-                        { ownerName: record.installedBy, actor: agentGaii, wasActive: existingExt.status === 'active' },
-                    );
-                    emitChange('extensions');
-                    // Never answer a write that did not apply with the record we WANTED to store.
-                    if (!upserted.record) {
-                        logger.error(`Extension upsert wrote nothing via MCP: ${name}`, { by: record.installedBy });
-                        return {
-                            content: [{ type: 'text' as const, text: `Extension "${name}" was NOT updated — the storage write did not apply, and the installed version is unchanged. Nothing was deployed.` }],
-                            isError: true,
-                        };
-                    }
-                    result = upserted.record;
-                    action = 'updated';
-                    logger.info(`Extension updated via MCP: ${name}`, { version: record.version, by: record.installedBy, reinitialized: upserted.reinitialized });
-                } else {
-                    result = await storage.createExtension(record);
-                    emitChange('extensions');
-                    action = 'installed';
-                    logger.info(`Extension installed via MCP: ${result.name}`, { version: result.version, by: record.installedBy });
+                // The whole write is services/extension-lifecycle.ts: the node-wide and per-owner
+                // install ceilings, the secret encryption (this path once wrote config straight to
+                // storage, so a `type: secret` value was persisted in the clear), the no-op shortcut
+                // for an identical manifest, the in-place swap with its schedule re-registration, and
+                // the EXCHANGE re-projection. Writing any of that out here is how the two doors came
+                // to disagree in the first place.
+                const written = await writeExtensionRecord({ storage, config, scheduler }, record, {
+                    existing: existingExt ?? null,
+                    ownerName: callerOwner,
+                    actor: agentGaii,
+                    isOperator: caller.roles.includes('operator'),
+                });
+                if (!written.ok) {
+                    return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}` }], isError: true };
                 }
+                const result = written.record;
+                logger.info(`Extension ${written.action} via MCP: ${result.name}`, {
+                    version: result.version, by: record.installedBy, reinitialized: written.reinitialized,
+                });
 
-                // Optional immediate activation (skips the separate activate call).
+                // Optional immediate activation (skips the separate activate call). The shared
+                // activation registers the manifest's schedules and runs its @activate jobs, which
+                // the status write here never did.
                 let status = result.status;
                 if (activate && status !== 'active') {
-                    await storage.updateExtension(name, { status: 'active', activatedAt: new Date().toISOString() });
-                    emitChange('extensions');
-                    status = 'active';
+                    const activated = await activateExtension({ storage, config, scheduler }, result, agentGaii);
+                    status = activated?.status ?? 'active';
                 }
-                // Re-project any EXCHANGE listings the actions declare (price/flag may have changed) —
-                // parity with POST/PUT /v1/extensions, which have always done this.
-                await reconcileAfterExtensionWrite(storage, record.installedBy, config.nodeId, name);
                 // Actions may have changed (or just went live) — refresh aggregated capabilities.
                 if (status === 'active') {
                     import('../services/capability-aggregator.js')
                         .then(m => m.runCapabilityAggregation(config, storage))
                         .catch(err => logger.error('Capability aggregation after MCP extension install failed', { error: String(err) }));
                 }
-
-                // The note that used to live here — "schedules are NOT re-registered by this tool,
-                // use the REST upsert" — is gone because it is no longer true: the shared upsert
-                // re-registers them for an active extension, on both doors.
-                const scheduleNote = undefined;
 
                 return {
                     content: [{
@@ -512,9 +480,12 @@ export function registerExtensionsTools(
                             name: result.name,
                             version: result.version,
                             status,
-                            action,
-                            ...(scheduleNote ? { note: scheduleNote } : {}),
+                            action: written.action,
                             actions: result.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
+                            // What the manifest lost or what the sandbox cannot do. The HTTP door has
+                            // always returned these; an author installing through an agent learned
+                            // nothing, so a stripped emailPolicy or a Math.random() went unmentioned.
+                            ...(built.warnings?.length ? { warnings: built.warnings } : {}),
                         }, null, 2),
                     }],
                 };
@@ -548,11 +519,14 @@ export function registerExtensionsTools(
             }
 
             try {
-                await storage.updateExtension(name, {
-                    status: 'active',
-                    activatedAt: new Date().toISOString(),
-                });
-                emitChange('extensions');
+                // Activating is three things: the status, the schedules the manifest declares, and
+                // the @activate jobs that do the extension's first run. This tool wrote the status
+                // and stopped, so an extension switched on by an agent never started its clock —
+                // it looked installed, active and idle. One implementation, in
+                // services/extension-lifecycle.ts.
+                const updated = await activateExtension(
+                    { storage, config, scheduler: getActiveScheduler() }, ext, getAgentGaii(),
+                );
 
                 // Trigger capability aggregation so the extension appears immediately
                 import('../services/capability-aggregator.js')
@@ -564,7 +538,11 @@ export function registerExtensionsTools(
                 return {
                     content: [{
                         type: 'text' as const,
-                        text: JSON.stringify({ name, status: 'active', activated_at: new Date().toISOString() }, null, 2),
+                        text: JSON.stringify({
+                            name,
+                            status: updated?.status ?? 'active',
+                            activated_at: updated?.activatedAt ?? null,
+                        }, null, 2),
                     }],
                 };
             } catch (err) {
@@ -597,8 +575,10 @@ export function registerExtensionsTools(
             }
 
             try {
-                await storage.updateExtension(name, { status: 'inactive' });
-                emitChange('extensions');
+                // The status and the scheduled jobs together. This tool wrote only the status, so a
+                // deactivated extension kept firing on its cron until somebody deactivated it again
+                // over HTTP.
+                await deactivateExtension({ storage, config, scheduler: getActiveScheduler() }, name);
 
                 logger.info(`Extension deactivated via MCP: ${name}`, { by: getAgentGaii() });
 
@@ -638,15 +618,12 @@ export function registerExtensionsTools(
             }
 
             try {
-                // Deactivate first if active
-                if (ext.status === 'active') {
-                    // An internal step of deleting, not a state anyone watches for on its own —
-                    // the delete below emits for the whole act.
-                    await storage.updateExtension(name, { status: 'inactive' });
-                }
-
-                await storage.deleteExtension(name);
-                emitChange('extensions');
+                // The row is not the extension. Its scheduled jobs, its `ext:{name}` memory and each
+                // instance's `ext:{name}.{id}` memory go with it — which this tool did not do, so an
+                // extension uninstalled by an agent left cron jobs firing against a name that no
+                // longer resolved and left its data unreachable. DELETE /v1/extensions/:name has
+                // cleaned all three since it was written; both doors now call the same function.
+                await uninstallExtension({ storage, config, scheduler: getActiveScheduler() }, name);
 
                 logger.info(`Extension deleted via MCP: ${name}`, { by: getAgentGaii() });
 

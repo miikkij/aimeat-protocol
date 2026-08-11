@@ -2,6 +2,9 @@
  * @file src/routes/agent-tasks/create-read.ts
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — The create WRITE moves to services/agent-task-write.ts, so aimeat_task_create
+ *     stops building its own record. Behaviour here is unchanged; the tool gains this route's input
+ *     caps, its unique-index race backstop and its `task_assigned` wake.
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)
  *   v1.2.0 — 2026-07-31 — One live commission per (agent, fingerprint): an identical open task wins
  *     instead of a second agent run being queued (200 + `deduplicated`), with the unique index as the
@@ -13,20 +16,16 @@
  */
 
 import type { Router } from 'express';
-import { resolveAutoActivation, AUTO_ACTIVATED_EVENT_MESSAGE } from '../../services/agent-task-rules.js';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentTaskScope } from '../../storage/interface.js';
+import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
-import { emitChange, emitDelivery } from '../../services/event-bus.js';
-import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
-import { AgentTaskCreateSchema } from '../../models/agent-task-schemas.js';
-import { resolveTaskFileInputs, taskWithFileHandles } from '../../services/task-files.js';
+import { createTask } from '../../services/agent-task-write.js';
+import { taskWithFileHandles } from '../../services/task-files.js';
 import type { TaskRouteHelpers } from './helpers.js';
-import { commissionFingerprint, isUniqueViolation, respondDeduplicated } from './dedupe.js';
+import { respondDeduplicated } from './dedupe.js';
 
 export function registerTaskCreateReadRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -94,175 +93,36 @@ export function registerTaskCreateReadRoutes(
       }
     }
 
-    // ownerGaii is always the OWNER's GHII (not the calling agent's GAII),
-    // so the task surfaces in the owner's dashboard the same way regardless
-    // of who actually queued it.
-    const ownerGaii = `${agent.owner}@${config.nodeId}`;
-
-    // Validate body
-    const parsed = AgentTaskCreateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
-      return;
-    }
-
-    const body = parsed.data;
-
-    // Attachments are validated against the CREATOR's own read access — a task must not be a way to
-    // slip a reference to data the creator cannot see into somebody's work queue.
-    const fileResult = await resolveTaskFileInputs(storage, config, body.resources?.files, {
-      gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined,
+    // The write itself is services/agent-task-write.ts, because it belongs to CREATING a task rather
+    // than to this door: the body validation, the one-live-commission guard, the record (whose
+    // ownerGaii is always the OWNER's GHII, never the calling agent's GAII), the task-runner
+    // auto-activation, the agent webhook and the connector-tunnel wake. aimeat_task_create built its
+    // own, and the two had already drifted apart in four places.
+    const result = await createTask({ storage, config, webhook: webhookDispatcher }, {
+      agent, agentGaii, agentName,
+      creator: { gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined },
+      body: req.body,
+      actor: resolve(req),
     });
-    if ('error' in fileResult) {
-      res.status(fileResult.error.status).json(error(config.nodeId, fileResult.error.code, fileResult.error.message));
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
+      return;
+    }
+    if (result.deduplicated) {
+      respondDeduplicated(res, config, agentName, result.task);
       return;
     }
 
-    // ── One live commission per (agent, fingerprint) ──
-    // The browser SDK collapses repeat clicks within a page, but a reload or a second tab starts
-    // with an empty in-flight map — and every duplicate here is a real agent run the owner pays for.
-    // The key is the caller's own `idempotency_key` or a fingerprint of what makes two commissions
-    // the same job. A matching OPEN task wins; a finished, failed or stalled one does not, so the
-    // same work is orderable again tomorrow.
-    // (The platform's `Idempotency-Key` HEADER is a different, older mechanism — a node-wide 24h
-    // replay cache of the exact first response, keyed by a UUID, in middleware/idempotency.ts. It
-    // works on this route too; this guard is the one that needs no client bookkeeping at all.)
-    const dedupeKey = body.allow_duplicate
-      ? undefined
-      : commissionFingerprint(agentGaii, body.idempotency_key, body.title, body.description);
-    if (dedupeKey) {
-      const live = await storage.findLiveTaskByDedupeKey(agentGaii, dedupeKey);
-      if (live) {
-        respondDeduplicated(res, config, agentName, live);
-        return;
-      }
-    }
-
-    const now = new Date().toISOString();
-    const id = randomUUID();
-
-    // Convert snake_case body to camelCase for storage
-    const todos: AgentTaskTodo[] = body.todos.map(t => ({
-      id: t.id,
-      order: t.order,
-      title: t.title,
-      description: t.description,
-      environment: t.environment,
-      environmentReason: t.environment_reason,
-      verification: t.verification,
-      estimateMinutes: t.estimate_minutes,
-      status: t.status,
-    }));
-
-    // Auto-active for task-runner mode (since 1.14.4): if the target agent's
-    // mode is 'task-runner', tasks created in 'queued' status are flipped to
-    // 'active' immediately so the agent's autonomous daemon can pick them up
-    // without manual owner approval. 'task-runner' is the explicit signal that
-    // the owner has pre-authorized this agent to start work without per-task
-    // gating; interactive/autonomous/coordinator modes still go through the
-    // standard queued -> (owner /start) -> active gate.
-    // services/agent-task-rules.ts — aimeat_task_create makes the same call, and the owner's
-    // standing instruction is not about which door the delegation came down.
-    const { autoActivated, effectiveStatus } = resolveAutoActivation(agent, body.status);
-
-    const record: AgentTaskRecord = {
-      id,
-      agentGaii,
-      ownerGaii,
-      title: body.title.trim(),
-      description: body.description.trim(),
-      scope: body.scope,
-      rules: body.rules,
-      verification: {
-        userExpects: body.verification.user_expects,
-        technicalChecks: body.verification.technical_checks,
-      },
-      resources: body.resources ? {
-        knowledgePackages: body.resources.knowledge_packages,
-        memoryKeys: body.resources.memory_keys,
-        memoryPrefixes: body.resources.memory_prefixes,
-        ...(fileResult.files.length ? { files: fileResult.files } : {}),
-      } : undefined,
-      todos,
-      status: effectiveStatus,
-      ...(dedupeKey ? { dedupeKey } : {}),
-      parentTaskId: body.parent_task_id,
-      createdAt: now,
-      updatedAt: now,
-      lastEventAt: autoActivated ? now : undefined,
-    };
-
-    // The pre-check above closes the ordinary window; the unique index closes the racing one. When
-    // two identical commissions arrive together, one inserts and the other lands here — read back
-    // the winner and answer with it rather than failing a click the owner is entitled to.
-    let created: AgentTaskRecord;
-    try {
-      created = await storage.createAgentTask(record);
-    } catch (err) {
-      if (dedupeKey && isUniqueViolation(err)) {
-        const live = await storage.findLiveTaskByDedupeKey(agentGaii, dedupeKey);
-        if (live) { respondDeduplicated(res, config, agentName, live); return; }
-      }
-      throw err;
-    }
-
-    // Append the matching 'started' event so the task history shows the same
-    // transition that POST /start would have appended. Keeps auto-activated
-    // tasks indistinguishable from owner-approved tasks in event reports.
-    if (autoActivated) {
-      await storage.appendTaskEvent({
-        id: randomUUID(),
-        taskId: record.id,
-        type: 'started',
-        message: AUTO_ACTIVATED_EVENT_MESSAGE,
-        timestamp: now,
-      });
-    }
-
-    // Push: webhook + MCP notification (parallel, fire-and-forget). Both
-    // 'queued' and auto-activated 'active' creations notify the agent so the
-    // daemon polls without waiting for the next interval. Auto-activated tasks
-    // share the same webhook event name as owner-approved tasks (task.approved)
-    // because subscribers usually want to react to "this task is now runnable"
-    // regardless of which gate flipped it.
-    if (record.status === 'queued' || autoActivated) {
-      const eventName = autoActivated ? 'task.approved' : 'task.queued';
-      if (webhookDispatcher) {
-        webhookDispatcher.dispatchWebhookEvent(agentGaii, eventName, {
-          task_id: record.id,
-          title: record.title,
-          description: record.description ?? '',
-          has_todos: (record.todos?.length ?? 0) > 0,
-          todo_count: record.todos?.length ?? 0,
-          scope_summary: (record.scope ?? []).slice(0, 5).map((s: AgentTaskScope) => `${s.type || s.name}:${s.value}`),
-          created_at: record.createdAt,
-          auto_activated: autoActivated,
-        });
-      }
-      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('scope_summary: MCP not connected', { error: String(err) }); }
-      // Connector forward tunnel: realtime reverse delivery. If the agent holds
-      // an open tunnel, the ConnectTunnelManager pushes the full task down the
-      // socket immediately (zero round-trip); if offline, the task stays in the
-      // store and is replayed via backlog-on-connect. No-op when no tunnel.
-      emitDelivery({ target: agentGaii, kind: 'task_assigned', id: record.id, payload: created });
+    const created = result.task;
+    if (created.status === 'queued' || result.autoActivated) {
+      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('POST /v1/agents/:name/tasks: MCP not connected', { error: String(err) }); }
     }
 
     res.status(201).json(success(config.nodeId, { task: created }, [
-      { description: 'View task', method: 'GET', url: `/v1/agents/${agentName}/tasks/${id}` },
-      { description: 'Start task', method: 'POST', url: `/v1/agents/${agentName}/tasks/${id}/start` },
-      { description: 'List events', method: 'GET', url: `/v1/agents/${agentName}/tasks/${id}/events` },
+      { description: 'View task', method: 'GET', url: `/v1/agents/${agentName}/tasks/${created.id}` },
+      { description: 'Start task', method: 'POST', url: `/v1/agents/${agentName}/tasks/${created.id}/start` },
+      { description: 'List events', method: 'GET', url: `/v1/agents/${agentName}/tasks/${created.id}/events` },
     ]));
-    emitChange('agent-tasks', resolve(req));
-    // Event-triggered workflows: a USER ordering an offer (the offers Ask flow tags the task with an
-    // `offer_id` scope) may start a workflow. The workflow engine's OWN dispatched tasks go through
-    // storage.createAgentTask directly (NOT this route) and use a different scope, so they don't fire
-    // this — only genuine user/agent orders do.
-    const orderedOfferId = record.scope?.find((s: AgentTaskScope) => s.name === 'offer_id')?.value;
-    if (orderedOfferId) {
-      getActiveWorkflowEngine()?.onOfferOrdered(record.ownerGaii, orderedOfferId)
-        .catch(e => logger.error('workflow event trigger (offer.ordered) failed', { offerId: orderedOfferId, error: String(e) }));
-    }
   });
 
   /* ── GET /v1/agents/:name/tasks -- List tasks for an agent ──

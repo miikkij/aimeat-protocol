@@ -22,6 +22,10 @@
  *     parameter is folded in as a fallback declaration rather than asked for twice. aimeat_knowledge_get
  *     returns each entry's record, batched. Knowledge is the material an agent later quotes back as
  *     established fact, which is why per-entry origin has to survive the hop.
+ *   v1.6.0 — 2026-08-11 — August 2026 audit step 8. aimeat_knowledge_contribute declares its
+ *     parameters and renders its answer; the work moved to services/knowledge-package-entry.ts,
+ *     where the manifest's index line goes through services/memory-write.ts like the entry already
+ *     did instead of straight to storage.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -31,28 +35,11 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
-import { writeMemoryRecord } from '../services/memory-write.js';
-
-/** An entry reference stored in a knowledge-package manifest's `entries` list. */
-interface KnowledgeEntryRef {
-    key: string;
-    title?: string;
-    visibility?: string;
-}
-
-/** Shape of a stored knowledge-package manifest value (memory record `value`). */
-interface KnowledgeManifestValue {
-    name?: string;
-    content_type?: string;
-    tags?: string[];
-    sharing?: { catalog_listed?: boolean };
-    entries?: KnowledgeEntryRef[];
-    created?: string;
-    updated?: string;
-}
+import {
+    addKnowledgePackageEntry, type KnowledgeManifestValue,
+} from '../services/knowledge-package-entry.js';
 
 export function registerKnowledgeTools(
     mcp: McpServer,
@@ -61,7 +48,7 @@ export function registerKnowledgeTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
-    /** The session's own scopes, for the gate inside writeMemoryRecord. */
+    /** The session's own scopes, for the gate inside the shared memory write. */
     sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
@@ -214,105 +201,26 @@ export function registerKnowledgeTools(
         },
         annotationsFor('aimeat_knowledge_contribute'),
         async ({ package_id, entry_key, content, model, ai_provenance, ai_provenance_id }) => {
-            // The appdev-pitfalls package is schema-reserved — its entries need model/category/
-            // severity structure, so raw contributions are redirected to the dedicated tool.
-            if (package_id === 'appdev-pitfalls') {
-                return {
-                    content: [{ type: 'text' as const, text: 'The appdev-pitfalls package is reserved — report pitfalls with aimeat_appdev_pitfall_report (model attribution is required there).' }],
-                    isError: true,
-                };
-            }
-            const manifestKey = `packages/${package_id}/manifest`;
-            const manifest = await storage.getMemory(agentGaii, manifestKey);
-            if (!manifest) {
-                return {
-                    content: [{ type: 'text' as const, text: `Package not found: ${package_id}` }],
-                    isError: true,
-                };
-            }
-
-            // Normalize entry key to full path
-            const fullEntryKey = entry_key.startsWith(`packages/${package_id}/`)
-                ? entry_key
-                : `packages/${package_id}/${entry_key}`;
-
-            const now = new Date().toISOString();
-
-            // Parse content if JSON, otherwise store as plain string
-            let value: unknown = content;
-            // eslint-disable-next-line aimeat/no-silent-catch -- store as string
-            try { value = JSON.parse(content); } catch { /* store as string */ }
-
-            // Check if entry exists to preserve version
-            const existing = await storage.getMemory(agentGaii, fullEntryKey);
-
-            const normModel = model?.trim().toLowerCase();
-            const baseTags = existing?.tags ?? ['knowledge-entry'];
-            const tags = normModel
-                ? [...baseTags.filter(t => !t.startsWith('model:')), `model:${normModel}`]
-                : baseTags;
-
-            // TARGET-058. Knowledge entries are the one write here that does NOT inherit anything —
-            // a workspace record rides on memory and picks up the memory path's stamp, but a
-            // knowledge entry written through this tool went to storage unmarked. It is also the
-            // content most likely to be model-written and most likely to be read back later as if it
-            // were established fact, which is exactly why the origin has to survive the hop.
-            const visibility = existing?.visibility ?? 'owner';
-
-            // ONE implementation (services/memory-write.ts). A knowledge entry is a memory record,
-            // and writing it straight to storage meant it had none of what a memory record gets:
-            // no value-size limit, no key ceiling, no byte budget, no archive guard, no schema lock,
-            // and no live-update event. Every quota this node advertises was reachable around by
-            // contributing knowledge instead of writing memory.
-            //
-            // `model` has meant "which model this knowledge came from" on this tool since long
-            // before provenance existed, so an agent that names it has told us something real. It is
-            // folded into the declaration as a fallback, so an explicit ai_provenance.model wins.
-            const written = await writeMemoryRecord({ storage, config }, {
+            // ONE implementation (services/knowledge-package-entry.ts). The tool declares its
+            // parameters because the protocol requires that, maps `ai_provenance` from the wire
+            // shape, and renders the answer as text; the entry record, the reserved-package guard
+            // and the manifest's index line belong to the capability, not to this door.
+            const out = await addKnowledgePackageEntry({ storage, config }, {
                 principal: agentGaii,
                 targetGaii: agentGaii,
                 scopes: sessionScopes,
                 roles: ['agent'],
             }, {
-                key: fullEntryKey,
-                value,
-                visibility,
-                tags,
+                packageId: package_id,
+                entryKey: entry_key,
+                content,
+                model,
+                declaredProvenance: toDeclaredProvenance(ai_provenance),
                 declaredProvenanceId: ai_provenance_id,
-                declaredProvenance: toDeclaredProvenance(ai_provenance)
-                    ?? (model?.trim() ? { level: 'ai-generated', model: model.trim() } : undefined),
                 pipeline: 'mcp.knowledge_contribute',
-                ownerScoped: true,
             });
-            if (!written.ok) {
-                return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}` }], isError: true };
-            }
-            const aiProvenanceId = written.record.aiProvenanceId;
-
-            // Update manifest's entries list if entry is new
-            const manifestValue = manifest.value as KnowledgeManifestValue;
-            const manifestEntries: KnowledgeEntryRef[] = manifestValue?.entries ?? [];
-            const entryExists = manifestEntries.some(
-                (e) => e.key === fullEntryKey || e.key === entry_key,
-            );
-            if (!entryExists) {
-                manifestEntries.push({
-                    key: fullEntryKey,
-                    title: entry_key,
-                    visibility: 'owner',
-                });
-                manifestValue.entries = manifestEntries;
-                manifestValue.updated = now;
-                // routes/knowledge/packages-core.ts emits this when a package changes. The entry
-                // itself goes through memory-write, which emits 'memory'; the MANIFEST is what the
-                // knowledge view reads, and it was written here with nothing announcing it.
-                emitChange('knowledge');
-                await storage.setMemory({
-                    ...manifest,
-                    value: manifestValue,
-                    updatedAt: now,
-                    version: (manifest.version ?? 0) + 1,
-                });
+            if (!out.ok) {
+                return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
             }
 
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${encodeURIComponent(package_id)}`);
@@ -321,8 +229,9 @@ export function registerKnowledgeTools(
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        package_id, entry_key: fullEntryKey, updated: true,
-                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                        package_id, entry_key: out.entryKey, updated: true,
+                        ...(out.manifestWarning ? { manifest_warning: out.manifestWarning } : {}),
+                        ...(await writeProvenanceEcho(storage, config, out.record.aiProvenanceId)),
                     }, null, 2),
                 }],
             };

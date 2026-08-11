@@ -492,12 +492,13 @@ const PUBLISH_PATH = 'src/services/app-publish.ts';
 
 /** Writes an app row WITHOUT being a publish. Each is a different act, with a different rule. */
 const CREATE_APP_DISTINCT_ACTS: Record<string, string> = {
-  'src/routes/apps/fork-manage.ts':
-    'A fork COPIES bytes rather than generating them: it carries the source record forward and must '
-    + 'not mint a new one, must not announce, and must not fire the publish feed.',
-  'src/mcp/apps-fork.ts':
-    'aimeat_app_fork — the MCP half of the same act, moved out of mcp/apps.ts by pure extraction on '
-    + '2026-08-11 when that file passed max-file-lines. Same code, same reason.',
+  'src/services/app-lifecycle.ts':
+    'A fork COPIES bytes rather than generating them: it carries the source provenance record forward '
+    + 'and must not mint a new one, must not announce, and must not fire the publish feed. This was '
+    + 'two entries until 2026-08-11 (routes/apps/fork-manage.ts and mcp/apps-fork.ts), which is what '
+    + 'an exemption list looks like when one act has two implementations. Step 8 collapsed them into '
+    + 'forkApp() here, and the two old entries came out with the code: neither file writes an app row '
+    + 'any more. One act, one exemption, one place to check when the provenance rule changes.',
   'src/services/apps-backup-import.ts':
     'Restoring a backup replays rows that were already published; re-announcing a restore would '
     + 'spam the feed with history.',

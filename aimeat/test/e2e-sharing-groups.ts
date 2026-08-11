@@ -298,6 +298,96 @@ await test('17. Deleted group is gone', async () => {
     assert(status === 404, `expected 404, got ${status}`);
 });
 
+// ─── Phase 4: The shared write path ───
+// These pin what services/sharing-group-members.ts decides for BOTH doors. aimeat_group_create and
+// aimeat_group_add_member call the same function, and before they did, neither the bare-name
+// resolution nor the shape limits applied on the agent surface: a member added by an agent was
+// stored as `bob`, matched no membership test, and read nothing while reporting success.
+console.log('\nPhase 4 -- Shared write path (REST and MCP call the same service)');
+
+let group2Id = '';
+
+await test('18. A bare member name is stored as a full GHII', async () => {
+    const { status, body } = await json('/v1/groups', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: 'Bare Identifier Group',
+            members: [{ identifier: owner2Name, identifier_type: 'ghii' }],
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    group2Id = body.data.group.id;
+    const stored = body.data.group.members[0].identifier;
+    assert(stored === `${owner2Name}@${NODE_ID}`, `stored identifier: ${stored}`);
+});
+
+await test('19. A bare name added later is resolved the same way', async () => {
+    const { status, body } = await json(`/v1/groups/${group2Id}/members`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ identifier: owner3Name, identifier_type: 'ghii' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.added.identifier === `${owner3Name}@${NODE_ID}`, `added: ${body.data.added.identifier}`);
+});
+
+await test('20. A member with no permissions gets the group default (read, no write)', async () => {
+    const { status, body } = await json(`/v1/groups/${group2Id}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const member = body.data.group.members.find((m: any) => m.identifier === `${owner3Name}@${NODE_ID}`);
+    assert(member.permissions.read === true && member.permissions.write === false,
+        `permissions: ${JSON.stringify(member.permissions)}`);
+});
+
+await test('21. A group name over 128 characters is refused', async () => {
+    const { status, body } = await json('/v1/groups', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'x'.repeat(129) }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+    assert(body.error.code === 'INVALID_INPUT', `code: ${body.error?.code}`);
+});
+
+await test('22. An empty group name is refused', async () => {
+    const { status } = await json('/v1/groups', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: '' }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('23. Adding the same member twice is refused', async () => {
+    const { status, body } = await json(`/v1/groups/${group2Id}/members`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ identifier: `${owner3Name}@${NODE_ID}`, identifier_type: 'ghii' }),
+    });
+    assert(status === 409, `expected 409, got ${status}`);
+    assert(body.error.code === 'DUPLICATE', `code: ${body.error?.code}`);
+});
+
+await test('24. Removing a member who is not there is refused', async () => {
+    const { status, body } = await json(`/v1/groups/${group2Id}/members/${encodeURIComponent('nobody@' + NODE_ID)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+    assert(body.error.code === 'NOT_FOUND', `code: ${body.error?.code}`);
+});
+
+await test('25. Delete the Phase 4 group', async () => {
+    const { status } = await json(`/v1/groups/${group2Id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

@@ -7,6 +7,16 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.8.0 — 2026-08-11 — The WRITES move to services/agent-task-write.ts: create, event, propose and
+ *     todo now call the same functions the HTTP routes call, so these tools stop building their own
+ *     records. Four differences closed with the move. Telemetry now ACCUMULATES instead of
+ *     overwriting the task totals with the last event's numbers, so a forty-call task stops reading
+ *     as a one-call task in the cost view. Title and description are capped as HTTP caps them (256 /
+ *     10 000), so the node no longer accepts over MCP what it refuses over HTTP. Two identical
+ *     commissions racing each other now answer with the winner instead of a raw unique-index error.
+ *     And a created task emits the `task_assigned` tunnel wake, so a parked daemon starts within the
+ *     second rather than on its next re-list. The agent webhook is the one thing still missing here:
+ *     the dispatcher belongs to the HTTP router and the MCP server holds no instance of it.
  *   v1.x — 2026-08-11 — aimeat_task_complete and _fail call services/agent-task-fanout.ts.
  *     They wrote the record and did none of the eight things a completion sets off, so a
  *     workflow run that dispatched the task stayed on that step, the open item behind it never
@@ -40,18 +50,14 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
-import { resumeIfStalled } from '../services/task-resume.js';
-import { resolveAutoActivation, canProposeTodos, todoProposeRefusal, statusAfterProposal, AUTO_ACTIVATED_EVENT_MESSAGE } from '../services/agent-task-rules.js';
-import { commissionFingerprint } from '../routes/agent-tasks/dedupe.js';
+import { createTask, recordTaskEvent, applyProposedPlan, setTodoStatus } from '../services/agent-task-write.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
-import { resolveTaskFileInputs, taskWithFileHandles } from '../services/task-files.js';
-import { emitDelivery, emitChange } from '../services/event-bus.js';
+import { taskWithFileHandles } from '../services/task-files.js';
 import { afterTaskCompleted, failTask } from '../services/agent-task-fanout.js';
-import { recordTaskStarted } from '../services/activity-recorder.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
@@ -100,70 +106,39 @@ export function registerAgentTaskTools(
                     isError: true,
                 };
             }
-            const fileResult = await resolveTaskFileInputs(
-                storage, config, files?.map(ref => ({ ref })),
-                { gaii: agentGaii, sub: agentGaii, owner: callerParsed.owner },
-            );
-            if ('error' in fileResult) {
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ error: fileResult.error.message, code: fileResult.error.code }, null, 2) }], isError: true };
+            // The write is services/agent-task-write.ts: the same validation, the same
+            // one-live-commission guard, the same record, the same task-runner auto-activation and
+            // the same tunnel wake POST /v1/agents/:name/tasks performs. This tool used to build its
+            // own, which is how it ended up accepting an unbounded title, failing a racing pair with
+            // a raw database error, and waking no daemon.
+            const result = await createTask({ storage, config }, {
+                agent: targetAgent,
+                agentGaii: targetGaii,
+                agentName: target_agent,
+                creator: { gaii: agentGaii, sub: agentGaii, owner: callerParsed.owner },
+                // 'queued' is THIS tool's documented default (an agent delegating work means the
+                // target to see it now); the HTTP body defaults to 'draft', which is the owner
+                // drafting a task in the dashboard.
+                body: {
+                    title,
+                    description,
+                    status: status ?? 'queued',
+                    ...(files?.length ? { resources: { files: files.map(ref => ({ ref })) } } : {}),
+                },
+                actor: agentGaii,
+            });
+            if (!result.ok) {
+                return { content: [{ type: 'text' as const, text: `${result.code}: ${result.message}` }], isError: true };
             }
-
-            // One live commission per (agent, fingerprint), as POST /v1/agent-tasks does. Without
-            // it, a repeated delegation over MCP queues duplicate runs the owner pays for, and the
-            // row carries no dedupeKey so nothing downstream can collapse them either. An agent
-            // retrying after a timeout is the ordinary case, not the exotic one.
-            const dedupeKey = commissionFingerprint(targetGaii, undefined, title, description);
-            const live = await storage.findLiveTaskByDedupeKey(targetGaii, dedupeKey);
-            if (live) {
+            if (result.deduplicated) {
                 return { content: [{ type: 'text' as const, text: JSON.stringify({
-                    deduplicated: true, task_id: live.id, status: live.status,
+                    deduplicated: true, task_id: result.task.id, status: result.task.status,
                     note: 'An identical commission is already live for this agent; the existing one is returned instead of queueing a second.',
                 }, null, 2) }] };
             }
 
-            const now = new Date().toISOString();
-            const id = randomUUID();
-            // The target agent's mode decides whether a queued task starts on its own.
-            const targetRecord = await storage.getAgent(targetGaii);
-            const { autoActivated, effectiveStatus } = resolveAutoActivation(targetRecord, status as AgentTaskRecord['status'] | undefined);
-            const record: AgentTaskRecord = {
-                id,
-                agentGaii: targetGaii,
-                ownerGaii: `${callerParsed.owner}@${config.nodeId}`,
-                title: title.trim(),
-                description: description.trim(),
-                scope: [],
-                rules: [],
-                verification: { userExpects: '', technicalChecks: [] },
-                ...(fileResult.files.length ? { resources: { files: fileResult.files } } : {}),
-                todos: [],
-                status: effectiveStatus,
-                dedupeKey,
-                createdAt: now,
-                updatedAt: now,
-                ...(autoActivated ? { lastEventAt: now } : {}),
-            };
-            const created = await storage.createAgentTask(record);
-            // Every REST task route emits this — create, lifecycle, completion — and the task board is the
-            // surface a person watches while an agent works. Over MCP the whole lifecycle happened in silence:
-            // the task appeared, ran and finished on screen only when somebody reloaded.
-            emitChange('agent-tasks');
-            // A task-runner agent is the owner saying "start without asking me each time", and
-            // POST /v1/agents/:name/tasks has honoured that since the mode existed: a queued task
-            // for such an agent flips to active and gets the matching 'started' event, so an
-            // auto-activated task is indistinguishable from an owner-approved one. This tool wrote
-            // the status verbatim, so delegating over MCP produced a task sitting queued waiting for
-            // a click the owner was told they would not need.
-            if (autoActivated) {
-                await storage.appendTaskEvent({
-                    id: randomUUID(),
-                    taskId: created.id,
-                    type: 'started',
-                    message: AUTO_ACTIVATED_EVENT_MESSAGE,
-                    timestamp: now,
-                });
-            }
-            emitResourceUpdated(targetGaii, `aimeat://agents/${target_agent}/tasks/${id}`);
+            const created = result.task;
+            emitResourceUpdated(targetGaii, `aimeat://agents/${target_agent}/tasks/${created.id}`);
             return {
                 content: [{
                     type: 'text' as const,
@@ -171,7 +146,7 @@ export function registerAgentTaskTools(
                         task_id: created.id,
                         target_agent,
                         status: created.status,
-                        files: fileResult.files.length,
+                        files: created.resources?.files?.length ?? 0,
                         created_at: created.createdAt,
                     }, null, 2),
                 }],
@@ -303,69 +278,22 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            // An ACTIVE task that already has a live plan is not re-plannable: the preserve step
-            // below keeps only todos already marked 'outdated', so a mid-run re-proposal drops every
-            // in-progress and completed todo, their completedAt stamps included. The rule and its
-            // wording are services/agent-task-rules.ts, because the HTTP door decides it too.
-            if (!canProposeTodos(task)) {
-                return { content: [{ type: 'text' as const, text: todoProposeRefusal(task.status) }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-            // Preserve outdated history (from prior revision cycles) and retire still-
-            // pending todos to outdated when the task is in revision_requested state.
-            // This mirrors POST /v1/agents/:name/tasks/:id/propose-todos exactly.
-            const preserved: AgentTaskTodo[] = (task.todos ?? []).flatMap(t => {
-                if (t.status === 'outdated') return [t];
-                if (task.status === 'revision_requested') return [{ ...t, status: 'outdated' as const }];
-                return [];
-            });
-            const baseOrder = preserved.length;
-            const newTodos: AgentTaskTodo[] = todos.map((todo, index) => ({
-                id: `todo-${baseOrder + index + 1}`,
-                order: baseOrder + index + 1,
+            // Accepting a plan is services/agent-task-write.ts: the live-plan guard that stops a
+            // mid-run re-proposal from dropping every in-progress and completed todo, the preserved
+            // history, the renumbering, the task-runner auto-activation and its tail. This tool kept
+            // a copy of all of it.
+            const result = await applyProposedPlan({ storage, config }, task, todos.map(todo => ({
                 title: todo.title,
-                description: todo.description ?? '',
-                environment: 'agent',
-                environmentReason: 'The connected agent can perform this work through AIMEAT MCP tools.',
-                verification: todo.verification ?? '',
-                estimateMinutes: todo.estimate_minutes,
-                status: 'pending',
-            }));
-
-            // Task-runner auto-approval (mirrors POST /propose-todos in routes/agent-tasks/lifecycle.ts):
-            // the owner pre-authorized a task-runner agent to start work without per-task gating, so a
-            // proposal on a plain 'queued' task activates it immediately (zero-click onboarding). A
-            // revision cycle still returns to 'queued' -- the owner explicitly asked to review the plan.
-            const { nextStatus, autoActivated } = await statusAfterProposal(g => storage.getAgent(g), task);
-
-            const updated = await storage.updateAgentTask(task_id, {
-                todos: [...preserved, ...newTodos],
-                status: nextStatus,
-                lastEventAt: now,
-                updatedAt: now,
-            });
-            emitChange('agent-tasks');
-
-            await storage.appendTaskEvent({
-                id: randomUUID(),
-                taskId: task_id,
-                type: 'progress',
-                message: task.status === 'revision_requested' ? 'Revised TODO plan proposed' : 'TODO plan proposed',
-                details: { todo_count: newTodos.length, outdated_count: preserved.length },
-                timestamp: now,
-            });
-
-            if (autoActivated) {
-                await storage.appendTaskEvent({
-                    id: randomUUID(),
-                    taskId: task_id,
-                    type: 'started',
-                    message: 'Task auto-activated on TODO proposal (agent mode: task-runner)',
-                    timestamp: now,
-                });
-                await recordTaskStarted(storage, task.agentGaii);
-                emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: task_id, payload: updated });
+                description: todo.description,
+                verification: todo.verification,
+                estimate_minutes: todo.estimate_minutes,
+                // Work proposed through this tool is by definition the connected agent's own, and
+                // this is the reason it states for that.
+                environment: 'agent' as const,
+                environment_reason: 'The connected agent can perform this work through AIMEAT MCP tools.',
+            })), agentGaii);
+            if (!result.ok) {
+                return { content: [{ type: 'text' as const, text: `${result.code}: ${result.message}` }], isError: true };
             }
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
@@ -376,10 +304,10 @@ export function registerAgentTaskTools(
                     text: JSON.stringify({
                         updated: true,
                         task_id,
-                        status: updated?.status ?? task.status,
-                        todo_count: newTodos.length,
-                        outdated_count: preserved.length,
-                        todos: newTodos.map(todo => ({
+                        status: result.task?.status ?? task.status,
+                        todo_count: result.todos.length,
+                        outdated_count: result.outdatedCount,
+                        todos: result.todos.map(todo => ({
                             id: todo.id,
                             order: todo.order,
                             title: todo.title,
@@ -420,41 +348,14 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            // An agent that briefly crashed and came back is the ordinary case, and the HTTP door
-            // has always read a new event as proof it is back. This tool refused outright, so the
-            // stall detector's verdict was permanent on the surface the agent actually uses.
-            await resumeIfStalled(storage, task, 'agent posted a new event');
-            if (task.status !== 'active') {
-                return { content: [{ type: 'text' as const, text: `Events can only be appended to active tasks (current: ${task.status})` }], isError: true };
+            // The auto-resume for an agent that briefly crashed and came back, the state gate, the
+            // event and the telemetry roll-up are services/agent-task-write.ts. The copy here
+            // OVERWROTE the task's telemetry totals with the last event's numbers, so an agent
+            // reporting one AI call per event finished a forty-call task showing one.
+            const result = await recordTaskEvent({ storage, config }, task, { type, message, details }, agentGaii);
+            if (!result.ok) {
+                return { content: [{ type: 'text' as const, text: `${result.code}: ${result.message}` }], isError: true };
             }
-
-            const now = new Date().toISOString();
-
-            const event = await storage.appendTaskEvent({
-                id: randomUUID(),
-                taskId: task_id,
-                type,
-                message,
-                details,
-                timestamp: now,
-            });
-
-            // Update lastEventAt and optionally telemetry
-            const taskUpdates: Partial<AgentTaskRecord> = {
-                lastEventAt: now,
-                updatedAt: now,
-            };
-            if (details?.telemetry) {
-                const tel = details.telemetry as Record<string, unknown>;
-                taskUpdates.telemetry = {
-                    aiCalls: typeof tel.ai_calls === 'number' ? tel.ai_calls : task.telemetry?.aiCalls,
-                    tokensIn: typeof tel.tokens_in === 'number' ? tel.tokens_in : task.telemetry?.tokensIn,
-                    tokensOut: typeof tel.tokens_out === 'number' ? tel.tokens_out : task.telemetry?.tokensOut,
-                    durationSeconds: typeof tel.duration_seconds === 'number' ? tel.duration_seconds : task.telemetry?.durationSeconds,
-                };
-            }
-            await storage.updateAgentTask(task_id, taskUpdates);
-            emitChange('agent-tasks');
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 
@@ -463,9 +364,9 @@ export function registerAgentTaskTools(
                     type: 'text' as const,
                     text: JSON.stringify({
                         appended: true,
-                        event_id: event.id,
+                        event_id: result.event.id,
                         task_id,
-                        type: event.type,
+                        type: result.event.type,
                     }, null, 2),
                 }],
             };
@@ -490,50 +391,13 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            // Same as the event path: ticking off a todo is the agent showing up.
-            await resumeIfStalled(storage, task, 'agent updated a todo');
-            if (task.status !== 'active') {
-                return { content: [{ type: 'text' as const, text: `TODOs can only be updated on active tasks (current: ${task.status})` }], isError: true };
+            // Same as the event path, and the same service: ticking off a todo is the agent showing
+            // up, so a stalled task resumes on it, the task's lastEventAt moves and the matching
+            // todo_completed / todo_failed event is appended.
+            const result = await setTodoStatus({ storage, config }, task, todo_id, { status }, agentGaii);
+            if (!result.ok) {
+                return { content: [{ type: 'text' as const, text: `${result.code}: ${result.message}` }], isError: true };
             }
-
-            const todoIdx = task.todos.findIndex(t => t.id === todo_id);
-            if (todoIdx === -1) {
-                return { content: [{ type: 'text' as const, text: `TODO '${todo_id}' not found in task` }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-
-            // Update the TODO
-            const updatedTodos: AgentTaskTodo[] = task.todos.map((t, i) => {
-                if (i !== todoIdx) return t;
-                return {
-                    ...t,
-                    status,
-                    completedAt: ['done', 'failed', 'skipped'].includes(status) ? now : t.completedAt,
-                };
-            });
-
-            await storage.updateAgentTask(task_id, {
-                todos: updatedTodos,
-                lastEventAt: now,
-                updatedAt: now,
-            });
-            emitChange('agent-tasks');
-
-            // Append appropriate event
-            const eventType = status === 'done' ? 'todo_completed' as const
-                : status === 'failed' ? 'todo_failed' as const
-                    : 'progress' as const;
-            const todoTitle = task.todos[todoIdx].title;
-
-            await storage.appendTaskEvent({
-                id: randomUUID(),
-                taskId: task_id,
-                type: eventType,
-                message: `TODO "${todoTitle}" ${status}`,
-                details: { todo_id, status },
-                timestamp: now,
-            });
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 
@@ -545,7 +409,7 @@ export function registerAgentTaskTools(
                         task_id,
                         todo_id,
                         status,
-                        todo_title: todoTitle,
+                        todo_title: result.todo.title,
                     }, null, 2),
                 }],
             };

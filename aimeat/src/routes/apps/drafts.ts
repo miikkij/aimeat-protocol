@@ -4,6 +4,11 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.3.0 — 2026-08-11 — August 2026 audit step 8: the draft save, the discard and the promotion go
+ *     through services/app-lifecycle.ts, shared with aimeat_app_draft_save / _discard / _publish.
+ *     The two manifest builders disagreed on the default category for a NEW app ('utility' here and
+ *     in publishApp, 'tool' over MCP), and the nine-field draft→publish mapping was written out
+ *     twice. What stays here: the body decode, and this door's own "no draft" wording.
  *   v2.2.0 — 2026-08-11 — publish-draft accepts `spec_token` / `spec_ack` and echoes `spec_check`,
  *     `app_hints` and `next_steps`. A blocking artifact finding refuses the promotion AND leaves the
  *     draft in place, so the fix has something to be applied to.
@@ -29,14 +34,14 @@
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AppManifest } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { generateDraftToken, generateFrameToken } from '../../services/draft-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
-import { publishApp } from '../../services/app-publish.js';
+import { stageAppDraft, discardAppDraft, publishAppDraft } from '../../services/app-lifecycle.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 
@@ -57,10 +62,6 @@ export function registerDraftRoutes(
     // app when omitted, so a draft that only changes the HTML keeps its name/category.
     router.put('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
         const filename = req.params.filename as string;
-        if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invalid filename.'));
-            return;
-        }
         const { owner, ownerGhii } = await canonicalOwner(req);
         const { content, mime_type, name, description, category, tags, icon, uses_cortex, protection } = req.body ?? {};
 
@@ -73,53 +74,40 @@ export function registerDraftRoutes(
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content must be base64-encoded (Buffer.from(html).toString("base64") / btoa(html)).'));
             return;
         }
-        const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
-        if (data.length > MAX_APP_SIZE) {
-            res.status(413).json(error(config.nodeId, 'TOO_LARGE', `Draft exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)`));
+
+        // The filename rule, the size cap and the manifest that inherits from the live app are
+        // services/app-lifecycle.ts — the same function aimeat_app_draft_save calls. This route maps
+        // its JSON body onto that one shape and nothing more.
+        const staged = await stageAppDraft(storage, config, {
+            ownerName: owner,
+            ownerGhii,
+            filename,
+            data,
+            requested: {
+                name: typeof name === 'string' ? name : undefined,
+                description: typeof description === 'string' ? description : undefined,
+                category: typeof category === 'string' ? category : undefined,
+                tags: Array.isArray(tags) ? tags.filter((t: unknown): t is string => typeof t === 'string') : undefined,
+                icon: typeof icon === 'string' ? icon : undefined,
+                usesCortex: Array.isArray(uses_cortex)
+                    ? uses_cortex.filter((c: unknown): c is string => typeof c === 'string') : undefined,
+                protection: sanitizeProtection(protection),
+                mimeType: typeof mime_type === 'string' ? mime_type : undefined,
+            },
+        });
+        if ('refusal' in staged) {
+            res.status(staged.refusal.status).json(error(
+                config.nodeId, staged.refusal.code, staged.refusal.message, staged.refusal.status, staged.refusal.details));
             return;
         }
-
-        // Inherit the live app's manifest as the base (so a draft that only changes
-        // HTML keeps its name/description/category/icon), overriding with any fields
-        // the caller sent.
-        const live = await storage.getApp(ownerGhii, filename);
-        const base = live?.manifest;
-        const manifest: AppManifest = {
-            name: typeof name === 'string' ? name : (base?.name ?? filename.replace(/\.html?$/i, '')),
-            description: typeof description === 'string' ? description : (base?.description ?? ''),
-            version: base?.version ?? '1.0.0',
-            category: typeof category === 'string' ? category : (base?.category ?? 'utility'),
-            tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string') : (base?.tags ?? []),
-            authorDisplay: owner,
-            usesCortex: Array.isArray(uses_cortex) ? uses_cortex.filter((c: unknown) => typeof c === 'string') : (base?.usesCortex ?? []),
-        };
-        const effectiveIcon = typeof icon === 'string' ? icon : base?.icon;
-        if (effectiveIcon) manifest.icon = effectiveIcon;
-        const effectiveProtection = sanitizeProtection(protection) ?? base?.protection;
-        if (effectiveProtection && Object.values(effectiveProtection).some(Boolean)) manifest.protection = effectiveProtection;
-        // A draft that only changes HTML keeps the live app's bundled crew-defs
-        // (cortex.agents); draft-publish then promotes them unchanged.
-        if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
-
-        const now = new Date().toISOString();
-        await storage.saveAppDraft({
-            ownerGaii: ownerGhii,
-            ownerName: owner,
-            filename,
-            manifest,
-            mimeType: typeof mime_type === 'string' ? mime_type : (live?.mimeType ?? 'text/html'),
-            size: data.length,
-            data,
-            updatedAt: now,
-        });
 
         res.json(success(config.nodeId, {
             filename,
             saved: true,
-            size: data.length,
-            updated_at: now,
-            has_live_version: !!live,
-            live_version_number: live?.versionNumber ?? 0,
+            size: staged.size,
+            updated_at: staged.updatedAt,
+            has_live_version: staged.hasLiveVersion,
+            live_version_number: staged.liveVersionNumber,
             note: 'Draft saved. The live app is unchanged. Mint a preview token to test it, then publish the draft when ready.',
         }, [
             { description: 'Get a preview URL', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/preview-token` },
@@ -229,7 +217,7 @@ export function registerDraftRoutes(
     router.delete('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
         const filename = req.params.filename as string;
         const { ownerGhii } = await canonicalOwner(req);
-        const deleted = await storage.deleteAppDraft(ownerGhii, filename);
+        const deleted = await discardAppDraft(storage, ownerGhii, filename);
         if (!deleted) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft to discard for "${filename}"`));
             return;
@@ -265,31 +253,17 @@ export function registerDraftRoutes(
             return;
         }
 
+        // The promotion — the draft manifest mapped onto the publish input, publishApp, and the slot
+        // cleared afterwards — is services/app-lifecycle.ts, shared with aimeat_app_draft_publish.
         // The draft manifest IS the caller's statement, so every field it can express is passed as
-        // stated. What it CANNOT express — pricing, licence, per-locale descriptions — is left
-        // unmentioned and carried from the live app. Publishing the draft manifest verbatim, which
-        // is what this route used to do, therefore turned a paid app free and dropped its
-        // translations every time somebody promoted a draft.
-        const out = await publishApp(storage, config, {
+        // stated; what it CANNOT express (pricing, licence, per-locale descriptions) is left
+        // unmentioned and carried from the live app.
+        const out = await publishAppDraft(storage, config, {
             ownerName: owner,
             ownerGhii,
             callerGaii,
             filename,
-            data: draft.data,
-            mimeType: draft.mimeType,
-            requested: {
-                name: draft.manifest.name,
-                description: draft.manifest.description,
-                version: draft.manifest.version || undefined,
-                category: draft.manifest.category,
-                tags: draft.manifest.tags,
-                icon: draft.manifest.icon,
-                usesCortex: draft.manifest.usesCortex,
-                cortexAgents: draft.manifest.cortex?.agents,
-                protection: draft.manifest.protection,
-            },
-            accessCode: { mode: 'carry' },
-            source: 'draft',
+            draft,
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
             declaredProvenance: declared.declared,
             specToken: typeof spec_token === 'string' ? spec_token : undefined,
@@ -302,8 +276,6 @@ export function registerDraftRoutes(
                 config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
             return;
         }
-
-        await storage.deleteAppDraft(ownerGhii, filename);
 
         res.status(201).json(success(config.nodeId, {
             filename,

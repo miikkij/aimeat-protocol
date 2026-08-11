@@ -7,7 +7,11 @@
  *   app-template proposal (proofs array + count in list; proofs survive a re-propose).
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=appdev-proofs).
- * @version-history v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 8).
+ * @version-history
+ *   v1.1.0 -- 2026-08-11 -- Reads the pack's proofs record back: one key, version 2 after two
+ *     attaches, both proofs present and still public. Pins the append-and-version behaviour now
+ *     that the write goes through the shared memory write (August 2026 audit step 8).
+ *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 8).
  */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -217,6 +221,21 @@ await test('/v1/library-packs surfaces proofs on the community entry (status sta
 
     const { body: det } = await json(`/v1/library-packs/${extName}`);
     assert(Array.isArray(det.data?.pack?.proofs) && det.data.pack.proofs.length === 2, 'detail proofs missing');
+});
+
+await test('the proofs ledger is one versioned memory record, appended not replaced', async () => {
+    // The attach goes through services/memory-write.ts now (services/contribution-proofs.ts). Two
+    // attaches must be two versions of ONE record carrying both proofs: the connector's copy of
+    // this tool SETS a single-proof array, and that is the shape this pins against.
+    const { status, body } = await json(`/v1/memory/${encodeURIComponent(`libpack.proofs.${extName}`)}`, {
+        headers: { Authorization: `Bearer ${tokenA}` },
+    });
+    assert(status === 200, `proofs record read ${status}`);
+    assert(body.data.version === 2, `two attaches should be two versions, got ${body.data.version}`);
+    assert(body.data.visibility === 'public', `proofs ledger must stay public, got ${body.data.visibility}`);
+    const value = body.data.value;
+    assert(value.packId === extName && Array.isArray(value.proofs) && value.proofs.length === 2, `ledger shape: ${JSON.stringify(value).slice(0, 200)}`);
+    assert(value.proofs.every((p: any) => p.selfReported === true && typeof p.date === 'string' && (p.verdict === 'pass' || p.verdict === 'fail')), 'proof shape lost');
 });
 
 await test('template proposal proofs: attach + survive a re-propose', async () => {

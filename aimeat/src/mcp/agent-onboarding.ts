@@ -6,7 +6,7 @@
  * @structure
  *   - registerAgentOnboardingTools() -- registers onboarding status and step tools
  *   - buildOnboardingStatus() -- refreshes auto steps and returns next-step hints
- *   - confirmOnboardingStep() -- validates and persists one API-confirmed step
+ *   - confirmStepAsText() -- calls the shared step write and renders it as tool text
  * @usage
  *   import { registerAgentOnboardingTools } from './agent-onboarding.js';
  *   registerAgentOnboardingTools(mcp, storage, config, getAgentGaii, emitResourceUpdated);
@@ -21,14 +21,17 @@
  *     optional->skipped-on-completion pass so the two surfaces match. next_step prefers next required.
  *   v1.4.0 -- 2026-07-14 -- hints.test_task_id is now ALWAYS present when a test task exists (it was
  *     gated on task status, starving deterministic connectors that fill {test_task_id} from it).
+ *   v1.5.0 -- 2026-08-11 -- The step write moved to services/onboarding-progress.ts, which POST
+ *     /v1/agents/:name/onboarding/step/:id now calls too. The copy here did not re-run the
+ *     auto-checkable steps after a step passed, so an agent finishing its last manual step through
+ *     MCP could stay incomplete with everything else objectively passable. It does now.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { refreshOnboarding, persistStepResult } from '../services/onboarding-progress.js';
-import { validateStep } from '../services/onboarding-validator.js';
+import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding-progress.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
+import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
 import { createT, DEFAULT_LOCALE } from '../i18n.js';
 import type { Storage } from '../storage/interface.js';
@@ -112,80 +115,35 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
     return { onboarding: onboardingOut, step_guide, summary, hints };
 }
 
-async function confirmOnboardingStep(
+/**
+ * Confirm one step and render the answer as tool text. The work is
+ * services/onboarding-progress.ts, shared with POST /v1/agents/:name/onboarding/step/:id; what
+ * stays here is the wording an MCP client reads and the resource-updated signal.
+ */
+async function confirmStepAsText(
     agentGaii: string,
     stepId: OnboardingStepId,
     body: Record<string, unknown>,
     storage: Storage,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
-): Promise<Record<string, unknown>> {
-    if (!(ONBOARDING_STEP_IDS as readonly string[]).includes(stepId)) {
-        return { error: `Unknown onboarding step: ${stepId}` };
-    }
+): Promise<ToolTextResult> {
+    const outcome = await confirmOnboardingStep(storage, agentGaii, stepId, body);
+    if (!outcome.ok) return asError(outcome.message);
+    if (outcome.alreadyPassed) return asText({ step: outcome.step, message: 'Step already passed' });
 
-    const onboarding = await storage.getOnboarding(agentGaii);
-    if (!onboarding || onboarding.status !== 'in_progress') {
-        return { error: 'Hello Integration onboarding is not active for this agent.' };
-    }
-
-    const step = onboarding.steps.find(candidate => candidate.id === stepId);
-    if (!step) return { error: `Onboarding step not found: ${stepId}` };
-
-    if (step.status === 'passed') {
-        return { step, message: 'Step already passed' };
-    }
-
-    const schema = STEP_SCHEMAS[stepId];
-    if (schema) {
-        const parsed = schema.safeParse(body);
-        if (!parsed.success) return { error: parsed.error.message };
-    }
-
-    const result = await validateStep(stepId, agentGaii, storage, body);
-    if (result.passed) {
-        step.status = 'passed';
-        step.validatedAt = new Date().toISOString();
-        step.validationMethod = result.validationMethod;
-        step.details = { ...step.details, ...result.details };
-
-        if (stepId === 'identify_platform' && typeof body.platform === 'string') {
-            const model = typeof body.model === 'string' && body.model.trim()
-                ? body.model.trim().toLowerCase().slice(0, 64) : undefined;
-            await storage.updateAgent(agentGaii, {
-                platform: body.platform,
-                platformVersion: typeof body.platform_version === 'string' ? body.platform_version : undefined,
-                platformDetectedBy: 'self_report',
-                // Indicative attribution only — self-reported, and platforms delegate to
-                // subagents on other models mid-session.
-                ...(model ? { model, modelDetectedBy: 'self_report' as const } : {}),
-            });
-            onboarding.detectedPlatform = body.platform;
-        }
-
-        if (stepId === 'install_skill' && typeof body.platform === 'string') {
-            onboarding.installedRuntime = body.platform;
-        }
-    } else {
-        step.status = 'failed';
-        step.failureReason = result.failureReason;
-    }
-
-    // services/onboarding-progress.ts. This used to be written out here, and the copy had lost the
-    // step that retires untouched OPTIONAL steps on completion — so an agent finishing through MCP
-    // kept them in pendingSteps forever, and the driver reads that list to decide what to do next.
-    const completedOnboarding = await persistStepResult(storage, agentGaii, onboarding, result.passed);
     emitResourceUpdated(agentGaii, `aimeat://agents/${getAgentName(agentGaii)}/onboarding`);
 
-    const testTaskAutoStarted = stepId === 'accept_test_task' && result.passed && result.details?.autoStarted;
-    return {
-        step,
-        progress: onboarding.steps.filter(candidate => candidate.status === 'passed').length,
-        total: onboarding.steps.length,
-        completed: !!completedOnboarding,
-        readinessScore: completedOnboarding?.readinessScore,
-        readinessLevel: completedOnboarding?.readinessLevel,
-        ...(testTaskAutoStarted ? { next_action: 'Test task auto-started. Execute the todos now and then complete the task.' } : {}),
-    };
+    return asText({
+        step: outcome.step,
+        progress: outcome.progress,
+        total: outcome.total,
+        completed: !!outcome.completed,
+        readinessScore: outcome.completed?.readinessScore,
+        readinessLevel: outcome.completed?.readinessLevel,
+        ...(outcome.testTaskAutoStarted
+            ? { next_action: 'Test task auto-started. Execute the todos now and then complete the task.' }
+            : {}),
+    });
 }
 
 export function registerAgentOnboardingTools(
@@ -209,33 +167,25 @@ export function registerAgentOnboardingTools(
         platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
         platform_version: z.string().optional().describe('Runtime/platform version if known'),
         model: z.string().max(64).optional().describe('Primary LLM model driving this agent, for example claude-haiku-4.5 or kimi-k2.6. Self-reported and indicative — used for attribution and filtering, never auditing'),
-    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version, model }) => {
-        const result = await confirmOnboardingStep(agentGaii, 'identify_platform', { platform, platform_version, model }, storage, emitResourceUpdated);
-        return result.error ? asError(String(result.error)) : asText(result);
-    });
+    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version, model }) =>
+        confirmStepAsText(agentGaii, 'identify_platform', { platform, platform_version, model }, storage, emitResourceUpdated));
 
     mcp.tool('aimeat_onboarding_confirm_skill_installed', descriptionFor('aimeat_onboarding_confirm_skill_installed'), {
         platform: z.string().describe('Runtime/platform using the bundle, for example generic, claude, openclaw, or hermes'),
         version: z.string().describe('Bundle version if known; use local when no version is shown'),
-    }, annotationsFor('aimeat_onboarding_confirm_skill_installed'), async ({ platform, version }) => {
-        const result = await confirmOnboardingStep(agentGaii, 'install_skill', { platform, version }, storage, emitResourceUpdated);
-        return result.error ? asError(String(result.error)) : asText(result);
-    });
+    }, annotationsFor('aimeat_onboarding_confirm_skill_installed'), async ({ platform, version }) =>
+        confirmStepAsText(agentGaii, 'install_skill', { platform, version }, storage, emitResourceUpdated));
 
     mcp.tool('aimeat_onboarding_confirm_directives_read', descriptionFor('aimeat_onboarding_confirm_directives_read'), {
         confirmed: z.boolean().optional().describe('Set true after reading the handbook/directives'),
-    }, annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ confirmed }) => {
-        const result = await confirmOnboardingStep(agentGaii, 'read_directives', { confirmed: confirmed ?? true }, storage, emitResourceUpdated);
-        return result.error ? asError(String(result.error)) : asText(result);
-    });
+    }, annotationsFor('aimeat_onboarding_confirm_directives_read'), async ({ confirmed }) =>
+        confirmStepAsText(agentGaii, 'read_directives', { confirmed: confirmed ?? true }, storage, emitResourceUpdated));
 
     mcp.tool('aimeat_onboarding_declare_services', descriptionFor('aimeat_onboarding_declare_services'), {
         services: z.array(z.object({
             name: z.string().describe('Service name'),
             description: z.string().optional().describe('Short service description'),
         })).optional().describe('Services the agent wants to declare; empty is allowed'),
-    }, annotationsFor('aimeat_onboarding_declare_services'), async ({ services }) => {
-        const result = await confirmOnboardingStep(agentGaii, 'declare_services', { services: services ?? [] }, storage, emitResourceUpdated);
-        return result.error ? asError(String(result.error)) : asText(result);
-    });
+    }, annotationsFor('aimeat_onboarding_declare_services'), async ({ services }) =>
+        confirmStepAsText(agentGaii, 'declare_services', { services: services ?? [] }, storage, emitResourceUpdated));
 }

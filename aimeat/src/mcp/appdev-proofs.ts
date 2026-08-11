@@ -8,9 +8,16 @@
  *   toward "proven acceleration", never a node-verified audit (that badge is a later additive
  *   field). Mirrors the curated PackProof ledger contract: append-only, duplicate
  *   (model, testSet, date) rejected.
+ *
+ *   The tool declares its name, parameters and text answer. The capability itself lives in
+ *   services/contribution-proofs.ts, which every other surface can call.
  * @structure registerAppdevProofTools()
- * @usage registerAppdevProofTools(mcp, storage, config, () => agentGaii);
+ * @usage registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   v1.1.0 -- 2026-08-11 -- The attach moved to services/contribution-proofs.ts and the record now
+ *     goes through services/memory-write.ts. Writing it straight to storage meant a public,
+ *     append-only ledger with no archive guard, no value-size or key ceiling, no byte quota and no
+ *     overage charge, and no live update, on a tool meant to be called after every run.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 8).
  */
 
@@ -18,21 +25,17 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
-import type { ContributionProof } from '../models/contribution-proof.js';
-import { getTemplateProposal, templateProposalKey } from '../services/app-template-proposals.js';
-import type { TemplateProposalManifest } from '../services/app-template-proposals.js';
-
-export const packProofsKey = (packId: string): string => `libpack.proofs.${packId}`;
+import { attachContributionProof } from '../services/contribution-proofs.js';
 
 export function registerAppdevProofTools(
     mcp: McpServer,
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    /** The session's own scopes, for the gate inside the shared memory write. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -50,80 +53,28 @@ export function registerAppdevProofTools(
         },
         annotationsFor('aimeat_appdev_proof_attach'),
         async ({ subject_type, subject_id, model, verdict, evidence, test_set, tokens }) => {
-            const parsed = parseGAII(agentGaii);
-            const owner = parsed?.owner ?? (agentGaii.includes('@') && !agentGaii.includes('#') ? agentGaii.split('@')[0] : null);
-            if (!owner) return { content: [{ type: 'text' as const, text: 'Could not resolve the caller to an owner' }], isError: true };
-            const ownerGhii = `${owner}@${config.nodeId}`;
-            const now = new Date().toISOString();
-
-            const proof: ContributionProof = {
-                model: model.trim().toLowerCase(),
-                verdict,
-                evidence,
-                ...(test_set ? { testSet: test_set } : {}),
-                ...(typeof tokens === 'number' ? { tokens } : {}),
-                date: now.slice(0, 10),
-                selfReported: true,
-            };
-            const isDup = (list: ContributionProof[]) =>
-                list.some(p => p.model === proof.model && (p.testSet ?? '') === (proof.testSet ?? '') && p.date === proof.date);
-
-            if (subject_type === 'library_pack') {
-                // Owner gate: the community pack is the caller's own ACTIVE + PUBLIC cortex with a lib.
-                const all = await storage.listCortexExtensions({ status: 'active' });
-                const ext = all.find(e => e.name === subject_id);
-                if (!ext || ext.visibility !== 'public' || !ext.components.some(c => c.type === 'lib')) {
-                    return { content: [{ type: 'text' as const, text: `No active public community pack "${subject_id}"` }], isError: true };
-                }
-                if (ext.installedBy !== owner) {
-                    return { content: [{ type: 'text' as const, text: 'Only the pack owner may attach proofs to it' }], isError: true };
-                }
-                const key = packProofsKey(subject_id);
-                const existing = await storage.getMemory(ownerGhii, key);
-                const value = (existing?.value ?? { packId: subject_id, proofs: [] }) as { packId: string; proofs: ContributionProof[] };
-                const proofs = Array.isArray(value.proofs) ? value.proofs : [];
-                if (isDup(proofs)) {
-                    return { content: [{ type: 'text' as const, text: 'Duplicate proof (same model + test set + date) — the ledger is append-only, one entry per run' }], isError: true };
-                }
-                proofs.push(proof);
-                // A memory record, and every REST memory door emits this.
-                emitChange('memory');
-                await storage.setMemory({
-                    key,
-                    ownerGaii: ownerGhii,
-                    value: { packId: subject_id, proofs },
-                    visibility: 'public',
-                    tags: ['libpack-proofs'],
-                    ttlHours: null,
-                    version: (existing?.version ?? 0) + 1,
-                    createdAt: existing?.createdAt ?? now,
-                    updatedAt: now,
-                });
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ attached: true, subject_type, subject_id, proofs_total: proofs.length, self_reported: true }, null, 2) }] };
-            }
-
-            // app_template: append to the caller's own proposal manifest.
-            const found = await getTemplateProposal(storage, config, agentGaii, subject_id);
-            if (!found) {
-                return { content: [{ type: 'text' as const, text: `Template proposal not found: ${subject_id}` }], isError: true };
-            }
-            const manifest = found.manifest as TemplateProposalManifest;
-            const proofs = Array.isArray(manifest.proofs) ? manifest.proofs : [];
-            if (isDup(proofs)) {
-                return { content: [{ type: 'text' as const, text: 'Duplicate proof (same model + test set + date) — the ledger is append-only, one entry per run' }], isError: true };
-            }
-            proofs.push(proof);
-            manifest.proofs = proofs;
-            manifest.updatedAt = now;
-            emitChange('memory');
-            await storage.setMemory({
-                ...found.record,
-                key: templateProposalKey(subject_id),
-                value: manifest,
-                version: (found.record.version ?? 0) + 1,
-                updatedAt: now,
+            const attached = await attachContributionProof({ storage, config }, {
+                principal: agentGaii, scopes: sessionScopes, roles: ['agent'],
+            }, {
+                subjectType: subject_type,
+                subjectId: subject_id,
+                model, verdict, evidence,
+                testSet: test_set,
+                tokens,
+                pipeline: 'mcp.appdev_proof_attach',
             });
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ attached: true, subject_type, subject_id, proofs_total: proofs.length, self_reported: true }, null, 2) }] };
+            if (!attached.ok) {
+                return { content: [{ type: 'text' as const, text: attached.message }], isError: true };
+            }
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        attached: true, subject_type, subject_id,
+                        proofs_total: attached.proofsTotal, self_reported: true,
+                    }, null, 2),
+                }],
+            };
         },
     );
 }

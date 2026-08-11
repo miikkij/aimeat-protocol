@@ -3,6 +3,9 @@
  * @description E2E tests for MCP flags module — 1 tool: report content for moderation.
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation
+ *   v1.1.0 — 2026-08-11 — Phase 3: the three things POST /v1/flags did and the tool's own copy of
+ *     the write did not (August 2026 audit step 8) — the flagCount bump on a flagged memory record,
+ *     the AI Act target type and reason, and the bound on description.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-flags.ts
@@ -267,6 +270,64 @@ await test('4. aimeat_flag_report works for memory target type', async () => {
     const result = JSON.parse(body.result.content[0].text);
     assert(result.status === 'submitted', `status: ${result.status}`);
     assert(result.target_type === 'memory', `target_type: ${result.target_type}`);
+});
+
+// ─── Phase 3: What the tool copy of the write used to be missing ───
+// Until the write moved to services/moderation-flags.ts the tool wrote its own FlagRecord, and the
+// three tests below are the three things POST /v1/flags did that the tool did not.
+console.log('\nPhase 3 — Parity with POST /v1/flags');
+
+await test('5. flagging memory over MCP bumps flagCount on the record', async () => {
+    const key = 'flagparity.counted';
+    const { status: writeStatus } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key, value: { note: 'flagged through the agent door' }, visibility: 'private' }),
+    });
+    assert(writeStatus === 201, `memory write status ${writeStatus}`);
+
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_flag_report',
+        arguments: {
+            target_type: 'memory',
+            target_id: `${ownerName}@${NODE_ID}::${key}`,
+            reason: 'unreliable',
+        },
+    }, 104);
+    assert(body.result?.isError !== true, `flag failed: ${body.result?.content?.[0]?.text}`);
+
+    const { body: read } = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(read.data?._ddc?.flagCount === 1, `flagCount: ${read.data?._ddc?.flagCount}`);
+});
+
+await test('6. the AI Act target type and reason reach the agent door', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_flag_report',
+        arguments: {
+            target_type: 'ai_provenance',
+            target_id: 'prov-unlabelled-generation',
+            reason: 'undisclosed_ai',
+        },
+    }, 105);
+    assert(body.result?.isError !== true, `refused: ${body.result?.content?.[0]?.text ?? JSON.stringify(body.error)}`);
+    const result = JSON.parse(body.result.content[0].text);
+    assert(result.target_type === 'ai_provenance', `target_type: ${result.target_type}`);
+    assert(result.reason === 'undisclosed_ai', `reason: ${result.reason}`);
+});
+
+await test('7. an oversized description is refused, not stored', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_flag_report',
+        arguments: {
+            target_type: 'agent',
+            target_id: 'agent-with-a-long-story',
+            reason: 'spam',
+            description: 'x'.repeat(10_001),
+        },
+    }, 106);
+    assert(body.result?.isError === true, 'oversized description returns isError');
 });
 
 // ─── Summary ───

@@ -8,6 +8,12 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.5.0 -- 2026-08-11 -- The send is one implementation again: validation, the record build, the
+ *     provenance stamp, the message.inbound webhook, the MCP resource notification and the live-update
+ *     emit moved to services/agent-message-send.ts, which aimeat_message_send now calls as well. The
+ *     two copies had drifted on `processedAt`, on the emit's owner scope, on the notified resource URI
+ *     and on the option-prompt metadata. What stays here: the access check, the agent 404, the
+ *     identity resolution and the HTTP answer.
  *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 9 step 0. A message sent here is stamped, and all three
  *     read paths (inbox, history, the mount composite) carry the record on the row via one shared
  *     withProvenance(). Before this the agent→owner chat was the last human-facing surface where a
@@ -22,7 +28,6 @@
  */
 
 import { Router } from 'express';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
@@ -30,10 +35,10 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
-import { AgentMessageCreateSchema, AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
+import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
 import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { sendAgentMessage } from '../services/agent-message-send.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { logger } from '../utils/logger.js';
 
@@ -101,24 +106,6 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
       return;
     }
 
-    // Validate body
-    const parsed = AgentMessageCreateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
-      return;
-    }
-
-    const body = parsed.data;
-    const now = new Date().toISOString();
-    const id = randomUUID();
-    // Thread = task: when a message is linked to a task but no explicit thread is
-    // given, group it under the task's id so a task's whole conversation (the
-    // agent's clarifications + the owner's answers) stays in ONE thread instead
-    // of spawning a fresh random thread per message. Falls back to a random
-    // thread only for ad-hoc, task-less chat.
-    const threadId = body.thread_id ?? body.linked_task_id ?? randomUUID();
-
     // Determine sender identity
     const roles = req.auth!.roles as string[];
     const isOwnerSession = roles.includes('owner') && !roles.includes('agent');
@@ -126,75 +113,24 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
       ? `${req.auth!.owner}@${config.nodeId}`
       : req.auth!.sub as string;
 
-    // Owner sends inbound (user->agent), agent sends outbound (agent->user)
-    const status = body.direction === 'inbound' ? 'pending' : 'delivered';
-
-    const record: AgentMessageRecord = {
-      id,
-      agentGaii,
-      threadId,
-      direction: body.direction,
-      senderGaii,
-      content: body.content,
-      status,
-      linkedTaskId: body.linked_task_id,
-      metadata: body.metadata ? {
-        tokensUsed: body.metadata.tokens_used,
-        processingMs: body.metadata.processing_ms,
-        proposedTask: body.metadata.proposed_task,
-        prompt: body.metadata.prompt ? {
-          promptId: body.metadata.prompt.prompt_id,
-          question: body.metadata.prompt.question,
-          options: body.metadata.prompt.options,
-          allowOther: body.metadata.prompt.allow_other,
-        } : undefined,
-        promptAnswer: body.metadata.prompt_answer ? {
-          promptId: body.metadata.prompt_answer.prompt_id,
-          choice: body.metadata.prompt_answer.choice,
-          isOther: body.metadata.prompt_answer.is_other,
-        } : undefined,
-      } : undefined,
-      createdAt: now,
-      // TARGET-058: the same stamp aimeat_message_send applies, on the REST door. The record
-      // describes `content`; `metadata` is machine plumbing and is deliberately outside the hash.
-      // An OWNER writing here is not stamped as model-written — provenanceForWrite decides that from
-      // the principal, which is why this call is unconditional and carries no direction test.
-      aiProvenanceId: await provenanceForWrite(storage, {
-        principal: senderGaii,
-        content: body.content,
-        pipeline: 'rest.agent_message_send',
-        surface: { visibility: 'private', humanAudience: true },
-        labelPolicy: config.aiLabelPublic,
-        nodeId: config.nodeId,
-        baseUrl: config.baseUrl,
-        enabled: config.aiProvenance,
-      }),
-    };
-
-    const created = await storage.createMessage(record);
-
-    // Push: webhook + MCP notification (parallel, fire-and-forget)
-    if (record.direction === 'inbound') {
-      if (webhookDispatcher) {
-        webhookDispatcher.dispatchWebhookEvent(agentGaii, 'message.inbound', {
-          message_id: record.id,
-          thread_id: record.threadId,
-          linked_task_id: record.linkedTaskId ?? null,
-          preview: record.content.substring(0, 200),
-          has_proposed_task: !!(record.metadata?.proposedTask),
-          has_prompt_answer: !!(record.metadata?.promptAnswer),
-          created_at: record.createdAt,
-        });
-      }
-      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/messages`); } catch (err) { logger.warn('POST /v1/agents/:name/messages: MCP not connected', { error: String(err) }); }
+    // Validation, the record build, the provenance stamp and the push side effects live in the
+    // service, which aimeat_message_send calls too, so the two doors cannot describe the same
+    // message differently. What is left here is the HTTP answer.
+    const result = await sendAgentMessage(
+      { storage, config, webhooks: webhookDispatcher, emitResourceUpdated },
+      { agentGaii, senderGaii, body: req.body, pipeline: 'rest.agent_message_send' },
+    );
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
+      return;
     }
+    const created = result.message;
 
     res.status(201).json(success(config.nodeId, { message: created }, [
       { description: 'View messages', method: 'GET', url: `/v1/agents/${agentName}/messages` },
-      { description: 'View thread', method: 'GET', url: `/v1/agents/${agentName}/messages?thread_id=${threadId}` },
+      { description: 'View thread', method: 'GET', url: `/v1/agents/${agentName}/messages?thread_id=${created.threadId}` },
       { description: 'View inbox', method: 'GET', url: `/v1/agents/${agentName}/messages/inbox` },
     ]));
-    emitChange('agent-messages', resolve(req));
   });
 
   /* ── GET /v1/agents/:name/messages/inbox -- Pending inbound messages ── */

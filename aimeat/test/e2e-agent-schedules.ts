@@ -1,5 +1,16 @@
-// E2E Tests for Agent/Profile Schedules
-// Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
+/**
+ * @file test/e2e-agent-schedules.ts
+ * @description The schedule surface end to end: create, list, trigger, constraints, authorization,
+ *   pause/resume/cancel, cross-agent targeting and the calendar occurrence projection.
+ * @structure Ten phases, in the order a schedule lives: create, list, trigger, constraints, failure,
+ *   authorization, lifecycle, agent budget defaults, cross-agent targeting, occurrences.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-agent-schedules
+ * @version-history
+ *   v1.1.0 — 2026-08-11 — 4e/4f: the length cut on description/purpose and cron validation on EDIT.
+ *     Both moved into services/schedule-write.ts with the August 2026 audit step 8, where the MCP
+ *     schedule tools now call them too; neither had a test on this door either.
+ *   v1.0.0 — 2026-06-03 — Initial
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -75,6 +86,7 @@ const auth2 = { Authorization: `Bearer ${o2.ownerToken}` };
 let agentTaskScheduleId = '';
 let maxRunsScheduleId = '';
 let aiScheduleId = '';
+let longTextScheduleId = '';
 
 console.log('Phase 1 -- Create schedules');
 
@@ -165,6 +177,35 @@ await test('4d. Patching an ai schedule cannot smuggle a foreign namespace in (C
     });
     assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
     assert(body.error?.code === 'NAMESPACE_DENIED', `code: ${JSON.stringify(body.error)}`);
+});
+
+// August 2026 audit step 8: create, edit and cancel moved into services/schedule-write.ts so the MCP
+// schedule tools build the record this door builds. These two lock the parts that had drifted apart:
+// the length cut on description and purpose, and cron validation on EDIT rather than create only.
+await test('4e. description and purpose are cut to their stored maximum', async () => {
+    const { status, body } = await json('/v1/schedules', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({
+            kind: 'ai', cron: '0 2 * * *', display_name: 'Long text',
+            prompt: 'Summarise.', description: 'd'.repeat(3000), purpose: 'p'.repeat(900),
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    const s = body.data.schedule;
+    assert(s.description.length === 2000, `description cut to 2000, got ${s.description.length}`);
+    assert(s.purpose.length === 500, `purpose cut to 500, got ${s.purpose.length}`);
+    longTextScheduleId = s.id;
+});
+
+await test('4f. An edit cannot replace a working cron with an unparseable one', async () => {
+    const { status, body } = await json(`/v1/schedules/${longTextScheduleId}`, {
+        method: 'PATCH', headers: auth1, body: JSON.stringify({ cron: 'not a cron' }),
+    });
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'INVALID_CRON', `code: ${JSON.stringify(body.error)}`);
+    const after = await json(`/v1/schedules/${longTextScheduleId}`, { headers: auth1 });
+    assert(after.body.data.schedule.cron === '0 2 * * *', `the working cron survives a refused edit, got ${after.body.data.schedule.cron}`);
+    await json(`/v1/schedules/${longTextScheduleId}`, { method: 'DELETE', headers: auth1 });
 });
 
 console.log('\nPhase 2 -- List');

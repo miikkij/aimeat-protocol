@@ -13,7 +13,7 @@
  *   surface — which is what aimeat/no-storage-in-mcp says, and it caught this file on its first run.
  *   They are not part of services/memory-write.ts because that function owns a whole write,
  *   and this path deliberately does not use it: the workspace write has its own owner-collapse rule
- *   (one owner per key, see writeRecord in mcp/workspaces.ts) that a generic write would undo.
+ *   (one owner per key, see services/workspace-write.ts) that a generic write would undo.
  * @structure
  *   - archivedRefusal() — is this key inside something the owner archived
  *   - checkWorkspaceWriteLimits() — value size and key count for a planned batch
@@ -21,6 +21,8 @@
  *   const bad = await archivedRefusal(storage, `${root}.`);
  *   if (bad) return fail(bad);
  * @version-history
+ *   v1.1.1 — 2026-08-11 — Pointer only: the owner-collapse write these guard is now
+ *     services/workspace-write.ts, not a helper inside mcp/workspaces.ts.
  *   v1.1.0 — 2026-08-11 — The byte budget and the per-RECORD archive flag, both of which the
  *     HTTP door applies and this path did not: a batch could clear the value and key limits
  *     and still write past the owner's paid storage, and a single archived record was

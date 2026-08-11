@@ -8,24 +8,24 @@
  *   v1.1.0 — 2026-08-10 — GET :name/actions/:actionId checks installedBy, as the PATCH beside it
  *                         always has. It returns scriptContent, and the ext:write scope was the
  *                         only thing in front of it — which an owner session bypasses.
+ *   v1.2.0 — 2026-08-11 — The write itself lives in services/extension-lifecycle.ts, which the MCP
+ *                         tools now call too. These handlers keep the permission decision, the
+ *                         envelope and the wording; the quota, the secret handling, the swap, the
+ *                         schedule bookkeeping and the memory cleanup are one implementation.
  */
 import { Router } from 'express';
-import { upsertExtensionInPlace } from '../../services/extension-upsert.js';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { extensionInstallRefusal } from '../../services/install-quotas.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { logger } from '../../utils/logger.js';
-import { reconcileAfterExtensionWrite } from '../../services/exchange-projection.js';
-import { stableStringify } from '../../utils/stable-json.js';
-import { ExtensionInstallSchema, validateBody } from '../../models/schemas.js';
-import { getEncryptionKey } from '../../services/encryption.js';
 import {
-  getExtSecretKeys, encryptSecretFields, decryptSecretFields, maskSecretFields,
-} from '../../services/extension-secrets.js';
+  writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
+} from '../../services/extension-lifecycle.js';
+import { ExtensionInstallSchema, validateBody } from '../../models/schemas.js';
+import { getExtSecretKeys, maskSecretFields } from '../../services/extension-secrets.js';
 import { buildExtensionRecordFromManifest } from './manifest.js';
 import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
@@ -126,18 +126,11 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
       const record = built.record;
       const name = record.name;
-
-      // Both install ceilings — the node's and this owner's — live in services/install-quotas.ts,
-      // because aimeat_extension_install answers to the same two numbers.
-      const overQuota = await extensionInstallRefusal({ storage, config }, req.auth!.owner as string, isOperator);
-      if (overQuota) {
-        res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
-        return;
-      }
       // Silence unused-var warning for legacy isOwner reference.
       void isOwner;
 
-      // Reject if extension name already exists
+      // POST never replaces an installed extension; PUT is the door for a redeploy. The check stays
+      // here because the answer is this route's: a conflict, not an offer to upsert.
       const existingExt = await storage.getExtension(name);
       if (existingExt) {
         res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS',
@@ -145,25 +138,26 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
-      // Encrypt any extension-level `type: 'secret'` config values before storing at rest.
-      const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
-      if (encConfig === null) {
-        res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
-          'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.'));
+      // The install ceilings, the secret encryption and the EXCHANGE projection are one
+      // implementation (services/extension-lifecycle.ts) because aimeat_extension_install does the
+      // same act and answers to the same numbers.
+      const written = await writeExtensionRecord({ storage, config, scheduler }, record, {
+        existing: null,
+        ownerName: req.auth!.owner as string,
+        actor: req.auth!.sub,
+        isOperator,
+      });
+      if (!written.ok) {
+        res.status(written.status).json(error(config.nodeId, written.code, written.message));
         return;
       }
-      record.config = encConfig;
-
-      const created = await storage.createExtension(record);
+      const created = written.record;
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
-      // TARGET-050: an action flagged `commercial.exchange` is projected onto the market from here.
-      await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
 
       res.status(201).json(success(config.nodeId, { extension: created, ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
       ]));
-      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to install extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to install extension'));
@@ -216,82 +210,44 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
-      // ── CREATE branch — brand-new extension, so the same two ceilings apply. It used to say
-      // "mirrors POST quota checks" and then write them out again, which is a mirror that has to be
-      // kept in step by hand. Third copy of the same numbers; now the same call.
-      if (!existing) {
-        const overQuota = await extensionInstallRefusal({ storage, config }, req.auth!.owner as string,
-          req.auth!.roles.includes('operator'));
-        if (overQuota) {
-          res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
-          return;
-        }
-        const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
-        if (encConfig === null) {
-          res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
-            'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.'));
-          return;
-        }
-        record.config = encConfig;
-        const created = await storage.createExtension(record);
-        logger.info(`Extension installed via upsert: ${created.name}`, { version: created.version, by: req.auth!.owner });
-        await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
-        res.status(201).json(success(config.nodeId, { extension: created, action: 'created', ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
-          { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
-          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
-        ]));
-        emitChange('extensions');
+      // The whole write — the install ceilings on a create, the secret carry-forward, the no-op
+      // shortcut, the in-place swap with its EXCHANGE re-projection and the re-initialisation of an
+      // active extension — is services/extension-lifecycle.ts, because aimeat_extension_install does
+      // the same act. This handler decides who may write and how the answer reads.
+      const written = await writeExtensionRecord({ storage, config, scheduler }, record, {
+        existing: existing ?? null,
+        ownerName: req.auth!.owner as string,
+        actor: req.auth!.sub,
+        isOperator: req.auth!.roles.includes('operator'),
+      });
+      if (!written.ok) {
+        res.status(written.status).json(error(config.nodeId, written.code, written.message));
         return;
       }
+      const warned = built.warnings?.length ? { warnings: built.warnings } : {};
 
-      // ── UPDATE branch — idempotency: identical derived bytes ⇒ 200 no-op. ──
-      // stableStringify (not JSON.stringify): config/actions/limits/federation/instances
-      // are Json fields, and PostgreSQL jsonb does not preserve object key order — a naive
-      // stringify would see identical data as "changed" on Postgres. See utils/stable-json.ts.
-      // Compare on PLAINTEXT-normalized config (decrypt existing secrets, strip __secretKeys) so a
-      // redeploy of an identical manifest is a no-op despite secret ciphertext changing IV each call.
-      const encKeyForSig = getEncryptionKey(config);
-      const signature = (r: ExtensionRecord) => stableStringify({
-        version: r.version, description: r.description, author: r.author,
-        requiredApis: r.requiredApis, actions: r.actions,
-        config: decryptSecretFields(r.config, getExtSecretKeys(r), encKeyForSig),
-        limits: r.limits, federation: r.federation, instances: r.instances ?? null,
-      });
-      if (signature(record) === signature(existing)) {
-        res.json(success(config.nodeId, { extension: existing, action: 'unchanged', message: 'Extension is already up to date' }, [
+      if (written.action === 'installed') {
+        logger.info(`Extension installed via upsert: ${name}`, { version: written.record.version, by: req.auth!.owner });
+        res.status(201).json(success(config.nodeId, { extension: written.record, action: 'created', ...warned }, [
+          { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
           { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
         ]));
         return;
       }
 
-      const wasActive = existing.status === 'active';
-
-      // Encrypt extension-level secret config values before the in-place swap.
-      const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), encKeyForSig);
-      if (encConfig === null) {
-        res.status(503).json(error(config.nodeId, 'ENCRYPTION_NOT_CONFIGURED',
-          'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.'));
+      // Identical derived bytes ⇒ 200 no-op, and nothing was re-run.
+      if (written.action === 'unchanged') {
+        res.json(success(config.nodeId, { extension: written.record, action: 'unchanged', message: 'Extension is already up to date' }, [
+          { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
+        ]));
         return;
       }
-      record.config = encConfig;
 
-      // The whole upsert — the field swap, the EXCHANGE re-projection and the re-initialisation of
-      // an active extension — is services/extension-upsert.ts, because aimeat_extension_install
-      // does the same act and used to do only the first of the three.
-      const upserted = await upsertExtensionInPlace({ storage, config, scheduler }, name, record, {
-        ownerName: req.auth!.owner as string,
-        actor: req.auth!.sub,
-        wasActive,
-      });
-      const updated = upserted.record;
-      const reinitialized = upserted.reinitialized;
-
-      logger.info(`Extension upserted: ${name}`, { version: record.version, by: req.auth!.sub, reinitialized });
-      res.json(success(config.nodeId, { extension: updated, action: 'updated', reinitialized, ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
+      logger.info(`Extension upserted: ${name}`, { version: record.version, by: req.auth!.sub, reinitialized: written.reinitialized });
+      res.json(success(config.nodeId, { extension: written.record, action: 'updated', reinitialized: written.reinitialized, ...warned }, [
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
       ]));
-      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to upsert extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to upsert extension'));
@@ -465,48 +421,15 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
-      // Clean scheduled jobs before deletion (same as deactivate)
-      if (scheduler) {
-        const jobs = await storage.listScheduledJobs({ extensionName: name });
-        for (const job of jobs) {
-          scheduler.removeJob(job.id);
-          await storage.deleteScheduledJob(job.id);
-        }
-        if (jobs.length > 0) {
-          logger.info(`Removed ${jobs.length} scheduled jobs for extension: ${name}`);
-        }
-      }
-
-      // Clean ext:{name} namespace memory (data the extension stored)
-      const extNamespace = `ext:${name}`;
-      const extMemoryRecords = await storage.listMemory(extNamespace);
-      for (const record of extMemoryRecords) {
-        await storage.deleteMemory(extNamespace, record.key);
-      }
-      if (extMemoryRecords.length > 0) {
-        logger.info(`Cleaned ${extMemoryRecords.length} memory keys from namespace: ${extNamespace}`);
-      }
-
-      // Clean instance-scoped namespace memory (ext:{name}.{instanceId})
-      const instances = await storage.listExtensionInstances(name);
-      for (const inst of instances) {
-        const instNamespace = `ext:${name}.${inst.id}`;
-        const instMemory = await storage.listMemory(instNamespace);
-        for (const record of instMemory) {
-          await storage.deleteMemory(instNamespace, record.key);
-        }
-        if (instMemory.length > 0) {
-          logger.info(`Cleaned ${instMemory.length} memory keys from instance namespace: ${instNamespace}`);
-        }
-      }
-
-      await storage.deleteExtension(name);
+      // The scheduled jobs, the ext:{name} namespace and each instance's namespace go with the row.
+      // One implementation (services/extension-lifecycle.ts): aimeat_extension_delete deleted only
+      // the row, so an extension uninstalled by an agent left its cron jobs and its data behind.
+      await uninstallExtension({ storage, config, scheduler }, name);
       logger.info(`Extension uninstalled: ${name}`, { by: req.auth!.sub });
 
       res.json(success(config.nodeId, { deleted: name }, [
         { description: 'List extensions', method: 'GET', url: '/v1/extensions' },
       ]));
-      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to uninstall extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to uninstall extension'));
@@ -531,43 +454,10 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
-      const updated = await storage.updateExtension(name, {
-        status: 'active',
-        activatedAt: new Date().toISOString(),
-      });
-
-      // Register scheduled jobs from manifest if scheduler is available
-      if (scheduler && ext.config.__schedules) {
-        const schedules = ext.config.__schedules as Array<Record<string, unknown>>;
-        for (const sched of schedules) {
-          const jobId = `ext:${name}:${sched.id as string}`;
-          const existing = await storage.getScheduledJob(jobId);
-          if (!existing) {
-            const jobRecord: ScheduledJobRecord = {
-              id: jobId,
-              name: (sched.description as string) ?? `${name}/${sched.id as string}`,
-              type: 'extension',
-              extensionName: name,
-              actionId: sched.action as string,
-              cron: sched.cron as string,
-              enabled: true,
-              input: (sched.input as Record<string, unknown>) ?? undefined,
-              createdBy: req.auth!.sub,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            await storage.createScheduledJob(jobRecord);
-            scheduler.addJob(jobRecord);
-            logger.info(`Registered scheduled job: ${jobId}`, { cron: sched.cron });
-          }
-        }
-      }
-
-      // Run @activate jobs immediately after activation
-      if (scheduler) {
-        scheduler.runActivateJobs(name).catch(err =>
-          logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
-      }
+      // Status, the schedules the manifest declares, and the @activate jobs — one implementation
+      // (services/extension-lifecycle.ts), because aimeat_extension_activate wrote only the status
+      // and left the extension switched on with its clock never started.
+      const updated = await activateExtension({ storage, config, scheduler }, ext, req.auth!.sub);
 
       logger.info(`Extension activated: ${name}`, { by: req.auth!.sub });
 
@@ -576,7 +466,6 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
         { description: 'Deactivate extension', method: 'POST', url: `/v1/extensions/${name}/deactivate` },
       ]));
-      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to activate extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to activate extension'));
@@ -599,28 +488,15 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
-      const updated = await storage.updateExtension(name, {
-        status: 'inactive',
-      });
-
-      // Remove scheduled jobs for this extension
-      if (scheduler) {
-        const jobs = await storage.listScheduledJobs({ extensionName: name });
-        for (const job of jobs) {
-          scheduler.removeJob(job.id);
-          await storage.deleteScheduledJob(job.id);
-        }
-        if (jobs.length > 0) {
-          logger.info(`Removed ${jobs.length} scheduled jobs for extension: ${name}`);
-        }
-      }
+      // Status and the scheduled jobs together — one implementation, because
+      // aimeat_extension_deactivate wrote only the status and left the cron firing.
+      const updated = await deactivateExtension({ storage, config, scheduler }, name);
 
       logger.info(`Extension deactivated: ${name}`, { by: req.auth!.sub });
 
       res.json(success(config.nodeId, { extension: updated }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${name}/activate` },
       ]));
-      emitChange('extensions');
     } catch (err) {
       logger.error('Failed to deactivate extension', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to deactivate extension'));

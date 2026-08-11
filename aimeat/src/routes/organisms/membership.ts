@@ -5,6 +5,9 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — the decline route calls declineNameInvitation() instead of deleting the
+ *     membership row itself, so it and aimeat_organism_invitation_respond share one write
+ *     (August 2026 MCP audit step 8).
  *   v1.1.0 — 2026-07-16 — Name-invites carry role + workspaces (services/invitations.ts core); new
  *     POST /members (direct add), PATCH + DELETE /invitations/:ghii (edit/cancel pending).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
@@ -21,7 +24,7 @@ import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
-  acceptNameInvitation, addOrganismMember,
+  acceptNameInvitation, declineNameInvitation, addOrganismMember,
 } from '../../services/invitations.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -553,14 +556,14 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
   router.post('/v1/organisms/:id/invitations/decline', requireAuth(), requireRole('agent'), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
-    const membership = await storage.getMembership(id, callerGhii);
-    if (!membership || membership.status !== 'invited') {
-      res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have no pending invitation to this organism'));
-      return;
+    try {
+      // Shared with aimeat_organism_invitation_respond (services/invitations.ts).
+      await declineNameInvitation(storage, { organismId: id, inviteeOwner: callerGhii });
+    } catch (e) {
+      if (e instanceof InvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
     }
-    await storage.deleteMembership(membership.id);
     res.json(success(config.nodeId, { status: 'declined' }));
-    emitChange('organisms');
   });
 
   /* ── Agent attachment (manage organism.agentGaiis) ──

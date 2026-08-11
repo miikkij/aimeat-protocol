@@ -14,6 +14,14 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   v1.2.0 -- 2026-08-11 -- aimeat_operator_ai_config writes through services/memory-write.ts and
+ *     resolves its target through routes/memory/owner-target.ts, which is where the reserved-key
+ *     guard lives. It wrote `openrouter.settings` straight to storage before, so the one key class
+ *     the server itself reads and trusts was reachable here without the memory:write-reserved grant
+ *     that /v1/memory demands for it, and without the record's ceilings, archive guard, provenance
+ *     stamp or any of the fan-out a memory write sets off. aimeat_operator_agent_configure still
+ *     calls storage.updateAgent directly: that is an agent-record write, and its shared home is
+ *     services/agent-profile-write.ts.
  *   v1.0.0 -- 2026-07-05 -- Initial: agent-configure with propose-then-confirm.
  *   v1.1.0 -- 2026-08-08 -- The narrow-only guard no longer exempts a target that holds '*'. It did,
  *     because an agent with everything could not gain anything -- true until memory:write-reserved
@@ -31,7 +39,9 @@ import { descriptionFor } from './catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
-import { uncoveredScopes, scopeIsCovered } from '../utils/scope-coverage.js';
+import { uncoveredScopes } from '../utils/scope-coverage.js';
+import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
+import { writeMemoryRecord } from '../services/memory-write.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
 
@@ -201,17 +211,19 @@ export function registerOperatorConfigTools(
         annotationsFor('aimeat_operator_ai_config'),
         async ({ daily_budget_usd, model, reasoning_model, execution_model, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
-            // This tool writes into the OWNER's namespace, and the platform's own rule for that move
-            // is memory:write-as-owner on top of whatever else the write needs
-            // (routes/memory/owner-target.ts). The redirect was implicit here, so an agent granted
-            // memory:write-reserved but deliberately NOT memory:write-as-owner wrote the owner's
-            // openrouter.settings through this door and was refused through /v1/memory. They are
-            // separate ticks in the permission dialog, so that combination is one an owner can pick.
-            if (!scopeIsCovered(sessionScopes, 'memory:write-as-owner')) {
-                return err('Changing the owner\'s AI settings writes into their namespace, which needs the '
-                    + '"memory:write-as-owner" permission as well. This session does not carry it.');
-            }
-            const ownerGhii = `${callerOwner}@${config.nodeId}`;
+            // This tool writes into the OWNER's namespace, and the platform decides that move in one
+            // place: routes/memory/owner-target.ts. It answers two questions this door used to
+            // answer for itself, or not at all. memory:write-as-owner was checked here by hand. The
+            // reserved-key guard was not checked anywhere: `openrouter.settings` is one of the keys
+            // the server itself reads and trusts (the URL a decrypted AI key is sent to lives in
+            // it), so writing it on the owner's behalf costs the separate memory:write-reserved
+            // grant that sits outside every wildcard — the same refusal /v1/memory has always given.
+            const target = resolveMcpWriteTarget({
+                agentGaii, ownerName: callerOwner, nodeId: config.nodeId,
+                scopes: sessionScopes, key: AI_SETTINGS_KEY, ownerScope: true,
+            });
+            if ('deny' in target) return err(`${target.deny.error}: ${target.deny.message} ${target.deny.how_to_fix}`);
+            const ownerGhii = target.gaii;
             const record = await storage.getMemory(ownerGhii, AI_SETTINGS_KEY);
             const settings = (record?.value ?? {}) as Record<string, unknown>;
 
@@ -268,23 +280,29 @@ export function registerOperatorConfigTools(
                 throw e;
             }
 
-            const now = new Date().toISOString();
             const merged: Record<string, unknown> = { ...settings };
             if (proposed.daily_budget_usd !== undefined) merged.daily_budget_usd = proposed.daily_budget_usd;
             if (proposed.model !== undefined) merged.model = proposed.model;
             if (proposed.reasoning_model !== undefined) merged.reasoningModel = proposed.reasoning_model;
             if (proposed.execution_model !== undefined) merged.executionModel = proposed.execution_model;
-            await storage.setMemory({
+            // ONE implementation. services/memory-write.ts owns the record shape, the ceilings, the
+            // archive guard, the provenance stamp and everything a write sets off, the same way
+            // POST /v1/memory does — this door used to reach storage itself, so a change to the
+            // owner's AI settings landed with none of it and nothing else on the node heard about it.
+            const written = await writeMemoryRecord({ storage, config }, {
+                principal: agentGaii, targetGaii: ownerGhii, scopes: sessionScopes, roles: ['agent'],
+            }, {
                 key: AI_SETTINGS_KEY,
-                ownerGaii: ownerGhii,
                 value: merged,
                 visibility: record?.visibility ?? 'private',
                 tags: record?.tags ?? ['openrouter'],
-                ttlHours: null,
-                version: (record?.version ?? 0) + 1,
-                createdAt: record?.createdAt ?? now,
-                updatedAt: now,
+                pipeline: 'mcp.operator_ai_config',
+                ownerScoped: true,
+                // The word the owner ticked for this door (mcp/catalog/scopes.ts), rather than a
+                // memory:write that nobody granting an operator agent was asked about.
+                authorisingScope: 'memory:write-reserved',
             });
+            if (!written.ok) return err(`${written.code}: ${written.message}`);
             logger.info(`Operator ai-config applied for ${callerOwner}`, { by: agentGaii, fields: Object.keys(diff) });
             return ok({ mode: 'applied', applied: diff });
         },

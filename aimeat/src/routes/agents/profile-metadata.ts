@@ -2,6 +2,9 @@
  * @file src/routes/agents/profile-metadata.ts
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — PATCH /tags and PATCH /mode call services/agent-profile-write.ts, which
+ *     aimeat_agent_tags_set and aimeat_agent_mode_set now call too. The mode handler's step-list
+ *     re-derive was written for a caller that arrives through MCP and never ran for it.
  *   v1.2.0 — 2026-08-09 — Each agent carries `health`, the account-level verdict from
  *     services/agent-health.ts. The frontend derived it from fields this response never sent
  *     (webhookFailCount was not projected at all), so two of its three problem conditions could
@@ -20,13 +23,20 @@ import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
-import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
 import { listByAgent as listEngagementsByAgent } from '../../services/workspace-engagements.js';
-import { VALID_MODES } from './constants.js';
+import { setAgentTags, setAgentMode, type AgentWriteRefusal } from '../../services/agent-profile-write.js';
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
+
+/** HTTP status for a refusal from services/agent-profile-write.ts. */
+function agentWriteStatus(code: AgentWriteRefusal['code']): number {
+  if (code === 'AGENT_NOT_FOUND') return 404;
+  if (code === 'ACCESS_DENIED') return 403;
+  if (code === 'INVALID_INPUT') return 400;
+  return 500;
+}
 
 export function registerProfileMetadataRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/agents/:gaii — public agent profile (no auth)
@@ -190,55 +200,19 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // handler). Cross-owner is rejected by the ownership check below.
   router.patch('/v1/agents/:name/tags', requireAuth(), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
-    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
-    const agent = await storage.getAgent(gaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
-      return;
-    }
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update tags for agents owned by the same owner'));
-      return;
-    }
-
-    const rawTags = req.body?.tags;
-    if (!Array.isArray(rawTags)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'tags must be an array of strings'));
-      return;
-    }
-
-    const tags: string[] = [];
-    for (const value of rawTags) {
-      if (typeof value !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'tags must be an array of strings'));
-        return;
-      }
-      const tag = value.trim().toLowerCase();
-      if (!tag) continue;
-      if (!/^[a-z0-9][a-z0-9._:-]{0,63}$/.test(tag)) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Invalid tag: ${value}`));
-        return;
-      }
-      if (!tags.includes(tag)) tags.push(tag);
-    }
-
-    if (tags.length > 20) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'An agent can have at most 20 tags'));
-      return;
-    }
-
-    const updated = await storage.updateAgent(gaii, { tags });
-    if (!updated) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+    // Ownership, normalisation and the write are services/agent-profile-write.ts, shared with
+    // aimeat_agent_tags_set.
+    const outcome = await setAgentTags({ storage, config }, req.auth!.owner, identifier, req.body?.tags);
+    if (!outcome.ok) {
+      res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;
     }
 
     res.json(success(config.nodeId, {
-      gaii: updated.gaii,
-      name: updated.name,
-      tags: updated.tags ?? [],
+      gaii: outcome.agent.gaii,
+      name: outcome.agent.name,
+      tags: outcome.agent.tags ?? [],
     }));
-    emitChange('agents');
   });
 
   // GET /v1/agents/:name/engagements — the agent's contract engagements across every organism/workspace
@@ -293,69 +267,19 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
   // task-runner gets a reduced 7-step flow, workstation the narrowest 4-step flow.
   router.patch('/v1/agents/:name/mode', requireAuth(), async (req, res) => {
     const identifier = decodeURIComponent(req.params.name as string);
-    const gaii = identifier.includes('#') ? identifier : buildGAII(identifier, req.auth!.owner, config.nodeId);
-    const agent = await storage.getAgent(gaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
+    // Ownership, the mode vocabulary, the write and the Hello Integration step-list re-derive are
+    // services/agent-profile-write.ts, shared with aimeat_agent_mode_set.
+    const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode);
+    if (!outcome.ok) {
+      res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;
-    }
-    if (agent.owner !== req.auth!.owner) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only update the mode of your own agents'));
-      return;
-    }
-
-    const newMode = req.body?.mode;
-    if (!VALID_MODES.includes(newMode)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        `mode must be one of: ${VALID_MODES.join(', ')}`));
-      return;
-    }
-
-    const updated = await storage.updateAgent(gaii, { mode: newMode });
-    if (!updated) {
-      res.status(404).json(error(config.nodeId, 'AGENT_NOT_FOUND', `Agent not found: ${identifier}`));
-      return;
-    }
-
-    // Ensure the Hello Integration step list matches the (possibly new) mode's flow — e.g. a
-    // task-runner's reduced 7-step set. This self-heals the case where an agent registered as
-    // 'interactive' (the device-auth default; the connector dropped `--mode`) later self-sets
-    // 'task-runner' at startup and would otherwise keep showing the full flow (7/16 instead of 7/7).
-    // Progress on steps that carry over (same id) is preserved. It fires whenever the stored step SET
-    // differs from the mode's flow — so it also repairs agents ALREADY in the target mode with a stale
-    // set — and is a no-op otherwise. Best-effort: a sync failure must never fail the mode change.
-    try {
-      const onboarding = await storage.getOnboarding(gaii);
-      if (onboarding) {
-        const target = createDefaultSteps(newMode);
-        const currentIds = new Set(onboarding.steps.map(s => s.id));
-        const flowChanged = target.length !== onboarding.steps.length || target.some(s => !currentIds.has(s.id));
-        if (flowChanged) {
-          const prevById = new Map(onboarding.steps.map(s => [s.id, s] as const));
-          const steps = target.map(fresh => {
-            const prev = prevById.get(fresh.id);
-            return prev
-              ? { ...fresh, status: prev.status, validatedAt: prev.validatedAt, details: prev.details, failureReason: prev.failureReason }
-              : fresh;
-          });
-          const allRequiredPassed = steps.filter(s => s.required).every(s => s.status === 'passed');
-          await storage.updateOnboarding(gaii, {
-            steps,
-            status: allRequiredPassed ? 'completed' : 'in_progress',
-            ...(allRequiredPassed && !onboarding.completedAt ? { completedAt: new Date().toISOString() } : {}),
-          });
-        }
-      }
-    } catch (err) {
-      console.error(`[agents] mode change: could not re-derive onboarding steps for ${gaii}:`, err);
     }
 
     res.json(success(config.nodeId, {
-      gaii: updated.gaii,
-      name: updated.name,
-      mode: updated.mode ?? 'interactive',
+      gaii: outcome.agent.gaii,
+      name: outcome.agent.name,
+      mode: outcome.agent.mode ?? 'interactive',
     }));
-    emitChange('agents');
   });
 
   // PATCH /v1/agents/:name/max-concurrent-tasks — owner sets how many tasks the

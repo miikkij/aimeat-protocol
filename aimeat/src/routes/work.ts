@@ -5,12 +5,15 @@
  *   delivery with exponential-backoff retries, cross-node work resolution, and a work→task bridge.
  *
  * @structure
- *   - fireWebhook(url, payload, maxRetries): safeFetch-guarded webhook POST with backoff + in-memory log
- *   - getWebhookLog(): exposes recent webhook delivery entries
+ *   - getWebhookLog(): re-exported from services/work-lifecycle.ts, where fireWebhook now lives
  *   - createWorkItem(...): builds a work item (escrow, tracking code, notification)
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.1.0 — 2026-08-11 — accept and deliver call services/work-lifecycle.ts, the same functions
+ *     aimeat_work_accept and aimeat_work_deliver call. The tools were a second implementation that
+ *     skipped the work→task bridge, the requester's callback webhook and both extension hooks.
+ *     fireWebhook moved into that service with them; this file imports it back for in_progress.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -21,92 +24,23 @@ import type { MailboxNotificationService } from '../services/mailbox-notificatio
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
-import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
+import { calculateWorkCost, holdEscrow } from '../services/morsel.js';
 import { logger } from '../utils/logger.js';
 import { createWorkTabService } from '../services/db/work-tab-db-service.js';
 import { executeHooks } from '../services/hooks.js';
-import { fireHook } from '../utils/fire-hook.js';
 import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
 import { checkOtkSession } from './auth.js';
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
-import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
+import { validateOutboundUrl } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
-import { createTaskFromWork } from '../services/work-task-bridge.js';
+import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
+
+// The webhook log kept its address here when fireWebhook moved to the shared service.
+export { getWebhookLog } from '../services/work-lifecycle.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
-}
-
-/** Webhook delivery log entry (in-memory, recent deliveries only). */
-interface WebhookLogEntry {
-  url: string;
-  trackingCode: string;
-  event: string;
-  attempt: number;
-  status: 'success' | 'failed' | 'retrying';
-  httpStatus?: number;
-  error?: string;
-  timestamp: string;
-}
-const webhookLog: WebhookLogEntry[] = [];
-const MAX_WEBHOOK_LOG = 500;
-
-/** Get recent webhook delivery log entries. */
-export function getWebhookLog(): WebhookLogEntry[] {
-  return webhookLog;
-}
-
-/**
- * Webhook POST with exponential backoff (§10.7).
- * Retries up to maxRetries times with delays: 1s, 2s, 4s, 8s, 16s, ...
- */
-function fireWebhook(url: string, payload: Record<string, unknown>, maxRetries: number): void {
-  const body = JSON.stringify(payload);
-  const event = (payload.event as string) ?? 'unknown';
-  const trackingCode = (payload.tracking_code as string) ?? '';
-  const doFetch = (attempt: number) => {
-    // safeFetch validates the URL AND re-validates every redirect hop (throws `Fetch blocked: …` on a
-    // blocked host/hop), so a caller-supplied webhook URL cannot 3xx-bounce to an internal target.
-    // A blocked URL surfaces in the .catch below alongside network errors (both = a failed delivery).
-    safeFetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      signal: AbortSignal.timeout(10_000),
-    }).then(resp => {
-      const entry: WebhookLogEntry = {
-        url, trackingCode, event, attempt,
-        status: resp.ok ? 'success' : 'failed',
-        httpStatus: resp.status,
-        timestamp: new Date().toISOString(),
-      };
-      if (!resp.ok && attempt < maxRetries) {
-        entry.status = 'retrying';
-      }
-      webhookLog.push(entry);
-      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
-      if (!resp.ok && attempt < maxRetries) {
-        const delay = Math.pow(2, attempt - 1) * 1000;
-        setTimeout(() => doFetch(attempt + 1), delay);
-      }
-    }).catch(err => {
-      const entry: WebhookLogEntry = {
-        url, trackingCode, event, attempt,
-        status: attempt < maxRetries ? 'retrying' : 'failed',
-        error: String(err),
-        timestamp: new Date().toISOString(),
-      };
-      webhookLog.push(entry);
-      if (webhookLog.length > MAX_WEBHOOK_LOG) webhookLog.splice(0, webhookLog.length - MAX_WEBHOOK_LOG);
-      logger.warn(`Webhook delivery failed (attempt ${attempt}/${maxRetries})`, { url, error: String(err) });
-      if (attempt < maxRetries) {
-        const delay = Math.pow(2, attempt - 1) * 1000;
-        setTimeout(() => doFetch(attempt + 1), delay);
-      }
-    });
-  };
-  doFetch(1);
 }
 
 /**
@@ -476,38 +410,19 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   // POST /v1/work/:tc/accept — accept work (provider, agent auth)
   router.post('/v1/work/:tc/accept', requireAuth(), requireRole('agent'), requireScope('work:accept'), async (req, res) => {
     const tc = param(req.params.tc);
-    const work = await storage.getWork(tc);
-    if (!work) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
+    const accepted = await acceptWork({ storage, config }, req.auth!.sub, tc);
+    if (!accepted.ok) {
+      res.status(accepted.status).json(error(config.nodeId, accepted.code, accepted.message));
       return;
     }
-    if (work.providerGaii !== req.auth!.sub) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can accept work'));
-      return;
-    }
-    if (work.status !== 'pending') {
-      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", cannot accept`));
-      return;
-    }
-
-    const updated = await storage.updateWork(tc, {
-      status: 'accepted',
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Auto-create task if agent has task system enabled
-    await createTaskFromWork(storage, work, work.providerGaii).catch(err =>
-      logger.warn('work-task-bridge: failed to create task', { tc: work.trackingCode, err: (err as Error).message })
-    );
 
     res.json(success(config.nodeId, {
-      tracking_code: updated!.trackingCode,
-      status: updated!.status,
+      tracking_code: accepted.work.trackingCode,
+      status: accepted.work.status,
     }, [
       { description: 'Mark work in progress', method: 'POST', url: `/v1/work/${tc}/progress` },
       { description: 'Deliver the work result', method: 'POST', url: `/v1/work/${tc}/deliver` },
     ]));
-    emitChange('work');
   });
 
   // POST /v1/work/:tc/progress — transition accepted → in_progress (§10.3)
@@ -590,61 +505,21 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
   // POST /v1/work/:tc/deliver — deliver work output (provider, agent auth)
   router.post('/v1/work/:tc/deliver', requireAuth(), requireRole('agent'), requireScope('work:accept'), validateBody(WorkDeliverySchema, config.nodeId), async (req, res) => {
     const tc = param(req.params.tc);
-    const work = await storage.getWork(tc);
-    if (!work) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
-      return;
-    }
-    if (work.providerGaii !== req.auth!.sub) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the provider can deliver work'));
-      return;
-    }
-    if (!['accepted', 'in_progress'].includes(work.status)) {
-      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", cannot deliver`));
-      return;
-    }
-
     const { output } = req.body ?? {};
 
-    // Settle: pay provider, network fee, burn
-    await settlePayment(storage, config, work);
-
-    // Extension hook: post_settlement (fire-and-forget)
-    fireHook(config, storage, 'post_settlement', {
-      tracking_code: tc, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
-      cost: work.cost,
-    });
-
-    const updated = await storage.updateWork(tc, {
-      status: 'delivered',
-      output,
-      updatedAt: new Date().toISOString(),
-    });
-
-    // Fire callback webhook if provided (fire-and-forget)
-    if (work.callbackUrl) {
-      fireWebhook(work.callbackUrl, {
-        event: 'work.delivered',
-        tracking_code: tc,
-        status: 'delivered',
-        output,
-        timestamp: new Date().toISOString(),
-      }, config.webhookMaxRetries);
+    const delivered = await deliverWork({ storage, config }, req.auth!.sub, tc, output);
+    if (!delivered.ok) {
+      res.status(delivered.status).json(error(config.nodeId, delivered.code, delivered.message));
+      return;
     }
 
-    // Extension hook: post_work_delivery (fire-and-forget)
-    fireHook(config, storage, 'post_work_delivery', {
-      tracking_code: tc, provider_gaii: work.providerGaii, requester_gaii: work.requesterGaii,
-    });
-
     res.json(success(config.nodeId, {
-      tracking_code: updated!.trackingCode,
-      status: updated!.status,
-      output: updated!.output,
+      tracking_code: delivered.work.trackingCode,
+      status: delivered.work.status,
+      output: delivered.work.output,
     }, [
       { description: 'Rate this delivery', method: 'POST', url: `/v1/work/${tc}/rate` },
     ]));
-    emitChange('work');
   });
 
   // POST /v1/work/:tc/rate — rate delivered work (requester, agent auth)

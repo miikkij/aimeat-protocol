@@ -13,16 +13,20 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-08-10 -- August audit step 8: aimeat_instance_create builds no record of its own.
+ *     It calls registerChatInstance (services/chat-instance-write.ts), the same write POST
+ *     /v1/chat-instances uses, so the GHII check, the isAnonymous flag and the change event are
+ *     decided once. The tool keeps its own text rendering.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGaiiLoose, buildChatInstanceId } from '../utils/gaii.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
+import { registerChatInstance } from '../services/chat-instance-write.js';
 
 export function registerChatInstancesTools(
     mcp: McpServer,
@@ -121,45 +125,20 @@ export function registerChatInstancesTools(
         },
         annotationsFor('aimeat_instance_create'),
         async ({ name, model }) => {
-            const owner = ownerName();
+            // The tool's own parameter is a model id; the record's platform is its vendor segment.
             const platform = model ? model.split('-')[0] ?? 'unknown' : 'unknown';
-            const id = buildChatInstanceId(platform, name, owner, config.nodeId);
-            const ghii = `${owner}@${config.nodeId}`;
-            const now = new Date().toISOString();
 
-            // Upsert: if already exists just return it
-            const existing = await storage.getChatInstance(id);
-            if (existing) {
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({
-                            id: existing.id,
-                            name: existing.appName,
-                            platform: existing.platform,
-                            status: 'existing',
-                            created_at: existing.createdAt,
-                        }, null, 2),
-                    }],
-                };
+            const out = await registerChatInstance(
+                { storage, config },
+                { ownerName: ownerName(), agentGaii },
+                { platform, appName: name },
+            );
+            if (!out.ok) {
+                return { content: [{ type: 'text' as const, text: out.message }], isError: true };
             }
 
-            const inst = await storage.createChatInstance({
-                id,
-                platform,
-                appName: name,
-                ownerName: owner,
-                ghii,
-                nodeId: config.nodeId,
-                isAnonymous: false,
-                agentGaii: agentGaii,
-                createdAt: now,
-                lastSeen: now,
-            });
-
-            // POST /v1/chat-instances emits this; the chat list in the browser listens on it.
-            emitChange('chat');
-            emitResourceListChanged(agentGaii);
+            const { record: inst, created } = out.value;
+            if (created) emitResourceListChanged(agentGaii);
 
             return {
                 content: [{
@@ -168,7 +147,7 @@ export function registerChatInstancesTools(
                         id: inst.id,
                         name: inst.appName,
                         platform: inst.platform,
-                        status: 'created',
+                        status: created ? 'created' : 'existing',
                         created_at: inst.createdAt,
                     }, null, 2),
                 }],

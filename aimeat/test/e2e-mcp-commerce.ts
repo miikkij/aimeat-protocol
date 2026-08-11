@@ -7,6 +7,8 @@
  *   end-to-end over the MCP surface (task-path fulfillment + fee arithmetic on the wallets).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-commerce
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Test 5b: psp_delete clears the card credentials and leaves the seller's
+ *     x402 payout address in the same record standing, which is what the REST delete has always done.
  *   v1.0.0 — 2026-07-14 — Initial MCP commerce suite
  */
 
@@ -214,6 +216,29 @@ await test('5. psp_delete removes the credentials', async () => {
     assert(!del.isError && del.data.deleted === true, `delete: ${del.text}`);
     const st = await mcp.call('aimeat_commerce_psp_status', {});
     assert(st.data.configured === false, `status after delete: ${st.text}`);
+});
+
+await test('5b. psp_delete leaves the stablecoin payout address standing', async () => {
+    // commerce.psp holds BOTH rails: the card credentials and the seller's x402 payout address.
+    // The tool used to drop the whole record, so removing a Stripe key also erased a hand-typed
+    // on-chain address that four validation steps guard on the way in. DELETE
+    // /v1/commerce/payout/stripe has always merged instead; this is the same act, so it merges too.
+    const ADDRESS = '0x1111111111111111111111111111111111111111';
+    const put = await json('/v1/commerce/payout/x402', {
+        method: 'PUT', headers: auth(buyerOwner.token), body: JSON.stringify({ address: ADDRESS }),
+    });
+    assert(put.status === 200, `x402 address ${put.status}: ${JSON.stringify(put.body.error)}`);
+
+    const set = await mcp.call('aimeat_commerce_psp_set', { provider: 'stripe', secret_key: SECRET });
+    assert(!set.isError, `psp_set: ${set.text}`);
+    const del = await mcp.call('aimeat_commerce_psp_delete', {});
+    assert(!del.isError && del.data.deleted === true, `delete: ${del.text}`);
+
+    const payout = await json('/v1/commerce/payout', { headers: auth(buyerOwner.token) });
+    assert(payout.status === 200, `payout read ${payout.status}`);
+    assert(payout.body.data.stripe.configured === false, `card credentials should be gone: ${JSON.stringify(payout.body.data.stripe)}`);
+    assert(String(payout.body.data.x402.address).toLowerCase() === ADDRESS,
+        `the payout address must survive: ${JSON.stringify(payout.body.data.x402)}`);
 });
 
 // ─── Phase 3: app-tool manifest + offer pricing (seller side, own owner) ───

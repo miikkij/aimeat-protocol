@@ -15,6 +15,12 @@
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   v1.0.0 — 2026-07-26 — Extracted from src/mcp/core.ts together with the reference-read change.
+ *   v1.1.0 — 2026-08-11 — aimeat_storage_upload stores through services/storage-file-write.ts, the
+ *     same write POST /v1/storage runs. This copy had never checked the account-wide storage quota
+ *     and never charged the overage that follows it, so an agent could pass the node's storage
+ *     ceiling through the tool and be billed for none of it, while the identical upload from the
+ *     browser was gated and charged. It also took Node's permissive base64 reader, which turns
+ *     mis-sent HTML or JSON into a few bytes of garbage stored as a successful file.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -22,12 +28,12 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
+import { writeStorageFile, mintStorageUploadUrl } from '../services/storage-file-write.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
+import { decodeStrictBase64 } from '../utils/base64.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, jsonContent } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
  *  handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
@@ -60,36 +66,26 @@ export function registerCoreStorageTools(
         },
         annotationsFor('aimeat_storage_upload'),
         async ({ key, data_base64, mime_type, visibility, group_id }) => {
+            const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
+
             // --- UPLOAD MODE ---
             if (!data_base64) {
-                // The operator's own setting, not a constant. This was hardcoded to 10 MB, so a node
-                // configured for 50 MB still minted 10 MB tokens and refused everything above it with
-                // 413 FILE_TOO_LARGE — the admin page said 50 and the tool said 10, with nothing
-                // connecting the two.
-                const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
-                const contentType = mime_type ?? 'application/octet-stream';
-                const token = await generateUploadToken({
-                    sub: agentGaii,
-                    utype: 'storage',
-                    meta: buildUploadMeta('storage', {
-                        key, mime_type: contentType, visibility: visibility ?? 'private', group_id,
-                    }),
-                    maxBytes,
-                    contentType,
+                const minted = await mintStorageUploadUrl(deps, agentGaii, {
+                    key, mimeType: mime_type, visibility, groupId: group_id,
                 });
-
-                const uploadUrl = `${config.baseUrl}/v1/upload/${token}`;
-
+                if (!minted.ok) {
+                    return { content: [{ type: 'text' as const, text: minted.message }], isError: true };
+                }
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
                             mode: 'upload',
-                            upload_url: uploadUrl,
+                            upload_url: minted.uploadUrl,
                             upload_method: 'PUT',
-                            content_type: contentType,
-                            max_size_bytes: maxBytes,
-                            expires_in_seconds: 3600,
+                            content_type: minted.contentType,
+                            max_size_bytes: minted.maxBytes,
+                            expires_in_seconds: minted.expiresInSeconds,
                             note: 'PUT the raw file to upload_url. The response contains the result as JSON.',
                         }, null, 2),
                     }],
@@ -97,35 +93,35 @@ export function registerCoreStorageTools(
             }
 
             // --- INLINE MODE ---
-            const fileData = Buffer.from(data_base64, 'base64');
-            if (fileData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
+            // Strict decode, as every other inline-upload door does: Node's own base64 reader drops
+            // anything outside the alphabet, so raw HTML or JSON sent here used to be stored as a few
+            // bytes of garbage and served back as a successful file.
+            const fileData = decodeStrictBase64(data_base64);
+            if (!fileData) {
                 return {
-                    content: [{
-                        type: 'text' as const,
-                        text: `File exceeds this node's ${config.storageMaxFileSizeMb}MB per-file limit. Omit data_base64 to get a presigned upload URL instead.`,
-                    }],
+                    content: [{ type: 'text' as const, text: 'data_base64 must be base64-encoded.' }],
                     isError: true,
                 };
             }
-            const file = await storage.createStorageFile({
-                key,
-                ownerGaii: agentGaii,
-                visibility: visibility ?? 'private',
-                groupId: visibility === 'group' ? group_id : undefined,
-                mimeType: mime_type ?? 'application/octet-stream',
-                size: fileData.length,
-                data: fileData,
-                createdAt: new Date().toISOString(),
+
+            const written = await writeStorageFile(deps, agentGaii, {
+                key, data: fileData, mimeType: mime_type, visibility, groupId: group_id,
             });
-            // routes/storage-files.ts emits BOTH: a stored file shows in the files view and counts against
-            // the memory budget the memory view renders.
-            emitChange('files');
-            emitChange('memory');
-            emitResourceUpdated(agentGaii, `aimeat://storage/${encodeURIComponent(key)}`);
-            emitResourceListChanged(agentGaii);
+            if (!written.ok) {
+                // Only the per-file ceiling has an answer the caller can act on. Offering the
+                // presigned URL against the ACCOUNT quota would send an agent round a loop that
+                // ends in the same refusal, since that door checks the same ceiling.
+                const alternative = written.limit === 'per_file'
+                    ? ' Omit data_base64 to get a presigned upload URL instead.'
+                    : '';
+                return { content: [{ type: 'text' as const, text: written.message + alternative }], isError: true };
+            }
+
+            const file = written.file;
             return {
                 content: [{ type: 'text' as const, text: JSON.stringify({
                     mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, uploaded: true,
+                    ...(written.overageMorsels > 0 ? { overage_charged: written.overageMorsels } : {}),
                     // To embed this image in a workspace document, use embed_markdown / embed_url — NOT the raw
                     // /v1/storage/<key> path. Saving it into a document scopes the file to that workspace's
                     // members (visibility:'workspace'); it is never exposed to the public internet.

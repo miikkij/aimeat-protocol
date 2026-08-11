@@ -1,6 +1,12 @@
 /**
  * @file capabilities.ts
  * @description MCP tools for capability discovery, detail, invocation, and CRUD management.
+ * @structure
+ *   - read tools: list, get
+ *   - invoke: the private-capability check, then the shared invoke and its recorded outcome
+ *   - write tools: create, update, delete, vouch, each rendering what capability-record.ts decided
+ * @usage Registered by mcp/index.ts per agent session; the shared write lives in
+ *   services/capability-record.ts, which the REST routes call as well.
  * @version-history
  *   v1.1.0 - 2026-05-02 - Add create, update, delete, vouch tools
  *   v1.0.0 - 2026-05-02 - Initial: list, get, invoke
@@ -10,16 +16,22 @@
  *   v1.4.0 -- 2026-07-25 -- aimeat_capabilities_invoke forwards the caller's CURRENT session token; it
  *     passed a hardcoded empty string, so invoking any extension-backed capability over MCP always
  *     failed with the route's AUTH_REQUIRED.
+ *   v1.5.0 -- 2026-08-11 -- August 2026 audit step 8: create, update, delete, vouch and the
+ *     post-invoke record go through services/capability-record.ts. Three things this door was
+ *     missing arrive with it: the operator's exemption from the publishing policy, the operator's
+ *     reach over another owner's capability, and a call-log entry for every invocation, which only
+ *     the HTTP door had been writing.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { buildCapabilityRecord, moderatedStatus } from '../services/capability-record.js';
+import {
+    createCapability, updateCapability, deleteCapability, vouchCapability, recordCapabilityInvocation,
+} from '../services/capability-record.js';
 import { z } from 'zod';
-import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { logger } from '../utils/logger.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 
 export function registerCapabilitiesTools(
     mcp: McpServer,
@@ -32,6 +44,24 @@ export function registerCapabilitiesTools(
      *  authenticated HTTP surface, so the caller's token has to travel with the invocation. */
     getToken: () => string | undefined = () => undefined,
 ): void {
+
+    /**
+     * Who this session is, in the shape the shared write expects.
+     *
+     * The identity stays the agent's own GAII: it is what this door has always stored in `ownerGhii`
+     * and what its ownership checks have always compared against. The HTTP door stores the owner's
+     * GHII there instead, so one person's capability lands under two different ids depending on
+     * which door made it. That is an ownership decision rather than a copied line, so it is reported
+     * in the August 2026 audit and left exactly as it stands.
+     *
+     * Operator-ness comes from the OWNER record, because a tool session carries an agent while the
+     * role lives on the human. mcp/boards.ts answers the same question the same way.
+     */
+    async function caller(): Promise<{ gaii: string; isOperator: boolean }> {
+        const gaii = getAgentGaii();
+        const owner = await storage.getOwner(parseGaiiLoose(gaii).owner);
+        return { gaii, isOperator: !!owner?.roles.includes('operator') };
+    }
 
     mcp.tool(
         'aimeat_capabilities_list',
@@ -87,12 +117,14 @@ export function registerCapabilitiesTools(
             const cap = await storage.getCapability(args.id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
 
+            const callerGhii = getAgentGaii();
+
             // A PRIVATE capability may only be invoked by its owner. The read path hides private
             // capabilities from everyone else, so invoke has to as well, and it answers "not found"
             // rather than "forbidden" so the id is not confirmed. routes/capabilities.ts:244 has said
             // this since it was written; this tool invoked anything by id, including another owner's
             // private manual webhook capability.
-            if (cap.visibility === 'private' && cap.ownerGhii !== getAgentGaii()) {
+            if (cap.visibility === 'private' && cap.ownerGhii !== callerGhii) {
                 return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
             }
 
@@ -104,16 +136,21 @@ export function registerCapabilitiesTools(
                 return { content: [{ type: 'text' as const, text: `This capability is not directly callable. ${cap.usage}` }], isError: true };
             }
 
+            const input = args.input || {};
+
             try {
                 const { invokeCapability } = await import('../services/capability-invoke.js');
-                const result = await invokeCapability(config, storage, cap, args.input || {}, getAgentGaii(), getToken() ?? '', args.mode || 'normal');
+                const result = await invokeCapability(config, storage, cap, input, callerGhii, getToken() ?? '', args.mode || 'normal');
 
-                storage.incrementCapabilityStats(cap.id, { success: 1, error: 0, totalMs: result.duration_ms }).catch(err => { logger.warn('getToken: continuing after a suppressed failure', { error: String(err) }); });
+                // Stats AND a line in the capability's call log. This door wrote the counters only,
+                // so the log an owner reads to see who has been calling them was missing every
+                // invocation an agent made.
+                await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: true, durationMs: result.duration_ms });
 
                 return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
-                storage.incrementCapabilityStats(cap.id, { success: 0, error: 1, totalMs: 0, lastError: message }).catch(err => { logger.warn('getToken: continuing after a suppressed failure', { error: String(err) }); });
+                await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: false, message });
                 return { content: [{ type: 'text' as const, text: `Invoke failed: ${message}` }], isError: true };
             }
         },
@@ -143,48 +180,22 @@ export function registerCapabilitiesTools(
         },
         annotationsFor('aimeat_capabilities_create'),
         async (args) => {
-            // The node's publishing policy, which this tool ignored entirely. The default is
-            // 'disabled' (config.ts:613), so on an ordinary node POST /v1/capabilities refuses a
-            // non-operator outright while the same account created capabilities freely over MCP.
-            // A capability is how an account offers work to others, so who may publish one is the
-            // operator's decision and not a per-surface accident.
-            if (config.capabilityPublishing === 'disabled') {
-                return { content: [{ type: 'text' as const, text: 'PUBLISHING_DISABLED: Only the operator can create capabilities on this node' }], isError: true };
-            }
-            if (config.capabilityPublishing === 'self_only' && args.visibility === 'public') {
-                return { content: [{ type: 'text' as const, text: 'PUBLIC_DISABLED: Public capabilities require operator approval. Use visibility: private' }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-            const ownerGhii = getAgentGaii();
-
-            const schemaHash = createHash('sha256')
-                .update(JSON.stringify(args.inputSchema ?? {}) + JSON.stringify(args.outputSchema ?? {}))
-                .digest('hex').slice(0, 16);
-
-            const record: CapabilityRecord = {
-                ...buildCapabilityRecord({
-                    ownerGhii, schemaHash, now,
-                    // The caller says which state. Default 'draft', the same as POST /v1/capabilities:
-                    // a capability an agent creates no longer appears in the catalogue the instant it
-                    // is written. moderatedStatus still overrides it to pending_review for a PUBLIC
-                    // capability on a moderated node — that gate is separate and not the caller's.
-                    status: moderatedStatus(config, args.visibility, false, args.status ?? 'draft'),
-                }, {
+            try {
+                // The node's publishing policy, the moderation rule and the record shape all live in
+                // the shared write. The caller says draft or active; a PUBLIC capability on a
+                // moderated node still waits for review whichever was asked for.
+                const created = await createCapability({ storage, config }, await caller(), {
                     id: args.id, name: args.name, summary: args.summary, visibility: args.visibility,
                     callable: args.callable, inputSchema: args.inputSchema, outputSchema: args.outputSchema,
                     usage: args.usage, whenToUse: args.whenToUse, tags: args.tags,
-                }),
-            };
-
-            try {
-                const created = await storage.createCapability(record);
-                return { content: [{ type: 'text' as const, text: JSON.stringify(created, null, 2) }] };
+                    status: args.status,
+                });
+                if (!created.ok) {
+                    return { content: [{ type: 'text' as const, text: `${created.code}: ${created.message}` }], isError: true };
+                }
+                return { content: [{ type: 'text' as const, text: JSON.stringify(created.value, null, 2) }] };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
-                if (message.includes('UNIQUE') || message.includes('duplicate')) {
-                    return { content: [{ type: 'text' as const, text: `Capability '${record.id}' already exists` }], isError: true };
-                }
                 return { content: [{ type: 'text' as const, text: `Create failed: ${message}` }], isError: true };
             }
         },
@@ -208,32 +219,23 @@ export function registerCapabilitiesTools(
         },
         annotationsFor('aimeat_capabilities_update'),
         async (args) => {
-            const cap = await storage.getCapability(args.id);
-            if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
-
-            const callerGhii = getAgentGaii();
-            if (cap.ownerGhii !== callerGhii) {
-                return { content: [{ type: 'text' as const, text: 'Forbidden: not the owner of this capability' }], isError: true };
-            }
-
-            const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+            // Which fields this door accepts is its own declaration, above. What happens to them —
+            // ownership, the moderation rule on a status change, the updatedAt stamp — is shared.
+            const updates: Record<string, unknown> = {};
             if (args.name !== undefined) updates.name = args.name;
             if (args.summary !== undefined) updates.summary = args.summary;
             if (args.tags !== undefined) updates.tags = args.tags;
             if (args.visibility !== undefined) updates.visibility = args.visibility;
-            // Asking for 'active' on a PUBLIC capability still lands on pending_review when the node
-            // moderates — the same rule the create path applies, from the same function.
-            if (args.status !== undefined) {
-                updates.status = args.status === 'active'
-                    ? moderatedStatus(config, args.visibility ?? cap.visibility, false, 'active')
-                    : args.status;
-            }
+            if (args.status !== undefined) updates.status = args.status;
             if (args.usage !== undefined) updates.usage = args.usage;
             if (args.whenToUse !== undefined) updates.whenToUse = args.whenToUse;
             if (args.whenNotToUse !== undefined) updates.whenNotToUse = args.whenNotToUse;
 
-            const updated = await storage.updateCapability(args.id, updates);
-            return { content: [{ type: 'text' as const, text: JSON.stringify(updated, null, 2) }] };
+            const updated = await updateCapability({ storage, config }, await caller(), args.id, updates);
+            if (!updated.ok) {
+                return { content: [{ type: 'text' as const, text: `${updated.code}: ${updated.message}` }], isError: true };
+            }
+            return { content: [{ type: 'text' as const, text: JSON.stringify(updated.value, null, 2) }] };
         },
     );
 
@@ -245,19 +247,10 @@ export function registerCapabilitiesTools(
         },
         annotationsFor('aimeat_capabilities_delete'),
         async ({ id }) => {
-            const cap = await storage.getCapability(id);
-            if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
-
-            const callerGhii = getAgentGaii();
-            if (cap.ownerGhii !== callerGhii) {
-                return { content: [{ type: 'text' as const, text: 'Forbidden: not the owner of this capability' }], isError: true };
+            const removed = await deleteCapability({ storage, config }, await caller(), id);
+            if (!removed.ok) {
+                return { content: [{ type: 'text' as const, text: `${removed.code}: ${removed.message}` }], isError: true };
             }
-
-            if (cap.source.type !== 'manual') {
-                return { content: [{ type: 'text' as const, text: 'Only manual capabilities can be deleted. Auto-aggregated capabilities are removed when their source is removed.' }], isError: true };
-            }
-
-            await storage.deleteCapability(id);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, id }, null, 2) }] };
         },
     );
@@ -270,18 +263,15 @@ export function registerCapabilitiesTools(
             comment: z.string().optional().describe('Optional comment explaining why you vouch for this capability'),
         },
         annotationsFor('aimeat_capabilities_vouch'),
+        // `comment` is accepted and goes nowhere: a vouch is a counter on both doors and nothing
+        // stores the text. Reported in the August 2026 audit; removing the parameter or giving it
+        // somewhere to land is a change to what this tool offers, not part of moving the write.
         async ({ id, comment: _comment }) => {
-            const cap = await storage.getCapability(id);
-            if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${id}` }], isError: true };
-
-            const callerGhii = getAgentGaii();
-            if (cap.ownerGhii === callerGhii) {
-                return { content: [{ type: 'text' as const, text: 'Cannot vouch for your own capability' }], isError: true };
+            const vouched = await vouchCapability({ storage, config }, await caller(), id);
+            if (!vouched.ok) {
+                return { content: [{ type: 'text' as const, text: `${vouched.code}: ${vouched.message}` }], isError: true };
             }
-
-            await storage.incrementVouchCount(id);
-            const updated = await storage.getCapability(id);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ vouchCount: updated?.trust.vouchCount ?? 0 }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(vouched.value, null, 2) }] };
         },
     );
 }

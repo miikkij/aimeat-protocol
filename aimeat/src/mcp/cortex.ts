@@ -15,21 +15,26 @@
  *   v1.3.0 -- 2026-08-11 -- The inline install branch checks namespace ownership, which the HTTP door
  *     and the presigned road both do. Cortex lib files are served as JavaScript from the apex origin,
  *     so a fresh name inside another owner's namespace was a squat on their front door.
+ *   v1.4.0 -- 2026-08-11 -- Install, activate, deactivate and delete call
+ *     services/cortex-lifecycle.ts, the same functions POST/DELETE /v1/cortex and the
+ *     activate/deactivate routes call. Three of the four were doing less than their HTTP twin:
+ *     activate flipped the status without materialising the cortex's components, deactivate
+ *     without tearing them down, delete without removing the seed-data memory. What stays here is
+ *     the upload-mode branch, the text rendering and the resource notification.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
-import { runCapabilityAggregation } from '../services/capability-aggregator.js';
 import { parseGAII } from '../utils/gaii.js';
-import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
-import { cortexInstallRefusal } from '../services/install-quotas.js';
+import {
+    installCortex, activateCortex, deactivateCortex, deleteCortex,
+    type CortexCaller, type CortexRefusal,
+} from '../services/cortex-lifecycle.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -40,8 +45,42 @@ export function registerCortexTools(
     emitResourceListChanged: (agentGaii: string) => void,
 ): void {
 
-    /** The owner behind this session. Every ownership check here compares against it. */
-    const callerOwner = parseGAII(getAgentGaii())?.owner ?? '';
+    /**
+     * The owner behind this session. Every ownership check here compares against it, and it is what
+     * an installed cortex records as `installedBy`.
+     *
+     * An agent session's sub is a GAII, so the owner is its middle part. An owner session's sub is
+     * the bare owner name already, which is why the fallback is the sub and not the empty string:
+     * with '' the four tools disagreed, install writing `installedBy: 'alice'` while activate
+     * compared 'alice' against '' and refused the owner their own cortex.
+     */
+    const callerOwner = parseGAII(getAgentGaii())?.owner ?? getAgentGaii();
+
+    /**
+     * The caller as services/cortex-lifecycle.ts sees it.
+     *
+     * `isOperator` is false on the lifecycle three on purpose: an MCP session is an agent, and an
+     * operator managing somebody else's cortex does it through the HTTP door. Install passes the
+     * owner's real role instead, because the namespace claim is the one place this surface has
+     * always honoured it. The two doors therefore disagree about operators, which is a live
+     * question for the developer rather than something to settle by extraction.
+     */
+    const agentCaller = (isOperator = false): CortexCaller => ({
+        ownerName: callerOwner,
+        gaii: getAgentGaii(),
+        isOperator,
+    });
+
+    /**
+     * A refusal, as text. On a named cortex both "no such name" and "not yours" answer the same
+     * sentence: this surface has always refused that way, so that probing names cannot confirm what
+     * another owner has installed. The HTTP door separates the two, because it answers a caller who
+     * is already inside a session it can hold responsible.
+     */
+    const refusalText = (refusal: CortexRefusal, name?: string): string =>
+        (name && (refusal.code === 'NOT_FOUND' || refusal.code === 'FORBIDDEN'))
+            ? `Cortex extension not found: ${name}`
+            : `${refusal.code}: ${refusal.message}`;
 
     // ── Tool 1: aimeat_cortex_list ──
     mcp.tool(
@@ -82,8 +121,6 @@ export function registerCortexTools(
         annotationsFor('aimeat_cortex_install'),
         async ({ manifest, libs }) => {
             const agentGaii = getAgentGaii();
-            const parsed = parseGAII(agentGaii);
-            const ownerName = parsed?.owner ?? agentGaii;
 
             // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
             if (!manifest) {
@@ -117,117 +154,37 @@ export function registerCortexTools(
 
             // --- INLINE MODE: manifest provided, process immediately ---
 
-            // Validate manifest is a string
-            if (typeof manifest !== 'string') {
-                return { content: [{ type: 'text' as const, text: 'manifest must be a YAML string' }], isError: true };
-            }
-
-            // Manifest size limit
-            const manifestSizeKb = Buffer.byteLength(manifest, 'utf-8') / 1024;
-            if (manifestSizeKb > config.cortexMaxLibSizeKb) {
-                return { content: [{ type: 'text' as const, text: `Manifest size ${Math.round(manifestSizeKb)}KB exceeds limit of ${config.cortexMaxLibSizeKb}KB` }], isError: true };
-            }
-
-            const overQuota = await cortexInstallRefusal({ storage, config }, true);
-            if (overQuota) return { content: [{ type: 'text' as const, text: `${overQuota.code}: ${overQuota.message}` }], isError: true };
-
-            // Validate lib sizes
-            if (libs) {
-                for (const [filename, content] of Object.entries(libs)) {
-                    if (typeof content !== 'string') {
-                        return { content: [{ type: 'text' as const, text: `libs["${filename}"] must be a string` }], isError: true };
-                    }
-                    const sizeKb = Buffer.byteLength(content, 'utf8') / 1024;
-                    if (sizeKb > config.cortexMaxLibSizeKb) {
-                        return { content: [{ type: 'text' as const, text: `Lib "${filename}" is ${sizeKb.toFixed(1)}KB, max is ${config.cortexMaxLibSizeKb}KB` }], isError: true };
-                    }
-                }
-            }
-
-            // Parse and validate manifest
-            const result = parseCortexManifest(manifest, ownerName, libs);
-
-            if (!result.ok || !result.extension) {
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({
-                            error: 'Manifest validation failed',
-                            errors: result.errors,
-                            warnings: result.warnings,
-                        }, null, 2),
-                    }],
-                    isError: true,
-                };
-            }
-
-            const ext = result.extension;
-
-            // The namespace comes out of the uploaded manifest, and cortex lib files are served back
-            // as JavaScript from the apex origin. Claiming a namespace you do not own is therefore
-            // squatting on someone else's front door. POST /v1/cortex has refused it since the
-            // feature shipped and the presigned upload path was fixed for it on 2026-08-10; this
-            // branch had no check at all, so a fresh name inside another owner's namespace sailed
-            // through. Operators may use any namespace, and an agent token carries the operator role
-            // when its owner holds it (routes/auth.ts:265-267), so the role is read the same way.
+            // An agent token carries the operator role when its owner holds it
+            // (routes/auth.ts:265-267), so the role is read off the owner record. It buys one thing
+            // here: a namespace this owner does not own.
             const ownerRec = await storage.getOwner(callerOwner);
-            if (!ownerRec?.roles.includes('operator') && !validateNamespaceOwnership(ext.namespace, ownerName)) {
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: `You cannot install a cortex in namespace "${ext.namespace}". `
-                            + `Use your own namespace "${ownerName}" or "community".`,
-                    }],
-                    isError: true,
-                };
+            const out = await installCortex(
+                { storage, config },
+                agentCaller(ownerRec?.roles.includes('operator') ?? false),
+                { manifest, libs },
+            );
+            if (!out.ok) {
+                return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
             }
 
-            // Installing over an existing cortex extension is an UPDATE, and only its installer may
-            // make one. routes/cortex.ts:265 refuses a mismatch on its own update path; this tool had
-            // no installedBy check at all, so an agent could overwrite another owner's extension and
-            // its lib files by installing a same-named one.
-            const prior = await storage.getCortexExtension(ext.name);
-            if (prior && prior.installedBy !== callerOwner) {
-                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${ext.name}` }], isError: true };
-            }
+            const { record, warnings } = out.value;
+            emitResourceListChanged(agentGaii);
 
-            // Store lib files
-            if (libs) {
-                for (const [filename, content] of Object.entries(libs)) {
-                    await storage.setCortexLibFile(ext.name, filename, content);
-                }
-            }
-
-            try {
-                const record = await storage.createCortexExtension(ext);
-
-                // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
-                // code the owner has running, so its list going stale is visible immediately.
-                emitChange('cortex');
-                emitResourceListChanged(agentGaii);
-
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({
-                            name: record.name,
-                            namespace: record.namespace,
-                            version: record.version,
-                            status: record.status,
-                            installed_at: record.installedAt,
-                            installed_by: record.installedBy,
-                            component_count: record.components.length,
-                            warnings: result.warnings,
-                        }, null, 2),
-                    }],
-                };
-            } catch (e: unknown) {
-                const msg = (e as Error).message;
-                if (msg.includes('already exists')) {
-                    return { content: [{ type: 'text' as const, text: `Extension "${ext.name}" is already installed` }], isError: true };
-                }
-                throw e;
-            }
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        name: record.name,
+                        namespace: record.namespace,
+                        version: record.version,
+                        status: record.status,
+                        installed_at: record.installedAt,
+                        installed_by: record.installedBy,
+                        component_count: record.components.length,
+                        warnings,
+                    }, null, 2),
+                }],
+            };
         },
     );
 
@@ -241,59 +198,35 @@ export function registerCortexTools(
         annotationsFor('aimeat_cortex_activate'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
-            const ext = await storage.getCortexExtension(name);
-
-            if (!ext) {
-                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
+            const out = await activateCortex({ storage, config }, agentCaller(), name);
+            if (!out.ok) {
+                return { content: [{ type: 'text' as const, text: refusalText(out.refusal, name) }], isError: true };
             }
 
-            // Only the installing owner may activate it. This tool had no ownership check, so any agent
-            // holding cortex:write reached every cortex extension on the node, including another
-            // owner's. routes/cortex.ts:265 has refused that on its own update path all along; the
-            // agent surface never got the same line. No operator bypass here: an MCP session is an
-            // agent, and an operator managing somebody else's cortex does it through the HTTP door.
-            if (ext.installedBy !== callerOwner) {
-                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
-            }
-
-            // Idempotent - already active
-            if (ext.status === 'active') {
+            const { extension, activatedAt, alreadyActive } = out.value;
+            if (alreadyActive) {
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
-                            name: ext.name,
+                            name: extension.name,
                             status: 'active',
-                            activated_at: ext.activatedAt,
+                            activated_at: activatedAt,
                             message: 'Extension is already active',
                         }, null, 2),
                     }],
                 };
             }
 
-            const now = new Date().toISOString();
-            await storage.updateCortexExtension(name, {
-                status: 'active',
-                activatedAt: now,
-            });
-
-            // Trigger capability aggregation
-            runCapabilityAggregation(config, storage).catch(err =>
-                logger.error('Capability aggregation failed after cortex activation', { error: String(err) }),
-            );
-
-            // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
-            // code the owner has running, so its list going stale is visible immediately.
-            emitChange('cortex');
             emitResourceListChanged(agentGaii);
 
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        name: ext.name,
+                        name: extension.name,
                         status: 'active',
-                        activated_at: now,
+                        activated_at: activatedAt,
                     }, null, 2),
                 }],
             };
@@ -310,28 +243,18 @@ export function registerCortexTools(
         annotationsFor('aimeat_cortex_deactivate'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
-            const ext = await storage.getCortexExtension(name);
-
-            if (!ext) {
-                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
+            const out = await deactivateCortex({ storage, config }, agentCaller(), name);
+            if (!out.ok) {
+                return { content: [{ type: 'text' as const, text: refusalText(out.refusal, name) }], isError: true };
             }
 
-            // Only the installing owner may deactivate it. This tool had no ownership check, so any agent
-            // holding cortex:write reached every cortex extension on the node, including another
-            // owner's. routes/cortex.ts:265 has refused that on its own update path all along; the
-            // agent surface never got the same line. No operator bypass here: an MCP session is an
-            // agent, and an operator managing somebody else's cortex does it through the HTTP door.
-            if (ext.installedBy !== callerOwner) {
-                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
-            }
-
-            // Idempotent - already inactive
-            if (ext.status === 'inactive') {
+            const { extension, alreadyInactive } = out.value;
+            if (alreadyInactive) {
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
-                            name: ext.name,
+                            name: extension.name,
                             status: 'inactive',
                             message: 'Extension is already inactive',
                         }, null, 2),
@@ -339,21 +262,13 @@ export function registerCortexTools(
                 };
             }
 
-            await storage.updateCortexExtension(name, {
-                status: 'inactive',
-                activatedAt: undefined,
-            });
-
-            // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
-            // code the owner has running, so its list going stale is visible immediately.
-            emitChange('cortex');
             emitResourceListChanged(agentGaii);
 
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        name: ext.name,
+                        name: extension.name,
                         status: 'inactive',
                     }, null, 2),
                 }],
@@ -371,41 +286,11 @@ export function registerCortexTools(
         annotationsFor('aimeat_cortex_delete'),
         async ({ name }) => {
             const agentGaii = getAgentGaii();
-            const ext = await storage.getCortexExtension(name);
-
-            if (!ext) {
-                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
+            const out = await deleteCortex({ storage, config }, agentCaller(), name);
+            if (!out.ok) {
+                return { content: [{ type: 'text' as const, text: refusalText(out.refusal, name) }], isError: true };
             }
 
-            // Only the installing owner may delete it. This tool had no ownership check, so any agent
-            // holding cortex:write reached every cortex extension on the node, including another
-            // owner's. routes/cortex.ts:265 has refused that on its own update path all along; the
-            // agent surface never got the same line. No operator bypass here: an MCP session is an
-            // agent, and an operator managing somebody else's cortex does it through the HTTP door.
-            if (ext.installedBy !== callerOwner) {
-                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
-            }
-
-            // Deactivate first if active
-            if (ext.status === 'active') {
-                await storage.updateCortexExtension(name, {
-                    status: 'inactive',
-                    activatedAt: undefined,
-                });
-            }
-
-            // Remove lib files
-            for (const comp of ext.components) {
-                if (comp.type === 'lib') {
-                    await storage.deleteCortexLibFile(name, comp.filename);
-                }
-            }
-
-            await storage.deleteCortexExtension(name);
-
-            // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
-            // code the owner has running, so its list going stale is visible immediately.
-            emitChange('cortex');
             emitResourceListChanged(agentGaii);
 
             return {

@@ -5,6 +5,8 @@
  *   knowledge resource template.
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation
+ *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: the manifest index line is written once per
+ *     entry and through the shared memory write, and the reserved-package refusal is covered.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-knowledge.ts
@@ -365,6 +367,38 @@ await test('10. Contribute to non-existent package fails', async () => {
         },
     }, 108);
     assert(body.result.isError === true, 'isError');
+});
+
+await test('10a. Re-contributing an entry updates it and indexes it once', async () => {
+    const { body: again } = await mcpRpc('tools/call', {
+        name: 'aimeat_knowledge_contribute',
+        arguments: {
+            package_id: packageId,
+            entry_key: 'chapter-1',
+            content: JSON.stringify({ title: 'Chapter 1', body: 'Revised first chapter' }),
+        },
+    }, 120);
+    assert(!again.result.isError, `unexpected error: ${again.result.content?.[0]?.text}`);
+
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_knowledge_get',
+        arguments: { package_id: packageId },
+    }, 121);
+    const result = JSON.parse(body.result.content[0].text);
+    const refs = (result.manifest?.entries ?? []).filter((e: any) => String(e.key).endsWith('/chapter-1'));
+    assert(refs.length === 1, `expected one manifest index line for chapter-1, got ${refs.length}`);
+    const stored = result.entries.find((e: any) => String(e.key).endsWith('/chapter-1'));
+    assert(stored?.value?.body === 'Revised first chapter', `entry value: ${JSON.stringify(stored?.value)}`);
+});
+
+await test('10b. Contributing to the reserved appdev-pitfalls package is refused', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_knowledge_contribute',
+        arguments: { package_id: 'appdev-pitfalls', entry_key: 'reserved', content: 'should not land' },
+    }, 122);
+    assert(body.result.isError === true, 'isError');
+    assert(String(body.result.content[0].text).includes('aimeat_appdev_pitfall_report'),
+        `refusal names the dedicated tool: ${body.result.content[0].text}`);
 });
 
 // ─── Phase 5: Links ───

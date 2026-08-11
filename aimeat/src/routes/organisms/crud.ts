@@ -4,6 +4,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-11 — create/update/join/leave call services/organism-lifecycle.ts, the one copy
+ *     of those writes shared with the MCP organism tools (August 2026 MCP audit step 8). The routes
+ *     keep their gate and their envelope; the record build, the validation and the side effects moved.
  *   v1.4.0 — 2026-07-23 — buildOrganismList no longer forces perPage=20: a member-scoped list (the owner's own
  *     organisms, e.g. the /tab "mine" list and /waiting) returns ALL matches so old organisms stop dropping into
  *     Discover once the owner belongs to 20+. Discovery (no member filter) still page-caps at the storage default.
@@ -16,21 +19,16 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
 import type { Router } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireRoleOrScope, optionalAuth } from '../../auth/middleware.js';
-import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
-import { recordPublicActivity } from '../../services/public-activity.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
-import { notify } from '../../services/notify.js';
-import { canSeeMembers, redactOrganism, rosterCallerFromAuth, MEMBER_VISIBILITY_VALUES } from '../../services/organism-privacy.js';
-import { getOrganismReadme, setOrganismReadme } from '../../services/organism-readme.js';
-import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
+import { getOrganismReadme } from '../../services/organism-readme.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../../services/organism-lifecycle.js';
 import type { OrganismHelpers } from './shared.js';
-import { logger } from '../../utils/logger.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -41,85 +39,21 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const ghii = req.auth!.owner as string;
     const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility } = req.body ?? {};
 
-    if (!name || typeof name !== 'string' || name.trim().length < 2) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name is required (min 2 characters)'));
+    // The record, the board, the creator membership and the feed/timeline side effects live in
+    // services/organism-lifecycle.ts, shared with aimeat_organism_create.
+    const result = await createOrganismRecord({ storage, config }, ghii, {
+      name, description, type, location, interests,
+      joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
+    });
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
 
-    const validTypes = ['community', 'team', 'club', 'cooperative', 'project'];
-    const orgType = validTypes.includes(type) ? type : 'community';
-    const policy = ['open', 'approval_required', 'invite_only'].includes(join_policy) ? join_policy : 'open';
-    const vis = ['public', 'listed', 'private'].includes(visibility) ? visibility : 'public';
-    // Roster privacy tier; unset = 'authenticated' (see services/organism-privacy.ts).
-    const memberVis = MEMBER_VISIBILITY_VALUES.includes(member_visibility) ? member_visibility : undefined;
-
-    const id = uuidv4();
-    const now = new Date().toISOString();
-    const boardId = `org-${id}`;
-
-    // Create the organism's discussion board
-    await storage.createBoard({
-      id: boardId,
-      name: `${name.trim()} — Discussion`,
-      description: `Discussion board for ${name.trim()}`,
-      visibility: vis === 'public' ? 'public' : 'shared',
-      ownerGaii: resolveIdentity(req.auth!, config.nodeId),
-      allowedGaiis: [],
-      createdAt: now,
-    });
-
-    const record = await storage.createOrganism({
-      id,
-      name: name.trim(),
-      description: description || '',
-      type: orgType,
-      location: location || {},
-      interests: Array.isArray(interests) ? interests : [],
-      creatorGhii: ghii,
-      admins: [ghii],
-      members: [ghii],
-      agentGaiis: [],
-      boardId,
-      joinPolicy: policy,
-      maxMembers: max_members || 500,
-      visibility: vis,
-      memberVisibility: memberVis,
-      moderationConfig: {
-        flagsEnabled: true,
-        autoHideThreshold: 3,
-        appealsEnabled: true,
-      },
-      memoryNamespace: `organism.${id}`,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    // Create creator membership
-    await storage.createMembership({
-      id: uuidv4(),
-      organismId: id,
-      ghii,
-      role: 'creator',
-      status: 'active',
-      joinedAt: now,
-    });
-
-    res.status(201).json(success(config.nodeId, { organism: record }, [
-      { description: 'View organism', method: 'GET', url: `/v1/organisms/${id}` },
-      { description: 'List members', method: 'GET', url: `/v1/organisms/${id}/members` },
+    res.status(201).json(success(config.nodeId, { organism: result.organism }, [
+      { description: 'View organism', method: 'GET', url: `/v1/organisms/${result.organism.id}` },
+      { description: 'List members', method: 'GET', url: `/v1/organisms/${result.organism.id}/members` },
     ]));
-    emitChange('organisms');
-    void updateOrganismStructure(storage, config, id, { event: 'organism created', actor: ghii }).catch(err => { logger.warn('POST /v1/organisms: timeline best-effort', { error: String(err) }); });
-    // Public landing feed — only public organisms are discoverable, so only they announce.
-    if (vis === 'public') {
-      void recordPublicActivity(storage, config, {
-        category: 'organisms',
-        actor: ghii,
-        summary: `Organism "${name.trim()}" created`,
-        detail: description || '',
-        link: `/v1/organisms/${id}`,
-      }).catch(err => { logger.warn('POST /v1/organisms: feed is best-effort', { error: String(err) }); });
-    }
   });
 
   /* ── GET /v1/organisms — List organisms ── */
@@ -305,32 +239,18 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     }
 
     const { name, description, type, location, interests, join_policy, max_members, visibility, readme, member_visibility } = req.body ?? {};
-    const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 
-    if (name !== undefined) updates.name = name;
-    if (description !== undefined) updates.description = description;
-    if (type !== undefined) updates.type = type;
-    if (location !== undefined) updates.location = location;
-    if (interests !== undefined) updates.interests = interests;
-    if (member_visibility !== undefined) {
-      if (!MEMBER_VISIBILITY_VALUES.includes(member_visibility)) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `member_visibility must be one of: ${MEMBER_VISIBILITY_VALUES.join(', ')}`));
-        return;
-      }
-      updates.memberVisibility = member_visibility;
+    // Field validation, the update itself and the README memory key live in
+    // services/organism-lifecycle.ts, shared with aimeat_organism_update.
+    const result = await updateOrganismRecord({ storage, config }, organism, {
+      name, description, type, location, interests, readme,
+      joinPolicy: join_policy, maxMembers: max_members, visibility, memberVisibility: member_visibility,
+    });
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
+      return;
     }
-    if (join_policy !== undefined) updates.joinPolicy = join_policy;
-    if (max_members !== undefined) updates.maxMembers = max_members;
-    if (visibility !== undefined) updates.visibility = visibility;
-
-    // README is a free-form markdown body stored as a creator-owned memory key (not an OrganismRecord
-    // column) — written separately. Owned by the organism's creator so it stays stable across admins.
-    if (typeof readme === 'string') await setOrganismReadme(storage, config, id, readme, organism.creatorGhii);
-
-    const updated = await storage.updateOrganism(id, updates);
-    const readmeOut = await getOrganismReadme(storage, id);
-    res.json(success(config.nodeId, { organism: updated, readme: readmeOut }));
-    emitChange('organisms');
+    res.json(success(config.nodeId, { organism: result.organism, readme: result.readme }));
   });
 
   /* ── DELETE /v1/organisms/:id — Delete organism ── */
@@ -366,90 +286,18 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    // Check if already a member
-    const existing = await storage.getMembership(id, ghii);
-    if (existing && existing.status === 'banned') {
-      res.status(403).json(error(config.nodeId, 'BANNED', 'You have been blocked from this organism'));
+    // Membership checks, capacity, the policy branch and the approver notifications live in
+    // services/organism-lifecycle.ts, shared with aimeat_organism_join.
+    const result = await joinOrganism({ storage, config }, organism, ghii, message);
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
-    if (existing && existing.status === 'active') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_MEMBER', 'You are already a member'));
+    if (result.outcome === 'joined') {
+      res.status(201).json(success(config.nodeId, { membership: result.membership, status: 'joined' }));
       return;
     }
-    if (existing && existing.status === 'pending') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_PENDING', 'You already have a pending join request'));
-      return;
-    }
-    if (existing && existing.status === 'invited') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_INVITED', 'You have a pending invitation — accept it instead of requesting to join'));
-      return;
-    }
-
-    // Check capacity
-    const members = await storage.listMembers(id, { status: 'active' });
-    if (members.length >= organism.maxMembers) {
-      res.status(409).json(error(config.nodeId, 'CAPACITY_FULL', 'Organism has reached maximum members'));
-      return;
-    }
-
-    const now = new Date().toISOString();
-
-    if (organism.joinPolicy === 'open') {
-      // Direct join
-      const membership = await storage.createMembership({
-        id: uuidv4(),
-        organismId: id,
-        ghii,
-        role: 'member',
-        status: 'active',
-        joinedAt: now,
-      });
-
-      // Update organism members list
-      await storage.updateOrganism(id, {
-        members: [...organism.members, ghii],
-        updatedAt: now,
-      });
-
-      res.status(201).json(success(config.nodeId, { membership, status: 'joined' }));
-      emitChange('organisms');
-    } else if (organism.joinPolicy === 'approval_required') {
-      // Create join request
-      const request = await storage.createJoinRequest({
-        id: uuidv4(),
-        organismId: id,
-        ghii,
-        message: message || undefined,
-        status: 'pending',
-        createdAt: now,
-      });
-
-      // Notify the creator + admins so the request doesn't go unnoticed (mirrors the
-      // workspace-access request path). admins includes the creator, so dedupe.
-      const approvers = [...new Set([organism.creatorGhii, ...organism.admins])];
-      const reviewEndpoint = `/v1/organisms/${id}/join-requests/${request.id}/review`;
-      for (const approver of approvers) {
-        await notify(storage, `${approver}@${config.nodeId}`, {
-          type: 'organism_join_request',
-          title: `${ghii} requested to join "${organism.name}"`,
-          body: typeof message === 'string' ? message : '',
-          link: '/v1/profile#organisms',
-          // Approve/Reject post the review endpoint as the admin. Once one admin decides, the others'
-          // clicks return 409 ALREADY_REVIEWED — the bell surfaces that and refreshes.
-          actions: [
-            { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'approved' }, style: 'primary' },
-            { id: 'reject', label: 'Reject', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'rejected' }, style: 'danger', confirm: true },
-          ],
-        });
-      }
-      emitChange('notifications');
-
-      res.status(202).json(success(config.nodeId, { join_request: request, status: 'pending' }));
-      emitChange('organisms');
-    } else {
-      // invite_only
-      res.status(403).json(error(config.nodeId, 'INVITE_ONLY', 'This organism requires an invitation to join'));
-    }
+    res.status(202).json(success(config.nodeId, { join_request: result.joinRequest, status: 'pending' }));
   });
 
   /* ── POST /v1/organisms/:id/leave — Leave an organism ── */
@@ -463,30 +311,13 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    if (organism.creatorGhii === ghii) {
-      res.status(400).json(error(config.nodeId, 'CREATOR_CANNOT_LEAVE', 'Creator cannot leave. Delete the organism instead.'));
+    // Membership removal + the roster/admin sync live in services/organism-lifecycle.ts, shared
+    // with aimeat_organism_leave.
+    const result = await leaveOrganism({ storage, config }, organism, ghii);
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
-
-    const membership = await storage.getMembership(id, ghii);
-    if (!membership || membership.status !== 'active') {
-      res.status(404).json(error(config.nodeId, 'NOT_MEMBER', 'You are not a member'));
-      return;
-    }
-
-    await storage.deleteMembership(membership.id);
-
-    // Update organism members + admins lists
-    const updates: Record<string, unknown> = {
-      members: organism.members.filter(m => m !== ghii),
-      updatedAt: new Date().toISOString(),
-    };
-    if (organism.admins.includes(ghii)) {
-      updates.admins = organism.admins.filter(a => a !== ghii);
-    }
-    await storage.updateOrganism(id, updates);
-
     res.json(success(config.nodeId, { left: true }));
-    emitChange('organisms');
   });
 }

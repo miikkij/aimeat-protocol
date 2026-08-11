@@ -9,6 +9,10 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.8.0 — 2026-08-11 — create/update/join/leave call services/organism-lifecycle.ts, the same
+ *     writer the REST routes use (August 2026 MCP audit step 8). The tools keep their gates and their
+ *     text; four side effects the copies disagreed on now happen on both surfaces: the join-request
+ *     notifications, the `organisms` change-bus emit, the structure snapshot and the public feed entry.
  *   v1.6.0 — 2026-07-16 — invite carries role + workspace grants (shared services/invitations.ts core);
  *     new member_add (direct add), invitation_update, invitation_cancel tools; respond-accept applies grants.
  *   v1.2.0 — 2026-07-16 — members roster rosters agents via getAgentsByOwners (one IN, was per-member)
@@ -31,7 +35,6 @@
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
@@ -47,7 +50,7 @@ import { canAccessWorkspaceComments, addComment, listComments } from '../service
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
-import { setOrganismReadme } from '../services/organism-readme.js';
+import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../services/organism-lifecycle.js';
 import { canSeeMembers } from '../services/organism-privacy.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
@@ -243,79 +246,29 @@ export function registerOrganismsTools(
         async ({ organism_id, message }) => {
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
+            // A private organism an agent cannot see answers as if it did not exist. The HTTP door
+            // has no such check (an id is enough there); it stays on this surface because a tool
+            // call is the one that arrives without a person having navigated to the organism first.
             if (organism.visibility === 'private' && !(await canSeeOrganism(organism))) {
                 return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             }
 
-            const ownerName = getOwnerName();
-
-            // Check if already a member
-            const existing = await storage.getMembership(organism_id, ownerName);
-            if (existing && existing.status === 'banned') {
-                return { content: [{ type: 'text' as const, text: 'You have been blocked from this organism' }], isError: true };
+            // The membership checks, capacity, the policy branch and the approver notifications are
+            // the shared writer's (services/organism-lifecycle.ts, same call POST /:id/join makes).
+            const result = await joinOrganism({ storage, config }, organism, getOwnerName(), message);
+            if (!result.ok) {
+                // The invitation refusal names the tool that resolves it; the rest render the
+                // service's own message.
+                const text = result.code === 'ALREADY_INVITED'
+                    ? 'You have a pending invitation — accept it with aimeat_organism_invitation_respond instead'
+                    : result.message;
+                return { content: [{ type: 'text' as const, text }], isError: true };
             }
-            if (existing && existing.status === 'active') {
-                return { content: [{ type: 'text' as const, text: 'Already a member of this organism' }], isError: true };
-            }
-            if (existing && existing.status === 'pending') {
-                return { content: [{ type: 'text' as const, text: 'Already have a pending join request' }], isError: true };
-            }
-            if (existing && existing.status === 'invited') {
-                return { content: [{ type: 'text' as const, text: 'You have a pending invitation — accept it with aimeat_organism_invitation_respond instead' }], isError: true };
-            }
-
-            // Check capacity
-            const members = await storage.listMembers(organism_id, { status: 'active' });
-            if (members.length >= organism.maxMembers) {
-                return { content: [{ type: 'text' as const, text: 'Organism has reached maximum members' }], isError: true };
-            }
-
-            if (organism.joinPolicy === 'invite_only') {
-                return { content: [{ type: 'text' as const, text: 'This organism requires an invitation to join' }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-
-            if (organism.joinPolicy === 'open') {
-                await storage.createMembership({
-                    id: uuidv4(),
-                    organismId: organism_id,
-                    ghii: ownerName,
-                    role: 'member',
-                    status: 'active',
-                    joinedAt: now,
-                });
-                await storage.updateOrganism(organism_id, {
-                    members: [...organism.members, ownerName],
-                    updatedAt: now,
-                });
-
+            if (result.outcome === 'joined') {
                 emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({ status: 'joined', organism_id }, null, 2),
-                    }],
-                };
-            } else {
-                // approval_required
-                await storage.createJoinRequest({
-                    id: uuidv4(),
-                    organismId: organism_id,
-                    ghii: ownerName,
-                    message: message || undefined,
-                    status: 'pending',
-                    createdAt: now,
-                });
-
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({ status: 'pending_approval', organism_id }, null, 2),
-                    }],
-                };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', organism_id }, null, 2) }] };
             }
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'pending_approval', organism_id }, null, 2) }] };
         },
     );
 
@@ -331,36 +284,13 @@ export function registerOrganismsTools(
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
 
-            const ownerName = getOwnerName();
-
-            if (organism.creatorGhii === ownerName) {
-                return { content: [{ type: 'text' as const, text: 'Creator cannot leave. Delete the organism instead.' }], isError: true };
-            }
-
-            const membership = await storage.getMembership(organism_id, ownerName);
-            if (!membership || membership.status !== 'active') {
-                return { content: [{ type: 'text' as const, text: 'Not a member of this organism' }], isError: true };
-            }
-
-            await storage.deleteMembership(membership.id);
-
-            const updates: Record<string, unknown> = {
-                members: organism.members.filter(m => m !== ownerName),
-                updatedAt: new Date().toISOString(),
-            };
-            if (organism.admins.includes(ownerName)) {
-                updates.admins = organism.admins.filter(a => a !== ownerName);
-            }
-            await storage.updateOrganism(organism_id, updates);
+            // Shared with POST /:id/leave (services/organism-lifecycle.ts): the membership row and
+            // the roster/admin sync go together.
+            const result = await leaveOrganism({ storage, config }, organism, getOwnerName());
+            if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
 
             emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-
-            return {
-                content: [{
-                    type: 'text' as const,
-                    text: JSON.stringify({ left: true, organism_id }, null, 2),
-                }],
-            };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ left: true, organism_id }, null, 2) }] };
         },
     );
 
@@ -590,30 +520,14 @@ export function registerOrganismsTools(
         },
         annotationsFor('aimeat_organism_create'),
         async ({ name, description, type, join_policy, visibility }) => {
-            if (!name || name.trim().length < 2) {
-                return { content: [{ type: 'text' as const, text: 'Name is required (min 2 characters)' }], isError: true };
-            }
-            const parsed = parseGAII(agentGaii);
-            const ownerName = parsed ? parsed.owner : agentGaii;          // bare — membership/members/creator
-            const ownerGhiiFull = `${ownerName}@${config.nodeId}`;        // full GHII — board owner
-            const orgType = ['community', 'team', 'club', 'cooperative', 'project'].includes(type ?? '') ? (type as string) : 'community';
-            const policy = ['open', 'approval_required', 'invite_only'].includes(join_policy ?? '') ? (join_policy as string) : 'open';
-            const vis = ['public', 'listed', 'private'].includes(visibility ?? '') ? (visibility as string) : 'public';
-            const id = uuidv4();
-            const now = new Date().toISOString();
-            const boardId = `org-${id}`;
-            await storage.createBoard({
-                id: boardId, name: `${name.trim()} — Discussion`, description: `Discussion board for ${name.trim()}`,
-                visibility: vis === 'public' ? 'public' : 'shared', ownerGaii: ownerGhiiFull, allowedGaiis: [], createdAt: now,
+            // Validation, the board, the record, the creator membership and the feed/timeline side
+            // effects are the shared writer's (services/organism-lifecycle.ts, same call
+            // POST /v1/organisms makes).
+            const result = await createOrganismRecord({ storage, config }, getOwnerName(), {
+                name, description, type, joinPolicy: join_policy, visibility,
             });
-            const record = await storage.createOrganism({
-                id, name: name.trim(), description: description || '', type: orgType as 'community' | 'team' | 'club' | 'cooperative' | 'project', location: {}, interests: [],
-                creatorGhii: ownerName, admins: [ownerName], members: [ownerName], agentGaiis: [],
-                boardId, joinPolicy: policy as 'open' | 'approval_required' | 'invite_only', maxMembers: 500, visibility: vis as 'public' | 'listed' | 'private',
-                moderationConfig: { flagsEnabled: true, autoHideThreshold: 3, appealsEnabled: true },
-                memoryNamespace: `organism.${id}`, createdAt: now, updatedAt: now,
-            });
-            await storage.createMembership({ id: uuidv4(), organismId: id, ghii: ownerName, role: 'creator', status: 'active', joinedAt: now });
+            if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
+            const record = result.organism;
             emitResourceListChanged(agentGaii);
             return {
                 content: [{
@@ -654,17 +568,15 @@ export function registerOrganismsTools(
             if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
                 return { content: [{ type: 'text' as const, text: 'Only the creator or an admin can update this organism' }], isError: true };
             }
-            const updates: Record<string, unknown> = { updatedAt: new Date().toISOString() };
-            if (name !== undefined) updates.name = name;
-            if (description !== undefined) updates.description = description;
-            if (interests !== undefined) updates.interests = interests;
-            if (join_policy !== undefined && ['open', 'approval_required', 'invite_only'].includes(join_policy)) updates.joinPolicy = join_policy;
-            if (visibility !== undefined && ['public', 'listed', 'private'].includes(visibility)) updates.visibility = visibility;
-            if (typeof readme === 'string') await setOrganismReadme(storage, config, organism_id, readme, organism.creatorGhii);
-            const updated = await storage.updateOrganism(organism_id, updates);
-            emitChange('organisms');
+            // Shared with PUT /v1/organisms/:id (services/organism-lifecycle.ts): the field
+            // validation, the record update and the README key. An unrecognised join_policy or
+            // visibility is refused here rather than dropped, so "updated" means it was.
+            const result = await updateOrganismRecord({ storage, config }, organism, {
+                name, description, readme, interests, joinPolicy: join_policy, visibility,
+            });
+            if (!result.ok) return { content: [{ type: 'text' as const, text: result.message }], isError: true };
             emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ updated: true, organism_id, name: updated?.name ?? organism.name, readme_set: typeof readme === 'string' }, null, 2) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ updated: true, organism_id, name: result.organism.name, readme_set: result.readmeSet }, null, 2) }] };
         },
     );
 

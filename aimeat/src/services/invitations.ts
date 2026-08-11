@@ -12,10 +12,14 @@
  * @structure constants (expiry/cap); hashInviteToken/inviteEmailHash; InvitationError; invitePublic;
  *   normalizeOrgRole/normalizeInviteeName/normalizeWorkspaceGrants; findWorkspaceEntry;
  *   applyInvitationWorkspaceGrants; createNameInvitation/updateNameInvitation/cancelNameInvitation/
- *   acceptNameInvitation/addOrganismMember; createEmailInvitation().
+ *   acceptNameInvitation/declineNameInvitation/addOrganismMember; createEmailInvitation/
+ *   cancelEmailInvitation().
  * @usage const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, input);
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  * @version-history
+ *   v1.5.0 — 2026-08-11 — declineNameInvitation() + cancelEmailInvitation(): the last two invitation
+ *     writes that still existed twice, once in the REST route and once in the MCP tool (August 2026
+ *     MCP audit step 8).
  *   v1.4.0 — 2026-07-18 — resolveInvitationReturnTarget(): allowlist an inviter-pinned post-accept
  *     redirect (node origin + app-origin subdomains only — open-redirect guard); createEmailInvitation
  *     stores the validated returnUrl so a link invitee can land back in the inviting app after accept.
@@ -601,6 +605,46 @@ export async function acceptNameInvitation(
   }
   emitChange('organisms');
   return granted;
+}
+
+/**
+ * The invitee declines: the membership row that WAS the invitation goes away. Throws InvitationError
+ * when there is nothing pending. A roster still showing someone who declined is not a stale list, it
+ * is a wrong answer about who has access, so this emits `organisms` like the accept path does.
+ */
+export async function declineNameInvitation(
+  storage: Storage,
+  input: { organismId: string; inviteeOwner: string },
+): Promise<void> {
+  const membership = await storage.getMembership(input.organismId, input.inviteeOwner);
+  if (!membership || membership.status !== 'invited') {
+    throw new InvitationError(404, 'NO_INVITATION', 'You have no pending invitation to this organism');
+  }
+  await storage.deleteMembership(membership.id);
+  emitChange('organisms');
+}
+
+/**
+ * Cancel a PENDING email invitation (creator/admin; the caller has already authorized). The record
+ * is kept and flipped to `cancelled` rather than deleted, so the token stays known-dead and an
+ * accept attempt with the old link resolves to a cancelled invitation instead of an unknown one.
+ * Throws InvitationError when the invitation is missing, belongs to another organism, or has
+ * already been used or cancelled.
+ */
+export async function cancelEmailInvitation(
+  storage: Storage,
+  input: { organismId: string; invitationId: string },
+): Promise<InvitationRecord> {
+  const inv = await storage.getInvitation(input.invitationId);
+  if (!inv || inv.organismId !== input.organismId) {
+    throw new InvitationError(404, 'NOT_FOUND', 'Invitation not found');
+  }
+  if (inv.status !== 'pending') {
+    throw new InvitationError(409, 'INVALID_STATE', `Invitation is already ${inv.status}`);
+  }
+  const updated = await storage.updateInvitation(input.invitationId, { status: 'cancelled' });
+  emitChange('organisms');
+  return updated ?? { ...inv, status: 'cancelled' };
 }
 
 /**

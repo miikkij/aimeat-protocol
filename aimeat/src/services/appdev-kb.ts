@@ -7,9 +7,14 @@
  *   (routes/appdev-pitfalls.ts) can never drift. Owner scope = the owner GHII + every
  *   same-owner agent GAII, deduped by key GHII-first.
  * @structure listOwnerScopeMemory · findOwnEntry · listLearnedPitfalls · setPitfallFlags ·
- *   deletePitfallEntry · upsertPitfallManifest · PITFALL_* constants
+ *   deletePitfallEntry · upsertPitfallManifest · pitfallEntryKey · PITFALL_* constants
  * @usage import { listLearnedPitfalls, setPitfallFlags } from './appdev-kb.js';
  * @version-history
+ *   v1.1.0 -- 2026-08-11 -- deletePitfallEntry() is now the only delete: the MCP tool had its own
+ *     copy (storage.deleteMemory + manifest cleanup) and emitted the live update, while this one,
+ *     which the REST door calls, did not. Deleting an entry in the browser left it on every other
+ *     screen until a reload. pitfallEntryKey() replaces the same key expression written out in
+ *     three places (August 2026 audit step 8).
  *   v1.0.0 — 2026-07-19 — extracted from mcp/appdev-pitfalls.ts + extended with the UI
  *     management operations (share/status flags, full-body listing) (AppDev KB UI phase).
  */
@@ -17,6 +22,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
+import { emitChange } from './event-bus.js';
 
 export const PITFALL_PACKAGE_ID = 'appdev-pitfalls';
 export const PITFALL_PREFIX = `packages/${PITFALL_PACKAGE_ID}/`;
@@ -41,6 +47,11 @@ export interface LearnedPitfallValue {
 
 export function slugifyKb(s: string): string {
     return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'entry';
+}
+
+/** The address of one learned entry. Category is slugified, slug is taken as given (lowercased). */
+export function pitfallEntryKey(category: string, slug: string): string {
+    return `${PITFALL_PREFIX}${slugifyKb(category)}/${slug.toLowerCase()}`;
 }
 
 function ownerOf(callerGaii: string, _config: AimeatConfig): string | null {
@@ -194,7 +205,7 @@ export async function setPitfallFlags(
     category: string, slug: string,
     flags: { share?: boolean; status?: 'active' | 'outdated' },
 ): Promise<LearnedPitfallEntry | null> {
-    const key = `${PITFALL_PREFIX}${slugifyKb(category)}/${slug.toLowerCase()}`;
+    const key = pitfallEntryKey(category, slug);
     const existing = await findOwnEntry(storage, config, callerGaii, key);
     if (!existing) return null;
     const now = new Date().toISOString();
@@ -222,10 +233,14 @@ export async function deletePitfallEntry(
     storage: Storage, config: AimeatConfig, callerGaii: string,
     category: string, slug: string,
 ): Promise<boolean> {
-    const key = `${PITFALL_PREFIX}${slugifyKb(category)}/${slug.toLowerCase()}`;
+    const key = pitfallEntryKey(category, slug);
     const existing = await findOwnEntry(storage, config, callerGaii, key);
     if (!existing) return false;
     await storage.deleteMemory(existing.ownerGaii, key);
     await upsertPitfallManifest(storage, config, callerGaii, key, '', true);
+    // The record and the manifest both changed, so every screen holding the list is out of date.
+    // The MCP tool used to emit this and the REST door did not, which is how a browser delete left
+    // the entry visible until a reload.
+    emitChange('memory');
     return true;
 }

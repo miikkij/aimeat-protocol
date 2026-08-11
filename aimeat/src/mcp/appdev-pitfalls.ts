@@ -10,6 +10,9 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.2.0 -- 2026-08-11 -- The delete calls services/appdev-kb.ts deletePitfallEntry(), the same
+ *     function the REST door calls, instead of repeating the record delete and the manifest
+ *     cleanup here. The live update moved into that function, so both doors now emit it.
  *   v1.1.0 -- 2026-08-11 -- The entry write goes through services/memory-write.ts: archive guard,
  *     value-size and key ceilings, byte quota and overage. Every {category, slug} is a new key on
  *     a tool built to be called repeatedly, and nothing bounded that.
@@ -24,13 +27,13 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import {
     PITFALL_PACKAGE_ID, PITFALL_PREFIX, PITFALL_MANIFEST_KEY, PITFALL_SLUG_RE, slugifyKb,
     listOwnerScopeMemory as kbListOwnerScope, ownIdentitySet as kbOwnIdentitySet,
     findOwnEntry as kbFindOwnEntry, upsertPitfallManifest,
+    pitfallEntryKey, deletePitfallEntry,
     type LearnedPitfallValue,
 } from '../services/appdev-kb.js';
 
@@ -102,7 +105,7 @@ export function registerAppdevPitfallTools(
             if (!PITFALL_SLUG_RE.test(cat) || !PITFALL_SLUG_RE.test(slg)) {
                 return { content: [{ type: 'text' as const, text: 'Invalid category/slug — use kebab-case (a-z, 0-9, dashes)' }], isError: true };
             }
-            const key = `${PITFALL_PREFIX}${cat}/${slg}`;
+            const key = pitfallEntryKey(cat, slg);
             const now = new Date().toISOString();
             const existing = await findOwnEntry(key);
             const normModel = model.trim().toLowerCase();
@@ -254,16 +257,14 @@ export function registerAppdevPitfallTools(
         },
         annotationsFor('aimeat_appdev_pitfall_delete'),
         async ({ category, slug }) => {
-            const key = `${PITFALL_PREFIX}${slugify(category)}/${slug.toLowerCase()}`;
-            const existing = await findOwnEntry(key);
-            if (!existing) {
+            // The delete itself (record + manifest ref + live update) is deletePitfallEntry, the
+            // same function DELETE /v1/appdev/pitfalls/learned/:category/:slug calls. This tool had
+            // its own copy of all three steps, and the two had already drifted on the third.
+            const key = pitfallEntryKey(category, slug);
+            const deleted = await deletePitfallEntry(storage, config, agentGaii, category, slug);
+            if (!deleted) {
                 return { content: [{ type: 'text' as const, text: `Pitfall entry not found: ${key}` }], isError: true };
             }
-            await storage.deleteMemory(existing.ownerGaii, key);
-            // The report path emits through memory-write; the DELETE went straight to storage, so
-            // removing an entry left it on screen until a reload.
-            emitChange('memory');
-            await upsertManifest(key, '', true);
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${PITFALL_PACKAGE_ID}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, key }, null, 2) }] };
         },

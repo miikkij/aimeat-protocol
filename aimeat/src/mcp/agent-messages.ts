@@ -6,6 +6,14 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   v1.6.0 -- 2026-08-11 -- aimeat_message_send calls services/agent-message-send.ts, the same
+ *     function POST /v1/agents/:name/messages calls, instead of building the record itself. Four
+ *     things this copy did differently are gone with it: the create-time `processedAt` the REST twin
+ *     never set, the unscoped live-update emit that woke every owner on the node, the resource
+ *     notification for `aimeat://messages/{thread}` (no resource template serves that URI; the twin
+ *     uses `aimeat://agents/{name}/messages`), and a metadata mapping that had never grown the
+ *     option-prompt fields. The tool still owns what the protocol makes it own: its parameters and
+ *     its text answer.
  *   Limits raised -- 2026-07-30 -- content to 200 000, tool descriptions to 10 000.
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -24,15 +32,13 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { sendAgentMessage } from '../services/agent-message-send.js';
 
 export function registerAgentMessageTools(
     mcp: McpServer,
@@ -92,54 +98,41 @@ export function registerAgentMessageTools(
         },
         annotationsFor('aimeat_message_send'),
         async ({ content, thread_id, linked_task_id, metadata, ai_provenance, ai_provenance_id }) => {
-            const now = new Date().toISOString();
-            // Thread = task: group a message under its linked task so the whole
-            // task conversation stays in one thread (omit thread_id and just pass
-            // linked_task_id). Random thread only for ad-hoc, task-less chat.
-            const threadId = thread_id ?? linked_task_id ?? randomUUID();
-
-            // TARGET-058. The message is delivered to a named person — the owner — so it is stamped
-            // like every other write that ends in front of a reader. The record describes the message
-            // CONTENT; `metadata` is machine plumbing (token counts, a proposed task) and not prose
-            // anyone reads as authored text.
-            //
-            // Phase 9 gave the message a column for the id, so the owner's own client renders the
-            // label from the message rather than the record standing alone, joined only by hash.
-            const provenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content,
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
-                pipeline: 'mcp.message_send',
-                surface: { visibility: 'private', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
-            });
-
-            const record = await storage.createMessage({
-                id: randomUUID(),
-                agentGaii,
-                threadId,
-                direction: 'outbound',
-                senderGaii: agentGaii,
-                content,
-                status: 'delivered',
-                linkedTaskId: linked_task_id,
-                metadata: metadata ? {
-                    tokensUsed: metadata.tokens_used,
-                    processingMs: metadata.processing_ms,
-                    proposedTask: metadata.proposed_task,
-                } : undefined,
-                createdAt: now,
-                processedAt: now,
-                aiProvenanceId: provenanceId,
-            });
-
-            // routes/agent-messages.ts emits this. An open thread is the whole point of the surface.
-            emitChange('agent-messages');
-            emitResourceUpdated(agentGaii, `aimeat://messages/${record.threadId}`);
+            // The record, the provenance stamp and the live-update emit are the REST route's, called
+            // rather than copied (services/agent-message-send.ts). Direction is fixed: this tool is
+            // the agent writing to its owner. The tool's job is the two ends — declaring these
+            // parameters, and rendering the answer as text.
+            const result = await sendAgentMessage(
+                { storage, config, emitResourceUpdated },
+                {
+                    agentGaii,
+                    senderGaii: agentGaii,
+                    body: {
+                        content,
+                        direction: 'outbound',
+                        thread_id,
+                        linked_task_id,
+                        metadata: metadata ? {
+                            tokens_used: metadata.tokens_used,
+                            processing_ms: metadata.processing_ms,
+                            proposed_task: metadata.proposed_task,
+                        } : undefined,
+                    },
+                    pipeline: 'mcp.message_send',
+                    declaredProvenanceId: ai_provenance_id,
+                    declaredProvenance: toDeclaredProvenance(ai_provenance),
+                },
+            );
+            if (!result.ok) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({ error: result.code, message: result.message }, null, 2),
+                    }],
+                    isError: true,
+                };
+            }
+            const record = result.message;
 
             return {
                 content: [{
@@ -149,7 +142,7 @@ export function registerAgentMessageTools(
                         thread_id: record.threadId,
                         status: record.status,
                         created_at: record.createdAt,
-                        ...(await writeProvenanceEcho(storage, config, provenanceId)),
+                        ...(await writeProvenanceEcho(storage, config, record.aiProvenanceId)),
                     }, null, 2),
                 }],
             };

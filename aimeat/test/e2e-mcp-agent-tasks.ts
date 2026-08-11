@@ -23,6 +23,9 @@
  *   this file proves is the two that a plain session reaches.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-agent-tasks
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Two more differences, from the step that moved the WRITES into
+ *     services/agent-task-write.ts: telemetry accumulates instead of overwriting the task totals with
+ *     the last event's numbers, and the title/description caps the HTTP route applies now apply here.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit: the MCP task tools had no coverage at all).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -199,6 +202,45 @@ async function run() {
             ],
         });
         assert(!r.isError, `first plan refused: ${r.text.slice(0, 300)}`);
+    });
+
+    // An event reports what THIS step cost, so the task total is the running sum — which is what the
+    // HTTP door has always stored. The tool OVERWROTE the totals with the last event's numbers, so an
+    // agent reporting one AI call per event finished a forty-call task showing one, and the cost view
+    // read from that. Two events reporting one call each is the smallest case that tells the two
+    // apart: accumulate gives 2, overwrite gives 1.
+    await test('telemetry from repeated events accumulates rather than overwriting', async () => {
+        const step = async (n: number) => {
+            const r = await callTool(runner.session, 'aimeat_task_event', {
+                task_id: runnerTaskId,
+                type: 'progress',
+                message: `step ${n} of the work`,
+                details: { telemetry: { ai_calls: 1, tokens_in: 100, tokens_out: 10 } },
+            });
+            assert(!r.isError, `event ${n} refused: ${r.text.slice(0, 300)}`);
+        };
+        await step(1);
+        await step(2);
+
+        const got = await callTool(runner.session, 'aimeat_task_get', { task_id: runnerTaskId });
+        const task = JSON.parse(got.text).task ?? JSON.parse(got.text);
+        const tel = task.telemetry ?? {};
+        assert(tel.aiCalls === 2, `two events at one AI call each should total 2: ${JSON.stringify(tel)}`);
+        assert(tel.tokensIn === 200, `tokens in should total 200: ${JSON.stringify(tel)}`);
+        assert(tel.tokensOut === 20, `tokens out should total 20: ${JSON.stringify(tel)}`);
+    });
+
+    // The HTTP door caps a title at 256 characters and a description at 10 000. The tool declared
+    // both as a bare string, so the same node accepted over MCP what it refused over HTTP and a UI
+    // built for the capped row had to render the oversized one.
+    await test('an over-long title is refused here as it is over HTTP', async () => {
+        const r = await callTool(runner.session, 'aimeat_task_create', {
+            target_agent: runner.agentName,
+            title: 'x'.repeat(300),
+            description: 'The cap is the same cap the HTTP route applies.',
+        });
+        assert(r.isError, `a 300-character title was accepted: ${r.text.slice(0, 200)}`);
+        assert(/INVALID_INPUT|title/i.test(r.text), `expected the input refusal, got: ${r.text.slice(0, 200)}`);
     });
 
     await test('a SECOND plan mid-run is refused, and the first plan survives intact', async () => {

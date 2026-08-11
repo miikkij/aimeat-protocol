@@ -16,6 +16,9 @@
  *   v1.4.0 — 2026-07-11 — Tests 26–34 (TARGET-028): aimeat_workspace_member_grant/_revoke/_members over
  *     MCP — grant/revoke, upgrade/downgrade, GHII+GAII grantee, multi-workspace grant, non-manager
  *     authorization, decide's explicit `role` + contributor default, and the metadata `source` stamp.
+ *   v1.5.0 — 2026-08-11 — Tests 42–43 (August 2026 audit step 8): a publish over MCP appends the same
+ *     organism decision-log entry the web publish appends, and workspace_create refuses a blank name
+ *     the way POST /v1/organisms/:id/workspaces always has.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-workspaces
 
@@ -774,6 +777,29 @@ await test('41. A single write still works unchanged', async () => {
     assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
     const data = JSON.parse(b.result.content[0].text);
     assert(data.written.endsWith('shared.notes.single-1.draft') && data.count === undefined, 'single-write shape unchanged (no count wrapper)');
+});
+
+await test('42. A publish over MCP appends the organism decision-log entry the web publish appends', async () => {
+    // The audit/Prove trail used to record web publishes and not agent publishes, so it read as if
+    // nothing shipped on the days an agent did the work. Both doors now go through the same
+    // publishDraft + writeDecision.
+    const w = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'audit-1', value: { title: 'Audited', body: 'x' } }, 142);
+    assert(w.result.isError !== true, `write error: ${w.result.content?.[0]?.text}`);
+    const p = await A.client.call('aimeat_workspace_publish', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'audit-1' }, 1421);
+    assert(p.result.isError !== true, `publish error: ${p.result.content?.[0]?.text}`);
+    // An owner session sees its agents' records, and the decision row is owned by the publishing agent.
+    const list = await json(`/v1/memory?prefix=${encodeURIComponent(`organism.${orgId}.meta.decisions.`)}&limit=200`, { headers: { Authorization: `Bearer ${A.ownerToken}` } });
+    assert(list.status === 200, `decision list ${list.status}`);
+    const entries = (list.body.data.items || []).map((i: any) => i.value?.summary).filter(Boolean);
+    assert(entries.some((s: string) => s.includes('shared.notes.audit-1')), `a decision entry names the publish, got ${JSON.stringify(entries)}`);
+});
+
+await test('43. workspace_create refuses a blank name, as the REST door always has', async () => {
+    // A nameless workspace was created over MCP and listed as 'Workspace' with a blank manifest name.
+    const b = await A.client.call('aimeat_workspace_create', { organism_id: orgId, name: '   ',
+        manifest: { objectTypes: [{ name: 'item', namespace: 'shared.items', mode: 'records' }] } }, 143);
+    assert(b.result.isError === true, 'rejected');
+    assert(b.result.content[0].text.toLowerCase().includes('name'), `says which field: ${b.result.content[0].text}`);
 });
 
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });

@@ -1,21 +1,27 @@
 /**
  * @file apps-fork.ts
  * @description aimeat_app_fork, moved out of mcp/apps.ts by pure extraction when that file passed
- *   the 800-line limit. The body is verbatim; only the surrounding function is new.
- * @structure registerAppForkTool(mcp, storage, config, getAgentGaii)
+ *   the 800-line limit. What is left here is the tool's own business: its two gates, and the answer
+ *   it renders. The copy itself is services/app-lifecycle.ts.
+ * @structure registerAppForkTool(mcp, storage, config, getAgentGaii, emitResourceListChanged)
  * @usage import { registerAppForkTool } from './apps-fork.js';
  * @version-history
+ *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: the write goes through forkApp() in
+ *     services/app-lifecycle.ts, the same function POST /v1/apps/:owner/:filename/fork calls. Five
+ *     things the HTTP fork does and this one did not now happen on both: the AI disclosure posture is
+ *     re-measured against the copied bytes, the source owner's private `specCheck` note is stripped
+ *     instead of travelling into someone else's catalogue, the screenshot is copied, a change-log
+ *     line is written, and the public feed fires. The caller's bucket is the owner's canonical GHII,
+ *     as it is on the HTTP door, rather than a hand-composed `owner@nodeId`.
  *   v1.0.0 — 2026-08-11 — Extracted from mcp/apps.ts (max-file-lines), no behaviour change.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { appQuotaRefusal } from '../services/install-quotas.js';
-import { emitChange } from '../services/event-bus.js';
+import { forkApp, resolveAppOwnerScope } from '../services/app-lifecycle.js';
 import { logger } from '../utils/logger.js';
 
 export function registerAppForkTool(
@@ -38,12 +44,9 @@ export function registerAppForkTool(
         annotationsFor('aimeat_app_fork'),
         async ({ owner, filename, new_filename, version }) => {
             const agentGaii = getAgentGaii();
-            const parsed = parseGAII(agentGaii);
-            if (!parsed) {
+            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            if (!scope) {
                 return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
-            }
-            if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(new_filename)) {
-                return { content: [{ type: 'text' as const, text: 'Invalid new_filename. Use alphanumeric, dots, hyphens, underscores. Max 100 chars.' }], isError: true };
             }
 
             const source = await storage.getAppByOwnerName(owner, filename, version);
@@ -51,8 +54,7 @@ export function registerAppForkTool(
                 return { content: [{ type: 'text' as const, text: `App "${filename}" not found for owner "${owner}"${version ? ` (version ${version})` : ''}` }], isError: true };
             }
 
-            const callerOwner = parsed.owner;
-            const callerGhii = `${callerOwner}@${config.nodeId}`;
+            const { ownerName: callerOwner, ownerGhii: callerGhii } = scope;
             const sameOwner = callerOwner === source.ownerName;
 
             // Gate 1 — derivative permission (agents are never operators here).
@@ -67,73 +69,33 @@ export function registerAppForkTool(
                 }
             }
 
-            const existing = await storage.getLatestVersionNumber(callerGhii, new_filename);
-            if (existing > 0) {
-                return { content: [{ type: 'text' as const, text: `You already have an app named "${new_filename}". Choose a different new_filename.` }], isError: true };
-            }
-
-            // The per-owner app quota, from the one place that holds it. Forking had it over HTTP
-            // and not here, so this tool was the unlimited way past a cap the other two roads apply.
-            const overQuota = await appQuotaRefusal({ storage, config }, callerGhii);
-            if (overQuota) return { content: [{ type: 'text' as const, text: `${overQuota.code}: ${overQuota.message}` }], isError: true };
-
-            const now = new Date().toISOString();
-            const forkedManifest: AppManifest = {
-                ...source.manifest,
-                name: `${source.manifest.name || filename.replace(/\.html?$/i, '')} (fork)`,
-                authorDisplay: callerOwner,
-                forkedFrom: { owner: source.ownerName, filename, version: source.versionNumber, node: config.nodeId },
-            };
-            delete forkedManifest.priceMorsels;
-            delete forkedManifest.licenseType;
-
             try {
-                await storage.createApp({
-                    ownerGaii: callerGhii,
-                    ownerName: callerOwner,
-                    filename: new_filename,
-                    versionNumber: 1,
-                    manifest: forkedManifest,
-                    mimeType: source.mimeType,
-                    size: source.size,
-                    data: source.data,
-                    parked: false,
-                    forkable: false,
-                    createdAt: now,
-                    // A fork copies bytes; it does not generate them. Carry the SOURCE's statement
-                    // forward rather than minting a new one — a fresh Mint-3 here would claim the
-                    // forker's agent produced content it merely copied, and the hash is the same
-                    // bytes either way, so a detection query must lead to the original assertion.
-                    ...(source.aiProvenanceId ? { aiProvenanceId: source.aiProvenanceId } : {}),
+                // From here it is services/app-lifecycle.ts — the same copy POST .../fork performs,
+                // including the target-name check, the per-owner quota, the lineage event, the
+                // change log and the feed.
+                const out = await forkApp(storage, config, {
+                    source,
+                    callerOwner,
+                    callerGhii,
+                    callerGaii: agentGaii,
+                    newFilename: new_filename,
                 });
-                await storage.recordAppFork({
-                    id: `fork-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,
-                    sourceOwnerGaii: source.ownerGaii,
-                    sourceOwnerName: source.ownerName,
-                    sourceFilename: filename,
-                    sourceVersion: source.versionNumber,
-                    childOwnerGaii: callerGhii,
-                    childOwnerName: callerOwner,
-                    childFilename: new_filename,
-                    forkedByGaii: agentGaii,
-                    forkedAt: now,
-                });
+                if ('refusal' in out) {
+                    return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };
+                }
 
-                const downloadUrl = `/v1/apps/${encodeURIComponent(callerOwner)}/${encodeURIComponent(new_filename)}`;
                 logger.info(`App forked via MCP: ${owner}/${filename} → ${new_filename}`, { by: agentGaii });
-                // The fork lands in the owner's catalogue, and routes/apps/fork-manage.ts emits for the same act.
-                emitChange('apps');
                 emitResourceListChanged(agentGaii);
 
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
-                            filename: new_filename,
-                            version_number: 1,
-                            forked_from: { owner: source.ownerName, filename, version: source.versionNumber },
-                            download_url: downloadUrl,
-                            inline_url: `${downloadUrl}?mode=inline`,
+                            filename: out.filename,
+                            version_number: out.versionNumber,
+                            forked_from: out.forkedFrom,
+                            download_url: out.downloadUrl,
+                            inline_url: `${out.downloadUrl}?mode=inline`,
                             note: `Forked "${filename}" into your catalogue as "${new_filename}".`,
                         }, null, 2),
                     }],

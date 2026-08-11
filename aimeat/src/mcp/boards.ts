@@ -17,18 +17,25 @@
  *     declaration and stamps the reply through provenanceForWrite(). Phase 4 froze it in the
  *     reviewed-without list as borderline; it is not borderline — a reply is text on a public board
  *     that a person reads, and aimeat_board_post next to it was stamped from the start.
+ *   v1.4.0 -- 2026-08-11 -- August 2026 audit step 8. Create, subscribe, react, members and delete
+ *     went through services/board-write.ts, which routes/boards.ts also calls. Each of the five used
+ *     to build its own record and emit its own event here, and the copies had drifted: no bound on a
+ *     board name or a reaction, the operator rule named public but not system, federate never set,
+ *     and a roster call with neither add nor remove reported success while changing nothing.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
-import { parseGAII, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
+import type { Storage, BoardRecord } from '../storage/interface.js';
+import { parseGAII, parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import { createBoardReply } from '../services/board-post.js';
+import {
+    boardVisibleTo, createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, deleteBoardById,
+    type BoardWriteCaller,
+} from '../services/board-write.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 
@@ -51,12 +58,18 @@ export function registerBoardsTools(
     }
 
     /** Check if the agent can see a board (visibility rules). */
-    function canSeeBoard(board: { visibility: string; ownerGaii: string; allowedGaiis: string[] }): boolean {
-        if (board.visibility === 'public' || board.visibility === 'system') return true;
-        if (board.ownerGaii === agentGaii) return true;
-        if (board.visibility === 'shared' && isSameOwner(board.ownerGaii, agentGaii)) return true;
-        if (board.allowedGaiis.includes(agentGaii)) return true;
-        return false;
+    function canSeeBoard(board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis'>): boolean {
+        return boardVisibleTo(board, agentGaii);
+    }
+
+    /**
+     * The caller the board services rule on. The roles come from the OWNER record rather than the
+     * session, because an MCP token carries roles ['agent'] and nothing else: an operator's agent
+     * would otherwise look like any other agent to a rule written against roles, and creating a
+     * public board over MCP has always been something an operator's agent can do.
+     */
+    async function boardCaller(): Promise<BoardWriteCaller> {
+        return { gaii: agentGaii, roles: (await isOperator()) ? ['agent', 'operator'] : ['agent'] };
     }
 
     // ── Resource: board posts ──
@@ -140,27 +153,15 @@ export function registerBoardsTools(
         },
         annotationsFor('aimeat_board_create'),
         async ({ name, visibility, description, allowed_gaiis }) => {
-            // public/system require operator
-            if (visibility === 'public') {
-                if (!(await isOperator())) {
-                    return { content: [{ type: 'text' as const, text: 'Operator role required for public boards' }], isError: true };
-                }
-            }
-
-            const id = `board-${randomBytes(8).toString('hex')}`;
-            const board = await storage.createBoard({
-                id,
-                name,
-                description,
-                visibility,
-                ownerGaii: agentGaii,
-                allowedGaiis: allowed_gaiis ?? [],
-                createdAt: new Date().toISOString(),
+            // services/board-write.ts — the same create POST /v1/boards performs. The operator rule
+            // lived here as "public requires operator" while the route reserves system boards too,
+            // the name and description had no bound at all, and federate was never set.
+            const out = await createBoard({ storage, config }, await boardCaller(), {
+                name, visibility, description, allowedGaiis: allowed_gaiis,
             });
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+            const board = out.board;
 
-            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
-            // browser is exactly the surface that must not need a reload while an agent posts.
-            emitChange('boards');
             emitResourceListChanged(agentGaii);
 
             return {
@@ -191,25 +192,13 @@ export function registerBoardsTools(
         },
         annotationsFor('aimeat_board_subscribe'),
         async ({ board_id, callback_url, filters }) => {
-            const board = await storage.getBoard(board_id);
-            if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
-            if (!canSeeBoard(board)) return { content: [{ type: 'text' as const, text: 'Access denied' }], isError: true };
-
-            // Check if already subscribed
-            const existing = await storage.getBoardSubscription(board_id, agentGaii);
-            if (existing) return { content: [{ type: 'text' as const, text: 'Already subscribed to this board' }], isError: true };
-
-            const sub = await storage.createBoardSubscription({
-                id: `sub-${randomBytes(8).toString('hex')}`,
-                boardId: board_id,
-                gaii: agentGaii,
-                callbackUrl: callback_url,
-                filters,
-                createdAt: new Date().toISOString(),
+            // services/board-write.ts — the same subscription POST /v1/boards/:id/subscribe writes,
+            // with the same visibility rule, the same duplicate refusal and the same change event.
+            const out = await subscribeToBoard({ storage, config }, await boardCaller(), {
+                boardId: board_id, callbackUrl: callback_url, filters,
             });
-            // POST /v1/boards/:id/subscribe emits this. A subscription changes what the board view
-            // shows about itself, so the open page must hear about it.
-            emitChange('boards');
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+            const sub = out.subscription;
 
             return {
                 content: [{
@@ -234,12 +223,14 @@ export function registerBoardsTools(
         },
         annotationsFor('aimeat_board_react'),
         async ({ board_id, post_id, emoji }) => {
-            const ok = await storage.addReaction(board_id, post_id, emoji, agentGaii);
-            if (!ok) return { content: [{ type: 'text' as const, text: 'Post not found' }], isError: true };
+            // services/board-write.ts — the same reaction POST /v1/boards/:b/posts/:p/react writes.
+            // The route runs BoardReactionSchema over it first; this tool declared z.string(), so an
+            // empty reaction and a ten-thousand-character one both stored.
+            const out = await reactToBoardPost({ storage, config }, await boardCaller(), {
+                boardId: board_id, postId: post_id, reaction: emoji,
+            });
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
 
-            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
-            // browser is exactly the surface that must not need a reload while an agent posts.
-            emitChange('boards');
             emitResourceUpdated(agentGaii, `aimeat://boards/${encodeURIComponent(board_id)}`);
 
             return {
@@ -309,23 +300,20 @@ export function registerBoardsTools(
             const board = await storage.getBoard(board_id);
             if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
 
-            // Auth: agent's owner must be the board owner
+            // Auth: agent's owner must be the board owner. This check stays on the door because the
+            // two doors answer it differently on purpose — PATCH /v1/boards/:id/members demands an
+            // owner session and rejects every agent session, while here an agent holding
+            // `social:members` acts for its owner, which is what makes an agent a first-class user.
             const agentOwner = parseGaiiLoose(agentGaii).owner;
             const boardOwner = parseGaiiLoose(board.ownerGaii).owner;
             if (agentOwner !== boardOwner) {
                 return { content: [{ type: 'text' as const, text: 'Only the board owner can manage members' }], isError: true };
             }
 
-            // Compute new member set
-            const members = new Set(board.allowedGaiis);
-            if (Array.isArray(add)) for (const g of add) members.add(g);
-            if (Array.isArray(remove)) for (const g of remove) members.delete(g);
-
-            const updated = await storage.updateBoardMembers(board_id, [...members]);
-            if (!updated) return { content: [{ type: 'text' as const, text: 'Failed to update board members' }], isError: true };
-            // Who may read a shared board is what this changes, and PUT /v1/boards/:id/members emits
-            // for it. Without the event the members list stayed as it was on screen.
-            emitChange('boards');
+            // The roster arithmetic, the write and the change event are services/board-write.ts.
+            const out = await setBoardMembers({ storage, config }, board, { add, remove });
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+            const updated = out.board;
 
             return {
                 content: [{
@@ -348,18 +336,11 @@ export function registerBoardsTools(
         },
         annotationsFor('aimeat_board_delete'),
         async ({ board_id }) => {
-            const board = await storage.getBoard(board_id);
-            if (!board) return { content: [{ type: 'text' as const, text: 'Board not found' }], isError: true };
+            // services/board-write.ts — the same delete DELETE /v1/boards/:id performs, with the
+            // same owner-or-operator rule and the same change event.
+            const out = await deleteBoardById({ storage, config }, await boardCaller(), board_id);
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
 
-            // Auth: owner or operator
-            if (board.ownerGaii !== agentGaii && !(await isOperator())) {
-                return { content: [{ type: 'text' as const, text: 'Only the board owner or operator can delete this board' }], isError: true };
-            }
-
-            await storage.deleteBoard(board_id);
-            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
-            // browser is exactly the surface that must not need a reload while an agent posts.
-            emitChange('boards');
             emitResourceListChanged(agentGaii);
 
             return {

@@ -11,6 +11,12 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.2.0 — 2026-08-11 — August 2026 audit step 8. Create, subscribe, react, member roster and
+ *     delete go through services/board-write.ts, which the MCP tools now call as well. Each of the
+ *     five was written out here and again in src/mcp/boards.ts, and the copies had drifted: the
+ *     tool's operator rule named public boards but not system ones, nothing bounded a board name or
+ *     a reaction over MCP, federate was never set there, and a roster call carrying neither add nor
+ *     remove reported success while changing nothing.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. The REST post/reply writes are stamped, the same
  *     act the MCP tools have been stamping since Phase 4. Leaving one door stamped and the other not
  *     would mean a post's label depended on which client wrote it, which is the sort of split a
@@ -32,6 +38,9 @@ import { checkOtkSession } from './auth.js';
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost, createBoardReply } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
+import {
+  createBoard, subscribeToBoard, reactToBoardPost, setBoardMembers, deleteBoardById,
+} from '../services/board-write.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
@@ -45,24 +54,19 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards — create a board (agent auth; system boards require operator)
   router.post('/v1/boards', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
+    // services/board-write.ts — the same create aimeat_board_create makes. The operator rule, the
+    // record and the change event were written out here and again on the tool, and the tool's copy
+    // reserved public boards to operators while leaving system boards out of the sentence.
     const { name, visibility, allowed_gaiis, description, federate } = req.body ?? {};
-
-    // System and public boards can only be created by operators
-    if ((visibility === 'system' || visibility === 'public') && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can create public or system boards'));
+    const out = await createBoard({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, { name, visibility, description, allowedGaiis: allowed_gaiis, federate });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    const id = `board-${randomBytes(8).toString('hex')}`;
-    const board = await storage.createBoard({
-      id,
-      name,
-      description,
-      visibility,
-      ownerGaii: resolve(req),
-      allowedGaiis: allowed_gaiis ?? [],
-      federate: federate === true,
-      createdAt: new Date().toISOString(),
-    });
+    const board = out.board;
 
     res.status(201).json(success(config.nodeId, {
       id: board.id,
@@ -74,7 +78,6 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Post to this board', method: 'POST', url: `/v1/boards/${board.id}/posts` },
       { description: 'View posts', method: 'GET', url: `/v1/boards/${board.id}/posts` },
     ]));
-    emitChange('boards');
   });
 
   // GET /v1/boards — list boards (public boards no auth, private/shared need auth)
@@ -166,28 +169,21 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       }
     }
 
+    // The roster arithmetic, the write and the change event are services/board-write.ts, which
+    // aimeat_board_members also calls. The authorization above stays here because the two doors
+    // answer it differently on purpose: this one demands an owner session, the tool accepts an agent
+    // of the same owner holding `social:members`.
     const { add, remove } = req.body ?? {};
-    if (!add && !remove) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide "add" and/or "remove" arrays'));
-      return;
-    }
-
-    // Compute new list
-    const members = new Set(board.allowedGaiis);
-    if (Array.isArray(add)) for (const g of add) members.add(g);
-    if (Array.isArray(remove)) for (const g of remove) members.delete(g);
-
-    const updated = await storage.updateBoardMembers(boardId, [...members]);
-    if (!updated) {
-      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update board members'));
+    const out = await setBoardMembers({ storage, config }, board, { add, remove });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
     res.json(success(config.nodeId, {
-      board_id: updated.id,
-      allowed_gaiis: updated.allowedGaiis,
+      board_id: out.board.id,
+      allowed_gaiis: out.board.allowedGaiis,
     }));
-    emitChange('boards');
   });
 
   // GET /v1/boards/subscriptions — list agent's own subscriptions
@@ -418,23 +414,19 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // DELETE /v1/boards/:boardId — delete own board
   router.delete('/v1/boards/:boardId', requireAuth(), requireRole('agent'), requireScope('social:write'), async (req, res) => {
+    // services/board-write.ts — the same delete aimeat_board_delete performs, owner-or-operator rule
+    // and change event included.
     const boardId = req.params.boardId as string;
-    const gaii = resolve(req);
-
-    const board = await storage.getBoard(boardId);
-    if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
+    const out = await deleteBoardById({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, boardId);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
-    if (board.ownerGaii !== gaii && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the board owner or operator can delete this board'));
-      return;
-    }
-
-    await storage.deleteBoard(boardId);
     res.json(success(config.nodeId, { deleted: true, board_id: boardId }));
-    emitChange('boards');
   });
 
   // DELETE /v1/boards/:boardId/posts/:postId — delete own post
@@ -463,18 +455,23 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards/:boardId/posts/:postId/react — react to a post
   router.post('/v1/boards/:boardId/posts/:postId/react', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardReactionSchema, config.nodeId), async (req, res) => {
-    const boardId = req.params.boardId as string;
-    const postId = req.params.postId as string;
+    // services/board-write.ts — the same reaction aimeat_board_react writes. The bound on the
+    // reaction lived in BoardReactionSchema on this door alone.
     const { reaction } = req.body ?? {};
-
-    const ok = await storage.addReaction(boardId, postId, reaction, resolve(req));
-    if (!ok) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Post not found'));
+    const out = await reactToBoardPost({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, {
+      boardId: req.params.boardId as string,
+      postId: req.params.postId as string,
+      reaction,
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
 
     res.json(success(config.nodeId, { reacted: true, reaction }));
-    emitChange('boards');
   });
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post
@@ -510,41 +507,19 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards/:boardId/subscribe — subscribe to a board
   router.post('/v1/boards/:boardId/subscribe', requireAuth(), requireRole('agent'), requireScope('social:read'), async (req, res) => {
+    // services/board-write.ts — the same subscription aimeat_board_subscribe writes, with the
+    // visibility rule, the duplicate refusal and the change event in one place.
     const boardId = req.params.boardId as string;
-    const board = await storage.getBoard(boardId);
-    if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
-      return;
-    }
-
-    const gaii = resolve(req);
-
-    // Check access for non-public boards (system boards are publicly accessible)
-    // isSameOwner only grants access on shared boards — private boards are strictly owner-only
-    if (board.visibility !== 'public' && board.visibility !== 'system') {
-      const sameOwnerSub = board.visibility === 'shared' && isSameOwner(board.ownerGaii, gaii);
-      if (board.ownerGaii !== gaii && !sameOwnerSub && !board.allowedGaiis.includes(gaii)) {
-        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
-        return;
-      }
-    }
-
-    // Check if already subscribed
-    const existing = await storage.getBoardSubscription(boardId, gaii);
-    if (existing) {
-      res.status(409).json(error(config.nodeId, 'CONFLICT', 'Already subscribed to this board'));
-      return;
-    }
-
     const { callback_url, filters } = req.body ?? {};
-    const sub = await storage.createBoardSubscription({
-      id: `sub-${randomBytes(8).toString('hex')}`,
-      boardId,
-      gaii,
-      callbackUrl: callback_url,
-      filters,
-      createdAt: new Date().toISOString(),
-    });
+    const out = await subscribeToBoard({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, { boardId, callbackUrl: callback_url, filters });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    const sub = out.subscription;
 
     res.status(201).json(success(config.nodeId, {
       id: sub.id,
@@ -556,7 +531,6 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Unsubscribe', method: 'DELETE', url: `/v1/boards/${boardId}/subscribe` },
       { description: 'View board posts', method: 'GET', url: `/v1/boards/${boardId}/posts` },
     ]));
-    emitChange('boards');
   });
 
   // DELETE /v1/boards/:boardId/subscribe — unsubscribe from a board

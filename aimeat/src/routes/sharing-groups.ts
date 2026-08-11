@@ -11,29 +11,28 @@
  *   - PATCH  /v1/groups/:id/members/:identifier -- Update member permissions
  *   - DELETE /v1/groups/:id/members/:identifier -- Remove member
  * @version-history
+ *   v1.1.0 -- 2026-08-11 -- Create, add-member and remove-member call
+ *     services/sharing-group-members.ts, which aimeat_group_create and friends now call too. This
+ *     router keeps the envelope and the status codes and nothing else of those three.
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  */
 
 import { Router } from 'express';
-import { addGroupMember, removeGroupMember } from '../services/sharing-group-members.js';
-import { v4 as uuidv4 } from 'uuid';
+import {
+  createSharingGroup,
+  addSharingGroupMember,
+  removeSharingGroupMember,
+} from '../services/sharing-group-members.js';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, SharingGroupMember } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import {
-  SharingGroupCreateSchema,
   SharingGroupUpdateSchema,
-  SharingGroupAddMemberSchema,
   SharingGroupUpdateMemberSchema,
 } from '../models/sharing-group-schemas.js';
-
-function resolveMemberIdentifier(identifier: string, nodeId: string): string {
-  if (identifier.includes('@') || identifier.includes('#')) return identifier;
-  return `${identifier}@${nodeId}`;
-}
 
 export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -45,49 +44,19 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
   router.post('/v1/groups', requireAuth(), requireRole('owner'), async (req, res) => {
     const ownerGaii = resolve(req);
 
-    const parsed = SharingGroupCreateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues.map(i => i.message).join(', ')));
+    // Validation, the 50-group ceiling, the member's stored address, the record and the change
+    // event are services/sharing-group-members.ts, because aimeat_group_create decides them too.
+    const created = await createSharingGroup({ storage, config }, ownerGaii, req.body);
+    if (!created.ok) {
+      res.status(created.status).json(error(config.nodeId, created.code, created.message));
       return;
     }
 
-    const { name, description, members, default_permissions } = parsed.data;
-
-    // Max 50 groups per owner
-    const existing = await storage.listSharingGroups(ownerGaii);
-    if (existing.length >= 50) {
-      res.status(409).json(error(config.nodeId, 'LIMIT_REACHED', 'Maximum 50 sharing groups per owner'));
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const id = uuidv4();
-
-    // Convert members from request format (identifier_type) to storage format (identifierType)
-    const storageMbers: SharingGroupMember[] = members.map(m => ({
-      identifier: resolveMemberIdentifier(m.identifier, config.nodeId),
-      identifierType: m.identifier_type,
-      permissions: m.permissions ?? default_permissions,
-      addedAt: now,
-      addedBy: ownerGaii,
-    }));
-
-    const record = await storage.createSharingGroup({
-      id,
-      name: name.trim(),
-      description: description?.trim(),
-      ownerGaii,
-      members: storageMbers,
-      defaultPermissions: default_permissions,
-      createdAt: now,
-      updatedAt: now,
-    });
-
+    const record = created.group;
     res.status(201).json(success(config.nodeId, { group: record }, [
-      { description: 'View group', method: 'GET', url: `/v1/groups/${id}` },
-      { description: 'Add member', method: 'POST', url: `/v1/groups/${id}/members` },
+      { description: 'View group', method: 'GET', url: `/v1/groups/${record.id}` },
+      { description: 'Add member', method: 'POST', url: `/v1/groups/${record.id}/members` },
     ]));
-    emitChange('groups');
   });
 
   /* ── GET /v1/groups -- List own + member-of groups ── */
@@ -220,47 +189,15 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
     const id = req.params.id as string;
     const ownerGaii = resolve(req);
 
-    const group = await storage.getSharingGroup(id);
-    if (!group) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Sharing group not found'));
-      return;
-    }
-
-    if (group.ownerGaii !== ownerGaii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the group owner can add members'));
-      return;
-    }
-
-    const parsed = SharingGroupAddMemberSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues.map(i => i.message).join(', ')));
-      return;
-    }
-
-    const { identifier: rawIdentifier, identifier_type, permissions } = parsed.data;
-    const identifier = resolveMemberIdentifier(rawIdentifier, config.nodeId);
-
-    // The ceiling, the duplicate test and the member's shape are services/sharing-group-members.ts,
-    // because aimeat_group_add_member decides them too.
-    const added = addGroupMember(group, { identifier, identifierType: identifier_type, permissions }, ownerGaii);
+    // Ownership, the ceiling, the duplicate test, the member's stored address and the write are
+    // services/sharing-group-members.ts, because aimeat_group_add_member decides them too.
+    const added = await addSharingGroupMember({ storage, config }, ownerGaii, id, req.body);
     if (!added.ok) {
       res.status(added.status).json(error(config.nodeId, added.code, added.message));
       return;
     }
-    const { members: updatedMembers, now } = added;
-    const newMember = updatedMembers[updatedMembers.length - 1];
-    const updated = await storage.updateSharingGroup(id, {
-      members: updatedMembers,
-      updatedAt: now,
-    });
 
-    if (!updated) {
-      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to add member'));
-      return;
-    }
-
-    res.status(201).json(success(config.nodeId, { group: updated, added: newMember }));
-    emitChange('groups');
+    res.status(201).json(success(config.nodeId, { group: added.group, added: added.member }));
   });
 
   /* ── PATCH /v1/groups/:id/members/:identifier -- Update member permissions ── */
@@ -319,35 +256,13 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
     const identifier = req.params.identifier as string;
     const ownerGaii = resolve(req);
 
-    const group = await storage.getSharingGroup(id);
-    if (!group) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Sharing group not found'));
-      return;
-    }
-
-    if (group.ownerGaii !== ownerGaii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the group owner can remove members'));
-      return;
-    }
-
-    const removed = removeGroupMember(group, identifier);
+    const removed = await removeSharingGroupMember({ storage, config }, ownerGaii, id, identifier);
     if (!removed.ok) {
       res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
       return;
     }
-    const { members: updatedMembers, now } = removed;
-    const updated = await storage.updateSharingGroup(id, {
-      members: updatedMembers,
-      updatedAt: now,
-    });
 
-    if (!updated) {
-      res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to remove member'));
-      return;
-    }
-
-    res.json(success(config.nodeId, { group: updated, removed: identifier }));
-    emitChange('groups');
+    res.json(success(config.nodeId, { group: removed.group, removed: removed.identifier }));
   });
 
   return router;

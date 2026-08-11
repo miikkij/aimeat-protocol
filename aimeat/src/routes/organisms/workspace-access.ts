@@ -21,6 +21,9 @@
  *     accept/GET refuse non-'link' invites (defence in depth). Additive: an inviter-pinned, allowlisted
  *     return_url lands the accepter back in the inviting app after join; GET returns a `viewer` verdict
  *     so the page warns about a mismatch before the button.
+ *   v1.6.0 — 2026-08-11 — the email-invite cancel route calls cancelEmailInvitation() instead of
+ *     flipping the record itself, so it and aimeat_organism_invitation_email_cancel share one write
+ *     (August 2026 MCP audit step 8).
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -38,7 +41,7 @@ import { provisionOwner, ProvisionEmailTakenError } from '../../services/owner-p
 import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
-import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
+import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
 
@@ -440,12 +443,14 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const invId = req.params.invId as string;
     const organism = await requireOrgAdmin(req, res, id);
     if (!organism) return;
-    const inv = await storage.getInvitation(invId);
-    if (!inv || inv.organismId !== id) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
-    if (inv.status !== 'pending') { res.status(409).json(error(config.nodeId, 'INVALID_STATE', `Invitation is already ${inv.status}`)); return; }
-    await storage.updateInvitation(invId, { status: 'cancelled' });
+    try {
+      // Shared with aimeat_organism_invitation_email_cancel (services/invitations.ts).
+      await cancelEmailInvitation(storage, { organismId: id, invitationId: invId });
+    } catch (e) {
+      if (e instanceof InvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
+    }
     res.json(success(config.nodeId, { status: 'cancelled' }));
-    emitChange('organisms');
   });
 
   /* ══ Provisioned-code invitations ("keys") — a second invitation TYPE whose account is created at

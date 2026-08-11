@@ -54,8 +54,15 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * max-file-lines while their gates were being fixed. The same code, counted in two places instead
  * of one. Raising a ratchet needs a reason in writing, and that is the reason; the backlog did not
  * grow, and clearing either parent clears its extraction with it.
+ *
+ * 39 files / 2 writers on 2026-08-11, audit step 8: nineteen capabilities moved in one pass, each
+ * one's write extracted into the service its REST twin already called. The number that matters is
+ * the second one, 29 writing tool surfaces became 2, because a tool that only READS a record it did
+ * not build has no shape to drift. The move found 169 places where the two copies had already
+ * disagreed, 113 of them visible to whoever was using the tool. That is the argument for this rule
+ * restated as measurement rather than as principle.
  */
-const SEED = 44;
+const SEED = 39;
 
 /**
  * The number that actually matters. A READ through storage is the same read whichever door asks;
@@ -65,8 +72,12 @@ const SEED = 44;
  *
  * 30 rather than 28 for the same reason as SEED above: two pure extractions, no new capability
  * writing on its own. Both parents still write, so both extractions count as writers too.
+ *
+ * 2 on 2026-08-11 after step 8. Nineteen capabilities moved in one pass; what remains is the two
+ * files whose last write genuinely has no REST twin to share with, each with its reason recorded in
+ * the step 8 section of docs/internal/secauditaug2026/03-proposal.md.
  */
-const WRITE_SEED = 29;
+const WRITE_SEED = 2;
 
 /** Storage methods that change something. Everything else is a read. */
 const WRITEISH = /^(create|set|update|delete|add|remove|insert|upsert|write|debit|credit|transfer|enqueue|revoke|grant|mint|save|publish|archive|deactivate|activate|link|unlink)/i;

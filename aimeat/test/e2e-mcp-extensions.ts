@@ -6,6 +6,10 @@
  *   v1.0.0 — 2026-03-21 — Initial creation
  *   v1.1.0 — 2026-08-05 — Test 9b: ctx.files reaches the sandbox over MCP (write + read back +
  *     missing ref), guarding the makeExtensionFiles parity fix in mcp/extensions.ts
+ *   v1.2.0 — 2026-08-11 — Phase 8: the side effects of install, activate, deactivate and delete over
+ *     MCP, which the HTTP door has always had and this one did not. Activating registers the
+ *     manifest's schedules, deactivating removes them, an identical redeploy answers "unchanged",
+ *     and deleting takes the extension's ext: memory with it.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-extensions.ts
@@ -558,6 +562,131 @@ await test('14. aimeat_extension_invoke returns error for inactive extension', a
     }, 108);
     assert(body.result?.isError === true, 'isError = true for inactive extension');
     assert(body.result.content[0].text.includes('not active'), `msg: ${body.result.content[0].text}`);
+});
+
+// ─── Phase 8: The lifecycle side effects, over MCP ───
+// Installing, switching on, switching off and deleting are each more than a status field, and this
+// door used to do only the field. The four tests below are the parts that were missing: the
+// schedules a manifest declares, their removal on deactivate, the no-op answer for an unchanged
+// redeploy, and the ext: memory that has to go when the extension does.
+console.log('\nPhase 8 — Lifecycle Side Effects via MCP');
+
+const lifeName = `mcp-ext-life-${Date.now()}`;
+const lifeManifest = `
+metadata:
+  name: ${lifeName}
+  version: 1.0.0
+  description: MCP extension lifecycle E2E extension
+  author: e2e-test
+actions:
+  - id: store
+    method: POST
+    path: /store
+    script: store_script
+    input:
+      type: object
+      properties:
+        note:
+          type: string
+    output:
+      type: object
+schedules:
+  - id: newyear
+    cron: "0 0 1 1 *"
+    action: store
+    description: yearly no-op, far enough away never to fire during a test
+limits:
+  memory_mb: 16
+  timeout_ms: 5000
+  max_api_calls: 10
+`.trim();
+
+const lifeScripts = {
+    store_script: `export default async function(ctx, input) {
+        await ctx.memory.set('probe', { note: input.note ?? 'stored' });
+        return { stored: await ctx.memory.get('probe') };
+    }`,
+};
+
+const lifeJobId = `ext:${lifeName}:newyear`;
+const lifeMemoryUrl = `/v1/memory/${encodeURIComponent(`ext:${lifeName}`)}/probe`;
+
+async function extensionJobIds(): Promise<string[]> {
+    const { body } = await json('/v1/schedules', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    return ((body.data?.extensions ?? []) as any[]).map(j => j.id as string);
+}
+
+await test('15. aimeat_extension_install with activate:true registers the manifest schedules', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_extension_install',
+        arguments: { manifest: lifeManifest, scripts: lifeScripts, activate: true },
+    }, 300);
+    assert(!body.result?.isError, `install failed: ${body.result?.content?.[0]?.text}`);
+    const result = JSON.parse(body.result.content[0].text);
+    assert(result.action === 'installed', `action: ${result.action}`);
+    assert(result.status === 'active', `status: ${result.status}`);
+
+    // The part that was missing: switching an extension on over MCP wrote the status and stopped,
+    // so a scheduled extension was active and never ran.
+    const ids = await extensionJobIds();
+    assert(ids.includes(lifeJobId), `schedule "${lifeJobId}" should be registered, got ${JSON.stringify(ids)}`);
+});
+
+await test('16. An identical redeploy answers "unchanged" instead of re-running initialisation', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_extension_install',
+        arguments: { manifest: lifeManifest, scripts: lifeScripts, update: true },
+    }, 301);
+    assert(!body.result?.isError, `update failed: ${body.result?.content?.[0]?.text}`);
+    const result = JSON.parse(body.result.content[0].text);
+    assert(result.action === 'unchanged', `action: ${result.action}`);
+});
+
+await test('17. The action writes into ext: memory, readable without auth', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_extension_invoke',
+        arguments: { extension_name: lifeName, action_id: 'store', input: { note: 'lifecycle' } },
+    }, 302);
+    assert(!body.result?.isError, `invoke failed: ${body.result?.content?.[0]?.text}`);
+
+    const mem = await json(lifeMemoryUrl);
+    assert(mem.status === 200, `public ext memory read: ${mem.status}`);
+    assert(mem.body.data?.value?.note === 'lifecycle', `stored value: ${JSON.stringify(mem.body.data?.value)}`);
+});
+
+await test('18. Deactivating over MCP removes the scheduled jobs, activating puts them back', async () => {
+    // Stated as a precondition rather than assumed: "the job is absent" is true for free when
+    // activation never registered it, which is exactly the bug this guards.
+    assert((await extensionJobIds()).includes(lifeJobId), `schedule "${lifeJobId}" should be registered before deactivating`);
+
+    const off = await mcpRpc('tools/call', {
+        name: 'aimeat_extension_deactivate',
+        arguments: { name: lifeName },
+    }, 303);
+    assert(!off.body.result?.isError, `deactivate failed: ${off.body.result?.content?.[0]?.text}`);
+    assert(!(await extensionJobIds()).includes(lifeJobId), `schedule "${lifeJobId}" should be gone after deactivate`);
+
+    // aimeat_extension_activate, the tool on its own: it wrote the status field and nothing else.
+    const on = await mcpRpc('tools/call', {
+        name: 'aimeat_extension_activate',
+        arguments: { name: lifeName },
+    }, 304);
+    assert(!on.body.result?.isError, `activate failed: ${on.body.result?.content?.[0]?.text}`);
+    assert((await extensionJobIds()).includes(lifeJobId), `schedule "${lifeJobId}" should be registered again after activate`);
+});
+
+await test('19. aimeat_extension_delete takes the ext: namespace memory with it', async () => {
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_extension_delete',
+        arguments: { name: lifeName },
+    }, 305);
+    assert(!body.result?.isError, `delete failed: ${body.result?.content?.[0]?.text}`);
+
+    const mem = await json(lifeMemoryUrl);
+    assert(mem.status === 404, `ext memory must be gone after uninstall, got ${mem.status}`);
+
+    const gone = await json(`/v1/extensions/${lifeName}`);
+    assert(gone.status === 404, `extension must be gone, got ${gone.status}`);
 });
 
 // ─── Summary ───

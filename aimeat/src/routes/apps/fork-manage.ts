@@ -4,6 +4,11 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — August 2026 audit step 8: the fork's copy and the delete's bucket sweep go
+ *     through services/app-lifecycle.ts, shared with aimeat_app_fork and aimeat_app_delete. The two
+ *     gates stay here, because only an HTTP session carries the operator role they consult. The
+ *     per-owner fork quota now reads services/install-quotas.ts (via the shared fork) instead of
+ *     spelling the same ceiling out a second time.
  *   Fork description limits 2 000 → 10 000 — 2026-07-30.
  *   v1.1.0 — 2026-07-17 — Agent-Bundled Apps: PATCH accepts `cortex` — edit/clear the bundled
  *     crew-defs in place (validated fail-loud like publish) without re-uploading the HTML.
@@ -14,18 +19,15 @@
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, AppManifest, AppProtection } from '../../storage/interface.js';
+import type { Storage, AppProtection } from '../../storage/interface.js';
 import { validateCortexAgents } from '../../models/crew-def-schemas.js';
-import { lintAppAiDisclosure } from '../../services/app-ai-posture.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import { recordPublicActivity } from '../../services/public-activity.js';
+import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { randomBytes } from 'node:crypto';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import type { CanonicalOwner } from './helpers.js';
-import { logger } from '../../utils/logger.js';
 
 export function registerForkManageRoutes(
     router: Router,
@@ -51,10 +53,6 @@ export function registerForkManageRoutes(
 
         const body = req.body ?? {};
         const newFilename = typeof body.new_filename === 'string' ? body.new_filename.trim() : '';
-        if (!newFilename || !/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(newFilename)) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'new_filename is required (alphanumeric, dots, hyphens, underscores; max 100 chars)'));
-            return;
-        }
         const version = body.version !== undefined ? parseInt(String(body.version), 10) : undefined;
 
         // Load the source app (specific version if given, else latest).
@@ -91,128 +89,35 @@ export function registerForkManageRoutes(
             }
         }
 
-        // A fork is a NEW app in the caller's catalogue — refuse to shadow an app the
-        // caller already owns by that filename (to update, publish; don't fork).
-        const existingVersion = await storage.getLatestVersionNumber(callerGhii, newFilename);
-        if (existingVersion > 0) {
-            res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS', `You already have an app named "${newFilename}". Choose a different new_filename.`));
+        // Past the gates it is services/app-lifecycle.ts — the same copy aimeat_app_fork performs:
+        // the target-name check, the shadowing check, the per-owner quota, the manifest with the
+        // source's paid terms and private notes removed, the bytes, the screenshot, the lineage
+        // event, the change log and the public feed.
+        const out = await forkApp(storage, config, {
+            source,
+            callerOwner,
+            callerGhii,
+            callerGaii,
+            newFilename,
+        });
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
             return;
         }
 
-        // Per-owner app quota (same rule as publish).
-        if (config.maxAppsPerAgent > 0) {
-            const { total } = await storage.listApps({ ownerGaii: callerGhii, limit: 1 });
-            if (total >= config.maxAppsPerAgent) {
-                res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `You have reached the maximum of ${config.maxAppsPerAgent} published apps`));
-                return;
-            }
-        }
-
-        const now = new Date().toISOString();
-        const forkedManifest: AppManifest = {
-            ...source.manifest,
-            name: `${source.manifest.name || sourceFilename.replace(/\.html?$/i, '')} (fork)`,
-            authorDisplay: callerOwner,
-            // A fork starts as its own independent, free app — drop the source's paid
-            // terms; the forker can price their own copy later. Record its origin.
-            forkedFrom: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber, node: config.nodeId },
-        };
-        delete forkedManifest.priceMorsels;
-        delete forkedManifest.licenseType;
-        // The build-spec state describes how the SOURCE's last publish was made. It says nothing
-        // about this fork, and it is owner-only besides — copying it would hand one owner's note
-        // about their own working habits to whoever forked them.
-        delete forkedManifest.specCheck;
-        // TARGET-058 Phase 5: A FORK OF A GENERATIVE APP IS STILL A GENERATIVE APP. The manifest
-        // spread above already brings the posture across, and this re-measures the observed half
-        // against the bytes actually being stored while keeping what the source DECLARED — so the
-        // statement neither resets to silence nor becomes a claim about code that moved on. Without
-        // it the posture would quietly vanish exactly when somebody else takes the code over.
-        if (/html/i.test(source.mimeType)) {
-            forkedManifest.aiPosture = lintAppAiDisclosure(
-                Buffer.from(source.data).toString('utf8'), source.manifest.aiPosture,
-            ).posture;
-        }
-
-        await storage.createApp({
-            ownerGaii: callerGhii,
-            ownerName: callerOwner,
-            filename: newFilename,
-            versionNumber: 1,
-            manifest: forkedManifest,
-            mimeType: source.mimeType,
-            size: source.size,
-            data: source.data,
-            parked: false,
-            forkable: false,   // the forker decides their own copy's forkability later
-            createdAt: now,
-            // The record describes how these BYTES were made, and a fork copies the bytes exactly —
-            // so the statement travels with them. A fork that dropped it would read as unstated
-            // content that is in fact known to be model-written.
-            ...(source.aiProvenanceId ? { aiProvenanceId: source.aiProvenanceId } : {}),
-        });
-
-        // Copy the source screenshot into the fork's bucket (best-effort) so the fork
-        // renders with the same catalogue thumbnail.
-        try {
-            const srcShot = await storage.getStorageFile(source.ownerGaii, `apps/screenshots/${sourceFilename}`);
-            if (srcShot) {
-                await storage.createStorageFile({
-                    key: `apps/screenshots/${newFilename}`,
-                    ownerGaii: callerGhii,
-                    visibility: 'public',
-                    mimeType: srcShot.mimeType,
-                    size: srcShot.size,
-                    data: srcShot.data,
-                    createdAt: now,
-                });
-            }
-        } catch (err) { logger.warn('POST /v1/apps/:owner/:filename/fork: screenshot copy is non-critical', { error: String(err) }); }
-
-        // Record the fork event — the source of truth for fork stats + lineage.
-        await storage.recordAppFork({
-            id: `fork-${Date.now()}-${randomBytes(4).toString('hex')}`,
-            sourceOwnerGaii: source.ownerGaii,
-            sourceOwnerName: source.ownerName,
-            sourceFilename,
-            sourceVersion: source.versionNumber,
-            childOwnerGaii: callerGhii,
-            childOwnerName: callerOwner,
-            childFilename: newFilename,
-            forkedByGaii: callerGaii,
-            forkedAt: now,
-        });
-
-        const downloadUrl = `/v1/apps/${encodeURIComponent(callerOwner)}/${encodeURIComponent(newFilename)}`;
-
-        await storage.addSiteChangeLog({
-            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
-            action: 'app_publish',
-            summary: `Forked "${sourceFilename}" (by ${source.ownerName}) into "${newFilename}"`,
-            changedBy: callerOwner,
-            changedAt: now,
-        });
-
         res.status(201).json(success(config.nodeId, {
-            filename: newFilename,
-            version_number: 1,
-            manifest: forkedManifest,
+            filename: out.filename,
+            version_number: out.versionNumber,
+            manifest: out.manifest,
             forkable: false,
-            forked_from: { owner: source.ownerName, filename: sourceFilename, version: source.versionNumber },
-            download_url: downloadUrl,
-            versions_url: `${downloadUrl}/versions`,
-            note: `Forked "${sourceFilename}" into your catalogue as "${newFilename}".`,
+            forked_from: out.forkedFrom,
+            download_url: out.downloadUrl,
+            versions_url: `${out.downloadUrl}/versions`,
+            note: `Forked "${sourceFilename}" into your catalogue as "${out.filename}".`,
         }, [
-            { description: 'Open the fork', method: 'GET', url: `${downloadUrl}?mode=inline` },
+            { description: 'Open the fork', method: 'GET', url: `${out.downloadUrl}?mode=inline` },
         ]));
-        emitChange('apps');
-        void recordPublicActivity(storage, config, {
-            category: 'apps',
-            actor: callerGaii,
-            summary: `App ${forkedManifest.name} forked from ${source.ownerName}/${sourceFilename}`,
-            detail: forkedManifest.description || '',
-            link: `${downloadUrl}?mode=inline`,
-        }).catch(err => { logger.warn('POST /v1/apps/:owner/:filename/fork: feed is best-effort', { error: String(err) }); });
     });
 
     // PATCH /v1/apps/:filename — Update an app you own (requires auth). Accepts
@@ -429,60 +334,27 @@ export function registerForkManageRoutes(
         const versionParam = req.query.version as string | undefined;
         const version = versionParam ? parseInt(versionParam, 10) : undefined;
 
-        // ── No-version case: sweep every bucket this owner has for this filename ──
-        // getAppByOwnerName finds the latest version in any bucket; we delete
-        // that bucket entirely (deleteApp without version removes all its
-        // versions), then loop until no more rows exist. This handles ghost
-        // entries from old shadow-bucket bugs in one user click.
-        if (!version) {
-            let sweepCount = 0;
-            for (;;) {
-                const app = await storage.getAppByOwnerName(owner, filename);
-                if (!app) break;
-                // Authorization sanity check: ownerName MUST match the caller's
-                // owner. (It always will, because getAppByOwnerName takes
-                // ownerName as the key — but defense in depth.)
-                if (app.ownerName !== owner) break;
-                await storage.deleteApp(app.ownerGaii, filename);
-                await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(err => { logger.warn('DELETE /v1/apps/:filename: continuing after a suppressed failure', { error: String(err) }); });
-                sweepCount++;
-                if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
-            }
-            if (sweepCount === 0) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads`));
-                return;
-            }
-        } else {
-            // ── Single-version case: try buckets in order, delete from the one that has it ──
-            let app = await storage.getApp(ownerGhii, filename, version);
-            let effectiveGaii = ownerGhii;
-            if (!app) { app = await storage.getApp(callerGaii, filename, version); if (app) effectiveGaii = callerGaii; }
-            if (!app) { app = await storage.getApp(owner, filename, version); if (app) effectiveGaii = owner; }
-            if (!app) {
-                // Last-resort: find the row by ownerName across all buckets
-                const found = await storage.getAppByOwnerName(owner, filename, version);
-                if (found && found.ownerName === owner) { app = found; effectiveGaii = found.ownerGaii; }
-            }
-            if (!app) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found in your uploads (version ${version})`));
-                return;
-            }
-            await storage.deleteApp(effectiveGaii, filename, version);
-        }
-
-        await storage.addSiteChangeLog({
-            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
-            action: 'app_delete',
-            summary: version ? `Deleted version ${version} of app "${filename}"` : `Deleted app "${filename}" (all versions)`,
-            changedBy: owner,
-            changedAt: new Date().toISOString(),
+        // The bucket sweep, the screenshot removal and the change-log line are
+        // services/app-lifecycle.ts — the same function aimeat_app_delete calls. That tool used to
+        // delete a single bucket and nothing else, so a ghost row from an old publish path survived
+        // an agent's delete and its screenshot stayed in storage.
+        const out = await deleteOwnedApp(storage, {
+            ownerName: owner,
+            ownerGhii,
+            callerGaii,
+            filename,
+            version,
         });
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
+            return;
+        }
 
         res.json(success(config.nodeId, {
             filename,
-            version_deleted: version ?? 'all',
+            version_deleted: out.versionDeleted,
             note: version ? `Version ${version} deleted.` : 'App deleted (all versions).',
         }));
-        emitChange('apps');
     });
 }

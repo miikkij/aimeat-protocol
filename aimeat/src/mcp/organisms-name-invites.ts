@@ -9,6 +9,9 @@
  *   aimeat_organism_invitations, aimeat_organism_invitation_respond.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — invitation_respond's decline path calls declineNameInvitation() instead of
+ *     deleting the membership row itself (August 2026 MCP audit step 8), so the delete and the
+ *     `organisms` emit stay together with the REST decline route.
  *   v1.0.0 — 2026-07-16 — Extracted from mcp/organisms.ts; tools now ride the shared name-invite core.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -17,10 +20,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
-    acceptNameInvitation, addOrganismMember,
+    acceptNameInvitation, declineNameInvitation, addOrganismMember,
 } from '../services/invitations.js';
 
 export function registerOrganismNameInviteTools(
@@ -193,10 +195,12 @@ export function registerOrganismNameInviteTools(
                 return { content: [{ type: 'text' as const, text: 'You have no pending invitation to this organism' }], isError: true };
             }
             if (decision === 'decline') {
-                await storage.deleteMembership(membership.id);
-                // routes/organisms/membership.ts emits this. A roster that still shows a member who
-                // declined is worse than a stale list: it is a wrong answer about who has access.
-                emitChange('organisms');
+                // Shared with POST /:id/invitations/decline (services/invitations.ts).
+                try {
+                    await declineNameInvitation(storage, { organismId: organism_id, inviteeOwner: ownerName });
+                } catch (e) {
+                    return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
+                }
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'declined', organism_id }, null, 2) }] };
             }
             // Shared accept core: activates the row, syncs members/admins, applies invite-time ws grants.

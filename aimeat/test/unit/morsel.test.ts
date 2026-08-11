@@ -9,6 +9,7 @@ import {
     returnEscrow,
     applyDailyAllowance,
     calculateEscrow,
+    mintMorsels,
 } from '../../src/services/morsel.js';
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -595,6 +596,82 @@ describe('calculateEscrow', () => {
 
         const escrow = await calculateEscrow(storage, REQUESTER);
         expect(escrow).toBe(110); // only the pending one
+    });
+});
+
+// ════════════════════════════════════════════════════════════════════
+// ── Operator mint (shared by POST /v1/admin/mint and aimeat_admin_mint) ──
+// ════════════════════════════════════════════════════════════════════
+
+describe('mintMorsels', () => {
+    let storage: SqliteStorage;
+    const TARGET = 'mint-target#mintowner@node';
+    const OPERATOR = 'op@test-node';
+
+    beforeEach(async () => {
+        storage = new SqliteStorage(':memory:');
+        // The owner on the record has to match the one in the GAII: the new balance is read back
+        // through getGHIIByOwner(agent.owner), which is how both mint doors report it.
+        await storage.createAgent(makeAgent({ gaii: TARGET, name: 'mint-target', owner: 'mintowner' }));
+        await seedOwner(storage, 'mintowner');
+    });
+
+    it('credits the owner balance and writes one mint transaction', async () => {
+        const config = makeConfig({ maxOperatorMintPerDay: 10_000 });
+        const out = await mintMorsels({ storage, config }, OPERATOR, TARGET, 500);
+
+        expect(out.ok).toBe(true);
+        if (!out.ok) return;
+        expect(out.minted).toBe(500);
+        expect(out.newBalance).toBe(500);
+        expect(out.mintedToday).toBe(500);
+        expect(out.dailyCap).toBe(10_000);
+        expect(await balOf(storage, TARGET)).toBe(500);
+
+        const mints = (await storage.getTransactions(TARGET)).filter(t => t.type === 'mint');
+        expect(mints).toHaveLength(1);
+        expect(mints[0].amount).toBe(500);
+        expect(mints[0].counterpartyGaii).toBe(OPERATOR);
+    });
+
+    it('refuses an unknown agent with NOT_FOUND', async () => {
+        const config = makeConfig({ maxOperatorMintPerDay: 10_000 });
+        const out = await mintMorsels({ storage, config }, OPERATOR, 'ghost#nobody@node', 10);
+        expect(out.ok).toBe(false);
+        if (out.ok) return;
+        expect(out.status).toBe(404);
+        expect(out.code).toBe('NOT_FOUND');
+    });
+
+    it('refuses a non-positive or non-integer amount', async () => {
+        const config = makeConfig({ maxOperatorMintPerDay: 10_000 });
+        for (const bad of [0, -5, 1.5]) {
+            const out = await mintMorsels({ storage, config }, OPERATOR, TARGET, bad);
+            expect(out.ok).toBe(false);
+            if (out.ok) return;
+            expect(out.status).toBe(400);
+            expect(out.code).toBe('INVALID_INPUT');
+        }
+        expect(await balOf(storage, TARGET)).toBe(0);
+    });
+
+    it('counts what was already minted today against the cap', async () => {
+        const config = makeConfig({ maxOperatorMintPerDay: 1000 });
+
+        const first = await mintMorsels({ storage, config }, OPERATOR, TARGET, 800);
+        expect(first.ok).toBe(true);
+
+        const second = await mintMorsels({ storage, config }, OPERATOR, TARGET, 300);
+        expect(second.ok).toBe(false);
+        if (second.ok) return;
+        expect(second.status).toBe(429);
+        expect(second.code).toBe('QUOTA_EXCEEDED');
+        expect(second.message).toContain('800');
+
+        // The refused mint changed nothing.
+        expect(await balOf(storage, TARGET)).toBe(800);
+        const mints = (await storage.getTransactions(TARGET)).filter(t => t.type === 'mint');
+        expect(mints).toHaveLength(1);
     });
 });
 

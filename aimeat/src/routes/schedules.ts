@@ -29,6 +29,10 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   v1.6.0 — 2026-08-11 — August 2026 audit step 8: the record build, the per-kind input checks and the
+ *     write moved to services/schedule-write.ts, which the MCP schedule tools now call too. They built
+ *     their own record next to this one and the two had drifted: no length cut on description/purpose,
+ *     no cron validation on edit, and a target-agent check for one kind only.
  *   v1.4.0 — 2026-08-10 — Security audit C-2: an `ai` schedule's `input_namespaces` may only name the
  *     owner's own identities, checked on create and on patch. The executor reads each namespace with
  *     the raw composite-key lookup and pastes the value into the prompt, so an unchecked entry was a
@@ -61,24 +65,22 @@
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { randomUUID } from 'node:crypto';
 import { Cron } from 'croner';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord, ScheduleConstraint, AgentTaskScope, AgentRecord } from '../storage/interface.js';
+import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
-import { buildGAII } from '../utils/gaii.js';
-import { resolveIdentity, isSameOwner } from '../utils/gaii.js';
+import { buildGAII, resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { mergeConstraintDefaults, knownConstraintTypes } from '../services/schedule-constraints.js';
 import { logger } from '../utils/logger.js';
-import { checkScheduleGate, isValidCron } from '../services/schedule-gate.js';
+import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, canManageSchedule } from '../services/schedule-write.js';
+import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 
-type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish';
-
-// isValidCron moved to services/schedule-gate.ts on 2026-08-10 so the MCP door judges a cron
-// expression the same way this one does. Imported above.
+// The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
+// 2026-08-11, so the MCP tools that create, edit and cancel schedules produce the same record this
+// router does. The scope-and-cron gate sits in services/schedule-gate.ts, called from there. What is
+// left here is HTTP: reading the request and rendering the envelope.
 
 /** Parse a query timestamp: absent → fallback, invalid → null (caller 400s). */
 function parseWhen(q: unknown, fallback: Date): Date | null {
@@ -88,42 +90,6 @@ function parseWhen(q: unknown, fallback: Date): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Normalise a constraints array from the request body (drop unknown types). */
-function sanitizeConstraints(raw: unknown): ScheduleConstraint[] | undefined {
-  if (!Array.isArray(raw)) return undefined;
-  const known = new Set(knownConstraintTypes());
-  const out: ScheduleConstraint[] = [];
-  for (const c of raw) {
-    if (!c || typeof c !== 'object') continue;
-    const type = (c as { type?: string }).type;
-    if (!type || !known.has(type)) continue;
-    out.push({
-      type,
-      enabled: (c as { enabled?: boolean }).enabled === true,
-      params: ((c as { params?: Record<string, unknown> }).params) ?? {},
-      state: (c as { state?: Record<string, unknown> }).state,
-    });
-  }
-  return out.length ? out : undefined;
-}
-
-/**
- * SECURITY (C-2): the first namespace in `input_namespaces` that does not belong to the job's owner,
- * or null when every entry is theirs. An `ai` job reads each namespace with the raw composite-key
- * lookup and pastes the value into the prompt, so an unchecked entry here is a verbatim read of
- * another owner's private memory. Owner GHII, the owner's agents (`bot#alice@node`) and their
- * ecosystem apps (`eco:app#alice@node`) all parse to the same owner and are allowed; anything else
- * is refused. A non-array or empty value is fine — the executor then defaults to the owner.
- */
-function foreignNamespace(ownerIdentity: string, raw: unknown): string | null {
-  if (!Array.isArray(raw)) return null;
-  for (const entry of raw) {
-    if (typeof entry !== 'string' || !entry) continue;   // falsy entries fall back to the owner
-    if (!isSameOwner(entry, ownerIdentity)) return entry;
-  }
-  return null;
-}
-
 export function schedulesRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
   const router = Router();
 
@@ -131,13 +97,18 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   const isOwnerSession = (req: Express.Request) =>
     req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
 
-  /** Owner manages every schedule it owns; agents only their own (same owner). */
-  function canManage(req: Express.Request, job: ScheduledJobRecord): boolean {
-    if (job.ownerScope !== ownerGhii(req)) return false;
-    if (isOwnerSession(req)) return true;
-    // Agent session: only schedules it created.
-    return job.createdByAgent === true;
-  }
+  /** This session in the terms services/schedule-write.ts speaks. */
+  const writeCaller = (req: Express.Request): ScheduleWriteCaller => ({
+    owner: req.auth!.owner as string,
+    identity: resolveIdentity(req.auth!, config.nodeId),
+    isOwnerSession: isOwnerSession(req),
+    scopes: req.auth!.scopes ?? [],
+  });
+
+  /** Owner manages every schedule it owns; agents only their own (same owner). The rule itself lives
+   *  in services/schedule-write.ts, where edit and cancel apply it, so "run it now" cannot drift. */
+  const canManage = (req: Express.Request, job: ScheduledJobRecord) =>
+    canManageSchedule(writeCaller(req), ownerGhii(req), job);
 
   /** Read an agent's self-reported internal scheduler mirror (display-only). */
   async function readAgentInternal(agentName: string, agentGaii: string): Promise<unknown[]> {
@@ -146,232 +117,16 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     return Array.isArray(val?.entries) ? val!.entries! : [];
   }
 
-  /**
-   * Everything about a connections-publish input that can be checked BEFORE it fires.
-   *
-   * Shared by create AND edit, and that is the point: PATCH replaces `input` wholesale, so a check
-   * that only ran at create time would be a check anyone could walk around by editing afterwards.
-   * The publish gate would still refuse a foreign connection — that is the wall — but a schedule
-   * that is going to fail should be refused where somebody can see it, not at 07:00.
-   */
-  async function checkConnectionsPublishInput(
-    owner: string, raw: unknown,
-  ): Promise<{ status: number; code: string; message: string } | null> {
-    const input = (raw ?? {}) as { connection_id?: unknown; storage_key?: unknown };
-    const connectionId = typeof input.connection_id === 'string' ? input.connection_id : '';
-    if (!connectionId) {
-      return { status: 400, code: 'INVALID_INPUT', message: 'input.connection_id is required' };
-    }
-    const conn = await storage.getConnection(connectionId);
-    // Absent and not-yours answer identically: a connection belongs to the person who attached it,
-    // and the difference between the two answers would enumerate other people's accounts.
-    if (!conn || conn.principal !== owner) {
-      return { status: 404, code: 'NOT_FOUND', message: 'no such connection of yours' };
-    }
-    if (conn.status !== 'active') {
-      return {
-        status: 400, code: 'CONNECTION_UNAVAILABLE',
-        message: 'that account needs to be reconnected before anything can be scheduled to it',
-      };
-    }
-    const storageKey = typeof input.storage_key === 'string' ? input.storage_key : '';
-    if (storageKey && !(await storage.getStorageFile(owner, storageKey))) {
-      return { status: 404, code: 'NO_SUCH_FILE', message: `you have no stored file named '${storageKey}'` };
-    }
-    return null;
-  }
-
-  /** Build a ScheduledJobRecord from a create body. Returns {record} or {error}. */
-  async function buildRecordFromBody(
-    req: Request, body: Record<string, unknown>, forcedAgentName?: string,
-  ): Promise<{ record?: ScheduledJobRecord; status?: number; code?: string; message?: string }> {
-    const owner = ownerGhii(req);
-    const kind = body.kind as ScheduleKind;
-    // The gate lives in services/schedule-gate.ts, because the MCP tool creates schedules too and
-    // applied none of this: any kind for any caller, and any string as a cron expression. A schedule
-    // is the one record that keeps acting after the call that made it, so the caller has to hold the
-    // scope for the capability it DRIVES — a memory:write-only app must not be able to cron the
-    // owner's AI budget. Owner sessions bypass, exactly as requireScope lets them.
-    const gateRefusal = checkScheduleGate(
-      { kind, cron: typeof body.cron === 'string' ? body.cron : '', timezone: typeof body.timezone === 'string' ? body.timezone : undefined },
-      { isOwnerSession: isOwnerSession(req), scopes: req.auth!.scopes ?? [] },
-    );
-    if (gateRefusal) return gateRefusal;
-    if (kind === 'connections-publish') {
-      const bad = await checkConnectionsPublishInput(owner, body.input);
-      if (bad) return bad;
-    }
-
-    const cron = typeof body.cron === 'string' ? body.cron : '';
-    const timezone = typeof body.timezone === 'string' ? body.timezone : undefined;
-    // Kind, scope and cron were all checked by checkScheduleGate above.
-
-    // Target agent = the path param when present, else a body field. Accept
-    // agent_name / target_agent / agent as aliases (target_agent mirrors the MCP
-    // tool's field) so the same payload works across REST and MCP. The target is
-    // resolved under the CALLER'S owner, so any same-owner agent's token can
-    // schedule any sibling agent — no token-borrowing needed; createdBy still
-    // records the real creator.
-    const bodyAgent = ['agent_name', 'target_agent', 'agent'].reduce(
-      (acc, k) => acc ?? (typeof body[k] === 'string' ? (body[k] as string) : undefined),
-      undefined as string | undefined,
-    );
-    const agentName = forcedAgentName ?? bodyAgent;
-    let agentGaii: string | undefined;
-    let agentRecord: AgentRecord | null = null;
-    if (agentName) {
-      agentGaii = buildGAII(agentName, req.auth!.owner as string, config.nodeId);
-      agentRecord = await storage.getAgent(agentGaii);
-      if (!agentRecord) return { status: 404, code: 'AGENT_NOT_FOUND', message: `Agent "${agentName}" not found` };
-    }
-
-    const now = new Date().toISOString();
-    const id = randomUUID();
-    const displayName = (typeof body.display_name === 'string' && body.display_name.trim())
-      || (typeof body.title === 'string' ? body.title : '') || `${kind} schedule`;
-
-    const base: ScheduledJobRecord = {
-      id,
-      name: `schedule:${id}`,
-      type: kind,
-      cron,
-      enabled: body.enabled !== false,
-      createdBy: resolveIdentity(req.auth!, config.nodeId),
-      createdAt: now,
-      updatedAt: now,
-      ownerScope: owner,
-      agentName,
-      agentGaii,
-      // True whenever a non-owner (agent) session created it — used by canManage so
-      // the creating agent can manage its own schedules. Derived from session type
-      // (not a literal 'agent' role, which agent tokens don't always carry).
-      createdByAgent: !isOwnerSession(req),
-      displayName: displayName.slice(0, 200),
-      description: typeof body.description === 'string' ? body.description.slice(0, 2000) : undefined,
-      purpose: typeof body.purpose === 'string' ? body.purpose.slice(0, 500) : undefined,
-      timezone,
-      runCount: 0,
-    };
-
-    // Inherit the agent's default budget guards for any guard the body omits (reuse the record
-    // already loaded above — no second getAgent).
-    const bodyConstraints = sanitizeConstraints(body.constraints);
-    const agentDefaults = agentRecord?.scheduleConstraintDefaults;
-    base.constraints = mergeConstraintDefaults(bodyConstraints, agentDefaults);
-
-    if (kind === 'extension') {
-      const extensionName = typeof body.extension_name === 'string' ? body.extension_name : '';
-      const actionId = typeof body.action_id === 'string' ? body.action_id : '';
-      if (!extensionName || !actionId) {
-        return { status: 400, code: 'INVALID_EXTENSION_JOB', message: 'extension_name and action_id are required for extension schedules' };
-      }
-      const ext = await storage.getExtension(extensionName);
-      if (!ext) return { status: 404, code: 'EXTENSION_NOT_FOUND', message: `Extension "${extensionName}" not found` };
-      // Only the extension's own owner may put its actions on a clock. The scheduler runs an action as
-      // a system caller — no paywall, no contract, no meter — so a cron on someone else's extension is
-      // an unlimited standing call on their capability, their API keys and their quota, with no door
-      // where a price could be asked. 404 rather than 403: which extensions exist is not a stranger's
-      // business either.
-      if (ext.installedBy !== req.auth!.owner) {
-        return { status: 404, code: 'EXTENSION_NOT_FOUND', message: `Extension "${extensionName}" not found` };
-      }
-      base.extensionName = extensionName;
-      base.actionId = actionId;
-      if (typeof body.instance_id === 'string') base.instanceId = body.instance_id;
-      if (body.input && typeof body.input === 'object') base.input = body.input as Record<string, unknown>;
-    } else if (kind === 'ai') {
-      const prompt = typeof body.prompt === 'string' ? body.prompt : '';
-      if (!prompt) return { status: 400, code: 'INVALID_AI_JOB', message: 'prompt is required for ai schedules' };
-      const foreign = foreignNamespace(owner, body.input_namespaces);
-      if (foreign) {
-        return {
-          status: 403, code: 'NAMESPACE_DENIED',
-          message: `input_namespaces may only name your own identities; "${foreign}" is not one of yours.`,
-        };
-      }
-      base.input = {
-        inputKeys: Array.isArray(body.input_keys) ? body.input_keys : [],
-        inputNamespaces: Array.isArray(body.input_namespaces) ? body.input_namespaces : undefined,
-        prompt,
-        systemPrompt: typeof body.system_prompt === 'string' ? body.system_prompt : undefined,
-        model: typeof body.model === 'string' ? body.model : undefined,
-        outputKey: typeof body.output_key === 'string' ? body.output_key : undefined,
-        outputVisibility: typeof body.output_visibility === 'string' ? body.output_visibility : 'private',
-      };
-    } else if (kind === 'agent_task') {
-      if (!agentName || !agentGaii) {
-        return { status: 400, code: 'AGENT_REQUIRED', message: 'agent_name is required for agent_task schedules' };
-      }
-      // Accept either nested task_template.{title,description} or flat
-      // task_title / task_description (mirrors the MCP tool's flat fields).
-      const tmpl = body.task_template as Record<string, unknown> | undefined;
-      const title = (tmpl && typeof tmpl.title === 'string' ? tmpl.title : '')
-        || (typeof body.task_title === 'string' ? body.task_title : '');
-      if (!title) return { status: 400, code: 'INVALID_TASK_TEMPLATE', message: 'task_template.title (or task_title) is required for agent_task schedules' };
-      const v = (tmpl?.verification ?? {}) as { user_expects?: string; technical_checks?: string[] };
-      const flatDesc = typeof body.task_description === 'string' ? body.task_description : '';
-      base.input = {
-        taskTemplate: {
-          title,
-          description: typeof tmpl?.description === 'string' ? tmpl.description : flatDesc,
-          scope: Array.isArray(tmpl?.scope) ? (tmpl!.scope as AgentTaskScope[]) : [],
-          rules: Array.isArray(tmpl?.rules) ? tmpl!.rules : [],
-          verification: {
-            userExpects: typeof v.user_expects === 'string' ? v.user_expects : '',
-            technicalChecks: Array.isArray(v.technical_checks) ? v.technical_checks : [],
-          },
-          resources: tmpl?.resources,
-        },
-      };
-    } else if (kind === 'eco-capability') {
-      // Invoke a connected ecosystem app's capability over the connect-tunnel on each fire.
-      const app = typeof body.app === 'string' ? body.app : '';
-      const capabilityId = typeof body.capability_id === 'string' ? body.capability_id : '';
-      if (!app || !capabilityId) {
-        return { status: 400, code: 'INVALID_ECO_JOB', message: 'app and capability_id are required for eco-capability schedules' };
-      }
-      // The app must be connected under this owner.
-      const ecoApp = await storage.getEcosystemAppByOwnerAndApp(req.auth!.owner as string, app);
-      if (!ecoApp) {
-        return { status: 404, code: 'ECO_APP_NOT_FOUND', message: `Ecosystem app "${app}" is not connected for this owner` };
-      }
-      // The named capability must be one the app actually declared at approval.
-      const declared = (ecoApp.capabilities ?? []).map(c => c.id);
-      if (!declared.includes(capabilityId)) {
-        return { status: 400, code: 'CAPABILITY_NOT_DECLARED', message: `Ecosystem app "${app}" does not declare capability "${capabilityId}"` };
-      }
-      base.input = {
-        app,
-        capability_id: capabilityId,
-        input: (body.input && typeof body.input === 'object') ? body.input as Record<string, unknown> : {},
-      };
-    } else if (kind === 'connections-publish') {
-      // Narrowed to the fields the executor reads. Copying the body wholesale would let a caller park
-      // arbitrary JSON on the owner's schedule row, and `ref` is deliberately the ONLY free-form field
-      // — stored and handed back, never parsed.
-      const raw = (body.input ?? {}) as Record<string, unknown>;
-      base.input = {
-        connection_id: raw.connection_id,
-        ...(typeof raw.caption === 'string' ? { caption: raw.caption } : {}),
-        ...(typeof raw.storage_key === 'string' ? { storage_key: raw.storage_key } : {}),
-        ...(raw.params && typeof raw.params === 'object' ? { params: raw.params } : {}),
-        ...(typeof raw.ref === 'string' ? { ref: raw.ref.slice(0, 200) } : {}),
-      };
-    }
-
-    return { record: base };
-  }
-
   async function createSchedule(req: Request, res: Response, forcedAgentName?: string): Promise<void> {
-    const built = await buildRecordFromBody(req, (req.body ?? {}) as Record<string, unknown>, forcedAgentName);
-    if (!built.record) {
-      res.status(built.status ?? 400).json(error(config.nodeId, built.code ?? 'INVALID_BODY', built.message ?? 'Invalid request'));
+    const out = await createScheduleRecord(
+      { storage, config, scheduler }, writeCaller(req),
+      (req.body ?? {}) as Record<string, unknown>, forcedAgentName,
+    );
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    const created = await storage.createScheduledJob(built.record);
-    if (created.enabled) scheduler.addJob(created);
-    res.status(201).json(success(config.nodeId, { schedule: created }));
-    emitChange('scheduler');
+    res.status(201).json(success(config.nodeId, { schedule: out.schedule }));
   }
 
   // Master schedule aggregate — managed jobs + the owner's extension cron jobs + each agent's
@@ -568,60 +323,19 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   // ── PATCH /v1/schedules/:id — edit ──
   router.patch('/v1/schedules/:id', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
-    const job = await storage.getScheduledJob(id);
-    if (!job) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Schedule "${id}" not found`)); return; }
-    if (!canManage(req, job)) { res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not allowed to edit this schedule')); return; }
-
-    const body = (req.body ?? {}) as Record<string, unknown>;
-    const updates: Partial<ScheduledJobRecord> = { updatedAt: new Date().toISOString() };
-    if (typeof body.enabled === 'boolean') updates.enabled = body.enabled;
-    if (typeof body.cron === 'string') {
-      const tz = typeof body.timezone === 'string' ? body.timezone : job.timezone;
-      if (!isValidCron(body.cron, tz)) { res.status(400).json(error(config.nodeId, 'INVALID_CRON', 'cron is invalid')); return; }
-      updates.cron = body.cron;
-    }
-    if (typeof body.timezone === 'string') updates.timezone = body.timezone;
-    if (typeof body.display_name === 'string') updates.displayName = body.display_name.slice(0, 200);
-    if (typeof body.description === 'string') updates.description = body.description.slice(0, 2000);
-    if (typeof body.purpose === 'string') updates.purpose = body.purpose.slice(0, 500);
-    if (body.constraints !== undefined) updates.constraints = sanitizeConstraints(body.constraints);
-    if (body.input && typeof body.input === 'object') {
-      // A connections-publish edit is re-checked against the SAME rule the create used. Without this
-      // the ownership check is create-only, and "edit the schedule afterwards" walks around it.
-      if (job.type === 'connections-publish') {
-        const bad = await checkConnectionsPublishInput(ownerGhii(req), body.input);
-        if (bad) { res.status(bad.status).json(error(config.nodeId, bad.code, bad.message)); return; }
-      }
-      // Same rule as create for an `ai` job's input namespaces, and for the same reason: a gate that
-      // only runs on create is walked around by editing the schedule afterwards.
-      if (job.type === 'ai') {
-        const patch = body.input as { inputNamespaces?: unknown; input_namespaces?: unknown };
-        const foreign = foreignNamespace(job.ownerScope ?? ownerGhii(req), patch.inputNamespaces ?? patch.input_namespaces);
-        if (foreign) {
-          res.status(403).json(error(config.nodeId, 'NAMESPACE_DENIED',
-            `input_namespaces may only name your own identities; "${foreign}" is not one of yours.`));
-          return;
-        }
-      }
-      updates.input = body.input as Record<string, unknown>;
-    }
-
-    const updated = await storage.updateScheduledJob(id, updates);
-    await scheduler.reschedule(id);
-    res.json(success(config.nodeId, { schedule: updated }));
-    emitChange('scheduler');
+    const out = await updateScheduleRecord(
+      { storage, config, scheduler }, writeCaller(req), id, (req.body ?? {}) as Record<string, unknown>,
+    );
+    if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+    res.json(success(config.nodeId, { schedule: out.schedule }));
   });
 
   // ── DELETE /v1/schedules/:id — cancel ──
   router.delete('/v1/schedules/:id', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
-    const job = await storage.getScheduledJob(id);
-    if (!job) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Schedule "${id}" not found`)); return; }
-    if (!canManage(req, job)) { res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not allowed to delete this schedule')); return; }
-    scheduler.removeJob(id);
-    await storage.deleteScheduledJob(id);
+    const out = await deleteScheduleRecord({ storage, config, scheduler }, writeCaller(req), id);
+    if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
     res.json(success(config.nodeId, { deleted: id }));
-    emitChange('scheduler');
   });
 
   // ── POST /v1/schedules/:id/trigger — run now ──

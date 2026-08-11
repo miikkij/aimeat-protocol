@@ -4,6 +4,10 @@
  *   Tests board creation, listing, posting, reactions, replies, subscriptions,
  *   member management, deletion, and the board posts resource.
  * @version-history
+ *   v1.1.0 — 2026-08-11 — August 2026 audit step 8. Three refusals the tool surface did not have
+ *     before create/react/members went through services/board-write.ts: an empty board name, a
+ *     reaction past 32 characters, and a roster call asking for nothing. The HTTP door has refused
+ *     all three since it was written; over MCP the first two stored and the third reported success.
  *   v1.0.0 — 2026-03-21 — Initial creation
  */
 
@@ -277,6 +281,16 @@ await test('4. Create a public board succeeds (first owner is operator)', async 
     assert(typeof result.id === 'string', 'has id');
 });
 
+await test('4b. A board with an empty name is refused', async () => {
+    // The HTTP door has run BoardCreateSchema (name 1-128) since it was written. This tool declared
+    // z.string(), so a nameless board stored and then showed up as a blank row in every board list.
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_board_create',
+        arguments: { name: '', visibility: 'private' },
+    }, 120);
+    assert(body.result.isError === true, 'isError for an empty board name');
+});
+
 // ─── Phase 3: Post, React, Reply ───
 console.log('\nPhase 3 — Post, React, Reply');
 
@@ -306,6 +320,16 @@ await test('7. React to non-existent post fails', async () => {
         arguments: { board_id: boardId, post_id: 'nonexistent-post', emoji: '👍' },
     }, 106);
     assert(body.result.isError === true, 'isError');
+});
+
+await test('7b. A reaction longer than 32 characters is refused', async () => {
+    // BoardReactionSchema bounds it at 1-32 on the HTTP door. Here `emoji` was z.string(), so the
+    // reactions map on a post could take a key of any length from any agent.
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_board_react',
+        arguments: { board_id: boardId, post_id: postId, emoji: 'x'.repeat(64) },
+    }, 121);
+    assert(body.result.isError === true, 'isError for an over-long reaction');
 });
 
 await test('8. Reply to post', async () => {
@@ -384,6 +408,16 @@ await test('15. Manage members of non-existent board fails', async () => {
         arguments: { board_id: 'nonexistent', add: ['x#y@aimeat-fi-001-test'] },
     }, 114);
     assert(body.result.isError === true, 'isError');
+});
+
+await test('15b. A member change asking for nothing is refused', async () => {
+    // The HTTP door answers 400 when neither add nor remove is given. The tool wrote the unchanged
+    // roster back and reported success, which reads as "the change was applied".
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_board_members',
+        arguments: { board_id: boardId },
+    }, 122);
+    assert(body.result.isError === true, 'isError when neither add nor remove was given');
 });
 
 // ─── Phase 6: Board Resource ───

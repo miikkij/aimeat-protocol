@@ -2,6 +2,11 @@
  * @file src/routes/agent-tasks/completion.ts
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — The event append and the single-todo update move to
+ *     services/agent-task-write.ts. The event write is unchanged here; the todo update now bumps
+ *     lastEventAt and appends the matching todo_completed / todo_failed event, which this door never
+ *     did — a task worked through PATCH /todos/:todoId filled its plan in with nothing in its history
+ *     to say when, and the stall detector counted a visibly working agent as gone quiet.
  *   v1.2.0 — 2026-08-11 — The completion and failure tails move to services/agent-task-fanout.ts,
  *     so the MCP door gets them too. Behaviour here is unchanged.
  *   v1.1.0 — 2026-08-09 — /complete reclaims the runner's live-progress record (reclaimTaskLiveTrace).
@@ -13,7 +18,6 @@
 
 import type { Router } from 'express';
 import { randomUUID } from 'node:crypto';
-import { resumeIfStalled } from '../../services/task-resume.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskRating, RaterType } from '../../storage/interface.js';
 import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../../storage/interface.js';
@@ -23,7 +27,8 @@ import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
 import { afterTaskCompleted, failTask } from '../../services/agent-task-fanout.js';
 import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js';
-import { AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
+import { recordTaskEvent, setTodoStatus } from '../../services/agent-task-write.js';
+import { AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import type { TaskRouteHelpers } from './helpers.js';
 
@@ -47,58 +52,17 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    // Stalled tasks are reactivated automatically when an event arrives:
-    // the stall-detector marks tasks as stalled when no events come in for
-    // a while, but if the agent posts an event now, it's evidently back and
-    // the task should resume. This avoids needing a separate "restart"
-    // endpoint for the common case of an agent that briefly crashed or lost
-    // connectivity and then recovered.
-    await resumeIfStalled(storage, task, 'agent posted a new event');
-
-    if (task.status !== 'active') {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Events can only be appended to active tasks (current: ${task.status})`));
+    // The stalled auto-resume, the state gate, the event and the telemetry roll-up are
+    // services/agent-task-write.ts, because they belong to APPENDING AN EVENT rather than to this
+    // door. aimeat_task_event wrote its own, and its telemetry OVERWROTE the task totals with the
+    // last event's numbers instead of accumulating them.
+    const result = await recordTaskEvent({ storage, config }, task, req.body, resolve(req));
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
 
-    const parsed = AgentTaskEventSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
-      return;
-    }
-
-    const body = parsed.data;
-    const now = new Date().toISOString();
-
-    const event = await storage.appendTaskEvent({
-      id: randomUUID(),
-      taskId: id,
-      type: body.type,
-      message: body.message,
-      details: body.details,
-      timestamp: now,
-    });
-
-    // Update lastEventAt and optionally telemetry
-    const taskUpdates: Partial<AgentTaskRecord> = {
-      lastEventAt: now,
-      updatedAt: now,
-    };
-    if (body.details?.telemetry) {
-      const tel = body.details.telemetry as Record<string, unknown>;
-      const prev = task.telemetry;
-      taskUpdates.telemetry = {
-        aiCalls: (prev?.aiCalls ?? 0) + (typeof tel.ai_calls === 'number' ? tel.ai_calls : 0),
-        tokensIn: (prev?.tokensIn ?? 0) + (typeof tel.tokens_in === 'number' ? tel.tokens_in : 0),
-        tokensOut: (prev?.tokensOut ?? 0) + (typeof tel.tokens_out === 'number' ? tel.tokens_out : 0),
-        durationSeconds: (prev?.durationSeconds ?? 0) + (typeof tel.duration_seconds === 'number' ? tel.duration_seconds : 0),
-      };
-    }
-    await storage.updateAgentTask(id, taskUpdates);
-
-    res.status(201).json(success(config.nodeId, { event }));
-    emitChange('agent-tasks', resolve(req));
+    res.status(201).json(success(config.nodeId, { event: result.event }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/complete -- Complete task (active -> done) ── */
@@ -359,51 +323,21 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    // Stalled tasks accept todo updates too: same auto-resume semantics as
-    // events -- if the agent is updating todos, it's clearly back.
-    await resumeIfStalled(storage, task, 'agent updated a todo');
-
-    if (task.status !== 'active') {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Todo updates are only allowed on active tasks (current: ${task.status})`));
+    // The auto-resume, the state gate, the todo write and its event are services/agent-task-write.ts.
+    // aimeat_task_todo wrote its own, and that copy carried two things this one did not: the
+    // lastEventAt bump that keeps the stall detector off a visibly working agent, and the
+    // todo_completed / todo_failed event the task history is read from.
+    const result = await setTodoStatus({ storage, config }, task, todoId, req.body, resolve(req));
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
-
-    const parsed = AgentTaskTodoUpdateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
-      return;
-    }
-
-    const todos = task.todos || [];
-    const todoIndex = todos.findIndex(t => t.id === todoId);
-    if (todoIndex === -1) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Todo '${todoId}' not found in task`));
-      return;
-    }
-
-    const body = parsed.data;
-    const now = new Date().toISOString();
-    const updatedTodos = [...todos];
-    updatedTodos[todoIndex] = {
-      ...updatedTodos[todoIndex],
-      status: body.status,
-      ...(body.completed_at ? { completedAt: body.completed_at } : body.status === 'done' ? { completedAt: now } : {}),
-    };
-
-    const updated = await storage.updateAgentTask(id, {
-      todos: updatedTodos,
-      updatedAt: now,
-    });
-
-    if (!updated) {
+    if (!result.task) {
       res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', 'Failed to update todo'));
       return;
     }
 
-    res.json(success(config.nodeId, { task: updated, todo: updatedTodos[todoIndex] }));
-    emitChange('agent-tasks', resolve(req));
+    res.json(success(config.nodeId, { task: result.task, todo: result.todo }));
   });
 
   /* ── GET /v1/agents/:name/tasks/:id/events -- List task events ── */

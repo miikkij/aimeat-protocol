@@ -26,10 +26,15 @@
  *   v1.4.0 -- 2026-07-14 -- hints.test_task_id is now ALWAYS present when a test task exists
  *                            (it was gated on task status, starving deterministic connectors
  *                            that fill the {test_task_id} placeholder from it).
+ *   v1.5.0 -- 2026-08-11 -- POST /step/:id calls confirmOnboardingStep() in
+ *                            services/onboarding-progress.ts, which the aimeat_onboarding_* tools
+ *                            call too. The handler keeps its status codes, its translated
+ *                            messages and the owner's webhook; the validate-apply-persist middle
+ *                            is no longer written twice.
  */
 
 import { Router, type Request } from 'express';
-import { refreshOnboarding, persistStepResult } from '../services/onboarding-progress.js';
+import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding-progress.js';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -38,9 +43,7 @@ import { requireAuth, requireRole, agentNotFoundResponse } from '../auth/middlew
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
-import { createDefaultSteps, ONBOARDING_STEP_IDS, STEP_SCHEMAS } from '../models/agent-onboarding-schemas.js';
-import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
-import { validateStep, checkAutoSteps } from '../services/onboarding-validator.js';
+import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
 import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
 import { calculateReadiness } from '../services/readiness-scorer.js';
 import { detectPlatform } from '../services/platform-detector.js';
@@ -337,84 +340,34 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       return;
     }
 
-    if (!(ONBOARDING_STEP_IDS as readonly string[]).includes(stepId)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_STEP', t(req, 'agentOnboarding.errors.unknownStep', { stepId })));
-      return;
-    }
-
     const agentGaii = resolveAgentGaii(req, agentName);
-    const onboarding = await storage.getOnboarding(agentGaii);
-    if (!onboarding || onboarding.status !== 'in_progress') {
-      res.status(400).json(error(config.nodeId, 'ONBOARDING_NOT_ACTIVE', t(req, 'agentOnboarding.errors.onboardingNotActive')));
+
+    // The validate-apply-persist middle is services/onboarding-progress.ts, shared with the
+    // aimeat_onboarding_* tools. What stays here is the HTTP rendering: the status code, the
+    // translated message, and the owner's webhook.
+    const outcome = await confirmOnboardingStep(storage, agentGaii, stepId, req.body as Record<string, unknown> | undefined);
+
+    if (!outcome.ok) {
+      // STEP_NOT_IN_FLOW differs from INVALID_STEP: the id IS a step in the canonical catalog, but
+      // this agent's reduced flow does not include it (task-runner mode skips read_directives,
+      // send_test_message and others). Clients, LLM-driven liaisons above all, should read it as
+      // "not applicable, skip" rather than "the system is broken, retry".
+      const rendered = {
+        UNKNOWN_STEP: { code: 'INVALID_STEP', message: t(req, 'agentOnboarding.errors.unknownStep', { stepId }) },
+        ONBOARDING_NOT_ACTIVE: { code: 'ONBOARDING_NOT_ACTIVE', message: t(req, 'agentOnboarding.errors.onboardingNotActive') },
+        STEP_NOT_IN_FLOW: { code: 'STEP_NOT_IN_FLOW', message: t(req, 'agentOnboarding.errors.stepNotInFlow', { stepId }) },
+        VALIDATION_ERROR: { code: 'VALIDATION_ERROR', message: outcome.message },
+      }[outcome.code];
+      res.status(400).json(error(config.nodeId, rendered.code, rendered.message));
       return;
     }
 
-    const step = onboarding.steps.find(s => s.id === stepId);
-    if (!step) {
-      // Differentiates from INVALID_STEP (line 295 -- unknown stepId entirely):
-      // the stepId IS a valid step in the canonical catalog, but the agent's
-      // reduced onboarding flow does not include it. Task-runner mode for
-      // example skips read_directives / send_test_message / etc. Clients
-      // (especially LLM-driven liaisons) should treat this as "ok, not
-      // applicable -- skip" rather than "the system is broken -- retry".
-      res.status(400).json(error(config.nodeId, 'STEP_NOT_IN_FLOW', t(req, 'agentOnboarding.errors.stepNotInFlow', { stepId })));
+    if (outcome.alreadyPassed) {
+      res.json(success(config.nodeId, { step: outcome.step, message: t(req, 'agentOnboarding.errors.stepAlreadyPassed') }));
       return;
     }
 
-    if (step.status === 'passed') {
-      res.json(success(config.nodeId, { step, message: t(req, 'agentOnboarding.errors.stepAlreadyPassed') }));
-      return;
-    }
-
-    const schema = STEP_SCHEMAS[stepId as OnboardingStepId];
-    if (schema) {
-      const parsed = schema.safeParse(req.body);
-      if (!parsed.success) {
-        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', parsed.error!.message));
-        return;
-      }
-    }
-
-    const result = await validateStep(stepId as OnboardingStepId, agentGaii, storage, req.body);
-
-    if (result.passed) {
-      step.status = 'passed';
-      step.validatedAt = new Date().toISOString();
-      step.validationMethod = result.validationMethod;
-      step.details = { ...step.details, ...result.details };
-
-      if (stepId === 'identify_platform' && req.body?.platform) {
-        const model = typeof req.body.model === 'string' && req.body.model.trim()
-          ? req.body.model.trim().toLowerCase().slice(0, 64) : undefined;
-        await storage.updateAgent(agentGaii, {
-          platform: req.body.platform,
-          platformVersion: req.body.platform_version,
-          platformDetectedBy: 'self_report',
-          // Indicative attribution only (self-reported; subagent delegation may differ).
-          ...(model ? { model, modelDetectedBy: 'self_report' as const } : {}),
-        });
-        onboarding.detectedPlatform = req.body.platform;
-      }
-      if (stepId === 'install_skill' && req.body?.platform) {
-        onboarding.installedRuntime = req.body.platform;
-      }
-    } else {
-      step.status = 'failed';
-      step.failureReason = result.failureReason;
-    }
-
-    // If the just-posted step passed, also re-run auto-validation on the OTHER
-    // auto-checkable steps. Otherwise posting the last manual step would never
-    // trigger auto-complete even when memory-backed steps (publish_commands,
-    // publish_config, ...) are objectively passable.
-    if (result.passed) {
-      const refreshed = await checkAutoSteps(agentGaii, onboarding, storage);
-      onboarding.steps = refreshed;
-    }
-
-    // Auto-complete when that was the last required step — services/onboarding-progress.ts, which
-    // aimeat_onboarding_* also calls.
-    const completedOnboarding = await persistStepResult(storage, agentGaii, onboarding, result.passed);
+    const step = outcome.step;
     try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('POST /v1/agents/:name/onboarding/step/:id: MCP not connected', { error: String(err) }); }
 
     if (webhookDispatcher) {
@@ -424,20 +377,19 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
         step_title: step.title,
         action: step.status as 'needed' | 'passed' | 'failed',
         message: step.failureReason,
-        onboarding_progress: onboarding.steps.filter(s => s.status === 'passed').length,
-        onboarding_total: onboarding.steps.length,
+        onboarding_progress: outcome.progress,
+        onboarding_total: outcome.total,
       });
     }
 
-    const testTaskAutoStarted = stepId === 'accept_test_task' && result.passed && result.details?.autoStarted;
     res.json(success(config.nodeId, {
       step,
-      progress: onboarding.steps.filter(s => s.status === 'passed').length,
-      total: onboarding.steps.length,
-      completed: !!completedOnboarding,
-      readinessScore: completedOnboarding?.readinessScore,
-      readinessLevel: completedOnboarding?.readinessLevel,
-      ...(testTaskAutoStarted ? { next_action: 'Test task auto-started. Execute the todos now and then POST /complete.' } : {}),
+      progress: outcome.progress,
+      total: outcome.total,
+      completed: !!outcome.completed,
+      readinessScore: outcome.completed?.readinessScore,
+      readinessLevel: outcome.completed?.readinessLevel,
+      ...(outcome.testTaskAutoStarted ? { next_action: 'Test task auto-started. Execute the todos now and then POST /complete.' } : {}),
     }));
   });
 

@@ -1,8 +1,9 @@
 /**
  * @file agent-schedules.ts
  * @description MCP tools letting an agent create and manage its own recurring
- *   schedules (the server owns the clock — these persist ScheduledJobRecords and
- *   register them on the live cron via the active Scheduler). Kinds:
+ *   schedules. The server owns the clock: create, update and delete go through
+ *   services/schedule-write.ts, the same service the /v1/schedules routes use, which
+ *   stores the record and arms it on the live Scheduler. Kinds:
  *     - ai         : server-side OpenRouter completion over predefined memory keys
  *     - agent_task : materialise a task into the agent's own queue each fire
  *     - extension  : run an installed extension action (zero-token)
@@ -14,20 +15,24 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: create, update and delete go through
+ *     services/schedule-write.ts, the same service POST/PATCH/DELETE /v1/schedules use. The record
+ *     these tools built by hand had drifted from the route's: description and purpose were stored
+ *     whole where HTTP cuts them to 2000 and 500 characters, an edit accepted any string as a cron
+ *     where HTTP validates it, and a target agent that does not exist was caught for agent_task only.
  *   v1.0.0 — 2026-06-03 — Initial: agent-created recurring schedules + internal mirror
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { parseGAII, buildGAII } from '../utils/gaii.js';
-import { getActiveScheduler } from '../services/scheduler.js';
-import { mergeConstraintDefaults } from '../services/schedule-constraints.js';
+import { parseGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { checkScheduleGate } from '../services/schedule-gate.js';
+import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord } from '../services/schedule-write.js';
+import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 
 export function registerAgentScheduleTools(
@@ -48,6 +53,14 @@ export function registerAgentScheduleTools(
 
   const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] });
   const err = (msg: string) => ({ content: [{ type: 'text' as const, text: msg }], isError: true });
+
+  /**
+   * This session in the terms services/schedule-write.ts speaks. An MCP session is an agent acting
+   * for its owner and never an owner session, so the per-kind scope is checked rather than bypassed,
+   * and everything these tools create is createdByAgent (the agent may manage its own schedules,
+   * the owner may manage all of them).
+   */
+  const writeCaller: ScheduleWriteCaller = { owner, identity: agentGaii, isOwnerSession: false, scopes: sessionScopes };
 
   // ── aimeat_schedule_create ──
   mcp.tool(
@@ -78,72 +91,34 @@ export function registerAgentScheduleTools(
     async (a) => {
       if (!owner) return err('Could not resolve caller owner');
 
-      // The same gate POST /v1/schedules applies (services/schedule-gate.ts). This tool applied
-      // none of it: any kind for any caller, and any string as a cron. An MCP session is an agent,
-      // never an owner session, so the per-kind scope is checked rather than bypassed.
-      const gateRefusal = checkScheduleGate(
-        { kind: a.kind, cron: a.cron, timezone: a.timezone },
-        { isOwnerSession: false, scopes: sessionScopes },
-      );
-      if (gateRefusal) return err(`${gateRefusal.code}: ${gateRefusal.message}`);
-
-      const now = new Date().toISOString();
-      const id = randomUUID();
+      // A schedule an agent creates is targeted at that agent by default, so it shows up in the
+      // agent's own view; an agent_task may name a sibling agent under the same owner instead.
       const targetName = a.kind === 'agent_task' ? (a.target_agent ?? selfName) : selfName;
-      const targetGaii = buildGAII(targetName, owner, config.nodeId);
-      const targetAgent = await storage.getAgent(targetGaii);
-      if (a.kind === 'agent_task' && !targetAgent) return err(`Target agent "${targetName}" not found under this owner`);
 
-      const record: ScheduledJobRecord = {
-        id,
-        name: `schedule:${id}`,
-        type: a.kind,
+      // The write itself lives in services/schedule-write.ts, the service POST /v1/schedules calls:
+      // the gate, the per-kind input checks, the record build, the store, and registering the job on
+      // the live clock. The body field names below are the aliases the route already accepts, so
+      // there is nothing to translate at the seam.
+      const out = await createScheduleRecord({ storage, config }, writeCaller, {
+        kind: a.kind,
         cron: a.cron,
-        enabled: true,
-        createdBy: agentGaii,
-        createdAt: now,
-        updatedAt: now,
-        ownerScope,
-        agentName: targetName,
-        agentGaii: targetGaii,
-        createdByAgent: true,
-        displayName: a.display_name.slice(0, 200),
+        timezone: a.timezone,
+        display_name: a.display_name,
         description: a.description,
         purpose: a.purpose,
-        timezone: a.timezone,
-        runCount: 0,
-        constraints: mergeConstraintDefaults(undefined, targetAgent?.scheduleConstraintDefaults),
-      };
-
-      if (a.kind === 'ai') {
-        if (!a.prompt) return err('prompt is required for ai schedules');
-        record.input = {
-          inputKeys: a.input_keys ?? [], prompt: a.prompt,
-          systemPrompt: a.system_prompt, model: a.model,
-          outputKey: a.output_key, outputVisibility: 'private',
-        };
-      } else if (a.kind === 'agent_task') {
-        if (!a.task_title) return err('task_title is required for agent_task schedules');
-        record.input = { taskTemplate: { title: a.task_title, description: a.task_description ?? '' } };
-      } else if (a.kind === 'extension') {
-        if (!a.extension_name || !a.action_id) return err('extension_name and action_id are required for extension schedules');
-        const ext = await storage.getExtension(a.extension_name);
-        if (!ext) return err(`Extension "${a.extension_name}" not found`);
-        // Only the extension's OWNER may put its actions on a clock. The scheduler runs the action
-        // as a system caller, so a cron on somebody else's extension is a standing unpriced call on
-        // their capability, their API keys and their quota, with no door where a price could be
-        // asked. POST /v1/schedules has refused this since 2026-07-27; this tool checked only that
-        // the extension EXISTS, so the hole REST closed stayed open on the agent surface. Same
-        // wording as the route: "not found" rather than "not yours", because which extensions exist
-        // is not a stranger's business either.
-        if (ext.installedBy !== owner) return err(`Extension "${a.extension_name}" not found`);
-        record.extensionName = a.extension_name;
-        record.actionId = a.action_id;
-      }
-
-      const created = await storage.createScheduledJob(record);
-      getActiveScheduler()?.addJob(created);
-      emitChange('scheduler');
+        agent_name: targetName,
+        prompt: a.prompt,
+        input_keys: a.input_keys,
+        system_prompt: a.system_prompt,
+        model: a.model,
+        output_key: a.output_key,
+        task_title: a.task_title,
+        task_description: a.task_description,
+        extension_name: a.extension_name,
+        action_id: a.action_id,
+      });
+      if (!out.ok) return err(`${out.code}: ${out.message}`);
+      const created = out.schedule;
       return text({ created: true, schedule_id: created.id, kind: created.type, cron: created.cron, display_name: created.displayName });
     },
   );
@@ -181,16 +156,15 @@ export function registerAgentScheduleTools(
     },
     annotationsFor('aimeat_schedule_update'),
     async (a) => {
-      const job = await storage.getScheduledJob(a.schedule_id);
-      if (!job || job.ownerScope !== ownerScope || !job.createdByAgent) return err('Schedule not found or not yours to manage');
-      const updates: Partial<ScheduledJobRecord> = { updatedAt: new Date().toISOString() };
-      if (typeof a.enabled === 'boolean') updates.enabled = a.enabled;
-      if (typeof a.cron === 'string') updates.cron = a.cron;
-      if (typeof a.timezone === 'string') updates.timezone = a.timezone;
-      if (typeof a.display_name === 'string') updates.displayName = a.display_name.slice(0, 200);
-      await storage.updateScheduledJob(a.schedule_id, updates);
-      await getActiveScheduler()?.reschedule(a.schedule_id);
-      emitChange('scheduler');
+      // Same service as PATCH /v1/schedules/:id, which means an edit here is judged the way an edit
+      // there is: only a schedule this agent created, and a cron expression that parses.
+      const out = await updateScheduleRecord({ storage, config }, writeCaller, a.schedule_id, {
+        enabled: a.enabled,
+        cron: a.cron,
+        timezone: a.timezone,
+        display_name: a.display_name,
+      });
+      if (!out.ok) return err(`${out.code}: ${out.message}`);
       return text({ updated: true, schedule_id: a.schedule_id });
     },
   );
@@ -202,11 +176,8 @@ export function registerAgentScheduleTools(
     { schedule_id: z.string() },
     annotationsFor('aimeat_schedule_delete'),
     async (a) => {
-      const job = await storage.getScheduledJob(a.schedule_id);
-      if (!job || job.ownerScope !== ownerScope || !job.createdByAgent) return err('Schedule not found or not yours to manage');
-      getActiveScheduler()?.removeJob(a.schedule_id);
-      await storage.deleteScheduledJob(a.schedule_id);
-      emitChange('scheduler');
+      const out = await deleteScheduleRecord({ storage, config }, writeCaller, a.schedule_id);
+      if (!out.ok) return err(`${out.code}: ${out.message}`);
       return text({ deleted: a.schedule_id });
     },
   );

@@ -4,9 +4,11 @@
  *   managing its owner's SELLING (PSP credentials — masked, the secret never returns; app-tool
  *   manifests; offer money pricing) and for BUYING through checkout sessions. Every tool wraps an
  *   EXISTING commerce mechanism — the commerce.psp / apps.{appId}.tools memory-record conventions
- *   the sellable resolvers read, the agents.{name}.offers document (validated with the same
- *   OffersDocSchema the REST route uses), and src/commerce/session-service.ts — no new business
- *   logic. Ownership is always the CALLER's own owner (derived from the session GAII, never from
+ *   the sellable resolvers read, the agents.{name}.offers document (published through
+ *   services/agent-offers-write.ts, the same function the REST route's publish uses), and
+ *   src/commerce/session-service.ts — no new business logic, and no write of its own: every record
+ *   this file stores goes through services/memory-write.ts. Ownership is always the CALLER's own
+ *   owner (derived from the session GAII, never from
  *   input). Money = integer 6-decimal micro-units through money.ts. Scope gates (commerce:sell /
  *   commerce:buy) are enforced by the per-session registration filter (catalog/scopes.ts).
  *   checkout_complete mints a short-lived JWT for the CALLING agent itself (same identity, no
@@ -16,6 +18,13 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.3.0 — 2026-08-11 — The last three direct storage writes leave this file. Offer pricing goes
+ *     through services/agent-offers-write.ts, the same publish PUT /v1/agents/:name/offers performs.
+ *     psp_delete clears the card credentials by MERGING, the way DELETE /v1/commerce/payout/stripe
+ *     does, instead of dropping a record that also holds the seller's stablecoin payout address;
+ *     psp_status therefore reports `configured` from the credentials rather than from the record's
+ *     existence, matching GET /v1/commerce/payout. putOwnerRecord names the commerce word that
+ *     actually governs each record, so an agent granted only `commerce:psp` is no longer refused.
  *   Limits aligned with the raised model schemas -- 2026-07-30 -- the tool kept its own max(40) on
  *     `tools`, which shadowed the manifest's raised 200 and refused a 41st tool anyway.
  *   v1.2.0 — 2026-08-11 — putOwnerRecord goes through services/memory-write.ts, so the PSP record
@@ -32,8 +41,7 @@ import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, responseFormatSchema, shapeResponse } from './catalog/shape.js';
 import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey } from '../models/app-tool-schemas.js';
-import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
-import { reconcileAfterSourceWrite } from '../services/exchange-projection.js';
+import { loadAgentOffers, publishAgentOffers } from '../services/agent-offers-write.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
@@ -43,7 +51,6 @@ import { readApproval, putApproval, beneficiaryEligibility, releaseBeneficiarySh
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
-import { emitChange } from '../services/event-bus.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
@@ -123,18 +130,25 @@ export function registerCommerceTools(
      * charge — the manifest in particular is up to 200 entries of unbounded records, so the only
      * thing that would ever have bounded it was the ceiling that was missing.
      *
-     * The authorising permission is commerce:sell and not memory:write: that is the word the owner
-     * granted for exactly this, and the registration filter and this tool both already check it.
-     * Naming it says which permission governs instead of demanding one nobody was asked for.
+     * The authorising permission is a commerce word and not memory:write: that is what the owner
+     * granted for exactly this, and demanding a memory permission nobody was asked for would refuse
+     * a seller who is properly configured. WHICH commerce word is the caller's to say, because the
+     * two records do not share one: the PSP credentials ride `commerce:psp` and the app-tool
+     * manifest rides `commerce:sell`, exactly as the registration filter has them
+     * (mcp/catalog/scopes.ts). Naming one for both meant an agent granted only `commerce:psp` had
+     * psp_set registered and then had its write refused.
      */
-    async function putOwnerRecord(key: string, value: Record<string, unknown>, visibility: 'private' | 'public', tags: string[]): Promise<string | null> {
+    async function putOwnerRecord(
+        key: string, value: Record<string, unknown>, visibility: 'private' | 'public', tags: string[],
+        authorisingScope: string,
+    ): Promise<string | null> {
         const written = await writeMemoryRecord({ storage, config }, {
             principal: agentGaii, targetGaii: ownerGhii, scopes: sessionScopes, roles: ['agent'],
         }, {
             key, value, visibility, tags,
             pipeline: 'mcp.commerce',
             ownerScoped: true,
-            authorisingScope: 'commerce:sell',
+            authorisingScope,
         });
         return written.ok ? null : `${written.code}: ${written.message}`;
     }
@@ -160,7 +174,7 @@ export function registerCommerceTools(
             // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
             // wholesale would silently delete the other rail's setting (and vice versa).
             const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            const pspRefusal = await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce']);
+            const pspRefusal = await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce'], 'commerce:psp');
             if (pspRefusal) return { content: [{ type: 'text' as const, text: pspRefusal }], isError: true };
             return ok({ configured: true, provider, key_hint: maskSecret(key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
         },
@@ -173,9 +187,13 @@ export function registerCommerceTools(
         annotationsFor('aimeat_commerce_psp_status'),
         async () => {
             const rec = await storage.getMemory(ownerGhii, PSP_KEY);
-            if (!rec) return ok({ configured: false });
-            const v = rec.value as { provider?: string; secretKey?: unknown };
-            return ok({ configured: true, provider: v.provider ?? 'unknown', key_hint: maskSecret(v.secretKey), updated_at: rec.updatedAt });
+            const v = (rec?.value ?? {}) as { provider?: string; secretKey?: unknown };
+            // `configured` means CREDENTIALS are set, which is what GET /v1/commerce/payout has
+            // always reported (`stripe.configured: !!psp.secretKey`). Keying it off the record's
+            // existence answered "configured" for a seller whose record holds only the stablecoin
+            // payout address and no card credentials at all.
+            if (!v.secretKey) return ok({ configured: false });
+            return ok({ configured: true, provider: v.provider ?? 'unknown', key_hint: maskSecret(v.secretKey), updated_at: rec?.updatedAt });
         },
     );
 
@@ -185,8 +203,24 @@ export function registerCommerceTools(
         {},
         annotationsFor('aimeat_commerce_psp_delete'),
         async () => {
-            const deleted = await storage.deleteMemory(ownerGhii, PSP_KEY);
-            return ok({ deleted, note: deleted ? 'Money-currency checkouts of your items now fail until new credentials are set.' : 'No PSP credentials were configured.' });
+            // MERGE, the same way DELETE /v1/commerce/payout/stripe does it. The record also holds
+            // the seller's x402 stablecoin payout address, so dropping the whole record threw away a
+            // hand-typed on-chain address that four validation steps guard on the way in — and
+            // psp_set a few lines above already merges for exactly that reason. What the tool says
+            // it removes is the credentials, so that is what it removes.
+            const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
+            if (!existing || (existing.secretKey === undefined && existing.provider === undefined)) {
+                return ok({ deleted: false, note: 'No PSP credentials were configured.' });
+            }
+            const next = { ...existing };
+            delete next.secretKey;
+            delete next.provider;
+            const clearRefusal = await putOwnerRecord(PSP_KEY, next, 'private', ['commerce'], 'commerce:psp');
+            if (clearRefusal) return { content: [{ type: 'text' as const, text: clearRefusal }], isError: true };
+            return ok({
+                deleted: true,
+                note: 'Card sales now fail until credentials are set again. Stablecoin and invoice settlement are unaffected.',
+            });
         },
     );
 
@@ -214,10 +248,11 @@ export function registerCommerceTools(
                 ...(parsed.data.provenance ? { provenance: parsed.data.provenance } : {}),
                 tools: parsed.data.tools,
             };
-            const manifestRefusal = await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools']);
+            const manifestRefusal = await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools'], 'commerce:sell');
             if (manifestRefusal) return { content: [{ type: 'text' as const, text: manifestRefusal }], isError: true };
-            // TARGET-050: the manifest is the source of truth for the EXCHANGE listing — project it now.
-            await reconcileAfterSourceWrite(storage, ownerGhii, key);
+            // TARGET-050: the manifest is the source of truth for the EXCHANGE listing. The
+            // projection is not called here any more — the shared write reconciles it, and calling
+            // it again did the same work twice.
             return ok({
                 app: `${owner}/${app_id}`,
                 version: doc.version,
@@ -277,15 +312,15 @@ export function registerCommerceTools(
         },
         annotationsFor('aimeat_offer_price_set'),
         async ({ agent_name, offer_id, price_morsels, money_amount_micros, money_currency, clear_morsels, clear_money, visibility }) => {
-            // Ownership: only the caller's OWN owner's agents — the GAII is built from the
-            // session owner, never from input, so a foreign agent name simply won't resolve.
-            const targetGaii = `${agent_name}#${owner}@${config.nodeId}`;
-            const agent = await storage.getAgent(targetGaii);
-            if (!agent) return fail(`AGENT_NOT_FOUND: you have no agent named "${agent_name}"`);
-            const key = `agents.${agent_name}.offers`;
-            const rec = await storage.getMemory(targetGaii, key);
-            const doc = (rec?.value as { version?: number; offers?: Offer[] } | undefined) ?? { offers: [] };
-            const offers = doc.offers ?? [];
+            // Ownership: only the caller's OWN owner's agents. The target is resolved from the
+            // session owner, never from input, so a foreign agent name simply will not resolve.
+            const loaded = await loadAgentOffers({ storage, config }, owner, agent_name);
+            if (!loaded.ok) {
+                return fail(loaded.code === 'AGENT_NOT_FOUND'
+                    ? `AGENT_NOT_FOUND: you have no agent named "${agent_name}"`
+                    : `${loaded.code}: ${loaded.message}`);
+            }
+            const offers = loaded.offers;
             const offer = offers.find((o) => o.id === offer_id);
             if (!offer) return fail(`OFFER_NOT_FOUND: ${offer_id} (agent ${agent_name} has ${offers.length} offer(s))`);
 
@@ -300,21 +335,19 @@ export function registerCommerceTools(
             if (clear_money) offer.priceMoney = null;
             if (visibility) offer.visibility = visibility;
 
-            // Same write-path contract as the REST route: the WHOLE document must validate.
-            const parsed = OffersDocSchema.safeParse({ offers });
-            if (!parsed.success) return fail(`INVALID_OFFERS: ${parsed.error.message}`);
-            const now = new Date().toISOString();
-            await storage.setMemory({
-                key, ownerGaii: targetGaii,
-                value: { version: (doc.version ?? 0) + 1, updatedAt: now, offers: parsed.data.offers },
-                visibility: 'owner', tags: ['offers'], ttlHours: null,
-                version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
-            });
-            emitChange('agents');
-            // TARGET-050: an offer flagged `exchange` is projected onto the market from here.
-            await reconcileAfterSourceWrite(storage, targetGaii, key);
+            // ONE implementation, and it is not this one. services/agent-offers-write.ts owns the
+            // whole-document validation, the version bump, the record shape, the memory rules the
+            // record answers to and the change event — the same sequence PUT /v1/agents/:name/offers
+            // runs, because publishing an offers document is the same act either way. What stays
+            // here is the price edit above and the answer below.
+            const published = await publishAgentOffers({ storage, config }, {
+                principal: agentGaii, owner, scopes: sessionScopes, roles: ['agent'],
+                pipeline: 'mcp.offer_price_set',
+                authorisingScope: 'commerce:sell',
+            }, agent_name, offers);
+            if (!published.ok) return fail(`${published.code}: ${published.message}`);
             return ok({
-                agent: agent_name, offer: offer_id,
+                agent: published.agentName, offer: offer_id,
                 price: offer.price ?? null, priceMoney: offer.priceMoney ?? null,
                 visibility: offer.visibility ?? 'private',
             });

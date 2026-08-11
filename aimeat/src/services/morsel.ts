@@ -10,13 +10,21 @@
  *   - settlePayment: burn + fee split + pay provider on successful delivery
  *   - applyDailyAllowance: capped daily allowance credit
  *   - calculateEscrow: sum in-escrow amounts across a requester's open work
+ *   - mintMorsels: operator mint against the daily cap, for every door that mints
  *
  * @version-history
+ *   v1.1.0 — 2026-08-11 — mintMorsels() added, and POST /v1/admin/mint and aimeat_admin_mint both
+ *     call it. They were two implementations of the same mint: the same cap arithmetic, the same
+ *     credit and the same ledger row written twice, and they had already drifted — the tool told the
+ *     live wallet stream about the new balance and the HTTP route did not, so a mint made from the
+ *     admin page left an open wallet view showing the old number until something else refreshed it.
+ *     The wallet emit is what both do now. (August 2026 audit step 8.)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WorkRecord } from '../storage/interface.js';
+import { emitChange } from './event-bus.js';
 
 export interface SettlementResult {
     providerEarnings: number;
@@ -220,6 +228,78 @@ export async function applyDailyAllowance(
     });
 
     return credited;
+}
+
+export type MintResult =
+    | { ok: true; minted: number; newBalance: number; mintedToday: number; dailyCap: number }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Mint morsels into an agent's owner balance as the operator (§16.1).
+ *
+ * The daily cap is the reason this is one function and not a line of route code: it is read from
+ * every 'mint' row since the UTC day boundary, and a second door that computed it separately would
+ * have been a second answer to "how much has been minted today".
+ *
+ * The operator check itself belongs to the door (requireRole on HTTP, the runtime role lookup on
+ * MCP), because the two prove the caller differently.
+ */
+export async function mintMorsels(
+    { storage, config }: { storage: Storage; config: AimeatConfig },
+    operatorGaii: string,
+    gaii: string,
+    amount: number,
+): Promise<MintResult> {
+    if (!gaii || typeof gaii !== 'string') {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'gaii is required' };
+    }
+    if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
+        return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'amount must be a positive integer' };
+    }
+
+    const agent = await storage.getAgent(gaii);
+    if (!agent) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: `Agent not found: ${gaii}` };
+    }
+
+    // Enforce daily mint cap (§16.1: max_operator_mint_per_day default 10,000)
+    const dayStart = new Date();
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const allTx = await storage.listAllTransactions();
+    const mintedToday = allTx
+        .filter(tx => tx.type === 'mint' && new Date(tx.timestamp) >= dayStart)
+        .reduce((sum, tx) => sum + tx.amount, 0);
+
+    if (mintedToday + amount > config.maxOperatorMintPerDay) {
+        return {
+            ok: false, status: 429, code: 'QUOTA_EXCEEDED',
+            message: `Daily mint cap is ${config.maxOperatorMintPerDay} morsels. Already minted ${mintedToday} today. Requested ${amount} would exceed cap.`,
+        };
+    }
+
+    await storage.creditBalance(gaii, amount);
+    await storage.addTransaction({
+        id: `tx-${Date.now()}-${randomBytes(4).toString('hex')}`,
+        gaii,
+        type: 'mint',
+        amount,
+        counterpartyGaii: operatorGaii,
+        timestamp: new Date().toISOString(),
+    });
+
+    // The mint moves a balance and the node's economy figures at once, so both domains hear it.
+    emitChange('config');
+    emitChange('wallet');
+
+    const mintedAgent = await storage.getAgent(gaii);
+    const mintedGhii = mintedAgent ? await storage.getGHIIByOwner(mintedAgent.owner) : null;
+    return {
+        ok: true,
+        minted: amount,
+        newBalance: mintedGhii?.morselBalance ?? 0,
+        mintedToday: mintedToday + amount,
+        dailyCap: config.maxOperatorMintPerDay,
+    };
 }
 
 /**

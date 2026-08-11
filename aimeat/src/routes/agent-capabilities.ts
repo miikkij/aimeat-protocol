@@ -8,6 +8,9 @@
  *   - PUT  /v1/agents/:name/capabilities -- Agent reports its capabilities
  *   - GET  /v1/agents/:name/capabilities -- Get agent capabilities + activity stats
  * @version-history
+ *   v1.3.0 -- 2026-08-11 -- The write moved to services/agent-profile-write.ts, which
+ *                            aimeat_agent_capabilities_report now calls too. That tool had kept
+ *                            the pre-v1.2.0 behaviour of folding languages into the domain list.
  *   v1.2.0 -- 2026-05-28 -- Stop merging languages into domain_capabilities; persist
  *                            and return them as a dedicated languages array.
  *   v1.1.0 -- 2026-05-22 -- Add modules_loaded and limitations to PUT/GET
@@ -16,12 +19,11 @@
 
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTechnicalCapability } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
-import { emitChange } from '../services/event-bus.js';
-import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
+import { setAgentCapabilities } from '../services/agent-profile-write.js';
 
 export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -51,48 +53,25 @@ export function agentCapabilitiesRouter(config: AimeatConfig, storage: Storage):
       return;
     }
 
-    const agent = await storage.getAgent(agentGaii);
-    if (!agent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
-      return;
-    }
+    // Validation, the record shape and the verified flag are services/agent-profile-write.ts,
+    // shared with aimeat_agent_capabilities_report. An agent session implies a live MCP
+    // connection, which is what makes an mcp-type capability verified.
+    const outcome = await setAgentCapabilities({ storage, config }, agentGaii, req.body,
+      { liveMcpSession: req.auth!.roles.includes('agent') });
 
-    const parsed = AgentCapabilitiesUpdateSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')));
-      return;
-    }
-
-    const body = parsed.data;
-
-    // Agent sessions imply an active MCP connection -- MCP-type capabilities are verified
-    const isAgentSession = req.auth!.roles.includes('agent');
-    const technicalCapabilities: AgentTechnicalCapability[] = body.technical.map(cap => ({
-      name: cap.name,
-      type: cap.type,
-      verified: isAgentSession && cap.type === 'mcp',
-    }));
-
-    const domainCapabilities = [...body.domain];
-    const languages = body.languages ?? undefined;
-    const modulesLoaded = body.modules_loaded ?? undefined;
-    const agentLimitations = body.limitations ?? undefined;
-
-    const updated = await storage.updateAgent(agentGaii, {
-      technicalCapabilities,
-      domainCapabilities,
-      ...(languages !== undefined && { languages }),
-      ...(modulesLoaded !== undefined && { modulesLoaded }),
-      ...(agentLimitations !== undefined && { agentLimitations }),
-    });
-
-    if (!updated) {
+    if (!outcome.ok) {
+      if (outcome.code === 'AGENT_NOT_FOUND') {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+        return;
+      }
+      if (outcome.code === 'INVALID_INPUT') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', outcome.message));
+        return;
+      }
       res.status(500).json(error(config.nodeId, 'UPDATE_FAILED', 'Failed to update capabilities'));
       return;
     }
-
-    emitChange('agent-capabilities');
+    const updated = outcome.agent;
 
     res.json(success(config.nodeId, {
       technical_capabilities: updated.technicalCapabilities ?? [],

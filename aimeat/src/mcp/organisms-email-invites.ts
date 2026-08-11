@@ -3,7 +3,13 @@
  * @description MCP email-invitation tools for organisms (invite_email, invitations_email,
  *   invitation_email_cancel) plus the shared creator/admin gate. Extracted from organisms.ts to
  *   satisfy max-file-lines.
+ * @structure registerOrganismEmailInviteTools() — orgForAdmin() gate + aimeat_organism_invite_email,
+ *   aimeat_organism_invitations_email, aimeat_organism_invitation_email_cancel.
+ * @usage registerOrganismEmailInviteTools(mcp, storage, config, getOwnerName);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — invitation_email_cancel calls cancelEmailInvitation() instead of flipping
+ *     the record itself, so it and the REST cancel route share one write (August 2026 MCP audit
+ *     step 8).
  *   v1.0.0 — 2026-07-13 — Extracted from mcp/organisms.ts (max-file-lines)
  */
 
@@ -13,7 +19,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { createEmailInvitation, invitePublic, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
+import { createEmailInvitation, cancelEmailInvitation, invitePublic, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
 import { emitChange } from '../services/event-bus.js';
 
 export function registerOrganismEmailInviteTools(
@@ -98,11 +104,13 @@ export function registerOrganismEmailInviteTools(
         async ({ organism_id, invitation_id }) => {
             const gate = await orgForAdmin(organism_id);
             if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };
-            const inv = await storage.getInvitation(invitation_id);
-            if (!inv || inv.organismId !== organism_id) return { content: [{ type: 'text' as const, text: 'Invitation not found' }], isError: true };
-            if (inv.status !== 'pending') return { content: [{ type: 'text' as const, text: `Invitation is already ${inv.status}` }], isError: true };
-            await storage.updateInvitation(invitation_id, { status: 'cancelled' });
-            emitChange('organisms');
+            try {
+                // Shared with POST /:id/invitations/email/:invId/cancel (services/invitations.ts).
+                await cancelEmailInvitation(storage, { organismId: organism_id, invitationId: invitation_id });
+            } catch (e) {
+                if (e instanceof InvitationError) return { content: [{ type: 'text' as const, text: e.message }], isError: true };
+                throw e;
+            }
             return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'cancelled', organism_id, invitation_id }, null, 2) }] };
         },
     );

@@ -40,11 +40,18 @@
  *     `text/*` makes a browser fall back to the locale default and render UTF-8 as mojibake; these
  *     are UPLOADED bytes though, so a genuinely cp1252 .txt/.csv keeps the type it has today rather
  *     than being retyped into something its owner cannot read.
+ *   v1.10.0 -- 2026-08-11 -- POST /v1/storage stores through services/storage-file-write.ts, which
+ *     aimeat_storage_upload now calls too. The tool copy of this write had never run the account-wide
+ *     storage quota, never charged the overage that follows it, and had no anonymous key fence, so the
+ *     same upload was gated and billed through this door and neither through the tool. The presigned
+ *     branch also stops hand-writing the token meta: it dropped `group_id` and `workspace_refs`, so a
+ *     presigned upload asking for visibility 'group' landed bound to no group and was readable by
+ *     nobody. Chunked complete still writes its own copy; it has no tool twin.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { sniffedContentType } from '../utils/app-content-type.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
@@ -56,7 +63,7 @@ import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
-import { generateUploadToken } from '../services/upload-token.js';
+import { writeStorageFile, mintStorageUploadUrl } from '../services/storage-file-write.js';
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
@@ -157,33 +164,28 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             federateFlag = reqFederate === true;
 
             // --- PRESIGNED MODE: return upload URL ---
+            // The key fence and the token meta are the shared ones (services/storage-file-write.ts).
+            // Hand-writing the meta here is how `group_id` and `workspace_refs` used to be dropped at
+            // mint: a presigned upload asking for visibility 'group' landed bound to no group and was
+            // then readable by nobody.
             if (mode === 'presigned') {
-                if (!k) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
-                    return;
-                }
-                // Same namespace fence as the inline path below. It used to sit AFTER this early
-                // return, so minting a presigned URL was a way for an anonymous agent to write
-                // outside anonymous/* — the gate is on the representation, not on the write.
-                if (isAnonymousGaii(gaii) && !String(k).startsWith('anonymous/')) {
-                    res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only upload to keys prefixed with "anonymous/"'));
-                    return;
-                }
-                const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
-                const ct = (mime_type as string) ?? 'application/octet-stream';
-                const token = await generateUploadToken({
-                    sub: gaii,
-                    utype: 'storage',
-                    meta: { key: k, mime_type: ct, visibility: v ?? 'private' },
-                    maxBytes,
-                    contentType: ct,
+                const minted = await mintStorageUploadUrl({ storage, config }, gaii, {
+                    key: k ? String(k) : '',
+                    mimeType: mime_type as string | undefined,
+                    visibility: v as string | undefined,
+                    groupId: reqGroupId as string | undefined,
+                    workspaceRef: normalizeWorkspaceRefs(reqWorkspaceRefs, reqWorkspaceRef) || undefined,
                 });
+                if (!minted.ok) {
+                    res.status(minted.status).json(error(config.nodeId, minted.code, minted.message));
+                    return;
+                }
                 res.json(success(config.nodeId, {
-                    upload_url: `${config.baseUrl}/v1/upload/${token}`,
+                    upload_url: minted.uploadUrl,
                     upload_method: 'PUT',
-                    content_type: ct,
-                    max_size_bytes: maxBytes,
-                    expires_in_seconds: 3600,
+                    content_type: minted.contentType,
+                    max_size_bytes: minted.maxBytes,
+                    expires_in_seconds: minted.expiresInSeconds,
                 }));
                 return;
             }
@@ -200,11 +202,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             key = k;
             visibility = v ?? 'private';
             groupId = visibility === 'group' ? reqGroupId : undefined;
+            // A 'workspace' file that names no workspace is refused by the shared write below, which
+            // is also where the raw-body branch meets the same rule.
             workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(reqWorkspaceRefs, reqWorkspaceRef) : undefined;
-            if (visibility === 'workspace' && !workspaceRef) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspace_ref) as one or more "<organismId>/<workspaceId>"'));
-                return;
-            }
             fileData = decoded;
             mimeType = mime_type ?? 'application/octet-stream';
         } else {
@@ -219,45 +219,23 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             mimeType = contentType || 'application/octet-stream';
         }
 
-        // Anonymous namespace enforcement: anonymous agents can only upload to anonymous/* keys
-        if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only upload to keys prefixed with "anonymous/"'));
-            return;
-        }
-
-        // Per-file size limit (configurable)
-        if (fileData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
-            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `File size exceeds ${config.storageMaxFileSizeMb}MB limit`));
-            return;
-        }
-
-        // M-2: Total storage quota enforcement (§8.4, default 100MB per agent)
-        const storageQuota = await checkStorageQuota(config, storage, gaii, fileData.length);
-        if (!storageQuota.allowed) {
-            res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', storageQuota.reason!));
-            return;
-        }
-
-        const file = await storage.createStorageFile({
+        // The key fence, the two size ceilings, the record shape, the overage charge and the change
+        // events are the shared write (services/storage-file-write.ts). This handler parses the
+        // request and renders the answer; the decisions belong to every door that stores a file.
+        const written = await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, {
             key,
-            ownerGaii: gaii,
-            visibility: visibility as 'private' | 'owner' | 'group' | 'workspace' | 'members' | 'public',
+            data: fileData,
+            mimeType,
+            visibility: visibility as StorageFileRecord['visibility'],
             groupId,
             workspaceRef,
-            mimeType,
-            size: fileData.length,
-            data: fileData,
             federate: federateFlag === true,
-            createdAt: new Date().toISOString(),
         });
-
-        // M-3: Charge overage morsels if over quota (§15)
-        if (storageQuota.overageMorsels > 0) {
-            await chargeOverage(storage, gaii, storageQuota.overageMorsels, 'storage_overage');
+        if (!written.ok) {
+            res.status(written.status).json(error(config.nodeId, written.code, written.message));
+            return;
         }
-
-        emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
-        emitResourceListChanged(gaii);
+        const { file, overageMorsels } = written;
 
         res.status(201).json(success(config.nodeId, {
             key: file.key,
@@ -267,7 +245,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             visibility: file.visibility,
             federate: file.federate ?? false,
             created_at: file.createdAt,
-            overage_charged: storageQuota.overageMorsels > 0 ? storageQuota.overageMorsels : undefined,
+            overage_charged: overageMorsels > 0 ? overageMorsels : undefined,
             // Ready-to-embed, owner-addressed URL. Embedding this in a workspace document scopes the file
             // to that workspace's members on save (never the public internet) — use it, not /v1/storage/<key>.
             embed_url: pubEmbedUrl(file.ownerGaii, file.key),
@@ -276,7 +254,6 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             { description: 'Download this file', method: 'GET', url: `/v1/storage/${encodeURIComponent(key)}` },
             { description: 'List all files', method: 'GET', url: '/v1/storage' },
         ]));
-        emitChange('files');
     });
 
     // GET /v1/storage — list storage items (agent auth)

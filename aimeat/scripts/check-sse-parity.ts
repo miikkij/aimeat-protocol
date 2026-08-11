@@ -92,13 +92,41 @@ const EXEMPT: Record<string, string> = {
  * claim that rots — each entry says which function carries it.
  */
 const DELEGATES: Record<string, string> = {
+    // Step 8 (2026-08-11) moved each of these writes into the service its REST twin already called,
+    // and the emit went with the write. Each was verified by reading the domain out of the service
+    // rather than trusting the delegation: a tool that hands its write to a silent service is the
+    // same defect as a tool that never emitted, and it hides better.
+    'src/mcp/agent-capabilities.ts': "services/agent-profile-write.ts, which emits 'agent-capabilities'",
+    'src/mcp/agent-management.ts': "services/agent-profile-write.ts, which emits 'agents'",
+    'src/mcp/appdev-pitfalls.ts': "services/memory-write.ts and services/appdev-kb.ts, both emitting 'memory'",
+    'src/mcp/appdev-proofs.ts': "services/contribution-proofs.ts, which writes through "
+        + "services/memory-write.ts and emits 'memory' there. No REST twin exists for this one: the "
+        + 'proof is attached from the appdev tool surface only.',
+    'src/mcp/apps.ts': "services/app-publish.ts and services/app-lifecycle.ts, both emitting 'apps'",
+    'src/mcp/boards.ts': "services/board-write.ts and services/board-post.ts, both emitting 'boards'",
+    'src/mcp/chat-instances.ts': "services/chat-instance-write.ts, which emits 'chat'",
+    'src/mcp/commerce.ts': "services/memory-write.ts ('memory') and services/agent-offers-write.ts ('agents')",
+    'src/mcp/cortex.ts': "services/cortex-lifecycle.ts, which emits 'cortex'",
+    'src/mcp/extensions.ts': "services/extension-lifecycle.ts, which emits 'extensions'",
+    'src/mcp/knowledge.ts': "services/knowledge-package-entry.ts, which emits 'knowledge'",
+    'src/mcp/organisms-name-invites.ts': "services/invitations.ts, which emits 'organisms' and 'notifications'",
+    'src/mcp/sharing-groups.ts': "services/sharing-group-members.ts, which emits 'groups'",
+
     'src/mcp/workspace-create.ts': 'writeRecord() from mcp/workspaces.ts, which emits organisms',
     'src/mcp/apps-fork.ts': 'emits apps itself',
     'src/mcp/consent.ts': "services/consent-write.ts, which emits 'consent'",
     'src/mcp/contacts.ts': "services/contacts.ts, which emits 'messages'",
     'src/mcp/dm-messages.ts': "services/message-send.ts, which emits 'messages'",
     'src/mcp/feedback.ts': "services/feedback.ts, which emits 'feedback'",
+    'src/mcp/flags.ts': "services/moderation-flags.ts, which emits 'flags'",
+    'src/mcp/agent-messages.ts': "services/agent-message-send.ts, which emits 'agent-messages' scoped to the owner",
+    'src/mcp/agent-tasks.ts': "services/agent-task-write.ts (create, event, plan and todo) and "
+        + "services/agent-task-fanout.ts (completion and failure), both emitting 'agent-tasks' scoped to the owner",
     'src/mcp/agent-telemetry.ts': "services/telemetry-buffer.ts ('agents') and usage-metering.ts ('agent-usage')",
+    'src/mcp/core.ts': "services/work-lifecycle.ts ('work' on accept and deliver), routes/work.ts "
+        + "createWorkItem ('work'), services/memory-write.ts ('memory') and services/board-post.ts ('boards')",
+    'src/mcp/core-admin.ts': "services/morsel.ts mintMorsels, which emits 'config' and 'wallet'",
+    'src/mcp/core-storage.ts': "services/storage-file-write.ts, which emits 'files' and 'memory'",
 };
 
 function walk(dir: string, out: string[] = []): string[] {

@@ -9,6 +9,11 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.17.0 — 2026-08-11 — aimeat_work_accept and aimeat_work_deliver call services/work-lifecycle.ts,
+ *     the same functions POST /v1/work/:tc/accept and /deliver call. Accepting over MCP skipped the
+ *     work→task bridge, so the agent had no task to work from; delivering over MCP skipped the
+ *     requester's callback webhook and both extension hooks, so the requester was told about an HTTP
+ *     delivery and not about this one.
  *   v1.16.0 — 2026-08-11 — aimeat_action_execute calls routes/work.ts createWorkItem, the same
  *     function POST /v1/work/request calls. It was a second, thinner implementation: no provider
  *     resolution (so cross-node work held escrow here while the provider's node heard nothing),
@@ -85,12 +90,10 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { settlePayment } from '../services/morsel.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
@@ -106,6 +109,7 @@ import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { createWorkItem } from '../routes/work.js';
+import { acceptWork, deliverWork } from '../services/work-lifecycle.js';
 import type { PeerInfo } from '../services/federation.js';
 import { createBoardPost } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
@@ -635,17 +639,14 @@ export function registerCoreTools(
         { tracking_code: z.string() },
         annotationsFor('aimeat_work_accept'),
         async ({ tracking_code }) => {
-            const work = await storage.getWork(tracking_code);
-            if (!work) return { content: [{ type: 'text' as const, text: 'Work not found' }], isError: true };
-            if (work.providerGaii !== agentGaii) return { content: [{ type: 'text' as const, text: 'Not your work item' }], isError: true };
-            if (work.status !== 'pending') return { content: [{ type: 'text' as const, text: `Cannot accept: status is ${work.status}` }], isError: true };
-            await storage.updateWork(tracking_code, { status: 'accepted', updatedAt: new Date().toISOString() });
-            // routes/work.ts emits on every status move. The requester is watching for exactly this
-            // one — "somebody took it" — and over MCP nothing said so.
-            // routes/work.ts emits on every status move. The requester is watching for exactly this
-            // one — "somebody took it" — and over MCP nothing said so.
-            emitChange('work');
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: 'accepted' }, null, 2) }] };
+            // ONE implementation (services/work-lifecycle.ts). This tool wrote the status itself and
+            // skipped the work→task bridge the HTTP door runs, so an agent that accepted its work
+            // over MCP, the door an agent actually uses, got no task to drive the job from.
+            const accepted = await acceptWork({ storage, config }, agentGaii, tracking_code);
+            if (!accepted.ok) {
+                return { content: [{ type: 'text' as const, text: `${accepted.code}: ${accepted.message}` }], isError: true };
+            }
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: accepted.work.status }, null, 2) }] };
         },
     );
 
@@ -656,17 +657,19 @@ export function registerCoreTools(
         { tracking_code: z.string(), output: z.record(z.string(), z.any()), metadata: z.unknown().optional() },
         annotationsFor('aimeat_work_deliver'),
         async ({ tracking_code, output }) => {
-            const work = await storage.getWork(tracking_code);
-            if (!work) return { content: [{ type: 'text' as const, text: 'Work not found' }], isError: true };
-            if (work.providerGaii !== agentGaii) return { content: [{ type: 'text' as const, text: 'Not your work item' }], isError: true };
-            if (!['accepted', 'in_progress'].includes(work.status)) return { content: [{ type: 'text' as const, text: `Cannot deliver: status is ${work.status}` }], isError: true };
-            await settlePayment(storage, config, work);
-            await storage.updateWork(tracking_code, { status: 'delivered', output, updatedAt: new Date().toISOString() });
-            emitChange('work');
+            // ONE implementation (services/work-lifecycle.ts). This tool settled and stored the
+            // output by hand, and that was all it did: the requester's callback_url was never
+            // called, so a delivery made over MCP left a requester who is not sitting on the node
+            // waiting, and neither post_settlement nor post_work_delivery ran, so an installed
+            // extension saw the HTTP deliveries and none of these.
+            const delivered = await deliverWork({ storage, config }, agentGaii, tracking_code, output);
+            if (!delivered.ok) {
+                return { content: [{ type: 'text' as const, text: `${delivered.code}: ${delivered.message}` }], isError: true };
+            }
             // Wallet balance changed for both parties
             emitResourceUpdated(agentGaii, `aimeat://wallet/${encodeURIComponent(agentGaii)}`);
-            emitResourceUpdated(work.requesterGaii, `aimeat://wallet/${encodeURIComponent(work.requesterGaii)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: 'delivered' }, null, 2) }] };
+            emitResourceUpdated(delivered.work.requesterGaii, `aimeat://wallet/${encodeURIComponent(delivered.work.requesterGaii)}`);
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: delivered.work.status }, null, 2) }] };
         },
     );
 

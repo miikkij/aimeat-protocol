@@ -12,14 +12,21 @@
  * @structure
  *   - refreshOnboarding() — auto-steps, completion, readiness; returns the record as it now stands
  *   - persistStepResult() — write a validated step back, completing the onboarding if it was the last
+ *   - confirmOnboardingStep() — validate one step's payload, apply its side effects, persist
  * @usage const { onboarding, completed } = await refreshOnboarding(storage, agentGaii, record);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — confirmOnboardingStep() moved in from POST /v1/agents/:name/onboarding/step/:id
+ *     and the aimeat_onboarding_* tools. The copies disagreed on two things: only the HTTP one
+ *     re-ran the auto-checkable steps after a step passed, so an agent finishing its last manual
+ *     step through MCP could sit at "not complete" with every remaining step objectively passable.
  *   v1.0.0 — 2026-08-11 — Extracted after the copied-logic check found the pair.
  */
-import type { Storage, AgentOnboardingRecord } from '../storage/interface.js';
-import { checkAutoSteps } from './onboarding-validator.js';
+import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../storage/interface.js';
+import { checkAutoSteps, validateStep } from './onboarding-validator.js';
 import { calculateReadiness } from './readiness-scorer.js';
 import { emitChange } from './event-bus.js';
+import { recordSelfReportedPlatform } from './agent-profile-write.js';
+import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 
 /**
  * Bring an in-progress onboarding up to date.
@@ -119,4 +126,97 @@ export async function persistStepResult(
     });
     emitChange('agent-onboarding');
     return completed ?? null;
+}
+
+/** Why a step confirmation was refused. Each surface maps this to its own status code and wording. */
+export type StepRefusalCode = 'UNKNOWN_STEP' | 'ONBOARDING_NOT_ACTIVE' | 'STEP_NOT_IN_FLOW' | 'VALIDATION_ERROR';
+
+export type ConfirmStepOutcome =
+    | { ok: false; code: StepRefusalCode; message: string }
+    | { ok: true; alreadyPassed: true; step: AgentOnboardingStep }
+    | {
+        ok: true;
+        alreadyPassed: false;
+        step: AgentOnboardingStep;
+        progress: number;
+        total: number;
+        /** The record when this call completed the onboarding, null otherwise. */
+        completed: AgentOnboardingRecord | null;
+        testTaskAutoStarted: boolean;
+    };
+
+/**
+ * Confirm one Hello Integration step: validate the payload, run the step's validator, apply the
+ * side effects the step carries, and persist.
+ *
+ * A passing step also re-runs auto-validation on every other auto-checkable step. Without that,
+ * posting the last manual step never triggers auto-complete even when the memory-backed steps
+ * (publish_commands, publish_config, ...) are objectively passable, which is exactly what the MCP
+ * copy of this did until it was folded in here.
+ */
+export async function confirmOnboardingStep(
+    storage: Storage,
+    agentGaii: string,
+    stepId: string,
+    // Undefined is a real case: Express 5 leaves req.body unset when nothing was parsed, and the
+    // step schema is meant to refuse that rather than fill in its defaults.
+    body: Record<string, unknown> | undefined,
+): Promise<ConfirmStepOutcome> {
+    if (!(ONBOARDING_STEP_IDS as readonly string[]).includes(stepId)) {
+        return { ok: false, code: 'UNKNOWN_STEP', message: `Unknown onboarding step: ${stepId}` };
+    }
+
+    const onboarding = await storage.getOnboarding(agentGaii);
+    if (!onboarding || onboarding.status !== 'in_progress') {
+        return { ok: false, code: 'ONBOARDING_NOT_ACTIVE', message: 'Hello Integration onboarding is not active for this agent.' };
+    }
+
+    const step = onboarding.steps.find(candidate => candidate.id === stepId);
+    if (!step) {
+        // Separate from UNKNOWN_STEP: the id IS a step in the canonical catalog, but this agent's
+        // reduced flow does not include it. A client should treat it as "not applicable, skip".
+        return { ok: false, code: 'STEP_NOT_IN_FLOW', message: `Onboarding step not found: ${stepId}` };
+    }
+
+    if (step.status === 'passed') return { ok: true, alreadyPassed: true, step };
+
+    const schema = STEP_SCHEMAS[stepId as OnboardingStepId];
+    if (schema) {
+        const parsed = schema.safeParse(body);
+        if (!parsed.success) return { ok: false, code: 'VALIDATION_ERROR', message: parsed.error.message };
+    }
+
+    const payload = body ?? {};
+    const result = await validateStep(stepId as OnboardingStepId, agentGaii, storage, payload);
+    if (result.passed) {
+        step.status = 'passed';
+        step.validatedAt = new Date().toISOString();
+        step.validationMethod = result.validationMethod;
+        step.details = { ...step.details, ...result.details };
+
+        if (stepId === 'identify_platform' && typeof payload.platform === 'string') {
+            await recordSelfReportedPlatform(storage, agentGaii, payload);
+            onboarding.detectedPlatform = payload.platform;
+        }
+        if (stepId === 'install_skill' && typeof payload.platform === 'string') {
+            onboarding.installedRuntime = payload.platform;
+        }
+
+        onboarding.steps = await checkAutoSteps(agentGaii, onboarding, storage);
+    } else {
+        step.status = 'failed';
+        step.failureReason = result.failureReason;
+    }
+
+    const completed = await persistStepResult(storage, agentGaii, onboarding, result.passed);
+
+    return {
+        ok: true,
+        alreadyPassed: false,
+        step,
+        progress: onboarding.steps.filter(candidate => candidate.status === 'passed').length,
+        total: onboarding.steps.length,
+        completed,
+        testTaskAutoStarted: stepId === 'accept_test_task' && result.passed && !!result.details?.autoStarted,
+    };
 }

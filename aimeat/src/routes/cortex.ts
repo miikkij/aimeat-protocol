@@ -7,6 +7,11 @@
  * @structure cortexRouter() — all /v1/cortex* routes; activateExtension()/deactivateExtension() — init helpers.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   v1.3.0 — 2026-08-11 — Install, activate, deactivate and uninstall call
+ *     services/cortex-lifecycle.ts, which the MCP tools call too. Each of the four had a second
+ *     copy in mcp/cortex.ts doing something different; the service header says what. What stays
+ *     here is the envelope and the hints. PUT /v1/cortex/:name is untouched and still holds its own
+ *     copy of the manifest parse and the namespace check.
  *   v1.2.0 — 2026-07-10 — Security (TARGET-020): per-resource ownership guard on activate,
  *     deactivate, DELETE and export — owner sessions bypass requireScope, so without it any signed-in
  *     owner could destroy (or, in the community namespace, replace) another owner's extension.
@@ -14,7 +19,7 @@
  *     live gap (libs swapped, never deleted-then-recreated), re-runs init on an active cortex,
  *     and never consumes a quota slot when updating an existing cortex.
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
@@ -22,6 +27,9 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
 import { cortexInstallRefusal } from '../services/install-quotas.js';
+import {
+  installCortex, activateCortex, deactivateCortex, deleteCortex, type CortexCaller,
+} from '../services/cortex-lifecycle.js';
 import { activateExtension, deactivateExtension } from './cortex/activation.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
@@ -30,6 +38,17 @@ export { activateExtension } from './cortex/activation.js';
 
 export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  /**
+   * The caller as services/cortex-lifecycle.ts sees it. `req.auth!.owner` is the bare owner name
+   * for an owner session and for that owner's agents alike, which is what `installedBy` holds;
+   * `req.auth!.sub` is the acting principal, recorded on whatever an activation materialises.
+   */
+  const callerOf = (req: Request): CortexCaller => ({
+    ownerName: req.auth!.owner,
+    gaii: req.auth!.sub,
+    isOperator: req.auth!.roles.includes('operator'),
+  });
 
   // ── GET /v1/cortex — list installed cortex extensions ──
   router.get('/v1/cortex', requireAuth(), async (req, res) => {
@@ -68,98 +87,27 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // Owner role bypasses scope checks; agents need 'cortex:write' (or 'cortex:*' / '*').
   router.post('/v1/cortex', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const { manifest, libs } = req.body ?? {};
-
-    if (!manifest || typeof manifest !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'manifest is required and must be a YAML string'));
+    const out = await installCortex({ storage, config }, callerOf(req), { manifest, libs });
+    if (!out.ok) {
+      res.status(out.refusal.status).json(
+        error(config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
       return;
     }
 
-    // Manifest size limit (reuse lib size config as reasonable upper bound)
-    const manifestSizeKb = Buffer.byteLength(manifest, 'utf-8') / 1024;
-    if (manifestSizeKb > config.cortexMaxLibSizeKb) {
-      res.status(413).json(error(config.nodeId, 'MANIFEST_TOO_LARGE',
-        `Manifest size ${Math.round(manifestSizeKb)}KB exceeds limit of ${config.cortexMaxLibSizeKb}KB`));
-      return;
-    }
-
-    // The node's cortex ceiling, from services/install-quotas.ts — the inline MCP branch and the
-    // presigned upload handler answer to the same number.
-    const overQuota = await cortexInstallRefusal({ storage, config }, true);
-    if (overQuota) {
-      res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
-      return;
-    }
-
-    // Validate lib sizes
-    if (libs && typeof libs === 'object') {
-      for (const [filename, content] of Object.entries(libs as Record<string, string>)) {
-        if (typeof content !== 'string') {
-          res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `libs["${filename}"] must be a string`));
-          return;
-        }
-        const sizeKb = Buffer.byteLength(content, 'utf8') / 1024;
-        if (sizeKb > config.cortexMaxLibSizeKb) {
-          res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-            `Lib "${filename}" is ${sizeKb.toFixed(1)}KB, max is ${config.cortexMaxLibSizeKb}KB`));
-          return;
-        }
-      }
-    }
-
-    const ownerName = req.auth!.owner;
-    const result = parseCortexManifest(manifest, ownerName, libs as Record<string, string> | undefined);
-
-    if (!result.ok || !result.extension) {
-      res.status(400).json(error(config.nodeId, 'INVALID_MANIFEST', 'Manifest validation failed', 400, {
-        errors: result.errors,
-        warnings: result.warnings,
-      }));
-      return;
-    }
-
-    const ext = result.extension;
-
-    // Namespace ownership check (operators can use any namespace)
-    if (!req.auth!.roles.includes('operator')) {
-      if (!validateNamespaceOwnership(ext.namespace, ownerName)) {
-        res.status(403).json(error(config.nodeId, 'NAMESPACE_DENIED',
-          `You cannot install extensions in namespace "${ext.namespace}". Use your own namespace "${ownerName}" or "community".`));
-        return;
-      }
-    }
-
-    // Store lib files
-    if (libs && typeof libs === 'object') {
-      for (const [filename, content] of Object.entries(libs as Record<string, string>)) {
-        await storage.setCortexLibFile(ext.name, filename, content);
-      }
-    }
-
-    try {
-      const record = await storage.createCortexExtension(ext);
-
-      res.status(201).json(success(config.nodeId, {
-        name: record.name,
-        namespace: record.namespace,
-        version: record.version,
-        status: record.status,
-        installed_at: record.installedAt,
-        installed_by: record.installedBy,
-        component_count: record.components.length,
-        warnings: result.warnings,
-      }, [
-        { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(record.name)}/activate` },
-        { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(record.name)}` },
-      ]));
-      emitChange('cortex');
-    } catch (e: unknown) {
-      const msg = (e as Error).message;
-      if (msg.includes('already exists')) {
-        res.status(409).json(error(config.nodeId, 'CONFLICT', `Extension "${ext.name}" is already installed`));
-        return;
-      }
-      throw e;
-    }
+    const { record, warnings } = out.value;
+    res.status(201).json(success(config.nodeId, {
+      name: record.name,
+      namespace: record.namespace,
+      version: record.version,
+      status: record.status,
+      installed_at: record.installedAt,
+      installed_by: record.installedBy,
+      component_count: record.components.length,
+      warnings,
+    }, [
+      { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(record.name)}/activate` },
+      { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(record.name)}` },
+    ]));
   });
 
   // ── PUT /v1/cortex/:name — idempotent upsert (create, or replace in place) ──
@@ -429,46 +377,11 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
   // ── DELETE /v1/cortex/:name — uninstall extension ──
   router.delete('/v1/cortex/:name', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
-
-    if (!ext) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+    const out = await deleteCortex({ storage, config }, callerOf(req), name);
+    if (!out.ok) {
+      res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
       return;
     }
-
-    // Ownership: owner sessions bypass requireScope, so this per-resource check is what stops
-    // a non-owner from uninstalling someone else's extension (see also PUT/visibility).
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
-      return;
-    }
-
-    // Ownership: only the installing owner (or an operator) may uninstall — a non-owner must never be
-    // able to delete someone else's extension (and its seed-data memory). Mirrors the update/export guards.
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
-      return;
-    }
-
-    // Deactivate first if active
-    if (ext.status === 'active') {
-      await deactivateExtension(ext, storage, req.auth!.sub);
-    }
-
-    // Remove seed-data entries (uninstall removes them, unlike deactivation)
-    // Use ext.installedBy since seed-data was created with that GAII as ownerGaii
-    for (const key of ext.activationArtifacts.seedDataKeys) {
-      await storage.deleteMemory(ext.installedBy, key);
-    }
-
-    // Remove lib files
-    for (const comp of ext.components) {
-      if (comp.type === 'lib') {
-        await storage.deleteCortexLibFile(name, comp.filename);
-      }
-    }
-
-    await storage.deleteCortexExtension(name);
 
     res.json(success(config.nodeId, {
       uninstalled: true,
@@ -476,122 +389,67 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'List extensions', method: 'GET', url: '/v1/cortex' },
     ]));
-    emitChange('cortex');
   });
 
   // ── POST /v1/cortex/:name/activate — activate extension ──
   router.post('/v1/cortex/:name/activate', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
-
-    if (!ext) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
+    const out = await activateCortex({ storage, config }, callerOf(req), name);
+    if (!out.ok) {
+      res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
       return;
     }
 
-    // Ownership: only the installing owner (or an operator) may (de)activate their extension.
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
-      return;
-    }
-
-    // Ownership: only the installing owner (or an operator) may activate someone's extension.
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
-      return;
-    }
-
-    // Idempotent — if already active, return success
-    if (ext.status === 'active') {
+    // Idempotent — already active, so nothing was materialised and there are no new artifacts.
+    const { extension, activatedAt, artifacts, alreadyActive } = out.value;
+    if (alreadyActive) {
       res.json(success(config.nodeId, {
-        name: ext.name,
+        name: extension.name,
         status: 'active',
-        activated_at: ext.activatedAt,
+        activated_at: activatedAt,
         message: 'Extension is already active',
       }));
-      emitChange('cortex');
       return;
     }
-
-    const gaii = req.auth!.sub;
-    const artifacts = await activateExtension(ext, config, storage, gaii);
-
-    const now = new Date().toISOString();
-    await storage.updateCortexExtension(name, {
-      status: 'active',
-      activatedAt: now,
-      activationArtifacts: artifacts,
-    });
 
     // Capability aggregation deferred to explicit admin trigger to avoid race conditions
     res.json(success(config.nodeId, {
-      name: ext.name,
+      name: extension.name,
       status: 'active',
-      activated_at: now,
+      activated_at: activatedAt,
       artifacts,
     }, [
       { description: 'Deactivate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(name)}/deactivate` },
       { description: 'View extension details', method: 'GET', url: `/v1/cortex/${encodeURIComponent(name)}` },
     ]));
-    emitChange('cortex');
   });
 
   // ── POST /v1/cortex/:name/deactivate — deactivate extension ──
   router.post('/v1/cortex/:name/deactivate', requireAuth(), requireScope('cortex:write'), async (req, res) => {
     const name = decodeURIComponent(req.params.name as string);
-    const ext = await storage.getCortexExtension(name);
-
-    if (!ext) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Cortex extension not found: ${name}`));
-      return;
-    }
-
-    // Ownership: only the installing owner (or an operator) may (de)activate their extension.
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
-      return;
-    }
-
-    // Ownership: only the installing owner (or an operator) may deactivate someone's extension.
-    if (ext.installedBy !== req.auth!.owner && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not your extension'));
+    const out = await deactivateCortex({ storage, config }, callerOf(req), name);
+    if (!out.ok) {
+      res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
       return;
     }
 
     // Idempotent — if already inactive, return success
-    if (ext.status === 'inactive') {
+    const { extension, alreadyInactive } = out.value;
+    if (alreadyInactive) {
       res.json(success(config.nodeId, {
-        name: ext.name,
+        name: extension.name,
         status: 'inactive',
         message: 'Extension is already inactive',
       }));
-      emitChange('cortex');
       return;
     }
 
-    await deactivateExtension(ext, storage, req.auth!.sub);
-
-    await storage.updateCortexExtension(name, {
-      status: 'inactive',
-      activatedAt: undefined,
-      activationArtifacts: {
-        schemaKeys: [],
-        promptKeys: [],
-        actionIds: [],
-        boardIds: [],
-        seedDataKeys: ext.activationArtifacts.seedDataKeys,  // preserve
-        ontologyKeys: [],
-        libFiles: ext.activationArtifacts.libFiles,  // preserve
-      },
-    });
-
     res.json(success(config.nodeId, {
-      name: ext.name,
+      name: extension.name,
       status: 'inactive',
     }, [
       { description: 'Activate this extension', method: 'POST', url: `/v1/cortex/${encodeURIComponent(name)}/activate` },
     ]));
-    emitChange('cortex');
   });
 
   // ── POST /v1/cortex/:name/visibility — toggle visibility ──

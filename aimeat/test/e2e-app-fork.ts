@@ -21,6 +21,10 @@
  *   v1.1.0 — 2026-07-07 — Phase 4: fork statistics + lineage — listing forks count,
  *     GET /forks (direct forks + live status), GET /lineage (cross-owner tree,
  *     2-level ancestry/descendants), and a deleted fork surviving as status=deleted.
+ *   v1.2.0 — 2026-08-11 — Phase 5: the MCP door. aimeat_app_fork and aimeat_app_delete now go
+ *     through the same service as the routes above, so the fork copies the source screenshot, a
+ *     duplicate target gives the shared ALREADY_EXISTS answer, and a delete takes the app's
+ *     screenshot with it instead of leaving it for whoever republishes the filename.
  */
 
 import * as ed from '@noble/ed25519';
@@ -76,6 +80,7 @@ const SRC_HTML = '<!DOCTYPE html><html><body><h1>original app</h1></body></html>
 let aToken = '';
 let bToken = '';
 let agentGaii = '';
+let agentPriv = '';
 let agentToken = '';
 
 function aAuthed(opts: RequestInit = {}): RequestInit {
@@ -115,7 +120,7 @@ await test('Register A\'s agent and get its token', async () => {
     }));
     assert(reg.status === 201, `status ${reg.status}: ${JSON.stringify(reg.body)}`);
     agentGaii = reg.body.data.agent.gaii;
-    const agentPriv = reg.body.data.private_key;
+    agentPriv = reg.body.data.private_key;
     const timestamp = new Date().toISOString();
     const signature = await signMsg(agentPriv, agentGaii + timestamp);
     const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii: agentGaii, timestamp, signature }) });
@@ -351,6 +356,140 @@ await test('A DELETED fork still appears in lineage with status=deleted', async 
     const gone = (body.data.nodes ?? []).find((n: any) => n.id === `${ownerAName}/agent-fork.html`);
     assert(!!gone, 'deleted fork still present in lineage (the event log survives)');
     assert(gone.status === 'deleted', `status should be deleted, got ${gone.status}`);
+});
+
+// ── Phase 5: the MCP door performs the SAME act as the HTTP door ──
+// aimeat_app_fork and aimeat_app_delete were second implementations of routes that live in
+// routes/apps/fork-manage.ts. The fork never copied the source screenshot, and the delete never
+// removed the app's own — so a fork made by an agent had no thumbnail, and republishing a filename
+// an agent had deleted served the deleted app's picture. Both now go through
+// services/app-lifecycle.ts, and these assertions are what tells the two apart.
+console.log('\nPhase 5: the same act through the MCP door');
+
+// A 1x1 PNG. Small enough to inline, real enough for decodeStrictBase64 and the mime sniffing.
+const PIXEL_PNG_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+function parseSSE(text: string): any[] {
+    const messages: any[] = [];
+    for (const evt of text.split('\n\n')) {
+        let data = '';
+        for (const line of evt.trim().split('\n')) {
+            if (line.startsWith('data: ')) data += line.slice(6);
+        }
+        if (data) { try { messages.push(JSON.parse(data)); } catch { /* not a JSON frame */ } }
+    }
+    return messages;
+}
+
+let mcpToken = '';
+let mcpSessionId = '';
+let mcpRpcId = 1;
+
+async function mcpRpc(method: string, params: Record<string, any> = {}) {
+    const id = mcpRpcId++;
+    const res = await fetch(`${BASE}/v1/mcp`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json, text/event-stream',
+            ...(mcpToken ? { Authorization: `Bearer ${mcpToken}` } : {}),
+            ...(mcpSessionId ? { 'mcp-session-id': mcpSessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+    });
+    const sid = res.headers.get('mcp-session-id');
+    if (sid) mcpSessionId = sid;
+    const ct = res.headers.get('content-type') ?? '';
+    if (ct.includes('text/event-stream')) {
+        const messages = parseSSE(await res.text());
+        return messages.find(m => m.id === id) ?? messages[0] ?? {};
+    }
+    return await res.json() as any;
+}
+
+async function mcpCall(name: string, args: Record<string, any>): Promise<{ isError: boolean; text: string }> {
+    const body = await mcpRpc('tools/call', { name, arguments: args });
+    return { isError: !!body?.result?.isError, text: body?.result?.content?.[0]?.text ?? JSON.stringify(body) };
+}
+
+await test('Setup: an MCP session for owner A\'s agent', async () => {
+    const { body: reg } = await json('/v1/mcp/register', {
+        method: 'POST', body: JSON.stringify({ client_name: 'fork e2e client', redirect_uris: [] }),
+    });
+    const ts = new Date().toISOString();
+    const params = new URLSearchParams({
+        response_type: 'code', client_id: reg.client_id, gaii: agentGaii,
+        signature: await signMsg(agentPriv, agentGaii + NODE_ID + ts), timestamp: ts,
+    });
+    const { body: auth } = await json(`/v1/mcp/authorize?${params}`);
+    const { body: tok } = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret }),
+    });
+    mcpToken = tok.access_token;
+    assert(typeof mcpToken === 'string' && mcpToken.length > 10, `no MCP access token: ${JSON.stringify(tok).slice(0, 150)}`);
+    const init = await mcpRpc('initialize', {
+        protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'Fork E2E', version: '1.0.0' },
+    });
+    assert(!!init.result, `initialize failed: ${JSON.stringify(init).slice(0, 200)}`);
+});
+
+await test('aimeat_app_fork copies the source screenshot into the fork', async () => {
+    const shot = await json(`/v1/apps/${ownerAName}/${SRC_FILE}/screenshot`, aAuthed({
+        method: 'POST', body: JSON.stringify({ screenshot: PIXEL_PNG_B64, screenshot_mime_type: 'image/png' }),
+    }));
+    assert(shot.status === 200 || shot.status === 201, `setting the source screenshot: ${shot.status}`);
+
+    const out = await mcpCall('aimeat_app_fork', {
+        owner: ownerAName, filename: SRC_FILE, new_filename: 'mcp-fork.html',
+    });
+    assert(!out.isError, `fork over MCP failed: ${out.text.slice(0, 200)}`);
+
+    const res = await fetch(`${BASE}/v1/apps/${ownerAName}/mcp-fork.html/screenshot`);
+    assert(res.status === 200, `the fork should carry the source thumbnail, got ${res.status}`);
+    assert((res.headers.get('content-type') ?? '').includes('image/png'), 'served as a PNG');
+});
+
+await test('aimeat_app_fork refuses a filename the owner already has', async () => {
+    const out = await mcpCall('aimeat_app_fork', {
+        owner: ownerAName, filename: SRC_FILE, new_filename: 'mcp-fork.html',
+    });
+    assert(out.isError, 'a duplicate fork target must be refused');
+    assert(/already have an app named/.test(out.text), `expected the shared ALREADY_EXISTS wording, got: ${out.text.slice(0, 200)}`);
+});
+
+await test('aimeat_app_delete removes the app\'s screenshot with it', async () => {
+    const DEL_FILE = 'mcp-delete-me.html';
+    const pub = await json('/v1/apps', aAuthed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: DEL_FILE, content: b64('<!DOCTYPE html><html><body><h1>delete me</h1></body></html>'),
+            name: 'Delete Me', description: 'published to be deleted again', category: 'utility', tags: [],
+        }),
+    }));
+    assert(pub.status === 201, `publish status ${pub.status}: ${JSON.stringify(pub.body).slice(0, 200)}`);
+    const shot = await json(`/v1/apps/${ownerAName}/${DEL_FILE}/screenshot`, aAuthed({
+        method: 'POST', body: JSON.stringify({ screenshot: PIXEL_PNG_B64, screenshot_mime_type: 'image/png' }),
+    }));
+    assert(shot.status === 200 || shot.status === 201, `setting the screenshot: ${shot.status}`);
+
+    const out = await mcpCall('aimeat_app_delete', { filename: DEL_FILE });
+    assert(!out.isError, `delete over MCP failed: ${out.text.slice(0, 200)}`);
+
+    // Republish the SAME filename. The app exists again, so a 404 here can only mean the screenshot
+    // went with the delete — which is the difference this test is for. Before the shared delete, the
+    // new app served the deleted one's picture.
+    const again = await json('/v1/apps', aAuthed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: DEL_FILE, content: b64('<!DOCTYPE html><html><body><h1>fresh</h1></body></html>'),
+            name: 'Delete Me', description: 'republished under the same name', category: 'utility', tags: [],
+        }),
+    }));
+    assert(again.status === 201, `republish status ${again.status}`);
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${DEL_FILE}/screenshot`);
+    assert(status === 404, `a republished filename must not inherit the deleted app's thumbnail, got ${status}`);
+    assert(/Screenshot not found/.test(JSON.stringify(body)), `expected the screenshot 404, got ${JSON.stringify(body).slice(0, 160)}`);
 });
 
 // ── Summary ──

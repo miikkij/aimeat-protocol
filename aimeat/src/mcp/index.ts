@@ -9,6 +9,13 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.13.0 -- 2026-08-11 -- August audit step 8: registerAppdevProofTools receives the session
+ *     scopes, the way the pitfall, knowledge and commerce registrations already do. The proof
+ *     attach now writes through services/memory-write.ts, whose scope gate needs them.
+ *   v1.12.0 — 2026-08-10 — August audit step 8: the session's chat-instance upsert and its per-request
+ *     heartbeat call services/chat-instance-write.ts instead of storage directly. A new MCP session
+ *     now emits the `chat` change event the two other doors already emitted, so the browser's chat
+ *     list shows it without waiting for something else to trigger a refresh.
  *   v1.11.0 — 2026-08-09 — The server declares PROMPTS (./prompts-managed.ts): the node's managed
  *     prompt packages become the primitive a person picks, which is what MCP's prompts primitive is
  *     for. mcp.prompt had been called nowhere in src/mcp/, so a surface built around prompt-driven
@@ -97,6 +104,7 @@ import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog
 import { instructionsFor } from './instructions.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
+import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
 
 // ── Resource change event bus ──
 // Allows REST routes and MCP tools to emit resource change events
@@ -186,7 +194,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes);
         registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
         registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
-        registerAppdevProofTools(mcp, storage, config, () => agentGaii);
+        registerAppdevProofTools(mcp, storage, config, () => agentGaii, scopes);
         registerSkillsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOperatorConfigTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
@@ -269,7 +277,9 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             // Existing session — update lastSeen for session tracking
             const ciId = sessionChatInstances.get(sessionId);
             if (ciId) {
-                storage.updateChatInstance(ciId, { lastSeen: new Date().toISOString() }).catch(err => { logger.warn('handleMcpPost: continuing after a suppressed failure', { error: String(err) }); });
+                // notify:false — this heartbeat fires on every tool call, and a `chat` change event
+                // per call would have every open browser re-fetching the list dozens of times a minute.
+                touchChatInstance({ storage }, ciId, { notify: false }).catch(err => { logger.warn('handleMcpPost: continuing after a suppressed failure', { error: String(err) }); });
             }
             // Refresh the session's bearer token from THIS request before dispatching: the client
             // rotates its access token mid-session, and capability invocation re-presents it.
@@ -397,24 +407,18 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 else if (ua.includes('gemini')) platform = 'gemini';
             }
 
+            // The id predates buildChatInstanceId and every session row in production is addressed
+            // by it, so it is passed explicitly rather than derived.
             chatInstanceId = `mcp-${platform}#${sessionOwner}@${config.nodeId}`;
             try {
-                const existing = await storage.getChatInstance(chatInstanceId);
-                if (existing) {
-                    await storage.updateChatInstance(chatInstanceId, { lastSeen: new Date().toISOString() });
-                } else {
-                    await storage.createChatInstance({
-                        id: chatInstanceId,
-                        platform,
-                        appName: `mcp-${platform}`,
-                        ownerName: sessionOwner,
-                        ghii: `${sessionOwner}@${config.nodeId}`,
-                        nodeId: config.nodeId,
-                        isAnonymous: false,
-                        agentGaii: authenticatedGaii,
-                        createdAt: new Date().toISOString(),
-                        lastSeen: new Date().toISOString(),
-                    });
+                const out = await registerChatInstance(
+                    { storage, config },
+                    { ownerName: sessionOwner, agentGaii: authenticatedGaii },
+                    { platform, appName: `mcp-${platform}`, id: chatInstanceId },
+                );
+                if (!out.ok) {
+                    logger.warn('Failed to upsert ChatInstance for MCP session', { error: `${out.code}: ${out.message}` });
+                    chatInstanceId = undefined;
                 }
             } catch (err) {
                 logger.warn('Failed to upsert ChatInstance for MCP session', { error: (err as Error).message });

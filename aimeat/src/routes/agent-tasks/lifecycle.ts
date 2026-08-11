@@ -2,6 +2,9 @@
  * @file src/routes/agent-tasks/lifecycle.ts
  * @description Agent-task lifecycle routes (update, delete, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — The propose-todos WRITE moves to services/agent-task-write.ts, so
+ *     aimeat_task_propose_todos stops keeping its own copy of the plan build. Behaviour here is
+ *     unchanged.
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)
  *   v1.1.0 — 2026-07-14 — propose-todos: allow the FIRST proposal on a plan-less active task
  *                          (auto-activated tasks are born active with zero todos — the 409 made
@@ -11,7 +14,7 @@
  */
 
 import type { Router } from 'express';
-import { canProposeTodos, todoProposeRefusal, statusAfterProposal } from '../../services/agent-task-rules.js';
+import { applyProposedPlan, type ProposedTodoInput } from '../../services/agent-task-write.js';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from '../../storage/interface.js';
@@ -334,117 +337,20 @@ export function registerTaskLifecycleRoutes(
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }
-    // services/agent-task-rules.ts — aimeat_task_propose_todos answers to the same rule.
-    if (!canProposeTodos(task)) {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE', todoProposeRefusal(task.status)));
+    // The whole acceptance — the live-plan guard, the preserved history, the renumbering, the status
+    // move and the auto-activation tail — is services/agent-task-write.ts, because it belongs to
+    // ACCEPTING A PLAN rather than to this door. aimeat_task_propose_todos wrote its own copy.
+    const proposeBody = req.body as { todos?: ProposedTodoInput[] };
+    const result = await applyProposedPlan(
+      { storage, config, webhook: webhookDispatcher }, task, proposeBody?.todos, resolve(req),
+    );
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('POST /v1/agents/:name/tasks/:id/propose-todos: MCP not connected', { error: String(err) }); }
 
-    const proposeBody = req.body as { todos?: Array<{
-      id?: string; order?: number; title: string; description?: string;
-      environment?: 'aimeat' | 'agent'; environment_reason?: string;
-      verification?: string; estimate_minutes?: number;
-    }>; };
-    const incoming = Array.isArray(proposeBody?.todos) ? proposeBody.todos : [];
-    if (incoming.length === 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'todos must be a non-empty array'));
-      return;
-    }
-
-    const now = new Date().toISOString();
-
-    // Preserve outdated todos from previous revision cycles. When the task is
-    // revision_requested, also retire the still-pending todos to outdated so
-    // the next owner view shows them as history rather than as the active plan.
-    const preserved: AgentTaskTodo[] = (task.todos ?? []).flatMap(t => {
-      if (t.status === 'outdated') return [t];
-      if (task.status === 'revision_requested') return [{ ...t, status: 'outdated' as const }];
-      return [];
-    });
-
-    // Number new todos AFTER the preserved ones so order is stable across history.
-    const baseOrder = preserved.length;
-    const newTodos: AgentTaskTodo[] = incoming.map((t, index) => ({
-      id: t.id ?? `todo-${baseOrder + index + 1}`,
-      order: t.order ?? baseOrder + index + 1,
-      title: t.title,
-      description: t.description ?? '',
-      environment: t.environment ?? 'agent',
-      environmentReason: t.environment_reason,
-      verification: t.verification ?? '',
-      estimateMinutes: t.estimate_minutes,
-      status: 'pending',
-    }));
-
-    // Revision cycle: agent's new proposal moves the task back to 'queued' so the owner can
-    // review again. Plain queued stays queued -- UNLESS the agent's mode is 'task-runner',
-    // where the owner pre-authorized work to start without per-task gating (the same signal
-    // create-time auto-activation keys off in create-read.ts). Active (plan-less) stays active.
-    const { nextStatus, autoActivated } = await statusAfterProposal(g => storage.getAgent(g), task);
-
-    const updated = await storage.updateAgentTask(id, {
-      todos: [...preserved, ...newTodos],
-      status: nextStatus,
-      lastEventAt: now,
-      updatedAt: now,
-    });
-
-    await storage.appendTaskEvent({
-      id: randomUUID(),
-      taskId: id,
-      type: 'progress',
-      message: task.status === 'revision_requested'
-        ? 'Revised TODO plan proposed'
-        : 'TODO plan proposed',
-      details: {
-        todo_count: newTodos.length,
-        outdated_count: preserved.length,
-      },
-      timestamp: now,
-    });
-
-    if (autoActivated) {
-      // Mirror POST /start + create-time auto-activation: matching 'started' event so the
-      // history reads like an owner-approved start, activity metric, 'task.approved' webhook
-      // (subscribers react to "this task is now runnable" regardless of which gate flipped it),
-      // and the connector-tunnel task_assigned push so a parked daemon wakes immediately.
-      await storage.appendTaskEvent({
-        id: randomUUID(),
-        taskId: id,
-        type: 'started',
-        message: 'Task auto-activated on TODO proposal (agent mode: task-runner)',
-        timestamp: now,
-      });
-      await recordTaskStarted(storage, task.agentGaii);
-      if (webhookDispatcher) {
-        webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.approved', {
-          task_id: task.id,
-          title: task.title,
-          status: 'active',
-          todo_count: (updated?.todos ?? []).length,
-          pending_todo_count: (updated?.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
-          approved_at: now,
-          auto_activated: true,
-        });
-      }
-      emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id, payload: updated });
-    }
-
-    if (webhookDispatcher) {
-      webhookDispatcher.dispatchWebhookEvent(task.agentGaii, 'task.updated', {
-        task_id: task.id,
-        title: task.title,
-        status: updated?.status ?? task.status,
-        changed_fields: ['todos', 'status'],
-        todo_count: (updated?.todos ?? []).length,
-        pending_todo_count: (updated?.todos ?? []).filter((t: AgentTaskTodo) => t.status === 'pending').length,
-        updated_at: now,
-      });
-    }
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('pending_todo_count: MCP not connected', { error: String(err) }); }
-
-    res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks', resolve(req));
+    res.json(success(config.nodeId, { task: result.task }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/request-changes -- Owner asks agent to revise the proposed TODOs ──

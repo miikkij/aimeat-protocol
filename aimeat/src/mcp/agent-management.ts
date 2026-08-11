@@ -19,22 +19,22 @@
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.2.0 -- 2026-06-24 -- Tag pattern allows ':' (faceted prefix:value tags compose with
  *     aimeat_discover's tags filter); '@' stays excluded.
+ *   v1.3.0 -- 2026-08-11 -- Both writes go through services/agent-profile-write.ts, shared with
+ *     PATCH /v1/agents/:name/tags and PATCH /v1/agents/:name/mode. The mode copy here never
+ *     re-derived the Hello Integration step list, so a crew self-setting task-runner through this
+ *     tool, which is the caller the HTTP handler's comment names, kept the full flow and read
+ *     7/16 where 7/7 was the truth.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { parseGAII, buildGAII } from '../utils/gaii.js';
-import { emitChange } from '../services/event-bus.js';
+import { parseGAII } from '../utils/gaii.js';
+import { setAgentTags, setAgentMode } from '../services/agent-profile-write.js';
+import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-
-const VALID_MODES = ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'] as const;
-// Colons are allowed so faceted tags (source:crewai, role:researcher) validate and compose
-// with aimeat_discover's `tags` CSV filter; '@' stays excluded to keep tags distinct from GAII.
-const TAG_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,63}$/;
-const MAX_TAGS = 20;
 
 export function registerAgentManagementTools(
     mcp: McpServer,
@@ -63,49 +63,18 @@ export function registerAgentManagementTools(
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
-            const targetGaii = buildGAII(target_agent_name, callerParsed.owner, config.nodeId);
-            const targetAgent = await storage.getAgent(targetGaii);
-            if (!targetAgent) {
-                return {
-                    content: [{ type: 'text' as const, text: `Target agent '${target_agent_name}' not found under owner '${callerParsed.owner}'.` }],
-                    isError: true,
-                };
-            }
-            if (targetAgent.owner !== callerParsed.owner) {
-                return {
-                    content: [{ type: 'text' as const, text: 'You can only update tags for agents owned by the same owner.' }],
-                    isError: true,
-                };
-            }
 
-            const normalised: string[] = [];
-            for (const raw of tags) {
-                if (typeof raw !== 'string') {
-                    return { content: [{ type: 'text' as const, text: 'tags must be an array of strings' }], isError: true };
-                }
-                const tag = raw.trim().toLowerCase();
-                if (!tag) continue;
-                if (!TAG_PATTERN.test(tag)) {
-                    return { content: [{ type: 'text' as const, text: `Invalid tag: ${raw}` }], isError: true };
-                }
-                if (!normalised.includes(tag)) normalised.push(tag);
+            const outcome = await setAgentTags({ storage, config }, callerParsed.owner, target_agent_name, tags);
+            if (!outcome.ok) {
+                return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             }
-            if (normalised.length > MAX_TAGS) {
-                return { content: [{ type: 'text' as const, text: `An agent can have at most ${MAX_TAGS} tags` }], isError: true };
-            }
-
-            const updated = await storage.updateAgent(targetGaii, { tags: normalised });
-            if (!updated) {
-                return { content: [{ type: 'text' as const, text: `Agent not found: ${target_agent_name}` }], isError: true };
-            }
-            emitChange('agents');
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        gaii: updated.gaii,
-                        name: updated.name,
-                        tags: updated.tags ?? [],
+                        gaii: outcome.agent.gaii,
+                        name: outcome.agent.name,
+                        tags: outcome.agent.tags ?? [],
                     }, null, 2),
                 }],
             };
@@ -129,33 +98,18 @@ export function registerAgentManagementTools(
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
-            const targetGaii = buildGAII(target_agent_name, callerParsed.owner, config.nodeId);
-            const targetAgent = await storage.getAgent(targetGaii);
-            if (!targetAgent) {
-                return {
-                    content: [{ type: 'text' as const, text: `Target agent '${target_agent_name}' not found under owner '${callerParsed.owner}'.` }],
-                    isError: true,
-                };
-            }
-            if (targetAgent.owner !== callerParsed.owner) {
-                return {
-                    content: [{ type: 'text' as const, text: 'You can only update the mode of agents owned by the same owner.' }],
-                    isError: true,
-                };
-            }
 
-            const updated = await storage.updateAgent(targetGaii, { mode });
-            if (!updated) {
-                return { content: [{ type: 'text' as const, text: `Agent not found: ${target_agent_name}` }], isError: true };
+            const outcome = await setAgentMode({ storage, config }, callerParsed.owner, target_agent_name, mode);
+            if (!outcome.ok) {
+                return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             }
-            emitChange('agents');
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        gaii: updated.gaii,
-                        name: updated.name,
-                        mode: updated.mode ?? 'interactive',
+                        gaii: outcome.agent.gaii,
+                        name: outcome.agent.name,
+                        mode: outcome.agent.mode ?? 'interactive',
                     }, null, 2),
                 }],
             };

@@ -4,6 +4,9 @@
  *   Tests instance list, create, status, and the instances resource template.
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation
+ *   v1.1.0 — 2026-08-10 — Phase 4: both doors, one write. The tool and POST /v1/chat-instances now
+ *     share services/chat-instance-write.ts, so re-registering a session behaves the same way
+ *     through either, and a session opened through one is visible through the other.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-chat-instances.ts
@@ -303,6 +306,57 @@ await test('8. Instances resource template listed in resources/templates', async
     const templates = body.result?.resourceTemplates ?? [];
     const found = templates.find((t: any) => t.uriTemplate?.includes('instances'));
     assert(found !== undefined, 'instances resource template present');
+});
+
+// ─── Phase 4: Both doors, one write ───
+console.log('\nPhase 4 — Both doors, one write');
+
+let restInstanceId = '';
+
+await test('9. POST /v1/chat-instances registers a session', async () => {
+    const { status, body } = await json('/v1/chat-instances', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ platform: 'claude', app_name: 'both-doors' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.chat_instance?.app_name === 'both-doors', 'app_name matches');
+    restInstanceId = body.data.chat_instance.id;
+});
+
+await test('10. Re-registering the same session returns the same instance, not a failure', async () => {
+    // The id is deterministic, so a returning session asks for the row it already has. Before the
+    // shared write this hit the primary key and surfaced as a 500 on HTTP while the MCP tool
+    // returned the existing row.
+    const { status, body } = await json('/v1/chat-instances', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ platform: 'claude', app_name: 'both-doors' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.chat_instance?.id === restInstanceId, `same id: ${body.data?.chat_instance?.id} === ${restInstanceId}`);
+});
+
+await test('11. The instance the MCP tool created is listed over HTTP', async () => {
+    const { body } = await json('/v1/chat-instances', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const found = (body.data?.chat_instances ?? []).find((ci: any) => ci.id === instanceId);
+    assert(found !== undefined, `instance ${instanceId} listed over HTTP`);
+    assert(found.app_name === 'mcp-e2e-test-app', `app_name: ${found.app_name}`);
+    assert(found.is_anonymous === false, 'is_anonymous derived from the owner, not hardcoded');
+    assert(found.ghii === `${ownerName}@${NODE_ID}`, `ghii: ${found.ghii}`);
+});
+
+await test('12. platform is required, whichever door asks', async () => {
+    const { status, body } = await json('/v1/chat-instances', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ app_name: 'no-platform' }),
+    });
+    assert(status === 400, `status ${status}`);
+    assert(body.error?.code === 'INVALID_INPUT', `code: ${JSON.stringify(body.error)}`);
 });
 
 // ─── Summary ───

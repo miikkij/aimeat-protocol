@@ -11,18 +11,23 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-08-11 -- The three writes go through services/sharing-group-members.ts instead of
+ *     storage: validation, the member's address, the record build and the change event are the same
+ *     ones POST /v1/groups applies. These tools render the answer and nothing else.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, SharingGroupMember } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { addGroupMember, removeGroupMember } from '../services/sharing-group-members.js';
-import { emitChange } from '../services/event-bus.js';
+import {
+    createSharingGroup,
+    addSharingGroupMember,
+    removeSharingGroupMember,
+} from '../services/sharing-group-members.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -151,39 +156,14 @@ export function registerSharingGroupTools(
         async ({ name, description, members }) => {
             const ownerGhii = getOwnerGhii();
 
-            // Max 50 groups per owner
-            const existing = await storage.listSharingGroups(ownerGhii);
-            if (existing.length >= 50) {
-                return { content: [{ type: 'text' as const, text: 'Maximum 50 sharing groups per owner' }], isError: true };
-            }
+            // The ceiling, the shape limits, the member's stored address and the record build are
+            // services/sharing-group-members.ts, because POST /v1/groups decides them too. The
+            // service also emits the `groups` change event to the owner's open browser; the
+            // notification below is the MCP session's own.
+            const created = await createSharingGroup({ storage, config }, ownerGhii, { name, description, members });
+            if (!created.ok) return { content: [{ type: 'text' as const, text: created.message }], isError: true };
+            const record = created.group;
 
-            const now = new Date().toISOString();
-            const id = uuidv4();
-
-            const defaultPermissions = { read: true, write: false };
-            const storageMembers: SharingGroupMember[] = (members ?? []).map(m => ({
-                identifier: m.identifier,
-                identifierType: m.identifier_type,
-                permissions: m.permissions ?? defaultPermissions,
-                addedAt: now,
-                addedBy: ownerGhii,
-            }));
-
-            const record = await storage.createSharingGroup({
-                id,
-                name: name.trim(),
-                description: description?.trim(),
-                ownerGaii: ownerGhii,
-                members: storageMembers,
-                defaultPermissions,
-                createdAt: now,
-                updatedAt: now,
-            });
-
-            // routes/sharing-groups.ts emits this on every mutation. emitResourceListChanged below
-            // tells THIS MCP session; emitChange tells the owner's open browser, which is where a
-            // sharing group is actually looked at.
-            emitChange('groups');
             emitResourceListChanged(agentGaii);
 
             return {
@@ -223,29 +203,19 @@ export function registerSharingGroupTools(
         async ({ group_id, identifier, identifier_type, permissions }) => {
             const ownerGhii = getOwnerGhii();
 
-            const group = await storage.getSharingGroup(group_id);
-            if (!group) return { content: [{ type: 'text' as const, text: 'Sharing group not found' }], isError: true };
-
-            if (group.ownerGaii !== ownerGhii) {
-                return { content: [{ type: 'text' as const, text: 'Only the group owner can add members' }], isError: true };
-            }
-
-            // The ceiling, the duplicate test and the member's shape are services/sharing-group-
-            // members.ts — the HTTP door decides them too, and a sharing group IS the boundary of
-            // who reads the owner's memory.
-            const added = addGroupMember(group, { identifier, identifierType: identifier_type, permissions }, ownerGhii);
-            if (!added.ok) return { content: [{ type: 'text' as const, text: added.message }], isError: true };
-            const { members: updatedMembers, now } = added;
-            const newMember = updatedMembers[updatedMembers.length - 1];
-            await storage.updateSharingGroup(group_id, {
-                members: updatedMembers,
-                updatedAt: now,
+            // Ownership, the ceiling, the duplicate test, the member's stored address and the write
+            // are services/sharing-group-members.ts. The HTTP door decides them too, and a sharing
+            // group IS the boundary of who reads the owner's memory.
+            const added = await addSharingGroupMember({ storage, config }, ownerGhii, group_id, {
+                identifier,
+                identifier_type,
+                permissions,
             });
+            if (!added.ok) return { content: [{ type: 'text' as const, text: added.message }], isError: true };
+            const newMember = added.member;
 
-            // Who is in a sharing group decides who reads the owner's memory, so the members view
-            // must not go stale while an agent changes it. routes/sharing-groups.ts emits on both
-            // the add and the remove.
-            emitChange('groups');
+            // The members view must not go stale while an agent changes it. The service has already
+            // told the owner's browser; this tells the MCP session holding the resource.
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(group_id)}`);
 
             return {
@@ -277,25 +247,11 @@ export function registerSharingGroupTools(
         async ({ group_id, identifier }) => {
             const ownerGhii = getOwnerGhii();
 
-            const group = await storage.getSharingGroup(group_id);
-            if (!group) return { content: [{ type: 'text' as const, text: 'Sharing group not found' }], isError: true };
-
-            if (group.ownerGaii !== ownerGhii) {
-                return { content: [{ type: 'text' as const, text: 'Only the group owner can remove members' }], isError: true };
-            }
-
-            const removed = removeGroupMember(group, identifier);
+            const removed = await removeSharingGroupMember({ storage, config }, ownerGhii, group_id, identifier);
             if (!removed.ok) return { content: [{ type: 'text' as const, text: removed.message }], isError: true };
-            const { members: updatedMembers, now } = removed;
-            await storage.updateSharingGroup(group_id, {
-                members: updatedMembers,
-                updatedAt: now,
-            });
 
-            // Who is in a sharing group decides who reads the owner's memory, so the members view
-            // must not go stale while an agent changes it. routes/sharing-groups.ts emits on both
-            // the add and the remove.
-            emitChange('groups');
+            // The members view must not go stale while an agent changes it. The service has already
+            // told the owner's browser; this tells the MCP session holding the resource.
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(group_id)}`);
 
             return {

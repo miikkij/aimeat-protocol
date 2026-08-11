@@ -9,6 +9,15 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.13.0 — 2026-08-11 — August 2026 audit step 8: the draft save, the draft promotion and the
+ *     delete go through services/app-lifecycle.ts, the same functions the HTTP routes call. Three
+ *     divergences went with the duplication. The delete removed ONE bucket and left the app's
+ *     screenshot in storage with no change-log line, where the route sweeps every bucket the owner
+ *     has for that filename (old publish paths left ghost rows), deletes the screenshot and logs. The
+ *     draft save defaulted a new app's category to 'tool' where every other door says 'utility'. And
+ *     all five tools composed the owner bucket as `owner@nodeId` by hand instead of resolving the
+ *     owner's canonical GHII, which is the key routes/apps.ts addresses and the key the startup
+ *     bucket-merge migration consolidates onto.
  *   v1.12.0 — 2026-08-11 — Both publish tools take `spec_token` / `spec_ack` (carried into the token
  *     in upload mode) and return `spec_check` + `app_hints`. A blocking artifact finding comes back
  *     as an error carrying the findings, so the remedy survives MCP's plain-text error channel.
@@ -64,7 +73,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
@@ -72,8 +81,11 @@ import { generateDraftToken } from '../services/draft-token.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
 import { publishApp } from '../services/app-publish.js';
+import {
+    appFilenameRefusal, resolveAppOwnerScope, stageAppDraft, discardAppDraft,
+    publishAppDraft, deleteOwnedApp,
+} from '../services/app-lifecycle.js';
 import { publicPosture } from '../services/app-ai-posture.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
@@ -141,24 +153,23 @@ export function registerAppsTools(
         annotationsFor('aimeat_app_publish'),
         async ({ filename, content_base64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
-            const parsed = parseGAII(agentGaii);
-            if (!parsed) {
+            // The same owner scope the HTTP door resolves. Composing `owner@nodeId` here addressed a
+            // different bucket than routes/apps.ts for any owner whose GHII record says otherwise.
+            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            if (!scope) {
                 return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
             }
 
-            // Validate filename
-            if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
-                return {
-                    content: [{ type: 'text' as const, text: 'Invalid filename. Use alphanumeric, dots, hyphens, underscores. Max 100 chars.' }],
-                    isError: true,
-                };
+            const badName = appFilenameRefusal(filename);
+            if (badName) {
+                return { content: [{ type: 'text' as const, text: badName.refusal.message }], isError: true };
             }
 
             // --- UPLOAD MODE: no content provided, return presigned upload URL ---
             if (!content_base64) {
                 const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
                 const token = await generateUploadToken({
-                    sub: `${parsed.owner}@${config.nodeId}`,
+                    sub: scope.ownerGhii,
                     // WHO asked, next to WHERE it lands. An app always lands in the owner's bucket,
                     // so `sub` alone erased the publishing agent — and with it everything MINT-3 has
                     // to reason from, on the door this tool recommends for anything over 1 KB. The
@@ -204,8 +215,6 @@ export function registerAppsTools(
                 };
             }
 
-            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
-
             // Agent-Bundled Apps: validate declared crew-defs fail-loud — a malformed agents[]
             // rejects the publish so it never reaches a fleet. This stays HERE because it is
             // validation of an MCP parameter, not part of the publish itself.
@@ -227,8 +236,8 @@ export function registerAppsTools(
             // re-publishing over MCP.
             try {
                 const out = await publishApp(storage, config, {
-                    ownerName: parsed.owner,
-                    ownerGhii: ownerGaii,
+                    ownerName: scope.ownerName,
+                    ownerGhii: scope.ownerGhii,
                     callerGaii: agentGaii,
                     filename,
                     data,
@@ -294,44 +303,28 @@ export function registerAppsTools(
         annotationsFor('aimeat_app_draft_save'),
         async ({ filename, content_base64, name, description, category, tags, icon }) => {
             const agentGaii = getAgentGaii();
-            const parsed = parseGAII(agentGaii);
-            if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
-            if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/.test(filename)) {
-                return { content: [{ type: 'text' as const, text: 'Invalid filename. Use alphanumeric, dots, hyphens, underscores. Max 100 chars.' }], isError: true };
-            }
+            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
             const data = Buffer.from(content_base64, 'base64');
-            const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
-            if (data.length > MAX_APP_SIZE) {
-                return { content: [{ type: 'text' as const, text: `Draft exceeds ${config.appMaxSizeMb}MB limit (${data.length} bytes)` }], isError: true };
-            }
-            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
-            // Inherit the live app's manifest as the base so a draft that only changes HTML
-            // keeps its name/description/category/icon.
-            const live = await storage.getApp(ownerGaii, filename);
-            const base = live?.manifest;
-            const manifest: AppManifest = {
-                name: name ?? base?.name ?? filename.replace(/\.html?$/i, ''),
-                description: (typeof description === 'string' ? description : base?.description) ?? '',
-                version: base?.version ?? '1.0.0',
-                category: category ?? base?.category ?? 'tool',
-                tags: tags ?? base?.tags ?? [],
-                authorDisplay: parsed.owner,
-                usesCortex: base?.usesCortex ?? [],
-            };
-            if (icon ?? base?.icon) manifest.icon = icon ?? base?.icon;
-            if (base?.protection) manifest.protection = base.protection;
-            if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
             try {
-                await storage.saveAppDraft({
-                    ownerGaii, ownerName: parsed.owner, filename, manifest,
-                    mimeType: live?.mimeType ?? 'text/html', size: data.length, data,
-                    updatedAt: new Date().toISOString(),
+                // The draft slot is written in services/app-lifecycle.ts, the same function
+                // PUT /v1/apps/:owner/:filename/draft calls. The two used to build the manifest
+                // separately and disagreed on the default category.
+                const staged = await stageAppDraft(storage, config, {
+                    ownerName: scope.ownerName,
+                    ownerGhii: scope.ownerGhii,
+                    filename,
+                    data,
+                    requested: { name, description, category, tags, icon },
                 });
+                if ('refusal' in staged) {
+                    return { content: [{ type: 'text' as const, text: refusalText(staged.refusal) }], isError: true };
+                }
                 // Mint a preview token + apex preview URL. On a node with the app origin ON the
                 // apex GET handler 301-redirects this to the isolated origin (preserving the
                 // token), so the SAME URL works in both postures.
-                const token = await generateDraftToken({ sub: ownerGaii, filename }, 600);
-                const previewUrl = `${config.baseUrl}/v1/apps/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(filename)}?mode=inline&preview=${encodeURIComponent(token)}`;
+                const token = await generateDraftToken({ sub: scope.ownerGhii, filename }, 600);
+                const previewUrl = `${config.baseUrl}/v1/apps/${encodeURIComponent(scope.ownerName)}/${encodeURIComponent(filename)}?mode=inline&preview=${encodeURIComponent(token)}`;
                 logger.info(`App draft saved via MCP: ${filename}`, { by: agentGaii });
                 return {
                     content: [{
@@ -339,8 +332,8 @@ export function registerAppsTools(
                         text: JSON.stringify({
                             filename,
                             saved: true,
-                            has_live_version: !!live,
-                            live_version_number: live?.versionNumber ?? 0,
+                            has_live_version: staged.hasLiveVersion,
+                            live_version_number: staged.liveVersionNumber,
                             preview_url: previewUrl,
                             preview_expires_in_seconds: 600,
                             note: 'Draft saved — the LIVE app is unchanged. Open preview_url in a browser to test this next version on a real origin (mic/camera prompts work). When it is good, call aimeat_app_draft_publish to make it live; to throw it away call aimeat_app_draft_discard. To ship straight to live without staging, use aimeat_app_publish instead.',
@@ -365,38 +358,24 @@ export function registerAppsTools(
         annotationsFor('aimeat_app_draft_publish'),
         async ({ filename, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
-            const parsed = parseGAII(agentGaii);
-            if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
-            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
-            const draft = await storage.getAppDraft(ownerGaii, filename);
+            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            // Loaded here rather than in the service so this door can name ITS remedy; the HTTP door
+            // points at `PUT .../draft` for the same condition.
+            const draft = await storage.getAppDraft(scope.ownerGhii, filename);
             if (!draft) {
                 return { content: [{ type: 'text' as const, text: `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.` }], isError: true };
             }
             try {
-                // The same shared publish the REST publish-draft goes through. This tool was the
-                // FIFTH copy, and the thinnest: it carried neither the access code nor the
-                // operator-hidden flag, so staging a draft and promoting it over MCP was a way out
-                // of an operator hide.
-                const out = await publishApp(storage, config, {
-                    ownerName: parsed.owner,
-                    ownerGhii: ownerGaii,
+                // The promotion, including the draft-slot clear, is services/app-lifecycle.ts — the
+                // same function POST .../publish-draft calls. Both doors used to map the draft
+                // manifest onto the publish input by hand, nine fields each.
+                const out = await publishAppDraft(storage, config, {
+                    ownerName: scope.ownerName,
+                    ownerGhii: scope.ownerGhii,
                     callerGaii: agentGaii,
                     filename,
-                    data: draft.data,
-                    mimeType: draft.mimeType,
-                    requested: {
-                        name: draft.manifest.name,
-                        description: draft.manifest.description,
-                        version: draft.manifest.version || undefined,
-                        category: draft.manifest.category,
-                        tags: draft.manifest.tags,
-                        icon: draft.manifest.icon,
-                        usesCortex: draft.manifest.usesCortex,
-                        cortexAgents: draft.manifest.cortex?.agents,
-                        protection: draft.manifest.protection,
-                    },
-                    accessCode: { mode: 'carry' },
-                    source: 'draft',
+                    draft,
                     declaredProvenanceId: ai_provenance_id,
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
                     specToken: spec_token,
@@ -406,10 +385,6 @@ export function registerAppsTools(
                     // The draft stays: a refused promotion is work to fix, not work to lose.
                     return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
                 }
-                await storage.deleteAppDraft(ownerGaii, filename);
-                // routes/apps/* emits this on every catalogue change. Without it the owner's app list, and the
-                // app store, showed yesterday's set while an agent published.
-                emitChange('apps');
                 emitResourceListChanged(agentGaii);
                 logger.info(`App draft published via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
                 return {
@@ -442,10 +417,9 @@ export function registerAppsTools(
         annotationsFor('aimeat_app_draft_discard'),
         async ({ filename }) => {
             const agentGaii = getAgentGaii();
-            const parsed = parseGAII(agentGaii);
-            if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
-            const ownerGaii = `${parsed.owner}@${config.nodeId}`;
-            const discarded = await storage.deleteAppDraft(ownerGaii, filename);
+            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            if (!scope) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
+            const discarded = await discardAppDraft(storage, scope.ownerGhii, filename);
             if (!discarded) {
                 return { content: [{ type: 'text' as const, text: `No draft to discard for "${filename}".` }], isError: true };
             }
@@ -478,7 +452,10 @@ export function registerAppsTools(
         },
         async ({ category, search, tag, own }) => {
             const agentGaii = getAgentGaii();
-            const ownerGhii = `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}`;
+            // The same bucket key the write tools use, so `own: true` cannot list a set the delete
+            // tool then fails to find.
+            const ownerGhii = (await resolveAppOwnerScope(storage, config, agentGaii))?.ownerGhii
+                ?? `${agentGaii}@${config.nodeId}`;
 
             const opts = {
                 category,
@@ -611,25 +588,27 @@ export function registerAppsTools(
         annotationsFor('aimeat_app_delete'),
         async ({ filename, version }) => {
             const agentGaii = getAgentGaii();
-            const ownerGaii = `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}`;
-
-            // Verify the app exists and belongs to this owner
-            const app = await storage.getApp(ownerGaii, filename, version);
-            if (!app) {
-                return {
-                    content: [{ type: 'text' as const, text: `App "${filename}" not found in your uploads${version ? ` (version ${version})` : ''}` }],
-                    isError: true,
-                };
+            const scope = await resolveAppOwnerScope(storage, config, agentGaii);
+            if (!scope) {
+                return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
             }
 
             try {
-                await storage.deleteApp(ownerGaii, filename, version);
+                // The delete is services/app-lifecycle.ts, the same function DELETE /v1/apps/:filename
+                // calls. This tool used to delete one bucket and stop: the ghost rows an old publish
+                // path left behind stayed listed, and the app's screenshot stayed in storage forever.
+                const out = await deleteOwnedApp(storage, {
+                    ownerName: scope.ownerName,
+                    ownerGhii: scope.ownerGhii,
+                    callerGaii: agentGaii,
+                    filename,
+                    version,
+                });
+                if ('refusal' in out) {
+                    return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };
+                }
 
                 logger.info(`App deleted via MCP: ${filename}${version ? ` v${version}` : ' (all versions)'}`, { by: agentGaii });
-
-                // routes/apps/* emits this on every catalogue change. Without it the owner's app list, and the
-                // app store, showed yesterday's set while an agent published.
-                emitChange('apps');
                 emitResourceListChanged(agentGaii);
 
                 return {
@@ -637,7 +616,7 @@ export function registerAppsTools(
                         type: 'text' as const,
                         text: JSON.stringify({
                             filename,
-                            version_deleted: version ?? 'all',
+                            version_deleted: out.versionDeleted,
                             note: version ? `Version ${version} deleted.` : 'App deleted (all versions).',
                         }, null, 2),
                     }],

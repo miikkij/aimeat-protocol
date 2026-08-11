@@ -11,14 +11,18 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-10 — August audit step 8: the record build, the GHII check and the lastSeen
+ *     write moved to services/chat-instance-write.ts, shared with the two MCP doors that were
+ *     building the same row. POST now returns the existing session when one is already registered
+ *     under that id, where the duplicate insert used to surface as a 500.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { buildChatInstanceId } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
+import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
 
 export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -26,36 +30,17 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
   // POST /v1/chat-instances — Register a new chat session
   router.post('/v1/chat-instances', requireAuth(), async (req, res) => {
     const { platform, app_name } = req.body ?? {};
-    const ownerName = req.auth!.owner;
 
-    if (!platform || typeof platform !== 'string') {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'platform is required'));
+    const out = await registerChatInstance(
+      { storage, config },
+      { ownerName: req.auth!.owner },
+      { platform, appName: typeof app_name === 'string' ? app_name : undefined },
+    );
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-
-    const appName = (typeof app_name === 'string' && app_name) || `session-${Date.now()}`;
-    const id = buildChatInstanceId(platform, appName, ownerName, config.nodeId);
-    const ghii = `${ownerName}@${config.nodeId}`;
-
-    // Verify GHII exists
-    const ghiiRecord = await storage.getGHII(ghii);
-    if (!ghiiRecord) {
-      res.status(404).json(error(config.nodeId, 'GHII_NOT_FOUND', `No GHII profile found for "${ownerName}"`));
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const record = await storage.createChatInstance({
-      id,
-      platform,
-      appName,
-      ownerName,
-      ghii,
-      nodeId: config.nodeId,
-      isAnonymous: ownerName === 'anonymous',
-      createdAt: now,
-      lastSeen: now,
-    });
+    const record = out.value.record;
 
     res.status(201).json(success(config.nodeId, {
       chat_instance: {
@@ -70,7 +55,6 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
       { description: 'Store data in memory', method: 'POST', url: '/v1/memory' },
       { description: 'List chat instances', method: 'GET', url: '/v1/chat-instances' },
     ]));
-    emitChange('chat');
   });
 
   // GET /v1/chat-instances — List chat instances
@@ -150,9 +134,7 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
 
-    const updated = await storage.updateChatInstance(id, {
-      lastSeen: new Date().toISOString(),
-    });
+    const updated = await touchChatInstance({ storage }, id);
 
     res.json(success(config.nodeId, {
       chat_instance: {
@@ -160,7 +142,6 @@ export function chatInstancesRouter(config: AimeatConfig, storage: Storage): Rou
         last_seen: updated!.lastSeen,
       },
     }));
-    emitChange('chat');
   });
 
   // DELETE /v1/chat-instances/:id — End chat session

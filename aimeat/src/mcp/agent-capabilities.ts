@@ -13,15 +13,20 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-08-11 -- The write is services/agent-profile-write.ts, shared with PUT
+ *     /v1/agents/:name/capabilities. Reported languages are stored in the agent's `languages`
+ *     field, as HTTP has stored them since May; this tool was still pushing them into
+ *     domainCapabilities as "Language: fi", so an MCP-onboarded agent had a polluted domain list
+ *     and read as speaking no language anywhere the UI shows one.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AgentTechnicalCapability } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { emitChange } from '../services/event-bus.js';
+import { setAgentCapabilities } from '../services/agent-profile-write.js';
 
 export function registerAgentCapabilityTools(
     mcp: McpServer,
@@ -47,37 +52,16 @@ export function registerAgentCapabilityTools(
         },
         annotationsFor('aimeat_agent_capabilities_report'),
         async ({ technical, domain, languages }) => {
-            const agent = await storage.getAgent(agentGaii);
-            if (!agent) {
-                return { content: [{ type: 'text' as const, text: 'Agent not found' }], isError: true };
+            // The caller reached this tool over an authenticated agent session, so the connection
+            // itself is the proof behind an mcp-type capability being marked verified.
+            const outcome = await setAgentCapabilities({ storage, config }, agentGaii,
+                { technical, domain, languages }, { liveMcpSession: true });
+
+            if (!outcome.ok) {
+                return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             }
+            const updated = outcome.agent;
 
-            // Agent is connected via MCP -- MCP-type capabilities are verified
-            const technicalCapabilities: AgentTechnicalCapability[] = (technical ?? []).map(cap => ({
-                name: cap.name,
-                type: cap.type,
-                verified: cap.type === 'mcp',
-            }));
-
-            // Build domain capabilities, merging language entries as "Language: fi" etc.
-            const domainCapabilities = [...(domain ?? [])];
-            if (languages) {
-                for (const lang of languages) {
-                    domainCapabilities.push(`Language: ${lang}`);
-                }
-            }
-
-            const updated = await storage.updateAgent(agentGaii, {
-                technicalCapabilities,
-                domainCapabilities,
-            });
-
-            if (!updated) {
-                return { content: [{ type: 'text' as const, text: 'Failed to update capabilities' }], isError: true };
-            }
-
-            // routes/agent-capabilities.ts emits this when an agent re-declares what it can do.
-            emitChange('agent-capabilities');
             emitResourceUpdated(agentGaii, `aimeat://agents/${agentGaii}/capabilities`);
 
             return {
@@ -86,6 +70,7 @@ export function registerAgentCapabilityTools(
                     text: JSON.stringify({
                         technical_capabilities: updated.technicalCapabilities ?? [],
                         domain_capabilities: updated.domainCapabilities ?? [],
+                        languages: updated.languages ?? [],
                     }, null, 2),
                 }],
             };
