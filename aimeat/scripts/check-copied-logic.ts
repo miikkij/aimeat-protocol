@@ -53,7 +53,7 @@ const MIN_LINES = 6;
  * Lower it as pairs are cleared. Never raise it: a new pair means somebody repaired a difference by
  * copying the rule, which is the failure this whole exercise exists to prevent.
  */
-const SEED = 9;
+const SEED = 8;
 
 const SIDES = [
     { name: 'mcp', dir: 'src/mcp' },

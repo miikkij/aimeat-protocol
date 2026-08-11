@@ -279,10 +279,24 @@ await test('8d. Verify reactions on post', async () => {
     assert(reactions['🚀']?.length === 1, `rocket: ${reactions['🚀']?.length}`);
 });
 
-await test('9. Add reply to post', async () => {
+await test('9. A stranger cannot reply on a PRIVATE board', async () => {
+    // agent2 does not own this board. Posting to it has always been refused; REPLYING was not,
+    // because neither door applied the board's access rule to a reply — both checked only that the
+    // parent post existed. The rule is one function now (services/board-post.ts), so a reply asks
+    // the same question a post does.
     const { status, body } = await json(`/v1/boards/${privateBoardId}/posts/${reactionPostId}/replies`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${agent2Token}` },
+        body: JSON.stringify({ body: 'this should not land' }),
+    });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body?.error?.code === 'ACCESS_DENIED', `code: ${JSON.stringify(body?.error)}`);
+});
+
+await test('9b. The board OWNER can reply on their own private board', async () => {
+    const { status, body } = await json(`/v1/boards/${privateBoardId}/posts/${reactionPostId}/replies`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
         body: JSON.stringify({ body: 'Great post, thanks for sharing!' }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);

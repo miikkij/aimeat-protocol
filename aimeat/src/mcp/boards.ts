@@ -28,9 +28,9 @@ import { parseGAII, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
+import { createBoardReply } from '../services/board-post.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
 
 export function registerBoardsTools(
     mcp: McpServer,
@@ -263,43 +263,20 @@ export function registerBoardsTools(
         },
         annotationsFor('aimeat_board_reply'),
         async ({ board_id, post_id, body, ai_provenance, ai_provenance_id }) => {
-            const parent = await storage.getPost(board_id, post_id);
-            if (!parent) return { content: [{ type: 'text' as const, text: 'Post not found' }], isError: true };
-
-            const replyId = `reply-${randomBytes(8).toString('hex')}`;
-            // TARGET-058. Same act as aimeat_board_post — text an agent puts where people read it —
-            // so it is stamped the same way. The hash covers the BODY alone: the title is generated
-            // by this tool ("Re: …"), and hashing our own prefix would describe bytes the agent never
-            // wrote. Phase 9 gave the reply a column for the id, so the label can be rendered from
-            // the reply rather than only found by that hash.
-            const provenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content: body,
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+            // The whole reply is services/board-post.ts: the board's ACCESS rule (which neither door
+            // applied to a reply — both checked only that the parent post existed), the body bound,
+            // the provenance stamp with the board's REAL visibility (this tool stamped every reply
+            // 'public', so one on a private board carried a public-surface label), the record, the
+            // change event and the subscriber fan-out.
+            const out = await createBoardReply({ storage, config }, { gaii: agentGaii, roles: ['agent'] }, {
+                boardId: board_id, postId: post_id, body,
+                declaredProvenanceId: ai_provenance_id,
+                declaredProvenance: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.board_reply',
-                surface: { visibility: 'public', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
             });
-            const reply = await storage.createPost({
-                id: replyId,
-                boardId: board_id,
-                authorGaii: agentGaii,
-                title: `Re: ${parent.title}`,
-                body,
-                tags: [],
-                reactions: {},
-                replyTo: post_id,
-                createdAt: new Date().toISOString(),
-                aiProvenanceId: provenanceId,
-            });
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+            const reply = out.reply;
 
-            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
-            // browser is exactly the surface that must not need a reload while an agent posts.
-            emitChange('boards');
             emitResourceUpdated(agentGaii, `aimeat://boards/${encodeURIComponent(board_id)}`);
 
             return {
@@ -311,7 +288,7 @@ export function registerBoardsTools(
                         reply_to: reply.replyTo,
                         title: reply.title,
                         created_at: reply.createdAt,
-                        ...(await writeProvenanceEcho(storage, config, provenanceId)),
+                        ...(await writeProvenanceEcho(storage, config, reply.aiProvenanceId ?? undefined)),
                     }, null, 2),
                 }],
             };

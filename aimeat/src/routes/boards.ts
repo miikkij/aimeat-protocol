@@ -30,10 +30,9 @@ import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { checkOtkSession } from './auth.js';
 import { emitChange } from '../services/event-bus.js';
-import { createBoardPost } from '../services/board-post.js';
+import { createBoardPost, createBoardReply } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
 import {
   loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
 } from '../services/ai-provenance-marks.js';
@@ -480,51 +479,29 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards/:boardId/posts/:postId/replies — reply to a post
   router.post('/v1/boards/:boardId/posts/:postId/replies', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardReplySchema, config.nodeId), async (req, res) => {
-    const boardId = req.params.boardId as string;
-    const postId = req.params.postId as string;
-    const parent = await storage.getPost(boardId, postId);
-    if (!parent) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Post not found'));
+    // services/board-post.ts — the same reply aimeat_board_reply makes. It carries the board's
+    // ACCESS rule, which this handler did not apply to a reply: it checked only that the parent post
+    // existed, so a reply could land on a board the replier may not post to.
+    const out = await createBoardReply({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, {
+      boardId: req.params.boardId as string,
+      postId: req.params.postId as string,
+      body: (req.body ?? {}).body,
+      pipeline: 'rest.board_reply',
+    });
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-
-    const { body } = req.body ?? {};
-
-    const replyId = `reply-${randomBytes(8).toString('hex')}`;
-    const replyAuthor = resolve(req);
-    // TARGET-058: the BODY alone — the "Re: …" title is generated here, and hashing our own prefix
-    // would describe bytes the author never wrote.
-    const board = await storage.getBoard(boardId);
-    const aiProvenanceId = await provenanceForWrite(storage, {
-      principal: replyAuthor,
-      content: body,
-      pipeline: 'rest.board_reply',
-      surface: { visibility: board?.visibility === 'public' ? 'public' : 'private', humanAudience: true },
-      labelPolicy: config.aiLabelPublic,
-      nodeId: config.nodeId,
-      baseUrl: config.baseUrl,
-      enabled: config.aiProvenance,
-    });
-    const reply = await storage.createPost({
-      id: replyId,
-      boardId,
-      authorGaii: replyAuthor,
-      title: `Re: ${parent.title}`,
-      body,
-      tags: [],
-      reactions: {},
-      replyTo: postId,
-      createdAt: new Date().toISOString(),
-      aiProvenanceId,
-    });
-
+    const reply = out.reply;
     res.status(201).json(success(config.nodeId, {
       id: reply.id,
       reply_to: reply.replyTo,
       body: reply.body,
       created_at: reply.createdAt,
     }));
-    emitChange('boards');
   });
 
   // ───────────────────────────────────────────────
