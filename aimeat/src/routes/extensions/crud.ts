@@ -10,6 +10,7 @@
  *                         only thing in front of it — which an owner session bypasses.
  */
 import { Router } from 'express';
+import { upsertExtensionInPlace } from '../../services/extension-upsert.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../../storage/interface.js';
 import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
@@ -274,55 +275,16 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
       record.config = encConfig;
 
-      // Swap code + metadata in place atomically. Lifecycle fields (status, installedBy,
-      // installedAt, activatedAt) and the ext:{name} memory + instances are preserved.
-      const updated = await storage.updateExtension(name, {
-        version: record.version,
-        description: record.description,
-        author: record.author,
-        requiredApis: record.requiredApis,
-        actions: record.actions,
-        config: record.config,
-        limits: record.limits,
-        federation: record.federation,
-        instances: record.instances,
+      // The whole upsert — the field swap, the EXCHANGE re-projection and the re-initialisation of
+      // an active extension — is services/extension-upsert.ts, because aimeat_extension_install
+      // does the same act and used to do only the first of the three.
+      const upserted = await upsertExtensionInPlace({ storage, config, scheduler }, name, record, {
+        ownerName: req.auth!.owner as string,
+        actor: req.auth!.sub,
+        wasActive,
       });
-      // TARGET-050: re-project the listings this extension's actions declare (price/flag may have changed).
-      await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, name);
-
-      // Re-run init for an active extension: re-register schedules from the (possibly changed)
-      // manifest and re-run @activate jobs. New action scriptContent is already live — each
-      // /v1/ext/... call reads it fresh from storage.
-      let reinitialized = false;
-      if (wasActive && scheduler) {
-        const jobs = await storage.listScheduledJobs({ extensionName: name });
-        for (const job of jobs) {
-          scheduler.removeJob(job.id);
-          await storage.deleteScheduledJob(job.id);
-        }
-        const schedules = (record.config.__schedules as Array<Record<string, unknown>> | undefined) ?? [];
-        for (const sched of schedules) {
-          const jobId = `ext:${name}:${sched.id as string}`;
-          const jobRecord: ScheduledJobRecord = {
-            id: jobId,
-            name: (sched.description as string) ?? `${name}/${sched.id as string}`,
-            type: 'extension',
-            extensionName: name,
-            actionId: sched.action as string,
-            cron: sched.cron as string,
-            enabled: true,
-            input: (sched.input as Record<string, unknown>) ?? undefined,
-            createdBy: req.auth!.sub,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          await storage.createScheduledJob(jobRecord);
-          scheduler.addJob(jobRecord);
-        }
-        scheduler.runActivateJobs(name).catch(err =>
-          logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
-        reinitialized = true;
-      }
+      const updated = upserted.record;
+      const reinitialized = upserted.reinitialized;
 
       logger.info(`Extension upserted: ${name}`, { version: record.version, by: req.auth!.sub, reinitialized });
       res.json(success(config.nodeId, { extension: updated, action: 'updated', reinitialized, ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [

@@ -51,6 +51,8 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { canManageExtensionAs } from '../routes/extensions/permissions.js';
+import { upsertExtensionInPlace } from '../services/extension-upsert.js';
+import { getActiveScheduler } from '../services/scheduler.js';
 import { extensionInstallRefusal } from '../services/install-quotas.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
@@ -453,37 +455,27 @@ export function registerExtensionsTools(
                 let result: ExtensionRecord;
                 let action: 'installed' | 'updated';
                 if (existingExt) {
-                    // In-place upsert (mirrors PUT /v1/extensions/:name): swap code + metadata,
-                    // preserve lifecycle fields (status, installedBy/At, activatedAt) and ext: memory.
-                    const updated = await storage.updateExtension(name, {
-                        version: record.version,
-                        description: record.description,
-                        author: record.author,
-                        requiredApis: record.requiredApis,
-                        actions: record.actions,
-                        config: record.config,
-                        limits: record.limits,
-                        federation: record.federation,
-                        instances: record.instances,
-                    });
-                    // routes/extensions/crud.ts emits on install, activate, deactivate and delete. An extension is
-                    // code the owner has running, so its state going stale on screen is the wrong answer to
-                    // "what is active right now".
+                    // The whole upsert is services/extension-upsert.ts: the field swap, the EXCHANGE
+                    // re-projection, and — for an ACTIVE extension — re-registering its schedules
+                    // from the new manifest and re-running its @activate jobs. This tool used to do
+                    // only the swap and said so in its own answer, so an agent redeploying an active
+                    // extension left the OLD schedules running against the new code.
+                    const upserted = await upsertExtensionInPlace(
+                        { storage, config, scheduler: getActiveScheduler() }, name, record,
+                        { ownerName: record.installedBy, actor: agentGaii, wasActive: existingExt.status === 'active' },
+                    );
                     emitChange('extensions');
                     // Never answer a write that did not apply with the record we WANTED to store.
-                    // This line used to be `updated ?? { ...record, status }`, which reported the NEW
-                    // version number while the database still held the old code — the most misleading
-                    // answer available, because it looks like proof the deploy worked.
-                    if (!updated) {
+                    if (!upserted.record) {
                         logger.error(`Extension upsert wrote nothing via MCP: ${name}`, { by: record.installedBy });
                         return {
                             content: [{ type: 'text' as const, text: `Extension "${name}" was NOT updated — the storage write did not apply, and the installed version is unchanged. Nothing was deployed.` }],
                             isError: true,
                         };
                     }
-                    result = updated;
+                    result = upserted.record;
                     action = 'updated';
-                    logger.info(`Extension updated via MCP: ${name}`, { version: record.version, by: record.installedBy });
+                    logger.info(`Extension updated via MCP: ${name}`, { version: record.version, by: record.installedBy, reinitialized: upserted.reinitialized });
                 } else {
                     result = await storage.createExtension(record);
                     emitChange('extensions');
@@ -508,12 +500,10 @@ export function registerExtensionsTools(
                         .catch(err => logger.error('Capability aggregation after MCP extension install failed', { error: String(err) }));
                 }
 
-                // An ACTIVE extension whose manifest declares schedules needs a schedule
-                // re-registration this tool cannot perform — point at the REST upsert.
-                const manifestSchedules = record.config.__schedules as unknown[] | undefined;
-                const scheduleNote = (action === 'updated' && status === 'active' && Array.isArray(manifestSchedules) && manifestSchedules.length > 0)
-                    ? 'schedules in the manifest are NOT re-registered by this tool — use PUT /v1/extensions/{name} (REST upsert) or deactivate + activate to refresh them'
-                    : undefined;
+                // The note that used to live here — "schedules are NOT re-registered by this tool,
+                // use the REST upsert" — is gone because it is no longer true: the shared upsert
+                // re-registers them for an active extension, on both doors.
+                const scheduleNote = undefined;
 
                 return {
                     content: [{

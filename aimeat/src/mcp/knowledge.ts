@@ -25,10 +25,10 @@
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { listOwnerScopeMemory as kbListOwnerScopeMemory } from '../services/appdev-kb.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
+import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
@@ -66,32 +66,11 @@ export function registerKnowledgeTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    // Aggregate owner-scope memory (GHII + all agents) — packages may be
-    // stored under the owner's GHII (web UI import) or any agent's GAII.
-    async function listOwnerScopeMemory(opts: { prefix?: string; tags?: string[]; visibility?: string }): Promise<MemoryRecord[]> {
-        const parsed = parseGAII(agentGaii);
-        const owner = parsed?.owner;
-        if (!owner) return storage.listMemory(agentGaii, opts);
-
-        const ownerGhii = `${owner}@${config.nodeId}`;
-        const agents = await storage.getAgentsByOwner(owner);
-        // GHII + every agent in ONE IN query (was listMemory per identity). Dedup by key keeping the
-        // highest-priority source (GHII first, then agents in order) — same as the old sequential scan.
-        const owners = [ownerGhii, ...agents.map(a => a.gaii)];
-        const priority = new Map(owners.map((g, i) => [g, i]));
-        const rows = await storage.listMemoryForOwners(owners, opts);
-        rows.sort((x, y) => (priority.get(x.ownerGaii) ?? 0) - (priority.get(y.ownerGaii) ?? 0));
-
-        const seen = new Set<string>();
-        const results: MemoryRecord[] = [];
-        for (const rec of rows) {
-            if (!seen.has(rec.key)) {
-                seen.add(rec.key);
-                results.push(rec);
-            }
-        }
-        return results;
-    }
+    // Owner-scope memory aggregation is services/appdev-kb.ts — packages may sit under the owner's
+    // GHII (web UI import) or any of their agents, and which duplicate key wins is a priority order
+    // that has to be the same answer on both surfaces.
+    const listOwnerScopeMemory = (opts: { prefix?: string; tags?: string[]; visibility?: string }) =>
+        kbListOwnerScopeMemory(storage, config, agentGaii, opts);
 
     // ── Resource: knowledge package ──
     mcp.registerResource(

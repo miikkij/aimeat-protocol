@@ -50,10 +50,18 @@ function ownerOf(callerGaii: string, _config: AimeatConfig): string | null {
     return null;
 }
 
-/** Owner-scope memory aggregation (GHII + all same-owner agents), deduped by key GHII-first. */
+/**
+ * Owner-scope memory aggregation (GHII + all same-owner agents), deduped by key GHII-first.
+ *
+ * A knowledge package may sit under the owner's GHII (imported through the web UI) or under any of
+ * their agents, so "what does this account hold" is one query across the whole identity set rather
+ * than a walk. mcp/knowledge.ts had its own copy of this, and of the priority ordering that decides
+ * which duplicate key wins — the two agreeing is what made an agent and the browser list the same
+ * packages, and there was nothing keeping them agreeing.
+ */
 export async function listOwnerScopeMemory(
     storage: Storage, config: AimeatConfig, callerGaii: string,
-    opts: { prefix?: string; tags?: string[] },
+    opts: { prefix?: string; tags?: string[]; visibility?: string },
 ): Promise<MemoryRecord[]> {
     const owner = ownerOf(callerGaii, config);
     if (!owner) return storage.listMemory(callerGaii, opts);
