@@ -18,6 +18,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.7.1 -- 2026-08-11 -- Note beside the onboarding entries in SCOPE_EXEMPT_TOOLS: the four tools
+ *     mirror the step-confirm route, which is still ungated, while start/cancel now ask for
+ *     agent:write (audit H-2) and have no tool. No mapping changed.
  *   v1.7.0 -- 2026-08-11 -- scopeAllowsTool delegates to utils/scope-coverage.ts scopeIsCovered
  *     instead of retelling the wildcard rule. The retelling had lost the memory:write-reserved
  *     exception, so an agent holding '*' got aimeat_operator_ai_config registered.
@@ -66,9 +69,12 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_agent_capabilities_report',              // Identity is resolved once from the session at agent-capabilities
     'aimeat_agent_telemetry_report',                 // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
     'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope
-    'aimeat_feedback_send',                          // Sender is the session identity: feedback
     'aimeat_instance_create',                        // owner comes from ownerName() derived from the session GAII (chat-instances
     'aimeat_message_send',                           // agentGaii and senderGaii are both the session identity (agent-messages
+    // The four onboarding tools confirm a STEP, which is the agent reporting its own progress: they
+    // mirror POST /v1/agents/:name/onboarding/step/:id, which asks for no scope either. Starting and
+    // cancelling onboarding are a different act and were gated on `agent:write` on 2026-08-11 (audit
+    // H-2), and neither has a tool, so nothing here mirrors them. Adding one means adding the word.
     'aimeat_onboarding_confirm_directives_read',     // agentGaii from the session closure (agent-onboarding
     'aimeat_onboarding_confirm_skill_installed',     // Same identity path as the rest of the onboarding set — agentGaii from the session closure (agent-onboarding
     'aimeat_onboarding_declare_services',            // agentGaii from the session closure (agent-onboarding

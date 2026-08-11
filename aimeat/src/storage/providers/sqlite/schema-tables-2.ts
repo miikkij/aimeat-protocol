@@ -4,6 +4,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Drop the feedback indexes with the table (see schema-tables-1).
  *   v1.1.0 — 2026-07-16 — Add feedback sender/status indexes (Node Feedback Channel).
  *   v1.0.0 — 2026-07-13 — Extracted from sqlite/schema.ts (max-file-lines)
  */
@@ -348,8 +349,6 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_consents_ownerGaii ON consents(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_consent_audit_ownerGaii ON consent_audit(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_flags_target ON flags(targetType, targetId);
-    CREATE INDEX IF NOT EXISTS idx_feedback_sender ON feedback(sender);
-    CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
     CREATE INDEX IF NOT EXISTS idx_matches_profileA ON matches(profileA);
     CREATE INDEX IF NOT EXISTS idx_matches_profileB ON matches(profileB);
     CREATE INDEX IF NOT EXISTS idx_memberships_organismId ON organism_memberships(organismId);

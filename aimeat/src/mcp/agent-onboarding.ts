@@ -143,6 +143,13 @@ async function confirmStepAsText(
         ...(outcome.testTaskAutoStarted
             ? { next_action: 'Test task auto-started. Execute the todos now and then complete the task.' }
             : {}),
+        // The step count can drop here (13 → 4), and an unexplained drop reads like lost progress.
+        ...(outcome.modeSetTo
+            ? {
+                mode_set_to: outcome.modeSetTo,
+                mode_note: `The platform you reported runs in your own environment, so this agent is now in ${outcome.modeSetTo} mode and its Hello Integration is the ${outcome.total}-step flow. The steps that assume a node-resident runtime (delivery channel, telemetry, task queue) do not apply to you and have been removed rather than left to fail.`,
+            }
+            : {}),
     });
 }
 

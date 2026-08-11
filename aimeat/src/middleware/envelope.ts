@@ -12,6 +12,8 @@
  *   - error: build an ok:false envelope with a code/message and default docs hints
  *
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Every error() carries the support@operators next-action. A caller that
+ *     hits a wall now has somewhere to ask on the response itself, instead of guessing.
  *   v1.1.0 — 2026-08-01 — TARGET-058: `meta.provenance` typed on the envelope, so every route that
  *     serves generated content carries the record in the same place. No `data` shape changed.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -71,6 +73,27 @@ export function success<T>(nodeId: string, data: T, hints?: HintAction[], meta?:
   };
 }
 
+/**
+ * The way out of a dead end, on every error this node returns.
+ *
+ * A caller that has hit a wall reads the error and then guesses. An external agent did exactly that
+ * in August 2026: it could not pass an onboarding step, invented three possible remedies, and its
+ * user waited six days for a human to relay the problem by email — because nothing in any response
+ * had ever told it where to ask. `support@operators` reaches whoever runs the node, so it belongs on
+ * the error itself rather than in documentation the caller has already left behind.
+ *
+ * It rides in `next_actions`, which is where a client already looks for what to do next, and it is
+ * appended rather than replacing a route's own hints: the specific fix comes first when the route
+ * knows one.
+ */
+const SUPPORT_HINT: HintAction = {
+  description: 'Stuck, or think this is a bug? Message the people who run this node — they answer in Messages',
+  method: 'POST',
+  url: '/v1/messages',
+  note: 'No identity lookup needed: "support@operators" reaches every operator in one thread.',
+  example_body: { to: 'support@operators', subject: 'What went wrong', body: 'What you were doing, and what happened instead.' },
+};
+
 export function error(nodeId: string, code: string, message: string, httpStatus?: number, details?: unknown, hints?: HintAction[]): AimeatResponse {
   return {
     ok: false,
@@ -80,9 +103,10 @@ export function error(nodeId: string, code: string, message: string, httpStatus?
     timestamp: new Date().toISOString(),
     request_id: generateRequestId(),
     error: { code, message, details },
-    hints: hints ? { next_actions: hints, help_url: '/v1/docs' } : {
+    hints: {
       next_actions: [
-        { description: 'View API documentation', method: 'GET', url: '/v1/docs' },
+        ...(hints ?? [{ description: 'View API documentation', method: 'GET', url: '/v1/docs' }]),
+        SUPPORT_HINT,
       ],
       help_url: '/v1/docs',
     },

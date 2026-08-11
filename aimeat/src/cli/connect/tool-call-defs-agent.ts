@@ -7,7 +7,7 @@
  *     through the per-field routes (PATCH /v1/agents/:name/{mode,tags,scopes}, POST /v1/ai/settings);
  *     scopes is requireRole('owner') which the role hierarchy also admits operators — a plain agent 403s.
  *   v1.1.0 -- 2026-07-19 -- Connector reachability: shell handlers for message_history, dm_send_as_owner,
- *     and feedback send/inbox — thin REST proxies (contacts stay connector-MCP-only, not cliFallback).
+ *     — thin REST proxies (contacts stay connector-MCP-only, not cliFallback).
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -387,34 +387,6 @@ export const agentTools: ConnectCliToolDefinition[] = [
             const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
             return client.post('/v1/messages', body);
         },
-    },
-    {
-        // → POST /v1/feedback (new thread) or POST /v1/feedback/:id/reply (reply into a thread).
-        name: 'aimeat_feedback_send',
-        description: 'Open a platform-feedback thread to the node operator, or reply into an existing one via thread_id.',
-        input: {
-            body: { type: 'string', required: true, description: 'The feedback text (max 8000 chars).' },
-            category: { type: 'string', enum: ['bug', 'blocker', 'idea', 'ux', 'question', 'other'], description: 'Category (required for a new thread).' },
-            title: { type: 'string', description: 'Short summary (required for a new thread).' },
-            context: { type: 'object', description: 'Optional pointers: { app, endpoint, version, url }.' },
-            thread_id: { type: 'string', description: 'Existing thread id to reply into (omit to open a new thread).' },
-        },
-        handler: ({ client }, input) => {
-            const threadId = optionalString(input, 'thread_id');
-            if (threadId) return client.post(`/v1/feedback/${encodeURIComponent(threadId)}/reply`, { body: requiredString(input, 'body') });
-            const body: JsonObject = {
-                category: optionalString(input, 'category') ?? '', title: optionalString(input, 'title') ?? '', body: requiredString(input, 'body'),
-            };
-            const context = optionalRecord(input, 'context'); if (context) body.context = context;
-            return client.post('/v1/feedback', body);
-        },
-    },
-    {
-        // → GET /v1/feedback/mine — the agent's own feedback threads + operator replies.
-        name: 'aimeat_feedback_inbox',
-        description: 'List your own platform-feedback threads and the operator\'s replies.',
-        input: {},
-        handler: ({ client }) => client.get('/v1/feedback/mine'),
     },
     // NOTE: the owner contacts (aimeat_contact_*) are NOT cliFallback — they are exposed on the connector
     // MCP surface (mcp/tools/contacts.ts) but intentionally have no `aimeat connect call` shell handler,

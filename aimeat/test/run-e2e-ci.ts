@@ -23,6 +23,11 @@
  *   v1.7.0 -- 2026-08-07 -- Add e2e-remake-funnel.ts (remake phase 0: onboarding.track separation)
  *            e2e-remake-home.ts (remake phases 2-3: the welcome mat gate) and
  *            e2e-registration-invites.ts (remake phase 4b: the agent door).
+ *   v1.11.0 -- 2026-08-11 -- Add e2e-account-security-gate.ts: the doors that decide who can sign in
+ *            as the person (password, recovery address, TOTP, identity proof, account delete and
+ *            export), probed with an agent JWT, an app-grant token and a second owner. None of them
+ *            carried a role gate before the August 2026 audit, and all of them key off the owner
+ *            name that every one of those tokens carries.
  *   v1.10.0 -- 2026-08-11 -- Add e2e-group-sharing.ts: the half of sharing groups that e2e-sharing-groups
  *            never touched. That suite manages a group in 17 assertions and never reads a record with
  *            one, which is how the sharing itself stayed broken on both backends under a green run.
@@ -53,6 +58,7 @@ const ALL_SUITES = [
     'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',
     'test/e2e-auth-lib.ts',
+    'test/e2e-account-security-gate.ts',
     'test/e2e-oauth-login.ts',
     'test/e2e-session-refresh.ts',
     'test/e2e-access-tokens.ts',
@@ -165,7 +171,6 @@ const ALL_SUITES = [
     'test/e2e-app-publish-provenance-doors.ts',
     'test/e2e-app-ai-posture.ts',
     'test/e2e-notifications.ts',
-    'test/e2e-feedback.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',
     'test/e2e-libs.ts',

@@ -57,7 +57,6 @@ import { patMethods } from './methods/pat.js';
 import { otkMethods } from './methods/otk.js';
 import { federationMethods } from './methods/federation.js';
 import { directMessageMethods } from './methods/direct-message.js';
-import { feedbackMethods } from './methods/feedback.js';
 import { moderationMethods } from './methods/moderation.js';
 import { marketplaceMethods } from './methods/marketplace.js';
 import { catalogueMethods } from './methods/catalogue.js';
@@ -162,7 +161,6 @@ Object.assign(
   otkMethods,
   federationMethods,
   directMessageMethods,
-  feedbackMethods,
   moderationMethods,
   marketplaceMethods,
   catalogueMethods,

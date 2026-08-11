@@ -15,18 +15,22 @@
  *   - confirmOnboardingStep() — validate one step's payload, apply its side effects, persist
  * @usage const { onboarding, completed } = await refreshOnboarding(storage, agentGaii, record);
  * @version-history
+ *   v1.2.0 — 2026-08-11 — identify_platform can now change the agent's mode (a workstation agent
+ *     reporting Claude Desktop / VS Code), so the step list is re-derived in the same pass and the
+ *     outcome carries `modeSetTo`. Without it such an agent kept the 13-step flow and sat forever on
+ *     a `configure_delivery` step it has no way to pass.
  *   v1.1.0 — 2026-08-11 — confirmOnboardingStep() moved in from POST /v1/agents/:name/onboarding/step/:id
  *     and the aimeat_onboarding_* tools. The copies disagreed on two things: only the HTTP one
  *     re-ran the auto-checkable steps after a step passed, so an agent finishing its last manual
  *     step through MCP could sit at "not complete" with every remaining step objectively passable.
  *   v1.0.0 — 2026-08-11 — Extracted after the copied-logic check found the pair.
  */
-import type { Storage, AgentOnboardingRecord, AgentOnboardingStep } from '../storage/interface.js';
+import type { Storage, AgentOnboardingRecord, AgentOnboardingStep, AgentRecord } from '../storage/interface.js';
 import { checkAutoSteps, validateStep } from './onboarding-validator.js';
 import { calculateReadiness } from './readiness-scorer.js';
 import { emitChange } from './event-bus.js';
 import { recordSelfReportedPlatform } from './agent-profile-write.js';
-import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
+import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, deriveStepsForMode, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
 
 /**
  * Bring an in-progress onboarding up to date.
@@ -143,6 +147,9 @@ export type ConfirmStepOutcome =
         /** The record when this call completed the onboarding, null otherwise. */
         completed: AgentOnboardingRecord | null;
         testTaskAutoStarted: boolean;
+        /** Set when the reported platform moved the agent into a different mode, which also changed
+         *  which steps apply. Surfaces say so rather than letting the step count change unexplained. */
+        modeSetTo?: AgentRecord['mode'];
     };
 
 /**
@@ -171,7 +178,7 @@ export async function confirmOnboardingStep(
         return { ok: false, code: 'ONBOARDING_NOT_ACTIVE', message: 'Hello Integration onboarding is not active for this agent.' };
     }
 
-    const step = onboarding.steps.find(candidate => candidate.id === stepId);
+    let step = onboarding.steps.find(candidate => candidate.id === stepId);
     if (!step) {
         // Separate from UNKNOWN_STEP: the id IS a step in the canonical catalog, but this agent's
         // reduced flow does not include it. A client should treat it as "not applicable, skip".
@@ -188,6 +195,7 @@ export async function confirmOnboardingStep(
 
     const payload = body ?? {};
     const result = await validateStep(stepId as OnboardingStepId, agentGaii, storage, payload);
+    let modeSetTo: AgentRecord['mode'];
     if (result.passed) {
         step.status = 'passed';
         step.validatedAt = new Date().toISOString();
@@ -195,8 +203,21 @@ export async function confirmOnboardingStep(
         step.details = { ...step.details, ...result.details };
 
         if (stepId === 'identify_platform' && typeof payload.platform === 'string') {
-            await recordSelfReportedPlatform(storage, agentGaii, payload);
+            ({ modeSetTo } = await recordSelfReportedPlatform(storage, agentGaii, payload));
             onboarding.detectedPlatform = payload.platform;
+
+            // The platform can imply the mode (a workstation agent), and the mode decides which
+            // steps apply at all. Re-derive here, before the auto-check and the persist below, so
+            // the flow the agent is measured against is the right one from this moment on — and so
+            // this one write is the only write. `step` is re-read because the derive returns fresh
+            // objects; identify_platform is in every flow, so it is always found.
+            if (modeSetTo) {
+                const rederived = deriveStepsForMode(onboarding.steps, modeSetTo);
+                if (rederived) {
+                    onboarding.steps = rederived;
+                    step = rederived.find(candidate => candidate.id === stepId) ?? step;
+                }
+            }
         }
         if (stepId === 'install_skill' && typeof payload.platform === 'string') {
             onboarding.installedRuntime = payload.platform;
@@ -218,5 +239,6 @@ export async function confirmOnboardingStep(
         total: onboarding.steps.length,
         completed,
         testTaskAutoStarted: stepId === 'accept_test_task' && result.passed && !!result.details?.autoStarted,
+        modeSetTo,
     };
 }

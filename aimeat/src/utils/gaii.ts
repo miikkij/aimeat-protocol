@@ -38,8 +38,11 @@ const GAII_RE = /^([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z
 export const ECO_PREFIX = 'eco:';
 const GEAI_RE = /^eco:([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32})$/;
 
+// 'support' and 'operators' are the two halves of `support@operators`, the named address that
+// reaches whoever runs this node (services/message-alias.ts). An owner or agent registered under
+// either name would make the address ambiguous, so neither is available.
 export const RESERVED_NAMES = new Set([
-  'admin', 'system', 'root', 'operator', 'meat', 'aimeat', 'node', 'network',
+  'admin', 'system', 'root', 'operator', 'operators', 'support', 'meat', 'aimeat', 'node', 'network',
   'registry', 'anonymous', 'null', 'undefined', 'test', 'debug', 'internal',
   'public', 'private', 'shared', 'all', 'none', 'any', 'self', 'global',
 ]);

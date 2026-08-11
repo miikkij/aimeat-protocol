@@ -117,7 +117,6 @@ import { appsRouter } from '../routes/apps.js';
 import { appMembersRouter } from '../routes/app-members.js';
 import { appStoreRouter } from '../routes/app-store.js';
 import { flagsRouter } from '../routes/flags.js';
-import { feedbackRouter } from '../routes/feedback.js';
 import { appealsRouter } from '../routes/appeals.js';
 import { matchesRouter } from '../routes/matches.js';
 import { personalRouter } from '../routes/personal.js';
@@ -525,7 +524,6 @@ export async function mountRoutes(
   app.use(federationRouter(config, storage, peers, networkDirectory));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));
-  app.use(feedbackRouter(config, storage));
   app.use(appealsRouter(config, storage));
   app.use(matchesRouter(config, storage));
   app.use(microMemoryRouter(config, storage));

@@ -625,6 +625,13 @@
 .inbox-track-badge--done  { border-color: var(--border); color: var(--text-dim); }
 .inbox-track-badge--err   { border-color: var(--danger); color: var(--danger); }
 
+/* The model an agent named for a message it wrote. Deliberately quiet: it belongs with the timestamp
+   as a fact about the message, not as a status the reader has to act on. */
+.inbox-model-badge {
+  font-size: 11px; padding: 1px 6px; border-radius: var(--radius-full);
+  border: 1px dashed var(--border); color: var(--text-dim); white-space: nowrap;
+}
+
 .inbox-tracked-list { display: flex; flex-direction: column; gap: 8px; padding: 12px; overflow-y: auto; }
 .inbox-tracked-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;

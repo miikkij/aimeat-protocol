@@ -36,6 +36,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
+import { resolveGroupTarget } from '../services/message-alias.js';
+import { sendGroupMessage } from '../services/conversation-group.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
 import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
 import { annotationsFor } from './annotations.js';
@@ -98,11 +100,11 @@ export function registerDmMessageTools(
         'aimeat_dm_send',
         descriptionFor('aimeat_dm_send'),
         {
-            to: z.string().min(3).max(256).describe('Recipient identity: a person (owner@node), an agent (agent#owner@node), or an app (eco:app#owner@node). A message to an agent/app is delivered to its owner\'s inbox.'),
+            to: z.string().min(3).max(256).optional().describe('Recipient identity: a person (owner@node), an agent (agent#owner@node), or an app (eco:app#owner@node). A message to an agent/app is delivered to its owner\'s inbox. Use "support@operators" to reach whoever runs this node — that is the address to write to when something here does not work, when a step cannot be completed, or when you need a human decision; it opens a thread the operators answer in. Omit only when conversation_id names a group thread you are already in.'),
             body: z.string().max(50000).optional().describe('Message body (GFM markdown). Optional only if you attach at least one file.'),
             reply_to: z.string().uuid().optional().describe('Id of a message you are replying to (keeps the same conversation thread).'),
-            subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title (instead of one endless thread with the recipient). Omit to use the default thread or continue one via conversation_id.'),
-            conversation_id: z.string().min(8).max(64).optional().describe('Continue a specific existing thread by its id (e.g. one returned by aimeat_dm_inbox). Omit for the default per-recipient thread.'),
+            subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title (instead of one endless thread with the recipient). For support@operators this is what the operators see in their list, so name the actual problem. Omit to use the default thread or continue one via conversation_id.'),
+            conversation_id: z.string().min(8).max(64).optional().describe('Continue a specific existing thread by its id (e.g. one returned by aimeat_dm_inbox, or the one a support@operators send returned). Omit for the default per-recipient thread.'),
             attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
                 .describe('Up to 20 files to attach. Upload each file first via aimeat_storage_upload (presigned), then pass its { storage_key, mime, kind, size, name } here — MCP does not carry the bytes.'),
             ...aiProvenanceInputs,
@@ -110,9 +112,9 @@ export function registerDmMessageTools(
         annotationsFor('aimeat_dm_send'),
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
-            const recipientGhii = to.trim();
+            const recipientGhii = (to ?? '').trim();
 
-            if (recipientGhii === senderGhii) {
+            if (recipientGhii && recipientGhii === senderGhii) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
             }
             if (!body?.trim() && !attachments?.length) {
@@ -138,6 +140,38 @@ export function registerDmMessageTools(
                 baseUrl: config.baseUrl,
                 enabled: config.aiProvenance,
             });
+            // A named group address (support@operators) or a group conversation id goes to the group
+            // path — the same resolver POST /v1/messages uses, so the two doors cannot drift.
+            const group = await resolveGroupTarget(ctx, config, senderGhii, {
+                to: recipientGhii, conversationId: conversation_id, subject,
+            });
+            if (group.kind === 'refused') {
+                return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: group.message, code: group.code }) }] };
+            }
+            if (group.kind === 'group') {
+                const sent = await sendGroupMessage(ctx, {
+                    conversationId: group.conversation.id,
+                    senderGhii, body: body ?? '', attachments: mapped, replyToId: reply_to, aiProvenanceId,
+                });
+                if (!sent.ok) {
+                    return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: sent.code === 'CONVERSATION_NOT_FOUND' ? 'No such conversation' : 'You are not a participant in this conversation', code: sent.code }) }] };
+                }
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                            message_id: sent.messageId,
+                            conversation_id: group.conversation.id,
+                            addressed_to: group.conversation.alias ?? 'group',
+                            participants: group.conversation.participants,
+                            delivered_to: sent.delivered,
+                            reply_with: 'aimeat_dm_send with conversation_id set to the value above',
+                            ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                        }, null, 2),
+                    }],
+                };
+            }
+
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
                 conversationId: conversation_id, subject, aiProvenanceId,

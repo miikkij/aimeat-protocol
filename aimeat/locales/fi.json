@@ -149,36 +149,6 @@
       }
     }
   },
-  "admin.feedback.allCategories": "Kaikki kategoriat",
-  "admin.feedback.allStatuses": "Kaikki tilat",
-  "admin.feedback.back": "Takaisin saapuneisiin",
-  "admin.feedback.cat.blocker": "Blokkeri",
-  "admin.feedback.cat.bug": "Bugi",
-  "admin.feedback.cat.idea": "Idea",
-  "admin.feedback.cat.other": "Muu",
-  "admin.feedback.cat.question": "Kysymys",
-  "admin.feedback.cat.ux": "Käytettävyys",
-  "admin.feedback.category": "Kategoria",
-  "admin.feedback.context": "Konteksti",
-  "admin.feedback.desc": "Käyttäjien ja agenttien palautesäikeet sinulle, noden operaattorille — bugit, blokkerit, ideat, käytettävyysongelmat. Vastauksesi näkyy lähettäjälle; vastaaminen kuittaa uuden säikeen vastaanotetuksi.",
-  "admin.feedback.empty": "Ei palautesäikeitä vielä.",
-  "admin.feedback.from": "Lähettäjä",
-  "admin.feedback.messagesCol": "Viestit",
-  "admin.feedback.operator": "Operaattori",
-  "admin.feedback.replyPlaceholder": "Kirjoita vastaus lähettäjälle…",
-  "admin.feedback.replySent": "Vastaus lähetetty",
-  "admin.feedback.send": "Lähetä vastaus",
-  "admin.feedback.sender": "Lähettäjä",
-  "admin.feedback.st.ack": "Kuitattu",
-  "admin.feedback.st.in_progress": "Työn alla",
-  "admin.feedback.st.new": "Uusi",
-  "admin.feedback.st.resolved": "Ratkaistu",
-  "admin.feedback.st.wont_fix": "Ei korjata",
-  "admin.feedback.statusCol": "Tila",
-  "admin.feedback.statusSaved": "Tila päivitetty",
-  "admin.feedback.title": "Alustapalaute",
-  "admin.feedback.titleCol": "Otsikko",
-  "admin.feedback.when": "Aika",
   "admin.messages.desc": "Toimitustelemetria käyttäjien välisille viesteille. Viestien sisältöä tai osapuolten henkilöllisyyttä ei näytetä.",
   "admin.messages.detail": "Lisätieto",
   "admin.messages.failedCol": "Epäonnistui",
@@ -241,6 +211,7 @@
     "startButton": "Aloita Hello-integraatio",
     "restartButton": "Suorita uudelleen",
     "cancelButton": "Peruuta",
+    "modeInferred": "Ilmoittamasi alusta toimii käyttäjän omassa ympäristössä, joten tämä agentti on nyt {{mode}}-moodissa ja sen Hello-integraatio on {{total}}-askelinen. Askeleet, jotka olettavat nodella asuvan ajoympäristön (toimituskanava, telemetria, tehtäväjono), eivät koske sinua, ja ne on poistettu sen sijaan että ne jäisivät epäonnistumaan.",
     "steps": {
       "authenticate": "Tunnistaudu",
       "identify_platform": "Tunnista alusta",
@@ -412,7 +383,8 @@
       "workflow": "automaatiosi",
       "ai": "AI-budjettisi",
       "notifications": "ilmoitukset sinulle",
-      "organism": "työtilasi"
+      "organism": "työtilasi",
+      "app": "nimissäsi julkaistut appit"
     }
   },
   "auth": {
@@ -3028,6 +3000,7 @@
   "inbox.loading": "Ladataan…",
   "inbox.markImportant": "Merkitse tärkeäksi (vaatii vastauksen)",
   "inbox.messageThis": "Lähetä viesti",
+  "inbox.modelClaimed": "Agentti ilmoittaa, että tämän kirjoitti {model}. Tieto on agentin oma ilmoitus: node ei voi tarkistaa sitä, ja alusta voi siirtää työn toiselle mallille kesken istunnon.",
   "inbox.new": "Uusi viesti",
   "inbox.noConversations": "Ei keskusteluja vielä.",
   "inbox.noThread": "Ei viestejä tässä keskustelussa vielä.",
@@ -5698,6 +5671,9 @@
           },
           "capability": {
             "write": "Tarjoa, muuta ja vedä pois palveluita joita myyt muille. Ne puhuvat sinun nimissäsi."
+          },
+          "account": {
+            "security": "Vaihda salasanasi, palautusosoitteesi ja kaksivaiheisen kirjautumisen, ja poista tai vie koko tili. Tämän saanut agentti pääsee kirjautumaan sinuna, joten anna se vain sellaiselle jolle antaisit salasanasi."
           }
         },
         "domainAi": "Tekoäly",
@@ -5714,6 +5690,7 @@
         "domainAgent": "Muut agenttisi",
         "domainApp": "Sovellukset",
         "domainCapability": "Myymäsi palvelut",
+        "domainAccount": "Tilisi ja kirjautuminen",
         "permInvoke": "Aja"
       },
       "deviceAuth": {

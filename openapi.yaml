@@ -179,8 +179,6 @@ tags:
     description: Scheduled jobs and recurring automation triggers
   - name: Workflows
     description: Multi-step agent workflows — save, run, answer human-input steps, and inspect pending inputs
-  - name: Feedback
-    description: Node feedback channel — send and inbox for operator/user feedback
   - name: Public
     description: Public unauthenticated endpoints — static pages, discovery documents, and public directory reads
   - name: Public Intake
@@ -1885,53 +1883,6 @@ components:
           type: string
           maxLength: 1000
           description: Optional detailed description
-
-    FeedbackThread:
-      type: object
-      description: |
-        A Node Feedback Channel thread — platform feedback from an authenticated principal to
-        the node operator, with a two-party sender↔operator reply chain and triage status.
-      properties:
-        id:
-          type: string
-          example: fb-a1b2c3d4e5f6a7b8
-        sender:
-          type: string
-          description: Resolved principal id (GHII, GAII, or GEAI)
-        category:
-          type: string
-          enum: [bug, blocker, idea, ux, question, other]
-        title:
-          type: string
-        body:
-          type: string
-        context:
-          type: object
-          additionalProperties:
-            type: string
-        status:
-          type: string
-          enum: [new, ack, in_progress, resolved, wont_fix]
-          default: new
-        messages:
-          type: array
-          items:
-            type: object
-            properties:
-              from:
-                type: string
-                enum: [sender, operator]
-              body:
-                type: string
-              at:
-                type: string
-                format: date-time
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
 
     FlagRecord:
       type: object
@@ -3698,13 +3649,18 @@ components:
       description: >-
         Request body for sending a direct message. The recipient may be a human GHII (owner@node), an
         agent GAII (agent#owner@node) or an app GEAI (eco:app#owner@node); messages to an agent/app are
-        delivered to that identity's owner inbox.
-      required: [to]
+        delivered to that identity's owner inbox. It may also be the named group address
+        `support@operators`, which reaches everyone who runs this node.
       properties:
-        to: { type: string, description: Recipient GHII/GAII/GEAI (owner@node, agent#owner@node, or eco:app#owner@node). }
+        to:
+          type: string
+          description: >-
+            Recipient GHII/GAII/GEAI (owner@node, agent#owner@node, or eco:app#owner@node), or the
+            named group address `support@operators` (`support@{nodeId}` in long form) to reach this
+            node's operators. Required unless conversation_id names a group thread you are in.
         body: { type: string, description: GFM markdown. May be empty if attachment-only. }
         reply_to: { type: string, format: uuid }
-        conversation_id: { type: string, description: Continue a specific thread by id. Omit for the default per-pair thread. }
+        conversation_id: { type: string, description: "Continue a specific thread by id: a pair thread, or a group thread (in which case `to` may be omitted). Omit for the default per-pair thread." }
         subject: { type: string, description: Open a NEW topic thread with this title (a fresh conversation id is minted). }
         attachments:
           type: array
@@ -18013,11 +17969,23 @@ paths:
         charset overrides a document's own `<meta charset>`, so all 110 published apps were scanned
         for double-encoded text before the header was added; none was found.
 
-        **H-2 app origin:** when the app origin is provisioned (`AIMEAT_APP_ORIGIN_ENABLED`), an
-        `mode=inline` request arriving on the **apex** origin is **301-redirected** to the isolated
-        app origin (`https://<sub>.apps.<apex>/` or `https://apps.<apex>/<owner>/<file>`), so runnable
-        app HTML is never served same-origin as the authenticated SPA. Access-code/paid apps and the
-        raw download form are unaffected.
+        **H-2 app origin:** when the app origin is provisioned, a `mode=inline` request arriving on
+        the **apex** origin is redirected to the isolated app origin (`https://<sub>.apps.<apex>/` or
+        `https://apps.<apex>/<owner>/<file>`), so runnable app HTML is never served same-origin as
+        the authenticated SPA. The raw download form is an attachment and is never executed, so it
+        stays on the apex. `AIMEAT_APP_ORIGIN_ENABLED` decides, and since 2026-08-11 an unset value
+        follows the node's security profile: on for a public node, off for a local or personal one.
+
+        A **gated** app — one carrying an access code, or a price on a node with the marketplace
+        enabled — is redirected too, which changed on 2026-08-11. It used to be carved out and served
+        on the apex, so the one class of app whose author had asked for protection was the class
+        running beside the session. The gates themselves are unchanged and still run first: the code
+        must match (the app's owner and node operators are exempt), and a priced app still refuses a
+        request with no `Authorization: Bearer` and then requires a licence. What follows is a `302`
+        with `Cache-Control: no-store` to the app origin, carrying `access=<grant>`: a signed,
+        one-app, one-hour token saying the apex authorized this delivery. The app origin holds no
+        session, so that grant is the whole check it makes; a gated app requested there without one
+        answers the same `404` an unmapped subdomain does. Ungated apps keep the plain `301`.
 
         **Agent Face (markdown for agents):** a request that prefers `text/markdown` (`Accept`
         negotiation, or an explicit `?format=md`) receives the app's markdown read-surface instead
@@ -18038,7 +18006,16 @@ paths:
         - { in: query, name: mode, required: false, schema: { type: string, enum: [inline] } }
         - { in: query, name: format, required: false, schema: { type: string, enum: [md] }, description: "md forces the Agent Face markdown variant regardless of the Accept header" }
         - { in: query, name: version, required: false, schema: { type: integer } }
-        - { in: query, name: code, required: false, schema: { type: string }, description: Access code for protected apps }
+        - in: query
+          name: code
+          required: false
+          schema: { type: string }
+          description: >
+            The access code for a protected app (the `X-Access-Code` header carries it too). A
+            browser navigation without it, or with the wrong one, gets an HTML unlock page with a
+            code field rather than JSON; an API caller gets `403 ACCESS_DENIED`. The app's own owner
+            and node operators never need it. With the app origin enabled, a correct code produces a
+            302 to the app origin carrying a grant, and the code itself is not forwarded.
         - in: query
           name: preview
           required: false
@@ -18051,6 +18028,12 @@ paths:
       responses:
         '200': { description: "App HTML (inline or attachment; the draft when a valid preview token is supplied), or text/markdown when the request prefers markdown (Agent Face)" }
         '301': { description: Redirect to the isolated app origin (H-2, when enabled) }
+        '302':
+          description: >
+            Redirect to the isolated app origin for a GATED app, carrying a short-lived `access`
+            grant. Not cacheable (`Cache-Control: no-store`), because the grant expires.
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '402': { description: The app has a price and the caller holds no licence }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -21474,254 +21457,6 @@ paths:
   # Phase 1.5: Data Quality Flags
   # ============================================================
 
-  /v1/feedback:
-    post:
-      operationId: createFeedback
-      summary: Open a platform-feedback thread to the node operator
-      description: |
-        Node Feedback Channel: any authenticated principal (GHII/GAII/GEAI) reports platform
-        bugs, blockers, ideas, UX issues, or questions about the PLATFORM itself to the node
-        operator (for content moderation use /v1/flags instead). The operator triages every
-        thread and can reply back — read replies via GET /v1/feedback/mine. A `blocker`
-        thread additionally notifies the operator (bell + web push). Rate-limited per
-        principal (20 threads / 24 h).
-      tags: [Feedback]
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [category, title, body]
-              properties:
-                category:
-                  type: string
-                  enum: [bug, blocker, idea, ux, question, other]
-                title:
-                  type: string
-                  maxLength: 200
-                body:
-                  type: string
-                  maxLength: 8000
-                context:
-                  type: object
-                  additionalProperties:
-                    type: string
-                  description: 'Optional pointers: { app, endpoint, version, url }'
-      responses:
-        '201':
-          description: Feedback thread created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/FeedbackThread'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/feedback/mine:
-    get:
-      operationId: listMyFeedback
-      summary: List the caller's own feedback threads + operator replies
-      tags: [Feedback]
-      security:
-        - BearerAuth: []
-      responses:
-        '200':
-          description: The caller's threads, newest first
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          threads:
-                            type: array
-                            items:
-                              $ref: '#/components/schemas/FeedbackThread'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /v1/feedback/{id}:
-    get:
-      operationId: getFeedback
-      summary: Read one feedback thread (own; operator reads any)
-      description: A thread belonging to another principal returns 404 (no existence disclosure).
-      tags: [Feedback]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: The thread
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/FeedbackThread'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /v1/feedback/{id}/reply:
-    post:
-      operationId: replyFeedback
-      summary: Append a reply to a feedback thread
-      description: |
-        The sender may reply into their own thread; the operator into any. An operator reply
-        on a `new` thread bumps its status to `ack`. Threads cap at 50 messages.
-      tags: [Feedback]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [body]
-              properties:
-                body:
-                  type: string
-                  maxLength: 8000
-      responses:
-        '200':
-          description: Updated thread
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/FeedbackThread'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '429':
-          $ref: '#/components/responses/RateLimited'
-
-  /v1/admin/feedback:
-    get:
-      operationId: adminListFeedback
-      summary: Operator feedback inbox
-      tags: [Feedback, Admin]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [new, ack, in_progress, resolved, wont_fix]
-        - name: category
-          in: query
-          schema:
-            type: string
-            enum: [bug, blocker, idea, ux, question, other]
-        - $ref: '#/components/parameters/Pagination'
-        - $ref: '#/components/parameters/PerPage'
-      responses:
-        '200':
-          description: Threads, newest first
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          threads:
-                            type: array
-                            items:
-                              $ref: '#/components/schemas/FeedbackThread'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  /v1/admin/feedback/{id}:
-    patch:
-      operationId: adminUpdateFeedback
-      summary: Operator status triage on a feedback thread
-      tags: [Feedback, Admin]
-      security:
-        - BearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [status]
-              properties:
-                status:
-                  type: string
-                  enum: [new, ack, in_progress, resolved, wont_fix]
-      responses:
-        '200':
-          description: Updated thread
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/FeedbackThread'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
   /v1/flags:
     post:
       operationId: createFlag
@@ -24982,9 +24717,15 @@ paths:
       operationId: pushSubscribe
       summary: Register push subscription
       description: |
-        Register a Web Push subscription for the authenticated user.
-        Uses the Web Push API standard with VAPID. The subscription
-        endpoint and keys are stored server-side for sending notifications.
+        Register one device for Web Push. Uses the Web Push API standard with VAPID; the
+        subscription endpoint and keys are stored server-side for sending notifications.
+
+        One subscription per DEVICE: a second browser is added beside the first, and both receive
+        every notification. Subscribing with an endpoint already registered refreshes its keys.
+
+        Owner sessions may call this. Any other principal (agent, ecosystem app, app grant) needs
+        the `push:manage` scope, because the endpoint is an address this node posts the body of
+        every notification to.
       tags: [PWA]
       security:
         - BearerAuth: []
@@ -25027,6 +24768,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/RateLimited'
 
@@ -25034,11 +24777,23 @@ paths:
       operationId: pushUnsubscribe
       summary: Unsubscribe push notifications
       description: |
-        Remove the push subscription for the authenticated user.
-        Stops all future push notifications to this device.
+        Remove one device's push subscription, named by `endpoint`. With no endpoint, every device
+        registered for the account is removed.
+
+        Owner sessions may call this; any other principal needs the `push:manage` scope.
       tags: [PWA]
       security:
         - BearerAuth: []
+      parameters:
+        - name: endpoint
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+          description: |
+            The push endpoint to remove. May also be sent in a JSON body as `{ "endpoint": "..." }`.
+            Omit to remove every device of the account.
       responses:
         '200':
           description: Push subscription removed
@@ -25055,8 +24810,14 @@ paths:
                           unsubscribed:
                             type: boolean
                             example: true
+                          endpoint:
+                            type: string
+                            nullable: true
+                            description: The endpoint removed, or null when every device was removed
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -25065,8 +24826,10 @@ paths:
       operationId: pushTest
       summary: Send test push notification
       description: |
-        Send a test push notification to the authenticated user's
-        registered subscription. Useful for verifying push setup.
+        Send a test push notification to every device the authenticated user has registered.
+        Useful for verifying push setup.
+
+        Owner sessions may call this; any other principal needs the `push:manage` scope.
       tags: [PWA]
       security:
         - BearerAuth: []
@@ -25088,6 +24851,8 @@ paths:
                             example: true
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           description: No push subscription found
           content:
@@ -28431,7 +28196,9 @@ paths:
         emails the code + landing link. The recipient logs in with the code on the client — there is no
         magic-link accept step. A per-inviter quota applies (org creator/admin unlimited); each
         un-cancelled key counts. Authorized by organism membership + the organism:invite scope, so it
-        works from an H-2 app-origin session (role app). Rate-limited.
+        works from an H-2 app-origin session (role app). Membership opens the door but does not decide
+        what comes through it: org_role admin needs the organism's creator/admin, and each workspace
+        grant needs the workspace's creator or an org creator/admin (403 otherwise). Rate-limited.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -28452,10 +28219,10 @@ paths:
                 locale: { type: string, enum: [en, fi], description: Language of the invitation email }
                 message: { type: string, description: Caller-composed, already-localized explanation shown in the email }
                 landing_url: { type: string, description: Where the recipient enters the code (defaults to the node base URL) }
-                org_role: { type: string, enum: [member, admin], description: 'Organism role granted (default: member)' }
+                org_role: { type: string, enum: [member, admin], description: 'Organism role granted (default: member). admin requires the caller to be the organism creator or an admin' }
                 workspaces:
                   type: array
-                  description: Optional per-workspace grants.
+                  description: Optional per-workspace grants. Each one requires the caller to be that workspace's creator or an org creator/admin.
                   items:
                     type: object
                     required: [ws, role]
@@ -33172,6 +32939,18 @@ paths:
         delivered immediately; remote recipients are delivered over federation (queued + retried if
         the peer is unreachable). First contact from an unknown sender is held as a request on the
         recipient side. Body is GFM markdown; attachments are storage-object descriptors.
+
+        GROUP THREADS. Two `to` values address a group rather than a person:
+
+        * `support@operators` (or `support@{nodeId}`) opens a thread with every operator of this
+          node. The sender needs no identity lookup and no idea who runs the node. The response
+          carries `conversation_id`, `participants` and `delivered_to` instead of a single message
+          record; pass that `conversation_id` back to continue the same thread. A support send is
+          never held behind the first-contact gate. 503 `NO_OPERATORS` when the node has none.
+        * A `conversation_id` naming an existing GROUP conversation posts into it, and `to` may then
+          be omitted. A non-participant gets 403 `NOT_A_PARTICIPANT`.
+
+        A group conversation is currently node-local: every participant must live on this node.
       tags: [Direct Messages]
       security:
         - BearerAuth: []
@@ -34918,6 +34697,15 @@ paths:
       description: |
         Agent confirms completion of an onboarding step. Server validates
         against actual system state.
+
+        `identify_platform` can also change the agent's MODE. A platform that runs in the
+        user's own environment (Claude Desktop, Claude Code, VS Code, Cursor, an MCP client)
+        implies `workstation`, and the mode decides which steps apply at all — a workstation
+        agent has no delivery channel, telemetry or task queue, so those steps are removed
+        rather than left to fail. Only an unchosen mode (`interactive`, the registration
+        default) is replaced; a mode someone deliberately set is left alone. When this
+        happens the response carries `mode_set_to` and `mode_note`, and `total` is the new
+        step count.
       tags: [Agent Onboarding]
       security:
         - BearerAuth: []

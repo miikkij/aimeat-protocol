@@ -6,6 +6,9 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.3.0 -- 2026-08-11 -- Group conversations: a thread with more than two participants gets a row
+ *     (createConversation / getConversation / updateConversation / listConversationsForParticipant).
+ *     A pair thread still stores nothing, so no existing conversation changed.
  *   v1.2.0 -- 2026-07-16 -- Add getDirectMessagesByIds batch (Phase 3): many messages by id under one owner.
  *   v1.1.0 -- 2026-07-16 -- Add listConversationsForOwners batch (Phase 3): the conversations list for many
  *     owners in 3 window-function queries, collapsing the route's owner + per-agent fan-out.
@@ -13,7 +16,7 @@
  */
 
 import type Database from 'better-sqlite3';
-import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
 import type { ConversationSummary } from '../../../repositories/direct-message.repository.js';
 
 // ── Helpers ──
@@ -432,6 +435,82 @@ export function pruneMessageDeliveryLogs(db: Database.Database, keep = 10000): n
      )`,
   ).run(keep);
   return info.changes;
+}
+
+// ── Group conversations ──
+// Only a thread with more than two participants has a row. A pair thread derives its id from the
+// two identities and stores nothing, so `getConversation` returning null means "ordinary pair".
+
+function deserializeConversation(row: Record<string, unknown>): ConversationRecord {
+  const record: ConversationRecord = {
+    id: row.id as string,
+    kind: 'group',
+    participants: JSON.parse(row.participants as string) as string[],
+    createdBy: row.createdBy as string,
+    createdAt: row.createdAt as string,
+    updatedAt: row.updatedAt as string,
+  };
+  if (row.subject) record.subject = row.subject as string;
+  if (row.alias) record.alias = row.alias as string;
+  return record;
+}
+
+export function createConversation(db: Database.Database, record: ConversationRecord): ConversationRecord {
+  db.prepare(
+    `INSERT INTO conversations (id, kind, subject, participants, createdBy, alias, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    record.id,
+    record.kind,
+    record.subject ?? null,
+    JSON.stringify(record.participants),
+    record.createdBy,
+    record.alias ?? null,
+    record.createdAt,
+    record.updatedAt,
+  );
+  return record;
+}
+
+export function getConversation(db: Database.Database, id: string): ConversationRecord | null {
+  const row = db.prepare('SELECT * FROM conversations WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+  return row ? deserializeConversation(row) : null;
+}
+
+export function updateConversation(
+  db: Database.Database,
+  id: string,
+  updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>,
+): ConversationRecord | null {
+  const existing = getConversation(db, id);
+  if (!existing) return null;
+  db.prepare(
+    `UPDATE conversations
+     SET participants = COALESCE(?, participants), subject = COALESCE(?, subject),
+         alias = COALESCE(?, alias), updatedAt = ?
+     WHERE id = ?`,
+  ).run(
+    updates.participants ? JSON.stringify(updates.participants) : null,
+    updates.subject ?? null,
+    updates.alias ?? null,
+    new Date().toISOString(),
+    id,
+  );
+  return getConversation(db, id);
+}
+
+/**
+ * Every group thread `identity` participates in, newest first.
+ *
+ * Membership is a JSON array, so the match is a LIKE on the serialised form with the quotes
+ * included: `"alice@node"` cannot match `"alice@node-2"` the way a bare substring would.
+ */
+export function listConversationsForParticipant(db: Database.Database, identity: string): ConversationRecord[] {
+  const needle = `%${JSON.stringify(identity)}%`;
+  const rows = db.prepare(
+    'SELECT * FROM conversations WHERE participants LIKE ? ORDER BY updatedAt DESC',
+  ).all(needle) as Record<string, unknown>[];
+  return rows.map(deserializeConversation);
 }
 
 // ── Contact consent ──

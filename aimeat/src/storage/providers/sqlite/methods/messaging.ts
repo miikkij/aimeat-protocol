@@ -7,7 +7,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
-  AgentMessageRecord, DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats, TelemetryEvent,
+  AgentMessageRecord, DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats, TelemetryEvent,
   WebhookDeliveryLog, AgentOnboardingRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -136,6 +136,24 @@ export const messagingMethods = {
 
   async pruneMessageDeliveryLogs(this: SqliteStorage, keep?: number): Promise<number> {
     return directMessageRepo.pruneMessageDeliveryLogs(this.db, keep);
+  },
+
+  // ── Group conversations (only a >2-participant thread has a row) ──
+
+  async createConversation(this: SqliteStorage, record: ConversationRecord): Promise<ConversationRecord> {
+    return directMessageRepo.createConversation(this.db, record);
+  },
+
+  async getConversation(this: SqliteStorage, id: string): Promise<ConversationRecord | null> {
+    return directMessageRepo.getConversation(this.db, id);
+  },
+
+  async updateConversation(this: SqliteStorage, id: string, updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>): Promise<ConversationRecord | null> {
+    return directMessageRepo.updateConversation(this.db, id, updates);
+  },
+
+  async listConversationsForParticipant(this: SqliteStorage, identity: string): Promise<ConversationRecord[]> {
+    return directMessageRepo.listConversationsForParticipant(this.db, identity);
   },
 
   async getContact(this: SqliteStorage, ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null> {

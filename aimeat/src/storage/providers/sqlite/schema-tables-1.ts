@@ -4,6 +4,10 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Drop the feedback table. The Node Feedback Channel is gone; its job is
+ *     done by support@operators, an ordinary group conversation the operators answer in Messages.
+ *   v1.2.0 — 2026-08-11 — push_subscriptions is keyed on (ownerName, endpoint): one row per device
+ *     instead of one per person (audit H-8). Mirrors Postgres migration 0032.
  *   v1.1.0 — 2026-07-16 — Add feedback table (Node Feedback Channel).
  *   v1.0.0 — 2026-07-13 — Extracted from sqlite/schema.ts (max-file-lines)
  */
@@ -439,19 +443,6 @@ export function applySchemaTables1(db: Database.Database): void {
       createdAt      TEXT NOT NULL
     );
 
-    -- ── Feedback (Node Feedback Channel: principal → operator) ──
-    CREATE TABLE IF NOT EXISTS feedback (
-      id             TEXT PRIMARY KEY,
-      sender         TEXT NOT NULL,
-      category       TEXT NOT NULL,
-      title          TEXT NOT NULL,
-      body           TEXT NOT NULL,
-      context        TEXT,
-      status         TEXT NOT NULL DEFAULT 'new',
-      messages       TEXT NOT NULL DEFAULT '[]',
-      createdAt      TEXT NOT NULL,
-      updatedAt      TEXT NOT NULL
-    );
 
     -- ── Appeals (Advanced Moderation) ──
     CREATE TABLE IF NOT EXISTS appeals (
@@ -593,12 +584,17 @@ export function applySchemaTables1(db: Database.Database): void {
     );
 
     -- ── Push Subscriptions ──
+    -- One row per DEVICE: the key is (ownerName, endpoint), so the owner's phone and laptop both
+    -- receive, and a caller cannot take over the notification stream by subscribing (audit H-8).
+    -- A database created before 2026-08-11 has ownerName alone as the key and is rebuilt in
+    -- schema.ts; mirrors Postgres migration 0032.
     CREATE TABLE IF NOT EXISTS push_subscriptions (
-      ownerName      TEXT PRIMARY KEY,
+      ownerName      TEXT NOT NULL,
       endpoint       TEXT NOT NULL,
       keys           TEXT NOT NULL DEFAULT '{}',
       createdAt      TEXT NOT NULL,
-      lastUsedAt     TEXT NOT NULL
+      lastUsedAt     TEXT NOT NULL,
+      PRIMARY KEY (ownerName, endpoint)
     );
 
     -- ── Trusted Issuers ──

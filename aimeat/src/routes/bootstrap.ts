@@ -481,10 +481,10 @@ export function bootstrapRouter(
                 aimeat_app_list: `GET ${base}/v1/apps`,
                 aimeat_storage_upload: `POST ${base}/v1/storage/upload`,
                 aimeat_storage_download: `GET ${base}/v1/storage/{fileId}`,
-                aimeat_feedback_send: `POST ${base}/v1/feedback with body { "category": "bug|blocker|idea|ux|question|other", "title": ..., "body": ..., "context": {...}? } (follow-up: POST ${base}/v1/feedback/{id}/reply)`,
-                aimeat_feedback_inbox: `GET ${base}/v1/feedback/mine`,
+                aimeat_dm_send_to_support: `POST ${base}/v1/messages with body { "to": "support@operators", "subject": "<the problem>", "body": "<what you were doing, what happened instead>" } — reaches everyone who runs this node in one thread; the response returns conversation_id, pass it back to continue`,
               },
               important_notes: [
+                'Stuck on anything here? Write to support@operators. It needs no identity lookup, it reaches every operator of this node in one thread, and they answer it in Messages.',
                 'owner_scope=true on /v1/memory returns data from your owner (GHII) AND all their agents. Without it you only see your own agent memory.',
                 '/v1/catalogue/knowledge lists PUBLIC packages from all users. /v1/memory?prefix=packages/&tags=knowledge-package&owner_scope=true lists YOUR packages.',
                 '/v1/packages is the APP STORE (installable app packages), NOT knowledge packages. Do not confuse these.',

@@ -85,7 +85,6 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email',
-        'aimeat_feedback_send', 'aimeat_feedback_inbox',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
         'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
@@ -122,7 +121,6 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_board_list', 'aimeat_board_read', 'aimeat_board_create', 'aimeat_board_post', 'aimeat_board_reply',
         'aimeat_board_react', 'aimeat_board_subscribe', 'aimeat_board_members', 'aimeat_board_delete',
         'aimeat_work_inbox', 'aimeat_work_accept', 'aimeat_work_deliver',
-        'aimeat_feedback_send', 'aimeat_feedback_inbox',
         'aimeat_action_execute',
         'aimeat_wallet_balance', 'aimeat_wallet_transactions',
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',

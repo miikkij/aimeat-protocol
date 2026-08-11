@@ -76,6 +76,7 @@ const opName = `dmop${stamp}`;
 const aliceName = `dmalice${stamp}`;
 const bobName = `dmbob${stamp}`;
 const malName = `dmmal${stamp}`;
+let op = { token: '', ghii: '' };
 let alice = { token: '', ghii: '' };
 let bob = { token: '', ghii: '' };
 let mal = { token: '', ghii: '' };
@@ -87,7 +88,7 @@ console.log('\n=== AIMEAT Direct Messages (human↔human) E2E ===\n');
 
 console.log('Setup -- three owners');
 await test('Register Alice, Bob, Mallory', async () => {
-    await registerOwner(opName);        // absorbs the operator role; see the note above
+    op = await registerOwner(opName);   // absorbs the operator role; see the note above
     alice = await registerOwner(aliceName);
     bob = await registerOwner(bobName);
     mal = await registerOwner(malName);
@@ -372,6 +373,75 @@ await test('20b. overview.peerNames maps every conversation peer to its display 
 await test('21. /v1/messages/overview requires an owner session (agent/anon rejected)', async () => {
     const anon = await json('/v1/messages/overview');
     assert(anon.status === 401 || anon.status === 403, `anon overview should be 401/403, got ${anon.status}`);
+});
+
+// ─── support@operators: a named address that reaches whoever runs the node ───
+// The point of the address is that the sender needs to know nothing: not who the operator is, not
+// what a GHII looks like, not whether there is one operator or three. It opens ONE group thread that
+// every operator sees and answers in, in the same Messages surface they already use.
+console.log('\nPhase 6 -- support@operators (group thread)');
+
+let supportConvId = '';
+
+await test('S1. Anyone can write to support@operators without knowing any operator identity', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: 'support@operators', subject: 'Cannot finish onboarding', body: 'The configure_delivery step never passes.' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    supportConvId = body.data.conversation_id;
+    assert(typeof supportConvId === 'string' && supportConvId.length > 0, 'a support send returns the thread id to reply into');
+    assert(body.data.participants.includes(op.ghii), `the operator must be a participant, got ${JSON.stringify(body.data.participants)}`);
+    assert(body.data.participants.includes(alice.ghii), 'the sender is in their own thread');
+    assert(body.data.delivered_to >= 1, `at least one operator received it, got ${body.data.delivered_to}`);
+});
+
+await test('S2. The operator finds it in their ordinary inbox, not a separate queue', async () => {
+    const { status, body } = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${op.token}` } });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const msg = body.data.messages.find((m: any) => m.conversationId === supportConvId);
+    assert(!!msg, 'the support message is in the operator inbox');
+    assert(msg.senderGhii === alice.ghii, `the sender is visible, got ${msg.senderGhii}`);
+    assert(msg.recipientGhii === 'support@operators', `the copy records what was addressed, got ${msg.recipientGhii}`);
+});
+
+await test('S3. A first-time sender is NOT held behind the first-contact gate', async () => {
+    const { body } = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${op.token}` } });
+    const held = (body.data.requests ?? []).find((r: any) => r.contactId === alice.ghii);
+    assert(!held, 'someone asking for help must never land in a request queue');
+});
+
+await test('S4. The operator replies into the same thread and the sender sees it', async () => {
+    const reply = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${op.token}` },
+        body: JSON.stringify({ conversation_id: supportConvId, body: 'Your agent is in the wrong mode — set it to workstation.' }),
+    });
+    assert(reply.status === 201, `reply status ${reply.status}: ${JSON.stringify(reply.body)}`);
+
+    const thread = await json(`/v1/messages/conversations/${supportConvId}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(thread.status === 200, `thread status ${thread.status}`);
+    const bodies = thread.body.data.messages.map((m: any) => m.body);
+    assert(bodies.some((b: string) => b.includes('wrong mode')), `the reply is in the sender's thread, got ${JSON.stringify(bodies)}`);
+    assert(bodies.some((b: string) => b.includes('configure_delivery')), 'the original question is in the same thread');
+});
+
+await test('S5. support@<node-id> is the same address in long form', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+        body: JSON.stringify({ to: `support@${NODE_ID}`, body: 'Second question, different person.' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.conversation_id !== supportConvId, 'a new request opens its own thread rather than joining an unrelated one');
+    assert(body.data.participants.includes(op.ghii), 'the long form resolves the same operators');
+});
+
+await test('S6. An outsider cannot post into a support thread they are not in (failure mode)', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${mal.token}` },
+        body: JSON.stringify({ conversation_id: supportConvId, body: 'Let me read your support tickets.' }),
+    });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'NOT_A_PARTICIPANT', `expected NOT_A_PARTICIPANT, got ${body.error?.code}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
