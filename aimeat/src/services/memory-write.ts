@@ -27,6 +27,12 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.2.0 — 2026-08-11 — afterMemoryWrite(): the nine things a write sets off, which all lived
+ *     in the tail of POST /v1/memory. A write through a tool call reached storage and stopped
+ *     there, so the record was right and the rest of the node did not know — no Tracked Response,
+ *     no automation recipe, no workflow trigger, no ecosystem push, no EXCHANGE projection, no
+ *     replication, and an organism document that did not appear on the screen it was written into.
+ *     It runs inside writeMemoryRecord, so every door inherits it.
  *   v1.1.0 — 2026-08-11 — The organism namespace rule (services/organism-namespace-access.ts) and
  *     input.authorisingScope, so a capability with its own permission word can come in the front
  *     door instead of writing to storage itself.
@@ -41,8 +47,34 @@ import { isKeyArchived } from './archive.js';
 import { provenanceForWrite } from './ai-provenance.js';
 import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
 import { emitChange } from './event-bus.js';
+import { enqueueMemoryReplication } from './memory-replication.js';
+import { emitMemoryWritten } from './event-bus.js';
+import { reconcileAfterSourceWrite } from './exchange-projection.js';
+import { getActiveWorkflowEngine } from './workflow/engine.js';
+import { emitEcosystemMemoryWrite } from './ecosystem-events.js';
+import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
+import { logger } from '../utils/logger.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { parseGAII } from '../utils/gaii.js';
+
+/** What a caller must supply for the fan-out that a memory write sets off. */
+export interface MemoryWriteFanout {
+    storage: Storage;
+    config: AimeatConfig;
+    /** Known peers, for the replication queue. Absent on a node with no federation. */
+    peers?: Map<string, unknown>;
+    /** MCP resource notifications, when the door has them. */
+    emitResourceUpdated?: (gaii: string, uri: string) => void;
+    emitResourceListChanged?: (gaii: string) => void;
+    /** The directory refresh, for the two profile keys it watches. */
+    onDirectoryChange?: () => void;
+    /** The node's counters. */
+    stats?: { increment: (metric: string) => void };
+    /** True when the write came from an agent session, for the activation marker. */
+    fromAgent?: boolean;
+    /** The owner behind the session, needed only when fromAgent. */
+    ownerName?: string;
+}
 
 /** Who is writing, in the terms every surface can supply. */
 export interface MemoryWriteCaller {
@@ -120,7 +152,7 @@ function hasScope(scopes: string[], needed: string): boolean {
  * provenance last so it describes what is actually being stored.
  */
 export async function writeMemoryRecord(
-    deps: { storage: Storage; config: AimeatConfig },
+    deps: MemoryWriteFanout,
     caller: MemoryWriteCaller,
     input: MemoryWriteInput,
 ): Promise<MemoryWriteResult> {
@@ -315,5 +347,90 @@ export async function writeMemoryRecord(
     //    layer's own scope check decides who is entitled to hear it.
     emitChange('memory');
 
+    // 7. And everything else the write sets off. It is part of WRITING, not part of the door, so it
+    //    runs here rather than in each caller's tail — which is where it used to live, on one door
+    //    only. A caller that cannot offer an optional piece (a node with no peers has no replication
+    //    queue; a tool call has no HTTP response) simply omits it, and the rest still happens.
+    await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing);
+
     return { ok: true, record, shadowedBy };
+}
+
+
+
+/**
+ * Everything a memory write sets off, for every door.
+ *
+ * WHY IT IS HERE. All of it lived in the tail of POST /v1/memory, so a write made through a tool
+ * call reached storage and stopped there. The record was correct and the rest of the node did not
+ * know: a Tracked Response watching the key never evaluated, an enabled automation recipe never
+ * materialised its task, an event-triggered workflow never started, a connected ecosystem app was
+ * never pushed the write, the EXCHANGE listing did not follow a reprice, an organism workspace
+ * document did not appear on the screen it was written into, and a federated peer waited for the
+ * next scheduled sync instead of getting the record now.
+ *
+ * Every one of those fires for a person's browser write and, until 2026-08-11, stayed silent for the
+ * identical write by that person's own agent. The whole promise of the platform is that those two
+ * are the same act.
+ *
+ * Best-effort and isolated throughout: none of it may fail a write that already happened.
+ */
+export async function afterMemoryWrite(
+    deps: MemoryWriteFanout,
+    gaii: string,
+    key: string,
+    existed: boolean,
+): Promise<void> {
+    const { storage, config } = deps;
+
+    // Event-driven replication: the scheduled sync would pick the record up later, so a failure
+    // here costs latency rather than the record.
+    if (deps.peers) {
+        enqueueMemoryReplication(gaii, key, config, storage, deps.peers as Map<string, never>).catch(err => {
+            logger.warn('memory write: replication enqueue failed, leaving it to the scheduled sync', { key, error: String(err) });
+        });
+    }
+
+    deps.emitResourceUpdated?.(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
+    if (!existed) deps.emitResourceListChanged?.(gaii);
+
+    // The directory refreshes on the two profile keys it indexes.
+    if (deps.onDirectoryChange && /^profile\.[^.]+\.(interests|location)$/.test(key)) deps.onDirectoryChange();
+
+    deps.stats?.increment('memory_writes');
+
+    // Memory Contracts: a write to a watched key fires Tracked Response evaluation. The subscriber
+    // gates on the track registry, so a write nobody watches does no work.
+    emitMemoryWritten(gaii, key, existed ? 'updated' : 'created');
+
+    // An app-tool manifest / agent offers doc IS the source of truth for its EXCHANGE listing —
+    // reprice a tool and the market follows, with no separate listing step.
+    await reconcileAfterSourceWrite(storage, gaii, key);
+
+    // Organism content lives under organism.{id}.*; the organism views listen on 'organisms' only,
+    // rather than on the global 'memory' firehose of every agent's every write.
+    if (key.startsWith('organism.')) emitChange('organisms');
+
+    // A write to an owner key may start a workflow. The engine matches the owner-GHII namespace, so
+    // an agent-namespace write does not fire owner-keyed triggers.
+    getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
+        .catch(e => logger.error('workflow event trigger (memory.write) failed', { key, error: String(e) }));
+
+    // Push memory.write to any subscribed ecosystem app of this owner.
+    emitEcosystemMemoryWrite(storage, config, gaii, key)
+        .catch(e => logger.error('ecosystem outbound (memory.write) failed', { key, error: String(e) }));
+
+    // When a connected app publishes on a key matching an enabled recipe's glob, materialise an
+    // agent task for each configured agent.
+    runAutomationRecipesForWrite(storage, config, gaii, key)
+        .catch(e => logger.error('ecosystem automation recipe trigger failed', { key, error: String(e) }));
+
+    // Activation: the third way an account first produces something durable is its AGENT writing
+    // through the connection. Owner-session and onboarding-marker writes are excluded — the first is
+    // the person's own hand, the second is the funnel measuring itself.
+    if (deps.fromAgent && deps.ownerName && !key.startsWith('onboarding.')) {
+        void import('./onboarding-funnel.js')
+            .then(m => m.recordActivation(storage, config, deps.ownerName!, 'agent'))
+            .catch(e => logger.warn('memory write: activation marker is best-effort', { error: String(e) }));
+    }
 }

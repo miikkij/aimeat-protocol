@@ -235,6 +235,34 @@ async function run() {
     await proves('a sharing group an agent creates', 'groups', 'aimeat_group_create',
         { name: `sse-group-${stamp}`, description: 'sse parity' });
 
+    // ── The fan-out that used to live in the HTTP route's tail ──────────────────────────────────
+    //
+    // A memory write does nine things besides the write, and all nine sat in the tail of
+    // POST /v1/memory: replication, the Tracked Response trigger, the EXCHANGE projection, the
+    // workflow trigger, the ecosystem push, the automation recipes, the directory refresh, the
+    // counters, and this one — organism content lives in memory under organism.{id}.*, and the
+    // organism views listen on 'organisms' rather than on the global 'memory' firehose of every
+    // agent's every write.
+    //
+    // So a document an agent wrote INTO a workspace did not appear on the screen it was written
+    // into. This is the piece of that fan-out an open stream can see.
+    await test('a workspace document an agent writes reaches the organism view, not just memory', async () => {
+        const org = await callTool(A.session, 'aimeat_organism_create',
+            { name: `SseOrg${stamp}`, description: 'sse parity', visibility: 'private' });
+        assert(!org.isError, `organism create failed: ${org.text.slice(0, 250)}`);
+        const orgId = JSON.parse(org.text).organism?.id ?? JSON.parse(org.text).id;
+        assert(!!orgId, `no organism id in: ${org.text.slice(0, 250)}`);
+
+        const stream = await openStream(A.ownerToken);
+        try {
+            const w = await callTool(A.session, 'aimeat_memory_write',
+                { key: `organism.${orgId}.shared.note`, value: { text: 'written by an agent' } });
+            assert(!w.isError, `organism write failed: ${w.text.slice(0, 250)}`);
+            await stream.waitFor('memory', 6_000);
+            await stream.waitFor('organisms', 6_000);
+        } finally { stream.close(); }
+    });
+
     // ── The negative control ────────────────────────────────────────────────────────────────────
     // Every assertion above is satisfied by a bus that broadcasts every domain on every write. This
     // one drives a memory write and checks the BOARDS domain does not arrive with it.

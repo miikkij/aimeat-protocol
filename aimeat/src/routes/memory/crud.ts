@@ -13,20 +13,13 @@
 import type { Router } from 'express';
 import type { MemoryRecord } from '../../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../../utils/workspace-ref.js';
-import { writeMemoryRecord } from '../../services/memory-write.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
-import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
 import { cached, TTL } from '../../services/cache.js';
-import { logger } from '../../utils/logger.js';
-import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
-import { reconcileAfterSourceWrite } from '../../services/exchange-projection.js';
-import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
-import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
-import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
+import { writeMemoryRecord } from '../../services/memory-write.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
@@ -130,7 +123,11 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // The scope gate is inside the service AS WELL as in this route's middleware. That is deliberate
     // belt-and-braces: requireScope('memory:write') is what an HTTP reader sees, and the service
     // check is what a future fourth door gets whether it remembers or not.
-    const written = await writeMemoryRecord({ storage, config }, {
+    const written = await writeMemoryRecord({
+      storage, config, peers, emitResourceUpdated, emitResourceListChanged, onDirectoryChange, stats,
+      fromAgent: req.auth!.roles.includes('agent'),
+      ownerName: req.auth!.owner as string,
+    }, {
       principal: gaii,
       targetGaii: gaii,
       scopes: req.auth!.scopes ?? [],
@@ -155,36 +152,6 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
     const record = written.record;
 
-    // C.3: Event-driven replication queue integration
-    if (peers) {
-      enqueueMemoryReplication(gaii, key, config, storage, peers).catch(err => {
-        // Non-critical for THIS request: the scheduled sync picks the record up later. Logged because
-        // an enqueue that keeps failing means replication is running only at sync cadence.
-        logger.warn('memory write: replication enqueue failed, leaving it to the scheduled sync', { key, error: String(err) });
-      });
-    }
-
-    // Overage is charged inside writeMemoryRecord, where the quota is measured.
-
-    // MCP resource subscription notifications
-    emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
-    if (!existing) emitResourceListChanged(gaii);
-
-    // Notify directory of profile data changes (Phase 1.4 — event-driven refresh)
-    if (onDirectoryChange && typeof key === 'string' && /^profile\.[^.]+\.(interests|location)$/.test(key)) {
-      onDirectoryChange();
-    }
-
-    stats?.increment('memory_writes');
-
-    // Memory Contracts (reactive): a write to a watched key fires Tracked Response evaluation. The
-    // subscriber gates on the track-registry (O(1)) so non-watched writes do no work.
-    emitMemoryWritten(gaii, key, existing ? 'updated' : 'created');
-
-    // TARGET-050: an app-tool manifest / agent offers doc IS the source of truth for its EXCHANGE
-    // listing — reprice a tool here and the market follows, with no separate listing step.
-    await reconcileAfterSourceWrite(storage, gaii, key);
-
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,
       // WHERE it landed. Memory is keyed by the writer, and with owner_scope a caller can now put a
@@ -202,30 +169,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       { description: 'List all memory keys', method: 'GET', url: '/v1/memory' },
       { description: 'Delete this memory entry', method: 'DELETE', url: `/v1/memory/${encodeURIComponent(key)}` },
     ]));
-    emitChange('memory');
-    // Organism content lives in memory under organism.{id}.*; also emit 'organisms' so organism
-    // views refresh WITHOUT having to subscribe to the global 'memory' firehose (every agent's
-    // every memory write). The workspace/organism views listen to 'organisms' only.
-    if (key.startsWith('organism.')) emitChange('organisms');
-    // Event-triggered workflows: a write to an owner key may start a workflow (engine matches the
-    // owner-GHII namespace, so agent-namespace writes don't fire owner-keyed triggers).
-    getActiveWorkflowEngine()?.onMemoryWrite(gaii, key)
-      .catch(e => logger.error('workflow event trigger (memory.write) failed', { key, error: String(e) }));
-    // Outbound ecosystem event: push memory.write to any subscribed GEAI of this owner (best-effort).
-    emitEcosystemMemoryWrite(storage, config, gaii, key)
-      .catch(e => logger.error('ecosystem outbound (memory.write) failed', { key, error: String(e) }));
-    // Ecosystem automation recipes (feature B4): when a connected app publishes data on a key
-    // matching an enabled recipe's glob, materialise an agent task for each configured agent.
-    runAutomationRecipesForWrite(storage, config, gaii, key)
-      .catch(e => logger.error('ecosystem automation recipe trigger failed', { key, error: String(e) }));
-    // Activation (05-mittaus.md): the third way an account first produces something durable is
-    // its AGENT writing through the connection. Owner-session and onboarding-marker writes are
-    // excluded — the first is the person's own hand, the second is the funnel measuring itself.
-    if (req.auth!.roles.includes('agent') && !key.startsWith('onboarding.')) {
-      void import('../../services/onboarding-funnel.js')
-        .then(m => m.recordActivation(storage, config, req.auth!.owner, 'agent'))
-        .catch(e => logger.warn('memory write: activation marker is best-effort', { error: String(e) }));
-    }
+
   });
 
   // GET /v1/memory — list memory keys (agent auth required)
