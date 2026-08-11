@@ -47,7 +47,7 @@ import {
     type Offering, type Need, type Bid, type ActionCommercial,
     resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
     getOffering, getOfferingWithMeta, listOfferings, matchOfferings, filterOfferings,
-    putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid,
+    putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid, acceptBid,
     offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
@@ -388,27 +388,17 @@ export function registerExchangeTools(
             const bid = await getBid(storage, n.needId, bid_id);
             if (!bid || bid.state !== 'open') return fail('NOT_FOUND: no such open bid');
 
-            const extRec = await storage.getExtension(bid.ext);
-            const act = extRec?.actions.find(a => a.id === bid.action);
-            if (!extRec || !act) return fail('NOT_FOUND: bid capability no longer exists');
-            const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, bid.planId);
-            if (!priced.ok) return fail(`${priced.code}: ${priced.message}`);
-
-            const capCap = cap_units !== undefined ? Math.floor(cap_units) : n.budgetCap;
-            const existing = await readContractForCall(storage, consumerGaii, bid.ext, bid.action);
-            const ent = await createEntitlement(storage, {
-                consumerGaii, appId: n.appId, providerGhii: `${extRec.installedBy}@${config.nodeId}`,
-                ext: bid.ext, action: bid.action, capabilityLabel: `${bid.ext}/${bid.action}`,
-                unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
-                // The pacing toll the ACTION declares for itself, which this door dropped. The same
-                // contract accepted over HTTP carries it (routes/exchange-market.ts:616), so the
-                // same capability burned morsels per call through one door and not the other.
-                capUnits: capCap, contractRef: `bid:${bid.bidId}`, tollMorsels: act.tollMorsels ?? null,
-                createdBy: owner, carrySpend: existing,
+            // The rest of the acceptance is services/exchange-market.ts: resolve the capability,
+            // price it, carry the spend already on an existing contract, create the entitlement with
+            // the action's own pacing toll, then move the bid and the need. Written out here, this
+            // copy had lost the toll — the same capability burned morsels per call through one door
+            // and ran free through the other, on what the consumer thinks is one contract.
+            const out = await acceptBid({ storage, config }, {
+                needId: n.needId, bidId: bid.bidId, consumerGaii, owner,
+                capUnits: cap_units !== undefined ? Math.floor(cap_units) : null,
             });
-            bid.state = 'accepted'; await putBid(storage, bid);
-            n.state = 'matched'; n.updatedAt = new Date().toISOString(); await putNeed(storage, n);
-            return ok({ entitlement_id: ent.entitlementId, ext: ent.ext, action: ent.action, unit: ent.unit, pricing: ent.pricing });
+            if (!out.ok) return fail(`${out.code}: ${out.message}`);
+            return ok({ entitlement_id: out.entitlementId, ext: out.ext, action: out.action, unit: out.unit, pricing: out.pricing });
         },
     );
 

@@ -33,7 +33,7 @@ import {
   BENEFICIARIES_MAX, type BeneficiarySplit, type BeneficiaryShare, type BeneficiaryRole,
 } from '../commerce/beneficiary-split.js';
 import {
-  listBeneficiaryEntries, listBeneficiaryObligations, type BeneficiaryEntry,
+  listBeneficiaryEntries, listBeneficiaryObligations, totalsOf, type BeneficiaryEntry,
 } from '../commerce/beneficiary-book.js';
 import {
   readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare,
@@ -81,19 +81,6 @@ function entryView(e: BeneficiaryEntry & { trackingCode: string }): Record<strin
     payout_reference: e.payoutReference ?? null,
     at: e.at,
   };
-}
-
-/** Sum the entries into the headline the reader actually wants, split by status and by unit. */
-function totalsOf(entries: Array<BeneficiaryEntry & { trackingCode: string }>): Record<string, unknown> {
-  const totals: Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> = {};
-  for (const e of entries) {
-    // Keyed by currency. There is no morsel bucket: morsels pace usage and are never shared.
-    const bucket = e.currency;
-    const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, paid: 0, reversed: 0, entries: 0 });
-    t[e.status] += e.amount;
-    t.entries += 1;
-  }
-  return totals;
 }
 
 /**

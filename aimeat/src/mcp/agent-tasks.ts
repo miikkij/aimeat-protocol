@@ -50,7 +50,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { resolveTaskFileInputs, taskWithFileHandles } from '../services/task-files.js';
 import { emitDelivery, emitChange } from '../services/event-bus.js';
-import { afterTaskCompleted, afterTaskFailed } from '../services/agent-task-fanout.js';
+import { afterTaskCompleted, failTask } from '../services/agent-task-fanout.js';
 import { recordTaskStarted } from '../services/activity-recorder.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -662,31 +662,15 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            if (task.status !== 'active') {
-                return { content: [{ type: 'text' as const, text: `Only active tasks can be failed (current: ${task.status})` }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-
-            const updated = await storage.updateAgentTask(task_id, {
-                status: 'failed',
-                completedAt: now,
-                lastEventAt: now,
-                updatedAt: now,
-            });
-
-            await storage.appendTaskEvent({
-                id: randomUUID(),
-                taskId: task_id,
-                type: 'failed',
-                message: reason,
-                timestamp: now,
-            });
-
-            // The counters move and the workflow run learns the step is over — same as the HTTP
-            // door. A run whose step failed stayed on that step forever when the agent reported it
-            // through a tool call.
-            await afterTaskFailed({ storage, config }, task, agentGaii);
+            // The whole failure — the allowed states, the record, the event and the fan-out — is
+            // services/agent-task-fanout.ts. This copy had NARROWED it to an active task, so an
+            // agent whose task had STALLED, which is the ordinary case for one that crashed, could
+            // not report the failure at all: the task sat stalled, the workflow run that dispatched
+            // it stayed on that step, and nothing said why.
+            const failed = await failTask({ storage, config }, task, reason, agentGaii);
+            if (!failed.ok) return { content: [{ type: 'text' as const, text: `${failed.code}: ${failed.message}` }], isError: true };
+            const updated = failed.task;
+            const now = updated.completedAt ?? new Date().toISOString();
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 

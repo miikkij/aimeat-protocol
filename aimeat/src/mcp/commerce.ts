@@ -38,7 +38,7 @@ import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
 import { putSplit, deleteSplit, listSplitsByProvider, BENEFICIARIES_MAX, type BeneficiaryShare } from '../commerce/beneficiary-split.js';
-import { listBeneficiaryEntries, listBeneficiaryObligations, type BeneficiaryEntry } from '../commerce/beneficiary-book.js';
+import { listBeneficiaryEntries, listBeneficiaryObligations, totalsOf } from '../commerce/beneficiary-book.js';
 import { readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare } from '../commerce/beneficiary-release.js';
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
@@ -416,19 +416,6 @@ export function registerCommerceTools(
     // hand-rolling a bearer token. Every one of them resolves the caller's OWN owner GHII and
     // never accepts a provider id from the argument list: the revenue being given away has to be
     // the giver's, and that is the whole cross-owner question here.
-
-    /** Money micros and morsels are different KINDS of quantity, so they are bucketed, never summed. */
-    function totalsOf(entries: BeneficiaryEntry[]): Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> {
-        const totals: Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> = {};
-        for (const e of entries) {
-            // Keyed by currency. No morsel bucket: morsels pace usage and are never shared.
-            const bucket = e.currency;
-            const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, paid: 0, reversed: 0, entries: 0 });
-            t[e.status] += e.amount;
-            t.entries += 1;
-        }
-        return totals;
-    }
 
     mcp.tool(
         'aimeat_commerce_beneficiary_split_set',

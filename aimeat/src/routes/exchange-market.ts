@@ -34,12 +34,11 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { resolvePacingToll } from './extensions/pacing.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
-import { createEntitlement, readContractForCall } from '../services/metered-entitlements.js';
 import {
   type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type OfferingPlan,
   resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings, filterOfferings,
-  putNeed, getNeed, parseNeedSpec, listNeeds, putBid, listBids, getBid,
+  putNeed, getNeed, parseNeedSpec, listNeeds, putBid, listBids, getBid, acceptBid,
   offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
 import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
@@ -586,27 +585,15 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const bid = await getBid(storage, n.needId, str(req.params.bidId));
     if (!bid || bid.state !== 'open') return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such open bid'));
 
-    const extRec = await storage.getExtension(bid.ext);
-    const act = extRec?.actions.find(a => a.id === bid.action);
-    if (!extRec || !act) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Bid capability no longer exists'));
-    const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, bid.planId);
-    if (!priced.ok) return res.status(400).json(error(config.nodeId, priced.code, priced.message));
-
-    const capCap = posOrNull((req.body ?? {})?.cap_units) ?? n.budgetCap;
-    const existing = await readContractForCall(storage, consumerGaii, bid.ext, bid.action);
-    const ent = await createEntitlement(storage, {
-      consumerGaii, appId: n.appId, providerGhii: `${extRec.installedBy}@${config.nodeId}`,
-      ext: bid.ext, action: bid.action, capabilityLabel: `${bid.ext}/${bid.action}`,
-      unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
-      capUnits: capCap, contractRef: `bid:${bid.bidId}`, tollMorsels: act.tollMorsels ?? null,
-      createdBy: owner, carrySpend: existing,
+    const out = await acceptBid({ storage, config }, {
+      needId: n.needId, bidId: bid.bidId, consumerGaii, owner,
+      capUnits: posOrNull((req.body ?? {})?.cap_units),
     });
-    // Mark the bid accepted + the need matched (append updates; other bids stay for the record).
-    bid.state = 'accepted'; await putBid(storage, bid);
-    n.state = 'matched'; n.updatedAt = new Date().toISOString(); await putNeed(storage, n);
-    return res.status(201).json(success(config.nodeId, { entitlement_id: ent.entitlementId, ext: ent.ext, action: ent.action, unit: ent.unit, pricing: ent.pricing }, [
-      { description: 'This app’s cost & contracts', method: 'GET', url: n.appId ? `/v1/apps/cost?app_id=${encodeURIComponent(n.appId)}` : '/v1/exchange/entitlements' },
-    ]));
+    if (!out.ok) return res.status(out.status).json(error(config.nodeId, out.code, out.message));
+    return res.status(201).json(success(config.nodeId,
+      { entitlement_id: out.entitlementId, ext: out.ext, action: out.action, unit: out.unit, pricing: out.pricing }, [
+        { description: 'This app’s cost & contracts', method: 'GET', url: n.appId ? `/v1/apps/cost?app_id=${encodeURIComponent(n.appId)}` : '/v1/exchange/entitlements' },
+      ]));
   });
 
   return router;

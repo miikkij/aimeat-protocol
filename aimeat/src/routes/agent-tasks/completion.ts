@@ -21,7 +21,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { afterTaskCompleted, afterTaskFailed } from '../../services/agent-task-fanout.js';
+import { afterTaskCompleted, failTask } from '../../services/agent-task-fanout.js';
 import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js';
 import { AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
@@ -187,26 +187,14 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    const now = new Date().toISOString();
     const message = typeof req.body?.message === 'string' ? req.body.message : 'Task failed';
-
-    const updated = await storage.updateAgentTask(id, {
-      status: 'failed',
-      completedAt: now,
-      lastEventAt: now,
-      updatedAt: now,
-    });
-
-    await storage.appendTaskEvent({
-      id: randomUUID(),
-      taskId: id,
-      type: 'failed',
-      message,
-      timestamp: now,
-    });
-
-    res.json(success(config.nodeId, { task: updated }));
-    await afterTaskFailed({ storage, config }, task, resolve(req));
+    // services/agent-task-fanout.ts — aimeat_task_fail makes the same transition.
+    const failed = await failTask({ storage, config }, task, message, resolve(req));
+    if (!failed.ok) {
+      res.status(failed.status).json(error(config.nodeId, failed.code, failed.message));
+      return;
+    }
+    res.json(success(config.nodeId, { task: failed.task }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/rate -- Review a completed task's deliverable ──

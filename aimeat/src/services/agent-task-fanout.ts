@@ -27,6 +27,7 @@
  * @structure
  *   - afterTaskCompleted() — the eight things a completion sets off
  *   - afterTaskFailed() — the two a failure sets off
+ *   - failTask() — the whole failure: the state move, the event and the fan-out
  * @usage
  *   await storage.updateAgentTask(id, { status: 'done', … });
  *   await afterTaskCompleted({ storage, config }, task, updated, message, deliverableKey);
@@ -34,6 +35,7 @@
  *   v1.0.0 — 2026-08-11 — Extracted from routes/agent-tasks/completion.ts (August 2026 audit, the
  *     side-effect sweep) so the tool surface stops being a completion that completes nothing.
  */
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { recordTaskCompleted, recordTaskFailed } from './activity-recorder.js';
@@ -123,4 +125,49 @@ export async function afterTaskFailed(
     emitChange('agent-tasks', actor);
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
         .catch(e => logger.error('workflow advance on task fail failed', { taskId: task.id, error: String(e) }));
+}
+
+/** The states a task may be failed from. STALLED counts: an agent that crashed still gets to say so. */
+export const FAILABLE_STATES: readonly string[] = ['active', 'stalled'];
+
+export type FailResult =
+    | { ok: true; task: AgentTaskRecord }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Move a task to 'failed', append the event, and run the fan-out.
+ *
+ * Written out on both doors, and the copy had narrowed it: the tool surface accepted only an ACTIVE
+ * task, so an agent whose task had STALLED — which is the ordinary case for an agent that crashed —
+ * could not report the failure at all. The task sat stalled, the workflow run that dispatched it
+ * stayed on that step, and nothing said why.
+ */
+export async function failTask(
+    deps: Deps,
+    task: AgentTaskRecord,
+    reason: string,
+    actor?: string,
+): Promise<FailResult> {
+    if (!FAILABLE_STATES.includes(task.status)) {
+        return {
+            ok: false, status: 409, code: 'INVALID_STATE',
+            message: `Only active or stalled tasks can be failed (current: ${task.status})`,
+        };
+    }
+    const now = new Date().toISOString();
+    const updated = await deps.storage.updateAgentTask(task.id, {
+        status: 'failed',
+        completedAt: now,
+        lastEventAt: now,
+        updatedAt: now,
+    });
+    await deps.storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: task.id,
+        type: 'failed',
+        message: reason,
+        timestamp: now,
+    });
+    await afterTaskFailed(deps, task, actor);
+    return { ok: true, task: updated ?? task };
 }

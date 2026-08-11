@@ -45,7 +45,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
-import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
+import type { AimeatConfig } from '../config.js';
+import { createEntitlement, readContractForCall, listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
 import { readCallTiming } from './call-timing.js';
 import { logger } from '../utils/logger.js';
@@ -605,4 +606,66 @@ export function parseNeedSpec(v: unknown): NeedSpec | null {
   if (isObj(o.inputSchema)) spec.inputSchema = o.inputSchema;
   if (isObj(o.outputSchema)) spec.outputSchema = o.outputSchema;
   return (requiredFields.length || spec.format || spec.sample || spec.notes || spec.inputSchema || spec.outputSchema) ? spec : null;
+}
+
+export type AcceptBidResult =
+    | { ok: true; entitlementId: string; ext: string; action: string; unit: string; pricing: unknown }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Accept a bid: turn it into a metered contract, and mark the bid and the need as settled.
+ *
+ * The whole sequence existed on both doors — resolve the capability, price it, carry any spend
+ * already on an existing contract, create the entitlement, then move both records. The MCP copy had
+ * already lost `tollMorsels`, so the same capability burned morsels per call through one door and
+ * ran free through the other on what the consumer thinks is one contract. That is what a copy costs:
+ * not a crash, a contract that means two different things.
+ */
+export async function acceptBid(
+    deps: { storage: Storage; config: AimeatConfig },
+    input: { needId: string; bidId: string; consumerGaii: string; owner: string; capUnits?: number | null },
+): Promise<AcceptBidResult> {
+    const { storage, config } = deps;
+
+    const n = await getNeed(storage, input.needId);
+    if (!n) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Need not found' };
+    const bid = await getBid(storage, n.needId, input.bidId);
+    if (!bid) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Bid not found' };
+
+    const extRec = await storage.getExtension(bid.ext);
+    const act = extRec?.actions.find(a => a.id === bid.action);
+    if (!extRec || !act) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Bid capability no longer exists' };
+
+    const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, bid.planId);
+    if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
+
+    const capUnits = input.capUnits ?? n.budgetCap;
+    const existing = await readContractForCall(storage, input.consumerGaii, bid.ext, bid.action);
+    const ent = await createEntitlement(storage, {
+        consumerGaii: input.consumerGaii,
+        appId: n.appId,
+        providerGhii: `${extRec.installedBy}@${config.nodeId}`,
+        ext: bid.ext,
+        action: bid.action,
+        capabilityLabel: `${bid.ext}/${bid.action}`,
+        unit: priced.unit,
+        pricePerCall: priced.pricePerCall,
+        currency: priced.currency,
+        pricing: priced.pricing,
+        capUnits,
+        contractRef: `bid:${bid.bidId}`,
+        // The pacing toll the ACTION declares for itself.
+        tollMorsels: act.tollMorsels ?? null,
+        createdBy: input.owner,
+        carrySpend: existing,
+    });
+
+    // Append updates; the other bids stay for the record.
+    bid.state = 'accepted';
+    await putBid(storage, bid);
+    n.state = 'matched';
+    n.updatedAt = new Date().toISOString();
+    await putNeed(storage, n);
+
+    return { ok: true, entitlementId: ent.entitlementId, ext: ent.ext, action: ent.action, unit: ent.unit, pricing: ent.pricing };
 }

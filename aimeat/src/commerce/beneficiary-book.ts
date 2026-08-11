@@ -263,3 +263,33 @@ function flatten(
   }
   return out.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''));
 }
+
+/** One currency's headline, split by the four states an entry can be in. */
+export interface BeneficiaryTotals {
+    accrued: number;
+    released: number;
+    paid: number;
+    reversed: number;
+    entries: number;
+}
+
+/**
+ * Sum entries into the headline a reader actually wants: by status, and bucketed by CURRENCY.
+ *
+ * Money micros and morsels are different kinds of quantity, so they are never added together — and
+ * there is no morsel bucket at all, because morsels pace usage and are never shared. Getting that
+ * wrong produces a number that looks like money and is not.
+ *
+ * It lived twice, once per door. Two ways of totalling the same ledger is two answers to "what am I
+ * owed", which is the one question this whole surface exists to answer.
+ */
+export function totalsOf(entries: BeneficiaryEntry[]): Record<string, BeneficiaryTotals> {
+    const totals: Record<string, BeneficiaryTotals> = {};
+    for (const e of entries) {
+        const bucket = e.currency;
+        const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, paid: 0, reversed: 0, entries: 0 });
+        t[e.status] += e.amount;
+        t.entries += 1;
+    }
+    return totals;
+}
