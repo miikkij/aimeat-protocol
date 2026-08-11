@@ -104,6 +104,9 @@ const ALL_SUITES = [
     // not call — so the consent layer, the meta.* admin rule and the member.* self-write rule held
     // on the browser and not on the agent.
     'test/e2e-mcp-organism-namespace.ts',
+    // The MCP task lifecycle, which nothing exercised — which is why five differences from the REST
+    // routes survived every green run.
+    'test/e2e-mcp-agent-tasks.ts',
     // Self-spawns its own node with AIMEAT_PACING_TOLL_DEFAULT set: the feature IS the node-wide
     // default, so it cannot be proven on the shared server.
     'test/e2e-pacing.ts',

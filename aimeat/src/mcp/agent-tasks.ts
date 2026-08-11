@@ -7,6 +7,11 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.x — 2026-08-11 — Five differences from the REST task routes, none of which any suite
+ *     exercised: task-runner auto-activation (a delegated task sat queued waiting for a click
+ *     the owner was told they would not need), the live-plan guard on propose_todos (a mid-run
+ *     re-proposal deleted every in-progress and completed todo), the stalled auto-resume on
+ *     both the event and todo paths, and the readiness bar on complete.
  *   v1.7.0 — 2026-08-01 — TARGET-058 Phase 4: aimeat_task_complete accepts an `ai_provenance`
  *     declaration and stamps the completion message — the text the OWNER reads when they look at
  *     what their agent did. The link rides in the event's `details` rather than a column of its
@@ -32,6 +37,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
+import { resumeIfStalled } from '../services/task-resume.js';
 import { commissionFingerprint } from '../routes/agent-tasks/dedupe.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -110,6 +116,10 @@ export function registerAgentTaskTools(
 
             const now = new Date().toISOString();
             const id = randomUUID();
+            // The target agent's mode decides whether a queued task starts on its own.
+            const targetRecord = await storage.getAgent(targetGaii);
+            const autoActivated = (status ?? 'queued') === 'queued' && targetRecord?.mode === 'task-runner';
+            const effectiveStatus = (autoActivated ? 'active' : (status ?? 'queued')) as AgentTaskRecord['status'];
             const record: AgentTaskRecord = {
                 id,
                 agentGaii: targetGaii,
@@ -121,12 +131,28 @@ export function registerAgentTaskTools(
                 verification: { userExpects: '', technicalChecks: [] },
                 ...(fileResult.files.length ? { resources: { files: fileResult.files } } : {}),
                 todos: [],
-                status: (status ?? 'queued') as AgentTaskRecord['status'],
+                status: effectiveStatus,
                 dedupeKey,
                 createdAt: now,
                 updatedAt: now,
+                ...(autoActivated ? { lastEventAt: now } : {}),
             };
             const created = await storage.createAgentTask(record);
+            // A task-runner agent is the owner saying "start without asking me each time", and
+            // POST /v1/agents/:name/tasks has honoured that since the mode existed: a queued task
+            // for such an agent flips to active and gets the matching 'started' event, so an
+            // auto-activated task is indistinguishable from an owner-approved one. This tool wrote
+            // the status verbatim, so delegating over MCP produced a task sitting queued waiting for
+            // a click the owner was told they would not need.
+            if (autoActivated) {
+                await storage.appendTaskEvent({
+                    id: randomUUID(),
+                    taskId: created.id,
+                    type: 'started',
+                    message: 'Task auto-activated (agent mode: task-runner)',
+                    timestamp: now,
+                });
+            }
             emitResourceUpdated(targetGaii, `aimeat://agents/${target_agent}/tasks/${id}`);
             return {
                 content: [{
@@ -267,8 +293,17 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            if (!['queued', 'revision_requested', 'active'].includes(task.status)) {
-                return { content: [{ type: 'text' as const, text: `TODOs can only be proposed on queued, revision_requested, or active tasks (current: ${task.status})` }], isError: true };
+            // An ACTIVE task that already has a live plan is not re-plannable here. The preserve
+            // step below keeps only todos already marked 'outdated', so a re-proposal mid-run drops
+            // every in-progress and completed todo, their completedAt stamps included — the plan the
+            // owner approved and the record of what was already done, both gone with no refusal.
+            // POST /v1/agents/:name/tasks/:id/propose-todos has answered 409 for this since it was
+            // written; mid-execution changes go through PATCH.
+            const hasLivePlan = (task.todos ?? []).some(t => t.status !== 'outdated');
+            const canPropose = task.status === 'queued' || task.status === 'revision_requested'
+                || (task.status === 'active' && !hasLivePlan);
+            if (!canPropose) {
+                return { content: [{ type: 'text' as const, text: `TODOs can only be proposed on queued, revision_requested, or plan-less active tasks (current: ${task.status})` }], isError: true };
             }
 
             const now = new Date().toISOString();
@@ -387,6 +422,10 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
+            // An agent that briefly crashed and came back is the ordinary case, and the HTTP door
+            // has always read a new event as proof it is back. This tool refused outright, so the
+            // stall detector's verdict was permanent on the surface the agent actually uses.
+            await resumeIfStalled(storage, task, 'agent posted a new event');
             if (task.status !== 'active') {
                 return { content: [{ type: 'text' as const, text: `Events can only be appended to active tasks (current: ${task.status})` }], isError: true };
             }
@@ -452,6 +491,8 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
+            // Same as the event path: ticking off a todo is the agent showing up.
+            await resumeIfStalled(storage, task, 'agent updated a todo');
             if (task.status !== 'active') {
                 return { content: [{ type: 'text' as const, text: `TODOs can only be updated on active tasks (current: ${task.status})` }], isError: true };
             }
@@ -522,6 +563,12 @@ export function registerAgentTaskTools(
         },
         annotationsFor('aimeat_task_complete'),
         async ({ task_id, message, ai_provenance, ai_provenance_id }) => {
+            // The same readiness bar the event path answers to. requireReadiness('standard') sits on
+            // the REST completion route, and this tool had nothing: an agent that may not report
+            // progress could still declare the whole task done.
+            const notReady = await readinessRefusal(storage, agentGaii, 'standard');
+            if (notReady) return { content: [{ type: 'text' as const, text: `READINESS_INSUFFICIENT: ${notReady}` }], isError: true };
+
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
 

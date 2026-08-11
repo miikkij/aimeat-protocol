@@ -11,6 +11,7 @@
 
 import type { Router } from 'express';
 import { randomUUID } from 'node:crypto';
+import { resumeIfStalled } from '../../services/task-resume.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskRating, RaterType } from '../../storage/interface.js';
 import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../../storage/interface.js';
@@ -56,18 +57,7 @@ export function registerTaskCompletionRoutes(
     // the task should resume. This avoids needing a separate "restart"
     // endpoint for the common case of an agent that briefly crashed or lost
     // connectivity and then recovered.
-    if (task.status === 'stalled') {
-      const resumeNow = new Date().toISOString();
-      await storage.updateAgentTask(id, { status: 'active', lastEventAt: resumeNow, updatedAt: resumeNow });
-      await storage.appendTaskEvent({
-        id: randomUUID(),
-        taskId: id,
-        type: 'started',
-        message: 'Task auto-resumed from stalled (agent posted a new event)',
-        timestamp: resumeNow,
-      });
-      task.status = 'active';
-    }
+    await resumeIfStalled(storage, task, 'agent posted a new event');
 
     if (task.status !== 'active') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
@@ -425,18 +415,7 @@ export function registerTaskCompletionRoutes(
 
     // Stalled tasks accept todo updates too: same auto-resume semantics as
     // events -- if the agent is updating todos, it's clearly back.
-    if (task.status === 'stalled') {
-      const resumeNow = new Date().toISOString();
-      await storage.updateAgentTask(id, { status: 'active', lastEventAt: resumeNow, updatedAt: resumeNow });
-      await storage.appendTaskEvent({
-        id: randomUUID(),
-        taskId: id,
-        type: 'started',
-        message: 'Task auto-resumed from stalled (agent updated a todo)',
-        timestamp: resumeNow,
-      });
-      task.status = 'active';
-    }
+    await resumeIfStalled(storage, task, 'agent updated a todo');
 
     if (task.status !== 'active') {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',

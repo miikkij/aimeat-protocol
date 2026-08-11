@@ -76,12 +76,17 @@ await test('Setup: owner + broad-scoped agent', async () => {
     const ts = new Date().toISOString();
     const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerKey, ownerName + NODE_ID + ts) }) });
     const ownerToken = tk.body.data.token;
-    const r = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'v2agent', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o', scopes: ['*'] }) });
+    const r = await json('/v1/agents', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ name: 'v2agent', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o', scopes: ['*', 'memory:write-reserved'] }) });
     assert(r.status === 201, `agent ${r.status}: ${JSON.stringify(r.body)}`);
     agent = { gaii: r.body.data.agent.gaii, key: r.body.data.private_key };
 });
 
 // Each role's tools/list must equal exactly its surface allowlist (broad scopes → no scope trimming).
+// The scope list is '*' PLUS memory:write-reserved, which is the one word no wildcard carries
+// (utils/scope-coverage.ts): '*' is the one-click Full access template, and the reserved keys are
+// the ones the server itself trusts — the AI budget cap among them. Without the explicit grant
+// aimeat_operator_ai_config is correctly absent, and this test would be measuring the exception
+// rather than the surface.
 for (const role of ['appdev', 'agent', 'service', 'admin'] as const) {
     await test(`/v2/mcp/${role} exposes exactly its surface (${MCP_SURFACES[role].length} tools)`, async () => {
         const got = new Set(await listToolsForRole(agent.gaii, agent.key, role));
