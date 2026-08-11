@@ -32,6 +32,9 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateMemoryWrite } from './schema-validator.js';
+import { checkMemoryQuota, chargeOverage } from './quota.js';
+import { checkMemoryQuotaAlarm } from './quota-alarm.js';
+import { isKeyArchived } from './archive.js';
 import { provenanceForWrite } from './ai-provenance.js';
 import { memoryContentBytes } from '../routes/memory/shared.js';
 import { emitChange } from './event-bus.js';
@@ -79,7 +82,8 @@ export type MemoryWriteResult =
     | {
         ok: false;
         status: number;
-        code: 'SCOPE_DENIED' | 'SCHEMA_VALIDATION_FAILED' | 'VERSION_CONFLICT';
+        code: 'SCOPE_DENIED' | 'SCHEMA_VALIDATION_FAILED' | 'VERSION_CONFLICT'
+            | 'ACCESS_DENIED' | 'ARCHIVED' | 'QUOTA_EXCEEDED';
         message: string;
         details?: unknown;
     };
@@ -130,6 +134,83 @@ export async function writeMemoryRecord(
     }
 
     const existing = await storage.getMemory(caller.targetGaii, input.key);
+
+    // Defence in depth: getMemory is already scoped by GAII, so this can only fire if the target
+    // resolution ever hands back a namespace the caller does not own.
+    if (existing && existing.ownerGaii !== caller.targetGaii) {
+        return {
+            ok: false, status: 403, code: 'ACCESS_DENIED',
+            message: 'You can only modify your own memory records',
+        };
+    }
+
+    // Archived is read-only, and it means it. An archived record, or one inside an archived
+    // workspace or organism, refuses the write. The MCP tool never checked either, so archiving —
+    // which is how an owner says "this is finished, stop changing it" — held on one surface only.
+    if (existing?.archived) {
+        return {
+            ok: false, status: 409, code: 'ARCHIVED',
+            message: 'This record is archived (read-only). Unarchive it before writing.',
+        };
+    }
+    if (input.key.startsWith('organism.')) {
+        const guard = await isKeyArchived(storage, input.key);
+        if (guard.archived) {
+            return {
+                ok: false, status: 409, code: 'ARCHIVED',
+                message: `This ${guard.level} is archived (read-only). Unarchive it before writing.`,
+            };
+        }
+    }
+
+    // The three memory ceilings. Every one of them lived in the HTTP route, so a write over MCP had
+    // no size limit, no key limit and no byte budget — on a store whose whole shape argument is that
+    // a value holds a record rather than a field.
+    const maxValueBytes = config.memoryMaxValueSizeKb * 1024;
+    const valueSize = Buffer.byteLength(JSON.stringify(input.value), 'utf8');
+    if (valueSize > maxValueBytes) {
+        return {
+            ok: false, status: 413, code: 'QUOTA_EXCEEDED',
+            message: `Value size ${valueSize} bytes exceeds limit of ${maxValueBytes} bytes`,
+        };
+    }
+
+    // An UPDATE never grows the key count, so the count is only taken on a new key.
+    let keyCount: number | undefined;
+    if (!existing) {
+        keyCount = await storage.countMemory([caller.targetGaii]);
+        if (keyCount >= config.memoryMaxKeysPerAgent) {
+            // The remedy named here matters: "delete unused keys" sends someone who hit the wall
+            // through one-key-per-small-fact off to delete data instead of fixing the shape that
+            // will refill the space next week.
+            return {
+                ok: false, status: 413, code: 'QUOTA_EXCEEDED',
+                message: `Memory key limit reached (${config.memoryMaxKeysPerAgent}). One value may hold `
+                    + `${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one record holding `
+                    + 'an array or an object keyed by id, rather than deleting data.',
+            };
+        }
+    }
+
+    const existingSize = existing ? Buffer.byteLength(JSON.stringify(existing.value), 'utf8') : 0;
+    const quotaCheck = await checkMemoryQuota(config, storage, caller.targetGaii, valueSize, existingSize);
+    if (!quotaCheck.allowed) {
+        return { ok: false, status: 413, code: 'QUOTA_EXCEEDED', message: quotaCheck.reason! };
+    }
+
+    // Overage is charged where the quota is measured. It was billed on the HTTP path only, so a
+    // write over MCP consumed the space and nobody paid for it.
+    if (quotaCheck.overageMorsels > 0) {
+        await chargeOverage(storage, caller.targetGaii, quotaCheck.overageMorsels, 'memory_overage');
+    }
+
+    // Warn the owner at 80% and 95%, while reshaping is still cheap. Both numbers are already in
+    // hand, so this costs no extra query, and it is fire-and-forget: a warning must never fail the
+    // write it is warning about.
+    void checkMemoryQuotaAlarm(config, storage, caller.targetGaii, {
+        ...(keyCount !== undefined ? { keyCount: keyCount + 1 } : {}),
+        usedBytes: quotaCheck.currentBytes - existingSize + valueSize,
+    });
 
     // 3. The optimistic lock is compared against the record in the TARGET namespace, which is why it
     //    comes after the target is resolved and not before.

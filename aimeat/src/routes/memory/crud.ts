@@ -17,8 +17,6 @@ import { writeMemoryRecord } from '../../services/memory-write.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { MemoryWriteSchema, validateBody } from '../../models/schemas.js';
-import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
-import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
@@ -32,7 +30,6 @@ import { runAutomationRecipesForWrite } from '../../services/ecosystem-automatio
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { resolveWriteTarget } from './owner-target.js';
-import { isKeyArchived } from '../../services/archive.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -128,71 +125,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const existing = await storage.getMemory(gaii, key);
 
-    // Defense-in-depth: verify ownership on overwrite even though getMemory is scoped by GAII
-    if (existing && existing.ownerGaii !== gaii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only modify your own memory records'));
-      return;
-    }
-
-    // Archive guard: a record that is itself archived, or sits inside an archived workspace/organism,
-    // is read-only. (isKeyArchived without ownerGaii only checks the cheap container markers; the
-    // record-level case reuses the `existing` we already fetched — no extra getMemory.)
-    if (existing?.archived) {
-      res.status(409).json(error(config.nodeId, 'ARCHIVED', 'This record is archived (read-only). Unarchive it before writing.'));
-      return;
-    }
-    if (key.startsWith('organism.')) {
-      const guard = await isKeyArchived(storage, key);
-      if (guard.archived) {
-        res.status(409).json(error(config.nodeId, 'ARCHIVED', `This ${guard.level} is archived (read-only). Unarchive it before writing.`));
-        return;
-      }
-    }
-
-    // Quota enforcement: configurable per-agent key limit and per-value size limit
-    const MAX_KEYS_PER_AGENT = config.memoryMaxKeysPerAgent;
-    const MAX_VALUE_SIZE = config.memoryMaxValueSizeKb * 1024;
-
-    const valueSize = Buffer.byteLength(JSON.stringify(value), 'utf8');
-    if (valueSize > MAX_VALUE_SIZE) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', `Value size ${valueSize} bytes exceeds limit of ${MAX_VALUE_SIZE} bytes`));
-      return;
-    }
-
-    // Carried out of the new-key branch so the quota alarm below can see it. An UPDATE never grows
-    // the key count, so it stays undefined there and the alarm only weighs the byte dimension.
-    let keyCount: number | undefined;
-    if (!existing) {
-      // Cheap DB COUNT(DISTINCT key) — NOT listMemory (which loaded every record + value just to
-      // count them; that full scan on each new key was a big part of the per-write latency).
-      keyCount = await storage.countMemory([gaii]);
-      if (keyCount >= MAX_KEYS_PER_AGENT) {
-        // The remedy this message names matters: the old text said "delete unused keys first", which
-        // sends a caller that hit the wall through one-key-per-small-fact off to delete data instead
-        // of fixing the shape that will refill the space next week. A value holds 1024 kB, so folding
-        // is almost always the right move and deletion almost never is.
-        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-          `Memory key limit reached (${MAX_KEYS_PER_AGENT}). One value may hold ${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one record holding an array or an object keyed by id, rather than deleting data.`));
-        return;
-      }
-    }
-
-    // M-1: Total memory quota enforcement (§8.2, default 10MB per agent)
-    const existingSize = existing ? Buffer.byteLength(JSON.stringify(existing.value), 'utf8') : 0;
-    const quotaCheck = await checkMemoryQuota(config, storage, gaii, valueSize, existingSize);
-    if (!quotaCheck.allowed) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED', quotaCheck.reason!));
-      return;
-    }
-
-    // Warn the owner at 80% / 95% of either ceiling, while reshaping is still cheap. Both numbers
-    // are already in hand (the count above, the byte total from checkMemoryQuota), so this costs no
-    // extra query on the write path, and the service throttles per principal per band per day.
-    // Fire-and-forget: a warning must never fail the write it is warning about.
-    void checkMemoryQuotaAlarm(config, storage, gaii, {
-      ...(keyCount !== undefined ? { keyCount: keyCount + 1 } : {}),
-      usedBytes: quotaCheck.currentBytes - existingSize + valueSize,
-    });
+    // Ownership on overwrite, the archive guard and all three memory ceilings moved to
+    // services/memory-write.ts on 2026-08-11. They lived here, so a write over MCP had none of
+    // them: no size limit, no key limit, no byte budget, and archiving held on one surface only.
+    // The service reads  itself, so this route no longer fetches it twice either.
 
     // ONE implementation. services/memory-write.ts owns the schema lock, the version check, the
     // provenance stamp, the record shape and the change event — the same sequence the MCP tool runs,
@@ -236,10 +172,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       });
     }
 
-    // Charge overage morsels if over quota (§15)
-    if (quotaCheck.overageMorsels > 0) {
-      await chargeOverage(storage, gaii, quotaCheck.overageMorsels, 'memory_overage');
-    }
+    // Overage is charged inside writeMemoryRecord, where the quota is measured.
 
     // MCP resource subscription notifications
     emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
