@@ -18,6 +18,10 @@ const config = { baseUrl: 'https://aimeat.io', appHost: 'apps.aimeat.io' } as un
 function mockReq(hostname: string, headers: Record<string, string> = {}): Request {
     const lower: Record<string, string> = {};
     for (const [k, v] of Object.entries(headers)) lower[k.toLowerCase()] = v;
+    // Express derives req.hostname FROM the Host header, so a mock that sets one without the other
+    // is a request no server ever sees. The middleware reads headers.host directly when it checks
+    // that an origin marker's family matches the host nginx routed on, and it read as absent here.
+    if (!lower.host) lower.host = hostname;
     return {
         hostname,
         headers: lower,
@@ -56,14 +60,26 @@ describe('subdomainMiddleware — hostname fallback', () => {
 });
 
 describe('subdomainMiddleware — header path (nginx)', () => {
+    // The Host must belong to the family the marker claims. Until 2026-08-11 it did not have to,
+    // and the apex nginx block was not blanking the markers either, so one request header made the
+    // node believe a request had arrived on the isolated app origin. That skipped the redirect and
+    // served app HTML on the origin the session lives on, which is the whole H-2 isolation.
+    //
+    // These two cases used the Host 'whatever' precisely because the Host was ignored. They now
+    // carry the host nginx would have routed on.
     it('x-app-origin + x-subdomain → app origin + subdomain', () => {
-        expect(run(mockReq('whatever', { 'x-app-origin': '1', 'x-subdomain': 'sanomat' })))
+        expect(run(mockReq('sanomat.apps.aimeat.io', { 'x-app-origin': '1', 'x-subdomain': 'sanomat' })))
             .toEqual({ subdomain: 'sanomat', appOrigin: true });
     });
 
     it('x-app-origin alone → app origin, no subdomain (bare app host)', () => {
-        expect(run(mockReq('whatever', { 'x-app-origin': '1' })))
+        expect(run(mockReq('apps.aimeat.io', { 'x-app-origin': '1' })))
             .toEqual({ subdomain: null, appOrigin: true });
+    });
+
+    it('a forged x-app-origin on the apex is ignored', () => {
+        expect(run(mockReq('aimeat.io', { 'x-app-origin': '1' })))
+            .toEqual({ subdomain: null, appOrigin: false });
     });
 
     it('x-subdomain alone (apex subdomain) → subdomain, not app origin', () => {

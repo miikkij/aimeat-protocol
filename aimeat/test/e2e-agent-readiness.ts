@@ -11,6 +11,10 @@
  *   llms.txt structure and llms-full.txt land here as their phases ship.
  * @version-history
  *   v0.1.0 — 2026-07-28 — Phase 02: sitemap.xml from the public-page registry
+ *   v0.2.0 — 2026-08-11 — The two app-origin guard checks moved to e2e-app-origin.ts. They asked
+ *     the shared CI server, which has no app host configured, to behave as an app origin, and the
+ *     only thing that ever made it answer was a header any client could send. subdomain.ts v1.5.0
+ *     stopped believing that header off-family; the guards are proven where the origin is real.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-readiness
 
@@ -353,16 +357,16 @@ function locs(xml: string): string[] {
     });
 
     // ── Apex-only guard ─────────────────────────────────────────────────────────────────────
-    // These documents describe THIS node. Served from an app's own host they would describe
-    // somebody else — a site map full of apex URLs, or the 145 kB app-BUILDING manual in which
-    // the app's own name never appears. Until phase 12 gives app origins their own versions, a
-    // 404 is the honest answer. `x-app-origin` is what nginx stamps on the app host family.
-    await test('node discovery documents do not answer on an app origin', async () => {
-        for (const p of ['/sitemap.md', '/AGENTS.md', '/agents.md', '/llms-full.txt']) {
-            const r = await text(p, { 'x-app-origin': '1', 'x-subdomain': 'someapp' });
-            assert(r.status === 404, `${p} on an app origin → ${r.status}, expected 404`);
-        }
-    });
+    // These documents describe THIS node, and on an app's own host they would describe somebody
+    // else — a site map full of apex URLs, or the 145 kB app-BUILDING manual in which the app's own
+    // name never appears. The guard is still there and still tested; the assertions moved to
+    // e2e-app-origin.ts (Phase 8) on 2026-08-11.
+    //
+    // They could not stay here. This suite runs against the shared CI server, which pins
+    // AIMEAT_APP_HOST to empty, so that server has no app-host family and no request to it can be
+    // on an app origin. `x-app-origin: 1` alone used to be enough to look like one, which is the
+    // hole subdomain.ts v1.5.0 closed: a family marker now counts only on a Host in that family.
+    // e2e-app-origin.ts self-spawns a server with a real app host, so there the origin is real.
 
     // ── Root content negotiation (phase 10) ─────────────────────────────────────────────────
     // A wildcard Accept is what every crawler, unfurler and readability scanner sends, and it used
@@ -447,16 +451,12 @@ function locs(xml: string): string[] {
         }
     });
 
-    // robots.txt is registered by the static-file layer, ahead of the subdomain router, so without
-    // a guard it answered on every app origin with the NODE's file — ending in a Sitemap: line
-    // pointing at the apex. A robots.txt that sends a crawler to another host's sitemap is a
-    // document about somebody else served under the app's name.
-    await test('robots.txt does not leak the node file onto an app origin', async () => {
+    // The app-origin half of this — that the node's file does not answer there — moved to
+    // e2e-app-origin.ts (Phase 8) for the reason given at the apex-only guard above. What the apex
+    // serves is still this suite's business.
+    await test('robots.txt is served on the apex', async () => {
         const apex = await text('/robots.txt');
         assert(apex.status === 200 && apex.body.includes('Content-Signal'), 'apex robots.txt missing');
-        const onApp = await text('/robots.txt', { 'x-app-origin': '1', 'x-subdomain': 'someapp' });
-        assert(!onApp.body.includes('Content-Signal'),
-            'the node robots.txt answered on an app origin');
     });
 
     await test('the root serves plain text to a plain-text client', async () => {

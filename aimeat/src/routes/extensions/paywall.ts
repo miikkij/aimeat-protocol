@@ -11,6 +11,9 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.8.0 — 2026-08-11 — The internal pass is checked against the call it is being spent on
+ *     (August 2026 audit H-17). It carried `coordExt`/`coordAction` from the day it was written and
+ *     this file read neither, so a pass minted for one product stood the paywall down on any other.
  *   v1.7.0 — 2026-08-10 — The carry plan is looked up only for an app the extension's installer
  *     owns. It read config.app straight through, so a manifest could put its callers on somebody
  *     else's carry plan.
@@ -42,7 +45,9 @@ import { getCarryPlan, getMember } from '../../services/app-members.js';
 import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
 import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
 import type { BeneficiaryAccrual } from '../../services/metered-settlement.js';
-import { consumeInternalPass } from './internal-pass.js';
+import { consumeInternalPass, type InternalPass } from './internal-pass.js';
+import { AppToolsDocSchema, appToolsKey } from '../../models/app-tool-schemas.js';
+import { listInterfaceVersions } from '../../services/app-tool-interfaces.js';
 import { appSpendRefusal } from '../../services/metered-access.js';
 import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
@@ -132,6 +137,90 @@ async function cheapestHeld(
   return best?.binding ?? unusable;
 }
 
+/** `apptool:{ownerName}/{appId}` — the only coordinate shape an internal pass is ever minted on. */
+const APPTOOL_COORD = /^apptool:([^/]+)\/(.+)$/;
+
+/**
+ * The pass, IF it is about the call that is about to run. Null when it is about something else, and
+ * then the normal rules apply exactly as if no pass had been presented.
+ *
+ * A pass cannot be forged, which is not the same as being about this call. Every mint site takes the
+ * coordinate from an app-tool manifest and then invokes whatever that manifest's `action_id` names —
+ * and a manifest is written by its own owner, who may name a capability belonging to somebody else.
+ * So a door can legitimately mint `apptool:mallory/free.html · look`, invoke `ext:alice-signals:search`
+ * with it, and have Alice's paywall stand down on a product Mallory never sold.
+ *
+ * Two things have to hold. First, the product belongs to the OWNER of this extension: checked
+ * without touching storage, so it holds whatever else fails, and it is what keeps a stranger's pass
+ * out. Second, that owner's app-tool really does bind THIS action, which within one owner is the
+ * difference between the cheap tool a caller came through and the expensive one they did not.
+ *
+ * Three answers satisfy the second, and all three are tried before a pass is turned away, because
+ * turning one away charges a caller who has already paid upstream:
+ *
+ *   · the tool's CURRENT binding, the answer nearly every call gets, at one row read;
+ *   · a PINNED interface version, because a contract is frozen at the binding it was signed at and a
+ *     consumer on v1 keeps hitting v1 while the manifest moves on;
+ *   · a binding that names a capability whose `source.ref` is this action. `action_id` is a
+ *     capability id, and a capability may be registered under any id rather than under its own ref,
+ *     so the two are not always the same string.
+ *
+ * Read uncached on purpose. The reads are single-row, and a stale answer here charges a caller who
+ * has already paid upstream, which is the one failure this whole mechanism exists to prevent.
+ */
+async function coveringPass(
+  storage: Storage, nodeId: string, ext: ExtensionRecord, action: ExtAction, pass: InternalPass,
+): Promise<InternalPass | null> {
+  const target = `ext:${ext.name}:${action.id}`;
+  const refuse = (why: string): null => {
+    // A pass is single-use and travels one loopback hop, so a mismatch is a bug or an attack and
+    // never ordinary traffic. Both coordinates are logged because either half can be the wrong one.
+    logger.warn('paywall: internal pass does not cover this call, charging normally', {
+      why, presented: `${pass.coordExt} · ${pass.coordAction}`, running: target, kind: pass.kind,
+    });
+    return null;
+  };
+
+  const parts = APPTOOL_COORD.exec(pass.coordExt);
+  if (!parts) return refuse('coordinate is not an app-tool');
+  const coordOwner = parts[1];
+  const appId = parts[2];
+  if (coordOwner !== ext.installedBy) return refuse('the product belongs to another owner');
+
+  /** Does a binding string name this action, either as the ref itself or through a capability id? */
+  const namesThisAction = async (binding: string | null | undefined): Promise<boolean> => {
+    if (!binding) return false;
+    if (binding === target) return true;
+    return (await storage.getCapability(binding))?.source.ref === target;
+  };
+
+  const providerGhii = `${coordOwner}@${nodeId}`;
+  try {
+    const rec = await storage.getMemory(providerGhii, appToolsKey(appId));
+    const parsed = rec ? AppToolsDocSchema.safeParse(rec.value) : null;
+    const tool = parsed?.success ? parsed.data.tools.find(t => t.name === pass.coordAction) : undefined;
+    if (await namesThisAction(tool?.action_id)) return pass;
+
+    // Only reached when the current binding is not this action, which is rare — so the scan for
+    // frozen versions stays off the path a normal call takes.
+    const frozen = await listInterfaceVersions(storage, providerGhii, appId, pass.coordAction);
+    for (const version of frozen) {
+      if (await namesThisAction(version.binding)) return pass;
+    }
+    return refuse('that app-tool does not bind this action');
+  } catch (err) {
+    // The manifest could not be read. The owner check above already held, so the cross-owner door is
+    // shut; what is unproven is which of that owner's own tools this is. Standing down loses them the
+    // difference between two of their own prices; refusing charges a caller who has already paid.
+    // The second is the worse answer, so this leans the same way priced-binding.ts does on the same
+    // failure — and says so loudly, because a storage hiccup must read as a hiccup.
+    logger.warn('paywall: could not verify the internal pass binding; honouring it on the owner check alone', {
+      presented: `${pass.coordExt} · ${pass.coordAction}`, running: target, error: String(err),
+    });
+    return pass;
+  }
+}
+
 /**
  * Gate a raw extension invoke. Order: owner-free → anti-abuse toll (burn) → free (no commercial) →
  * money token (Phase 3; currently 402) → morsel payment (atomic debit-caller + credit-owner).
@@ -163,14 +252,16 @@ export async function enforcePaywall(args: {
   //    HTTP surface, which lands right back here — so without a pass one call would be ruled on
   //    twice, and the second ruling would be made by the one place that cannot know the product.
   //    The pass is minted in-process, single use, and unknown to any caller, so an absent or bogus
-  //    one simply means "apply the normal rules".
+  //    one means "apply the normal rules" — and so does one that turns out to be about a different
+  //    product, which is what `coveringPass` decides.
   //
   //    `settled` — the contract was charged upstream; there is nothing left to take, pacing included.
   //    `unpriced` — the manifest puts no price on the tool the caller came through. That answers the
   //    app-tool question (step 3.5) and nothing else: an action with its own `commercial` terms is
   //    still owed them, because a provider publishing a free tool is declining to charge for THEIR
   //    tool, not waiving someone else's price.
-  const upstream = consumeInternalPass(internalPass);
+  const presented = consumeInternalPass(internalPass);
+  const upstream = presented ? await coveringPass(storage, config.nodeId, ext, action, presented) : null;
   if (upstream?.kind === 'settled') {
     logger.debug('paywall stood down: settled upstream', { ext: ext.name, action: action.id, ...upstream });
     return { ok: true, upstream: true };

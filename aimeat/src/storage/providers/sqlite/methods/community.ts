@@ -2,6 +2,8 @@
  * @file src/storage/providers/sqlite/methods/community.ts
  * @description Membership, Join-request, Approval, Appeal, Marketplace, Push, Issuer, Nonce, Genesis-peer, Reputation, Realtime-room methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — Push subscriptions are per device: upsert on (ownerName, endpoint),
+ *     listPushSubscriptionsByOwner added, delete takes an optional endpoint (audit H-8).
  *   v1.2.0 — 2026-07-16 — Memberships carry invitedWorkspaces (JSON column): workspace grants chosen at invite time.
  *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch (Phase 3): pending approvals for many orgs
  *     in one organismId-IN query.
@@ -13,6 +15,17 @@ import type {
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { logger } from '../../../../utils/logger.js';
+
+/** One push_subscriptions row → the record. Shared by the three readers so they cannot drift. */
+function toPushSubscription(row: Record<string, unknown>): PushSubscriptionRecord {
+  return {
+    ownerName: row.ownerName as string,
+    endpoint: row.endpoint as string,
+    keys: JSON.parse(row.keys as string),
+    createdAt: row.createdAt as string,
+    lastUsedAt: row.lastUsedAt as string,
+  };
+}
 
 export const communityMethods = {
   // ── Memberships ──
@@ -480,10 +493,14 @@ export const communityMethods = {
   // ── Push Subscriptions ──
   // ══════════════════════════════════════════════════════════
 
+  // One row per DEVICE, keyed (ownerName, endpoint) — see the table comment in schema-tables-1.ts.
   async createPushSubscription(this: SqliteStorage, record: PushSubscriptionRecord): Promise<PushSubscriptionRecord> {
+    // ON CONFLICT rather than INSERT OR REPLACE: the same device re-subscribing refreshes its keys
+    // and keeps its createdAt, and a DIFFERENT device does not collide at all.
     this.db.prepare(
-      `INSERT OR REPLACE INTO push_subscriptions (ownerName, endpoint, keys, createdAt, lastUsedAt)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO push_subscriptions (ownerName, endpoint, keys, createdAt, lastUsedAt)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(ownerName, endpoint) DO UPDATE SET keys = excluded.keys, lastUsedAt = excluded.lastUsedAt`
     ).run(
       record.ownerName, record.endpoint,
       JSON.stringify(record.keys), record.createdAt, record.lastUsedAt,
@@ -492,31 +509,29 @@ export const communityMethods = {
   },
 
   async getPushSubscription(this: SqliteStorage, ownerName: string): Promise<PushSubscriptionRecord | null> {
-    const row = this.db.prepare('SELECT * FROM push_subscriptions WHERE ownerName = ?').get(ownerName) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    return {
-      ownerName: row.ownerName as string,
-      endpoint: row.endpoint as string,
-      keys: JSON.parse(row.keys as string),
-      createdAt: row.createdAt as string,
-      lastUsedAt: row.lastUsedAt as string,
-    };
+    const row = this.db.prepare(
+      'SELECT * FROM push_subscriptions WHERE ownerName = ? ORDER BY lastUsedAt DESC, endpoint ASC LIMIT 1'
+    ).get(ownerName) as Record<string, unknown> | undefined;
+    return row ? toPushSubscription(row) : null;
   },
 
-  async deletePushSubscription(this: SqliteStorage, ownerName: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM push_subscriptions WHERE ownerName = ?').run(ownerName);
+  async listPushSubscriptionsByOwner(this: SqliteStorage, ownerName: string): Promise<PushSubscriptionRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM push_subscriptions WHERE ownerName = ? ORDER BY createdAt ASC, endpoint ASC'
+    ).all(ownerName) as Record<string, unknown>[];
+    return rows.map(toPushSubscription);
+  },
+
+  async deletePushSubscription(this: SqliteStorage, ownerName: string, endpoint?: string): Promise<boolean> {
+    const result = endpoint === undefined
+      ? this.db.prepare('DELETE FROM push_subscriptions WHERE ownerName = ?').run(ownerName)
+      : this.db.prepare('DELETE FROM push_subscriptions WHERE ownerName = ? AND endpoint = ?').run(ownerName, endpoint);
     return result.changes > 0;
   },
 
   async listPushSubscriptions(this: SqliteStorage): Promise<PushSubscriptionRecord[]> {
     const rows = this.db.prepare('SELECT * FROM push_subscriptions').all() as Record<string, unknown>[];
-    return rows.map(r => ({
-      ownerName: r.ownerName as string,
-      endpoint: r.endpoint as string,
-      keys: JSON.parse(r.keys as string),
-      createdAt: r.createdAt as string,
-      lastUsedAt: r.lastUsedAt as string,
-    }));
+    return rows.map(toPushSubscription);
   },
 
   // ══════════════════════════════════════════════════════════

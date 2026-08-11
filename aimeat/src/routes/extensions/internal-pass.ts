@@ -19,6 +19,14 @@
  *   the loopback request the node makes to itself. A pass that arrives from anywhere else does not
  *   exist in the map, so it does nothing — the header cannot be forged into a free call, only into
  *   a normal paid one.
+ *
+ *   `coordExt` and `coordAction` say WHICH product was ruled on, and the paywall has to check them
+ *   against the capability it is about to run. Being unforgeable is not the same as being about
+ *   this call: any owner may publish an app-tool manifest, and a manifest may name a capability
+ *   belonging to a different owner. Minting a pass on the coordinate the manifest declared and
+ *   invoking whatever it pointed at is a legitimately issued pass excusing payment for someone
+ *   else's capability. So the coordinate is a CLAIM the paywall verifies against the owner and the
+ *   binding, not a permission the pass carries on its own.
  * @structure mintInternalPass(coordExt, coordAction, kind) · consumeInternalPass(token) · INTERNAL_PASS_HEADER
  * @usage
  *   const pass = mintInternalPass(coordExt, toolName);              // after settling the contract
@@ -26,6 +34,10 @@
  *   headers[INTERNAL_PASS_HEADER] = pass;                            // on the loopback invoke
  *   const upstream = consumeInternalPass(req.header(INTERNAL_PASS_HEADER));  // paywall
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Document what the coordinate is for (August 2026 audit H-17). The two
+ *     fields had been carried since v1.0.0 and read by nobody, so a pass minted for one product
+ *     stood the paywall down on any other. The check itself lives in paywall.ts, which is the only
+ *     place that knows the capability the pass is being spent on.
  *   v1.1.0 — 2026-07-27 — A pass says WHICH decision was made. `unpriced` retires only the app-tool
  *     question; an action's own `commercial` terms survive a free tool in front of it.
  *   v1.0.0 — 2026-07-27 — Initial: one settlement per call once the raw door became chargeable.
@@ -46,7 +58,9 @@ export const INTERNAL_PASS_HEADER = 'x-aimeat-internal-pass';
  */
 export interface InternalPass {
   kind: 'settled' | 'unpriced';
+  /** The product coordinate the upstream door ruled on, `apptool:{ownerName}/{appId}`. */
   coordExt: string;
+  /** The tool name within that app's manifest. */
   coordAction: string;
 }
 

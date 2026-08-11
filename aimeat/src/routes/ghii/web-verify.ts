@@ -4,6 +4,10 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-11 — Security audit H-2: both unauthenticated mints issue roles ['agent'] and
+ *     stop copying the owner's owner/operator roles onto the token. A verification code and a magic
+ *     link prove control of a mailbox; the roles they were handing out are the ones no scope list
+ *     narrows, and they clear requireRole('owner') on the PAT door.
  *   v1.3.0 — 2026-08-10 — Security audit H-1: both unauthenticated mints stamp the agent's own
  *     scopes. Omitting `scopes` made issueJWT default to ['*'], so proving control of a mailbox
  *     returned a wildcard credential over the whole account.
@@ -340,15 +344,19 @@ export function registerWebVerifyRoutes(
         }
 
         // Issue JWT
-        const ownerRecord = await storage.getOwner(record.ownerName);
-        const roles = ['agent'];
-        if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-        if (ownerRecord?.roles.includes('operator')) roles.push('operator');
-
+        //
         // SECURITY (audit H-1): this token is minted on an UNAUTHENTICATED route — whoever holds the
         // verification id and the emailed code gets it. Leaving `scopes` off made issueJWT default it
         // to ['*'], so the answer to "prove you own this mailbox" was a wildcard credential over the
         // whole account. Stamp the agent's own scopes instead, the same set every other door gives it.
+        //
+        // SECURITY (audit H-2): and the roles are exactly ['agent']. Reading the owner record here to
+        // add its 'owner' and 'operator' roles handed an emailed code the owner's ROLE, which no scope
+        // limit constrains: role gates (requireRole) do not read scopes at all, and a token carrying
+        // 'owner' + 'operator' mints an unscoped operator PAT at POST /v1/access/tokens. Nothing reads
+        // this token as an owner session either: the SDK auth modal discards it and runs a password
+        // login (src/static/sdk-libs/auth/modal.js), and no SPA view fetches this route.
+        const roles = ['agent'];
         const token = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,
@@ -489,13 +497,13 @@ export function registerWebVerifyRoutes(
         }
 
         // Issue JWT
-        const ownerRecord = await storage.getOwner(record.ownerName);
-        const roles = ['agent'];
-        if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-        if (ownerRecord?.roles.includes('operator')) roles.push('operator');
-
+        //
         // SECURITY (audit H-1): same as the verify-email mint above — an unauthenticated route must
         // not hand out a wildcard credential by omission. The agent's own scopes are the grant.
+        // SECURITY (audit H-2): and the same again for the roles. A clicked link proves control of a
+        // mailbox; it does not make the holder the account's owner or the node's operator, and those
+        // are ROLES, which no scope list narrows.
+        const roles = ['agent'];
         const jwtToken = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,

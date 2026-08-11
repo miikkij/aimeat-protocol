@@ -17,8 +17,17 @@
  *     4. A second owner read another owner's action `scriptContent`. The PATCH on that exact
  *        resource has always checked `installedBy`; the GET checked only the `ext:write` scope,
  *        which an owner session bypasses.
+ *     5. A seller's app-tool manifest named somebody else's capability and `ctx.buy` invoked it.
+ *        `action_id` is a bare id in a node-wide registry and the seller writes it by hand, so the
+ *        buyer's money bought a call into a capability the seller had no part in.
+ *     6. An internal pass excused payment on a capability it was not minted for. The pass says which
+ *        product an upstream door already settled, and the paywall read only whether it said
+ *        `settled` — so a pass minted for one owner's free tool stood another owner's priced
+ *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Add the two H-17 mechanisms: the capability an app-tool binds must belong
+ *     to the seller, and an internal pass only stands the paywall down on the call it names.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 4: H-4, H-18 and the email escape).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -100,17 +109,19 @@ function rolesOf(token: string): string[] {
 
 let ownerA: Awaited<ReturnType<typeof setupOwner>>;
 let ownerB: Awaited<ReturnType<typeof setupOwner>>;
+let ownerC: Awaited<ReturnType<typeof setupOwner>>;
 
 async function run() {
-  // routes/auth.ts self-heals a node with no operator by promoting whoever authenticates first.
-  // On a freshly started test node that is whoever this suite creates first, and an operator IS
-  // allowed to set emailPolicy — so without this the email test would pass for the wrong reason.
-  // The seed owner absorbs the promotion; on a full CI run an operator already exists and this
-  // costs one registration.
-  await setupOwner('seed');
+  // routes/ghii/register-login.ts self-heals a node with no operator by promoting whoever
+  // registers first. On a freshly started test node that is whoever this suite creates first, and
+  // an operator IS allowed to set emailPolicy — so without this the email test would pass for the
+  // wrong reason. The seed owner absorbs the promotion; the H-17 tests below then borrow it,
+  // because turning an extension action into a callable capability is an operator action.
+  const seed = await setupOwner('seed');
 
   ownerA = await setupOwner('a');
   ownerB = await setupOwner('b');
+  ownerC = await setupOwner('c');
   assert(!rolesOf(ownerA.token).includes('operator'),
     'the installer in this suite must NOT be an operator, or the emailPolicy test proves nothing');
 
@@ -378,6 +389,120 @@ async function run() {
       limits: { timeout_ms: 5000, max_api_calls: 1 },
     }, { echo: ECHO });
     assert(ok.status === 201, `an ordinary price must still install, got ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+  });
+
+  // ── 3f. H-17: a binding the manifest owner typed, believed by the layer underneath ──────────
+  //
+  // An app-tool manifest is a public memory record its owner writes by hand, and `action_id` inside
+  // it is a bare capability id in a registry shared by the whole node. Two mechanisms took that id
+  // on trust, and both need real capabilities to prove, so one fixture serves both.
+  const h17 = Date.now();
+  const victimExt = `h17victim${h17}`;      // ownerA's extension: the capability everyone else points at
+  const sellerExt = `h17seller${h17}`;      // ownerC's extension: a capability ownerC genuinely owns
+  const buyerExt = `h17buyer${h17}`;        // ownerB's extension: hands ctx.buy whatever it is told
+  const victimCap = `ext:${victimExt}:ping`;
+  const sellerCap = `ext:${sellerExt}:ping`;
+  const appA = `h17a${h17}.html`;           // ownerA's own app, the legitimate seller of victimCap
+  const appB = `h17b${h17}.html`;           // ownerB's forgery, aimed at the paywall
+  const appC = `h17c${h17}.html`;           // ownerC's forgery, aimed at ctx.buy
+
+  await test('Setup: two capabilities, and three manifests pointing at them', async () => {
+    for (const [token, name] of [[ownerA.token, victimExt], [ownerC.token, sellerExt]] as const) {
+      const res = await install(token, name, {});
+      assert(res.status === 201, `install ${name}: ${res.status} ${JSON.stringify(res.body?.error)}`);
+      const act = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(token), body: '{}' });
+      assert(act.status === 200, `activate ${name}: ${act.status} ${JSON.stringify(act.body?.error)}`);
+    }
+
+    const buyer = await installManifest(ownerB.token, {
+      metadata: { name: buyerExt, version: '1.0.0', description: 'hardening e2e', author: 'e2e' },
+      actions: [{ id: 'buy', method: 'POST', path: '/buy', script: 'buy' }],
+      limits: { timeout_ms: 8000, max_api_calls: 5 },
+    }, { buy: 'export default async function(ctx, input){ return await ctx.buy(input.app, input.tool, {}); }' });
+    assert(buyer.status === 201, `buyer install ${buyer.status}: ${JSON.stringify(buyer.body?.error)}`);
+    const bact = await json(`/v1/extensions/${buyerExt}/activate`, { method: 'POST', headers: auth(ownerB.token), body: '{}' });
+    assert(bact.status === 200, `buyer activate ${bact.status}: ${JSON.stringify(bact.body?.error)}`);
+
+    // An extension action becomes a CALLABLE capability only through aggregation, and that is an
+    // operator action. The seed owner is the first registration on this suite's database.
+    const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(seed.token), body: '{}' });
+    assert(agg.status === 200,
+      `aggregate ${agg.status}: ${JSON.stringify(agg.body?.error)} — the seed owner must hold the operator role`);
+    for (const capId of [victimCap, sellerCap]) {
+      const cap = await json(`/v1/capabilities/${encodeURIComponent(capId)}`);
+      assert(cap.status === 200 && cap.body.data?.callable === true,
+        `capability ${capId} is not callable: ${cap.status} ${JSON.stringify(cap.body?.data ?? cap.body?.error)}`);
+    }
+
+    const manifest = async (token: string, appId: string, tools: unknown[]) => {
+      const w = await json('/v1/memory', {
+        method: 'POST', headers: auth(token),
+        body: JSON.stringify({ key: `apps.${appId}.tools`, value: { tools }, visibility: 'public' }),
+      });
+      assert(w.status === 200 || w.status === 201, `manifest ${appId}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    };
+    // ownerA sells their own capability, and publishes a free tool onto the same action. Both legitimate.
+    await manifest(ownerA.token, appA, [
+      { name: 'paid', action_id: victimCap, price: { morsels: 3 } },
+      { name: 'look', action_id: victimCap },
+    ]);
+    // ownerB and ownerC each name a capability they do not own.
+    await manifest(ownerB.token, appB, [{ name: 'freebie', action_id: victimCap }]);
+    await manifest(ownerC.token, appC, [
+      { name: 'steal', action_id: victimCap },
+      { name: 'own', action_id: sellerCap },
+    ]);
+  });
+
+  await test('an internal pass excuses payment only on the call it was minted for', async () => {
+    // ownerB's manifest binds ownerA's capability, and ownerB calls their own tool. So the app-tool
+    // door rules "the owner calls their own product free", mints a `settled` pass on
+    // `apptool:{ownerB}/{appB}`, and invokes ownerA's action carrying it. The pass is genuine and
+    // unforged. It is about a product ownerA never sold, and the paywall used to read only its kind.
+    const forged = await json(`/v1/apps/${ownerB.name}/${appB}/webmcp/tools/freebie`, {
+      method: 'POST', headers: auth(ownerB.token), body: JSON.stringify({ input: {} }),
+    });
+    assert(forged.status === 402,
+      `ownerB reached ownerA's priced capability through a pass minted for ownerB's own app: got ${forged.status} `
+      + `${JSON.stringify(forged.body?.data ?? forged.body?.error)}`);
+  });
+
+  await test('a pass that IS about this call still stands the paywall down', async () => {
+    // ownerA prices `paid` and leaves `look` free, and both bind the same action. Somebody coming
+    // through `look` must not be billed at `paid`'s price — that is what an `unpriced` pass is for,
+    // and the check above must not take it away. Green before the fix as well as after: this one
+    // guards the direction the fix could have gone too far in.
+    const free = await json(`/v1/apps/${ownerA.name}/${appA}/webmcp/tools/look`, {
+      method: 'POST', headers: auth(ownerB.token), body: JSON.stringify({ input: {} }),
+    });
+    assert(free.status === 200,
+      `ownerA's own free tool onto their own action must stay free: got ${free.status} `
+      + `${JSON.stringify(free.body?.data ?? free.body?.error)}`);
+  });
+
+  await test('ctx.buy refuses an app-tool bound to a capability its seller does not own', async () => {
+    const stolen = await json(`/v1/ext/${buyerExt}/buy`, {
+      method: 'POST', headers: auth(ownerB.token),
+      body: JSON.stringify({ app: `${ownerC.name}/${appC}`, tool: 'steal' }),
+    });
+    assert(stolen.status === 200, `the buying action itself should run: ${stolen.status} ${JSON.stringify(stolen.body?.error)}`);
+    const out = (stolen.body?.data?.result ?? stolen.body?.data ?? {}) as Record<string, unknown>;
+    assert(out.ok === false && out.code === 'CAPABILITY_NOT_SOLD_BY_SELLER',
+      `ownerC listed ownerA's capability and ctx.buy answered ${JSON.stringify(out)}`);
+  });
+
+  await test('ctx.buy still reaches the contract question for a binding the seller does own', async () => {
+    // Same seller, same buyer, a tool bound to a capability ownerC really owns. The ownership check
+    // has to let this through and the money gate has to be what answers — otherwise the test above
+    // is green because ctx.buy refuses everything.
+    const legit = await json(`/v1/ext/${buyerExt}/buy`, {
+      method: 'POST', headers: auth(ownerB.token),
+      body: JSON.stringify({ app: `${ownerC.name}/${appC}`, tool: 'own' }),
+    });
+    assert(legit.status === 200, `the buying action itself should run: ${legit.status} ${JSON.stringify(legit.body?.error)}`);
+    const out = (legit.body?.data?.result ?? legit.body?.data ?? {}) as Record<string, unknown>;
+    assert(out.ok === false && out.code === 'NO_CONTRACT',
+      `a binding the seller owns must reach the contract question, got ${JSON.stringify(out)}`);
   });
 
   // ── 4. Reading somebody else's source ──────────────────────────────────────────────────────

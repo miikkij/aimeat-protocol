@@ -3,9 +3,12 @@
  * @description T-5: end-to-end coverage of /v1/storage visibility — who may download whose file,
  *   and what the transport says about it: private/owner/group/public reads, presigned URLs, byte
  *   ranges, HEAD metadata, chunked uploads, and the audit trail for denied reads.
- * @structure Phases 1-10, each a numbered `test()` against a live node on E2E_BASE.
+ * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Phase 11: the headers every download path sends (August 2026 audit H-26).
+ *     An uploaded text/html file comes back as an attachment, an uploaded image does not, and both
+ *     carry nosniff and a file-only CSP, on /v1/pub, /v1/storage, HEAD, ranges and presigned URLs.
  *   v1.1.0 — 2026-08-01 — Content-type assertions compare the BASE type: sniffedContentType() now
  *     appends `; charset=utf-8` to text served from bytes that pass a strict UTF-8 decode.
  *   v1.0.0 — earlier — T-5 suite.
@@ -714,6 +717,117 @@ await test('42. Public file download (allowed read) is NOT audited', async () =>
     });
     const found = (body.data?.entries as any[]).some(e => e.memory_key === `storage:${publicKey}`);
     assert(!found, `unexpected audit entry for allowed public read storage:${publicKey}`);
+});
+
+// ─── Phase 11: Download Headers (August 2026 audit H-26) ───
+// A stored file's Content-Type is whatever the UPLOADER declared, and GET /v1/pub serves a public
+// file to anyone, from the apex origin, with no auth. So uploaded text/html or image/svg+xml was a
+// page running next to the portal's own session until the transport started refusing to render it.
+// What must hold on EVERY path that carries bytes: nosniff, a file-only CSP, and a disposition that
+// is `inline` only for the types a browser cannot run script from.
+console.log('\nPhase 11 — Download Headers');
+
+const htmlKey = `hardening-${Date.now()}.html`;
+const pngKey = `hardening-${Date.now()}.png`;
+const svgKey = `hardening-${Date.now()}.svg`;
+const htmlBody = '<script>alert(document.cookie)</script>';
+
+/** The header set every file response carries; `expected` is what this type is allowed to do. */
+function assertFileHeaders(res: Response, expected: 'inline' | 'attachment', label: string) {
+    assert(res.headers.get('x-content-type-options') === 'nosniff',
+        `${label}: X-Content-Type-Options is ${res.headers.get('x-content-type-options') ?? '(none)'}`);
+    const cd = res.headers.get('content-disposition') ?? '';
+    assert(cd.startsWith(expected), `${label}: Content-Disposition "${cd || '(none)'}" should start with ${expected}`);
+    const csp = res.headers.get('content-security-policy') ?? '';
+    assert(csp.startsWith("default-src 'none'"), `${label}: CSP "${csp || '(none)'}" should be the file policy`);
+    // `sandbox` strips the origin from anything that gets rendered anyway. It belongs on the types
+    // we refuse to show, and NOT on the ones we do: it has broken image and PDF documents before.
+    const sandboxed = /(^|;)\s*sandbox\s*(;|$)/.test(csp);
+    assert(sandboxed === (expected === 'attachment'), `${label}: sandbox=${sandboxed} on an ${expected} response`);
+}
+
+await test('43. Upload public html, png and svg files (agent-A)', async () => {
+    for (const [key, mime, body] of [
+        [htmlKey, 'text/html', htmlBody],
+        [pngKey, 'image/png', 'not-really-a-png'],
+        [svgKey, 'image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg"><script>1</script></svg>'],
+    ] as const) {
+        const { status } = await json('/v1/storage', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${agentAToken}` },
+            body: JSON.stringify({
+                key, mime_type: mime, visibility: 'public',
+                data: Buffer.from(body).toString('base64'),
+            }),
+        });
+        assert(status === 201, `${key} status ${status}`);
+    }
+});
+
+await test('44. Anonymous /v1/pub of an uploaded text/html file → attachment, nosniff, sandboxed', async () => {
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(htmlKey)}`);
+    assert(res.status === 200, `status ${res.status}`);
+    assertFileHeaders(res, 'attachment', 'pub html');
+    // The bytes are still served intact — this is a transport decision, not a content filter.
+    assert((await res.text()) === htmlBody, 'body unchanged');
+    assert((res.headers.get('content-disposition') ?? '').includes(`filename="${htmlKey}"`),
+        `filename missing: ${res.headers.get('content-disposition')}`);
+});
+
+await test('45. Anonymous /v1/pub of an image → inline, and still nosniff', async () => {
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(pngKey)}`);
+    assert(res.status === 200, `status ${res.status}`);
+    assertFileHeaders(res, 'inline', 'pub png');
+});
+
+await test('46. Anonymous /v1/pub of an SVG → attachment (an SVG is a scriptable document)', async () => {
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(svgKey)}`);
+    assert(res.status === 200, `status ${res.status}`);
+    assertFileHeaders(res, 'attachment', 'pub svg');
+});
+
+await test('47. Owner download of the same html file → attachment', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(htmlKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assertFileHeaders(res, 'attachment', 'storage html');
+});
+
+await test('48. An unknown type (application/octet-stream) is an attachment', async () => {
+    // The default when an upload declares no type, so it is the one that must not be inline.
+    const res = await rawFetch('/v1/storage/chunked-file.bin', {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assertFileHeaders(res, 'attachment', 'storage octet-stream');
+});
+
+await test('49. HEAD answers with the same headers as the GET', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(pngKey)}`, {
+        method: 'HEAD',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assertFileHeaders(res, 'inline', 'HEAD png');
+});
+
+await test('50. A byte range carries the headers too', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(htmlKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}`, Range: 'bytes=0-3' },
+    });
+    assert(res.status === 206, `expected 206, got ${res.status}`);
+    assertFileHeaders(res, 'attachment', 'range html');
+});
+
+await test('51. Presigned /v1/download carries them as well', async () => {
+    const { status, body } = await json(`/v1/storage/${encodeURIComponent(htmlKey)}?mode=handle`, {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(status === 200, `handle status ${status}: ${JSON.stringify(body)}`);
+    const res = await fetch(body.data.download_url as string);
+    assert(res.status === 200, `download status ${res.status}`);
+    assertFileHeaders(res, 'attachment', 'presigned html');
 });
 
 // ─── Cleanup ───

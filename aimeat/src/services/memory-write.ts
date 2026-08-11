@@ -27,6 +27,10 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.3.0 — 2026-08-11 — Security audit H-2: the owner/operator bypass now excludes agent and
+ *     ecosystem sessions, which is what requireScope has always done and what this copy of the rule
+ *     had dropped. While POST /v1/auth/token mirrored the owner's roles onto agent tokens, an agent
+ *     with no memory scope read as privileged here.
  *   v1.2.0 — 2026-08-11 — afterMemoryWrite(): the nine things a write sets off, which all lived
  *     in the tail of POST /v1/memory. A write through a tool call reached storage and stopped
  *     there, so the record was right and the rest of the node did not know — no Tracked Response,
@@ -160,8 +164,15 @@ export async function writeMemoryRecord(
 
     // 1. The gate, inside. REST had this in middleware and MCP had it in a lookup table, which is
     //    two places to forget it and the reason the audit could find surfaces that had neither.
-    //    Owner and operator pass on the role, exactly as requireScope lets them.
-    const privileged = caller.roles.includes('owner') || caller.roles.includes('operator');
+    //    Owner and operator pass on the role, exactly as requireScope lets them. And, exactly as
+    //    requireScope does, an agent or ecosystem session does NOT, whatever else its role list says.
+    //    That second half was missing (audit H-2): POST /v1/auth/token used to copy the owner's
+    //    owner/operator roles onto every agent JWT, so a session holding no memory scope at all
+    //    arrived here reading as privileged and skipped the check. Writing the exclusion out rather
+    //    than trusting the mint means the next surface that assembles a role list cannot reopen it.
+    const scopedPrincipal = caller.roles.includes('agent') || caller.roles.includes('ecosystem');
+    const privileged = !scopedPrincipal
+        && (caller.roles.includes('owner') || caller.roles.includes('operator'));
     const needed = input.authorisingScope ?? 'memory:write';
     if (!privileged && !hasScope(caller.scopes, needed)) {
         return {

@@ -5,6 +5,11 @@
  * @version-history
  *   v1.0.0 — 2026-03-01 — Initial scaffold
  *   v2.0.0 — 2026-05-02 — Nonce validation, FTN OIDC authorize/callback, VC JWT format
+ *   v2.1.0 — 2026-08-11 — Security audit H-1/H-7: the two routes that raise the human's
+ *     verification level to 3 are behind requireOwnerPrincipal(). Both keyed off req.auth.owner,
+ *     which is the human's account name on an agent, ecosystem or app-grant token, so a machine
+ *     principal could stamp a state identity onto a person's record. The two callback routes are
+ *     unauthenticated by design and bind to the owner recorded on the nonce instead.
  */
 
 import { Router } from 'express';
@@ -15,7 +20,7 @@ import type { EudiwService } from '../services/eudiw.js';
 import type { VcIssuerService } from '../services/vc-issuer.js';
 import type { MyDataReceiptService } from '../services/mydata-receipt.js';
 import type { OidcClient } from '../services/oidc-client.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 
@@ -57,8 +62,10 @@ export function verificationRouter(
     }
   });
 
-  // POST /v1/ghii/verify/eudiw — Verify VP Token (same-device flow)
-  router.post('/v1/ghii/verify/eudiw', requireAuth(), async (req, res) => {
+  // POST /v1/ghii/verify/eudiw — Verify VP Token (same-device flow, account holder only)
+  // This writes verificationLevel 3 and the issuer's attributes onto the person's record. Who the
+  // person is, proved by a wallet the person holds, is not something a connected machine says.
+  router.post('/v1/ghii/verify/eudiw', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     try {
       if (!config.eudiwEnabled) {
         res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'EUDIW verification not available'));
@@ -318,8 +325,9 @@ export function verificationRouter(
     }
   });
 
-  // POST /v1/ghii/verify/ftn — Finnish Trust Network verification (manual/API path)
-  router.post('/v1/ghii/verify/ftn', requireAuth(), async (req, res) => {
+  // POST /v1/ghii/verify/ftn — Finnish Trust Network verification (manual/API path, account
+  // holder only). Same reason as the EUDIW route above: it stamps verification level 3.
+  router.post('/v1/ghii/verify/ftn', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     try {
       if (!config.ftnEnabled) {
         res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'FTN verification not available'));

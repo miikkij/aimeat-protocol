@@ -107,6 +107,11 @@ await test('Agent auth token', async () => {
     });
     assert(body.ok === true, `agent token: ${JSON.stringify(body.error)}`);
     agentToken = body.data.token;
+    // Audit H-2: an agent session is exactly ['agent']. This mint used to read the owner record and
+    // add the owner's 'owner' and 'operator' roles, which cleared every requireRole('owner') door
+    // with a token whose owner had granted it four memory scopes.
+    assert(Array.isArray(body.data.roles) && body.data.roles.length === 1 && body.data.roles[0] === 'agent',
+        `agent roles should be ['agent'], got ${JSON.stringify(body.data.roles)}`);
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -881,17 +886,37 @@ await test('PUT /v1/ghii/cors — update CORS', async () => {
     assert(body.ok === true, `set cors: ${JSON.stringify(body.error)}`);
 });
 
+// Both agent-CORS routes are requireRole('owner'), and the Security tab calls them from an owner
+// session. They passed with the agent token only because that token carried the owner's roles
+// (audit H-2); the owner token is what the surface under test actually sends.
 await test('GET /v1/agents/:name/cors — get agent CORS', async () => {
-    const { body } = await authJson('/v1/agents/profileagent/cors', agentToken);
+    const { body } = await authJson('/v1/agents/profileagent/cors', ownerToken);
     assert(body.ok === true, `agent cors: ${JSON.stringify(body.error)}`);
 });
 
 await test('PUT /v1/agents/:name/cors — set agent CORS', async () => {
-    const { body } = await authJson('/v1/agents/profileagent/cors', agentToken, {
+    const { body } = await authJson('/v1/agents/profileagent/cors', ownerToken, {
         method: 'PUT',
         body: JSON.stringify({ allowed_origins: ['https://test.example.com'] }),
     });
     assert(body.ok === true, `set agent cors: ${JSON.stringify(body.error)}`);
+});
+
+await test('GET /v1/agents/:name/cors — refused for an agent token', async () => {
+    const { status } = await authJson('/v1/agents/profileagent/cors', agentToken);
+    assert(status === 403, `an owner-only door must refuse an agent token, got ${status}`);
+});
+
+// The laundering path itself, in the two calls it took: the mirrored token cleared
+// requireRole('owner') here, `isOperator` was true so grant_operator was accepted, and the PAT it
+// returned resolves to ['owner','operator'] with NO scopes and no agent role, a credential
+// requireScope stops applying to at all.
+await test('POST /v1/access/tokens — an agent cannot mint an operator token', async () => {
+    const { status, body } = await authJson('/v1/access/tokens', agentToken, {
+        method: 'POST',
+        body: JSON.stringify({ label: 'h2-escalation-probe', grant_operator: true }),
+    });
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
 });
 
 await test('PUT /v1/ghii/cors — reset CORS to defaults (empty array)', async () => {
@@ -900,6 +925,72 @@ await test('PUT /v1/ghii/cors — reset CORS to defaults (empty array)', async (
         body: JSON.stringify({ allowed_origins: [] }),
     });
     assert(body.ok === true, `reset cors: ${JSON.stringify(body.error)}`);
+});
+
+// ══════════════════════════════════════════════════════════════════
+// Onboarding gate (audit H-2): who may start and cancel an onboarding
+// ══════════════════════════════════════════════════════════════════
+// The owner reaches these on the role; an agent reaches its OWN on `agent:write`. Both agents below
+// are registered with EXPLICIT scopes, because the node's default set is what the E2E runner sets
+// (AIMEAT_DEFAULT_AGENT_SCOPES='*') rather than what a real owner grants, and a wildcard would prove
+// nothing about the gate.
+console.log('\n--- Onboarding Gate ---');
+
+let writerToken = '';   // profileagent2: agent:write
+let narrowToken = '';   // profileagent3: memory:read only
+
+/** Register an agent with exactly these scopes and return a JWT for it. */
+async function registerScopedAgent(name: string, scopes: string[]): Promise<string> {
+    const { body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name, owner: ownerName, scopes }),
+    });
+    assert(body.ok === true, `register ${name}: ${JSON.stringify(body.error)}`);
+    const gaii = body.data.agent.gaii;
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(body.data.private_key, gaii + timestamp);
+    const { body: tok } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp, signature }),
+    });
+    assert(tok.ok === true, `token for ${name}: ${JSON.stringify(tok.error)}`);
+    return tok.data.token;
+}
+
+await test('Register one agent with agent:write and one without', async () => {
+    writerToken = await registerScopedAgent('profileagent2', ['memory:read', 'agent:write']);
+    narrowToken = await registerScopedAgent('profileagent3', ['memory:read']);
+});
+
+await test('POST /v1/agents/:name/onboarding/start — owner starts it', async () => {
+    const { status, body } = await authJson('/v1/agents/profileagent/onboarding/start', ownerToken, { method: 'POST' });
+    assert(status === 200, `owner start: status ${status}: ${JSON.stringify(body.error)}`);
+});
+
+await test('POST /v1/agents/:name/onboarding/start — agent starts its own with agent:write', async () => {
+    const { status, body } = await authJson('/v1/agents/profileagent2/onboarding/start', writerToken, { method: 'POST' });
+    assert(status === 200, `self start: status ${status}: ${JSON.stringify(body.error)}`);
+});
+
+await test('POST /v1/agents/:name/onboarding/start — refused for a sibling agent', async () => {
+    const { status } = await authJson('/v1/agents/profileagent3/onboarding/start', writerToken, { method: 'POST' });
+    assert(status === 403, `agent:write must not reach a sibling's onboarding, got ${status}`);
+});
+
+await test('POST /v1/agents/:name/onboarding/start — refused without agent:write', async () => {
+    const { status } = await authJson('/v1/agents/profileagent3/onboarding/start', narrowToken, { method: 'POST' });
+    assert(status === 403, `expected 403 for an agent without agent:write, got ${status}`);
+});
+
+await test('DELETE /v1/agents/:name/onboarding — refused without agent:write', async () => {
+    const { status } = await authJson('/v1/agents/profileagent3/onboarding', narrowToken, { method: 'DELETE' });
+    assert(status === 403, `expected 403 for an agent without agent:write, got ${status}`);
+});
+
+await test('DELETE /v1/agents/:name/onboarding — agent cancels its own', async () => {
+    const { status, body } = await authJson('/v1/agents/profileagent2/onboarding', writerToken, { method: 'DELETE' });
+    assert(status === 200, `self cancel: status ${status}: ${JSON.stringify(body.error)}`);
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -929,7 +1020,9 @@ await test('GET /v1/federation/directory — federation directory', async () => 
 console.log('\n--- Nodes Tab ---');
 
 await test('GET /v1/personal/status — personal node status', async () => {
-    const { status, body } = await authJson('/v1/personal/status', agentToken);
+    // requireRole('owner') + requireScope('tunnel:connect'), and the Nodes tab is an owner surface.
+    // The agent token reached it only through the mirrored owner role (audit H-2).
+    const { status, body } = await authJson('/v1/personal/status', ownerToken);
     // 404 is valid when no nodes anchored yet
     assert(status === 200 || status === 404, `unexpected status ${status}: ${JSON.stringify(body.error)}`);
 });

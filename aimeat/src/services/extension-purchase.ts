@@ -22,6 +22,8 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.1.0 — 2026-08-11 — The backing capability must belong to the seller (August 2026 audit H-17),
+ *     and it is resolved BEFORE the settle so a mis-bound tool never takes money it has to give back.
  *   v1.0.0 — 2026-07-28 — Initial: the leg that turns a capability into a component someone can resell.
  */
 import { randomUUID } from 'node:crypto';
@@ -32,6 +34,13 @@ import { AppToolsDocSchema, appToolsKey, applyLockedInput } from '../models/app-
 import { authoriseMeteredCall } from './metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * The bare owner name behind any principal the capability registry stores. Extension-backed
+ * capabilities carry `ext.installedBy`, which is a bare name; ones registered through the HTTP door
+ * carry a full GHII; either can be an agent or an ecosystem form. All four collapse to the human.
+ */
+const ownerNameOf = (principal: string): string => principal.split('@')[0].split('#').pop() ?? principal;
 
 /** What an extension's purchase produced — or why it could not be made. */
 export interface ExtensionPurchaseResult {
@@ -95,6 +104,29 @@ export async function buyForExtension(args: {
   const coordExt = `apptool:${sellerOwner}/${appId}`;
   const correlation = args.correlationId ?? `chain-${randomUUID().slice(0, 12)}`;
 
+  // The manifest NAMES a capability; it does not confer one. `action_id` is a bare id in a node-wide
+  // registry, and the only thing that supplied it is the seller's own public memory record — so a
+  // seller could write down somebody else's capability and have this call invoke it, on the buyer's
+  // account, with the seller collecting. A capability reference resolves inside its owner's
+  // namespace, here as everywhere else (see routes/extensions/priced-binding.ts), so the one thing
+  // that makes a binding real is that the seller owns what they are selling.
+  //
+  // Resolved BEFORE the settle, deliberately. Money that has to be given back is a worse answer
+  // than money never taken, and a buyer told "no contract" about a tool whose binding is broken
+  // goes off to take a contract that could never have worked.
+  const cap = await storage.getCapability(toolDef.action_id);
+  if (!cap) {
+    return { ok: false, code: 'CAPABILITY_NOT_FOUND', message: `Backing capability not found: ${toolDef.action_id}`, correlation };
+  }
+  if (ownerNameOf(cap.ownerGhii) !== sellerOwner) {
+    logger.warn('Extension purchase refused: the app-tool binds a capability its seller does not own', {
+      buyer, seller: `${sellerOwner}/${appId}`, tool, binding: toolDef.action_id, capabilityOwner: cap.ownerGhii,
+    });
+    return { ok: false, code: 'CAPABILITY_NOT_SOLD_BY_SELLER',
+      message: `Tool "${tool}" on app "${appRef}" is bound to a capability "${sellerOwner}" does not own, so there is nothing here for them to sell. Nothing was charged.`,
+      correlation };
+  }
+
   const outcome = await authoriseMeteredCall({
     config, storage, caller: buyer,
     product: { ext: coordExt, action: tool, label: `${appId}/${tool}`, providerOwner: sellerOwner },
@@ -109,12 +141,6 @@ export async function buyForExtension(args: {
   }
   if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
     return { ok: false, code: outcome.kind.toUpperCase(), message: `The purchase could not settle (${outcome.kind})`, correlation };
-  }
-
-  const cap = await storage.getCapability(toolDef.action_id);
-  if (!cap) {
-    if (outcome.kind === 'settled') await outcome.refund();
-    return { ok: false, code: 'CAPABILITY_NOT_FOUND', message: `Backing capability not found: ${toolDef.action_id}`, correlation };
   }
 
   try {

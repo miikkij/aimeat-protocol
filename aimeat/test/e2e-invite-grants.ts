@@ -7,6 +7,9 @@
  *   an existing member → 409, and the plain no-fields invite regression.
  * @version-history
  *   v1.0.0 — 2026-07-16 — Initial: invite-with-grants / direct-add / edit / cancel / all=1.
+ *   v1.1.0 — 2026-08-11 — Tests 15-21 (H-28): a provisioned-code key hands out only what the person
+ *     minting it holds. Plain membership opens that door and used to decide nothing else, so a member
+ *     could mint a key granting the ADMIN role or a workspace they had no say over.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invite-grants
 
@@ -235,6 +238,76 @@ await test('14. ?all=1 stays scoped to owned workspaces for a plain member', asy
     const r = await json(`/v1/organisms/${orgId}/workspace-access?all=1`, { headers: auth(B.token) });
     assert(r.status === 200, `all=1 member ${r.status}`);
     assert((r.body.data.workspaces || []).length === 0, `plain member (owns no ws) sees none, got ${JSON.stringify(r.body.data.workspaces)}`);
+});
+
+// ── H-28: a provisioned-code key hands out only what the person minting it holds ──
+// Plain membership opens this door on purpose: a keyholder invites a friend, bounded by a quota. What
+// the key may GRANT is a separate question, and it used to go unasked — any active member could mint
+// one that joined its recipient as an ORG ADMIN, or that granted a workspace they had nothing to do
+// with, because the grant is written on the workspace CREATOR's behalf and looks legitimate after the
+// fact. B is a plain member here; C is an org admin; A created WS1 and WS2.
+
+const KEY_STEM = `keyuser${Date.now()}`;
+/** Each key provisions a real account, so every mint that can succeed gets its own name + address. */
+const mintKey = (token: string, org: string, who: string, extra: Record<string, unknown> = {}) =>
+    json(`/v1/organisms/${org}/invitations/code`, {
+        method: 'POST', headers: auth(token),
+        body: JSON.stringify({ email: `${KEY_STEM}${who}@example.test`, username: `${KEY_STEM}${who}`, code: 'keycode-12345', ...extra }),
+    });
+/** Cancelling an un-activated key deletes the provisioned account and frees the minter's quota slot. */
+const cancelKey = async (token: string, org: string, invId: string) => {
+    const r = await json(`/v1/organisms/${org}/invitations/code/${invId}/cancel`, { method: 'POST', headers: auth(token), body: '{}' });
+    assert(r.status === 200, `cancel ${r.status}: ${JSON.stringify(r.body.error)}`);
+};
+
+await test('15. A plain member cannot mint a key that grants the ADMIN role (403)', async () => {
+    const r = await mintKey(B.token, orgId, 'a', { org_role: 'admin' });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('16. A plain member cannot mint a key granting a workspace they do not control (403)', async () => {
+    const r = await mintKey(B.token, orgId, 'a', { workspaces: [{ ws: WS1, role: 'contributor' }] });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('17. A key naming a workspace that does not exist is refused (404)', async () => {
+    const r = await mintKey(B.token, orgId, 'a', { workspaces: [{ ws: 'no-such-ws', role: 'viewer' }] });
+    assert(r.status === 404, `expected 404, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('18. A non-member cannot mint a key at all (403, cross-owner)', async () => {
+    const outsider = await json('/v1/organisms', { method: 'POST', headers: auth(C.token), body: JSON.stringify({ name: 'Outsider Org', type: 'project', join_policy: 'invite_only', visibility: 'private' }) });
+    assert(outsider.status === 201, `org ${outsider.status}`);
+    const r = await mintKey(B.token, outsider.body.data.organism.id, 'a');
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('19. The plain member still mints an ordinary key, and the refusals provisioned nothing', async () => {
+    // Same username the four refused attempts used: a 201 here proves none of them created an account
+    // on the way to being refused (a taken name answers 409 NAME_TAKEN).
+    const r = await mintKey(B.token, orgId, 'a');
+    assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.body.data.invitation.org_role === 'member', `key grants member, got ${r.body.data.invitation.org_role}`);
+    await cancelKey(B.token, orgId, r.body.data.invitation.id);
+});
+
+await test('20. A plain member CAN grant a workspace they created themselves', async () => {
+    const manifest = { objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
+    const mk = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ name: 'B Own WS', manifest }) });
+    assert(mk.status === 201, `B creates a workspace ${mk.status}: ${JSON.stringify(mk.body.error)}`);
+    const bWs = mk.body.data.ws as string;
+    const r = await mintKey(B.token, orgId, 'b', { workspaces: [{ ws: bWs, role: 'contributor' }] });
+    assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert((r.body.data.workspaces || []).includes(bWs), `the grant was applied: ${JSON.stringify(r.body.data.workspaces)}`);
+    await cancelKey(B.token, orgId, r.body.data.invitation.id);
+});
+
+await test('21. The creator still mints an admin key with a workspace grant (regression)', async () => {
+    const r = await mintKey(A.token, orgId, 'c', { org_role: 'admin', workspaces: [{ ws: WS1, role: 'viewer' }] });
+    assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.body.data.invitation.org_role === 'admin', `key grants admin, got ${r.body.data.invitation.org_role}`);
+    assert((r.body.data.workspaces || []).includes(WS1), `WS1 granted: ${JSON.stringify(r.body.data.workspaces)}`);
+    await cancelKey(A.token, orgId, r.body.data.invitation.id);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

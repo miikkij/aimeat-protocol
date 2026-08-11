@@ -3,7 +3,14 @@
  * @description App-catalog read routes: version list, fork list, lineage, screenshot GET/POST/DELETE,
  *   and the app download (GET /v1/apps/:owner/:filename incl. draft preview + H-2 app-origin redirect +
  *   copy-protection). Extracted from src/routes/apps.ts to satisfy max-file-lines.
+ * @structure
+ *   - accessCodeUnlockPage() — the human code form a browser gets instead of ACCESS_DENIED JSON
+ *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
+ * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.5.0 — 2026-08-11 — Audit H-19: an inline request for a GATED app is redirected to the app
+ *     origin like any other, carrying a short-lived app-access grant, rather than being served on
+ *     the apex. The gate moves from the app HTML to the unlock.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 4 step 0a: the published app and the draft preview are
  *     served through appContentType(), so their `text/html` finally carries `charset=utf-8`. Without
  *     it the browser fell back to windows-1252 and every UTF-8 byte in the document arrived as
@@ -28,6 +35,7 @@ import { requireAuth, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
+import { generateAppAccessToken } from '../../services/app-access-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { appCsp } from '../../utils/app-csp.js';
@@ -470,19 +478,41 @@ export function registerReadRoutes(
 
         const mode = req.query.mode as string | undefined;
 
-        // H-2: never serve RUNNABLE app HTML from the apex (authenticated SPA) origin.
-        // When the app origin is provisioned (flag on) and this request arrived on the
-        // apex, 301 inline (runnable) requests to the isolated app origin. The raw
-        // download form (attachment, not executed) and access-code/paid apps stay on
-        // apex for now. Requests already on the app origin (req.appOrigin) serve normally.
+        // H-2: never serve RUNNABLE app HTML from the apex (authenticated SPA) origin. When the app
+        // origin is provisioned (flag on) and this request arrived on the apex, an inline (runnable)
+        // request goes to the isolated origin. The raw download form is an attachment and is never
+        // executed, so it stays here; a request already on the app origin serves normally.
+        //
+        // EVERY inline request is redirected, a gated app's included. Reaching this line means the
+        // gates above already said yes: the access code matched (or the caller is the owner or an
+        // operator), and a priced app's licence was checked. So the redirect carries a short-lived
+        // grant that says exactly that, and the session-less app origin verifies the grant instead
+        // of re-deciding why the app was gated.
+        //
+        // Until 2026-08-11 an access-coded or priced app was excluded here and ran on the apex.
+        // The price half of that exclusion was never a security problem and its removal changes
+        // nothing about who may read a paid app: a priced app refuses any request without
+        // `Authorization: Bearer` well above this line, and a Bearer is the one credential a browser
+        // navigation cannot carry, so only an API client ever arrived here, and an API client does
+        // not execute the HTML it fetched. The access-code half WAS a problem: the unlock page is
+        // served as HTML to an unauthenticated browser, so after the right code the app ran on the
+        // apex, which is the one origin an author asking for protection least wants it on.
         if (mode === 'inline' && config.appOriginEnabled && config.appHost && !req.appOrigin) {
-            const restricted = !!app.accessCode
+            const target = await appOriginUrl(config, storage, owner, filename);
+            const gated = !!app.accessCode
                 || (config.marketplaceEnabled && !!app.manifest.priceMorsels && app.manifest.priceMorsels > 0);
-            if (!restricted) {
-                const target = await appOriginUrl(config, storage, owner, filename);
+            if (!gated) {
                 res.redirect(301, target);
                 return;
             }
+            const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename });
+            const sep = target.includes('?') ? '&' : '?';
+            // 302 and no-store, never the 301 an open app gets: a permanent redirect to an address
+            // carrying an expiring grant is one the browser keeps reusing after the grant is dead,
+            // and the user then meets a 404 with no way back to the code field.
+            res.setHeader('Cache-Control', 'no-store');
+            res.redirect(302, `${target}${sep}access=${encodeURIComponent(grant)}`);
+            return;
         }
 
         // Copy-protection `noRawDownload`: the owner can block the raw (attachment)

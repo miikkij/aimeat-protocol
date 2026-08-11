@@ -17,6 +17,15 @@
  *     POST /token, GET /v1/app-grants, DELETE /v1/app-grants/:grantId
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.10.0 — 2026-08-11 — Security audit 1-later-c, step ONE of three: `app:write` joins
+ *     APP_GRANTABLE_SCOPES, so an app can ask to publish under its owner's name and the owner can
+ *     refuse. Publishing was reachable on an app-grant token and missing from this vocabulary, which
+ *     is why no owner had ever been asked. Nothing enforces it yet, and the ordering matters: the
+ *     entry's own comment names what has to be true before the publish doors may require it.
+ *   v1.9.0 — 2026-08-10 — Security audit H-9: a token minted for a PORTFOLIO origin is capped at the
+ *     ceiling the node already publishes for that origin (memory:read). The silent bridge took the
+ *     own-app branch and granted whatever the page asked for, and a portfolio page writes that ask
+ *     itself. Narrows the escalation; the unconditional own-app branch behind it is untouched.
  *   v1.8.0 — 2026-08-10 — Security audit C-1: the silent bridge now refuses any caller that is not the
  *     apex page. It reads the session cookie and takes the app's identity from `?origin=`, and app
  *     origins are same-site with the apex, so any published app could ask for, and read back, a
@@ -138,7 +147,81 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // somewhere are separate from reading the registry.
   'company:read': 'See the companies you have registered and their addresses',
   'company:write': 'Register companies in your name and set what their address serves',
+  // Publishing under the owner's name. This word is STEP ONE OF THREE and deliberately gates
+  // nothing yet. POST /v1/apps, the draft routes and fork/patch/delete ask for requireAuth() and no
+  // scope, and at least one live app (ORIGAMI, 460 downloads) publishes through an app-grant token
+  // while requesting ten permissions, none of them this one. Refusing role 'app' at those doors
+  // today would take a working app off the air. So step one only makes the favour askable: an app
+  // can request it, and the owner sees it on the consent screen and can uncheck it. Until now
+  // publishing was absent from this vocabulary entirely, which is why no owner has ever been asked.
+  //
+  // STEP TWO belongs to the apps. ORIGAMI, and anything else that publishes on a grant, declares
+  // `app:write` in its <meta name="aimeat-scopes">, and each of its owners passes the consent screen
+  // once more. A live grant carries the scopes that were approved when it was made and gains nothing
+  // from the app being updated. The owner's own app clears this with no prompt through
+  // /v1/auth/app-grant-silent; a stranger's app shows the screen with the new line badged "new".
+  //
+  // STEP THREE is still pending: the publish doors (routes/apps/publish.ts, drafts.ts,
+  // fork-manage.ts) start refusing a scoped principal that does not carry the word. Take it only
+  // once the live grants show that the apps publishing this way already hold it, or the outage
+  // repeats the shape of changelog 1.33.1. When it is taken, two surfaces nobody meant to touch are
+  // already safe: requireScope waves an owner session through (its owner branch is roles includes
+  // owner AND NOT agent AND NOT ecosystem), so publishing from the website is unaffected, and every
+  // agent alive on 2026-08-10 was handed `app:write` at boot by
+  // services/scope-vocabulary-migration.ts, so no agent loses publishing either. The app grant is
+  // the principal the gate is actually for, which is why it has to ask first.
+  'app:write': 'Publish and update apps in your name (each one gets a public address anyone with the link can open)',
 };
+
+/**
+ * A grant target for a portfolio origin reads `portfolio:<username>`. An app target reads
+ * `owner/filename` and an owner name carries no colon, so the prefix tells the two families apart
+ * with no ambiguity. It is minted in exactly one place (the silent bridge, below).
+ */
+const PORTFOLIO_TARGET_PREFIX = 'portfolio:';
+
+/**
+ * The most a token minted for a PORTFOLIO origin may carry.
+ *
+ * A portfolio origin exists for one job: the owner visiting their own published page sees their own
+ * members-only content there without logging in a second time. Reading memory is all that takes, and
+ * the node already publishes exactly this answer twice — `services/protected-resource.ts` returns
+ * `scopes_supported: ['memory:read']` for a portfolio origin, and `routes/subdomains.ts` injects a
+ * matching `<meta name="aimeat-scopes" content="memory:read">` into every portfolio it serves. Both
+ * of those still write the word out inline; when either is next touched, import it from here, so the
+ * ceiling has one home instead of three.
+ */
+export const PORTFOLIO_GRANT_SCOPES: readonly string[] = ['memory:read'];
+
+/** Is this grant target a portfolio origin rather than a published app? */
+function isPortfolioTarget(target: string): boolean {
+  return target.startsWith(PORTFOLIO_TARGET_PREFIX);
+}
+
+/**
+ * Trim a scope request down to what a portfolio origin may receive.
+ *
+ * AUDIT H-9. The silent bridge used to hand a portfolio whatever the PAGE asked for, and a portfolio
+ * page writes that ask itself, twice over: the SDK reads the FIRST `<meta name="aimeat-scopes">`
+ * while the node appends its own last, and a page can skip the SDK and build the /app-silent.html
+ * iframe with any `?scope=` it likes. Portfolio HTML is served with `unsafe-inline`, so any script
+ * that lands in a portfolio inherits that reach, and the inner fetch is apex-to-apex, so the
+ * `Sec-Fetch-Site` caller check does not see it. The ceiling was the node's published answer already;
+ * the bridge was the one door not reading it.
+ *
+ * A scope outside the ceiling is dropped rather than refused, and an empty result falls back to the
+ * ceiling, so the members-only content the origin exists for keeps working either way.
+ *
+ * This NARROWS the escalation, it does not close it. A standing memory:read grant reaches the
+ * owner's whole namespace, which is a lot of data, and a page holding that token can post it
+ * anywhere `connect-src https:` allows. The root is the unconditional own-app branch in the silent
+ * bridge, which hands any origin the owner happens to own whatever it asks for, and replacing that
+ * with something the owner actually decides is a larger piece of work than this cap.
+ */
+function capPortfolioScopes(requested: string[]): string[] {
+  const capped = requested.filter(s => PORTFOLIO_GRANT_SCOPES.includes(s));
+  return capped.length ? capped : [...PORTFOLIO_GRANT_SCOPES];
+}
 
 const CODE_TTL_MS = 60_000;        // authorization code: single-use, 60s
 const REQUEST_TTL_MS = 10 * 60_000; // pending authorize request awaiting consent: 10 min
@@ -496,7 +579,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       if (!sub || sub.includes('.')) return reply({ ok: false, error: 'bad_origin' });
       const resolved = await resolvePublishedPortfolio(storage, sub);
       if (!resolved.ok || !resolved.html) return reply({ ok: false, error: 'unknown_app' });
-      grantTarget = `portfolio:${sub}`;
+      grantTarget = `${PORTFOLIO_TARGET_PREFIX}${sub}`;
       grantName = `${sub}'s portfolio`;
       grantOwner = sub;
     } else {
@@ -515,8 +598,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     if (!sessionValid) return reply({ ok: false, error: 'login_required', app: grantTarget, app_name: grantName });
     const owner = session!.owner;
 
-    const requested = String(req.query.scope ?? '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
-    if (requested.some(s => !APP_GRANTABLE_SCOPES[s])) return reply({ ok: false, error: 'invalid_scope' });
+    const asked = String(req.query.scope ?? '').split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+    if (asked.some(s => !APP_GRANTABLE_SCOPES[s])) return reply({ ok: false, error: 'invalid_scope' });
+    // AUDIT H-9: a portfolio target gets the published ceiling and nothing more, before any branch
+    // below decides whether to approve it — including the own-app branch, which asks the page what
+    // it wants and believes the answer. See capPortfolioScopes for what this does and does not fix.
+    const requested = isPortfolioTarget(grantTarget) ? capPortfolioScopes(asked) : asked;
 
     // Policy: own app → auto-approve requested scopes; otherwise require a prior non-revoked grant
     // that already covers them (remembered approval). Anything else needs the visible consent.
@@ -600,10 +687,15 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       // Rotate the refresh token (one-time use).
       const newRaw = randomBytes(32).toString('hex');
       await storage.updateAppGrant(grant.grantId, { refreshTokenHash: hashToken(newRaw), lastUsedAt: new Date().toISOString() });
-      const { token, expiresIn } = await issueAccessToken({ gaii: grant.gaii, owner: grant.owner, scopes: grant.scopes, grantId: grant.grantId, app: grant.app });
+      // AUDIT H-9: the same portfolio ceiling, applied at the second door that mints from a stored
+      // grant. The silent bridge caps what it writes, so a fresh record can no longer hold more than
+      // memory:read for a portfolio — a record written before that cap existed still can, and this
+      // stops it refreshing itself back into a wide token.
+      const scopes = isPortfolioTarget(grant.app) ? capPortfolioScopes(grant.scopes) : grant.scopes;
+      const { token, expiresIn } = await issueAccessToken({ gaii: grant.gaii, owner: grant.owner, scopes, grantId: grant.grantId, app: grant.app });
       return res.json(success(config.nodeId, {
         access_token: token, token_type: 'Bearer', expires_in: expiresIn,
-        refresh_token: newRaw, scope: grant.scopes.join(' '), grant_id: grant.grantId,
+        refresh_token: newRaw, scope: scopes.join(' '), grant_id: grant.grantId,
       }));
     }
 

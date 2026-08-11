@@ -4,6 +4,10 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Security audit H-1/H-7: PUT /v1/ghii/cors and DELETE /v1/ghii are behind
+ *     requireOwnerPrincipal(). The rest of PUT /v1/ghii deliberately is not — an agent keeping the
+ *     person's details current is what this platform is for, and the note at the notification_email
+ *     branch says which part of that is not ordinary profile data.
  *   v1.1.0 — 2026-08-10 — Security audit H-5: a new notification_email arrives unverified, so the
  *     recovery rail stays closed until it is confirmed. Any principal of the owner may still set it.
  *   v1.1.0 — 2026-07-16 — GET /v1/ghii/list resolves the directory opt-in with ONE cross-owner key-IN read
@@ -14,7 +18,7 @@ import type { Router } from 'express';
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 
@@ -99,8 +103,12 @@ export function registerProfileRoutes(
         }));
     });
 
-    // PUT /v1/ghii/cors — Set your CORS allowed origins
-    router.put('/v1/ghii/cors', requireAuth(), async (req, res) => {
+    // PUT /v1/ghii/cors — Set your CORS allowed origins (account holder only)
+    //
+    // SECURITY (audit H-7): this decides which web origins may read this account's API with its
+    // credentials. A principal that can add its own origin here can keep reading the account from a
+    // page the person never visited, long after the token that set it was revoked.
+    router.put('/v1/ghii/cors', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
         const ownerName = req.auth!.owner;
         const ghiiRecord = await storage.getGHIIByOwner(ownerName);
         if (!ghiiRecord) {
@@ -291,8 +299,10 @@ export function registerProfileRoutes(
         if (onDirectoryChange) onDirectoryChange();
     });
 
-    // DELETE /v1/ghii — Delete own GHII profile (requires JWT auth as owner)
-    router.delete('/v1/ghii', requireAuth(), async (req, res) => {
+    // DELETE /v1/ghii — Delete own GHII profile (account holder only)
+    // Destroying the identity record is the person's decision, not something they delegate by
+    // connecting an agent.
+    router.delete('/v1/ghii', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
         const ownerName = req.auth!.owner;
         const ghiiRecord = await storage.getGHIIByOwner(ownerName);
         if (!ghiiRecord) {

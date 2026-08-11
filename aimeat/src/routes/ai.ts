@@ -36,6 +36,10 @@
  *   v1.5.0 — 2026-08-01 — TARGET-058: /v1/ai/complete carries the minted provenance record in
  *     `meta.provenance` and in the AI-Disclosure / Link response headers. The `data` shape is
  *     untouched, so nothing that reads `content` changes.
+ *   v1.7.0 — 2026-08-11 — Security audit H-2: the gate's owner branch excludes agent and ecosystem
+ *     sessions, matching requireScope. An agent now needs `ai:use` to spend the owner's AI budget,
+ *     which is what the endpoint always said and not what it enforced while agent tokens carried the
+ *     owner's roles.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -85,7 +89,12 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
    */
   function gateOwnerOrAiUseAgent(req: Request, res: Response): boolean {
     const roles = req.auth?.roles ?? [];
-    if (roles.includes('owner')) return true;
+    // The owner branch is requireScope's owner branch, exclusions and all: an agent or ecosystem
+    // session is scoped, and reaches this endpoint through `ai:use` or not at all. Testing
+    // roles.includes('owner') on its own let a mirrored agent token (POST /v1/auth/token copied the
+    // owner's roles onto it until 2026-08-11, audit H-2) spend the owner's AI budget without the
+    // word the owner would have had to grant for it.
+    if (roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
     if (scopes.includes('ai:use') || scopes.includes('*')) return true;
     res.status(403).json(error(config.nodeId, 'FORBIDDEN',

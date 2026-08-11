@@ -5,6 +5,9 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — SECURITY (H-29): removing or banning a member also detaches their agents
+ *     from organism.agentGaiis and revokes their workspace-role consents
+ *     (revokeDepartedMemberAccess) — an ejected person kept full access through their own agent token.
  *   v1.2.0 — 2026-08-11 — the decline route calls declineNameInvitation() instead of deleting the
  *     membership row itself, so it and aimeat_organism_invitation_respond share one write
  *     (August 2026 MCP audit step 8).
@@ -24,7 +27,7 @@ import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
-  acceptNameInvitation, declineNameInvitation, addOrganismMember,
+  acceptNameInvitation, declineNameInvitation, addOrganismMember, revokeDepartedMemberAccess,
 } from '../../services/invitations.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -311,6 +314,11 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       admins: organism.admins.filter(a => a !== targetGhii),
       updatedAt: now,
     });
+    // Two things survive the membership row, and both of them are access: the removed person's agents
+    // stay listed on the organism, where every membership gate reads them as members in their own
+    // right, and their workspace-role consents are owned by each workspace's creator, so the writes
+    // above reach neither. They go with the membership, on a ban as much as on a plain remove.
+    await revokeDepartedMemberAccess(storage, config, { organism, departing: targetGhii });
 
     // Let the removed member know their access was revoked.
     await notify(storage, `${targetGhii}@${config.nodeId}`, {

@@ -10,6 +10,9 @@
  *     identity → 400, UPPERCASE/@node/whitespace forms land on the real lowercase owner).
  *   v1.2.0 — 2026-07-23 — Test 28: an owner in 20+ organisms gets ALL of them in /tab mine (regression for
  *     the member-scoped page cap that dropped the owner's oldest organisms into Discover).
+ *   v1.3.0 — 2026-08-11 — Tests 29-34 (H-29): removing, banning and leaving detach the departing
+ *     person's agents from organism.agentGaiis and revoke their workspace-role consents. The agent
+ *     token is driven for real, because an ejected member kept the whole organism through it.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-membership
 
@@ -337,6 +340,124 @@ await test('28. Owner in 20+ organisms: /tab mine returns ALL of them (no 20-ite
     // The plain member-filtered list (GET /v1/organisms?member=self) must agree — no cap there either.
     const list = await json(`/v1/organisms?member=${encodeURIComponent(D.name)}`, { headers: auth(D.token) });
     assert((list.body.data.organisms || []).some((o: any) => o.id === oldest), 'oldest present in ?member= list too');
+});
+
+// ─── H-29: ending a membership ends the access that used to outlive it ───
+// Deleting the membership row and pruning members[]/admins[] left two live grants behind: the
+// departing person's agents stayed on organism.agentGaiis, where every membership gate reads them as
+// members in their own right, and the workspace-role consents granted to them are owned by each
+// workspace's CREATOR, so nothing about the removal reached them. An ejected person kept the whole
+// organism through their own agent's token.
+
+let org4 = '';
+const WS4 = 'ws-eject';
+
+/** Device-authorize an agent for `who` and return its GAII + bearer token (RFC 8628, three calls). */
+async function agentFor(who: { name: string; token: string }, agentName: string) {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: who.name }) });
+    assert(da.status === 200 || da.status === 201, `device-authorize ${da.status}: ${JSON.stringify(da.body.error)}`);
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: who.token }) });
+    assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body.error)}`);
+    const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    assert(!!t.body.token && !!t.body.gaii, `device-token ${t.status}: ${JSON.stringify(t.body)}`);
+    return { gaii: t.body.gaii as string, token: t.body.token as string };
+}
+
+/** Is `owner` on the workspace roster? Read as the workspace creator, whose consents ARE the roster. */
+async function onWsRoster(creatorToken: string, orgIdArg: string, ws: string, owner: string) {
+    const r = await json(`/v1/organisms/${orgIdArg}/workspace-access?ws=${ws}`, { headers: auth(creatorToken) });
+    assert(r.status === 200, `roster ${r.status}: ${JSON.stringify(r.body.error)}`);
+    return (r.body.data.members || []).some((m: any) => m.owner === owner);
+}
+
+async function attachedAgents(readerToken: string, orgIdArg: string): Promise<string[]> {
+    const r = await json(`/v1/organisms/${orgIdArg}`, { headers: auth(readerToken) });
+    assert(r.status === 200, `organism ${r.status}`);
+    return (r.body.data.organism.agentGaiis || []) as string[];
+}
+
+let cAgent: { gaii: string; token: string };
+
+await test('29. Setup: A opens an organism with a workspace, C joins, gets a contributor grant, attaches an agent', async () => {
+    const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Eject Org', description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }) });
+    assert(o.status === 201, `org ${o.status}: ${JSON.stringify(o.body.error)}`);
+    org4 = o.body.data.organism.id;
+
+    const reg = await json('/v1/memory', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ key: `organism.${org4}.meta.workspaces`, value: { workspaces: [{ id: WS4, name: 'Eject WS', createdAt: new Date().toISOString(), createdBy: A.name }] }, visibility: 'private' }),
+    });
+    assert(reg.status === 200 || reg.status === 201, `registry ${reg.status}`);
+    const manifest = { manifestVersion: '1.0', id: org4, name: 'Eject WS', kind: 'project', status: 'active', objectTypes: [{ name: 'task', schemaRef: 'schema:task@1', namespace: 'shared.tasks', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' }] };
+    const mr = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${org4}.w.${WS4}.meta.manifest`, value: manifest, visibility: 'private' }) });
+    assert(mr.status === 200 || mr.status === 201, `manifest ${mr.status}`);
+
+    const j = await json(`/v1/organisms/${org4}/join`, { method: 'POST', headers: auth(C.token), body: '{}' });
+    assert(j.status === 200 || j.status === 201, `C join ${j.status}: ${JSON.stringify(j.body.error)}`);
+
+    const g = await json(`/v1/organisms/${org4}/workspace-access/grant`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ws: WS4, grantee: C.name, role: 'contributor' }) });
+    assert(g.status === 200, `grant ${g.status}: ${JSON.stringify(g.body.error)}`);
+
+    cAgent = await agentFor(C, 'ejecttest');
+    const att = await json(`/v1/organisms/${org4}/agents`, { method: 'POST', headers: auth(C.token), body: JSON.stringify({ agent_gaii: cAgent.gaii }) });
+    assert(att.status === 201, `attach ${att.status}: ${JSON.stringify(att.body.error)}`);
+});
+
+await test('30. Baseline: C\'s agent passes the organism gate and C is on the workspace roster', async () => {
+    const r = await json(`/v1/organisms/${org4}/workspaces`, { headers: auth(cAgent.token) });
+    assert(r.status === 200, `agent read ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(await onWsRoster(A.token, org4, WS4, C.name), 'C holds a workspace grant before removal');
+});
+
+await test('31. A removes C → C\'s agent token is refused (403) and the agent is detached', async () => {
+    const rm = await json(`/v1/organisms/${org4}/members/${encodeURIComponent(C.name)}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(rm.status === 200, `remove ${rm.status}: ${JSON.stringify(rm.body.error)}`);
+    const r = await json(`/v1/organisms/${org4}/workspaces`, { headers: auth(cAgent.token) });
+    assert(r.status === 403, `a removed member's agent must be refused, got ${r.status}`);
+    assert(!(await attachedAgents(A.token, org4)).includes(cAgent.gaii), 'the agent is off organism.agentGaiis');
+});
+
+await test('32. C\'s workspace-role consent went with the membership', async () => {
+    assert(!(await onWsRoster(A.token, org4, WS4, C.name)), 'a removed member holds no workspace grant');
+});
+
+await test('33. Leaving does the same: C re-joins, re-attaches, leaves → agent detached, grant gone', async () => {
+    const j = await json(`/v1/organisms/${org4}/join`, { method: 'POST', headers: auth(C.token), body: '{}' });
+    assert(j.status === 200 || j.status === 201, `re-join ${j.status}: ${JSON.stringify(j.body.error)}`);
+    const g = await json(`/v1/organisms/${org4}/workspace-access/grant`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ws: WS4, grantee: C.name, role: 'viewer' }) });
+    assert(g.status === 200, `re-grant ${g.status}: ${JSON.stringify(g.body.error)}`);
+    const att = await json(`/v1/organisms/${org4}/agents`, { method: 'POST', headers: auth(C.token), body: JSON.stringify({ agent_gaii: cAgent.gaii }) });
+    assert(att.status === 201, `re-attach ${att.status}: ${JSON.stringify(att.body.error)}`);
+    assert((await json(`/v1/organisms/${org4}/workspaces`, { headers: auth(cAgent.token) })).status === 200, 'agent reads again while C is a member');
+
+    const left = await json(`/v1/organisms/${org4}/leave`, { method: 'POST', headers: auth(C.token), body: '{}' });
+    assert(left.status === 200 && left.body.data.left === true, `leave ${left.status}: ${JSON.stringify(left.body.error)}`);
+    const r = await json(`/v1/organisms/${org4}/workspaces`, { headers: auth(cAgent.token) });
+    assert(r.status === 403, `a leaver's agent must be refused, got ${r.status}`);
+    assert(!(await attachedAgents(A.token, org4)).includes(cAgent.gaii), 'the agent is off organism.agentGaiis after leaving');
+    assert(!(await onWsRoster(A.token, org4, WS4, C.name)), 'a leaver holds no workspace grant');
+});
+
+await test('34. Banning ejects the same way, and B\'s own agent is untouched by C\'s removal', async () => {
+    // B is a different owner in the same organism: their agent must survive C being ejected.
+    const j = await json(`/v1/organisms/${org4}/join`, { method: 'POST', headers: auth(B.token), body: '{}' });
+    assert(j.status === 200 || j.status === 201, `B join ${j.status}: ${JSON.stringify(j.body.error)}`);
+    const bAgent = await agentFor(B, 'bystander');
+    const attB = await json(`/v1/organisms/${org4}/agents`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ agent_gaii: bAgent.gaii }) });
+    assert(attB.status === 201, `B attach ${attB.status}: ${JSON.stringify(attB.body.error)}`);
+
+    const rj = await json(`/v1/organisms/${org4}/join`, { method: 'POST', headers: auth(C.token), body: '{}' });
+    assert(rj.status === 200 || rj.status === 201, `C re-join ${rj.status}`);
+    const attC = await json(`/v1/organisms/${org4}/agents`, { method: 'POST', headers: auth(C.token), body: JSON.stringify({ agent_gaii: cAgent.gaii }) });
+    assert(attC.status === 201, `C re-attach ${attC.status}: ${JSON.stringify(attC.body.error)}`);
+
+    const ban = await json(`/v1/organisms/${org4}/members/${encodeURIComponent(C.name)}?ban=1`, { method: 'DELETE', headers: auth(A.token) });
+    assert(ban.status === 200 && ban.body.data.banned === true, `ban ${ban.status}: ${JSON.stringify(ban.body.error)}`);
+    const gaiis = await attachedAgents(A.token, org4);
+    assert(!gaiis.includes(cAgent.gaii), 'a banned member\'s agent is detached');
+    assert(gaiis.includes(bAgent.gaii), 'another member\'s agent is left alone');
+    assert((await json(`/v1/organisms/${org4}/workspaces`, { headers: auth(cAgent.token) })).status === 403, 'the banned member\'s agent is refused');
+    assert((await json(`/v1/organisms/${org4}/workspaces`, { headers: auth(bAgent.token) })).status === 200, 'the bystander agent still reads');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

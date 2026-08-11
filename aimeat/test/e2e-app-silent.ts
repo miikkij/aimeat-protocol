@@ -14,11 +14,15 @@
  *     refresh_token never expands scopes on its own; the visible authorize flow rejects a
  *     redirect_uri on ANOTHER app's subdomain, exposes app_owner/origin_bound on the pending
  *     request, and the code exchange reports own=true only for the app's own origin-bound owner.
+ *   v1.2.0 — 2026-08-11 — The subdomain-serve check addresses a real Host in the app family
+ *     (helpers/host-request.ts). `x-app-origin` on its own stopped being an app origin when
+ *     subdomain.ts v1.5.0 began requiring the Host to belong to the family it claims.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { hostRequest } from './helpers/host-request.js';
 
 const PORT = process.env.E2E_SILENT_PORT ?? '40264';
 const BASE = `http://localhost:${PORT}`;
@@ -231,7 +235,11 @@ async function main() {
 
         console.log('\nPhase 3: Wiring — shim injected, bridge framable only by app origins');
         await test('app HTML on the per-app subdomain is served (the SDK does the SSO itself)', async () => {
-            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'aaa' } });
+            // A real Host in the app family, not just the marker: since subdomain.ts v1.5.0 the
+            // marker is only honoured on a Host that belongs to the family it claims.
+            const res = await hostRequest(BASE, '/', `aaa.${APP_HOST}:${PORT}`, {
+                headers: { 'x-app-origin': '1', 'x-subdomain': 'aaa' },
+            });
             assert(res.status === 200, `subdomain serve: ${res.status}`);
         });
         await test('GET /app-silent.html is framable only by *.appHost (frame-ancestors, no X-Frame-Options)', async () => {

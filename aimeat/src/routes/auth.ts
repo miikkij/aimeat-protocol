@@ -16,6 +16,12 @@
  *   v1.1.1 -- 2026-06-29 -- SECURITY: legacy Bearer refresh no longer merges the
  *     owner's owner/operator roles onto an agent session (intra-owner scope collapse /
  *     privilege escalation); agent sessions stay ['agent'] across refresh
+ *   v1.3.0 -- 2026-08-11 -- SECURITY (August 2026 audit H-2): POST /v1/auth/token stops doing on the
+ *     MINT what v1.1.1 stopped doing on the REFRESH. The agent branch no longer copies the owner's
+ *     owner/operator roles onto the agent's JWT (token laundering: the mirrored token bought an
+ *     unscoped operator PAT in two calls), and the operator self-heal that wrote to the owner record
+ *     from a token mint is gone, because routes/ghii/register-login.ts already does it on the
+ *     owner's own doors.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -260,21 +266,24 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
 
-      // Get owner to check roles
-      const ownerRecord = await storage.getOwner(parsed.owner);
+      // SECURITY (audit H-2): an agent session is exactly ['agent'], the same role set the other
+      // three mints already issue (agents/device-auth.ts, mcp/oauth.ts, and the refresh branch
+      // below). This handler used to read the OWNER record and copy the owner's 'owner' and
+      // 'operator' roles onto the agent's token, and that is the last step of the paved
+      // device-authorization path, so scope-limited agents held it in production.
+      //
+      // What the copy bought an agent, in two calls: the mirrored token cleared
+      // requireRole('owner') on POST /v1/access/tokens, `isOperator` was true there so
+      // `grant_operator` was accepted, and services/access-token.ts resolves that PAT to
+      // ['owner','operator'] with no scopes and NO agent role, at which point requireScope stops
+      // applying at all, because its owner branch only steps aside for an agent or ecosystem role.
+      // An agent granted memory:read could mint itself an unscoped operator credential.
+      //
+      // The operator self-heal that sat here went with it. Minting an agent token is the one path
+      // that has no business WRITING to the owner record, and the promotion it duplicated already
+      // runs where it belongs: on the owner's own doors in routes/ghii/register-login.ts, at
+      // registration and again at password login.
       const roles = ['agent'];
-      if (ownerRecord?.roles.includes('owner')) roles.push('owner');
-      if (ownerRecord?.roles.includes('operator')) roles.push('operator');
-
-      // Self-heal: if no operator exists anywhere, promote this user
-      if (ownerRecord && !roles.includes('operator')) {
-        const allOwners = await storage.listOwners();
-        const hasOperator = allOwners.some(o => o.roles.includes('operator'));
-        if (!hasOperator) {
-          roles.push('operator');
-          await storage.updateOwner(parsed.owner, { roles: [...ownerRecord.roles, 'operator'] });
-        }
-      }
 
       // P3-7: Create session record for JWT tracking
       const sessionId = generateSessionId();

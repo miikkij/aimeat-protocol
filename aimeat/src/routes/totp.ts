@@ -10,12 +10,17 @@
  *   - POST /v1/ghii/totp/setup: create encrypted secret, backup codes, and provisioning URI/QR
  *
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Security audit H-1/H-7: all four routes are behind
+ *     requireOwnerPrincipal(). They ran on requireAuth() alone and keyed off req.auth.owner, so an
+ *     agent, a GEAI or a granted app could arm a second factor on the human's account with a secret
+ *     only it held — and removing it needs a code from that secret, which the human does not have.
+ *     There is no operator TOTP reset, so this was a lock-out with no key.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { setupTotp, validateTotpCode, validateBackupCode, generateBackupCodes } from '../services/totp.js';
@@ -36,8 +41,10 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
       : undefined,
   };
 
-  // POST /v1/ghii/totp/setup — Start TOTP setup
-  router.post('/v1/ghii/totp/setup', requireAuth(), async (req, res) => {
+  // POST /v1/ghii/totp/setup — Start TOTP setup (account holder only)
+  // The secret is returned to whoever calls this, and it becomes the account's second factor. It
+  // belongs in the hands of the person who will be asked for the codes.
+  router.post('/v1/ghii/totp/setup', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     if (!config.totpEnabled) {
       res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'TOTP two-factor authentication is not enabled on this node'));
       return;
@@ -74,8 +81,8 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('totp');
   });
 
-  // POST /v1/ghii/totp/verify — Verify and activate TOTP
-  router.post('/v1/ghii/totp/verify', requireAuth(), async (req, res) => {
+  // POST /v1/ghii/totp/verify — Verify and activate TOTP (account holder only)
+  router.post('/v1/ghii/totp/verify', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner ?? '');
     if (!ghiiRecord) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found for your identity'));
@@ -118,8 +125,8 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('totp');
   });
 
-  // DELETE /v1/ghii/totp — Disable TOTP
-  router.delete('/v1/ghii/totp', requireAuth(), async (req, res) => {
+  // DELETE /v1/ghii/totp — Disable TOTP (account holder only)
+  router.delete('/v1/ghii/totp', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner ?? '');
     if (!ghiiRecord) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found for your identity'));
@@ -166,8 +173,10 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
     emitChange('totp');
   });
 
-  // POST /v1/ghii/totp/backup-codes — Regenerate backup codes
-  router.post('/v1/ghii/totp/backup-codes', requireAuth(), async (req, res) => {
+  // POST /v1/ghii/totp/backup-codes — Regenerate backup codes (account holder only)
+  // Regenerating invalidates the codes the person wrote down, so it is the same decision as
+  // arming the factor in the first place.
+  router.post('/v1/ghii/totp/backup-codes', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const ghiiRecord = await storage.getGHIIByOwner(req.auth!.owner ?? '');
     if (!ghiiRecord) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No GHII profile found for your identity'));

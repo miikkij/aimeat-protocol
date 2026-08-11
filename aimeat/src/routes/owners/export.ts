@@ -11,20 +11,24 @@
  *   import { registerOwnerExportRoute } from './owners/export.js';
  *   registerOwnerExportRoute(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Security audit H-1/H-7: behind requireOwnerPrincipal(). One export is
+ *     everything the account holds in one response, and the check below only refuses a DIFFERENT
+ *     owner — every machine principal of the SAME owner passed it, because req.auth.owner is the
+ *     human's account name on an agent, ecosystem and app-grant token alike.
  *   v1.0.0 — 2026-08-07 — Extracted from routes/owners.ts (max-file-lines).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { error, success } from '../../middleware/envelope.js';
 import { calculateTrustScore } from '../../services/trust.js';
 
 /** Mount GET /v1/owners/:name/export on an existing router. */
 export function registerOwnerExportRoute(router: Router, config: AimeatConfig, storage: Storage): void {
-  // GET /v1/owners/:name/export — GDPR data export (owner auth)
+  // GET /v1/owners/:name/export — GDPR data export (account holder or operator)
   // Exports ALL data types associated with the owner for full GDPR compliance.
-  router.get('/v1/owners/:name/export', requireAuth(), async (req, res) => {
+  router.get('/v1/owners/:name/export', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const name = req.params.name as string;
     if (req.auth!.owner !== name && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only export your own data'));

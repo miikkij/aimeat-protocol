@@ -17,9 +17,11 @@
  * @structure
  *   - providers(): the provider list for this run (sqlite always; postgres when reachable)
  *   - seedOwner(): one owner with data in several owner-scoped tables
- *   - the cases: delete cascade, transaction lookup, memory listing order
+ *   - the cases: delete cascade, transaction lookup, memory listing order, push subscriptions
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-conformance.test.ts
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Push subscriptions join the seed and the cascade check, and get a case of
+ *     their own: one row per device, refresh in place, prune one endpoint (audit H-8).
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, step 5c / systemic pattern 5).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -50,7 +52,13 @@ beforeAll(async () => {
     }
 }, 60_000);
 
-afterAll(() => {
+afterAll(async () => {
+    // Close first, or Windows refuses to unlink an open database file and every run of this suite
+    // leaves ~6 MB of scratch behind. `close` is not on the Storage interface (nothing in the node
+    // shuts storage down mid-process), so it is asked for rather than assumed.
+    for (const { storage } of provs) {
+        await (storage as unknown as { close?: () => void | Promise<void> }).close?.();
+    }
     for (const suffix of ['', '-wal', '-shm']) {
         const p = SQLITE_PATH + suffix;
         if (existsSync(p)) { try { rmSync(p); } catch { /* the file is the test's own scratch */ } }
@@ -97,6 +105,12 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
         id: randomUUID(), name: 'conformance group', ownerGaii: ghii, members: [],
         defaultPermissions: { read: true, write: false }, createdAt: now, updatedAt: now,
     });
+    // Keyed on the bare owner name rather than an identity: a push subscription belongs to a device
+    // of the person, and one person has several.
+    await s.createPushSubscription({
+        ownerName: name, endpoint: `https://push.example.test/${name}/laptop`,
+        keys: { p256dh: 'conf-p256dh', auth: 'conf-auth' }, createdAt: now, lastUsedAt: now,
+    });
     // Under the AGENT identity, so the per-agent branch of the cascade is exercised too.
     await s.setMicroMemory({ gaii, set: 'conf', entries: { a: '1' }, visibility: 'private', updatedAt: now });
     return { ghii, gaii };
@@ -110,6 +124,7 @@ async function leftovers(s: Storage, owner: string, ghii: string, gaii: string) 
         consents: (await s.listConsents(ghii)).length,
         files: (await s.listStorageFiles(ghii)).length,
         sharingGroups: (await s.listSharingGroups(ghii)).length,
+        pushSubscriptions: (await s.listPushSubscriptionsByOwner(owner)).length,
         microMemory: (await s.listMicroMemorySets(gaii)).length,
         agents: (await s.getAgentsByOwner(owner)).length,
         ghii: !!(await s.getGHII(ghii)),
@@ -259,6 +274,57 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect(await storage.getMemory(ghii, 'tx.inner'), `${name}: inner write committed`).not.toBeNull();
 
             await storage.deleteOwner(owner);
+        }
+    }, 60_000);
+
+    it('a push subscription is per DEVICE on every provider, and pruning takes one endpoint', async () => {
+        const shapes: Record<string, unknown> = {};
+
+        for (const { name, storage } of provs) {
+            const owner = `confpush${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            await seedOwner(storage, owner);              // already registers the "laptop" endpoint
+            const now = new Date().toISOString();
+            const laptop = `https://push.example.test/${owner}/laptop`;
+            const phone = `https://push.example.test/${owner}/phone`;
+            const keys = { p256dh: 'conf-p256dh', auth: 'conf-auth' };
+
+            // A second device joins the first. Keyed on ownerName alone (before H-8) this replaced it.
+            await storage.createPushSubscription({ ownerName: owner, endpoint: phone, keys, createdAt: now, lastUsedAt: now });
+            const both = (await storage.listPushSubscriptionsByOwner(owner)).map(s => s.endpoint).sort();
+
+            // The same device again refreshes its keys rather than adding a row.
+            await storage.createPushSubscription({
+                ownerName: owner, endpoint: laptop, keys: { p256dh: 'rotated', auth: 'rotated' }, createdAt: now, lastUsedAt: now,
+            });
+            const afterRefresh = await storage.listPushSubscriptionsByOwner(owner);
+            const rotated = afterRefresh.find(s => s.endpoint === laptop)?.keys.p256dh;
+
+            // A dead endpoint is pruned on its own: the other device must survive it.
+            const prunedOne = await storage.deletePushSubscription(owner, phone);
+            const afterPrune = (await storage.listPushSubscriptionsByOwner(owner)).map(s => s.endpoint);
+
+            // No endpoint named: the whole account unsubscribes.
+            const prunedAll = await storage.deletePushSubscription(owner);
+            const afterAll_ = await storage.listPushSubscriptionsByOwner(owner);
+            const missing = await storage.deletePushSubscription(owner, laptop);
+
+            shapes[name] = {
+                both, count: afterRefresh.length, rotated, prunedOne, afterPrune, prunedAll,
+                left: afterAll_.length, missing,
+            };
+            expect(shapes[name], `${name}: per-device subscriptions`).toEqual({
+                both: [laptop, phone].sort(), count: 2, rotated: 'rotated',
+                prunedOne: true, afterPrune: [laptop], prunedAll: true, left: 0, missing: false,
+            });
+
+            await storage.deleteOwner(owner);
+        }
+
+        const [first, ...rest] = Object.entries(shapes);
+        for (const [name, s] of rest) {
+            // Endpoints carry the owner name, which differs per provider run, so compare the shape.
+            expect(JSON.stringify(s).replace(/confpush\d+/g, 'OWNER'), `${name} must behave like ${first[0]}`)
+                .toEqual(JSON.stringify(first[1]).replace(/confpush\d+/g, 'OWNER'));
         }
     }, 60_000);
 

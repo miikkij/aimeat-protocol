@@ -10,6 +10,8 @@
  *   - extension, escrow-hold, and cortex-extension/lib-file CRUD
  *
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Push subscriptions are per DEVICE (audit H-8): listPushSubscriptionsByOwner
+ *     added, deletePushSubscription takes an optional endpoint.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type {
@@ -29,9 +31,19 @@ export interface NodeRepository {
   getNodeKey(): Promise<{ publicKey: string; privateKey: string } | null>;
   getMaintenanceMode(): Promise<MaintenanceState>;
   setMaintenanceMode(state: MaintenanceState): Promise<MaintenanceState>;
+  /**
+   * Register one DEVICE. The identity of a push subscription is (ownerName, endpoint), so a second
+   * browser arrives BESIDE the first instead of replacing it; the same endpoint twice refreshes its
+   * keys and lastUsedAt. Keyed on ownerName alone until 2026-08-11, which meant whoever subscribed
+   * last owned the person's whole notification stream (audit H-8).
+   */
   createPushSubscription(record: PushSubscriptionRecord): Promise<PushSubscriptionRecord>;
+  /** ONE of the owner's devices, the most recently used. Use listPushSubscriptionsByOwner to reach them all. */
   getPushSubscription(ownerName: string): Promise<PushSubscriptionRecord | null>;
-  deletePushSubscription(ownerName: string): Promise<boolean>;
+  /** Every device this owner has registered, oldest first. This is what a notification fans out to. */
+  listPushSubscriptionsByOwner(ownerName: string): Promise<PushSubscriptionRecord[]>;
+  /** With `endpoint`, unregister that one device; without it, every device of the owner. */
+  deletePushSubscription(ownerName: string, endpoint?: string): Promise<boolean>;
   listPushSubscriptions(): Promise<PushSubscriptionRecord[]>;
   createTrustedIssuer(record: TrustedIssuerRecord): Promise<TrustedIssuerRecord>;
   getTrustedIssuer(id: string): Promise<TrustedIssuerRecord | null>;

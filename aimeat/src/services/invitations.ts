@@ -11,12 +11,18 @@
  *   a direct add).
  * @structure constants (expiry/cap); hashInviteToken/inviteEmailHash; InvitationError; invitePublic;
  *   normalizeOrgRole/normalizeInviteeName/normalizeWorkspaceGrants; findWorkspaceEntry;
- *   applyInvitationWorkspaceGrants; createNameInvitation/updateNameInvitation/cancelNameInvitation/
+ *   applyInvitationWorkspaceGrants + its inverse revokeDepartedMemberAccess;
+ *   createNameInvitation/updateNameInvitation/cancelNameInvitation/
  *   acceptNameInvitation/declineNameInvitation/addOrganismMember; createEmailInvitation/
  *   cancelEmailInvitation().
  * @usage const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, input);
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
+ *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   v1.6.0 — 2026-08-11 — SECURITY (H-29): revokeDepartedMemberAccess(), the inverse of
+ *     applyInvitationWorkspaceGrants — a removed, banned or departed member's agents are detached from
+ *     the organism and their workspace-role consents revoked, neither of which the membership row's
+ *     deletion touched.
  *   v1.5.0 — 2026-08-11 — declineNameInvitation() + cancelEmailInvitation(): the last two invitation
  *     writes that still existed twice, once in the REST route and once in the MCP tool (August 2026
  *     MCP audit step 8).
@@ -40,7 +46,8 @@ import { notify } from './notify.js';
 import { emitChange } from './event-bus.js';
 import { getActiveEmailService } from './email.js';
 import { registrationInviteEmail } from './email-templates.js';
-import { grantWorkspaceRole } from './workspace-roles.js';
+import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
@@ -459,6 +466,69 @@ export async function applyInvitationWorkspaceGrants(
     granted.push(g.ws);
   }
   return granted;
+}
+
+/**
+ * The inverse of {@link applyInvitationWorkspaceGrants}: strip an organism's access from someone whose
+ * membership has just ended, whether they left, were removed, or were banned.
+ *
+ * Deleting the membership row and pruning members[]/admins[] was never the whole of it, because two
+ * things outlive that row and both of them ARE access:
+ *
+ *   1. `organism.agentGaiis`. Every membership gate in the organism code treats a GAII listed there as
+ *      a member in its own right (routes/organisms/shared.ts memberRole, the nine workspace read
+ *      gates, the MCP workspace tools), so an ejected person kept the whole organism through their own
+ *      agent's token while the roster showed them gone.
+ *   2. The workspace-role consents granted to them. Those are owned by each workspace's CREATOR and
+ *      keyed to the departing owner, so nothing about ending their membership reaches them — they
+ *      would keep serving cross-owner reads of workspace content indefinitely.
+ *
+ * A workspace the departing person created themselves is skipped: those grants are theirs, on their
+ * own content, and revoking them would be this function deciding what someone may do with their own
+ * data. Call it after the membership write, from every door that ends a membership. Returns what it
+ * removed, so a caller can log or report it.
+ */
+export async function revokeDepartedMemberAccess(
+  storage: Storage,
+  config: AimeatConfig,
+  args: { organism: OrganismRecord; departing: string },
+): Promise<{ detachedAgents: string[]; revokedWorkspaces: string[] }> {
+  const { organism, departing } = args;
+
+  // Agents are listed by full GAII (`claude#alice@node`); the owner segment ties one to a person.
+  const detachedAgents = organism.agentGaiis.filter(g => parseGaiiLoose(g).owner === departing);
+  if (detachedAgents.length) {
+    await storage.updateOrganism(organism.id, {
+      agentGaiis: organism.agentGaiis.filter(g => !detachedAgents.includes(g)),
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  // Which consent list to look in is decided by who CREATED each workspace, and the registry is what
+  // says so — one registry record per creator, each listing the workspaces they made. revokeWorkspaceRole
+  // is the same call the deny and revoke routes make, so what counts as a workspace-role grant stays
+  // defined in exactly one place (services/workspace-roles.ts).
+  const revokedWorkspaces: string[] = [];
+  const regKey = `organism.${organism.id}.meta.workspaces`;
+  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
+  const seen = new Set<string>();
+  for (const rec of items) {
+    if (rec.key !== regKey) continue;
+    const list = (rec.value as { workspaces?: Array<{ id?: string; createdBy?: string }> } | null)?.workspaces ?? [];
+    for (const w of list) {
+      if (!w.id || seen.has(w.id)) continue;
+      seen.add(w.id);
+      const createdBy = w.createdBy ?? bareOwnerOf(rec.ownerGaii);
+      if (createdBy === departing) continue;
+      const revoked = await revokeWorkspaceRole(storage, config, {
+        creatorGhii: `${createdBy}@${config.nodeId}`, orgId: organism.id, ws: w.id, grantee: departing,
+      });
+      if (revoked > 0) revokedWorkspaces.push(w.id);
+    }
+  }
+
+  if (detachedAgents.length || revokedWorkspaces.length) emitChange('organisms');
+  return { detachedAgents, revokedWorkspaces };
 }
 
 /** Validate that every grant's workspace exists (invite/update time — an org creator/admin may grant
