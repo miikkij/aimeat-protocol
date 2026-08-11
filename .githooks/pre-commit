@@ -21,6 +21,7 @@
 #  15. Owner-scoped tables vs cascades  — pnpm check:storage-parity
 #  16. Sandbox entry points on builder — pnpm check:ext-entrypoints
 #  17. One capability one impl       — pnpm check:shared-impl
+#  18. Published surfaces + release   — pnpm check:liaison-surface
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -100,5 +101,8 @@ pnpm -s check:ext-entrypoints
 
 echo "[pre-commit] MCP tools call what REST calls (check:shared-impl)…"
 pnpm -s check:shared-impl
+
+echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
+pnpm -s check:liaison-surface
 
 echo "[pre-commit] ✓ all checks passed"
