@@ -1,4 +1,8 @@
--- 0031_group_shares.sql
+-- 0033_group_shares.sql
+--
+-- Numbered 0033 rather than 0031: two other migrations with those numbers were in flight in a
+-- parallel branch when this landed. The gap is deliberate and harmless — migrations run in filename
+-- order, and a number nobody used is cheaper than two files claiming the same one.
 --
 -- A share becomes its own row: this owner lets this group read this key pattern.
 --
