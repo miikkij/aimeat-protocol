@@ -5674,6 +5674,9 @@
           },
           "account": {
             "security": "Change your password, your recovery email address and your two-step login, and delete or export the whole account. An agent with this can sign in as you, so grant it only to one you would hand your password to."
+          },
+          "share": {
+            "manage": "Open parts of your knowledge to a sharing group you have set up, and close them again. Never to anyone you have not put in a group yourself."
           }
         },
         "domainAi": "AI",

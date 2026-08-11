@@ -5674,6 +5674,9 @@
           },
           "account": {
             "security": "Vaihda salasanasi, palautusosoitteesi ja kaksivaiheisen kirjautumisen, ja poista tai vie koko tili. Tämän saanut agentti pääsee kirjautumaan sinuna, joten anna se vain sellaiselle jolle antaisit salasanasi."
+          },
+          "share": {
+            "manage": "Avaa osia tiedostasi perustamallesi jakoryhmälle ja sulkea ne taas. Ei koskaan kenellekään jota et ole itse ryhmään laittanut."
           }
         },
         "domainAi": "Tekoäly",

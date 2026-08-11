@@ -56,6 +56,10 @@ export const NOT_IN_WILDCARD = [
   'commerce:beneficiary-verify',
   'agent:permissions',
   'consent:groups',
+  // Handing another account a standing right to read part of the owner's memory. Same reasoning:
+  // assembling an audience and giving it a key space are separate acts, and only the second gives
+  // anything away.
+  'share:manage',
   'social:members',
   // ── Added 2026-08-11 ─────────────────────────────────────────────────────────────────────────
   // The account itself: the password, the recovery address, the second factor, the identity proof,
@@ -103,6 +107,9 @@ export const SCOPE_DOMAINS = [
   // consent:groups — create a sharing group and decide who is in it. A sharing group IS the
   //   boundary of who reads the owner's memory, so it is separated from managing consents.
   { key: 'consent',   permissions: ['manage', 'groups'] },
+  // Key-space shares: what a sharing group actually reaches. The group is the audience (consent:groups);
+  // this is what they may read. Without a row here an owner could not grant it in this editor at all.
+  { key: 'share',     permissions: ['manage'] },
   { key: 'tunnel',    permissions: ['connect'] },
   { key: 'catalogue', permissions: ['read'] },
   { key: 'task',      permissions: ['read', 'write'] },
