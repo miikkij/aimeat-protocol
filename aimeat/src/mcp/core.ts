@@ -100,8 +100,8 @@ import { logger } from '../utils/logger.js';
 import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { createBoardPost } from '../services/board-post.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -710,36 +710,24 @@ export function registerCoreTools(
         { board_id: z.string(), title: z.string(), body: z.string(), category: z.string().optional(), ...aiProvenanceInputs },
         annotationsFor('aimeat_board_post'),
         async ({ board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
-            const { randomBytes } = await import('node:crypto');
-            const postId = `post-${randomBytes(8).toString('hex')}`;
-            // TARGET-058. A board post is text an agent puts where people read it, so it is stamped
-            // like any other write. The hash covers title + body together, which is the unit a reader
-            // sees. Phase 9 gave the post a column for the id as well, so a reader gets the label
-            // FROM the post instead of having to already suspect something and go looking by hash.
-            const provenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content: `${title}\n\n${body}`,
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+            // ONE implementation (services/board-post.ts). This tool never loaded the board, so it
+            // had no access check, no price on a public board, no pre_board_post hook and no bound
+            // on title or body. Any agent holding social:write posted into any board on the node,
+            // including another owner's private one, for free.
+            const posted = await createBoardPost({ storage, config }, {
+                gaii: agentGaii,
+                roles: ['agent'],
+            }, {
+                boardId: board_id, title, body, category,
+                declaredProvenanceId: ai_provenance_id,
+                declaredProvenance: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.board_post',
-                surface: { visibility: 'public', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
             });
-            const post = await storage.createPost({
-                id: postId,
-                boardId: board_id,
-                authorGaii: agentGaii,
-                title,
-                body,
-                category,
-                tags: [],
-                reactions: {},
-                createdAt: new Date().toISOString(),
-                aiProvenanceId: provenanceId,
-            });
+            if (!posted.ok) {
+                return { content: [{ type: 'text' as const, text: `${posted.code}: ${posted.message}` }], isError: true };
+            }
+            const post = posted.post;
+            const provenanceId = post.aiProvenanceId;
             return {
                 content: [{ type: 'text' as const, text: JSON.stringify({
                     id: post.id, board_id, title, posted: true,

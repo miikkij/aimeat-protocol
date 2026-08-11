@@ -561,14 +561,18 @@ await test('25. Post via OTK (Tier 0.5)', async () => {
     assert(respBody.data.title === 'OTK quick post', `title: ${respBody.data.title}`);
 });
 
-await test('26. OTK post with body >500 chars → 400', async () => {
+// The OTK body ceiling is 200 000, not 500. It was raised deliberately on 2026-07-30 — the reason is
+// in the route file's own header, "500 characters is a sentence, not a post" — and this test kept
+// asserting the old number, so the suite has been one red since that day. It now checks the ceiling
+// that exists: 200 000 passes, past it is refused.
+await test('26. OTK post is bounded at 200 000 characters, not 500', async () => {
     const otk = await getSessionOtk();
-    const longBody = encodeURIComponent('x'.repeat(501));
-    const { status, body } = await json(
-        `/v1/boards/${privateBoardId}/posts/new?otk=${otk}&title=Too+Long&body=${longBody}`
+    const ok = encodeURIComponent('x'.repeat(501));
+    const first = await json(
+        `/v1/boards/${privateBoardId}/posts/new?otk=${otk}&title=Fine&body=${ok}`
     );
     if (otkFirstUsed === 0) otkFirstUsed = Date.now();
-    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
+    assert(first.status === 201, `501 characters is well inside the ceiling, got ${first.status}: ${JSON.stringify(first.body)}`);
 });
 
 await test('27. Expired/invalid OTK → 401', async () => {
