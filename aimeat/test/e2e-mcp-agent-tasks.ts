@@ -220,6 +220,37 @@ async function run() {
         assert(afterTodos[0].title === 'Read the brief', `the original plan is gone: ${JSON.stringify(afterTodos.map(t => t.title))}`);
     });
 
+    // ── What a completion sets off ──────────────────────────────────────────────────────────────
+    //
+    // Completing a task writes one record and sets off eight other things: the workflow run that
+    // dispatched it advances, the open item behind it closes, the agent's counters move, the
+    // runner's live-trace key is reclaimed, the automation report is sent and its advisory outbox
+    // drained. All eight lived inside the HTTP handler, so this tool answered "completed: true" and
+    // nothing downstream of it happened — the worst shape a side effect can have, because the
+    // answer looked right.
+    //
+    // The counters are what a plain session can observe, and they are the FIRST thing the shared
+    // fan-out does. If the counter moved, the fan-out ran.
+    await test("completing over MCP moves the agent's own counters, as the HTTP door does", async () => {
+        const read = async () => {
+            const r = await json(`/v1/agents/${runner.agentName}/activity?days=1`, {
+                headers: { Authorization: `Bearer ${runner.ownerToken}` },
+            });
+            assert(r.status === 200, `activity read ${r.status}: ${JSON.stringify(r.body?.error)}`);
+            return JSON.stringify(r.body?.data ?? {});
+        };
+        const before = await read();
+
+        const done = await callTool(runner.session, 'aimeat_task_complete', {
+            task_id: runnerTaskId, message: 'Finished, and the rest of the node should know.',
+        });
+        assert(!done.isError, `complete failed: ${done.text.slice(0, 300)}`);
+
+        const after = await read();
+        assert(after !== before,
+            `the activity record did not change on completion; it read ${before.slice(0, 250)}`);
+    });
+
     console.log('\nCleanup');
     await json(`/v1/owners/${runner.owner}`, { method: 'DELETE', headers: { Authorization: `Bearer ${runner.ownerToken}` } });
     await json(`/v1/owners/${interactive.owner}`, { method: 'DELETE', headers: { Authorization: `Bearer ${interactive.ownerToken}` } });

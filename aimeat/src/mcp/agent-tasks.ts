@@ -7,6 +7,11 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.x — 2026-08-11 — aimeat_task_complete and _fail call services/agent-task-fanout.ts.
+ *     They wrote the record and did none of the eight things a completion sets off, so a
+ *     workflow run that dispatched the task stayed on that step, the open item behind it never
+ *     closed, the automation report was never sent, the agent's counters never moved and the
+ *     runner's live-trace key was never reclaimed — one key per completed task, forever.
  *   v1.x — 2026-08-11 — Five differences from the REST task routes, none of which any suite
  *     exercised: task-runner auto-activation (a delegated task sat queued waiting for a click
  *     the owner was told they would not need), the live-plan guard on propose_todos (a mid-run
@@ -44,6 +49,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { resolveTaskFileInputs, taskWithFileHandles } from '../services/task-files.js';
 import { emitDelivery, emitChange } from '../services/event-bus.js';
+import { afterTaskCompleted, afterTaskFailed } from '../services/agent-task-fanout.js';
 import { recordTaskStarted } from '../services/activity-recorder.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -596,7 +602,6 @@ export function registerAgentTaskTools(
                 lastEventAt: now,
                 updatedAt: now,
             });
-            emitChange('agent-tasks');
 
             // TARGET-058. The completion message is what the OWNER reads when they look at what their
             // agent did, so it is stamped like any other text an agent writes for a person.
@@ -627,6 +632,14 @@ export function registerAgentTaskTools(
                 ...(aiProvenanceId ? { details: { aiProvenanceId } } : {}),
                 timestamp: now,
             });
+
+            // Everything a completion sets off, which this tool used to do none of: the workflow run
+            // that dispatched the task advances, the open item behind it closes, the agent's own
+            // counters move, the runner's live-trace key is reclaimed, the automation report is sent
+            // and its advisory outbox drained, and a public deliverable reaches the feed. The tool
+            // answered "completed: true" and everything downstream simply never happened.
+            await afterTaskCompleted({ storage, config }, task, updated ?? null, completionMessage,
+                (updated ?? task).deliverableKey, agentGaii);
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 
@@ -674,7 +687,6 @@ export function registerAgentTaskTools(
                 lastEventAt: now,
                 updatedAt: now,
             });
-            emitChange('agent-tasks');
 
             await storage.appendTaskEvent({
                 id: randomUUID(),
@@ -683,6 +695,11 @@ export function registerAgentTaskTools(
                 message: reason,
                 timestamp: now,
             });
+
+            // The counters move and the workflow run learns the step is over — same as the HTTP
+            // door. A run whose step failed stayed on that step forever when the agent reported it
+            // through a tool call.
+            await afterTaskFailed({ storage, config }, task, agentGaii);
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 

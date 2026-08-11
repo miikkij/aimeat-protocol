@@ -2,6 +2,8 @@
  * @file src/routes/agent-tasks/completion.ts
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — The completion and failure tails move to services/agent-task-fanout.ts,
+ *     so the MCP door gets them too. Behaviour here is unchanged.
  *   v1.1.0 — 2026-08-09 — /complete reclaims the runner's live-progress record (reclaimTaskLiveTrace).
  *     991 such keys had accumulated on aimeat.io, one per finished task, none ever removed. /fail
  *     deliberately keeps its record: on a failure that is the diagnosis.
@@ -18,18 +20,12 @@ import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../../storage/interface.js'
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
-import { recordPublicActivity } from '../../services/public-activity.js';
-import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
 import { logger } from '../../utils/logger.js';
-import { recordTaskCompleted, recordTaskFailed } from '../../services/activity-recorder.js';
+import { afterTaskCompleted, afterTaskFailed } from '../../services/agent-task-fanout.js';
 import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js';
 import { AgentTaskEventSchema, AgentTaskTodoUpdateSchema, AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
-import { notifyAutomationTaskComplete } from '../../services/ecosystem-automation-notify.js';
-import { processAutomationAdvisories } from '../../services/ecosystem-automation-advisories.js';
 import type { TaskRouteHelpers } from './helpers.js';
-import { reclaimTaskLiveTrace } from './helpers.js';
-import { closeItemsForTask } from '../../services/open-items.js';
 
 export function registerTaskCompletionRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -157,48 +153,14 @@ export function registerTaskCompletionRoutes(
       timestamp: now,
     });
 
-    await recordTaskCompleted(storage, task.agentGaii, task.telemetry);
-
-    // If this task came from the owner's intent pool, the intent closes here. The SERVER does it:
-    // the agent never writes into the owner's namespace, so the pool's one indirect write is this,
-    // and it happens on the evidence of a completed task rather than on the agent's say-so.
-    // Best-effort and isolated — a pool that cannot be updated must not fail a real completion.
-    void closeItemsForTask(storage, config, task)
-      .catch(e => logger.error('switching off the open item behind a task failed', { taskId: id, error: String(e) }));
-
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks', resolve(req));
-    // Public landing feed — only when the agent published a PUBLIC deliverable (a real material).
-    if (deliverableKey) {
-      void (async () => {
-        const rec = await storage.getMemory(task.agentGaii, deliverableKey);
-        if (rec?.visibility !== 'public') return;
-        await recordPublicActivity(storage, config, {
-          category: 'agents',
-          actor: task.agentGaii,
-          summary: `Agent ${task.agentGaii.split('#')[0]} completed "${task.title}"`,
-          detail: message,
-          link: `/v1/memory/${encodeURIComponent(task.agentGaii)}/${encodeURIComponent(deliverableKey)}`,
-        });
-      })().catch(e => logger.error('public activity (task deliverable) failed', { taskId: id, error: String(e) }));
-    }
-    // If this task was dispatched by a workflow, advance that run (output check → next step).
-    getActiveWorkflowEngine()?.onTaskTerminal(task, 'done')
-      .catch(e => logger.error('workflow advance on task done failed', { taskId: id, error: String(e) }));
-    // The runner's live-progress record is spent now that the task is done: reclaim its key rather
-    // than hold one per completed task forever. Safe to run concurrently with the workflow advance
-    // above — a step's success signal globs the agent's DELIVERABLE keys, never this
-    // `agents.{name}.tasks.{id}.` prefix, so the two never touch the same record.
-    void reclaimTaskLiveTrace(storage, task);
-    // B6 — if this task was materialised by an ecosystem-app automation recipe with email:true,
-    // email the owner a short report + store an in-app report record. Best-effort + isolated:
-    // pass the freshly-updated record (carries the deliverableKey the agent just set).
-    void notifyAutomationTaskComplete(storage, config, updated ?? task, message)
-      .catch(e => logger.error('automation completion notify failed', { taskId: id, error: String(e) }));
-    // B7/B8 — drain the owner's advisory outbox for this app: deliver immediately (no approval) over
-    // the connector tunnel, or gate behind owner approval. Best-effort + isolated (sibling to B6).
-    void processAutomationAdvisories(storage, config, updated ?? task)
-      .catch(e => logger.error('automation advisory drain failed', { taskId: id, error: String(e) }));
+
+    // Everything a completion sets off is services/agent-task-fanout.ts, because it belongs to
+    // COMPLETING rather than to this door: the workflow run that dispatched the task advances, the
+    // open item behind it closes, the agent's counters move, the runner's live-trace key is
+    // reclaimed, the automation report is sent and its advisory outbox drained, and a public
+    // deliverable reaches the feed. aimeat_task_complete did none of it.
+    await afterTaskCompleted({ storage, config }, task, updated ?? null, message, deliverableKey, resolve(req));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/fail -- Fail task (active -> failed) ── */
@@ -243,12 +205,8 @@ export function registerTaskCompletionRoutes(
       timestamp: now,
     });
 
-    await recordTaskFailed(storage, task.agentGaii);
-
     res.json(success(config.nodeId, { task: updated }));
-    emitChange('agent-tasks', resolve(req));
-    getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
-      .catch(e => logger.error('workflow advance on task fail failed', { taskId: id, error: String(e) }));
+    await afterTaskFailed({ storage, config }, task, resolve(req));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/rate -- Review a completed task's deliverable ──
