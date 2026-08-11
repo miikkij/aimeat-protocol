@@ -37,7 +37,7 @@ import {
 } from '../../services/onboarding-funnel.js';
 import { readHomeState } from '../../services/home-state.js';
 import {
-    portfolioWriteGaii, portfolioStandaloneUrl, PORTFOLIO_HTML_KEY, PORTFOLIO_CONFIG_KEY,
+    portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml, PORTFOLIO_CONFIG_KEY,
 } from '../portfolio.js';
 
 export interface HomeRouteCtx {
@@ -84,7 +84,7 @@ function branchPayload(decision: BranchDecision) {
 /**
  * Store the page as the owner's portfolio and turn the portfolio on.
  *
- * One write path with PUT /v1/portfolio/upload by construction: both call portfolioWriteGaii, so
+ * One write path with PUT /v1/portfolio/upload by construction: both call writePortfolioHtml, so
  * a mat made before the first agent lands under the GHII and a later one under the agent, and the
  * reader finds either.
  */
@@ -96,16 +96,7 @@ async function storeMatAsPortfolio(
     const data = Buffer.from(html, 'utf-8');
     const now = new Date().toISOString();
 
-    await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
-    await storage.createStorageFile({
-        key: PORTFOLIO_HTML_KEY,
-        ownerGaii: target,
-        visibility: 'public',
-        mimeType: 'text/html',
-        size: data.length,
-        data,
-        createdAt: now,
-    });
+    await writePortfolioHtml(storage, target, data);
 
     // Enable the portfolio, preserving whatever settings are already there. The mat is meant to be
     // looked at the moment it lands — an accepted mat behind a disabled portfolio would be the

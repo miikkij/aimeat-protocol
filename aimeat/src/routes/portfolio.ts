@@ -63,6 +63,34 @@ export const PORTFOLIO_CONFIG_KEY = 'portfolio.config';
  * byte for byte. An owner with none writes under their own GHII, which is an identity they have
  * from the moment the account exists.
  */
+/**
+ * Store one owner's welcome page, replacing whatever was there.
+ *
+ * Three copies of this existed — this route, the MCP publish tool, and the welcome-mat accept path —
+ * and each wrote the same file under the same key with the same visibility. Which identity the page
+ * lands under is already resolved in one place (portfolioWriteGaii above); the WRITE had no reason
+ * to be resolved in three, and a fourth surface would have made a fourth.
+ *
+ * Returns the target identity, because every caller reports it back one way or another.
+ */
+export async function writePortfolioHtml(
+  storage: Storage,
+  target: string,
+  data: Buffer,
+): Promise<string> {
+  await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
+  await storage.createStorageFile({
+    key: PORTFOLIO_HTML_KEY,
+    ownerGaii: target,
+    visibility: 'public',
+    mimeType: 'text/html',
+    size: data.length,
+    data,
+    createdAt: new Date().toISOString(),
+  });
+  return target;
+}
+
 export async function portfolioWriteGaii(
   storage: Storage, ownerName: string, nodeId: string,
 ): Promise<string> {
@@ -397,17 +425,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
-    // Delete existing portfolio file if any (upsert)
-    await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
-    await storage.createStorageFile({
-      key: PORTFOLIO_HTML_KEY,
-      ownerGaii: target,
-      visibility: 'public',
-      mimeType: 'text/html',
-      size: fileData.length,
-      data: fileData,
-      createdAt: new Date().toISOString(),
-    });
+    await writePortfolioHtml(storage, target, fileData);
 
     res.json(success(config.nodeId, { uploaded: true, sizeKb: Math.round(fileData.length / 1024) }));
     emitChange('portfolio');

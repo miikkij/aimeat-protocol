@@ -583,3 +583,26 @@ export async function offeringConsumers(storage: Storage, o: Offering): Promise<
     })
     .sort((a, b) => b.calls - a.calls);
 }
+
+/**
+ * Parse a need's interface-spec — the shape it sends and expects, plus light hints — from a loose
+ * input object.
+ *
+ * It lived twice: once in routes/exchange-market.ts and once, byte-for-byte, in mcp/exchange.ts,
+ * whose copy carried the comment "mirrors exchange-market.ts route parseNeedSpec". A mirror kept in
+ * step by hand is not a mirror. The spec decides what a bid has to satisfy, so the two doors
+ * disagreeing about what counts as a spec is the two doors disagreeing about the contract.
+ */
+export function parseNeedSpec(v: unknown): NeedSpec | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
+  const requiredFields = Array.isArray(o.requiredFields) ? (o.requiredFields as unknown[]).filter(f => typeof f === 'string') as string[] : [];
+  const spec: NeedSpec = { requiredFields };
+  if (typeof o.format === 'string') spec.format = o.format;
+  if (typeof o.sample === 'string') spec.sample = o.sample;
+  if (typeof o.notes === 'string') spec.notes = o.notes;
+  if (isObj(o.inputSchema)) spec.inputSchema = o.inputSchema;
+  if (isObj(o.outputSchema)) spec.outputSchema = o.outputSchema;
+  return (requiredFields.length || spec.format || spec.sample || spec.notes || spec.inputSchema || spec.outputSchema) ? spec : null;
+}

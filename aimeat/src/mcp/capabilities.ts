@@ -12,8 +12,9 @@
  *     failed with the route's AUTH_REQUIRED.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { buildCapabilityRecord, moderatedStatus } from '../services/capability-record.js';
 import { z } from 'zod';
-import { randomUUID, createHash } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
@@ -157,43 +158,18 @@ export function registerCapabilitiesTools(
                 .digest('hex').slice(0, 16);
 
             const record: CapabilityRecord = {
-                id: args.id || randomUUID(),
-                name: args.name,
-                summary: args.summary,
-                ownerGhii,
-                visibility: args.visibility || 'private',
-                scope: 'local',
-                // Moderation, matching routes/capabilities.ts:153-156. This wrote 'active' whatever
-                // the node's policy said, so a public capability that the web door would have parked
-                // for review went live the moment an agent asked.
-                status: config.capabilityPublishing === 'moderated' && args.visibility === 'public'
-                    ? 'pending_review'
-                    : 'active',
-                rejectionReason: null,
-                deprecationMessage: null,
-                replacedBy: null,
-                source: { type: 'manual', ref: 'manual', version: '1.0.0' },
-                authRequired: 'registered',
-                callable: args.callable ?? false,
-                inputSchema: args.inputSchema ?? null,
-                outputSchema: args.outputSchema ?? null,
-                exports: null,
-                usage: args.usage || '',
-                whenToUse: args.whenToUse || '',
-                whenNotToUse: '',
-                examples: [],
-                dependencies: [],
-                schemaHash,
-                webhookUrl: null,
-                cost: null,
-                trustRequired: null,
-                trust: { operatorReviewed: false, reviewedAt: null, vouchCount: 0, publisherTrustScore: 0, codeAudited: false, auditNotes: null },
-                redactedFields: [],
-                operatorOverride: null,
-                stats: { totalInvocations: 0, successCount: 0, errorCount: 0, lastInvokedAt: null, avgResponseMs: 0, lastError: null },
-                tags: args.tags || [],
-                createdAt: now,
-                updatedAt: now,
+                ...buildCapabilityRecord({
+                    ownerGhii, schemaHash, now,
+                    // The one field the two doors genuinely differ on: the web door parks a new
+                    // capability as a draft for the owner to review, this one publishes it live.
+                    // A product decision, recorded in the drift map, and not a copied line — which
+                    // is why it is the argument and the other twenty-nine fields are not.
+                    status: moderatedStatus(config, args.visibility, false, 'active'),
+                }, {
+                    id: args.id, name: args.name, summary: args.summary, visibility: args.visibility,
+                    callable: args.callable, inputSchema: args.inputSchema, outputSchema: args.outputSchema,
+                    usage: args.usage, whenToUse: args.whenToUse, tags: args.tags,
+                }),
             };
 
             try {

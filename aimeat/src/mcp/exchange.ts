@@ -44,10 +44,10 @@ import {
     pauseEntitlement, revokeEntitlement, type MeteredEntitlement,
 } from '../services/metered-entitlements.js';
 import {
-    type Offering, type Need, type Bid, type ActionCommercial, type NeedSpec,
+    type Offering, type Need, type Bid, type ActionCommercial,
     resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
     getOffering, getOfferingWithMeta, listOfferings, matchOfferings, filterOfferings,
-    putNeed, getNeed, listNeeds, putBid, getBid,
+    putNeed, getNeed, parseNeedSpec, listNeeds, putBid, getBid,
     offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
@@ -84,21 +84,6 @@ function entitlementView(config: AimeatConfig, e: MeteredEntitlement) {
             calls: e.budget.calls,
         },
     };
-}
-
-/** Parse a need's minimum-spec from a loose input object (mirrors exchange-market.ts route parseNeedSpec). */
-function parseNeedSpec(v: unknown): NeedSpec | null {
-    if (!v || typeof v !== 'object') return null;
-    const o = v as Record<string, unknown>;
-    const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
-    const requiredFields = Array.isArray(o.requiredFields) ? (o.requiredFields as unknown[]).filter(f => typeof f === 'string') as string[] : [];
-    const spec: NeedSpec = { requiredFields };
-    if (typeof o.format === 'string') spec.format = o.format;
-    if (typeof o.sample === 'string') spec.sample = o.sample;
-    if (typeof o.notes === 'string') spec.notes = o.notes;
-    if (isObj(o.inputSchema)) spec.inputSchema = o.inputSchema;
-    if (isObj(o.outputSchema)) spec.outputSchema = o.outputSchema;
-    return (requiredFields.length || spec.format || spec.sample || spec.notes || spec.inputSchema || spec.outputSchema) ? spec : null;
 }
 
 export function registerExchangeTools(

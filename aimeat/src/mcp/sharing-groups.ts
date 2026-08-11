@@ -21,6 +21,7 @@ import type { Storage, SharingGroupMember } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { addGroupMember, removeGroupMember } from '../services/sharing-group-members.js';
 import { emitChange } from '../services/event-bus.js';
 
 export function registerSharingGroupTools(
@@ -229,25 +230,13 @@ export function registerSharingGroupTools(
                 return { content: [{ type: 'text' as const, text: 'Only the group owner can add members' }], isError: true };
             }
 
-            if (group.members.length >= 100) {
-                return { content: [{ type: 'text' as const, text: 'Maximum 100 members per group' }], isError: true };
-            }
-
-            // Check for duplicate
-            if (group.members.some(m => m.identifier === identifier)) {
-                return { content: [{ type: 'text' as const, text: 'Member already exists in this group' }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-            const newMember: SharingGroupMember = {
-                identifier,
-                identifierType: identifier_type,
-                permissions: permissions ?? group.defaultPermissions,
-                addedAt: now,
-                addedBy: ownerGhii,
-            };
-
-            const updatedMembers = [...group.members, newMember];
+            // The ceiling, the duplicate test and the member's shape are services/sharing-group-
+            // members.ts — the HTTP door decides them too, and a sharing group IS the boundary of
+            // who reads the owner's memory.
+            const added = addGroupMember(group, { identifier, identifierType: identifier_type, permissions }, ownerGhii);
+            if (!added.ok) return { content: [{ type: 'text' as const, text: added.message }], isError: true };
+            const { members: updatedMembers, now } = added;
+            const newMember = updatedMembers[updatedMembers.length - 1];
             await storage.updateSharingGroup(group_id, {
                 members: updatedMembers,
                 updatedAt: now,
@@ -295,13 +284,9 @@ export function registerSharingGroupTools(
                 return { content: [{ type: 'text' as const, text: 'Only the group owner can remove members' }], isError: true };
             }
 
-            const memberIdx = group.members.findIndex(m => m.identifier === identifier);
-            if (memberIdx === -1) {
-                return { content: [{ type: 'text' as const, text: 'Member not found in this group' }], isError: true };
-            }
-
-            const updatedMembers = group.members.filter(m => m.identifier !== identifier);
-            const now = new Date().toISOString();
+            const removed = removeGroupMember(group, identifier);
+            if (!removed.ok) return { content: [{ type: 'text' as const, text: removed.message }], isError: true };
+            const { members: updatedMembers, now } = removed;
             await storage.updateSharingGroup(group_id, {
                 members: updatedMembers,
                 updatedAt: now,

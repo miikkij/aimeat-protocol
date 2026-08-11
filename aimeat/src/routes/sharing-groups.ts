@@ -15,6 +15,7 @@
  */
 
 import { Router } from 'express';
+import { addGroupMember, removeGroupMember } from '../services/sharing-group-members.js';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SharingGroupMember } from '../storage/interface.js';
@@ -230,11 +231,6 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
 
-    if (group.members.length >= 100) {
-      res.status(409).json(error(config.nodeId, 'LIMIT_REACHED', 'Maximum 100 members per group'));
-      return;
-    }
-
     const parsed = SharingGroupAddMemberSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error.issues.map(i => i.message).join(', ')));
@@ -244,22 +240,15 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
     const { identifier: rawIdentifier, identifier_type, permissions } = parsed.data;
     const identifier = resolveMemberIdentifier(rawIdentifier, config.nodeId);
 
-    // Check for duplicate
-    if (group.members.some(m => m.identifier === identifier)) {
-      res.status(409).json(error(config.nodeId, 'DUPLICATE', 'Member already exists in this group'));
+    // The ceiling, the duplicate test and the member's shape are services/sharing-group-members.ts,
+    // because aimeat_group_add_member decides them too.
+    const added = addGroupMember(group, { identifier, identifierType: identifier_type, permissions }, ownerGaii);
+    if (!added.ok) {
+      res.status(added.status).json(error(config.nodeId, added.code, added.message));
       return;
     }
-
-    const now = new Date().toISOString();
-    const newMember: SharingGroupMember = {
-      identifier,
-      identifierType: identifier_type,
-      permissions: permissions ?? group.defaultPermissions,
-      addedAt: now,
-      addedBy: ownerGaii,
-    };
-
-    const updatedMembers = [...group.members, newMember];
+    const { members: updatedMembers, now } = added;
+    const newMember = updatedMembers[updatedMembers.length - 1];
     const updated = await storage.updateSharingGroup(id, {
       members: updatedMembers,
       updatedAt: now,
@@ -341,14 +330,12 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
       return;
     }
 
-    const memberIdx = group.members.findIndex(m => m.identifier === identifier);
-    if (memberIdx === -1) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Member not found in this group'));
+    const removed = removeGroupMember(group, identifier);
+    if (!removed.ok) {
+      res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
       return;
     }
-
-    const updatedMembers = group.members.filter(m => m.identifier !== identifier);
-    const now = new Date().toISOString();
+    const { members: updatedMembers, now } = removed;
     const updated = await storage.updateSharingGroup(id, {
       members: updatedMembers,
       updatedAt: now,

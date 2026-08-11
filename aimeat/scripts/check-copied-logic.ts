@@ -46,14 +46,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MIN_LINES = 6;
 
 /**
- * The seed: file pairs on 2026-08-11, after the four the audit itself had copied were collapsed
+ * The seed: file pairs on 2026-08-11, after the audit's own copies AND five more were collapsed
  * (services/install-quotas.ts, services/agent-task-rules.ts, services/memory-ceilings.ts and the
  * board post). What is left predates this work and is the backlog, not the rule being broken today.
  *
  * Lower it as pairs are cleared. Never raise it: a new pair means somebody repaired a difference by
  * copying the rule, which is the failure this whole exercise exists to prevent.
  */
-const SEED = 19;
+const SEED = 15;
 
 const SIDES = [
     { name: 'mcp', dir: 'src/mcp' },

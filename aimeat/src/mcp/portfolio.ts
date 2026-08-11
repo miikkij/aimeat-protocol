@@ -28,7 +28,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { descriptionFor } from './catalog/shape.js';
 import { annotationsFor } from './annotations.js';
-import { portfolioWriteGaii, PORTFOLIO_HTML_KEY } from '../routes/portfolio.js';
+import { portfolioWriteGaii, writePortfolioHtml } from '../routes/portfolio.js';
 import { emitChange } from '../services/event-bus.js';
 
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
@@ -78,16 +78,7 @@ export function registerPortfolioTools(
             // Same target the REST route writes, so the page an agent publishes is the same file the
             // browser reads. Resolving it anywhere else is how two "welcome pages" come to exist.
             const target = await portfolioWriteGaii(storage, owner, config.nodeId);
-            await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
-            await storage.createStorageFile({
-                key: PORTFOLIO_HTML_KEY,
-                ownerGaii: target,
-                visibility: 'public',
-                mimeType: 'text/html',
-                size: data.length,
-                data,
-                createdAt: new Date().toISOString(),
-            });
+            await writePortfolioHtml(storage, target, data);
             emitChange('portfolio');
             return out({
                 published: true,

@@ -36,10 +36,10 @@ import { resolvePacingToll } from './extensions/pacing.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { createEntitlement, readContractForCall } from '../services/metered-entitlements.js';
 import {
-  type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type NeedSpec, type OfferingPlan,
+  type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type OfferingPlan,
   resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings, filterOfferings,
-  putNeed, getNeed, listNeeds, putBid, listBids, getBid,
+  putNeed, getNeed, parseNeedSpec, listNeeds, putBid, listBids, getBid,
   offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
 import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
@@ -86,21 +86,6 @@ function parseOdpsExtras(v: unknown): { ok: true; value: OdpsExtras | null } | {
   const parsed = OdpsExtrasSchema.safeParse(v);
   if (!parsed.success) return { ok: false, message: parsed.error.issues.map(i => `${i.path.join('.') || 'odps'}: ${i.message}`).join('; ') };
   return { ok: true, value: Object.keys(parsed.data).length ? parsed.data : null };
-}
-
-/** Parse a need's interface-spec (the shape it sends/expects + light hints) from a request body. */
-function parseNeedSpec(v: unknown): NeedSpec | null {
-  if (!v || typeof v !== 'object') return null;
-  const o = v as Record<string, unknown>;
-  const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
-  const requiredFields = Array.isArray(o.requiredFields) ? (o.requiredFields as unknown[]).filter(f => typeof f === 'string') as string[] : [];
-  const spec: NeedSpec = { requiredFields };
-  if (typeof o.format === 'string') spec.format = o.format;
-  if (typeof o.sample === 'string') spec.sample = o.sample;
-  if (typeof o.notes === 'string') spec.notes = o.notes;
-  if (isObj(o.inputSchema)) spec.inputSchema = o.inputSchema;
-  if (isObj(o.outputSchema)) spec.outputSchema = o.outputSchema;
-  return (requiredFields.length || spec.format || spec.sample || spec.notes || spec.inputSchema || spec.outputSchema) ? spec : null;
 }
 
 export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Router {

@@ -9,6 +9,7 @@
  *            non-manual type is now a 400 INVALID_INPUT.
  */
 import { Router } from 'express';
+import { buildCapabilityRecord, moderatedStatus } from '../services/capability-record.js';
 import type { Request } from 'express';
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -149,45 +150,22 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       .update(JSON.stringify(body.inputSchema ?? {}) + JSON.stringify(body.outputSchema ?? {}))
       .digest('hex').slice(0, 16);
 
-    // Moderation: if publishing=moderated and visibility=public, set pending_review
-    let initialStatus = body.status || 'draft';
-    if (!isOperator && config.capabilityPublishing === 'moderated' && body.visibility === 'public') {
-      initialStatus = 'pending_review';
-    }
+    const initialStatus = moderatedStatus(config, body.visibility, isOperator, (body.status || 'draft') as CapabilityRecord['status']);
 
     const record: CapabilityRecord = {
-      id: body.id || randomUUID(),
-      name: body.name || '',
-      summary: body.summary || '',
-      ownerGhii: gaii,
-      visibility: body.visibility || 'private',
-      scope: 'local',
-      status: initialStatus as CapabilityRecord['status'],
-      rejectionReason: null,
-      deprecationMessage: null,
-      replacedBy: null,
-      source: { type: sourceType, ref: sourceRef, version: sourceVersion },
-      authRequired: body.authRequired || 'registered',
-      callable: body.callable ?? false,
-      inputSchema: body.inputSchema ?? null,
-      outputSchema: body.outputSchema ?? null,
-      exports: body.exports ?? null,
-      usage: body.usage || '',
-      whenToUse: body.whenToUse || '',
-      whenNotToUse: body.whenNotToUse || '',
-      examples: body.examples || [],
-      dependencies: body.dependencies || [],
-      schemaHash,
-      webhookUrl: body.webhookUrl ?? null,
-      cost: body.cost ?? null,
-      trustRequired: body.trustRequired ?? null,
-      trust: { operatorReviewed: false, reviewedAt: null, vouchCount: 0, publisherTrustScore: 0, codeAudited: false, auditNotes: null },
-      redactedFields: body.redactedFields || [],
-      operatorOverride: null,
-      stats: { totalInvocations: 0, successCount: 0, errorCount: 0, lastInvokedAt: null, avgResponseMs: 0, lastError: null },
-      tags: body.tags || [],
-      createdAt: now,
-      updatedAt: now,
+      ...buildCapabilityRecord({
+        ownerGhii: gaii, schemaHash, now,
+        status: initialStatus,
+      }, {
+        id: body.id, name: body.name, summary: body.summary, visibility: body.visibility,
+        source: { type: sourceType, ref: sourceRef, version: sourceVersion },
+        authRequired: body.authRequired, callable: body.callable,
+        inputSchema: body.inputSchema, outputSchema: body.outputSchema, exports: body.exports,
+        usage: body.usage, whenToUse: body.whenToUse, whenNotToUse: body.whenNotToUse,
+        examples: body.examples, dependencies: body.dependencies,
+        webhookUrl: body.webhookUrl, cost: body.cost, trustRequired: body.trustRequired,
+        redactedFields: body.redactedFields, tags: body.tags,
+      }),
     };
 
     try {
