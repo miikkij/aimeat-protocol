@@ -217,7 +217,13 @@ await test('Register agent under owner A', async () => {
     const { status, body } = await json('/v1/agents', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'] }),
+        // '*' plus the words no wildcard carries. Since 2026-08-11 the calls this suite drives in
+        // phases 6 and 8 — rewriting another agent's permissions, and changing the owner's AI
+        // settings — each cost their own tick, so a Full-access agent does not get them for free.
+        body: JSON.stringify({
+            name: agentName, owner: ownerName, capabilities: ['memory'],
+            scopes: ['*', 'agent:permissions', 'memory:write-reserved', 'memory:write-as-owner'],
+        }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     agentGaii = body.data.agent.gaii;

@@ -291,6 +291,24 @@ async function run() {
         assert(!r.isError, `the board owner was refused: ${r.text.slice(0, 200)}`);
     });
 
+    await test("owner B cannot READ owner A's private board either", async () => {
+        // The sweep that found the write holes asked what a WRITE owes. aimeat_board_read was the
+        // other half: it called storage.listPosts(board_id) and nothing else, so it never loaded the
+        // board and never had a visibility to rule on. Any session read any private board, and
+        // because the refusal never happened there was no consent-denial row to show it either.
+        // The MCP RESOURCE for the same board DID filter on visibility, so the two doors to one
+        // board disagreed with each other.
+        const r = await callTool(B.session, 'aimeat_board_read', { board_id: boardId });
+        assert(r.isError, `owner B read owner A's private board: ${r.text.slice(0, 250)}`);
+        assert(!/this should land/.test(r.text), `and the posts came back with it: ${r.text.slice(0, 250)}`);
+    });
+
+    await test('owner A CAN read their own private board (the rule is not a ban)', async () => {
+        const r = await callTool(A.session, 'aimeat_board_read', { board_id: boardId });
+        assert(!r.isError, `the board owner was refused their own board: ${r.text.slice(0, 250)}`);
+        assert(/this should land/.test(r.text), `the owner's own post is missing: ${r.text.slice(0, 250)}`);
+    });
+
     await test('a board post with an empty title is refused', async () => {
         // The route validates 1-256; the tool took z.string(), so an empty post stored.
         const r = await callTool(A.session, 'aimeat_board_post', { board_id: boardId, title: '', body: 'no title' });

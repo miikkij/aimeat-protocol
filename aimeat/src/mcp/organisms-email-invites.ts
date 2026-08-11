@@ -52,6 +52,9 @@ export function registerOrganismEmailInviteTools(
             const gate = await orgForAdmin(organism_id);
             if ('error' in gate) return { content: [{ type: 'text' as const, text: gate.error }], isError: true };
             try {
+                // Its sibling _cancel emits; this one did not, so an invitation an agent sent did
+                // not show in the organism's pending list until a reload.
+                emitChange('organisms');
                 const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, {
                     organism: gate.organism!,
                     inviterGhii: getOwnerName(),

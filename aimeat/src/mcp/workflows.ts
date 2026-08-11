@@ -21,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { parseGAII } from '../utils/gaii.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { getActiveWorkflowEngine, HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
@@ -90,6 +91,9 @@ export function registerWorkflowTools(
       }
 
       const result = await saveWorkflow(storage, config, ownerGhii, owner, a.id, a.definition, agentGaii);
+      // routes/workflows.ts emits this on save. A workflow an agent authored did not appear in the
+      // owner's list, which reads as the save having failed.
+      emitChange('workflows');
       if (!result.ok) return err(`Validation failed:\n- ${(result.errors ?? []).join('\n- ')}`);
       const scheduler = getActiveScheduler();
       if (scheduler) await syncWorkflowTriggers(storage, scheduler, config.nodeId, result.def!, ownerGhii, agentGaii);

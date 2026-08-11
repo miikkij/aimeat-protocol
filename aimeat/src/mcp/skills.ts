@@ -21,6 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import {
   publishSkill, listSkills, listSkillLibrary, resolveSkillRef,
@@ -112,6 +113,10 @@ export function registerSkillsTools(
                     visibility,
                     ...(targetScope === 'workspace' ? { organismId: organism_id, workspaceId: workspace_id, accessor: acc } : {}),
                 });
+                // routes/skills.ts emits this on publish, link and unlink. A skill is an agent's
+                // operating guide, so the owner's skills view showing the old set is the wrong
+                // answer to "what does this agent know how to do".
+                emitChange('skills');
                 emitResourceListChanged(agentGaii);
                 return ok({ published: true, skill: summary });
             } catch (e) {
@@ -209,6 +214,7 @@ export function registerSkillsTools(
             if (!target) return err(`No agent "${agentName}" under owner ${ownerName}`);
             try {
                 const links = await linkSkillToAgent(storage, config, ownerName, agentName, ref, agentGaii, await accessor());
+                emitChange('skills');
                 emitResourceListChanged(agentGaii);
                 return ok({ agent: agentName, links });
             } catch (e) {
@@ -230,6 +236,7 @@ export function registerSkillsTools(
             if (!ownerName || !parsed) return err('Could not resolve the calling agent\'s owner');
             const agentName = agent_name ?? parsed.agent;
             const links = await unlinkSkillFromAgent(storage, config, ownerName, agentName, ref);
+            emitChange('skills');
             emitResourceListChanged(agentGaii);
             return ok({ agent: agentName, links });
         },

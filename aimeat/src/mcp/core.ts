@@ -108,6 +108,7 @@ import { writeMemoryRecord } from '../services/memory-write.js';
 import { createWorkItem } from '../routes/work.js';
 import type { PeerInfo } from '../services/federation.js';
 import { createBoardPost } from '../services/board-post.js';
+import { boardReadRefusal } from '../services/board-read-access.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -695,6 +696,15 @@ export function registerCoreTools(
         { board_id: z.string(), category: z.string().optional(), limit: z.number().optional(), response_format: responseFormatSchema },
         annotationsFor('aimeat_board_read'),
         async ({ board_id, category, limit, response_format }) => {
+            // Load the board and rule on it. This tool used to list the posts and nothing else, so
+            // it never had a visibility to rule on: any MCP session read another owner's PRIVATE
+            // board, and no consent-denial row existed to show it happened. The MCP RESOURCE for the
+            // same board filtered on visibility, so the two doors to one board disagreed.
+            const board = await storage.getBoard(board_id);
+            if (!board) return { content: [{ type: 'text' as const, text: `Board not found: ${board_id}` }], isError: true };
+            const refusal = await boardReadRefusal({ storage, config }, agentGaii, board);
+            if (refusal) return { content: [{ type: 'text' as const, text: `${refusal.code}: ${refusal.message}` }], isError: true };
+
             const posts = await storage.listPosts(board_id, { category, limit: limit ?? 20 });
             // TARGET-058: an agent asked to summarise a board has to be able to say which posts a
             // model wrote. One query for the page — see readProvenanceMany's N+1 note.

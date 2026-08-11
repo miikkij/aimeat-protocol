@@ -31,6 +31,7 @@ import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySche
 import { checkOtkSession } from './auth.js';
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost } from '../services/board-post.js';
+import { boardReadRefusal } from '../services/board-read-access.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import {
@@ -255,32 +256,14 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // Who may read this board is services/board-read-access.ts, the same rule aimeat_board_read
+    // answers to. It used to live only here, and that tool listed the posts without ever loading the
+    // board — so a private board was readable over MCP and there was no denial row to show it.
     const gaii = req.auth ? resolveIdentity(req.auth, config.nodeId) : undefined;
-    if (board.visibility !== 'public' && board.visibility !== 'system') {
-      if (!gaii) {
-        res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Authentication required for non-public boards'));
-        return;
-      }
-      // isSameOwner only grants access on shared boards — private boards are strictly owner-only
-      const sameOwnerAccess = board.visibility === 'shared' && isSameOwner(board.ownerGaii, gaii);
-      if (board.ownerGaii !== gaii && !sameOwnerAccess && !board.allowedGaiis.includes(gaii)) {
-        // Consent fallback: check if the caller has a consent grant for this board
-        if (config.consentEnabled) {
-          const consentResult = await checkConsentForRead(
-            storage, `board:${boardId}`, board.ownerGaii, gaii, board.visibility,
-          );
-          if (!consentResult.allowed) {
-            // Audit denials only (allowed reads are no longer logged — see consent-audit-buffer).
-            await auditDataAccess(storage, consentResult.consentId ?? null,
-              board.ownerGaii, gaii, `board:${boardId}`, 'read', false);
-            res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this board'));
-            return;
-          }
-        } else {
-          res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You do not have access to this board'));
-          return;
-        }
-      }
+    const readRefusal = await boardReadRefusal({ storage, config }, gaii, board);
+    if (readRefusal) {
+      res.status(readRefusal.status).json(error(config.nodeId, readRefusal.code, readRefusal.message));
+      return;
     }
 
     const category = req.query.category as string | undefined;

@@ -27,6 +27,10 @@
  * @structure EXEMPT (with reasons) · DELEGATES (files whose emit happens downstream) · main()
  * @usage pnpm check:sse-parity  ·  --strict fails the build
  * @version-history
+ *   v1.1.0 — 2026-08-11 — The rule reads the tool ANNOTATIONS as well as storage calls. The first
+ *     version looked only for storage.*, and four files walked past it — companies, skills,
+ *     workflows and the email invitations all write through a service, and each was silently
+ *     missing its emit. Found by an adversarial pass over this very check.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit, the side-effect sweep).
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -35,9 +39,26 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MCP = join(ROOT, 'src/mcp');
+const ANNOTATIONS = join(ROOT, 'src/mcp/annotations.ts');
 
 /** Storage methods that change something. Everything else is a read, and a read announces nothing. */
 const WRITEISH = /\bstorage\.(?:create|set|update|delete|add|remove|insert|upsert|write|debit|credit|transfer|enqueue|revoke|grant|mint|save|publish|archive|deactivate|activate|link|unlink)[A-Za-z]*\s*\(/;
+
+/**
+ * Every tool that declares itself as changing something (`readOnlyHint: false` in annotations.ts).
+ *
+ * The first version of this check looked only for `storage.*` calls, and four files walked straight
+ * past it — companies, skills, workflows and the email invitations all write through a SERVICE, so
+ * the regex above never saw them and each was silently missing its emit. A tool's own annotation is
+ * the honest signal: it is what the tool tells its client about itself, and a mutating tool that
+ * lies there has a bigger problem than a missing event.
+ */
+function mutatingTools(): Set<string> {
+    const src = readFileSync(ANNOTATIONS, 'utf-8');
+    const out = new Set<string>();
+    for (const m of src.matchAll(/(\w+):\s*\{[^}]*readOnlyHint:\s*false/g)) out.add(m[1]);
+    return out;
+}
 
 /** Files that write and must NOT emit, each with the reason it is not a gap. */
 const EXEMPT: Record<string, string> = {
@@ -54,6 +75,15 @@ const EXEMPT: Record<string, string> = {
     'src/mcp/agent-onboarding.ts':
         'Emits agent-onboarding on its own; listed because the storage write sits in a helper the '
         + 'regex below does not associate with the emit.',
+    'src/mcp/exchange.ts':
+        'The EXCHANGE surface has no SSE domain at all — routes/exchange.ts and exchange-market.ts '
+        + 'emit nothing either, and the market is read through the catalogue rather than a live view. '
+        + 'Silence is parity. If the exchange ever gets a live surface, both doors need the domain.',
+    'src/mcp/exchange-run.ts':
+        'Same as exchange.ts: no SSE domain exists for the running half either.',
+    'src/mcp/app-template-proposals.ts':
+        'There is no REST route for template proposals — it is an MCP-only capability, so there is '
+        + 'no twin to be out of step with. Emitting here would be a new behaviour, not a repair.',
 };
 
 /**
@@ -63,8 +93,12 @@ const EXEMPT: Record<string, string> = {
  */
 const DELEGATES: Record<string, string> = {
     'src/mcp/workspace-create.ts': 'writeRecord() from mcp/workspaces.ts, which emits organisms',
-    'src/mcp/organisms-email-invites.ts': 'services/invitations.ts, which emits notifications + organisms',
     'src/mcp/apps-fork.ts': 'emits apps itself',
+    'src/mcp/consent.ts': "services/consent-write.ts, which emits 'consent'",
+    'src/mcp/contacts.ts': "services/contacts.ts, which emits 'messages'",
+    'src/mcp/dm-messages.ts': "services/message-send.ts, which emits 'messages'",
+    'src/mcp/feedback.ts': "services/feedback.ts, which emits 'feedback'",
+    'src/mcp/agent-telemetry.ts': "services/telemetry-buffer.ts ('agents') and usage-metering.ts ('agent-usage')",
 };
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -84,6 +118,7 @@ function stripComments(source: string): string {
 
 function main(): void {
     const strict = process.argv.includes('--strict');
+    const mutating = mutatingTools();
     const silent: string[] = [];
     let writers = 0;
     let emitters = 0;
@@ -91,7 +126,19 @@ function main(): void {
     for (const file of walk(MCP)) {
         const rel = relative(ROOT, file).replace(/\\/g, '/');
         const source = stripComments(readFileSync(file, 'utf-8'));
-        if (!WRITEISH.test(source)) continue;
+        // A file counts as writing if it touches storage directly OR REGISTERS a tool that declares
+        // itself mutating. The second half is what catches a file writing through a service.
+        //
+        // src/mcp/catalog/ is excluded from that half: those files are the metadata tables — tool
+        // descriptions, scope requirements, surface membership — so they NAME every tool without
+        // being any tool's surface. Including them would make the check noise on its first run,
+        // which is how a gate stops being read.
+        const isCatalog = rel.startsWith('src/mcp/catalog/');
+        const registersMutating = !isCatalog && [...mutating].some(t => source.includes(`mcp.tool(
+        '${t}'`)
+            || source.includes(`mcp.tool('${t}'`) || source.includes(`'${t}',
+`) && source.includes('mcp.tool'));
+        if (!WRITEISH.test(source) && !registersMutating) continue;
         writers++;
         if (rel in EXEMPT) continue;
         if (/emitChange\(/.test(source)) { emitters++; continue; }
@@ -109,7 +156,7 @@ function main(): void {
     console.log('');
 
     if (silent.length) {
-        for (const s of silent) console.error(`  ✖ ${s} writes through storage and emits no change domain`);
+        for (const s of silent) console.error(`  ✖ ${s} changes something and emits no change domain`);
         console.error('');
         console.error('  Emit the domain the view for this capability listens on, right after the write —');
         console.error('  the same one its REST twin emits. If it genuinely should not, add it to EXEMPT in');

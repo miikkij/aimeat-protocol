@@ -21,6 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import type { CompanyRecord } from '../models/company-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import {
     CompanyError, createCompany, updateCompany, setFrontPage, requireOwnCompany, companyAddress,
@@ -128,6 +129,10 @@ export function registerCompanyTools(
         annotationsFor('aimeat_company_create'),
         async ({ name, slug, ...identity }) => {
             try {
+                // routes/companies.ts emits on every mutation, and the companies tab re-fetches
+                // only when the change carries this domain (companies-tab.js). Without it a company
+                // an agent registered was invisible on the owner's screen until a reload.
+                emitChange('companies');
                 const company = await createCompany(storage, ownerGhii(), {
                     name, slug, ...toRecordFields(identity as IdentityInput),
                 } as never);
@@ -152,6 +157,7 @@ export function registerCompanyTools(
                 // that gathers details over several turns must not blank what an earlier turn set.
                 const current = await requireOwnCompany(storage, ownerGhii(), company_id);
                 const patch = toRecordFields(identity as IdentityInput);
+                emitChange('companies');
                 const company = await updateCompany(storage, ownerGhii(), company_id, {
                     name: name ?? current.name,
                     description: current.description, organismId: current.organismId,
