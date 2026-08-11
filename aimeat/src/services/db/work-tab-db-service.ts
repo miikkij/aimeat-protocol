@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Work tab's inbox + sent reads into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 const OPEN_INBOX_STATUSES = ['pending', 'accepted', 'in_progress'];
 

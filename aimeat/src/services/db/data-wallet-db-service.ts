@@ -14,7 +14,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Data Wallet tab's 3 reads into one composite (memory = meta-only).
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { getPendingConsentAudit } from '../consent-audit-buffer.js';
 
 export interface DataWalletOverview {

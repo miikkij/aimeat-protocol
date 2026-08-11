@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Knowledge tab's owner packages + consents into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 export interface KnowledgeOverview {
   packages: Array<Record<string, unknown>>;

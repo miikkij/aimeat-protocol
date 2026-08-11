@@ -16,7 +16,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { LegacyMemoryAdapter } from '../../storage/adapter/legacy-memory-adapter.js';
 import { MemoryRepository } from '../../storage/repositories-impl/memory-repository.js';
 import { MemoryDbService } from './memory-db-service.js';

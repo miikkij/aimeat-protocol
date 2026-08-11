@@ -15,7 +15,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import type { ConversationSummary } from '../../storage/repositories/direct-message.repository.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 

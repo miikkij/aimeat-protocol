@@ -17,7 +17,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AgentRecord } from '../../storage/types/identity.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { buildPostOnboardingChecklist } from '../../routes/agent-onboarding.js';
 
 export interface AgentIntegrationOverview {

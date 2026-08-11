@@ -13,7 +13,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { AgentRecord, MemoryRecord } from '../../src/storage/interface.js';
 import { createMemoryDbService, MemoryRepository } from '../../src/services/db/index.js';
-import { IdentityMap } from '../../src/storage/uow/identity-map.js';
+import { IdentityMap } from '../../src/storage/read-scope/identity-map.js';
 import {
   listOwnerScopeMemory,
   listOwnerScopeMemoryMeta,

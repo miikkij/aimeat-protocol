@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Notebook tab's 3 reads into one composite (inbox = prefix scan).
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { visibilityToZone } from '../../routes/memory/shared.js';
 
 /** Owner-captured notes live under this key prefix (mirrors public/views/profile/notebook-helpers.js). */

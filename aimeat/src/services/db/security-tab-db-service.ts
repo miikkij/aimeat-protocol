@@ -15,7 +15,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 export interface SecurityOverview {
   ghii: { ghii: string; allowed_origins: string[] | null; effective: string[]; inherited: boolean } | null;

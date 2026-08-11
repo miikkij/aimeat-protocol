@@ -16,7 +16,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, WalletTransaction } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { calculateEscrow } from '../morsel.js';
 import { cached, TTL } from '../cache.js';
 import { listSessions, listOrders } from '../../commerce/session-service.js';

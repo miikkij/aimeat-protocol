@@ -3,8 +3,8 @@
  * @description The ONE place an owner's agent list, ecosystem-app list, and owner-scope identity set are
  *   resolved — the fix for `getAgentsByOwner` being re-read independently by ~60 call sites (and the
  *   owner-scope identity array being re-derived in services/db/index.ts, usage-summary.ts and several
- *   handlers). Each loader is IdentityMap-aware: inside an active {@link ../../storage/uow/unit-of-work.js
- *   UnitOfWork} (a read scope / whole operation) it reads through the map so the list is fetched ONCE and
+ *   handlers). Each loader is IdentityMap-aware: inside an active {@link ../../storage/read-scope/read-scope.js
+ *   ReadScope} (a read scope / whole operation) it reads through the map so the list is fetched ONCE and
  *   reused by every domain service composed in that operation; outside any scope it falls back to a direct
  *   storage read, so the same code path works for a lone caller and a composite alike.
  *
@@ -18,25 +18,25 @@
  *   v1.0.0 — 2026-07-15 — Phase 3: canonical IdentityMap-aware owner-identity loaders (dedup).
  */
 import type { Storage } from '../../storage/interface.js';
-import { getCurrentUow } from '../../storage/uow/unit-of-work.js';
+import { getCurrentReadScope } from '../../storage/read-scope/read-scope.js';
 
 type Agents = Awaited<ReturnType<Storage['getAgentsByOwner']>>;
 type EcoApps = Awaited<ReturnType<Storage['getEcosystemAppsByOwner']>>;
 
-/** The owner's agents. Memoised in the active UoW's IdentityMap (`owner-agents/<owner>`) so a composite
- *  operation reads them once; a direct storage read when no UoW is bound. */
+/** The owner's agents. Memoised in the active read scope's IdentityMap (`owner-agents/<owner>`) so a composite
+ *  operation reads them once; a direct storage read when no scope is bound. */
 export function loadOwnerAgents(storage: Storage, owner: string): Promise<Agents> {
-  const uow = getCurrentUow();
-  return uow
-    ? uow.identity.getOrLoad('owner-agents', owner, () => storage.getAgentsByOwner(owner))
+  const scope = getCurrentReadScope();
+  return scope
+    ? scope.identity.getOrLoad('owner-agents', owner, () => storage.getAgentsByOwner(owner))
     : storage.getAgentsByOwner(owner);
 }
 
-/** The owner's ecosystem apps. Memoised in the active UoW's IdentityMap (`owner-eco/<owner>`). */
+/** The owner's ecosystem apps. Memoised in the active read scope's IdentityMap (`owner-eco/<owner>`). */
 export function loadOwnerEcoApps(storage: Storage, owner: string): Promise<EcoApps> {
-  const uow = getCurrentUow();
-  return uow
-    ? uow.identity.getOrLoad('owner-eco', owner, () => storage.getEcosystemAppsByOwner(owner))
+  const scope = getCurrentReadScope();
+  return scope
+    ? scope.identity.getOrLoad('owner-eco', owner, () => storage.getEcosystemAppsByOwner(owner))
     : storage.getEcosystemAppsByOwner(owner);
 }
 

@@ -39,7 +39,7 @@ import type { Storage, AgentUsageDailyRecord } from '../storage/interface.js';
 import type { AgentUsageEvent } from '../storage/types/agents-messaging.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { runInReadScope } from '../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../storage/read-scope/read-scope.js';
 import { getOwnerBudgetStatus } from '../services/ledger-budget.js';
 import { getOwnerMonthlyBilling, billingToCsv } from '../services/ledger-billing.js';
 import { getAdminLedger } from '../services/ledger-admin.js';

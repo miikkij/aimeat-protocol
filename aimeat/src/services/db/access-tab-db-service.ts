@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Access tab's 6-request fan-out into one composite.
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 // Each section's payload mirrors its source endpoint's response `.data` exactly (see the @description).
 export interface AccessOverview {

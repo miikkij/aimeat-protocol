@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Calibrator detail mount's 4-read waterfall into one prefix scan.
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 interface BatchModel {
   modelId?: string;

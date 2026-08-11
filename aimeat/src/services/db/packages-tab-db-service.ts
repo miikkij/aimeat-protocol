@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Packages tab's 3 local reads into one composite (federation stays separate).
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 export interface PackagesOverview {
   instances: { instances: unknown[]; total: number };

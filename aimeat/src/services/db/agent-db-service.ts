@@ -4,7 +4,7 @@
  *   agents, so the ~60 handlers that each call `storage.getAgentsByOwner` (and re-derive the same
  *   counts/identity list) can migrate onto ONE service instead of duplicating the logic (redesign rules
  *   3 + 10, doc-id925fp). It composes the IdentityMap-aware {@link ./owner-identity.js} loaders, so
- *   inside a read scope / UoW the agent list is fetched once and shared across every domain service in
+ *   inside a read scope the agent list is fetched once and shared across every domain service in
  *   the operation (the home dashboard composite relies on this).
  *
  * @structure
@@ -38,12 +38,12 @@ export interface HomeAgent {
 export class AgentDbService {
   constructor(private readonly storage: Storage, private readonly nodeId: string) {}
 
-  /** The owner's agents — the single source (IdentityMap-shared inside a UoW). */
+  /** The owner's agents — the single source (IdentityMap-shared inside a read scope). */
   listOwnerAgents(owner: string): Promise<AgentRecord[]> {
     return loadOwnerAgents(this.storage, owner);
   }
 
-  /** The owner's ecosystem apps (IdentityMap-shared inside a UoW). */
+  /** The owner's ecosystem apps (IdentityMap-shared inside a read scope). */
   listOwnerEcoApps(owner: string): ReturnType<Storage['getEcosystemAppsByOwner']> {
     return loadOwnerEcoApps(this.storage, owner);
   }

@@ -16,7 +16,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the inbox mount's 6-request fan-out into one composite.
  */
 import type { Storage, DirectMessageRecord, AgentRecord } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { conversationIdFor, messagePreview } from '../../utils/messaging.js';
 import { listTrackedResponses } from '../tracked-response.js';
 import { MessagingDbService, type OwnerConversation } from './messaging-db-service.js';

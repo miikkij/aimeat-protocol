@@ -12,7 +12,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Messages subtab's commands + threads + messages reads into one.
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { logger } from '../../utils/logger.js';
 
 export interface AgentMessagesOverview {

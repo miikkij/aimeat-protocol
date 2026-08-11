@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Living Docs tab's 2 duplicate memory scans + organisms into one.
  */
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 
 const TEMPLATE_PREFIX = 'living.template.';
 // A deployed living instance's config key: organism.{org}.w.{ws}.living.{docId}.latest (mirrors the

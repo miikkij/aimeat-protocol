@@ -18,7 +18,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { getOwnerUsageSummary, type OwnerUsageSummary } from '../usage-summary.js';
 import { AgentDbService, createAgentDbService, type HomeAgent } from './agent-db-service.js';
 
