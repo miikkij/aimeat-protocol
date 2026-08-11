@@ -6,7 +6,7 @@
  */
 import type {
   CapabilityRecord, CapabilityLogEntry, CapabilityStats, AgentTaskRecord, AgentTaskEventRecord, AgentDirectivesRecord,
-  OwnerAgentDefaults, SharingGroupRecord, AgentActivityRecord, AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter,
+  OwnerAgentDefaults, SharingGroupRecord, GroupShareRecord, AgentActivityRecord, AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter,
   UsageEventFilter, AdminUsageDailyFilter, StorageStatsSnapshot
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -476,6 +476,32 @@ export const capabilityAgentsMethods = {
 
   async countEntriesReferencingGroup(this: SqliteStorage, groupId: string): Promise<number> {
     return sharingGroupRepo.countEntriesReferencingGroup(this.db, groupId);
+  },
+
+  // ── Key-space shares ──
+
+  async createGroupShare(this: SqliteStorage, record: GroupShareRecord): Promise<GroupShareRecord> {
+    return sharingGroupRepo.createGroupShare(this.db, record);
+  },
+
+  async getGroupShare(this: SqliteStorage, id: string): Promise<GroupShareRecord | null> {
+    return sharingGroupRepo.getGroupShare(this.db, id);
+  },
+
+  async listGroupSharesByOwner(this: SqliteStorage, ownerGaii: string): Promise<GroupShareRecord[]> {
+    return sharingGroupRepo.listGroupSharesByOwner(this.db, ownerGaii);
+  },
+
+  async listGroupSharesByGroups(this: SqliteStorage, groupIds: string[]): Promise<GroupShareRecord[]> {
+    return sharingGroupRepo.listGroupSharesByGroups(this.db, groupIds);
+  },
+
+  async deleteGroupShare(this: SqliteStorage, id: string): Promise<boolean> {
+    return sharingGroupRepo.deleteGroupShare(this.db, id);
+  },
+
+  async deleteGroupSharesByGroup(this: SqliteStorage, groupId: string): Promise<number> {
+    return sharingGroupRepo.deleteGroupSharesByGroup(this.db, groupId);
   },
 
   // ══════════════════════════════════════════════════════════

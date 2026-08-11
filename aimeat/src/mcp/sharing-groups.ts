@@ -1,6 +1,7 @@
 /**
  * @file sharing-groups.ts
- * @description MCP tools for sharing group management (list, get, create, add/remove members)
+ * @description MCP tools for sharing groups: the audience (list, get, create, add/remove members)
+ *   and what it reaches (share create/list/revoke).
  * @structure
  *   - registerSharingGroupTools() -- registers all sharing group tools on an McpServer instance
  * @usage
@@ -11,6 +12,9 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.4.0 -- 2026-08-11 -- aimeat_share_create / _list / _revoke: the agent surface for key-space
+ *     shares, calling the same services/group-shares.ts the REST routes call. Without them an agent
+ *     could assemble an audience over MCP and then have nothing to give it.
  *   v1.3.0 -- 2026-08-11 -- The three writes go through services/sharing-group-members.ts instead of
  *     storage: validation, the member's address, the record build and the change event are the same
  *     ones POST /v1/groups applies. These tools render the answer and nothing else.
@@ -18,16 +22,24 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { GroupShareRecord, Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import {
     createSharingGroup,
     addSharingGroupMember,
     removeSharingGroupMember,
 } from '../services/sharing-group-members.js';
+import {
+    createShare,
+    revokeShare,
+    listOutgoingShares,
+    listIncomingShares,
+} from '../services/group-shares.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -36,6 +48,7 @@ export function registerSharingGroupTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -264,6 +277,87 @@ export function registerSharingGroupTools(
                     }, null, 2),
                 }],
             };
+        },
+    );
+
+    // ── Key-space shares ──
+    // The group says WHO; a share says WHAT. Without these an agent could assemble an audience over
+    // MCP and then have nothing to give it, which is the shape the whole feature was stuck in.
+
+    const shareJson = (s: GroupShareRecord) => ({
+        id: s.id,
+        group_id: s.groupId,
+        owner_gaii: s.ownerGaii,
+        key_pattern: s.keyPattern,
+        note: s.note ?? null,
+        expires_at: s.expiresAt ?? null,
+        created_at: s.createdAt,
+    });
+    const caller = () => ({
+        ownerGaii: getOwnerGhii(),
+        principal: agentGaii,
+        scopes: sessionScopes,
+        roles: ['agent'],
+    });
+
+    // ── Tool 6: aimeat_share_create ──
+    mcp.tool(
+        'aimeat_share_create',
+        descriptionFor('aimeat_share_create'),
+        {
+            group_id: z.string().describe('The sharing group whose members should be able to read'),
+            key_pattern: z.string().describe('A key or a pattern, e.g. "deliveries.abc.**". `*` is one segment, `**` is the whole subtree. Keys written later are covered automatically.'),
+            note: z.string().optional().describe('A reminder for the owner\'s own list. The reader never sees it.'),
+            expires_at: z.string().optional().describe('ISO timestamp when the share stops granting. Omit for "until revoked".'),
+        },
+        annotationsFor('aimeat_share_create'),
+        async ({ group_id, key_pattern, note, expires_at }) => {
+            const created = await createShare(
+                { storage, newId: () => randomUUID(), now: () => new Date().toISOString() },
+                caller(),
+                { groupId: group_id, keyPattern: key_pattern, note, expiresAt: expires_at ?? null },
+            );
+            if (!created.ok) return { content: [{ type: 'text' as const, text: created.message }], isError: true };
+            emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(group_id)}`);
+            emitChange('groups');
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ share: shareJson(created.value) }, null, 2) }] };
+        },
+    );
+
+    // ── Tool 7: aimeat_share_list ──
+    mcp.tool(
+        'aimeat_share_list',
+        descriptionFor('aimeat_share_list'),
+        {
+            direction: z.enum(['outgoing', 'incoming']).default('outgoing')
+                .describe('outgoing = what your owner shares with others; incoming = what others have shared with your owner (and with you)'),
+        },
+        annotationsFor('aimeat_share_list'),
+        async ({ direction }) => {
+            const shares = direction === 'incoming'
+                ? await listIncomingShares(storage, agentGaii)
+                : await listOutgoingShares(storage, getOwnerGhii());
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({ direction, shares: shares.map(shareJson), total: shares.length }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── Tool 8: aimeat_share_revoke ──
+    mcp.tool(
+        'aimeat_share_revoke',
+        descriptionFor('aimeat_share_revoke'),
+        { share_id: z.string().describe('The share to withdraw. Reads stop at once; copies already taken are not recalled.') },
+        annotationsFor('aimeat_share_revoke'),
+        async ({ share_id }) => {
+            const revoked = await revokeShare({ storage }, caller(), share_id);
+            if (!revoked.ok) return { content: [{ type: 'text' as const, text: revoked.message }], isError: true };
+            emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(revoked.value.groupId)}`);
+            emitChange('groups');
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ revoked: true, share: shareJson(revoked.value) }, null, 2) }] };
         },
     );
 }

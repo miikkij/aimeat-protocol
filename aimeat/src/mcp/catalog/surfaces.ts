@@ -155,6 +155,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_stats', 'aimeat_admin_agents', 'aimeat_admin_config', 'aimeat_admin_mint',
         'aimeat_flag_report',
         'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
+        'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',
         'aimeat_consent_grant', 'aimeat_consent_list', 'aimeat_consent_revoke',
         'aimeat_agent_mode_set', 'aimeat_agent_tags_set',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',

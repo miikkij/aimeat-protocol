@@ -69,6 +69,7 @@ const OWN_TICK_SCOPES = [
     'commerce:beneficiary-verify', // record a beneficiary as verified, i.e. as payable
     'agent:permissions',       // rewrite an agent's granted permissions
     'consent:groups',          // create a sharing group, add or remove who is in it
+    'share:manage',            // hand another account a standing right to read part of the owner's memory
     'social:members',          // change who may read a shared board
 ] as const;
 

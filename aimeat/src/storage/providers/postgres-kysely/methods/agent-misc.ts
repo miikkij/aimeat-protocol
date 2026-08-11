@@ -14,6 +14,7 @@ import { sql, type Selectable } from 'kysely';
 import type {
   AgentActivityRecord,
   AgentDirectivesRecord,
+  GroupShareRecord,
   OwnerAgentDefaults,
   SharingGroupRecord,
   TelemetryEvent,
@@ -22,6 +23,7 @@ import type {
 import type {
   AgentActivity,
   AgentDirective,
+  GroupShare,
   OwnerAgentDefault,
   SharingGroup,
   TelemetryEvent as TelemetryEventRow,
@@ -73,6 +75,20 @@ function toSharingGroupRecord(r: Selectable<SharingGroup>): SharingGroupRecord {
     updatedAt: iso(r.updatedAt),
   };
   if (r.description) record.description = r.description;
+  return record;
+}
+
+function toGroupShareRecord(r: Selectable<GroupShare>): GroupShareRecord {
+  const record: GroupShareRecord = {
+    id: r.id,
+    groupId: r.groupId,
+    ownerGaii: r.ownerGaii,
+    keyPattern: r.keyPattern,
+    createdAt: iso(r.createdAt),
+    createdBy: r.createdBy,
+  };
+  if (r.note) record.note = r.note;
+  if (r.expiresAt) record.expiresAt = iso(r.expiresAt);
   return record;
 }
 
@@ -333,11 +349,58 @@ export const sharingGroupMethods = {
   },
 
   async countEntriesReferencingGroup(this: PostgresKyselyStorage, groupId: string): Promise<number> {
-    // Both Memory rows and StorageFile rows can carry a group id — sum both (matches Prisma).
-    const [mem, file] = await Promise.all([
+    // Both Memory rows and StorageFile rows can carry a group id — sum both (matches Prisma), plus
+    // the key-space shares pointed at it, which are now the main way a group reaches anything.
+    const [mem, file, shares] = await Promise.all([
       this.db.selectFrom('Memory').select(eb => eb.fn.countAll().as('c')).where('groupId', '=', groupId).executeTakeFirst(),
       this.db.selectFrom('StorageFile').select(eb => eb.fn.countAll().as('c')).where('groupId', '=', groupId).executeTakeFirst(),
+      this.db.selectFrom('GroupShare').select(eb => eb.fn.countAll().as('c')).where('groupId', '=', groupId).executeTakeFirst(),
     ]);
-    return Number(mem?.c ?? 0) + Number(file?.c ?? 0);
+    return Number(mem?.c ?? 0) + Number(file?.c ?? 0) + Number(shares?.c ?? 0);
+  },
+
+  // ── Key-space shares (GroupShare) ──
+
+  async createGroupShare(this: PostgresKyselyStorage, record: GroupShareRecord): Promise<GroupShareRecord> {
+    await this.db.insertInto('GroupShare').values({
+      id: record.id,
+      groupId: record.groupId,
+      ownerGaii: record.ownerGaii,
+      keyPattern: record.keyPattern,
+      note: record.note ?? null,
+      expiresAt: record.expiresAt ? new Date(record.expiresAt) : null,
+      createdAt: new Date(record.createdAt),
+      createdBy: record.createdBy,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any).execute();
+    return record;
+  },
+
+  async getGroupShare(this: PostgresKyselyStorage, id: string): Promise<GroupShareRecord | null> {
+    const r = await this.db.selectFrom('GroupShare').selectAll().where('id', '=', id).executeTakeFirst();
+    return r ? toGroupShareRecord(r) : null;
+  },
+
+  async listGroupSharesByOwner(this: PostgresKyselyStorage, ownerGaii: string): Promise<GroupShareRecord[]> {
+    const rows = await this.db.selectFrom('GroupShare').selectAll()
+      .where('ownerGaii', '=', ownerGaii).orderBy('createdAt', 'desc').execute();
+    return rows.map(toGroupShareRecord);
+  },
+
+  async listGroupSharesByGroups(this: PostgresKyselyStorage, groupIds: string[]): Promise<GroupShareRecord[]> {
+    if (groupIds.length === 0) return [];
+    const rows = await this.db.selectFrom('GroupShare').selectAll()
+      .where('groupId', 'in', groupIds).orderBy('createdAt', 'desc').execute();
+    return rows.map(toGroupShareRecord);
+  },
+
+  async deleteGroupShare(this: PostgresKyselyStorage, id: string): Promise<boolean> {
+    const r = await this.db.deleteFrom('GroupShare').where('id', '=', id).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0) > 0;
+  },
+
+  async deleteGroupSharesByGroup(this: PostgresKyselyStorage, groupId: string): Promise<number> {
+    const r = await this.db.deleteFrom('GroupShare').where('groupId', '=', groupId).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
 };

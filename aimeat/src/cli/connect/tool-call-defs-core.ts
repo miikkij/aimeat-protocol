@@ -355,6 +355,26 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.delete(`/v1/groups/${encodeURIComponent(requiredString(input, 'id'))}/members/${encodeURIComponent(requiredString(input, 'identifier'))}`),
     },
     {
+        name: 'aimeat_share_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { key_pattern: requiredString(input, 'key_pattern') };
+            const note = optionalString(input, 'note');
+            if (note) body.note = note;
+            const expiresAt = optionalString(input, 'expires_at');
+            if (expiresAt) body.expires_at = expiresAt;
+            return client.post(`/v1/groups/${encodeURIComponent(requiredString(input, 'group_id'))}/shares`, body);
+        },
+    },
+    {
+        name: 'aimeat_share_list',
+        handler: ({ client }, input) =>
+            client.get(optionalString(input, 'direction') === 'incoming' ? '/v1/shares/incoming' : '/v1/shares'),
+    },
+    {
+        name: 'aimeat_share_revoke',
+        handler: ({ client }, input) => client.delete(`/v1/shares/${encodeURIComponent(requiredString(input, 'share_id'))}`),
+    },
+    {
         name: 'aimeat_instance_list',
         handler: ({ client }) => client.get('/v1/instances'),
     },

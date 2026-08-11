@@ -1605,6 +1605,17 @@ export interface Session {
   userAgent: string | null;
 }
 
+export interface GroupShare {
+  createdAt: Generated<Timestamp>;
+  createdBy: string;
+  expiresAt: Timestamp | null;
+  groupId: string;
+  id: string;
+  keyPattern: string;
+  note: string | null;
+  ownerGaii: string;
+}
+
 export interface SharingGroup {
   createdAt: Generated<Timestamp>;
   defaultPermissions: Generated<Json>;
@@ -1886,6 +1897,7 @@ export interface DB {
   Flag: Flag;
   GenesisPeer: GenesisPeer;
   Ghii: Ghii;
+  GroupShare: GroupShare;
   Invitation: Invitation;
   JoinRequest: JoinRequest;
   KnowledgeLink: KnowledgeLink;

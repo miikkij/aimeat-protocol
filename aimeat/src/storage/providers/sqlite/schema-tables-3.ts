@@ -325,6 +325,24 @@ export function applySchemaTables3(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_sharing_groups_owner ON sharing_groups(ownerGaii);
 
+    -- ── Key-space shares: this owner lets this group read this key pattern ──
+    -- Indexed both ways on purpose. The group direction answers the reader ("what is shared with
+    -- me") AND every cross-owner read, so it must never become a scan; the owner direction is the
+    -- Access tab. A share is a row rather than a column on the record because one record can be in
+    -- several shares, and because a pattern has to cover keys that do not exist yet.
+    CREATE TABLE IF NOT EXISTS group_shares (
+      id          TEXT PRIMARY KEY,
+      groupId     TEXT NOT NULL,
+      ownerGaii   TEXT NOT NULL,
+      keyPattern  TEXT NOT NULL,
+      note        TEXT,
+      expiresAt   TEXT,
+      createdAt   TEXT NOT NULL,
+      createdBy   TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_group_shares_group ON group_shares(groupId);
+    CREATE INDEX IF NOT EXISTS idx_group_shares_owner ON group_shares(ownerGaii, groupId);
+
     -- ── Agent Activity (Phase 2 prep) ──
     CREATE TABLE IF NOT EXISTS agent_activity (
       agentGaii TEXT NOT NULL,

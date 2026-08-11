@@ -114,6 +114,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // The other side of the same coin: an app that manages who may use ITS owner's capability.
   // A membership gate that approves someone and cannot open the door for them is decoration, and
   // the owner is the one paying for what it gives away — so it is asked for, never assumed.
+  // Handing another account a standing right to read part of your memory is not something
+  // memory:write covers, and reading it that way would be the wrong bargain: an app allowed to
+  // write your records would silently also be allowed to publish them to people you never named.
+  // So it is asked for on its own, exactly as exchange:grant is for giving away what you sell.
+  'share:manage': 'Share parts of your memory with people and groups you have set up (and stop sharing)',
   'exchange:grant': 'Give and withdraw free access to capabilities you sell (you carry the cost)',
   // Declaring that part of your revenue goes to someone else, and paying it out, both move value out
   // of the owner's own pocket. That is a spending decision even though nobody is being charged for it,

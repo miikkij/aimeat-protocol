@@ -70,4 +70,33 @@ export function registerGroupsTools(mcp: McpServer, registry: AgentRegistry): vo
     );
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
+
+  // ── Key-space shares: the group says WHO, these say WHAT it reaches ──
+
+  mcp.tool('aimeat_share_create', descriptionFor('aimeat_share_create'), {
+    group_id: z.string().describe('The group whose members should be able to read'),
+    key_pattern: z.string().describe('Key or pattern, e.g. "deliveries.abc.**". `*` is one segment, `**` the subtree.'),
+    note: z.string().optional().describe('A reminder for your own list; the reader never sees it'),
+    expires_at: z.string().optional().describe('ISO timestamp after which it stops granting'),
+  }, annotationsFor('aimeat_share_create'), async ({ group_id, key_pattern, note, expires_at }) => {
+    const body: Record<string, unknown> = { key_pattern };
+    if (note) body.note = note;
+    if (expires_at) body.expires_at = expires_at;
+    const resp = await client.post(`/v1/groups/${encodeURIComponent(group_id)}/shares`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_share_list', descriptionFor('aimeat_share_list'), {
+    direction: z.enum(['outgoing', 'incoming']).optional().describe('outgoing = what you share; incoming = what was shared with you'),
+  }, annotationsFor('aimeat_share_list'), async ({ direction }) => {
+    const resp = await client.get(direction === 'incoming' ? '/v1/shares/incoming' : '/v1/shares');
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_share_revoke', descriptionFor('aimeat_share_revoke'), {
+    share_id: z.string().describe('The share to withdraw'),
+  }, annotationsFor('aimeat_share_revoke'), async ({ share_id }) => {
+    const resp = await client.delete(`/v1/shares/${encodeURIComponent(share_id)}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
 }

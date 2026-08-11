@@ -10,7 +10,17 @@
  *   - POST   /v1/groups/:id/members  -- Add member
  *   - PATCH  /v1/groups/:id/members/:identifier -- Update member permissions
  *   - DELETE /v1/groups/:id/members/:identifier -- Remove member
+ *   - POST   /v1/groups/:id/shares   -- Share a key space with this group
+ *   - GET    /v1/groups/:id/shares   -- What this group can reach
+ *   - GET    /v1/shares              -- What I have shared, and to whom
+ *   - GET    /v1/shares/incoming     -- What has been shared WITH me
+ *   - DELETE /v1/shares/:shareId     -- Stop sharing
  * @version-history
+ *   v1.2.0 -- 2026-08-11 -- Key-space shares. A group could only ever be pointed at one record at a
+ *     time (`visibility:'group'` + one `groupId` on the record), which meant a subscription had to
+ *     re-share every new key and could not hand anyone a space that does not exist yet. A share is
+ *     now (owner, group, key pattern), the record stays private, and both list directions exist —
+ *     including the reader's, whose absence is why nobody could find what they had been given.
  *   v1.1.0 -- 2026-08-11 -- Create, add-member and remove-member call
  *     services/sharing-group-members.ts, which aimeat_group_create and friends now call too. This
  *     router keeps the envelope and the status codes and nothing else of those three.
@@ -18,15 +28,22 @@
  */
 
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import {
   createSharingGroup,
   addSharingGroupMember,
   removeSharingGroupMember,
 } from '../services/sharing-group-members.js';
+import {
+  createShare,
+  revokeShare,
+  listOutgoingShares,
+  listIncomingShares,
+} from '../services/group-shares.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import {
@@ -173,10 +190,14 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
     // Check if any memory entries reference this group
     const refCount = await storage.countEntriesReferencingGroup(id);
 
+    // The group's shares go with it. A share whose audience no longer exists grants nothing anyway,
+    // and leaving the rows behind would make "what have I shared" list access that nobody holds.
+    const droppedShares = await storage.deleteGroupSharesByGroup(id);
     await storage.deleteSharingGroup(id);
 
     res.json(success(config.nodeId, {
       deleted: true,
+      shares_revoked: droppedShares,
       warning: refCount > 0
         ? `${refCount} memory entries referenced this group and will fall back to private visibility`
         : undefined,
@@ -263,6 +284,106 @@ export function sharingGroupsRouter(config: AimeatConfig, storage: Storage): Rou
     }
 
     res.json(success(config.nodeId, { group: removed.group, removed: removed.identifier }));
+  });
+
+  // ── Key-space shares ────────────────────────────────────────────────────────
+  // A share is (owner, group, key pattern). It is what actually grants a cross-owner read; the
+  // group is only the audience. Both list directions are here because the table answers two
+  // different people's questions, and the reader's half is the one whose absence made groups
+  // unusable: without it you have to be handed the owner identity and the exact key out of band.
+
+  const shareApi = (share: import('../storage/interface.js').GroupShareRecord) => ({
+    id: share.id,
+    group_id: share.groupId,
+    owner_gaii: share.ownerGaii,
+    key_pattern: share.keyPattern,
+    note: share.note ?? null,
+    expires_at: share.expiresAt ?? null,
+    created_at: share.createdAt,
+    created_by: share.createdBy,
+  });
+
+  /** The caller as the share layer sees them: which owner it lands under, and who is acting. */
+  const shareCaller = (req: Express.Request) => ({
+    ownerGaii: `${req.auth!.owner}@${config.nodeId}`,
+    principal: resolve(req),
+    scopes: req.auth!.scopes ?? [],
+    roles: req.auth!.roles,
+  });
+
+  // The write gate for shares lives in services/group-shares.ts and nowhere else, so this door and
+  // the MCP one refuse for the same reason. It cannot be a `requireRole('owner')` here: an agent's
+  // token carries its owner's `owner` role (routes/auth.ts), so a role check would pass every agent
+  // and `share:manage` would be decoration. The service distinguishes the human from the agent.
+
+  /* ── POST /v1/groups/:id/shares -- share a key space with this group ── */
+  router.post('/v1/groups/:id/shares', requireAuth(), requireScope('share:manage'), async (req, res) => {
+    const { key_pattern, note, expires_at } = req.body ?? {};
+    const created = await createShare(
+      { storage, newId: () => randomUUID(), now: () => new Date().toISOString() },
+      shareCaller(req),
+      { groupId: req.params.id as string, keyPattern: key_pattern, note, expiresAt: expires_at ?? null },
+    );
+    if (!created.ok) {
+      res.status(created.status).json(error(config.nodeId, created.code, created.message));
+      return;
+    }
+    res.status(201).json(success(config.nodeId, { share: shareApi(created.value) }, [
+      { description: 'What you have shared', method: 'GET', url: '/v1/shares' },
+      { description: 'Stop sharing this', method: 'DELETE', url: `/v1/shares/${created.value.id}` },
+    ]));
+    emitChange('groups');
+  });
+
+  /* ── GET /v1/groups/:id/shares -- what this group can reach ── */
+  router.get('/v1/groups/:id/shares', requireAuth(), requireScope('memory:read'), async (req, res) => {
+    const id = req.params.id as string;
+    const group = await storage.getSharingGroup(id);
+    if (!group) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Sharing group not found'));
+      return;
+    }
+    // Owner or member. A member seeing which key spaces they were given is the point; anyone else
+    // learns nothing, not even that the group exists.
+    const identity = resolve(req);
+    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const isOwner = group.ownerGaii === identity || group.ownerGaii === ownerGhii;
+    const isMember = group.members.some(m => m.identifier === identity || m.identifier === ownerGhii);
+    if (!isOwner && !isMember) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Sharing group not found'));
+      return;
+    }
+    const all = await storage.listGroupSharesByGroups([id]);
+    res.json(success(config.nodeId, { shares: all.map(shareApi), total: all.length }));
+  });
+
+  /* ── GET /v1/shares -- what I have shared, and to whom ── */
+  router.get('/v1/shares', requireAuth(), requireScope('memory:read'), async (req, res) => {
+    const shares = await listOutgoingShares(storage, `${req.auth!.owner}@${config.nodeId}`);
+    res.json(success(config.nodeId, { shares: shares.map(shareApi), total: shares.length }));
+  });
+
+  /* ── GET /v1/shares/incoming -- what has been shared WITH me ── */
+  // MUST stay above any /v1/shares/:param route (Express matches top-to-bottom).
+  router.get('/v1/shares/incoming', requireAuth(), requireScope('memory:read'), async (req, res) => {
+    // Resolved identity, not the raw sub: an owner session carries a bare account name, and every
+    // membership is keyed under the GHII. This is the same trap that made group reads fail for
+    // humans while working for their agents.
+    const shares = await listIncomingShares(storage, resolve(req));
+    res.json(success(config.nodeId, { shares: shares.map(shareApi), total: shares.length }, [
+      { description: 'Read a shared key', method: 'GET', url: '/v1/memory/{owner_gaii}/{key}' },
+    ]));
+  });
+
+  /* ── DELETE /v1/shares/:shareId -- stop sharing ── */
+  router.delete('/v1/shares/:shareId', requireAuth(), requireScope('share:manage'), async (req, res) => {
+    const revoked = await revokeShare({ storage }, shareCaller(req), req.params.shareId as string);
+    if (!revoked.ok) {
+      res.status(revoked.status).json(error(config.nodeId, revoked.code, revoked.message));
+      return;
+    }
+    res.json(success(config.nodeId, { revoked: true, share: shareApi(revoked.value) }));
+    emitChange('groups');
   });
 
   return router;

@@ -287,6 +287,9 @@ const ALL_SUITES = [
     // The other half of the same feature: e2e-sharing-groups proves a group can be MANAGED,
     // this proves it grants a cross-owner read (and that removing a member takes it away).
     'test/e2e-group-sharing.ts',
+    // Sharing a KEY SPACE rather than one record at a time: a pattern covers keys written later,
+    // one record can be in several shares, and both sides can see what was given.
+    'test/e2e-key-space-shares.ts',
     'test/e2e-agent-tasks.ts',
     'test/e2e-agent-file-handoff.ts',
     'test/e2e-agent-schedules.ts',

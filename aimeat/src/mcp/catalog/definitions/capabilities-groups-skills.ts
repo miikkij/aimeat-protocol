@@ -229,6 +229,34 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_share_create',
+        description: 'Let a sharing group read a key space of your owner\'s memory. The group says WHO, this says WHAT: give a key or a pattern ("deliveries.abc.**"), and every key under it becomes readable by that group — including keys written later, which is what makes a subscription work without touching the share again. `*` is one segment, `**` is the whole subtree. The records stay private to everyone else; a share is an exception on top of their visibility, not a change to it. Needs the share:manage permission, which no wildcard carries. Withdraw with aimeat_share_revoke.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            group_id: { type: 'string', required: true, description: 'The group whose members should be able to read.' },
+            key_pattern: { type: 'string', required: true, description: 'Key or pattern, e.g. "deliveries.abc.**".' },
+            note: { type: 'string', description: 'A reminder for the owner\'s own list; the reader never sees it.' },
+            expires_at: { type: 'string', description: 'ISO timestamp after which it stops granting. Omit for until-revoked.' },
+        },
+    },
+    {
+        name: 'aimeat_share_list',
+        description: 'List key-space shares in either direction: "outgoing" is what your owner has given away and to whom, "incoming" is what other people have shared with your owner (and with you). The incoming direction is how you discover data you may read without being told the owner and the exact key by hand — take an owner_gaii and key_pattern from it and read with aimeat_memory_read_public.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            direction: { type: 'string', enum: ['outgoing', 'incoming'], description: 'Default outgoing.' },
+        },
+    },
+    {
+        name: 'aimeat_share_revoke',
+        description: 'Withdraw a key-space share by id. Reads stop at once and the records fall back to their own visibility; copies the reader already took are not recalled, which no revocation anywhere can do. Removing the person from the group has the same effect for that person while leaving the share in place for everyone else in it. Needs share:manage.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { share_id: { type: 'string', required: true, description: 'The share to withdraw.' } },
+    },
+    {
         name: 'aimeat_instance_list',
         description: 'List the chat instances under your owner — registered AI chat sessions (platform, app name, linked GHII, last-seen). Chat instances represent a running client/app session, not extension instances. Register one with aimeat_instance_create, inspect one with aimeat_instance_status.',
         caller: 'agent',

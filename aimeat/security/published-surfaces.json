@@ -1,9 +1,9 @@
 {
   "npm": {
     "package": "aimeat",
-    "version": "2.7.0",
-    "fingerprint": "84d89133be90a887",
-    "toolCount": 212
+    "version": "2.7.1",
+    "fingerprint": "b5c3d3059d1a106f",
+    "toolCount": 215
   },
   "pypi": {
     "package": "aimeat-crewai",

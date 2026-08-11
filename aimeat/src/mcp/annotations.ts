@@ -101,6 +101,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_group_list: { title: 'List Sharing Groups', readOnlyHint: true },
     aimeat_group_get: { title: 'Get Sharing Group', readOnlyHint: true },
     aimeat_group_create: { title: 'Create Sharing Group', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    // Idempotent: the same pattern to the same group returns the share that already exists rather
+    // than adding a second row that revoking the first would not undo.
+    aimeat_share_create: { title: 'Share a Key Space', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_share_list: { title: 'List Shares', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // Destructive in the sense that matters: someone who could read loses that access.
+    aimeat_share_revoke: { title: 'Stop Sharing', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_group_add_member: { title: 'Add Group Member', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_group_remove_member: { title: 'Remove Group Member', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 

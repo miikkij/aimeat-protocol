@@ -15,6 +15,10 @@
  *   });
  *   if (!r.allowed) { res.status(403)...; return; }
  * @version-history
+ *   v1.3.0 -- 2026-08-11 -- Key-space shares are checked before any tier is refused, because a share
+ *     is deliberately independent of visibility: a `private` record covered by a live share is
+ *     readable by that group and by nobody else. Both memory and storage files get it here, so the
+ *     two stay one decision.
  *   v1.0.0 -- 2026-06-07 -- Extract memory/storage read guard into a shared authorizeRead().
  *   v1.1.0 -- 2026-07-05 -- Add the `workspace` tier: readable by members of the organism workspace in
  *     `workspaceRef` ("org/ws"), gated by canReadWorkspace() (membership + manifest read). Brings storage
@@ -26,6 +30,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { checkConsentForRead, auditDataAccess } from './consent.js';
+import { isKeyShared } from './group-shares.js';
 
 export interface AuthorizeReadArgs {
   /** GAII/GHII that owns the resource. */
@@ -79,6 +84,19 @@ export async function authorizeRead(
 
   if (visibility === 'public') {
     return { allowed: true, reason: 'public_data' };
+  }
+
+  // A KEY-SPACE SHARE is checked before any tier is refused, because it is deliberately independent
+  // of the tier. The owner shares `deliveries.abc.**` with a group; the records under it stay
+  // `private`, which is what they are to everyone else. Visibility is the floor and a share is a
+  // named exception on top of it, so sharing something never changes what it is — and a subscriber
+  // reading tomorrow's record needs no second act from anybody.
+  //
+  // 'anonymous' never matches: accessorGroups() returns nothing for it, so an unauthenticated
+  // caller cannot reach a shared key however broad the pattern.
+  const share = await isKeyShared(storage, ownerGaii, resourceKey, accessorGaii);
+  if (share.shared) {
+    return { allowed: true, reason: 'group_share' };
   }
 
   // 'members' = any authenticated user of this node. The CALLER must verify the

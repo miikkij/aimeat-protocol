@@ -270,6 +270,34 @@ export interface SharingGroupRecord {
   updatedAt: string;
 }
 
+/**
+ * One share: this owner lets this group read this key space.
+ *
+ * A share is its own fact, not a field on the record it covers, and that is the whole design. As a
+ * field it could only ever name ONE group, it had to be repeated on every write, and it could not
+ * describe a space that does not exist yet — which is exactly what a subscription is, since
+ * tomorrow's record is written tomorrow and the reader must not need a second act to see it.
+ *
+ * The record it covers stays `private`. Visibility is the floor; a share is a named exception on
+ * top of it, so sharing something never changes what it is.
+ */
+export interface GroupShareRecord {
+  id: string;
+  /** The group whose members may read. */
+  groupId: string;
+  /** Whose key space this is. Always a GHII — the owner, never the agent that made the share. */
+  ownerGaii: string;
+  /** An exact key, or a prefix glob like `deliveries.abc.*`. Matched with the shared key matcher. */
+  keyPattern: string;
+  /** Free text the owner sees in their own list. Not shown to the reader, not a GDPR purpose. */
+  note?: string;
+  /** ISO timestamp after which the share stops granting. Null = until revoked. */
+  expiresAt?: string | null;
+  createdAt: string;
+  /** The exact principal that made it: the owner's GHII, or the agent/app GAII acting for them. */
+  createdBy: string;
+}
+
 // ── Agent LLM Usage Ledger (LEDGER / TARGET-016) ──
 
 /**

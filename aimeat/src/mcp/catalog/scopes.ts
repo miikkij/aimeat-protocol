@@ -129,6 +129,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_group_create:                      'consent:groups',
     aimeat_group_remove_member:               'consent:groups',
 
+    // A share is the other half, and a separate decision: the group is WHO, the share is WHAT they
+    // reach. Assembling an audience and handing it a key space are different acts, and only the
+    // second one gives anything away — so it costs its own tick and no wildcard carries it.
+    aimeat_share_create:                      'share:manage',
+    aimeat_share_revoke:                      'share:manage',
+
     // RUN an installed extension's action. Separate from ext:write, which is about which
     // extensions exist — using a capability is not the same as installing one.
     aimeat_extension_invoke:                  'ext:invoke',

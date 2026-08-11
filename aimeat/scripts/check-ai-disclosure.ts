@@ -225,6 +225,11 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   'aimeat_flag_report',
   'aimeat_group_create',
   'aimeat_iam_define',
+  // DECIDED, 2026-08-11. A share carries no content: it names an owner, a group and a key pattern.
+  // Its one free-text field is `note`, a reminder in the owner's own list that the reader is never
+  // shown. Provenance describes how content a person reads was made, and there is no such content
+  // here — the records the share exposes carry their own, minted where they were written.
+  'aimeat_share_create',
   'aimeat_organism_create',
   'aimeat_organism_update',
   'aimeat_schedule_create',
