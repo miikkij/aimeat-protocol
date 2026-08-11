@@ -2,6 +2,19 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-11",
+      "version": "2.7.0",
+      "kind": "feature",
+      "title": {
+        "en": "An app that cannot run no longer goes live",
+        "fi": "Appi joka ei voi toimia ei enää mene liveksi"
+      },
+      "body": {
+        "en": "Publishing an app now looks at the file first. Two things stop it: a script inside the app that does not parse, and a script or stylesheet address this node answers \"not found\" for. Either one means every visitor gets a blank page, and until now both went live with a response that said \"published\".\n\nEverything else the check notices is said out loud, and the app publishes anyway. Colours written into the app past the theme, so your light and dark switch does nothing for it. Missing declarations in the page head, which is why the language switch sometimes never appears. Reads of data your agents wrote that never say whose namespace they mean, which is how an app can look empty to the very person whose agents filled it. Each finding names the page that explains it in full, so the AI that built the app can fix it in the same conversation.\n\nThe build specification also hands out a token now. An AI that read the spec passes it back when it publishes, and the answer says whether the app was built against what the spec says today. Nothing is refused over that. And if you tell your AI to publish without reading the spec, that stays on the app where you can see it later, instead of passing unnoticed.",
+        "fi": "Appin julkaisu katsoo nyt tiedostoa ennen kuin päästää sen eteenpäin. Kaksi asiaa pysäyttää sen: appin sisällä oleva skripti joka ei jäsenny, ja skriptin tai tyylitiedoston osoite johon tämä node vastaa \"ei löydy\". Kumpi tahansa tarkoittaa että jokainen kävijä saa tyhjän sivun, ja tähän asti molemmat menivät liveksi vastauksella joka luki \"julkaistu\".\n\nMuut havainnot sanotaan ääneen, ja appi julkaistaan silti. Appiin kirjoitetut värit teeman ohi, jolloin vaalea ja tumma -kytkin ei tee sille mitään. Puuttuvat määrittelyt sivun headissä, minkä takia kielivalitsin joskus jää kokonaan ilmestymättä. Agenttien kirjoittaman datan luvut jotka eivät kerro kenen nimiavaruudesta on kyse, mikä on syy siihen että appi voi näyttää tyhjältä juuri sille ihmiselle jonka agentit sen täyttivät. Jokainen havainto kertoo sivun jolla asia selitetään kokonaan, joten appin rakentanut tekoäly korjaa sen samassa keskustelussa.\n\nRakennusohje jakaa nyt myös tunnisteen. Ohjeen lukenut tekoäly palauttaa sen julkaistessaan, ja vastaus kertoo rakennettiinko appi sitä vasten mitä ohje sanoo tänään. Siitä ei kieltäydytä julkaisemasta. Ja jos käsket tekoälyäsi julkaisemaan ohjetta lukematta, se jää appiin näkyviin sinulle myöhemminkin sen sijaan että menisi ohi huomaamatta."
+      }
+    },
+    {
       "date": "2026-08-08",
       "version": "2.7.0",
       "kind": "fix",
