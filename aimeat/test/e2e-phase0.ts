@@ -1,5 +1,18 @@
-// E2E tests for Phase 0 features: Schema Locking, CSM, Consent, MSM
-// Run: cd aimeat && pnpm exec tsx test/e2e-phase0.ts
+/**
+ * @file e2e-phase0.ts
+ * @description Phase 0 features end to end: schema locking, CSM, the consent layer, TOTP, MSM and
+ *   the semantic ontology annotations that ride on memory, actions and boards.
+ * @structure Setup (owner, then agent) · 0.1 schema locking · 0.2 CSM · 0.3 consent · 0.5 TOTP ·
+ *   MSM · 0.7 semantic ontology · cleanup.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
+ *   test/run-e2e-ci.ts --test=phase0
+ * @version-history
+ *   v1.1.0 — 2026-08-12 — The semantic board case created a PUBLIC board with the agent token, which
+ *     only an operator may do; it passed while the token mint still copied the owner's roles onto
+ *     agent JWTs (audit H-2). It sends the owner's token now, which is the operator this suite
+ *     registers in setup.
+ *   v1.0.0 — earlier — Initial Phase 0 coverage.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -514,7 +527,12 @@ await test('POST /v1/boards with semantic → 201, visible in board list', async
         '@context': { schema: 'https://schema.org/' },
         '@type': 'schema:ItemList',
     };
-    const { status, body } = await json('/v1/boards', agentAuthed({
+    // Audit H-2: a public board is the operator's to create, and this used to send the agent token.
+    // It passed because POST /v1/auth/token copied the owner's roles onto the agent JWT, so the
+    // agent arrived holding 'operator'. The mint now issues ['agent'] alone. The subject here is the
+    // semantic annotation surviving create and list, so the caller changes and the flow does not:
+    // the owner registered in setup is the node's first real owner and therefore its operator.
+    const { status, body } = await json('/v1/boards', authed({
         method: 'POST',
         body: JSON.stringify({
             name: 'Semantic Test Board',

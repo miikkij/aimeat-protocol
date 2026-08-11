@@ -1,5 +1,18 @@
-// T-6: Board Post TTL E2E Tests
-// Run: cd aimeat && pnpm exec tsx test/e2e-board-ttl.ts
+/**
+ * @file e2e-board-ttl.ts
+ * @description E2E for board posts: TTL expiry and the default/custom ttl_hours arithmetic,
+ *   reactions and replies, subscriptions with category filters and webhook fan-out, the public-board
+ *   morsel price, and the access rules (private, shared, public, and the operator gate on creating a
+ *   public board).
+ * @version-history
+ *   v1.0.0 -- 2026-02-26 -- Initial (T-6 board post TTL).
+ *   v1.1.0 -- 2026-08-11 -- Phase 6 (Tier 0.5 one-time-key posting) removed with the routes it
+ *     covered; a reply on a private board asks the board's access question (test 9).
+ *   v1.2.0 -- 2026-08-12 -- August 2026 audit H-2: the operator-gated public-board creation is
+ *     driven by the OWNER session, because an agent JWT no longer carries its owner's roles.
+ *     Test 35 proves the operator gate with a non-operator owner session as well as an agent one.
+ */
+// Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=board-ttl
 
 import * as http from 'node:http';
 import * as ed from '@noble/ed25519';
@@ -354,7 +367,10 @@ await test('12. List own subscriptions (agent-B)', async () => {
     assert(body.data.subscriptions.some((s: any) => s.board_id === sharedBoardId), 'subscription found');
 });
 
-await test('13. List subscribers (owner/operator = agent-A)', async () => {
+// Named for what it proves: agent-A created the shared board, so agent-A passes the subscribers gate
+// as its BOARD OWNER. The gate's other arm is 'operator', which an agent session has not carried
+// since H-2, so an agent token here is correct only while it is the board's owner.
+await test('13. List subscribers (board owner = agent-A)', async () => {
     const { status, body } = await json(`/v1/boards/${sharedBoardId}/subscribers`, {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
@@ -447,17 +463,18 @@ await json(`/v1/boards/${sharedBoardId}/subscribe`, {
 // ─── Phase 5: Public Board Morsel Costs ───
 console.log('\nPhase 5 — Public Board Morsel Costs');
 
-// First owner = operator, so agent-A's owner can create public boards
-// But we need to use the owner token (which has operator role) to create public boards
-// Actually, the route requires agent auth + operator role. The first owner's agents should have operator.
-// Let's check: the owner token has roles=['owner','operator'], but we need agent role too.
-// Create public board with owner token — nope, needs agent role.
-// Use agentToken — agent-A's owner is the first owner, so agent-A should have operator role.
-
+// A public board is operator-only, and the first registered owner is the operator. This suite used
+// agentToken here, which worked because POST /v1/auth/token copied the owner's 'owner' and
+// 'operator' roles onto the agent JWT. Audit finding H-2 closed that: an agent session is exactly
+// ['agent'] now, matching what device-auth, the MCP OAuth path and the refresh path always issued.
+// So the operator credential is ownerToken, the owner session from the signing mint, whose roles
+// come from the owner record. requireRole('agent') admits an owner session (operator > owner >
+// agent), and requireScope steps aside for it. DO NOT switch this back to agentToken: the board
+// would 403 again, and every public-board test after it would 404 on an id that was never minted.
 await test('20. Create public board (operator)', async () => {
     const { status, body } = await json('/v1/boards', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ name: 'Public Economy Board', visibility: 'public' }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -619,7 +636,26 @@ await test('35. Non-operator create public board → 403', async () => {
         headers: { Authorization: `Bearer ${nonOpAgentToken}` },
         body: JSON.stringify({ name: 'Should Fail', visibility: 'public' }),
     });
-    assert(status === 403, `expected 403, got ${status}`);
+    assert(status === 403, `expected 403 for agent, got ${status}`);
+
+    // The probe above no longer says much: since H-2 no agent session carries 'operator' at all, so
+    // it would refuse whoever the agent's owner is. The distinction it used to draw needs a
+    // principal that CAN hold 'operator' and does not, which is the second owner (only the first
+    // registered owner is promoted). The private board is the control: same credential, same route,
+    // 201, so the 403 that follows it is about `public` alone.
+    const { status: controlStatus } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
+        body: JSON.stringify({ name: 'Control Private Board', visibility: 'private' }),
+    });
+    assert(controlStatus === 201, `control private board should succeed, got ${controlStatus}`);
+
+    const { status: ownerStatus } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${nonOpOwnerToken}` },
+        body: JSON.stringify({ name: 'Should Fail Too', visibility: 'public' }),
+    });
+    assert(ownerStatus === 403, `expected 403 for non-operator owner session, got ${ownerStatus}`);
 });
 
 await test('36. Unsubscribe when not subscribed → 404', async () => {

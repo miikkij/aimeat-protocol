@@ -133,8 +133,12 @@ export function registerProfileRoutes(
             }
         }
 
+        // `null` rather than `undefined` for "inherit the node default". Undefined is the absence of
+        // an instruction, and a provider is entitled to read it as "leave this column alone"; null is
+        // the instruction to clear. The two backends disagreed on that for as long as this route has
+        // existed, and the disagreement only surfaced when a test finally drove it on both.
         const updates: Record<string, unknown> = {
-            allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
+            allowedOrigins: allowed_origins === null ? null : allowed_origins,
         };
 
         const updated = await storage.updateGHII(ghiiRecord.ghii, updates);

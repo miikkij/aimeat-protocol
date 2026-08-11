@@ -46,17 +46,21 @@ describe('error envelope', () => {
         expect(result.request_id).toMatch(/^req-[0-9a-f]{8}$/);
     });
 
-    it('includes default hints when none provided', () => {
+    // Every error also carries the way out of a dead end: `support@operators` reaches whoever runs
+    // this node. It is APPENDED, so a route's own specific hint stays first and the docs link keeps
+    // its place; these assertions read positionally rather than by count for that reason.
+    it('includes default hints when none provided, plus the support hint', () => {
         const result = error('aimeat-us-001-dev', 'ERR', 'fail');
         expect(result.hints).toBeDefined();
-        expect(result.hints!.next_actions).toHaveLength(1);
+        expect(result.hints!.next_actions).toHaveLength(2);
         expect(result.hints!.next_actions[0].url).toBe('/v1/docs');
+        expect(result.hints!.next_actions[1].url).toBe('/v1/messages');
     });
 
     it('includes custom hints when provided', () => {
         const hints = [{ description: 'Retry', method: 'POST', url: '/v1/retry' }];
         const result = error('aimeat-us-001-dev', 'ERR', 'fail', 500, undefined, hints);
-        expect(result.hints!.next_actions).toHaveLength(1);
+        expect(result.hints!.next_actions).toHaveLength(2);
         expect(result.hints!.next_actions[0].description).toBe('Retry');
     });
 

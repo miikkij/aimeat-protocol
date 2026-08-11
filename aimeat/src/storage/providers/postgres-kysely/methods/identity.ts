@@ -274,6 +274,13 @@ export const identityMethods = {
       // clean 401 while the counter stayed at zero forever. Migration 0013 adds both columns (their
       // totp equivalents were always there). See also the empty-update guard below.
       delete data.semantic;   // not a column
+      // A key present with an UNDEFINED value is not a column to set, and Kysely throws on one. The
+      // sqlite provider never noticed, because it spreads the patch over the whole row and rewrites
+      // every column, so `{ x: undefined }` reaches the database as NULL and reads as "cleared".
+      // Over here the same patch was a 500. PUT /v1/ghii/cors sent exactly that to clear the origin
+      // list, so the account CORS setting could be cleared on one backend and crashed on the other.
+      // Dropping the key means "leave this column alone"; a caller that wants to CLEAR passes null.
+      for (const [k, v] of Object.entries(data)) if (v === undefined) delete data[k];
       if (data.createdAt) data.createdAt = new Date(data.createdAt as string);
       if (data.updatedAt) data.updatedAt = new Date(data.updatedAt as string);
       if ('externalIdentities' in data) data.externalIdentities = jsonb((data.externalIdentities ?? null) as Parameters<typeof jsonb>[0]);   // Json column

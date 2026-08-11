@@ -167,7 +167,12 @@ await test('POST /v1/auth/token — get agent JWT', async () => {
     agentJwt = data.data.token;
     assert(typeof agentJwt === 'string' && agentJwt.length > 0, 'missing agent JWT');
     assert(data.data.roles.includes('agent'), 'should have agent role');
-    assert(data.data.roles.includes('owner'), 'agent of owner should inherit owner role');
+    // An agent is an agent. This used to assert the opposite, and the opposite was audit finding
+    // H-2: POST /v1/auth/token copied the OWNER's owner and operator roles onto the agent's JWT, so
+    // every agent of an operator was an operator, and a scope-limited agent could mint itself an
+    // unscoped operator PAT in two calls. The other three mints had always said ['agent'].
+    assert(!data.data.roles.includes('owner'), 'an agent must NOT inherit the owner role');
+    assert(!data.data.roles.includes('operator'), 'an agent must NOT inherit the operator role');
 });
 
 await test('Agent JWT signature: gaii+owner+host format should FAIL', async () => {

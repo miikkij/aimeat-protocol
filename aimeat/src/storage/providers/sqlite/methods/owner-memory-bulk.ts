@@ -5,6 +5,9 @@
  *   to keep that file ≤800 lines (max-file-lines); method bodies are verbatim, bound to SqliteStorage via
  *   the same prototype merge. Each is workload-shaped so the higher layers compose them without SQL.
  * @version-history
+ *   v1.2.0 — 2026-08-12 — bulkSetMemory/bulkDeleteMemory join an open transaction instead of opening a
+ *     second one (SqliteError: cannot start a transaction within a transaction). Storage.transaction()
+ *     landed after these two, and its contract says a nested call joins.
  *   v1.1.0 — 2026-07-16 — Add getMemoryByKeysAnyOwner (Phase 2 N×M): many keys across ALL owners in one query.
  *   v1.0.0 — 2026-07-15 — Extracted from owner.ts (Phase 1/2 bulk primitives).
  */
@@ -54,9 +57,19 @@ export const ownerMemoryBulkMethods = {
   // bump + trackable-history + byteSize stay identical); a manual BEGIN/COMMIT wraps the loop into a
   // single commit. better-sqlite3 runs every statement synchronously, so the awaited setMemory calls
   // execute inside the open transaction with nothing else touching the connection between them.
+  //
+  // Inside a caller's storage.transaction() the loop runs bare: SQLite has no nested BEGIN, and the
+  // Storage.transaction contract says a nested call joins the open transaction. Opening a second one
+  // threw `cannot start a transaction within a transaction`, which reached the caller as a 500 —
+  // every batch record publish did this, since publishDraftsBatch wraps the upsert and the delete in
+  // one boundary. The caller's rollback covers a throw from here, so the try/catch drops with it.
   async bulkSetMemory(this: SqliteStorage, records: MemoryRecord[]): Promise<MemoryRecord[]> {
     if (records.length === 0) return [];
     const out: MemoryRecord[] = [];
+    if (this.insideTransaction) {
+      for (const r of records) out.push(await this.setMemory(r));
+      return out;
+    }
     this.db.exec('BEGIN');
     try {
       for (const r of records) out.push(await this.setMemory(r));
@@ -89,10 +102,16 @@ export const ownerMemoryBulkMethods = {
   // BULK PRIMITIVE (Phase 2) — delete many explicit (ownerGaii, key) rows in ONE transaction (a manual
   // BEGIN/COMMIT round a prepared per-key delete — better-sqlite3 runs it synchronously). Backs the
   // batched record-family delete (rows collected across records, possibly spanning owner identities).
+  // Same nesting rule as bulkSetMemory above: inside a caller's transaction the deletes run bare and
+  // commit with it.
   async bulkDeleteMemory(this: SqliteStorage, refs: { ownerGaii: string; key: string }[]): Promise<number> {
     if (refs.length === 0) return 0;
     const stmt = this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?');
     let removed = 0;
+    if (this.insideTransaction) {
+      for (const r of refs) removed += stmt.run(r.ownerGaii, r.key).changes;
+      return removed;
+    }
     this.db.exec('BEGIN');
     try {
       for (const r of refs) removed += stmt.run(r.ownerGaii, r.key).changes;
