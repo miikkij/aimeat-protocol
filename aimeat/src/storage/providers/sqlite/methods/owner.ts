@@ -2,6 +2,10 @@
  * @file src/storage/providers/sqlite/methods/owner.ts
  * @description Owner, Agent, and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — The memory writes persist `groupId` (shared rule in storage/memory-sharing.ts).
+ *     This backend had never written the column on any path, so every `visibility:'group'` record on a
+ *     SQLite node was unreadable by every member of the group it named, permanently and silently — the
+ *     write answering 201 with the group's own name in the response.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-07-14 — Perf: add listMemoryMeta (metadata + byteSize projection, no value column)
  *     backing ?include=meta.
@@ -13,6 +17,7 @@ import type {
   OwnerRecord, AgentRecord, MemoryRecord, ArchiveFilter
 } from '../../../interface.js';
 import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+import { resolveGroupId } from '../../../memory-sharing.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
@@ -395,6 +400,9 @@ export const ownerMethods = {
     // a generic rewrite never silently turns tracking off. Archiving keeps the PREVIOUS version.
     const trackable = record.trackable ?? existing?.trackable ?? false;
     record.trackable = trackable || undefined;
+    // Which group this lands in — shared with the Postgres provider so the rule cannot drift.
+    const groupId = resolveGroupId(record, existing);
+    record.groupId = groupId ?? undefined;
     const valueStr = JSON.stringify(record.value);
     const byteSize = Buffer.byteLength(valueStr, 'utf8');   // cached for the O(1) total-size quota sum + ?include=meta
     if (existing) {
@@ -412,11 +420,11 @@ export const ownerMethods = {
       }
       record.version = existing.version + 1;
       this.db.prepare(
-        `UPDATE memory SET value = ?, visibility = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
+        `UPDATE memory SET value = ?, visibility = ?, groupId = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
          createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ?, byteSize = ?,
          aiProvenanceId = ? WHERE ownerGaii = ? AND key = ?`
       ).run(
-        valueStr, record.visibility, record.workspaceRef ?? null,
+        valueStr, record.visibility, groupId, record.workspaceRef ?? null,
         JSON.stringify(record.tags), record.ttlHours,
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
@@ -429,11 +437,11 @@ export const ownerMethods = {
       );
     } else {
       this.db.prepare(
-        `INSERT INTO memory (ownerGaii, key, value, visibility, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO memory (ownerGaii, key, value, visibility, groupId, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ownerGaii, record.key,
-        valueStr, record.visibility, record.workspaceRef ?? null,
+        valueStr, record.visibility, groupId, record.workspaceRef ?? null,
         JSON.stringify(record.tags), record.ttlHours,
         record.version, record.createdAt, record.updatedAt,
         record.flagCount ?? 0,
@@ -467,12 +475,12 @@ export const ownerMethods = {
     // than overwriting a subtree it never saw.
     const valueStr = JSON.stringify(record.value);
     const result = this.db.prepare(
-      `INSERT INTO memory (ownerGaii, key, value, visibility, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO memory (ownerGaii, key, value, visibility, groupId, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(ownerGaii, key) DO NOTHING`
     ).run(
       record.ownerGaii, record.key,
-      valueStr, record.visibility, record.workspaceRef ?? null,
+      valueStr, record.visibility, resolveGroupId(record, null), record.workspaceRef ?? null,
       JSON.stringify(record.tags), record.ttlHours,
       record.version, record.createdAt, record.updatedAt,
       record.flagCount ?? 0,
@@ -485,12 +493,18 @@ export const ownerMethods = {
 
   async setMemoryIfVersion(this: SqliteStorage, record: MemoryRecord, expectedVersion: number): Promise<MemoryRecord | null> {
     const valueStr = JSON.stringify(record.value);
+    // Read the row this replaces so an unnamed group can be inherited (resolveGroupId rule 3). Safe
+    // against a racing writer without reading inside the UPDATE: a concurrent change bumps the
+    // version, and the WHERE below then matches nothing and this write is refused.
+    const existing = await this.getMemory(record.ownerGaii, record.key);
+    const groupId = resolveGroupId(record, existing);
+    record.groupId = groupId ?? undefined;
     const result = this.db.prepare(
-      `UPDATE memory SET value = ?, visibility = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
+      `UPDATE memory SET value = ?, visibility = ?, groupId = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
        updatedAt = ?, flagCount = ?, allowedOrigins = ?, byteSize = ?, aiProvenanceId = ?
        WHERE ownerGaii = ? AND key = ? AND version = ?`
     ).run(
-      valueStr, record.visibility, record.workspaceRef ?? null,
+      valueStr, record.visibility, groupId, record.workspaceRef ?? null,
       JSON.stringify(record.tags), record.ttlHours,
       record.version, record.updatedAt,
       record.flagCount ?? 0,

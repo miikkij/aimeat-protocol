@@ -23,6 +23,9 @@
  *   v1.7.0 -- 2026-08-07 -- Add e2e-remake-funnel.ts (remake phase 0: onboarding.track separation)
  *            e2e-remake-home.ts (remake phases 2-3: the welcome mat gate) and
  *            e2e-registration-invites.ts (remake phase 4b: the agent door).
+ *   v1.10.0 -- 2026-08-11 -- Add e2e-group-sharing.ts: the half of sharing groups that e2e-sharing-groups
+ *            never touched. That suite manages a group in 17 assertions and never reads a record with
+ *            one, which is how the sharing itself stayed broken on both backends under a green run.
  *   v1.9.0 -- 2026-08-11 -- Add e2e-app-publish-gate.ts (the build-spec token + the publish-time
  *            artifact check: what refuses a publish, and what merely warns).
  *   v1.8.0 -- 2026-08-10 -- Register the three suites that were in no runner at all: cortex-e2e.ts,
@@ -281,6 +284,9 @@ const ALL_SUITES = [
     'test/e2e-message-transcript.ts',
     'test/ai.ts',
     'test/e2e-sharing-groups.ts',
+    // The other half of the same feature: e2e-sharing-groups proves a group can be MANAGED,
+    // this proves it grants a cross-owner read (and that removing a member takes it away).
+    'test/e2e-group-sharing.ts',
     'test/e2e-agent-tasks.ts',
     'test/e2e-agent-file-handoff.ts',
     'test/e2e-agent-schedules.ts',

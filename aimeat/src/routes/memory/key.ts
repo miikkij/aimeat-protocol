@@ -2,6 +2,11 @@
  * @file src/routes/memory/key.ts
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — The cross-owner read resolves the accessor's identity instead of passing
+ *     the raw JWT `sub`. An owner session carries a bare account name, so no sharing-group
+ *     membership and no consent grant could match it: a person could not read what had been shared
+ *     with them, while their own agents could. Same fix the storage-file twin GET /v1/pub took in
+ *     July; this side of the pair had been left. Decision d-resolve-identity.
  *   v1.2.0 — 2026-08-01 — TARGET-058: the reads carry `meta.provenance` + the AI-Disclosure / Link
  *     headers, and the writes stamp a non-human principal that declared nothing (Mint-3).
  *   v1.1.0 — 2026-07-19 — public :gaii/:key read supports ?soft=1 (200 + exists:false, identical
@@ -583,7 +588,13 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Non-public data with consent enabled: shared guard decides + audits the attempt. For a
     // 'workspace' record the guard runs canReadWorkspace(record.workspaceRef) — thread the ref + the
     // accessor's sub/owner so a workspace member is recognised (parity with the storage-file /v1/pub path).
-    const accessorGaii = req.auth?.sub ?? 'anonymous';
+    // Resolve to the GHII/GAII. An OWNER session carries a BARE `sub` (just `alice`), while group
+    // membership and consent grants are both keyed under the resolved identity (`alice@node`), so
+    // passing the bare name matched neither and a human could not read what was shared with them —
+    // only their agents could, whose `sub` is already a full GAII. Same fix, same reason, as the
+    // storage-file twin GET /v1/pub, which resolves here and has since 2026-07-05.
+    const isAnonymousReader = !req.auth?.sub || req.auth.anonymous === true;
+    const accessorGaii = isAnonymousReader ? 'anonymous' : resolve(req);
     const consentResult = await authorizeRead(storage, config, {
       ownerGaii: record.ownerGaii,
       accessorGaii,

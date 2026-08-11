@@ -7,6 +7,10 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.3.0 — 2026-08-11 — `groupId` is written on the UPDATE paths and on createMemoryIfAbsent, not
+ *     only on the first INSERT (shared rule in storage/memory-sharing.ts). It was frozen at creation,
+ *     so a record could never be shared after it existed, and MOVING one to another group changed
+ *     nothing while answering 200: the old audience kept reading it and the new one never saw it.
  *   v1.2.0 — 2026-07-25 — listAllMemory gains excludeOwnerPrefix (filters in SQL, so a windowed read
  *     is not emptied by rows it was going to drop) and newestFirst (key order made `limit` return an
  *     alphabetical slice here while SQLite returned the newest rows for the same call).
@@ -17,6 +21,7 @@ import { sql } from 'kysely';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
 import type { MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 import type { PostgresKyselyStorage } from '../index.js';
+import { resolveGroupId } from '../../../memory-sharing.js';
 import { buildSearchBlob, byteSize, isLive, jsonb, rowToMeta, rowToRecord } from '../helpers.js';
 
 type ListOpts = { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter };
@@ -72,10 +77,16 @@ export const memoryMethods = {
         } as any).onConflict(oc => oc.columns(['ownerGaii', 'key', 'version']).doNothing()).execute();
       }
       record.version = existing.version + 1;
+      // The group binding is written on the UPDATE too, not only on the INSERT. Without it a record
+      // could never be shared after creation, and moving one between groups changed nothing while
+      // reporting success — the old audience kept reading it.
+      const updGroupId = resolveGroupId(record, existing as { groupId?: string | null });
+      record.groupId = updGroupId ?? undefined;
       await this.db.updateTable('Memory').set({
         value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [], ttlHours: record.ttlHours,
         version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null, trackable,
+        groupId: updGroupId,
         byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
         // Write-through, deliberately NOT inherited from `existing`: a new value is new content, and
         // keeping the old provenance id would assert something about bytes that no longer exist.
@@ -91,7 +102,7 @@ export const memoryMethods = {
         version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null,
         trackable, byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
-        groupId: record.groupId ?? null, workspaceRef: record.workspaceRef ?? null,
+        groupId: resolveGroupId(record, null), workspaceRef: record.workspaceRef ?? null,
         aiProvenanceId: record.aiProvenanceId ?? null,
       };
       await this.db.insertInto('Memory').values({ ownerGaii: record.ownerGaii, key: record.key, ...insertCols } as never)
@@ -108,7 +119,7 @@ export const memoryMethods = {
     const res = await this.db.insertInto('Memory').values({
       ownerGaii: record.ownerGaii, key: record.key,
       value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [],
-      workspaceRef: record.workspaceRef ?? null, ttlHours: record.ttlHours,
+      groupId: resolveGroupId(record, null), workspaceRef: record.workspaceRef ?? null, ttlHours: record.ttlHours,
       version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
       flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null,
       trackable: record.trackable ?? false,
@@ -141,16 +152,19 @@ export const memoryMethods = {
         } as any).onConflict(oc => oc.columns(['ownerGaii', 'key', 'version']).doNothing()).execute();
       }
       const newVersion = existing.version + 1;
+      const cswGroupId = resolveGroupId(record, existing as { groupId?: string | null });
       await trx.updateTable('Memory').set({
         value: jsonb(record.value), visibility: record.visibility, tags: record.tags ?? [], ttlHours: record.ttlHours,
         version: newVersion, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null, trackable,
+        groupId: cswGroupId,
         byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
         aiProvenanceId: record.aiProvenanceId ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).where('version', '=', expectedVersion).execute();
       record.version = newVersion;
       record.trackable = trackable || undefined;
+      record.groupId = cswGroupId ?? undefined;
       return record;
     });
   },
