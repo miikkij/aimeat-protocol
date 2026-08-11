@@ -375,6 +375,17 @@ export function registerExtensionsTools(
             if (!built.ok) {
                 return { content: [{ type: 'text' as const, text: `${built.code}: ${built.message}` }], isError: true };
             }
+            // The write permission, checked HERE and not only by the registration filter. That filter
+            // is warn-only when AIMEAT_MCP_ENFORCE_SCOPES=false, and in that mode this tool installed
+            // executable extension code with no permission check at all. routes/extensions/crud.ts
+            // checks it in the handler for the same reason.
+            if (!canManageExtensionAs(
+                { owner: callerOwner, roles: ['agent'], scopes: sessionScopes },
+                config, callerOwner,
+            )) {
+                return { content: [{ type: 'text' as const, text: 'Installing an extension needs the ext:write permission, which this session does not carry.' }], isError: true };
+            }
+
             const record = built.record;
             const name = record.name;
 

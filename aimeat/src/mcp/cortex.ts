@@ -161,6 +161,15 @@ export function registerCortexTools(
 
             const ext = result.extension;
 
+            // Installing over an existing cortex extension is an UPDATE, and only its installer may
+            // make one. routes/cortex.ts:265 refuses a mismatch on its own update path; this tool had
+            // no installedBy check at all, so an agent could overwrite another owner's extension and
+            // its lib files by installing a same-named one.
+            const prior = await storage.getCortexExtension(ext.name);
+            if (prior && prior.installedBy !== callerOwner) {
+                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${ext.name}` }], isError: true };
+            }
+
             // Store lib files
             if (libs) {
                 for (const [filename, content] of Object.entries(libs)) {

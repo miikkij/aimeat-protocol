@@ -103,7 +103,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { canWriteNamespaceRule } from '../routes/organisms/shared.js';
-import { isKeyArchived } from '../services/archive.js';
+import { archivedRefusal, checkWorkspaceWriteLimits } from '../services/workspace-write-guards.js';
 import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -190,18 +190,6 @@ export function registerWorkspaceTools(
         if (m && m.status === 'active') return m.role;
         const org = await storage.getOrganism(orgId);
         return org?.agentGaiis?.includes(agentGaii) ? 'member' : null;
-    }
-
-    /**
-     * Is this key inside something the owner archived? Archived is read-only, and it means it on
-     * every surface. These tools checked nothing, so an archived workspace kept accepting drafts,
-     * publishes and structure edits through an agent while the web door refused them with 409.
-     */
-    async function archivedRefusal(key: string): Promise<string | null> {
-        const guard = await isKeyArchived(storage, key);
-        return guard.archived
-            ? `This ${guard.level} is archived (read-only). Unarchive it before writing.`
-            : null;
     }
 
     /** Pick the freshest of two records for the same key: higher version wins, then newer updatedAt.
@@ -493,6 +481,16 @@ export function registerWorkspaceTools(
                 if (!valid.valid) return fail(`${batch ? `items[${i}]: ` : ''}Draft rejected by schema: ` + JSON.stringify(valid.errors));
                 planned.push({ key, v, item });
             }
+            // Archived is read-only. This path had no check, so an agent kept filing drafts into a
+            // workspace the owner had closed, and the view then showed fresh material in something
+            // marked finished.
+            const wsArchived = await archivedRefusal(storage, `${root}.`);
+            if (wsArchived) return fail(wsArchived);
+
+            const overLimit = await checkWorkspaceWriteLimits(
+                storage, config, ownerGhii, planned, i => (batch ? `items[${i}]: ` : ''),
+            );
+            if (overLimit) return fail(overLimit);
             const written: Record<string, unknown>[] = [];
             let lastProvenanceId: string | undefined;
             for (const { key, v, item } of planned) {
@@ -549,7 +547,7 @@ export function registerWorkspaceTools(
             if (!role || !canWriteNamespaceRule(role, namespace)) {
                 return fail('Admin/creator role required to publish in a meta.* namespace');
             }
-            const archived = await archivedRefusal(`${wsRoot(organism_id, ws)}.`);
+            const archived = await archivedRefusal(storage, `${wsRoot(organism_id, ws)}.`);
             if (archived) return fail(archived);
             const cfg = await storage.getMemory(ownerGhii, `organism.${organism_id}.meta.config`);
             const gate = (cfg?.value as { gates?: { publish?: { enabled?: boolean } } } | undefined)?.gates?.publish?.enabled;
