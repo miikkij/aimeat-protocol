@@ -16,6 +16,10 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Five words that no wildcard carries: commerce:psp,
+ *     commerce:beneficiary-verify, agent:permissions, consent:groups and social:members. Each names
+ *     a call the web door reserves to a logged-in person, so it costs its own tick rather than
+ *     riding along with Full access.
  *   v1.1.0 — 2026-08-10 — Three new domains (agent, app, capability) plus organism:write,
  *     organism:invite and ext:invoke. These name things an agent could already do with no
  *     permission at all, because the MCP scope table read silence as consent.
@@ -37,7 +41,19 @@
  * the wildcard. "Full access" is one click, and nobody clicking it is deciding that an agent may
  * point their decrypted AI key at a URL of its choosing — so that one costs its own tick.
  */
-export const NOT_IN_WILDCARD = ['memory:write-reserved'];
+export const NOT_IN_WILDCARD = [
+  'memory:write-reserved',
+  // ── Added 2026-08-11 ─────────────────────────────────────────────────────────────────────────
+  // Eight tool calls the web door reserves to a logged-in person and the agent surface allowed on
+  // an ordinary permission. Each is the owner's money or who else sees their data. The agent is not
+  // shut out — it should be able to do what a person can — but each of these costs its own tick, so
+  // it cannot ride along with "Full access".
+  'commerce:psp',
+  'commerce:beneficiary-verify',
+  'agent:permissions',
+  'consent:groups',
+  'social:members',
+];
 
 /**
  * The vocabulary of the checkbox editor.
@@ -70,10 +86,14 @@ export const SCOPE_DOMAINS = [
   { key: 'storage',   permissions: ['read', 'write'] },
   { key: 'ai',        permissions: ['use'] },
   { key: 'work',      permissions: ['request', 'read', 'accept', 'publish'] },
-  { key: 'social',    permissions: ['read', 'write'] },
+  // social:members — add or remove who may read a shared board. A different promise from posting
+  //   to one, which is what social:write covers.
+  { key: 'social',    permissions: ['read', 'write', 'members'] },
   { key: 'messages',  permissions: ['send', 'read', 'send-as-owner'] },
   { key: 'wallet',    permissions: ['read'] },
-  { key: 'consent',   permissions: ['manage'] },
+  // consent:groups — create a sharing group and decide who is in it. A sharing group IS the
+  //   boundary of who reads the owner's memory, so it is separated from managing consents.
+  { key: 'consent',   permissions: ['manage', 'groups'] },
   { key: 'tunnel',    permissions: ['connect'] },
   { key: 'catalogue', permissions: ['read'] },
   { key: 'task',      permissions: ['read', 'write'] },
@@ -86,7 +106,11 @@ export const SCOPE_DOMAINS = [
   { key: 'connections', permissions: ['read', 'write', 'use'] },
   { key: 'notifications', permissions: ['send'] },
   { key: 'exchange',  permissions: ['read', 'write', 'grant', 'beneficiary'] },
-  { key: 'commerce',  permissions: ['sell', 'buy'] },
+  // commerce:psp — write or destroy the payment credentials money is paid out through.
+  // commerce:beneficiary-verify — record a beneficiary as verified, which is what makes a payout
+  //   possible. Kept apart from the rest because a provider who could open this gate for their own
+  //   payee is not a gate at all.
+  { key: 'commerce',  permissions: ['sell', 'buy', 'psp', 'beneficiary-verify'] },
   // organism:read   — see the organisms and workspaces this agent's owner belongs to
   // organism:write  — create a workspace, write and publish documents in one, comment, revert
   // organism:invite — hand somebody else access: invite a member, grant or revoke a workspace role.
@@ -115,7 +139,9 @@ export const SCOPE_DOMAINS = [
   //               write because publishing an update and deleting the thing are different risks.
   // capability:write — create, update, delete or vouch for a published capability. A capability is
   //               how this account offers work to others, so writing one speaks in the owner's name.
-  { key: 'agent',      permissions: ['write'] },
+  // agent:permissions — rewrite what another of the owner's agents is allowed to do. Separate
+  //   from agent:write, which is its mode and its tags: this one changes the permission set itself.
+  { key: 'agent',      permissions: ['write', 'permissions'] },
   { key: 'app',        permissions: ['write', 'manage'] },
   { key: 'capability', permissions: ['write'] },
 ];

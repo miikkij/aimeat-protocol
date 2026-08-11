@@ -32,6 +32,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /**
  * The words added on 2026-08-10, and what each one covers. Every existing agent gets all of them,
@@ -72,6 +73,14 @@ export const CONDITIONAL_SCOPES: ReadonlyArray<{ grant: string; when: string; wh
         when: 'commerce:sell',
         why: 'the four beneficiary tools moved from commerce:sell to the word REST already required',
     },
+    // The five words added on 2026-08-11 that no wildcard carries. Each names a call the web door
+    // reserves to a logged-in person; the agent keeps the door and pays an explicit tick for it.
+    // Granted here to exactly the agents that could already reach the tool, and to nobody else.
+    { grant: 'commerce:psp', when: 'commerce:sell', why: 'aimeat_commerce_psp_set / _delete' },
+    { grant: 'commerce:beneficiary-verify', when: 'wallet:read', why: 'aimeat_commerce_beneficiary_approve' },
+    { grant: 'agent:permissions', when: 'agent:write', why: 'aimeat_operator_agent_configure' },
+    { grant: 'consent:groups', when: 'consent:manage', why: 'aimeat_group_create / _add_member / _remove_member' },
+    { grant: 'social:members', when: 'social:write', why: 'aimeat_board_members' },
 ];
 
 /**
@@ -84,13 +93,20 @@ export async function migrateAgentScopeVocabulary(storage: Storage): Promise<num
 
     for (const agent of agents) {
         const held = agent.defaultScopes;
-        // No recorded scopes at all, or the wildcard: nothing to grandfather. An agent with no
-        // defaultScopes is minted from config.defaultAgentScopes, which is a separate decision.
-        if (!Array.isArray(held) || held.includes('*')) continue;
+        // No recorded scopes at all: nothing to grandfather. An agent with none is minted from
+        // config.defaultAgentScopes, which is a separate decision.
+        if (!Array.isArray(held)) continue;
 
-        const missing: string[] = GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
+        // The grandfathered words ride inside a wildcard already, so a '*' agent needs none of them.
+        const missing: string[] = held.includes('*')
+            ? []
+            : GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
+
+        // The conditional words do NOT ride inside a wildcard — that is their whole point — so a
+        // '*' agent DOES need them written out, or it silently loses a tool it has today. Coverage
+        // is asked of the 'when' word, which '*' does carry.
         for (const c of CONDITIONAL_SCOPES) {
-            if (held.includes(c.when) && !held.includes(c.grant)) missing.push(c.grant);
+            if (scopeIsCovered(held, c.when) && !held.includes(c.grant)) missing.push(c.grant);
         }
         if (!missing.length) continue;
 

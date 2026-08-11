@@ -5599,7 +5599,9 @@
           },
           "commerce": {
             "buy": "Pay for purchases at checkout using your balance.",
-            "sell": "Set up what you sell: prices, payout account and revenue sharing."
+            "sell": "Set up what you sell: prices, payout account and revenue sharing.",
+            "psp": "Set or remove the payment account your earnings are paid into. Whoever can change this can redirect where the money goes.",
+            "beneficiary-verify": "Confirm that someone you share revenue with is verified, which is what allows them to be paid."
           },
           "company": {
             "read": "See the companies you have registered and their details.",
@@ -5611,7 +5613,8 @@
             "write": "Connect new social accounts to your name and disconnect existing ones."
           },
           "consent": {
-            "manage": "See and change the permissions you have given to other people and services."
+            "manage": "See and change the permissions you have given to other people and services.",
+            "groups": "Create sharing groups and choose who is in them. A sharing group decides who else can read your knowledge."
           },
           "cortex": {
             "write": "Install, switch on and remove the browser add-ons in your account."
@@ -5658,7 +5661,8 @@
           },
           "social": {
             "read": "Follow and unfollow discussion boards. Reading board posts is public and needs no permission.",
-            "write": "Create and delete boards, and post, reply and react on your behalf."
+            "write": "Create and delete boards, and post, reply and react on your behalf.",
+            "members": "Add and remove who can read your shared boards."
           },
           "storage": {
             "read": "Open and download the files you have stored.",
@@ -5685,7 +5689,8 @@
             "write": "Create, change and run your automations."
           },
           "agent": {
-            "write": "Change the settings of your OTHER agents: what mode they run in and how they are tagged."
+            "write": "Change the settings of your OTHER agents: what mode they run in and how they are tagged.",
+            "permissions": "Change what your OTHER agents are allowed to do. Separate from their settings, because this is the permission list itself."
           },
           "app": {
             "write": "Publish and update apps on your account, including saving and publishing drafts.",

@@ -50,7 +50,29 @@ export const WRITE_RESERVED_SCOPE = 'memory:write-reserved';
  * asserted to agree in test/unit/agent-scope-model.test.ts. Adding an entry here without adding it
  * there produces a checkbox that lies about what it granted.
  */
-export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [WRITE_RESERVED_SCOPE];
+/**
+ * Eight tool calls the HTTP door reserves to an owner session and the tool surface let an agent
+ * make on an ordinary permission. Each is either the owner's money or who else sees the owner's
+ * data: the seller's Stripe credentials, the AI budget and the models it routes to, rewriting an
+ * agent's own permissions, the sharing groups that decide who reads memory, the roster of a shared
+ * board, and recording a beneficiary as payable.
+ *
+ * The answer is not to shut the agent out — an agent should be able to do what a person can. It is
+ * that each of these costs its own tick, and no wildcard carries it. "Full access" is one click,
+ * and nobody clicking it is deciding that an agent may repoint their payouts.
+ *
+ * Every agent that could already reach one of these tools was handed the new word at boot, once, by
+ * services/scope-vocabulary-migration.ts, so nothing lost a capability it had.
+ */
+const OWN_TICK_SCOPES = [
+    'commerce:psp',            // write or destroy the seller's payment credentials
+    'commerce:beneficiary-verify', // record a beneficiary as verified, i.e. as payable
+    'agent:permissions',       // rewrite an agent's granted permissions
+    'consent:groups',          // create a sharing group, add or remove who is in it
+    'social:members',          // change who may read a shared board
+] as const;
+
+export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [WRITE_RESERVED_SCOPE, ...OWN_TICK_SCOPES];
 
 /** True when `scope` is one of the scopes only an exact grant can confer. */
 export function isOutsideWildcard(scope: string): boolean {

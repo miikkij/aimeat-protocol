@@ -5599,7 +5599,9 @@
           },
           "commerce": {
             "buy": "Maksa ostoksia kassalla saldollasi.",
-            "sell": "Määritä mitä myyt: hinnat, tilitystili ja tulonjako."
+            "sell": "Määritä mitä myyt: hinnat, tilitystili ja tulonjako.",
+            "psp": "Aseta tai poista tilitystili jolle ansiosi maksetaan. Se joka voi vaihtaa tämän, voi ohjata rahat muualle.",
+            "beneficiary-verify": "Vahvista että tulonjaon saaja on todennettu, mikä on edellytys sille että hänelle voi maksaa."
           },
           "company": {
             "read": "Näe rekisteröimäsi yritykset ja niiden tiedot.",
@@ -5611,7 +5613,8 @@
             "write": "Liitä uusia sometilejä nimiisi ja irrota olemassa olevia."
           },
           "consent": {
-            "manage": "Näe ja muuta lupia jotka olet antanut muille ihmisille ja palveluille."
+            "manage": "Näe ja muuta lupia jotka olet antanut muille ihmisille ja palveluille.",
+            "groups": "Luo jakoryhmiä ja valitse keitä niissä on. Jakoryhmä ratkaisee kuka muu saa lukea tietosi."
           },
           "cortex": {
             "write": "Asenna, ota käyttöön ja poista tilisi selainlisäosia."
@@ -5658,7 +5661,8 @@
           },
           "social": {
             "read": "Seuraa ja lopeta keskustelupalstojen seuraaminen. Palstojen lukeminen on julkista eikä vaadi lupaa.",
-            "write": "Luo ja poista palstoja sekä kirjoita, vastaa ja reagoi puolestasi."
+            "write": "Luo ja poista palstoja sekä kirjoita, vastaa ja reagoi puolestasi.",
+            "members": "Lisää ja poista keitä jaetuille palstoillesi pääsee lukemaan."
           },
           "storage": {
             "read": "Avaa ja lataa tallentamasi tiedostot.",
@@ -5685,7 +5689,8 @@
             "write": "Luo, muuta ja aja automaatioitasi."
           },
           "agent": {
-            "write": "Muuta muiden agenttiesi asetuksia: missä tilassa ne toimivat ja millä tunnisteilla."
+            "write": "Muuta muiden agenttiesi asetuksia: missä tilassa ne toimivat ja millä tunnisteilla.",
+            "permissions": "Muuta mitä muut agenttisi saavat tehdä. Eri asia kuin niiden asetukset: tämä on itse lupalista."
           },
           "app": {
             "write": "Julkaise ja päivitä tilisi sovelluksia, luonnokset mukaan lukien.",

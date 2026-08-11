@@ -47,9 +47,22 @@ describe('expand', () => {
         expect(expandScopes(['*']).has(RESERVED)).toBe(false);
     });
 
-    it("['*', reserved] shows every box, reserved included", () => {
-        const set = expandScopes(['*', RESERVED]);
+    it('the wildcard plus EVERY out-of-wildcard word shows every box', () => {
+        // There are five more of these since 2026-08-11 — the seller's payment account, the
+        // beneficiary verification, an agent's permission list, the sharing groups and a board's
+        // roster. Each costs its own tick precisely so it cannot ride along with Full access, so
+        // the list is read from NOT_IN_WILDCARD rather than naming the reserved key alone.
+        const set = expandScopes(['*', ...NOT_IN_WILDCARD]);
         for (const s of everyScope()) expect(set.has(s)).toBe(true);
+    });
+
+    it("['*', reserved] alone leaves the OTHER out-of-wildcard boxes unticked", () => {
+        const set = expandScopes(['*', RESERVED]);
+        expect(set.has(RESERVED)).toBe(true);
+        for (const s of NOT_IN_WILDCARD) {
+            if (s === RESERVED) continue;
+            expect(set.has(s), `${s} must not ride along with the wildcard`).toBe(false);
+        }
     });
 
     it('a domain wildcard carries no more than the global one', () => {

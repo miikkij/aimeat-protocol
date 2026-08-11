@@ -33,22 +33,38 @@ function stubStorage(agents: Array<{ gaii: string; defaultScopes?: string[] }>) 
 }
 
 describe('migrateAgentScopeVocabulary', () => {
-    it('hands every grandfathered word to a narrow agent, and leaves a wildcard alone', async () => {
+    it('hands every grandfathered word to a narrow agent, and none of them to a wildcard', async () => {
         const { storage, written } = stubStorage([
             { gaii: 'narrow#a@node', defaultScopes: ['memory:read'] },
             { gaii: 'wide#a@node', defaultScopes: ['*'] },
         ]);
-        const changed = await migrateAgentScopeVocabulary(storage);
+        await migrateAgentScopeVocabulary(storage);
 
-        expect(changed).toBe(1);
-        expect(written.has('wide#a@node')).toBe(false);
-        for (const s of GRANDFATHERED_SCOPES) expect(written.get('narrow#a@node')).toContain(s);
+        for (const s of GRANDFATHERED_SCOPES) {
+            expect(written.get('narrow#a@node')).toContain(s);
+            // A wildcard already carries these, so writing them out would be noise.
+            expect(written.get('wide#a@node') ?? []).not.toContain(s);
+        }
         expect(written.get('narrow#a@node')).toContain('memory:read');
     });
 
-    it('grants a conditional word ONLY to an agent already holding the word it replaces', async () => {
-        const cond = CONDITIONAL_SCOPES[0];
-        expect(cond).toEqual(expect.objectContaining({ grant: 'exchange:beneficiary', when: 'commerce:sell' }));
+    /**
+     * The wildcard case that matters. The conditional words are deliberately OUTSIDE every wildcard,
+     * so a '*' agent does not carry them — and would silently lose tools it uses today unless they
+     * are written out for it. Coverage is asked of the 'when' word, which '*' does carry.
+     */
+    it('writes the out-of-wildcard words out for a wildcard agent, so it keeps its tools', async () => {
+        const { storage, written } = stubStorage([{ gaii: 'wide#a@node', defaultScopes: ['*'] }]);
+        await migrateAgentScopeVocabulary(storage);
+
+        const got = written.get('wide#a@node') ?? [];
+        for (const c of CONDITIONAL_SCOPES) expect(got).toContain(c.grant);
+        expect(got).toContain('*');
+    });
+
+    it('grants a conditional word ONLY to an agent already holding the word it depends on', async () => {
+        expect(CONDITIONAL_SCOPES[0]).toEqual(
+            expect.objectContaining({ grant: 'exchange:beneficiary', when: 'commerce:sell' }));
 
         const { storage, written } = stubStorage([
             { gaii: 'seller#a@node', defaultScopes: ['commerce:sell'] },
@@ -56,12 +72,16 @@ describe('migrateAgentScopeVocabulary', () => {
         ]);
         await migrateAgentScopeVocabulary(storage);
 
+        // A seller keeps every door it could already open, now under its own word.
         expect(written.get('seller#a@node')).toContain('exchange:beneficiary');
-        expect(written.get('reader#a@node')).not.toContain('exchange:beneficiary');
+        expect(written.get('seller#a@node')).toContain('commerce:psp');
+        // And an agent that never held commerce:sell gains neither.
+        expect(written.get('reader#a@node') ?? []).not.toContain('exchange:beneficiary');
+        expect(written.get('reader#a@node') ?? []).not.toContain('commerce:psp');
     });
 
     it('is idempotent — a second run over the migrated agents changes nothing', async () => {
-        const held = ['commerce:sell', 'exchange:beneficiary', ...GRANDFATHERED_SCOPES];
+        const held = ['commerce:sell', ...CONDITIONAL_SCOPES.map(c => c.grant), ...GRANDFATHERED_SCOPES];
         const { storage, written } = stubStorage([{ gaii: 'done#a@node', defaultScopes: held }]);
         const changed = await migrateAgentScopeVocabulary(storage);
 

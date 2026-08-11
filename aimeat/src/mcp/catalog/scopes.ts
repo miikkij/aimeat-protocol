@@ -99,7 +99,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     // reaching sideways at a sibling principal with its own identity and trust score does.
     aimeat_agent_mode_set:                    'agent:write',
     aimeat_agent_tags_set:                    'agent:write',
-    aimeat_operator_agent_configure:          'agent:write',
+    // Rewriting an agent's PERMISSIONS is its own word, and no wildcard carries it. PATCH
+    // /v1/agents/:name/scopes is owner-only, and the propose-then-confirm dance here binds the
+    // token to the CALLER — so the same agent mints and redeems it in two consecutive calls, and
+    // the "show this diff to the owner" text is instruction rather than a gate.
+    aimeat_operator_agent_configure:          'agent:permissions',
 
     // The destructive half: delete an app. Split from write because shipping an update and
     // removing the thing are different risks.
@@ -119,9 +123,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_capabilities_update:               'capability:write',
 
     // A sharing group IS a consent boundary: who may read what.
-    aimeat_group_add_member:                  'consent:manage',
-    aimeat_group_create:                      'consent:manage',
-    aimeat_group_remove_member:               'consent:manage',
+    // A sharing group IS the boundary of who reads the owner's memory. POST/PUT/DELETE
+    // /v1/sharing-groups are owner-only; here it costs an explicit tick instead of being shut.
+    aimeat_group_add_member:                  'consent:groups',
+    aimeat_group_create:                      'consent:groups',
+    aimeat_group_remove_member:               'consent:groups',
 
     // RUN an installed extension's action. Separate from ext:write, which is about which
     // extensions exist — using a capability is not the same as installing one.
@@ -224,7 +230,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_board_reply: 'social:write',
     aimeat_board_react: 'social:write',
     aimeat_board_delete: 'social:write',
-    aimeat_board_members: 'social:write',
+    // Who may READ a shared board, which is a different promise from posting to one. The HTTP
+    // route rejects every agent session outright ("even operator agents must use their owner
+    // session"); this door stays open and costs its own tick.
+    aimeat_board_members: 'social:members',
     aimeat_board_subscribe: 'social:read',
 
     // Wallet (GET /v1/wallet, /v1/wallet/transactions → wallet:read)
@@ -294,9 +303,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     // PSP secrets; buying spends the owner's balance). commerce:sell = seller-side config (PSP,
     // app-tool manifests, offer pricing); commerce:buy = spending through checkout sessions.
     // Owner-attached '*' agents get both; granular agents opt in per scope.
-    aimeat_commerce_psp_set: 'commerce:sell',
+    // The seller's payment credentials: an agent that can rewrite these can repoint the payouts.
+    // PUT/DELETE /v1/commerce/payout/stripe are owner-only.
+    aimeat_commerce_psp_set: 'commerce:psp',
     aimeat_commerce_psp_status: 'commerce:sell',
-    aimeat_commerce_psp_delete: 'commerce:sell',
+    aimeat_commerce_psp_delete: 'commerce:psp',
     aimeat_app_tools_publish: 'commerce:sell',
     aimeat_offer_price_set: 'commerce:sell',
     // aimeat_app_tools_get is intentionally ungated — it reads PUBLIC manifests (own always).
@@ -323,6 +334,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_commerce_beneficiary_earnings: 'wallet:read',
     // The approval gate is operator-only at the handler; the scope keeps a narrow agent from even
     // seeing the tool, so it is not offered to somebody who could never use it.
+    // This one tool covers BOTH halves: reading an approval state and recording one. REST splits
+    // them (GET wants wallet:read, POST wants the operator role), so the registration gate stays on
+    // the read word and the write word is checked inside the handler on the write branch only.
+    // Gating the whole tool on the write word would have made an account unable to see whether it
+    // may be paid, which is not the thing anyone meant to restrict.
     aimeat_commerce_beneficiary_approve: 'wallet:read',
 
     aimeat_checkout_open: 'commerce:buy',

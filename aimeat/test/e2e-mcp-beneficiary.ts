@@ -161,7 +161,11 @@ await test('Setup: operator, provider, beneficiary and consumer, each with an MC
     consumer = await setupOwner('cons');
     benef = await setupOwner('ben');
 
-    opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read', 'exchange:beneficiary']);
+    // commerce:beneficiary-verify is checked on the WRITE branch of aimeat_commerce_beneficiary_approve
+    // and no wildcard carries it: recording a beneficiary as verified is what makes a payout
+    // possible, so it costs its own tick. Reading an approval state still needs only wallet:read,
+    // which is why the tool itself is registered on that.
+    opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read', 'exchange:beneficiary', 'commerce:beneficiary-verify']);
     // ext:invoke is separate from ext:write since the 2026-08-10 scope work: publishing an extension
     // and running one are different promises, and running one can spend the caller's morsels. An
     // agent that does both needs both words. (The REST invoke route asks for no scope at all, so
@@ -283,6 +287,23 @@ await test('A NON-operator agent cannot open the gate, not even for itself', asy
         });
         assert(r.isError && /FORBIDDEN/.test(r.text), `${who} should be refused, got ${r.text}`);
     }
+});
+
+await test('An operator WITHOUT commerce:beneficiary-verify is refused the write, and still reads', async () => {
+    // The role is not the whole gate since 2026-08-11. Recording a beneficiary as verified is what
+    // makes a payout possible, so it costs a permission no wildcard carries — an operator account
+    // whose agent was never given that tick cannot open the gate from a chat. Reading stays open,
+    // which is why the tool is registered on wallet:read and the word is checked on the write.
+    const bare = await agentSession(operator.token, operator.name, 'opbare', ['wallet:read']);
+
+    const write = await bare.session.call('aimeat_commerce_beneficiary_approve', {
+        ghii: benef.ghii, state: 'verified', method: 'contract-on-file',
+    });
+    assert(write.isError && /commerce:beneficiary-verify/.test(write.text),
+        `expected the missing-permission refusal, got: ${write.text}`);
+
+    const read = await bare.session.call('aimeat_commerce_beneficiary_approve', { ghii: benef.ghii });
+    assert(!read.isError, `an operator must still be able to READ an approval state: ${read.text}`);
 });
 
 await test('Anyone may READ their own approval state', async () => {

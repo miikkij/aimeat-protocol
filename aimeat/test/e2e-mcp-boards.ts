@@ -152,6 +152,11 @@ await test('Register agent', async () => {
             owner: ownerName,
             capabilities: ['social'],
             model: 'gpt-4o',
+            // Spelled out rather than left to the node default, because this suite covers both
+            // halves of the board surface and they are separate permissions: social:write posts,
+            // replies and reacts, while social:members changes who may READ a shared board — the
+            // one thing the HTTP route reserves to a logged-in person.
+            scopes: ['social:read', 'social:write', 'social:members', 'memory:read', 'memory:write'],
         }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);

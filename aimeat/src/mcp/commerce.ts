@@ -45,6 +45,7 @@ import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
 import { emitChange } from '../services/event-bus.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 
 const PSP_KEY = 'commerce.psp';
@@ -586,8 +587,15 @@ export function registerCommerceTools(
                 const gate = await beneficiaryEligibility(storage, config, target);
                 return ok({ ghii: target, approval, state: gate.state, payable: gate.eligible, message: gate.message });
             }
-            // WRITE path. Operator only: a gate a provider could open for their own payees is not a gate.
+            // WRITE path. Operator only: a gate a provider could open for their own payees is not a
+            // gate. On top of the role, its own permission word — recording a beneficiary as
+            // verified is what makes a payout possible, so it costs an explicit tick that no
+            // wildcard carries rather than riding along with Full access.
             if (!isOperator) return fail('FORBIDDEN: recording an approval is an operator action');
+            if (!scopeIsCovered(sessionScopes, 'commerce:beneficiary-verify')) {
+                return fail('Recording a beneficiary approval needs the "commerce:beneficiary-verify" '
+                    + 'permission, which this session does not carry.');
+            }
             if (!ghii) return fail('INVALID_INPUT: name the beneficiary GHII to record an approval for');
             if (state === 'verified' && !method) {
                 return fail('INVALID_INPUT: a verification must say HOW representation was established. '

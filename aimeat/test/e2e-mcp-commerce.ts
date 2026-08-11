@@ -139,7 +139,7 @@ await test('Setup: owners + commerce-scoped and narrow MCP agents + seller manif
     // Commerce-scoped agent: granular scopes, NOT '*', to prove the gates open exactly right.
     const a1 = await json('/v1/agents', {
         method: 'POST', headers: auth(buyerOwner.token),
-        body: JSON.stringify({ name: 'trader', owner: buyerOwner.name, capabilities: ['commerce'], scopes: ['commerce:buy', 'commerce:sell', 'memory:read', 'memory:write'] }),
+        body: JSON.stringify({ name: 'trader', owner: buyerOwner.name, capabilities: ['commerce'], scopes: ['commerce:buy', 'commerce:sell', 'commerce:psp', 'memory:read', 'memory:write'] }),
     });
     assert(a1.status === 201, `trader ${a1.status}: ${JSON.stringify(a1.body.error)}`);
     traderGaii = a1.body.data.agent.gaii;
