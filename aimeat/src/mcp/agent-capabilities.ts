@@ -21,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTechnicalCapability } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function registerAgentCapabilityTools(
     mcp: McpServer,
@@ -75,6 +76,8 @@ export function registerAgentCapabilityTools(
                 return { content: [{ type: 'text' as const, text: 'Failed to update capabilities' }], isError: true };
             }
 
+            // routes/agent-capabilities.ts emits this when an agent re-declares what it can do.
+            emitChange('agent-capabilities');
             emitResourceUpdated(agentGaii, `aimeat://agents/${agentGaii}/capabilities`);
 
             return {

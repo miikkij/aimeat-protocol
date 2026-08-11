@@ -27,6 +27,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
@@ -157,6 +158,9 @@ export function registerBoardsTools(
                 createdAt: new Date().toISOString(),
             });
 
+            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
+            // browser is exactly the surface that must not need a reload while an agent posts.
+            emitChange('boards');
             emitResourceListChanged(agentGaii);
 
             return {
@@ -203,6 +207,9 @@ export function registerBoardsTools(
                 filters,
                 createdAt: new Date().toISOString(),
             });
+            // POST /v1/boards/:id/subscribe emits this. A subscription changes what the board view
+            // shows about itself, so the open page must hear about it.
+            emitChange('boards');
 
             return {
                 content: [{
@@ -230,6 +237,9 @@ export function registerBoardsTools(
             const ok = await storage.addReaction(board_id, post_id, emoji, agentGaii);
             if (!ok) return { content: [{ type: 'text' as const, text: 'Post not found' }], isError: true };
 
+            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
+            // browser is exactly the surface that must not need a reload while an agent posts.
+            emitChange('boards');
             emitResourceUpdated(agentGaii, `aimeat://boards/${encodeURIComponent(board_id)}`);
 
             return {
@@ -287,6 +297,9 @@ export function registerBoardsTools(
                 aiProvenanceId: provenanceId,
             });
 
+            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
+            // browser is exactly the surface that must not need a reload while an agent posts.
+            emitChange('boards');
             emitResourceUpdated(agentGaii, `aimeat://boards/${encodeURIComponent(board_id)}`);
 
             return {
@@ -333,6 +346,9 @@ export function registerBoardsTools(
 
             const updated = await storage.updateBoardMembers(board_id, [...members]);
             if (!updated) return { content: [{ type: 'text' as const, text: 'Failed to update board members' }], isError: true };
+            // Who may read a shared board is what this changes, and PUT /v1/boards/:id/members emits
+            // for it. Without the event the members list stayed as it was on screen.
+            emitChange('boards');
 
             return {
                 content: [{
@@ -364,6 +380,9 @@ export function registerBoardsTools(
             }
 
             await storage.deleteBoard(board_id);
+            // routes/boards.ts emits on create, delete, post, reply, react and membership. A board open in a
+            // browser is exactly the surface that must not need a reload while an agent posts.
+            emitChange('boards');
             emitResourceListChanged(agentGaii);
 
             return {

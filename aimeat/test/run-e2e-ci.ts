@@ -107,6 +107,9 @@ const ALL_SUITES = [
     // The MCP task lifecycle, which nothing exercised — which is why five differences from the REST
     // routes survived every green run.
     'test/e2e-mcp-agent-tasks.ts',
+    // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
+    // SSE change domain at all, so the write landed and the screen stayed as it was.
+    'test/e2e-mcp-sse-parity.ts',
     // Self-spawns its own node with AIMEAT_PACING_TOLL_DEFAULT set: the feature IS the node-wide
     // default, so it cannot be proven on the shared server.
     'test/e2e-pacing.ts',

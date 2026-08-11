@@ -6,7 +6,7 @@
  *
  * @structure
  *   - boardsRouter(config, storage): mounts the /v1/boards/* routes
- *   - notifySubscribers(): fire-and-forget webhook fan-out with category/tag filters via safeFetch
+ *   - notifyBoardSubscribers(storage, ): fire-and-forget webhook fan-out with category/tag filters via safeFetch
  *   - POST /v1/boards + posts/reactions/replies/subscribe: create + interact (scope/role gated)
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
@@ -21,18 +21,16 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
-import { executeHooks } from '../services/hooks.js';
 import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
 import { checkOtkSession } from './auth.js';
-import { logger } from '../utils/logger.js';
-import { safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
+import { createBoardPost } from '../services/board-post.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import {
@@ -44,37 +42,6 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
 
   /** Notify board subscribers of a new post (fire-and-forget). */
-  function notifySubscribers(boardId: string, post: { id: string; authorGaii: string; title: string; category?: string; tags: string[] }): void {
-    storage.listBoardSubscriptions(boardId).then(subs => {
-      for (const sub of subs) {
-        // Don't notify the author of their own post
-        if (sub.gaii === post.authorGaii) continue;
-        // Apply category/tag filters if subscriber set them
-        if (sub.filters?.categories?.length && post.category && !sub.filters.categories.includes(post.category)) continue;
-        if (sub.filters?.tags?.length && !sub.filters.tags.some(t => post.tags.includes(t))) continue;
-        if (!sub.callbackUrl) continue;
-        // SSRF validation: block requests to private/reserved IPs
-        // safeFetch validates the URL + re-validates redirects (throws `Fetch blocked: …`), closing the
-        // redirect-bounce SSRF on the subscriber-supplied callbackUrl.
-        safeFetch(sub.callbackUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            event: 'board.new_post',
-            board_id: boardId,
-            post_id: post.id,
-            author_gaii: post.authorGaii,
-            title: post.title,
-            category: post.category,
-            timestamp: new Date().toISOString(),
-          }),
-          signal: AbortSignal.timeout(10_000),
-        }).catch(err => {
-          logger.warn('Board subscription notification failed', { boardId, gaii: sub.gaii, error: String(err) });
-        });
-      }
-    }).catch(err => { logger.warn('notifySubscribers: ignore', { error: String(err) }); });
-  }
 
   // POST /v1/boards — create a board (agent auth; system boards require operator)
   router.post('/v1/boards', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardCreateSchema, config.nodeId), async (req, res) => {
@@ -249,88 +216,25 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
   // POST /v1/boards/:boardId/posts — post to a board (agent auth)
   router.post('/v1/boards/:boardId/posts', requireAuth(), requireRole('agent'), requireScope('social:write'), validateBody(BoardPostSchema, config.nodeId), async (req, res) => {
-    const boardId = req.params.boardId as string;
-    const board = await storage.getBoard(boardId);
-    if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Board not found: ${boardId}`));
-      return;
-    }
-
-    const gaii = resolve(req);
-
-    // Extension hook: pre_board_post
-    const hookResult = await executeHooks(config, storage, 'pre_board_post', { board_id: boardId, author_gaii: gaii });
-    if (!hookResult.allowed) {
-      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Post denied by extension hook'));
-      return;
-    }
-
-    // Check access
-    if (board.visibility === 'system' && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only operators can post to system boards'));
-      return;
-    }
-    if (board.visibility === 'private' && board.ownerGaii !== gaii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Cannot post to this private board'));
-      return;
-    }
-    if (board.visibility === 'shared' && board.ownerGaii !== gaii && !isSameOwner(board.ownerGaii, gaii) && !board.allowedGaiis.includes(gaii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You are not invited to this board'));
-      return;
-    }
-
+    // The whole post — access, the extension hook, the public-board price, the provenance stamp, the
+    // record, the SSE event and the subscriber fan-out — is services/board-post.ts, which
+    // aimeat_board_post also calls. It used to be written out here, and the tool surface then had a
+    // thinner copy of it: no board load at all, so no access check, no price and no hook. The event
+    // and the subscriber notification were the last two pieces still living only on this door.
     const { title, body, category, tags, ttl_hours } = req.body ?? {};
-
-    // Public board posting costs morsels — system boards are free (§15, Appendix B)
-    if (board.visibility === 'public') {
-      const cost = config.boardPostBaseCost + Math.ceil((body.length / 1000) * config.boardPostCostPerKb);
-      const debited = await storage.debitBalance(gaii, cost);
-      if (!debited) {
-        res.status(402).json(error(config.nodeId, 'INSUFFICIENT_MORSELS',
-          `Posting costs ${cost} morsels`));
-        return;
-      }
-      await storage.addTransaction({
-        id: `tx-${randomUUID()}`,
-        gaii,
-        type: 'spent',
-        amount: -cost,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    const postId = `post-${randomBytes(8).toString('hex')}`;
-    const ttlExpiresAt = ttl_hours
-      ? new Date(Date.now() + ttl_hours * 3600_000).toISOString()
-      : new Date(Date.now() + 168 * 3600_000).toISOString(); // default 7 days
-
-    // TARGET-058: the same stamp aimeat_board_post applies, on the REST door. The hash covers
-    // title + body together, which is the unit a reader sees.
-    const aiProvenanceId = await provenanceForWrite(storage, {
-      principal: gaii,
-      content: `${title}\n\n${body}`,
+    const out = await createBoardPost({ storage, config }, {
+      gaii: resolve(req),
+      roles: req.auth!.roles ?? [],
+    }, {
+      boardId: req.params.boardId as string,
+      title, body, category, tags, ttlHours: ttl_hours,
       pipeline: 'rest.board_post',
-      surface: { visibility: board.visibility === 'public' ? 'public' : 'private', humanAudience: true },
-      labelPolicy: config.aiLabelPublic,
-      nodeId: config.nodeId,
-      baseUrl: config.baseUrl,
-      enabled: config.aiProvenance,
     });
-
-    const post = await storage.createPost({
-      id: postId,
-      boardId,
-      authorGaii: gaii,
-      title,
-      body,
-      category,
-      tags: tags ?? [],
-      ttlExpiresAt,
-      reactions: {},
-      createdAt: new Date().toISOString(),
-      aiProvenanceId,
-    });
-
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    const post = out.post;
     res.status(201).json(success(config.nodeId, {
       id: post.id,
       board_id: post.boardId,
@@ -339,15 +243,9 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       ttl_expires_at: post.ttlExpiresAt,
       created_at: post.createdAt,
     }, [
-      { description: 'View this post', method: 'GET', url: `/v1/boards/${boardId}/posts` },
+      { description: 'View this post', method: 'GET', url: `/v1/boards/${post.boardId}/posts` },
     ]));
-    emitChange('boards');
-
-    // §12.3: Notify board subscribers (fire-and-forget)
-    notifySubscribers(boardId, { id: post.id, authorGaii: gaii, title: post.title, category: post.category, tags: post.tags ?? [] });
   });
-
-  // GET /v1/boards/:boardId/posts — read board posts (public = no auth)
   router.get('/v1/boards/:boardId/posts', async (req, res) => {
     const boardId = req.params.boardId as string;
     const board = await storage.getBoard(boardId);

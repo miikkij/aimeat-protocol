@@ -21,6 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import type { ContributionProof } from '../models/contribution-proof.js';
 import { getTemplateProposal, templateProposalKey } from '../services/app-template-proposals.js';
 import type { TemplateProposalManifest } from '../services/app-template-proposals.js';
@@ -85,6 +86,8 @@ export function registerAppdevProofTools(
                     return { content: [{ type: 'text' as const, text: 'Duplicate proof (same model + test set + date) — the ledger is append-only, one entry per run' }], isError: true };
                 }
                 proofs.push(proof);
+                // A memory record, and every REST memory door emits this.
+                emitChange('memory');
                 await storage.setMemory({
                     key,
                     ownerGaii: ownerGhii,
@@ -112,6 +115,7 @@ export function registerAppdevProofTools(
             proofs.push(proof);
             manifest.proofs = proofs;
             manifest.updatedAt = now;
+            emitChange('memory');
             await storage.setMemory({
                 ...found.record,
                 key: templateProposalKey(subject_id),

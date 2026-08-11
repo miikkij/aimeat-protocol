@@ -33,6 +33,8 @@ import type { Storage, BoardPostRecord } from '../storage/interface.js';
 import { executeHooks } from './hooks.js';
 import { provenanceForWrite } from './ai-provenance.js';
 import { isSameOwner } from '../utils/gaii.js';
+import { emitChange } from './event-bus.js';
+import { notifyBoardSubscribers } from './board-subscribers.js';
 
 /** The bounds BoardPostSchema applies on the HTTP door, named here so both doors share them. */
 export const BOARD_POST_LIMITS = {
@@ -167,6 +169,20 @@ export async function createBoardPost(
         reactions: {},
         createdAt: new Date().toISOString(),
         ...(aiProvenanceId ? { aiProvenanceId } : {}),
+    });
+
+    // The two things that happen BESIDES the write, and both lived in the HTTP route so the tool
+    // surface had neither. A board open in a browser listens on the 'boards' domain, so without the
+    // event an agent's post did not appear until somebody reloaded; and a subscriber is an agent
+    // that asked to be told precisely so it need not poll, so a post made through a tool call was
+    // invisible to every one of them. Both belong to POSTING, not to the door it came through.
+    emitChange('boards');
+    notifyBoardSubscribers(storage, input.boardId, {
+        id: post.id,
+        authorGaii: caller.gaii,
+        title: post.title,
+        category: post.category,
+        tags: post.tags ?? [],
     });
 
     return { ok: true, post, charged };

@@ -28,6 +28,7 @@ import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function registerCortexTools(
     mcp: McpServer,
@@ -202,6 +203,9 @@ export function registerCortexTools(
             try {
                 const record = await storage.createCortexExtension(ext);
 
+                // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
+                // code the owner has running, so its list going stale is visible immediately.
+                emitChange('cortex');
                 emitResourceListChanged(agentGaii);
 
                 return {
@@ -280,6 +284,9 @@ export function registerCortexTools(
                 logger.error('Capability aggregation failed after cortex activation', { error: String(err) }),
             );
 
+            // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
+            // code the owner has running, so its list going stale is visible immediately.
+            emitChange('cortex');
             emitResourceListChanged(agentGaii);
 
             return {
@@ -339,6 +346,9 @@ export function registerCortexTools(
                 activatedAt: undefined,
             });
 
+            // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
+            // code the owner has running, so its list going stale is visible immediately.
+            emitChange('cortex');
             emitResourceListChanged(agentGaii);
 
             return {
@@ -395,6 +405,9 @@ export function registerCortexTools(
 
             await storage.deleteCortexExtension(name);
 
+            // routes/cortex.ts emits this on install, activate, deactivate and delete. A cortex is browser
+            // code the owner has running, so its list going stale is visible immediately.
+            emitChange('cortex');
             emitResourceListChanged(agentGaii);
 
             return {

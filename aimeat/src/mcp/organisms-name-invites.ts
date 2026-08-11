@@ -17,6 +17,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
     acceptNameInvitation, addOrganismMember,
@@ -193,6 +194,9 @@ export function registerOrganismNameInviteTools(
             }
             if (decision === 'decline') {
                 await storage.deleteMembership(membership.id);
+                // routes/organisms/membership.ts emits this. A roster that still shows a member who
+                // declined is worse than a stale list: it is a wrong answer about who has access.
+                emitChange('organisms');
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'declined', organism_id }, null, 2) }] };
             }
             // Shared accept core: activates the row, syncs members/admins, applies invite-time ws grants.

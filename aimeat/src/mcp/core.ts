@@ -90,6 +90,7 @@ import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, structuredResult } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
@@ -638,6 +639,11 @@ export function registerCoreTools(
             if (work.providerGaii !== agentGaii) return { content: [{ type: 'text' as const, text: 'Not your work item' }], isError: true };
             if (work.status !== 'pending') return { content: [{ type: 'text' as const, text: `Cannot accept: status is ${work.status}` }], isError: true };
             await storage.updateWork(tracking_code, { status: 'accepted', updatedAt: new Date().toISOString() });
+            // routes/work.ts emits on every status move. The requester is watching for exactly this
+            // one — "somebody took it" — and over MCP nothing said so.
+            // routes/work.ts emits on every status move. The requester is watching for exactly this
+            // one — "somebody took it" — and over MCP nothing said so.
+            emitChange('work');
             return { content: [{ type: 'text' as const, text: JSON.stringify({ tracking_code, status: 'accepted' }, null, 2) }] };
         },
     );
@@ -655,6 +661,7 @@ export function registerCoreTools(
             if (!['accepted', 'in_progress'].includes(work.status)) return { content: [{ type: 'text' as const, text: `Cannot deliver: status is ${work.status}` }], isError: true };
             await settlePayment(storage, config, work);
             await storage.updateWork(tracking_code, { status: 'delivered', output, updatedAt: new Date().toISOString() });
+            emitChange('work');
             // Wallet balance changed for both parties
             emitResourceUpdated(agentGaii, `aimeat://wallet/${encodeURIComponent(agentGaii)}`);
             emitResourceUpdated(work.requesterGaii, `aimeat://wallet/${encodeURIComponent(work.requesterGaii)}`);

@@ -43,7 +43,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { resolveTaskFileInputs, taskWithFileHandles } from '../services/task-files.js';
-import { emitDelivery } from '../services/event-bus.js';
+import { emitDelivery, emitChange } from '../services/event-bus.js';
 import { recordTaskStarted } from '../services/activity-recorder.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -138,6 +138,10 @@ export function registerAgentTaskTools(
                 ...(autoActivated ? { lastEventAt: now } : {}),
             };
             const created = await storage.createAgentTask(record);
+            // Every REST task route emits this — create, lifecycle, completion — and the task board is the
+            // surface a person watches while an agent works. Over MCP the whole lifecycle happened in silence:
+            // the task appeared, ran and finished on screen only when somebody reloaded.
+            emitChange('agent-tasks');
             // A task-runner agent is the owner saying "start without asking me each time", and
             // POST /v1/agents/:name/tasks has honoured that since the mode existed: a queued task
             // for such an agent flips to active and gets the matching 'started' event, so an
@@ -348,6 +352,7 @@ export function registerAgentTaskTools(
                 lastEventAt: now,
                 updatedAt: now,
             });
+            emitChange('agent-tasks');
 
             await storage.appendTaskEvent({
                 id: randomUUID(),
@@ -456,6 +461,7 @@ export function registerAgentTaskTools(
                 };
             }
             await storage.updateAgentTask(task_id, taskUpdates);
+            emitChange('agent-tasks');
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 
@@ -519,6 +525,7 @@ export function registerAgentTaskTools(
                 lastEventAt: now,
                 updatedAt: now,
             });
+            emitChange('agent-tasks');
 
             // Append appropriate event
             const eventType = status === 'done' ? 'todo_completed' as const
@@ -589,6 +596,7 @@ export function registerAgentTaskTools(
                 lastEventAt: now,
                 updatedAt: now,
             });
+            emitChange('agent-tasks');
 
             // TARGET-058. The completion message is what the OWNER reads when they look at what their
             // agent did, so it is stamped like any other text an agent writes for a person.
@@ -666,6 +674,7 @@ export function registerAgentTaskTools(
                 lastEventAt: now,
                 updatedAt: now,
             });
+            emitChange('agent-tasks');
 
             await storage.appendTaskEvent({
                 id: randomUUID(),

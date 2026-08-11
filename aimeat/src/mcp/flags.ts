@@ -22,6 +22,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function registerFlagsTools(
     mcp: McpServer,
@@ -67,6 +68,9 @@ export function registerFlagsTools(
                 status: 'active',
                 createdAt: now,
             });
+            // POST /v1/flags emits this, and a moderation queue open in a browser listens on it.
+            // Without it a flag raised by an agent sat unseen until somebody reloaded the page.
+            emitChange('flags');
 
             return {
                 content: [{

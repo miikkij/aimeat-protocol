@@ -27,6 +27,7 @@ import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, jsonContent } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
  *  handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
@@ -116,6 +117,10 @@ export function registerCoreStorageTools(
                 data: fileData,
                 createdAt: new Date().toISOString(),
             });
+            // routes/storage-files.ts emits BOTH: a stored file shows in the files view and counts against
+            // the memory budget the memory view renders.
+            emitChange('files');
+            emitChange('memory');
             emitResourceUpdated(agentGaii, `aimeat://storage/${encodeURIComponent(key)}`);
             emitResourceListChanged(agentGaii);
             return {

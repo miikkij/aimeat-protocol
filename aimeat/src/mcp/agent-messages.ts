@@ -29,6 +29,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
@@ -136,6 +137,8 @@ export function registerAgentMessageTools(
                 aiProvenanceId: provenanceId,
             });
 
+            // routes/agent-messages.ts emits this. An open thread is the whole point of the surface.
+            emitChange('agent-messages');
             emitResourceUpdated(agentGaii, `aimeat://messages/${record.threadId}`);
 
             return {

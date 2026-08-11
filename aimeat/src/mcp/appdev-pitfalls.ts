@@ -24,6 +24,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import {
@@ -259,6 +260,9 @@ export function registerAppdevPitfallTools(
                 return { content: [{ type: 'text' as const, text: `Pitfall entry not found: ${key}` }], isError: true };
             }
             await storage.deleteMemory(existing.ownerGaii, key);
+            // The report path emits through memory-write; the DELETE went straight to storage, so
+            // removing an entry left it on screen until a reload.
+            emitChange('memory');
             await upsertManifest(key, '', true);
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${PITFALL_PACKAGE_ID}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ deleted: true, key }, null, 2) }] };

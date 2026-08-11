@@ -14,6 +14,7 @@ import type { Storage, AppManifest } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 
 export function registerAppForkTool(
@@ -124,6 +125,8 @@ export function registerAppForkTool(
 
                 const downloadUrl = `/v1/apps/${encodeURIComponent(callerOwner)}/${encodeURIComponent(new_filename)}`;
                 logger.info(`App forked via MCP: ${owner}/${filename} → ${new_filename}`, { by: agentGaii });
+                // The fork lands in the owner's catalogue, and routes/apps/fork-manage.ts emits for the same act.
+                emitChange('apps');
                 emitResourceListChanged(agentGaii);
 
                 return {

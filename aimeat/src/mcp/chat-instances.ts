@@ -22,6 +22,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose, buildChatInstanceId } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function registerChatInstancesTools(
     mcp: McpServer,
@@ -156,6 +157,8 @@ export function registerChatInstancesTools(
                 lastSeen: now,
             });
 
+            // POST /v1/chat-instances emits this; the chat list in the browser listens on it.
+            emitChange('chat');
             emitResourceListChanged(agentGaii);
 
             return {

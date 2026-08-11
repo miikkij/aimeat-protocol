@@ -31,6 +31,7 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
@@ -323,6 +324,10 @@ export function registerKnowledgeTools(
                 });
                 manifestValue.entries = manifestEntries;
                 manifestValue.updated = now;
+                // routes/knowledge/packages-core.ts emits this when a package changes. The entry
+                // itself goes through memory-write, which emits 'memory'; the MANIFEST is what the
+                // knowledge view reads, and it was written here with nothing announcing it.
+                emitChange('knowledge');
                 await storage.setMemory({
                     ...manifest,
                     value: manifestValue,

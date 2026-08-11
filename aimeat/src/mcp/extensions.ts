@@ -52,6 +52,7 @@ import { generateUploadToken, buildUploadMeta } from '../services/upload-token.j
 import { makeExtensionFiles } from '../services/extension-files.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { defineAppIam } from '../services/iam/define-app-iam.js';
 
 export function registerExtensionsTools(
@@ -459,6 +460,10 @@ export function registerExtensionsTools(
                         federation: record.federation,
                         instances: record.instances,
                     });
+                    // routes/extensions/crud.ts emits on install, activate, deactivate and delete. An extension is
+                    // code the owner has running, so its state going stale on screen is the wrong answer to
+                    // "what is active right now".
+                    emitChange('extensions');
                     // Never answer a write that did not apply with the record we WANTED to store.
                     // This line used to be `updated ?? { ...record, status }`, which reported the NEW
                     // version number while the database still held the old code — the most misleading
@@ -475,6 +480,7 @@ export function registerExtensionsTools(
                     logger.info(`Extension updated via MCP: ${name}`, { version: record.version, by: record.installedBy });
                 } else {
                     result = await storage.createExtension(record);
+                    emitChange('extensions');
                     action = 'installed';
                     logger.info(`Extension installed via MCP: ${result.name}`, { version: result.version, by: record.installedBy });
                 }
@@ -483,6 +489,7 @@ export function registerExtensionsTools(
                 let status = result.status;
                 if (activate && status !== 'active') {
                     await storage.updateExtension(name, { status: 'active', activatedAt: new Date().toISOString() });
+                    emitChange('extensions');
                     status = 'active';
                 }
                 // Re-project any EXCHANGE listings the actions declare (price/flag may have changed) —
@@ -549,6 +556,7 @@ export function registerExtensionsTools(
                     status: 'active',
                     activatedAt: new Date().toISOString(),
                 });
+                emitChange('extensions');
 
                 // Trigger capability aggregation so the extension appears immediately
                 import('../services/capability-aggregator.js')
@@ -594,6 +602,7 @@ export function registerExtensionsTools(
 
             try {
                 await storage.updateExtension(name, { status: 'inactive' });
+                emitChange('extensions');
 
                 logger.info(`Extension deactivated via MCP: ${name}`, { by: getAgentGaii() });
 
@@ -635,10 +644,13 @@ export function registerExtensionsTools(
             try {
                 // Deactivate first if active
                 if (ext.status === 'active') {
+                    // An internal step of deleting, not a state anyone watches for on its own —
+                    // the delete below emits for the whole act.
                     await storage.updateExtension(name, { status: 'inactive' });
                 }
 
                 await storage.deleteExtension(name);
+                emitChange('extensions');
 
                 logger.info(`Extension deleted via MCP: ${name}`, { by: getAgentGaii() });
 

@@ -19,6 +19,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -157,6 +158,8 @@ export function registerCoreAdminTools(
             }
 
             await storage.creditBalance(gaii, amount);
+            emitChange('config');
+            emitChange('wallet');
             const { randomBytes: rb } = await import('node:crypto');
             await storage.addTransaction({
                 id: `tx-${Date.now()}-${rb(4).toString('hex')}`,

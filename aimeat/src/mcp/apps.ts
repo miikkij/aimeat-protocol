@@ -72,6 +72,7 @@ import { generateDraftToken } from '../services/draft-token.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 import { publishApp } from '../services/app-publish.js';
 import { publicPosture } from '../services/app-ai-posture.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
@@ -406,6 +407,9 @@ export function registerAppsTools(
                     return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
                 }
                 await storage.deleteAppDraft(ownerGaii, filename);
+                // routes/apps/* emits this on every catalogue change. Without it the owner's app list, and the
+                // app store, showed yesterday's set while an agent published.
+                emitChange('apps');
                 emitResourceListChanged(agentGaii);
                 logger.info(`App draft published via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
                 return {
@@ -623,6 +627,9 @@ export function registerAppsTools(
 
                 logger.info(`App deleted via MCP: ${filename}${version ? ` v${version}` : ' (all versions)'}`, { by: agentGaii });
 
+                // routes/apps/* emits this on every catalogue change. Without it the owner's app list, and the
+                // app store, showed yesterday's set while an agent published.
+                emitChange('apps');
                 emitResourceListChanged(agentGaii);
 
                 return {

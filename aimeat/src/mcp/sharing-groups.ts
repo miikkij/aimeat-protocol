@@ -21,6 +21,7 @@ import type { Storage, SharingGroupMember } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function registerSharingGroupTools(
     mcp: McpServer,
@@ -178,6 +179,10 @@ export function registerSharingGroupTools(
                 updatedAt: now,
             });
 
+            // routes/sharing-groups.ts emits this on every mutation. emitResourceListChanged below
+            // tells THIS MCP session; emitChange tells the owner's open browser, which is where a
+            // sharing group is actually looked at.
+            emitChange('groups');
             emitResourceListChanged(agentGaii);
 
             return {
@@ -248,6 +253,10 @@ export function registerSharingGroupTools(
                 updatedAt: now,
             });
 
+            // Who is in a sharing group decides who reads the owner's memory, so the members view
+            // must not go stale while an agent changes it. routes/sharing-groups.ts emits on both
+            // the add and the remove.
+            emitChange('groups');
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(group_id)}`);
 
             return {
@@ -298,6 +307,10 @@ export function registerSharingGroupTools(
                 updatedAt: now,
             });
 
+            // Who is in a sharing group decides who reads the owner's memory, so the members view
+            // must not go stale while an agent changes it. routes/sharing-groups.ts emits on both
+            // the add and the remove.
+            emitChange('groups');
             emitResourceUpdated(agentGaii, `aimeat://groups/${encodeURIComponent(group_id)}`);
 
             return {
