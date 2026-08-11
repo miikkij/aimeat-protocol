@@ -23,6 +23,8 @@
  *   v1.7.0 -- 2026-08-07 -- Add e2e-remake-funnel.ts (remake phase 0: onboarding.track separation)
  *            e2e-remake-home.ts (remake phases 2-3: the welcome mat gate) and
  *            e2e-registration-invites.ts (remake phase 4b: the agent door).
+ *   v1.9.0 -- 2026-08-11 -- Add e2e-app-publish-gate.ts (the build-spec token + the publish-time
+ *            artifact check: what refuses a publish, and what merely warns).
  *   v1.8.0 -- 2026-08-10 -- Register the three suites that were in no runner at all: cortex-e2e.ts,
  *            e2e-profile-tabs.ts and e2e-audio-speech.ts. Between them 160 assertions had been
  *            executing nowhere, in one case for a month, and each was a handful of stale
@@ -54,6 +56,7 @@ const ALL_SUITES = [
     'test/e2e-apps.ts',
     'test/e2e-app-agent-deploy.ts',
     'test/e2e-app-draft.ts',
+    'test/e2e-app-publish-gate.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-protect.ts',
     'test/e2e-app-descriptions.ts',

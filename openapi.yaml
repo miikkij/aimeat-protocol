@@ -2749,6 +2749,43 @@ components:
             message: { type: string, description: Written for the model that built the app — it names the exact calls to add. }
             at: { type: string, format: date-time }
 
+    AppSpecCheck:
+      type: object
+      description: >-
+        Did whoever published this app carry the build spec that is in force now? Reported by every
+        publish door. It never refuses a publish — the point is that neither reading the spec nor
+        skipping it is silent.
+      properties:
+        status:
+          type: string
+          enum: [ok, stale, missing, skipped]
+          description: >-
+            ok = the token matches the spec as served now. stale = an older spec. missing = no token
+            was carried. skipped = the owner said to publish without it, which is recorded on the
+            node's change log.
+        message: { type: string }
+        skill:
+          type: string
+          description: The skill carrying the whole workflow. Present on everything but `ok`.
+          example: node:aimeat-app-builder
+        spec_url: { type: string, example: https://aimeat.io/v1/prompts/build-app }
+      required: [status, message]
+
+    AppArtifactFinding:
+      type: object
+      description: One thing the node noticed in an app's bytes at publish, tied to a curated pitfall.
+      properties:
+        pitfall:
+          type: string
+          description: Curated appdev-pitfall id. GET /v1/appdev/pitfalls/{pitfall} has the full entry.
+          example: hardcoded-theme-colors
+        severity: { type: string, enum: [critical, warn] }
+        message:
+          type: string
+          description: Written for whoever built the app — what is wrong and what to do instead.
+        url: { type: string, example: /v1/appdev/pitfalls/hardcoded-theme-colors }
+      required: [pitfall, severity, message, url]
+
     AppSummary:
       type: object
       description: Catalogue/publish view of an app (latest version), as returned by the apps endpoints.
@@ -7742,7 +7779,10 @@ paths:
         Cursor, any HTTP client) and AI chats alike: complete client-library catalog, the correct
         login-bar auth pattern, data-visibility patterns, AI usage, realtime, theming, and the
         publish walkthrough. data.prompt is the complete copy-paste prompt; data.body is the
-        platform-instructions core the app-catalog composes its dynamic header around. Public.
+        platform-instructions core the app-catalog composes its dynamic header around.
+        data.spec_token is the digest of the spec as served here: pass it back as `spec_token` when
+        publishing (POST /v1/apps, aimeat_app_publish) and the publish response reports whether the
+        app was built against the spec currently in force. Public.
       tags:
         - Discovery
       parameters:
@@ -7764,7 +7804,28 @@ paths:
           description: txt returns the full prompt as text/plain instead of the JSON envelope
       responses:
         '200':
-          description: The build prompt (JSON envelope with prompt + body, or text/plain with format=txt)
+          description: The build prompt (JSON envelope with prompt + body + spec_token, or text/plain with format=txt)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          prompt: { type: string }
+                          body: { type: string }
+                          mode: { type: string }
+                          lang: { type: string }
+                          spec_token:
+                            type: string
+                            description: >-
+                              Digest of the spec above. Changes when the spec changes. Pass it as
+                              `spec_token` on a publish; the publish answers `spec_check.status`
+                              ok | stale | missing | skipped.
+                            example: spec-9f21c4ab77de
 
   /v1/prompts/build-extension:
     get:
@@ -17563,6 +17624,20 @@ paths:
                   description: >
                     Attach an ALREADY-MINTED record instead of declaring a new one. Must belong to
                     the caller's own account. Also carried through the presigned token.
+                spec_token:
+                  type: string
+                  description: >
+                    The `spec_token` from GET /v1/prompts/build-app — the digest of the build spec
+                    this app was written against. Honoured in BOTH modes (with `mode: presigned` it
+                    rides in the signed upload token). Omitting it publishes anyway and answers
+                    `spec_check.status: missing`; an out-of-date one answers `stale`.
+                  example: spec-9f21c4ab77de
+                spec_ack:
+                  type: string
+                  enum: [skipped-by-owner]
+                  description: >
+                    The owner chose to publish without the build spec. Recorded on the node's change
+                    log rather than passing silently.
       responses:
         '201':
           description: |
@@ -17570,6 +17645,12 @@ paths:
             AI inside the app, and `data.ai_hints` carries the non-blocking transparency findings —
             worded for the model that built the app, so the fix happens in the same session. The
             publish NEVER fails on a transparency finding.
+
+            `data.spec_check` says whether the publisher carried the current build spec, and
+            `data.app_hints` carries non-blocking artifact findings (theme tokens, the head
+            declarations, unscoped reads of agent-written data), each with the id of the curated
+            pitfall that explains it. Findings that PROVE the app cannot run — an inline script that
+            does not parse, an asset URL this node answers 404 for — are a 422 instead; see below.
           content:
             application/json:
               schema:
@@ -17590,10 +17671,47 @@ paths:
                                 type: array
                                 description: Non-blocking AI-transparency findings. Never a reason to reject a publish.
                                 items: { type: string }
+                              spec_check:
+                                $ref: '#/components/schemas/AppSpecCheck'
+                              app_hints:
+                                type: array
+                                description: >-
+                                  Non-blocking artifact findings, each naming the curated pitfall
+                                  that explains it (GET /v1/appdev/pitfalls/{pitfall}).
+                                items: { $ref: '#/components/schemas/AppArtifactFinding' }
+                              next_steps:
+                                type: object
+                                description: >-
+                                  What the app still lacks: an agent face, a bound skill. Best-effort,
+                                  so it can be absent.
         '200':
           description: Presigned upload URL (when mode=presigned)
         '400':
           $ref: '#/components/responses/BadRequest'
+        '422':
+          description: >-
+            APP_ARTIFACT_BROKEN — the app cannot run as published, so nothing was written. Exactly
+            two findings reach here, both provable from the bytes: an inline `<script>` that does not
+            parse, and a script/stylesheet URL this node answers 404 for. `error.details.findings`
+            lists them. A staged draft is left in place.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code: { type: string, enum: [APP_ARTIFACT_BROKEN] }
+                          message: { type: string }
+                          details:
+                            type: object
+                            properties:
+                              findings:
+                                type: array
+                                items: { $ref: '#/components/schemas/AppArtifactFinding' }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '413': { description: File too large }

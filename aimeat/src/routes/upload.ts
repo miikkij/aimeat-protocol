@@ -30,6 +30,9 @@
  *     (presigned meta cannot express them; a re-upload never strips cortex deps / bundled agents).
  *   v1.5.0 — 2026-07-19 — handleAppUpload provisions the per-app subdomain at publish time
  *     (mirrors POST /v1/apps; pitfall publish/new-app-subdomain-provisioning-lag).
+ *   v1.8.0 — 2026-08-11 — handleAppUpload carries the token's `spec_token` / `spec_ack` into the
+ *     shared publish and echoes `spec_check`, `app_hints` and `next_steps`. A blocking artifact
+ *     finding (unparseable inline script, 404 asset URL) refuses the upload with its findings.
  *   v1.6.0 — 2026-07-19 — handleAppUpload adds non-blocking `mobile_hints` (lintAppHtmlForMobile),
  *     mirroring the inline publish path, so presigned publishes get the same phone-overflow hints.
  *   v1.7.0 — 2026-07-22 — handleAppUpload full metadata carry-forward on update: description,
@@ -247,10 +250,14 @@ async function handleAppUpload(
         // mode has already been "the app is published, the record is missing" once.
         declaredProvenance: declaredFromMeta(meta),
         declaredProvenanceId: typeof meta.ai_provenance_id === 'string' ? meta.ai_provenance_id : undefined,
+        // Stated when the URL was minted, carried in the signed token, checked here.
+        specToken: typeof meta.spec_token === 'string' ? meta.spec_token : undefined,
+        specAck: typeof meta.spec_ack === 'string' ? meta.spec_ack : undefined,
     });
     if ('refusal' in out) {
         res.status(out.refusal.status).json({
             success: false, error: out.refusal.code, message: out.refusal.message,
+            ...(out.refusal.details ? { details: out.refusal.details } : {}),
         });
         return;
     }
@@ -271,6 +278,9 @@ async function handleAppUpload(
         ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
         ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
         ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+        spec_check: out.specCheck,
+        ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+        ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),
     });
 }
 

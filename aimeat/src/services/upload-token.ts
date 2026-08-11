@@ -10,6 +10,10 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.6.0 — 2026-08-11 — PRESIGNED_META_KEYS.app carries `spec_token` / `spec_ack`, so the door
+ *     every author is told to use above 1 KB can state which build spec the app was written against.
+ *     Without them the presigned publish would report `spec_check: missing` for everybody, which is
+ *     a gate that fires loudest exactly where it has nothing to say.
  *   v1.0.0 — 2026-05-02 — Initial implementation
  *   v1.1.0 — 2026-07-05 — Add 'skill' upload type; add a jti nonce (deterministic EdDSA made
  *     same-second identical mints collide with the single-use guard).
@@ -147,7 +151,7 @@ export const PRESIGNED_META_KEYS = {
     // which no app had a provenance record at all. Carried through the SIGNED token, so the
     // declaration that arrives with the bytes is the one the caller made when they asked for the URL.
     app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version',
-          'ai_provenance', 'ai_provenance_id'],
+          'ai_provenance', 'ai_provenance_id', 'spec_token', 'spec_ack'],
     storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],

@@ -6,6 +6,10 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.2.0 — 2026-08-11 — Both modes carry `spec_token` / `spec_ack` (the presigned handshake puts
+ *     them in the token, as it does for the provenance declaration), and the response document gains
+ *     `spec_check`, `app_hints` and `next_steps`. A blocking artifact finding comes back as 422
+ *     APP_ARTIFACT_BROKEN with the findings in `error.details`.
  *   v2.1.0 — 2026-08-01 — TARGET-058: BOTH modes of this route carry a provenance declaration —
  *     the inline body reads `ai_provenance` / `ai_provenance_id`, and the presigned handshake puts
  *     them in the token via buildUploadMeta so the PUT can mint from them. Phase 4 wired the
@@ -65,7 +69,7 @@ export function registerPublishRoutes(
             screenshot, screenshot_mime_type,
             name, description, descriptions, version: semver, category, tags, icon,
             uses_cortex, cortex, price_morsels, license_type, protection,
-            ai_provenance, ai_provenance_id,
+            ai_provenance, ai_provenance_id, spec_token, spec_ack,
         } = req.body ?? {};
 
         // Validated at the door, against the SAME block every other surface uses. A malformed
@@ -111,7 +115,7 @@ export function registerPublishRoutes(
                     filename, description, category, tags, icon,
                     ...(typeof req.body.name === 'string' ? { name: req.body.name } : {}),
                     ...(typeof semver === 'string' ? { version: semver } : {}),
-                    ai_provenance, ai_provenance_id,
+                    ai_provenance, ai_provenance_id, spec_token, spec_ack,
                 }),
                 maxBytes: MAX_APP_SIZE,
                 contentType: 'text/html',
@@ -203,9 +207,12 @@ export function registerPublishRoutes(
             source: 'inline',
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
             declaredProvenance: declared.declared,
+            specToken: typeof spec_token === 'string' ? spec_token : undefined,
+            specAck: typeof spec_ack === 'string' ? spec_ack : undefined,
         });
         if ('refusal' in out) {
-            res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
             return;
         }
 
@@ -257,6 +264,9 @@ export function registerPublishRoutes(
             // response. `ai_posture` is what the node now believes; `ai_hints` is what to fix.
             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+            spec_check: out.specCheck,
+            ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+            ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),
         }, [
             { description: 'View all versions', method: 'GET', url: `${out.downloadUrl}/versions` },
         ]));

@@ -14,6 +14,10 @@
  *     workflows liaison), with node_id/gaii/agent_name substituted from the caller's auth.
  *   v1.6.0 -- 2026-06-13 -- Add GET /v1/agents/me/handbook/offerings: the "Offerings & Workflows for
  *     agents" page (constant-backed, registered before /:module).
+ *   v1.8.0 -- 2026-08-11 -- GET /v1/prompts/build-app returns `spec_token`, the digest of the spec
+ *     it just served. The publish gate (services/app-spec-gate.ts) reports whether a publisher
+ *     carried it, which is the difference between asking an agent to read the spec and being able
+ *     to tell whether it did.
  *   v1.7.0 -- 2026-07-13 -- Add GET /v1/prompts/build-app: the canonical app-building prompt (same
  *     text as the app-catalog Create-new-app button), node-served so agentic coders get the paved path.
  */
@@ -28,7 +32,7 @@ import { handbookForRole } from '../services/handbooks/index.js';
 import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
-import { buildAppPrompt } from '../services/build-app-prompt.js';
+import { buildAppPrompt, buildAppSpecToken } from '../services/build-app-prompt.js';
 import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
@@ -262,9 +266,13 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       prompt: full,
       system_prompt: full,
       body,
+      // The digest of the spec above. Pass it back as `spec_token` when publishing and the node can
+      // tell whether the app was built against what it currently says. It is named in the prompt
+      // text as well, for the `?format=txt` reader who never sees this envelope.
+      spec_token: buildAppSpecToken(config),
     }, [
       { description: 'Starter templates (use-case scaffolds + app shells)', method: 'GET', url: '/v1/app-templates' },
-      { description: 'Publish the finished app', method: 'POST', url: '/v1/apps' },
+      { description: 'Publish the finished app (pass spec_token)', method: 'POST', url: '/v1/apps' },
     ]));
   });
 

@@ -9,9 +9,16 @@
  *   - body: the platform-instructions core (heading + libraries + auth + data + AI + realtime
  *     + design + rules [+ publish-back for mode 'new']) — what the app-catalog fetches.
  *   - full: language line + interview header (mode 'new') + body — what agents fetch.
+ *   - buildAppSpecToken(config): the digest of this document, which the publish gate checks.
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-11 — ADDITIVE: the spec token. buildAppSpecToken(config) digests this document, the
+ *     prompt names it once in the MCP-agent section, and services/app-spec-gate.ts checks it at
+ *     publish. Born from an app that went live on 2026-08-11 with three defects this text already
+ *     answers, published by an agent that never fetched it — the soft "read this first" in the MCP
+ *     instructions and the skill changed nothing, while a machine-readable field in a publish
+ *     response changed behaviour on the spot. Existing text untouched.
  *   2026-08-09 — ADDITIVE (permission granted 2026-08-09): four memory-SHAPE rules at the top of Data
  *     Storage — one key per entity or coherent collection, the 1024 kB / 1000-key ceilings with the
  *     `keys_per_day × 365 > 1000` check, nesting is free for search (depth ≤ 5), and a key name is an
@@ -76,6 +83,7 @@
  *     (extruded type via the fonts pack, sticker cards, juice, world-object ambient rule) —
  *     born from pitfall app/candy-palette-alone-is-not-a-game-look.
  */
+import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 // The grantable scope vocabulary — imported so the prompt's scope list can NEVER drift from
 // what the authorize endpoint actually accepts (guessed scope names were an AEB-2 finding).
@@ -98,8 +106,16 @@ export interface BuildAppPromptOptions {
 const PB_LANGS: Record<string, string> = { en: 'English', fi: 'Finnish (Suomi)' };
 const DEFAULT_IDEA = '(not given yet — ask me what to build)';
 
+/**
+ * Where the spec token is written into the prompt text.
+ *
+ * The token is a digest OF this prompt, and the prompt names the token — so the digest is taken
+ * with the slot still unfilled. Otherwise the text would have to contain its own hash.
+ */
+const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
+
 /** Compose the canonical build-an-app prompt. Text mirrors the app-catalog prompt builder. */
-export function buildAppPrompt(
+function composeAppPrompt(
   config: AimeatConfig,
   opts: BuildAppPromptOptions = {},
 ): { full: string; body: string } {
@@ -505,6 +521,11 @@ export function buildAppPrompt(
   body += '### If you are an agentic coder with AIMEAT MCP tools\n';
   body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, OpenHands, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n';
   body += 'Load the paved-path skill first: `aimeat_skill_get` with ref `node:aimeat-app-builder` (spec-first workflow, research-before-building, publish checklist). Research with ONE call: `aimeat_appdev_overview` (pass your OWN model id — self-identify, never ask the user) — your existing apps + template proposals, library packs with per-model proofs, curated + learned pitfalls. Skim the pitfalls for the areas you touch before you hit them.\n';
+  // The spec token. Added 2026-08-11 after an app went live with three defects this document
+  // already answers, published by an agent that never fetched it: the soft "read this first" in the
+  // MCP instructions and in the skill changed nothing, while the machine-readable `mobile_hints` in
+  // a publish response changed behaviour immediately. So the ASK became a value to carry.
+  body += 'Carry the spec token when you publish: `spec_token: "' + SPEC_TOKEN_SLOT + '"` on `aimeat_app_publish` (or in the POST /v1/apps body). It is the digest of THIS document; it changes when the spec changes, so passing it says which version you actually built against. Publishing without it returns `spec_check: { status: "missing" }` and publishing against an older one returns `"stale"` — neither refuses the publish, both mean fetch GET ' + nodeUrl + '/v1/prompts/build-app again and read what changed. If the owner tells you to skip the spec, send `spec_ack: "skipped-by-owner"`; that is recorded rather than silent.\n';
   body += buildFinishChecklist();
   body += 'Namespace rule: data written through MCP tools is stored under the AGENT\'s identity (GAII, `name#owner@node`), NOT the human owner\'s — so a browser app reading the signed-in owner\'s keys will NOT see it. When agents seed or share data the app must read: store the author identity inside each record, write such keys with public visibility and read them with `AIMEAT.data.getPublic(<full agent GAII>, key)`, or add `?owner_scope=true` to memory reads (resolves the owner\'s agents\' keys too).\n\n';
 
@@ -541,4 +562,46 @@ export function buildAppPrompt(
   full += body;
 
   return { full, body };
+}
+
+/**
+ * The spec token: a short digest of the build spec as this node currently serves it.
+ *
+ * WHY A DIGEST AND NOT A CONSTANT. A fixed string would prove only that somebody, at some point,
+ * saw a document by this name. A digest changes the moment the spec changes, so a token that still
+ * matches is evidence the publisher read the version that is in force now — and a token that no
+ * longer matches names its own remedy ("fetch it again"). It is a memory aid for an agent, not a
+ * credential: nothing here is secret and the gate warns rather than refuses.
+ *
+ * Canonicalised on `improve` mode with no idea and English, because those are the axes that vary
+ * per REQUEST rather than per spec — a token that changed when the caller passed `?idea=` would be
+ * stale for everybody and would teach agents to ignore it. The node's own base URL IS part of the
+ * digest: the library URLs a self-hosted node serves are part of what the spec says.
+ */
+const specTokenCache = new Map<string, string>();
+
+export function buildAppSpecToken(config: AimeatConfig): string {
+  const cached = specTokenCache.get(config.baseUrl);
+  if (cached) return cached;
+  // The slot is still unfilled here, which is the point: the digest is taken over the spec text
+  // WITHOUT its own token in it.
+  const canonical = composeAppPrompt(config, { lang: 'en', mode: 'improve' }).body;
+  const token = 'spec-' + createHash('sha256').update(canonical, 'utf8').digest('hex').slice(0, 12);
+  specTokenCache.set(config.baseUrl, token);
+  return token;
+}
+
+/**
+ * Compose the canonical build-an-app prompt, with the spec token written into it.
+ *
+ * Every caller goes through here — the app-catalog's `body`, an agent's `full`, the `?format=txt`
+ * plain-text form — so no consumer can end up with a prompt that names no token.
+ */
+export function buildAppPrompt(
+  config: AimeatConfig,
+  opts: BuildAppPromptOptions = {},
+): { full: string; body: string } {
+  const token = buildAppSpecToken(config);
+  const { full, body } = composeAppPrompt(config, opts);
+  return { full: full.split(SPEC_TOKEN_SLOT).join(token), body: body.split(SPEC_TOKEN_SLOT).join(token) };
 }

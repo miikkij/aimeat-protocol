@@ -4,6 +4,9 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.2.0 — 2026-08-11 — publish-draft accepts `spec_token` / `spec_ack` and echoes `spec_check`,
+ *     `app_hints` and `next_steps`. A blocking artifact finding refuses the promotion AND leaves the
+ *     draft in place, so the fix has something to be applied to.
  *   v2.1.0 — 2026-08-01 — TARGET-058: publish-draft accepts `ai_provenance` / `ai_provenance_id`.
  *     aimeat_app_draft_publish has advertised both since Phase 4 and this route never read them, so
  *     the declaration died at the last hop before the mint.
@@ -254,7 +257,7 @@ export function registerDraftRoutes(
         // that puts bytes in front of readers, and it is the moment the publisher is answering for how
         // they were made. Accepted here so aimeat_app_draft_publish's advertised `ai_provenance` has
         // somewhere to land — it reached this route and was dropped, like the other two doors.
-        const { ai_provenance, ai_provenance_id } = req.body ?? {};
+        const { ai_provenance, ai_provenance_id, spec_token, spec_ack } = req.body ?? {};
         const declared = parseDeclaredProvenanceInput(ai_provenance);
         if (!declared.ok) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -289,9 +292,14 @@ export function registerDraftRoutes(
             source: 'draft',
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
             declaredProvenance: declared.declared,
+            specToken: typeof spec_token === 'string' ? spec_token : undefined,
+            specAck: typeof spec_ack === 'string' ? spec_ack : undefined,
         });
         if ('refusal' in out) {
-            res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
+            // The draft SURVIVES a refusal. A broken artifact is something to fix and publish again,
+            // and clearing the staging slot would delete the only copy of the work.
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
             return;
         }
 
@@ -311,6 +319,9 @@ export function registerDraftRoutes(
             ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+            spec_check: out.specCheck,
+            ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+            ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),
         }, [
             { description: 'View all versions', method: 'GET', url: `${out.downloadUrl}/versions` },
         ]));

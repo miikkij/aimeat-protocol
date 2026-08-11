@@ -25,101 +25,27 @@
  *        ever makes them parse, this exits non-zero and says so, instead of quietly blessing
  *        everything it is handed.
  * @structure
- *   - SENTINELS — sources that must not parse; the self-test
- *   - parseSource(source, filename, goal) — vm.Script (script goal) / vm.SourceTextModule (module)
- *   - extractInlineScripts(html) — the <script> bodies of a single-file app
+ *   - the parser core lives in src/utils/inline-script-parse.ts (SENTINELS + selfTest, parseSource,
+ *     extractInlineScripts) and is re-exported here
  *   - CLI: check-js-syntax [--module] [--html] <file...>
  * @usage
  *   pnpm check:js-syntax path/to/app.js
  *   pnpm check:js-syntax --html path/to/app.html      # every inline <script> body
  *   pnpm check:js-syntax --module src/static/sdk-libs/ai/index.js
  * @version-history
+ *   v1.1.0 — 2026-08-11 — The parser core moved to src/utils/inline-script-parse.ts so the
+ *     publish-time artifact check (services/app-artifact-lint.ts) and this CLI parse an app with
+ *     the SAME code and the same sentinels. Pure extraction: this file is now the CLI around it,
+ *     and re-exports the core so existing importers keep working.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0b.
  */
 import { readFileSync } from 'node:fs';
-import * as vm from 'node:vm';
+import {
+  SENTINELS, extractInlineScripts, parseSource, selfTest, type ParseGoal,
+} from '../src/utils/inline-script-parse.js';
 
-/** Parse goal. A single-file app's inline `<script>` is a CLASSIC script; an SDK lib is a module. */
-export type ParseGoal = 'script' | 'module';
-
-/**
- * Sources that MUST NOT parse. Run before every real check, so the checker cannot silently become a
- * no-op. The first two are the pair the Phase 6 audit used; the third catches a module-goal-only
- * mistake that a script-goal parse would happily accept as a label.
- */
-const SENTINELS: Array<{ name: string; source: string; goal: ParseGoal }> = [
-  { name: 'unterminated string', source: "var x = 'a's b'", goal: 'script' },
-  { name: 'stray parenthesis', source: 'var x = ( ;', goal: 'script' },
-  { name: 'reserved word as binding', source: 'var function = 1;', goal: 'script' },
-];
-
-/**
- * Parse one source in the given goal, throwing on a syntax error.
- *
- * Module goal needs `vm.SourceTextModule`, which only exists under `--experimental-vm-modules`. When
- * it is missing this THROWS rather than falling back to a script-goal parse: a script-goal parse of
- * module source rejects `import`/`export` outright, so a silent fallback would report a syntax error
- * for correct code, and any looser fallback would report a pass it had not earned. Fail closed, and
- * say which flag is missing.
- */
-export function parseSource(source: string, filename: string, goal: ParseGoal = 'script'): void {
-  if (goal === 'module') {
-    // `SourceTextModule` exists on the vm namespace only under --experimental-vm-modules, and
-    // @types/node does not declare it, so it is reached through an explicitly typed lookup.
-    const SourceTextModule = (vm as unknown as {
-      SourceTextModule?: new (src: string, opts?: { identifier?: string }) => unknown;
-    }).SourceTextModule;
-    if (typeof SourceTextModule !== 'function') {
-      throw new Error(
-        'module-goal parsing needs node --experimental-vm-modules; re-run with that flag rather than '
-        + 'accepting an unchecked file');
-    }
-    // Constructing it parses the source. Nothing is linked or evaluated: this must never run code.
-    new SourceTextModule(source, { identifier: filename });
-    return;
-  }
-  // Constructing a vm.Script parses without executing anything.
-  new vm.Script(source, { filename });
-}
-
-/**
- * The `<script>` bodies of a single-file app, in document order.
- *
- * Blocks carrying a `src` or a non-JavaScript `type` (`application/ld+json`, an import map, a
- * template) are skipped — parsing those as JavaScript would be a false failure, which trains people
- * to ignore the checker.
- */
-export function extractInlineScripts(html: string): Array<{ index: number; source: string; goal: ParseGoal }> {
-  const out: Array<{ index: number; source: string; goal: ParseGoal }> = [];
-  const re = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi;
-  let m: RegExpExecArray | null;
-  let n = 0;
-  while ((m = re.exec(html)) !== null) {
-    n += 1;
-    const attrs = m[1] ?? '';
-    if (/\bsrc\s*=/i.test(attrs)) continue;
-    const type = /\btype\s*=\s*["']([^"']*)["']/i.exec(attrs)?.[1]?.toLowerCase();
-    if (type && !/^(text\/javascript|application\/javascript|module)$/.test(type)) continue;
-    // The block states its own goal. Parsing a `type="module"` body in script goal rejects its
-    // `import` line and reports a syntax error for perfectly good code — a false failure, which is
-    // the fastest way to teach people to ignore a checker.
-    out.push({ index: n, source: m[2] ?? '', goal: type === 'module' ? 'module' : 'script' });
-  }
-  return out;
-}
-
-/** Run the sentinels. Throws when one of them PARSES, which would mean the checker checks nothing. */
-export function selfTest(): void {
-  for (const s of SENTINELS) {
-    let threw = false;
-    try { parseSource(s.source, `<sentinel:${s.name}>`, s.goal); } catch { threw = true; }
-    if (!threw) {
-      throw new Error(
-        `check-js-syntax self-test FAILED: the sentinel "${s.name}" parsed without error, so this `
-        + 'checker is not checking anything. Do not trust any pass it has reported.');
-    }
-  }
-}
+// Re-exported so callers (and the unit test) can keep importing the checker by its CLI name.
+export { SENTINELS, extractInlineScripts, parseSource, selfTest, type ParseGoal } from '../src/utils/inline-script-parse.js';
 
 // ── CLI ─────────────────────────────────────────────────────────────────────────────────────────
 

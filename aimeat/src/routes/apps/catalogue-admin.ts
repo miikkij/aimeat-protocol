@@ -91,12 +91,21 @@ export function registerCatalogueAdminRoutes(
             const isOwn = !!viewerGhii && app.ownerGaii === viewerGhii;
             const posture = app.manifest.aiPosture;
             const shownPosture = isOwn ? posture : publicPosture(posture);
+            // `specCheck` travels with the gap: whether the last publish carried the build spec is
+            // the owner's own business, and a public "built without reading the manual" badge would
+            // be a punishment nobody agreed to.
+            const shownManifest = isOwn ? app.manifest : {
+                ...app.manifest,
+                ...(posture ? { aiPosture: shownPosture } : {}),
+                ...(app.manifest.specCheck ? { specCheck: undefined } : {}),
+            };
             return {
                 owner: app.ownerName,
                 filename: app.filename,
                 version_number: app.versionNumber,
-                manifest: posture && !isOwn ? { ...app.manifest, aiPosture: shownPosture } : app.manifest,
+                manifest: shownManifest,
                 ai_posture: shownPosture ?? null,
+                ...(isOwn && app.manifest.specCheck ? { spec_check: app.manifest.specCheck } : {}),
                 size: app.size,
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,

@@ -27,8 +27,8 @@
  *   published contracts, and unifying them would be an API break dressed up as a refactor.
  * @structure
  *   - PublishAppInput / PublishAppResult / PublishAppRefusal — the contract
- *   - publishApp(storage, config, input) — resolve version → quota → carry forward → lint → stamp →
- *     store → subdomain → change log → announce → feed
+ *   - publishApp(storage, config, input) — resolve version → quota → ARTIFACT CHECK → spec check →
+ *     carry forward → lint → stamp → store → subdomain → change log → announce → feed
  * @usage
  *   const out = await publishApp(storage, config, {
  *     ownerName, ownerGhii, callerGaii, filename, data, mimeType: 'text/html',
@@ -37,6 +37,13 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Three additions, all on the shared path so no door can miss them: the
+ *     ARTIFACT CHECK (services/app-artifact-lint.ts) refuses a publish whose inline script does not
+ *     parse or whose asset URL this node answers 404 for — the first thing here that blocks, because
+ *     both are proof the app cannot run rather than an opinion about it; the build-spec check
+ *     (services/app-spec-gate.ts) reports whether the publisher carried the current spec token, and
+ *     records an owner-declared skip on the change-log line; and `nextSteps` moved in from mcp/apps.ts
+ *     so the agent-face and bound-skill reminder reaches every door instead of MCP-inline only.
  *   v1.1.0 — 2026-08-02 — The app's declared `public-interest` reaches the disclosure decision.
  *     It was parsed into the posture and then never passed, so every publish fell to the
  *     over-label default and recorded the statutory basis. Tri-state: `observed` (the author
@@ -51,6 +58,9 @@ import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
 import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
+import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
+import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
+import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { ensureAppSubdomain } from '../routes/subdomains.js';
@@ -104,13 +114,21 @@ export interface PublishAppInput {
   declaredProvenanceId?: string;
   /** What the caller said about how the bytes were made. Absent + non-human principal → MINT-3. */
   declaredProvenance?: DeclaredProvenance;
+  /** The build-spec digest the caller says they built against (services/app-spec-gate.ts). */
+  specToken?: string;
+  /** `skipped-by-owner` when the owner decided to publish without the spec. Recorded, not silent. */
+  specAck?: string;
   /** A NEW app counts against the per-owner quota. Always on; the parameter exists for tests. */
   enforceQuota?: boolean;
 }
 
 /** A refusal the door turns into its own error envelope. */
 export interface PublishAppRefusal {
-  refusal: { status: number; code: string; message: string };
+  refusal: {
+    status: number; code: string; message: string;
+    /** Machine-readable reasons, for a refusal whose remedy is per-finding rather than per-message. */
+    details?: Record<string, unknown>;
+  };
 }
 
 export interface PublishAppResult {
@@ -129,6 +147,12 @@ export interface PublishAppResult {
   /** The AI transparency check, or null for a non-HTML bundle. */
   aiLint: AppAiLintResult | null;
   aiProvenanceId?: string;
+  /** Did the publisher carry the current build spec? Warns; never refuses. */
+  specCheck: AppSpecCheck;
+  /** Non-blocking artifact findings (HTML only) — the blocking ones became a refusal. */
+  artifactWarnings: AppArtifactFinding[];
+  /** Agent face + bound skill, and what to do about each. Best-effort, so it can be undefined. */
+  nextSteps?: Record<string, unknown>;
 }
 
 /**
@@ -163,6 +187,31 @@ export async function publishApp(
       };
     }
   }
+
+  // THE ARTIFACT CHECK, before a single byte is written. Two findings are proof the app cannot work
+  // — an inline script that does not parse, and an asset URL this node answers 404 for — and both
+  // used to reach production unremarked: an app published on 2026-08-11 loaded /lib/aimeat-auth.js
+  // (the path is /v1/libs/) and threw before drawing anything, while the publish response said
+  // "published". Everything else the check notices is a warning further down. Refusing here rather
+  // than after createApp is what keeps a rejected publish from leaving a half-written version.
+  const isHtml = /html/i.test(mimeType);
+  const artifact = isHtml
+    ? await lintAppArtifact(data.toString('utf8'), config)
+    : { blocking: [], warnings: [] };
+  if (artifact.blocking.length > 0) {
+    return {
+      refusal: {
+        status: 422, code: 'APP_ARTIFACT_BROKEN',
+        message: `This app cannot run as published: ${artifact.blocking.map(f => f.message).join(' ')}`,
+        details: { findings: artifact.blocking },
+      },
+    };
+  }
+
+  // Did whoever is publishing read the build spec that is in force NOW? This one only ever warns
+  // (services/app-spec-gate.ts explains why), and an owner-declared skip is recorded on the change
+  // log below rather than passing silently.
+  const specCheck = evaluateSpecCheck(config, { specToken: input.specToken, specAck: input.specAck });
 
   const live = isUpdate ? await storage.getApp(ownerGhii, filename) : null;
   const prev = live?.manifest;
@@ -215,8 +264,15 @@ export async function publishApp(
   // OBSERVES is re-measured from the bytes being published, never carried. HTML only — there is
   // nothing to read in a binary. It WARNS and never blocks (decision D2): a publish that fails is a
   // publish that gets worked around, and the app then ships with less transparency, not more.
-  const aiLint = /html/i.test(mimeType) ? lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture) : null;
+  const aiLint = isHtml ? lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture) : null;
   if (aiLint) manifest.aiPosture = aiLint.posture;
+
+  // The spec state of THIS publish, kept where the owner can still find it later. Deliberately not
+  // carried forward: a clean publish clears it, so the field answers "how was this version put
+  // here" rather than marking an app forever for one hurried afternoon.
+  if (specCheck.status !== 'ok') {
+    manifest.specCheck = { status: specCheck.status, at: new Date().toISOString() };
+  }
 
   // Carry the moderation and exposure state forward, so an update never silently re-exposes a
   // parked app, opens forking, or escapes an operator hide by re-uploading.
@@ -294,8 +350,12 @@ export async function publishApp(
   await storage.addSiteChangeLog({
     id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
     action: isUpdate ? 'app_update' : 'app_publish',
+    // The spec-check state rides on the change-log line, which is the owner's own record of what
+    // happened to their node. A skip the owner asked for is a decision, and a decision that leaves
+    // no trace is indistinguishable from an omission six months later.
     summary: `${isUpdate ? 'Updated' : 'Published'} app "${filename}" v${newVersion}`
-      + `${input.source === 'draft' ? ' from draft' : ''} (${(data.length / 1024).toFixed(1)} KB)`,
+      + `${input.source === 'draft' ? ' from draft' : ''} (${(data.length / 1024).toFixed(1)} KB)`
+      + (specCheck.status === 'ok' ? '' : ` [build spec: ${specCheck.status}]`),
     changedBy: ownerName,
     changedAt: now,
   });
@@ -332,6 +392,12 @@ export async function publishApp(
     .then(m => m.recordActivation(storage, config, ownerName, 'app'))
     .catch(err => { logger.warn('publishApp: activation marker is best-effort', { error: String(err) }); });
 
+  if (specCheck.status !== 'ok') {
+    logger.info('publishApp: published without a current build-spec token', {
+      filename, owner: ownerName, by: callerGaii, spec_check: specCheck.status,
+    });
+  }
+
   return {
     filename,
     versionNumber: newVersion,
@@ -343,9 +409,14 @@ export async function publishApp(
     parked,
     forkable,
     downloadUrl,
-    mobileHints: /html/i.test(mimeType) ? lintAppHtmlForMobile(data.toString('utf8')) : [],
+    mobileHints: isHtml ? lintAppHtmlForMobile(data.toString('utf8')) : [],
     aiLint,
     ...(aiProvenanceId ? { aiProvenanceId } : {}),
+    specCheck,
+    artifactWarnings: artifact.warnings,
+    // Every door returns this now. It used to exist only on the MCP inline branch, so the two
+    // things an app most often lacks went unmentioned on the door most apps come through.
+    nextSteps: await buildPublishNextSteps(storage, config, ownerName, filename),
   };
 }
 

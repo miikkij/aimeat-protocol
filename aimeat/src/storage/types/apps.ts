@@ -5,6 +5,9 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — AppManifest gains `cortex.agents` (Agent-Bundled Apps Slice 1):
  *     declarative crew-defs an app ships, validated at publish (crew-def-schemas.ts).
+ *   v1.3.0 — 2026-08-11 — AppManifest gains `specCheck`: the build-spec state of the last publish,
+ *     stored only when it was not clean. Owner-only, on the manifest for the same reason aiPosture
+ *     is — a JSON blob on both providers, so no migration and no second place to keep in sync.
  *   v1.2.0 — 2026-08-01 — AppManifest gains `aiPosture` (TARGET-058 Phase 5): the app's own AI
  *     transparency statement plus the publish check's finding. On the manifest, so it needs no
  *     storage migration and survives a fork.
@@ -62,6 +65,16 @@ export interface AppManifest {
    * app has. See services/app-ai-posture.ts.
    */
   aiPosture?: AppAiPosture;
+  /**
+   * Present only when the LAST publish did not carry the build spec that was in force at the time
+   * (services/app-spec-gate.ts). A clean publish stores nothing and clears whatever was here, so
+   * this reads as "the state right now" rather than an accusation an app can never shed.
+   *
+   * OWNER-ONLY, like `aiPosture.gap`: the catalogue strips it for anybody else. It exists so a skip
+   * the owner authorised is still visible to them a month later, which the publish response — read
+   * once, by an agent — cannot be. Never accepted from a publish payload.
+   */
+  specCheck?: { status: 'stale' | 'missing' | 'skipped'; at: string };
   // Opt-in copy-protection applied to the app's inline (runnable) HTML at serve time.
   // All flags default OFF. HONEST LIMITS: client HTML a browser runs can always be
   // copied by anyone who can view it — these only raise the cost of casual theft

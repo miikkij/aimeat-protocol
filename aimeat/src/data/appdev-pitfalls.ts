@@ -10,6 +10,10 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   v1.2.0 — 2026-08-11 — +inline-js-does-not-parse, +app-meta-declarations, +namespace-rule. All
+ *     three are what the publish-time artifact check (services/app-artifact-lint.ts) reports by id,
+ *     so a finding in a publish response resolves to a full entry at GET /v1/appdev/pitfalls/{id}.
+ *     Each was hit for real on 2026-08-11 by one app that reached production.
  *   v1.1.0 — 2026-07-19 — +flex-nav-wrap (mobile) +app-grant-node-role-via-owners (auth); updated
  *     auth-pill-overflow now that the compact pill is default + shells ship overflow-x:clip.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: three AI-transparency entries (unlabelled output,
@@ -62,6 +66,36 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'critical',
     source: 'curated',
     updatedAt: '2026-07-19',
+  }),
+  E({
+    id: 'inline-js-does-not-parse',
+    title: 'An inline <script> that does not parse takes the whole app with it',
+    symptom: 'The page renders its static HTML and then nothing works — no data, no handlers, no login bar. The browser stopped at the syntax error and never reached anything after it. Publishing REFUSES this (APP_ARTIFACT_BROKEN): the node parses every inline block before the app goes live.',
+    fix: 'Parse before you publish: `cd aimeat && pnpm check:js-syntax --html your-app.html` compiles every inline <script> body without running it, and the publish gate uses that same parser. The classic cause is a literal closing script tag inside a JS string or comment — the HTML parser ends the block there, mid-statement — so build one from pieces: `"</" + "script>"`.',
+    appliesTo: ['app', 'publish'],
+    severity: 'critical',
+    source: 'curated',
+    updatedAt: '2026-08-11',
+  }),
+  E({
+    id: 'app-meta-declarations',
+    title: 'The three head declarations an app is expected to make',
+    symptom: 'The language switch never appears in the login pill, sign-in asks for less than the app needs (ai:use is unavailable, deletes 403), or AIMEATAgentFace.publish cannot work out which app it belongs to on a per-app subdomain.',
+    fix: 'Declare them, one line each: `<meta name="aimeat-app" content="my-app.html">` (your published filename), `<meta name="aimeat-scopes" content="memory:read memory:write ai:use">` (what sign-in asks the user to approve — an app that declares nothing gets the default grant only), `<meta name="aimeat-locales" content="en fi">` (the languages you have; this is what draws the segmented switch in the login pill).',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-08-11',
+  }),
+  E({
+    id: 'namespace-rule',
+    title: 'Data your agents wrote is not in the owner\'s namespace',
+    symptom: 'The app shows the signed-in owner an empty screen while the data is plainly there — an agent wrote it minutes ago, the owner can see it in their own memory list, and the app\'s list() returns nothing at all.',
+    fix: 'An agent writes under ITS own identity (`name#owner@node`), and an app token is role `app`, which gets no automatic owner-scope broadening — so an unscoped read legitimately finds nothing. Name the namespace: `AIMEAT.data.list({ prefix, ownerScope: true })` covers the owner GHII and every agent of theirs, `{ agent: "name#owner@node" }` picks one, and `AIMEAT.data.getPublic(gaii, key)` reads a specific public record. The build spec states this under "Namespace rule".',
+    appliesTo: ['app', 'auth'],
+    severity: 'critical',
+    source: 'curated',
+    updatedAt: '2026-08-11',
   }),
   E({
     id: 'cdn-libs-blocked',

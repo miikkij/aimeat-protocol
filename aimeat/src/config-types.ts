@@ -331,6 +331,14 @@ export interface AimeatConfig {
   minTrustForPaidActions: number;
   appMaxSizeMb: number;
   maxAppsPerAgent: number;
+  /**
+   * Ask this node, over loopback, whether the asset URLs a published app loads actually resolve —
+   * a 404 refuses the publish (services/app-artifact-lint.ts). On by default: the destination is
+   * always 127.0.0.1 on this node's own port, so it reaches nowhere else, and the check is what
+   * stops an app whose script tags 404 from going live. Turn it off only where the node cannot
+   * reach itself over loopback; the publish then simply says nothing about those URLs.
+   */
+  appAssetProbe: boolean;
   agentPortingFeeMorsels: number;
   memoryOverageMorselsPerMbMonth: number;
   storageOverageMorselsPerGbMonth: number;

@@ -9,6 +9,12 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.12.0 — 2026-08-11 — Both publish tools take `spec_token` / `spec_ack` (carried into the token
+ *     in upload mode) and return `spec_check` + `app_hints`. A blocking artifact finding comes back
+ *     as an error carrying the findings, so the remedy survives MCP's plain-text error channel.
+ *     `buildNextSteps` moved to services/app-publish-next-steps.ts and now runs on the shared publish
+ *     path — it lived here, so the agent-face and bound-skill reminder reached MCP-inline callers
+ *     only, and never the presigned door this very tool recommends above 1 KB.
  *   v1.11.0 — 2026-08-09 — aimeat_app_list is an MCP App: `_meta.ui.resourceUri` names the card grid
  *     in ./apps-ui.ts, which a host that supports the extension renders inside the conversation.
  *     Moved from mcp.tool to mcp.registerTool because only the config form carries `_meta`. First
@@ -66,10 +72,8 @@ import { generateDraftToken } from '../services/draft-token.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
-import { agentFaceKey } from '../services/agent-face.js';
-import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
-import { listSkillsByBinding } from '../services/skills.js';
 import { publishApp } from '../services/app-publish.js';
+import { publicPosture } from '../services/app-ai-posture.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
 import { registerAppIndexUi, APP_INDEX_UI_URI, uiToolMeta, appUiAvailable } from './apps-ui.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
@@ -85,28 +89,34 @@ export function registerAppsTools(
     emitResourceListChanged: (agentGaii: string) => void,
 ): void {
 
-    // Post-publish reflection nudge (AppDev KB Phase 6): report whether the app already has an
-    // agent face + bound skills, and hint at proposing a template. Best-effort — a publish must
-    // NEVER fail because this enrichment does.
-    async function buildNextSteps(ownerName: string, filename: string): Promise<Record<string, unknown> | undefined> {
-        try {
-            // Resolve the face across the owner's whole keyspace (GHII + the owner's agents), matching what
-            // the anonymous serve path serves — so an agent that published the face under its own GAII still
-            // reports agent_face_present:true here.
-            const [faceRec, boundSkills] = await Promise.all([
-                getOwnerScopePublicMemory(storage, config.nodeId, ownerName, agentFaceKey(filename)).catch(err => { logger.warn('buildNextSteps: continuing after a suppressed failure', { error: String(err) }); return null; }),
-                listSkillsByBinding(storage, config, `app:${ownerName}/${filename}`, { ownerName }).catch(err => { logger.warn('buildNextSteps: continuing after a suppressed failure', { error: String(err) }); return []; }),
-            ]);
-            return {
-                agent_face_present: !!faceRec,
-                bound_skills_count: boundSkills.length,
-                template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Finish checklist: agent face published, a skill bound (metadata.binding app:owner/filename), learnings reported via aimeat_appdev_pitfall_report.',
-            };
-        } catch (err) {
-          logger.warn('buildNextSteps: continuing after a suppressed failure', { error: String(err) });
-          return undefined;
-        }
+    /**
+     * A refusal, rendered for the model that will read it.
+     *
+     * MCP has no status codes and no error envelope, so a refusal is a paragraph of text — and a
+     * paragraph is exactly where a per-finding remedy gets lost. The findings are appended as JSON
+     * so `pitfall` and `url` survive, and the agent can fetch the full entry instead of inferring
+     * one from prose.
+     */
+    function refusalText(refusal: { message: string; details?: Record<string, unknown> }): string {
+        if (!refusal.details) return refusal.message;
+        return `${refusal.message}\n\n${JSON.stringify(refusal.details, null, 2)}`;
     }
+
+    /**
+     * The build-spec parameters, declared once and spread into both publish tools. Two tools
+     * spelling the same pair by hand is how `ai_provenance` came to be accepted on one door and
+     * dropped on another.
+     */
+    const specGateInputs = {
+        spec_token: z.string().optional().describe(
+            'The `spec_token` from GET /v1/prompts/build-app — the digest of the build spec you built against. '
+            + 'It changes when the spec changes. Omitting it publishes anyway and returns spec_check.status "missing"; '
+            + 'an out-of-date one returns "stale". Fetch the spec and pass the token rather than guessing a value: '
+            + 'the point is that you read what it currently says.'),
+        spec_ack: z.string().optional().describe(
+            'Send "skipped-by-owner" when the owner explicitly told you to publish without reading the build spec. '
+            + 'The publish is recorded as skipped on the node\'s change log instead of passing silently.'),
+    };
 
     // ── Tool 1: aimeat_app_publish ──
     mcp.tool(
@@ -124,9 +134,10 @@ export function registerAppsTools(
             cortex_agents: z.array(z.record(z.string(), z.unknown())).optional().describe(
                 'Declarative crew-defs this app ships (Agent-Bundled Apps). Each entry is a crewaimeat crew_def JSON document (agent_name, agents[], tasks[], ...) validated at publish — DATA the owner\'s own fleet interprets, never code. Stored as manifest.cortex.agents. Omit on update to carry the existing list forward; send [] to clear.'),
             ...aiProvenanceInputs,
+            ...specGateInputs,
         },
         annotationsFor('aimeat_app_publish'),
-        async ({ filename, content_base64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id }) => {
+        async ({ filename, content_base64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
             if (!parsed) {
@@ -157,7 +168,7 @@ export function registerAppsTools(
                     // lives with the token, so a new option is covered by declaring it there once.
                     meta: buildUploadMeta('app', {
                         filename, name, description, category, tags, icon, version,
-                        ai_provenance, ai_provenance_id,
+                        ai_provenance, ai_provenance_id, spec_token, spec_ack,
                     }),
                     maxBytes: MAX_APP_SIZE,
                     contentType: 'text/html',
@@ -225,9 +236,11 @@ export function registerAppsTools(
                     source: 'inline',
                     declaredProvenanceId: ai_provenance_id,
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
+                    specToken: spec_token,
+                    specAck: spec_ack,
                 });
                 if ('refusal' in out) {
-                    return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };
+                    return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
                 }
 
                 logger.info(`App ${out.isUpdate ? 'updated' : 'published'} via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
@@ -249,7 +262,9 @@ export function registerAppsTools(
                             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
                             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
                             ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
-                            next_steps: await buildNextSteps(parsed.owner, filename),
+                            spec_check: out.specCheck,
+                            ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+                            next_steps: out.nextSteps,
                         }, null, 2),
                     }],
                 };
@@ -340,9 +355,13 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_draft_publish',
         descriptionFor('aimeat_app_draft_publish'),
-        { filename: z.string().describe('App filename whose saved draft should be promoted to a new live version.'), ...aiProvenanceInputs },
+        {
+            filename: z.string().describe('App filename whose saved draft should be promoted to a new live version.'),
+            ...aiProvenanceInputs,
+            ...specGateInputs,
+        },
         annotationsFor('aimeat_app_draft_publish'),
-        async ({ filename, ai_provenance, ai_provenance_id }) => {
+        async ({ filename, ai_provenance, ai_provenance_id, spec_token, spec_ack }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
             if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
@@ -378,9 +397,12 @@ export function registerAppsTools(
                     source: 'draft',
                     declaredProvenanceId: ai_provenance_id,
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
+                    specToken: spec_token,
+                    specAck: spec_ack,
                 });
                 if ('refusal' in out) {
-                    return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };
+                    // The draft stays: a refused promotion is work to fix, not work to lose.
+                    return { content: [{ type: 'text' as const, text: refusalText(out.refusal) }], isError: true };
                 }
                 await storage.deleteAppDraft(ownerGaii, filename);
                 emitResourceListChanged(agentGaii);
@@ -395,7 +417,9 @@ export function registerAppsTools(
                             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
                             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
                             ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
-                            next_steps: await buildNextSteps(parsed.owner, filename),
+                            spec_check: out.specCheck,
+                            ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
+                            next_steps: out.nextSteps,
                         }, null, 2),
                     }],
                 };
@@ -532,6 +556,16 @@ export function registerAppsTools(
             const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
             const urlByApp = await resolveAppUrls(config, storage, [{ owner: app.ownerName, filename: app.filename }]);
 
+            // Two notes on the manifest are the OWNER's own — the disclosure gap and the build-spec
+            // state of their last publish — and this tool reads any owner's app. The catalogue
+            // listing has stripped them from the start; this door had not.
+            const isOwn = parseGAII(getAgentGaii())?.owner === app.ownerName;
+            const manifest = isOwn ? app.manifest : {
+                ...app.manifest,
+                ...(app.manifest.aiPosture ? { aiPosture: publicPosture(app.manifest.aiPosture) } : {}),
+                ...(app.manifest.specCheck ? { specCheck: undefined } : {}),
+            };
+
             return {
                 content: [{
                     type: 'text' as const,
@@ -539,7 +573,7 @@ export function registerAppsTools(
                         owner: app.ownerName,
                         filename: app.filename,
                         version_number: app.versionNumber,
-                        manifest: app.manifest,
+                        manifest,
                         size: app.size,
                         mime_type: app.mimeType,
                         protected: !!app.accessCode,

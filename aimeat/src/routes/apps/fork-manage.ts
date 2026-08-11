@@ -119,6 +119,10 @@ export function registerForkManageRoutes(
         };
         delete forkedManifest.priceMorsels;
         delete forkedManifest.licenseType;
+        // The build-spec state describes how the SOURCE's last publish was made. It says nothing
+        // about this fork, and it is owner-only besides — copying it would hand one owner's note
+        // about their own working habits to whoever forked them.
+        delete forkedManifest.specCheck;
         // TARGET-058 Phase 5: A FORK OF A GENERATIVE APP IS STILL A GENERATIVE APP. The manifest
         // spread above already brings the posture across, and this re-measures the observed half
         // against the bytes actually being stored while keeping what the source DECLARED — so the

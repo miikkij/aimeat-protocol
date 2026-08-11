@@ -9,6 +9,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.9.0 -- 2026-08-11 -- aimeat-app-builder gains the spec token (carry it on publish, read
+ *     `spec_check`) and what the publish now REFUSES (unparseable inline script, 404 asset URL)
+ *     versus what it merely reports as `app_hints`. Seeding is create-if-missing, so an existing
+ *     node needs an operator republish to pick this up.
  *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 4: `ai-transparency` (public) — when to declare, what the
  *     levels mean, how to state human involvement honestly, and what an absent record means when
  *     reading. Small and cheap to load, attachable to any agent. Seeding is create-if-missing, so an
@@ -657,6 +661,12 @@ GET /v1/appdev/pitfalls          ← curated "what bites app builders" registry
 Everything the app loads at runtime — CSS, auth, data, UI libraries — must be a URL
 **listed in that spec**. Never invent script/style \`src\` URLs; they 404 and break the app.
 
+**Carry the spec token.** The response includes \`spec_token\`, the digest of the spec you just
+read. Pass it as \`spec_token\` on \`aimeat_app_publish\`; the publish answers \`spec_check\`
+(\`ok\` | \`stale\` | \`missing\`), so a spec that moved under you says so instead of surfacing as a
+broken app later. If the owner tells you to skip the spec, send \`spec_ack: "skipped-by-owner"\` —
+that is recorded rather than silent.
+
 ## Research before building (research → frame → propose → build → finish)
 
 Before writing code, look at what already exists on the node and reuse it. ONE call gives
@@ -701,9 +711,15 @@ After a successful publish (the publish response's \`next_steps\` shows what is 
    Do **not** use bare \`node --check $VAR\`: with an empty or unset variable it reads empty
    stdin, parses that, and exits 0 printing nothing — which reads exactly like a pass for a
    file nobody looked at.
-4. **Publish over MCP.** \`aimeat_app_publish\` — for any file over ~1 KB use **presigned
-   upload** (omit the content param → PUT the raw HTML to the returned \`upload_url\`).
-   Re-publishing the same \`filename\` bumps the version — it does not duplicate.
+4. **Publish over MCP.** \`aimeat_app_publish\` (with \`spec_token\`) — for any file over ~1 KB
+   use **presigned upload** (omit the content param → PUT the raw HTML to the returned
+   \`upload_url\`). Re-publishing the same \`filename\` bumps the version — it does not duplicate.
+   The node checks the bytes and **refuses** two things outright: an inline \`<script>\` that does
+   not parse, and a script/stylesheet URL it answers 404 for. Both come back as
+   \`APP_ARTIFACT_BROKEN\` with a pitfall id per finding — fix and publish again. Anything else it
+   notices (theme tokens, the head declarations, unscoped reads of agent-written data) arrives as
+   \`app_hints\` on a successful publish; read them, they are the same three defects that put a
+   broken app live on 2026-08-11.
 5. **Return the live URL** and confirm with \`aimeat_app_list\` if unsure.
 
 ## When the app generates content, say so — it is two lines
