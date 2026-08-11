@@ -22,6 +22,9 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.1.0 — 2026-08-11 — WRITE_SEED 2 → 1: aimeat_operator_agent_configure writes through
+ *     services/agent-profile-write.ts. The remaining writer is named, with what its REST twin is
+ *     and how the two already disagree.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B).
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -73,11 +76,24 @@ const SEED = 39;
  * 30 rather than 28 for the same reason as SEED above: two pure extractions, no new capability
  * writing on its own. Both parents still write, so both extractions count as writers too.
  *
- * 2 on 2026-08-11 after step 8. Nineteen capabilities moved in one pass; what remains is the two
- * files whose last write genuinely has no REST twin to share with, each with its reason recorded in
- * the step 8 section of docs/internal/secauditaug2026/03-proposal.md.
+ * 2 on 2026-08-11 after step 8. Nineteen capabilities moved in one pass.
+ *
+ * 1 on 2026-08-11 after aimeat_operator_agent_configure moved onto services/agent-profile-write.ts,
+ * where PATCH /v1/agents/:name/tags and /mode already were. Three rules it had been writing around:
+ * tags were stored verbatim, a mode change skipped the Hello Integration step-list re-derive, and an
+ * empty scope list was accepted where REST refuses it.
+ *
+ * The one that remains is mcp/agent-tasks.ts, and the step 8 note that it has "no REST twin at all"
+ * is wrong: aimeat_task_complete writes the same two records POST /v1/agents/:name/tasks/:id/complete
+ * writes, and the two have already drifted. REST completes an ACTIVE or a STALLED task and the tool
+ * only an active one, so an agent that crashed and came back cannot report the work it finished --
+ * the same narrowing services/agent-task-fanout.ts was written to close on the failure path. REST
+ * takes a deliverable_key and the tool has no way to send one, so an MCP completion never reaches
+ * the public feed. And the tool stamps AI provenance on the completion message where REST does not.
+ * The shared home is a completeTask() in services/agent-task-fanout.ts, next to the failTask() that
+ * is the same shape, and closing it means editing the REST door in the same pass.
  */
-const WRITE_SEED = 2;
+const WRITE_SEED = 1;
 
 /** Storage methods that change something. Everything else is a read. */
 const WRITEISH = /^(create|set|update|delete|add|remove|insert|upsert|write|debit|credit|transfer|enqueue|revoke|grant|mint|save|publish|archive|deactivate|activate|link|unlink)/i;

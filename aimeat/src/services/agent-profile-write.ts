@@ -21,7 +21,9 @@
  *   record, and no way to tell from either which of them is current.
  * @structure
  *   - AgentWriteOutcome: a stored record or a refusal code each surface renders its own way
+ *   - normaliseAgentProfile(): the field vocabulary (tags, mode, scopes, name, description)
  *   - setAgentTags() / setAgentMode(): same-owner gated writes on a named sibling agent
+ *   - setAgentProfile(): several of those fields in one write, for the operator configure tool
  *   - syncOnboardingFlowToMode(): re-derive the Hello Integration steps after a mode change
  *   - setAgentCapabilities(): validated capability self-report
  *   - recordSelfReportedPlatform(): the platform/model stamp written by the identify_platform step
@@ -29,6 +31,13 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   v1.1.0 -- 2026-08-11 -- setAgentProfile() and normaliseAgentProfile(), for the multi-field write
+ *     aimeat_operator_agent_configure was making on its own. That tool wrote tags verbatim where
+ *     this file trims, lowercases, de-duplicates and caps them; it wrote a mode without re-deriving
+ *     the Hello Integration step list; and it accepted an empty scope list, which PATCH
+ *     /v1/agents/:name/scopes refuses. The tag and mode rules are the ones already here; the scope
+ *     and length rules are read from the doors that state them (management.ts and the registration
+ *     schema), so this file is now where an agent record's field vocabulary lives.
  *   v1.0.0 -- 2026-08-11 -- Extracted from routes/agent-capabilities.ts,
  *     routes/agents/profile-metadata.ts, mcp/agent-capabilities.ts and mcp/agent-management.ts
  *     (August 2026 MCP audit, step 8).
@@ -61,6 +70,15 @@ export type AgentWriteOutcome = { ok: true; agent: AgentRecord } | AgentWriteRef
 const TAG_PATTERN = /^[a-z0-9][a-z0-9._:-]{0,63}$/;
 const MAX_TAGS = 20;
 
+// The bounds the rest of the node states for these fields. Scopes: PATCH /v1/agents/:name/scopes
+// refuses a non-array or an empty list, and models/schemas.ts caps a registration request at 50
+// scopes of 64 characters. Name and description: the registration schema is the only door that ever
+// bounded them, because nothing but this file writes them again afterwards.
+const MAX_SCOPES = 50;
+const MAX_SCOPE_LENGTH = 64;
+const MAX_DISPLAY_NAME = 128;
+const MAX_DESCRIPTION = 10_000;
+
 /**
  * Resolve what a caller named into a GAII under the caller's OWN owner. A bare name is built into
  * a GAII; a full GAII is taken as given and then has to survive the same-owner check below, which
@@ -85,20 +103,11 @@ async function loadSameOwnerAgent(
 }
 
 /**
- * Replace the tag list on a same-owner agent. Tags are lowercased, de-duplicated and dropped when
- * empty; anything that fails TAG_PATTERN refuses the whole call rather than being silently skipped,
- * so a typo does not look like it was accepted.
+ * Trim, lowercase, de-duplicate and cap a tag list. Empty entries are dropped; anything that fails
+ * TAG_PATTERN refuses the whole call rather than being silently skipped, so a typo does not look
+ * like it was accepted.
  */
-export async function setAgentTags(
-    deps: AgentWriteDeps,
-    callerOwner: string,
-    identifier: string,
-    rawTags: unknown,
-): Promise<AgentWriteOutcome> {
-    const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
-        'You can only update tags for agents owned by the same owner');
-    if (!target.ok) return target;
-
+function normaliseTags(rawTags: unknown): { ok: true; tags: string[] } | AgentWriteRefusal {
     if (!Array.isArray(rawTags)) {
         return { ok: false, code: 'INVALID_INPUT', message: 'tags must be an array of strings' };
     }
@@ -118,9 +127,166 @@ export async function setAgentTags(
     if (tags.length > MAX_TAGS) {
         return { ok: false, code: 'INVALID_INPUT', message: `An agent can have at most ${MAX_TAGS} tags` };
     }
+    return { ok: true, tags };
+}
 
-    const updated = await deps.storage.updateAgent(target.gaii, { tags });
+/** The mode vocabulary, from the route constants so there is one list. */
+function normaliseMode(rawMode: unknown): { ok: true; mode: NonNullable<AgentRecord['mode']> } | AgentWriteRefusal {
+    if (typeof rawMode !== 'string' || !(VALID_MODES as readonly string[]).includes(rawMode)) {
+        return { ok: false, code: 'INVALID_INPUT', message: `mode must be one of: ${VALID_MODES.join(', ')}` };
+    }
+    return { ok: true, mode: rawMode as NonNullable<AgentRecord['mode']> };
+}
+
+/**
+ * Check a replacement scope list against what the node allows an agent to hold.
+ *
+ * An empty list is refused, because an agent holding zero scopes has its whole tool surface
+ * filtered away and no door left to fix itself through. The node ceiling is `config.maxAgentScopes`,
+ * inert on a default node ('*') and the operator's answer on a restricted one; PATCH
+ * /v1/agents/:name/scopes calls the same refusal INVALID_SCOPES, which folds into INVALID_INPUT
+ * here so callers keep one refusal vocabulary.
+ */
+function normaliseScopes(config: AimeatConfig, raw: unknown): { ok: true; scopes: string[] } | AgentWriteRefusal {
+    if (!Array.isArray(raw) || raw.length === 0) {
+        return { ok: false, code: 'INVALID_INPUT', message: 'scopes must be a non-empty array of strings' };
+    }
+    if (raw.length > MAX_SCOPES) {
+        return { ok: false, code: 'INVALID_INPUT', message: `An agent can hold at most ${MAX_SCOPES} scopes` };
+    }
+    if (!raw.every((s: unknown): s is string => typeof s === 'string' && s.length > 0 && s.length <= MAX_SCOPE_LENGTH)) {
+        return {
+            ok: false, code: 'INVALID_INPUT',
+            message: `Each scope must be a non-empty string of at most ${MAX_SCOPE_LENGTH} characters`,
+        };
+    }
+    if (!config.maxAgentScopes.includes('*')) {
+        const invalid = raw.filter(s => {
+            if (s === '*') return true;
+            const [domain] = s.split(':');
+            return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
+        });
+        if (invalid.length > 0) {
+            return { ok: false, code: 'INVALID_INPUT', message: `Scopes exceed node maximum: ${invalid.join(', ')}` };
+        }
+    }
+    return { ok: true, scopes: [...raw] };
+}
+
+/** The fields a caller may set on an agent record through this file. Each one arrives unvalidated. */
+export interface AgentProfileFields {
+    displayName?: unknown;
+    description?: unknown;
+    mode?: unknown;
+    tags?: unknown;
+    defaultScopes?: unknown;
+}
+
+/**
+ * Turn a caller's field bag into the exact record update, or refuse it.
+ *
+ * Separate from the write so a door that proposes a change before applying it can refuse bad input
+ * and show the value it will actually store. Tags come back normalised, which is what makes the
+ * proposal a proposal rather than a guess: `aimeat_operator_agent_configure` shows the owner a diff
+ * and mints a token bound to it, and the token has to bind to the stored form.
+ */
+export function normaliseAgentProfile(
+    config: AimeatConfig,
+    fields: AgentProfileFields,
+): { ok: true; updates: Partial<AgentRecord> } | AgentWriteRefusal {
+    const updates: Partial<AgentRecord> = {};
+
+    if (fields.displayName !== undefined) {
+        if (typeof fields.displayName !== 'string' || fields.displayName.length > MAX_DISPLAY_NAME) {
+            return {
+                ok: false, code: 'INVALID_INPUT',
+                message: `display name must be a string of at most ${MAX_DISPLAY_NAME} characters`,
+            };
+        }
+        updates.displayName = fields.displayName;
+    }
+
+    if (fields.description !== undefined) {
+        if (typeof fields.description !== 'string' || fields.description.length > MAX_DESCRIPTION) {
+            return {
+                ok: false, code: 'INVALID_INPUT',
+                message: `description must be a string of at most ${MAX_DESCRIPTION} characters`,
+            };
+        }
+        updates.description = fields.description;
+    }
+
+    if (fields.mode !== undefined) {
+        const mode = normaliseMode(fields.mode);
+        if (!mode.ok) return mode;
+        updates.mode = mode.mode;
+    }
+
+    if (fields.tags !== undefined) {
+        const tags = normaliseTags(fields.tags);
+        if (!tags.ok) return tags;
+        updates.tags = tags.tags;
+    }
+
+    if (fields.defaultScopes !== undefined) {
+        const scopes = normaliseScopes(config, fields.defaultScopes);
+        if (!scopes.ok) return scopes;
+        updates.defaultScopes = scopes.scopes;
+    }
+
+    return { ok: true, updates };
+}
+
+/** Replace the tag list on a same-owner agent, normalised by the rules in normaliseTags(). */
+export async function setAgentTags(
+    deps: AgentWriteDeps,
+    callerOwner: string,
+    identifier: string,
+    rawTags: unknown,
+): Promise<AgentWriteOutcome> {
+    const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
+        'You can only update tags for agents owned by the same owner');
+    if (!target.ok) return target;
+
+    const normalised = normaliseTags(rawTags);
+    if (!normalised.ok) return normalised;
+
+    const updated = await deps.storage.updateAgent(target.gaii, { tags: normalised.tags });
     if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+    emitChange('agents');
+    return { ok: true, agent: updated };
+}
+
+/**
+ * Set several owner-managed fields of a same-owner agent in one write, with the same vocabulary the
+ * single-field writers use and the same Hello Integration step-list re-derive a mode change owes.
+ *
+ * The caller decides whether the change is ALLOWED (the operator tool's narrow-only rule on scopes
+ * is a privilege question, and it stays where the propose-then-confirm flow can answer it before a
+ * token is minted); this decides whether the values are WELL FORMED and performs the write.
+ */
+export async function setAgentProfile(
+    deps: AgentWriteDeps,
+    callerOwner: string,
+    identifier: string,
+    fields: AgentProfileFields,
+): Promise<AgentWriteOutcome> {
+    const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
+        'You can only configure agents owned by the same owner');
+    if (!target.ok) return target;
+
+    const normalised = normaliseAgentProfile(deps.config, fields);
+    if (!normalised.ok) return normalised;
+    if (Object.keys(normalised.updates).length === 0) {
+        return { ok: false, code: 'INVALID_INPUT', message: 'No fields to change' };
+    }
+
+    const updated = await deps.storage.updateAgent(target.gaii, normalised.updates);
+    if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+
+    // A mode change owes the step-list re-derive whether it arrived alone or alongside a rename.
+    if (normalised.updates.mode) await syncOnboardingFlowToMode(deps.storage, target.gaii, normalised.updates.mode);
+
     emitChange('agents');
     return { ok: true, agent: updated };
 }
@@ -144,10 +310,9 @@ export async function setAgentMode(
         'You can only update the mode of agents owned by the same owner');
     if (!target.ok) return target;
 
-    if (typeof rawMode !== 'string' || !(VALID_MODES as readonly string[]).includes(rawMode)) {
-        return { ok: false, code: 'INVALID_INPUT', message: `mode must be one of: ${VALID_MODES.join(', ')}` };
-    }
-    const mode = rawMode as AgentRecord['mode'];
+    const checked = normaliseMode(rawMode);
+    if (!checked.ok) return checked;
+    const mode = checked.mode;
 
     const updated = await deps.storage.updateAgent(target.gaii, { mode });
     if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };

@@ -106,6 +106,7 @@ const DELEGATES: Record<string, string> = {
     'src/mcp/boards.ts': "services/board-write.ts and services/board-post.ts, both emitting 'boards'",
     'src/mcp/chat-instances.ts': "services/chat-instance-write.ts, which emits 'chat'",
     'src/mcp/commerce.ts': "services/memory-write.ts ('memory') and services/agent-offers-write.ts ('agents')",
+    'src/mcp/operator-config.ts': "services/memory-write.ts ('memory') and services/agent-profile-write.ts ('agents')",
     'src/mcp/cortex.ts': "services/cortex-lifecycle.ts, which emits 'cortex'",
     'src/mcp/extensions.ts': "services/extension-lifecycle.ts, which emits 'extensions'",
     'src/mcp/knowledge.ts': "services/knowledge-package-entry.ts, which emits 'knowledge'",

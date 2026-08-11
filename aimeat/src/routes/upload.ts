@@ -2,17 +2,35 @@
  * @file upload.ts
  * @description Presigned upload endpoint. Receives raw file bodies at PUT /v1/upload/:token,
  *   validates the token, enforces size limits, and delegates processing based on upload type
- *   (app, storage, extension, cortex).
+ *   (app, storage, extension, cortex, skill).
+ *
+ *   A handler here reads the signed token's meta, unpacks whatever shape the bytes arrive in, and
+ *   renders the answer. The decisions belong to the service each capability already has, so the
+ *   app, storage and cortex-install paths call services/app-publish.ts, storage-file-write.ts and
+ *   cortex-lifecycle.ts rather than restating their gates. Presigned upload is the door an author
+ *   is told to use for anything over ~1 kB, which makes a gate that is missing here a gate that is
+ *   missing for most real traffic.
  * @structure
  *   - uploadRouter() — Express router factory with single PUT endpoint
  *   - handleAppUpload() — process HTML app uploads
  *   - handleStorageUpload() — process generic file uploads
  *   - handleExtensionUpload() — process extension ZIP uploads
+ *   - handleSkillUpload() — process skill-directory ZIP uploads
  *   - handleCortexUpload() — process cortex ZIP uploads
+ *   - respondCortexInstalled() — the cortex answer, shared by its install and replace branches
  * @usage
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.13.0 — 2026-08-11 — handleStorageUpload calls services/storage-file-write.ts and
+ *     handleCortexUpload's install branch calls services/cortex-lifecycle.ts, so this door stops
+ *     being a third copy of two capabilities that got one implementation each in the August 2026
+ *     audit's step 8. What it gains by asking the shared code: the anonymous key fence and the
+ *     workspace-binding requirement on a stored file, and the operator bypass on the cortex
+ *     namespace claim, which POST /v1/cortex and aimeat_cortex_install both apply and this door
+ *     did not. Replacing a cortex you already own stays here: installCortex creates and never
+ *     replaces, and the in-place upsert lives inline in PUT /v1/cortex/:name rather than in a
+ *     service, so there is nothing to call for it yet.
  *   v1.6.0 — 2026-08-11 — handleCortexUpload enforces cortexMaxInstalled on a new name. Omitting the
  *     manifest is the documented way to install anything over ~1 kB, and it was the one road past
  *     the node's install ceiling that both manifest-carrying doors apply.
@@ -74,11 +92,12 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord, StorageFileRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord, StorageFileRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { validateNamespaceOwnership } from '../services/cortex-manifest.js';
-import { cortexInstallRefusal } from '../services/install-quotas.js';
+import { installCortex } from '../services/cortex-lifecycle.js';
+import { writeStorageFile } from '../services/storage-file-write.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
@@ -87,12 +106,12 @@ import { publishApp } from '../services/app-publish.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
-import { emitResourceListChanged } from '../mcp/index.js';
+import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
-import { checkStorageQuota, chargeOverage } from '../services/quota.js';
+import { emitChange } from '../services/event-bus.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -294,46 +313,36 @@ async function handleStorageUpload(
     res: Response, config: AimeatConfig, storage: Storage,
     sub: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
-    const key = meta.key as string;
-    const visibility = (meta.visibility as StorageFileRecord['visibility']) ?? 'private';
-    const mimeType = (meta.mime_type as string) ?? 'application/octet-stream';
     // tags + workspace_refs ride in the token meta (PRESIGNED_META_KEYS.storage). Dropping them here
     // is how a presigned upload of a workspace-shared file would land as an untagged private one —
     // the file exists, nobody it was meant for can see it, and nothing says why.
     const tags = Array.isArray(meta.tags)
         ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
         : undefined;
-    const workspaceRef = typeof meta.workspace_refs === 'string' ? meta.workspace_refs : undefined;
-    const groupId = typeof meta.group_id === 'string' ? meta.group_id : undefined;
 
-    // The token's maxBytes caps ONE file; the account-wide quota (M-2 §8.4) is a separate gate that
-    // only the inline POST /v1/storage used to run. Without it here, the presigned route was an
-    // unmetered way past the storage quota — and it is now the route the SPA's DM attachments take.
-    const quota = await checkStorageQuota(config, storage, sub, data.length);
-    if (!quota.allowed) {
-        res.status(413).json({ success: false, error: 'QUOTA_EXCEEDED', message: quota.reason });
+    // The key fence, the two size ceilings, the account-wide quota, the record shape, the overage
+    // charge and the change events are services/storage-file-write.ts, shared with POST /v1/storage
+    // and aimeat_storage_upload. This door's own business is reading the token meta and rendering
+    // the answer. `sub` is the token subject, set server-side at mint from resolveIdentity(), so the
+    // owner the file lands under is never anything a client sent.
+    const written = await writeStorageFile(
+        { storage, config, emitResourceUpdated, emitResourceListChanged },
+        sub,
+        {
+            key: meta.key as string,
+            data,
+            mimeType: (meta.mime_type as string) ?? 'application/octet-stream',
+            visibility: (meta.visibility as StorageFileRecord['visibility']) ?? 'private',
+            groupId: typeof meta.group_id === 'string' ? meta.group_id : undefined,
+            workspaceRef: typeof meta.workspace_refs === 'string' ? meta.workspace_refs : undefined,
+            tags,
+        },
+    );
+    if (!written.ok) {
+        res.status(written.status).json({ success: false, error: written.code, message: written.message });
         return;
     }
-
-    const file = await storage.createStorageFile({
-        key,
-        ownerGaii: sub,
-        visibility,
-        groupId: visibility === 'group' ? groupId : undefined,
-        workspaceRef: visibility === 'workspace' ? workspaceRef : undefined,
-        mimeType,
-        size: data.length,
-        data,
-        ...(tags?.length ? { tags } : {}),
-        createdAt: new Date().toISOString(),
-    });
-
-    // M-3: charge overage morsels exactly as the inline path does (§15).
-    if (quota.overageMorsels > 0) {
-        await chargeOverage(storage, sub, quota.overageMorsels, 'storage_overage');
-    }
-
-    emitResourceListChanged(sub);
+    const { file, overageMorsels } = written;
 
     res.json({
         success: true,
@@ -341,8 +350,11 @@ async function handleStorageUpload(
         key: file.key,
         owner_gaii: file.ownerGaii,
         size: file.size,
-        mime_type: mimeType,
-        visibility,
+        mime_type: file.mimeType,
+        visibility: file.visibility,
+        // What the account-wide quota cost this upload. The charge already happened on this path;
+        // reporting it is what tells the caller their balance moved.
+        ...(overageMorsels > 0 ? { overage_charged: overageMorsels } : {}),
         // Ready-to-embed, owner-addressed URL. Embedding this in a workspace document scopes the file to
         // that workspace's members on save (never the public internet) — use it, not /v1/storage/<key>.
         embed_url: pubEmbedUrl(file.ownerGaii, file.key),
@@ -573,38 +585,66 @@ async function handleCortexUpload(
     const parsed = parseGAII(sub);
     const ownerName = parsed?.owner ?? sub;
 
+    // The ZIP is this door's own business: magic bytes, entry extraction, the manifest.yaml + libs/
+    // layout. What comes out of it is the manifest text and the lib sources, which is what the
+    // shared install takes.
     const result = await parseCortexZip(data, config, ownerName);
     if (!result.ok) {
         res.status(400).json({ success: false, error: 'VALIDATION_FAILED', message: result.error });
         return;
     }
-
-    // SECURITY (C-4): the cortex NAME comes out of the uploaded manifest, and setCortexLibFile is an
-    // unconditional upsert keyed on (extName, libName) with no owner column. Naming someone else's
-    // cortex therefore replaced their lib bytes — which are served back as JavaScript from the apex
-    // origin to everyone who has that cortex active. Both gates the PUT /v1/cortex/:name route
-    // already applies (cortex.ts:226 namespace ownership, cortex.ts:265 installedBy) belong here
-    // too, and they must run BEFORE the first lib write, because that write is what does the damage.
     const incoming = result.extension!;
-    if (!validateNamespaceOwnership(incoming.namespace, ownerName)) {
+
+    // An agent token carries the operator role when its owner holds it (routes/auth.ts), and a
+    // presigned token carries no roles at all, so the role is read off the owner record here the way
+    // aimeat_cortex_install reads it. It buys one thing: a namespace this owner does not own. POST
+    // /v1/cortex and the MCP tool both grant it and this door did not, so the same bundle installed
+    // as an inline manifest and was refused as a ZIP.
+    const ownerRec = await storage.getOwner(ownerName);
+    const isOperator = ownerRec?.roles.includes('operator') ?? false;
+
+    const existing = await storage.getCortexExtension(incoming.name);
+
+    // ── NEW NAME — services/cortex-lifecycle.ts, the same install POST /v1/cortex and the inline
+    //    branch of aimeat_cortex_install run. It re-reads the manifest and applies the manifest and
+    //    lib ceilings, the node's cortex ceiling, the namespace claim and the prior-owner check,
+    //    every one of them before the first lib byte is written.
+    if (!existing) {
+        const out = await installCortex({ storage, config }, { ownerName, gaii: sub, isOperator }, {
+            manifest: incoming.manifest,
+            libs: result.libs,
+        });
+        if (!out.ok) {
+            res.status(out.refusal.status).json({
+                success: false, error: out.refusal.code, message: out.refusal.message,
+                ...(out.refusal.details ? { details: out.refusal.details } : {}),
+            });
+            return;
+        }
+        respondCortexInstalled(res, out.value.record, false, sub);
+        return;
+    }
+
+    // ── EXISTING NAME — replace in place. installCortex creates and never replaces, and the
+    //    in-place upsert lives inline in PUT /v1/cortex/:name rather than in a service, so this
+    //    branch has nothing shared to call. It has to stay: re-uploading is how a cortex bundle over
+    //    ~1 kB is iterated on, and turning that into a duplicate-name failure would leave an agent
+    //    with no way to redeploy at all.
+    //
+    //    SECURITY (C-4): the cortex NAME comes out of the uploaded manifest, and setCortexLibFile is
+    //    an unconditional upsert keyed on (extName, libName) with no owner column. Naming someone
+    //    else's cortex replaces their lib bytes, which are served back as JavaScript from the apex
+    //    origin to everyone who has that cortex active. Both gates therefore run BEFORE the first
+    //    lib write, because that write is what does the damage.
+    if (!isOperator && !validateNamespaceOwnership(incoming.namespace, ownerName)) {
         res.status(403).json({
             success: false, error: 'NAMESPACE_DENIED',
             message: `You cannot install a cortex in namespace "${incoming.namespace}". Use your own namespace "${ownerName}" or "community".`,
         });
         return;
     }
-    const existing = await storage.getCortexExtension(incoming.name);
-    if (existing && existing.installedBy !== ownerName) {
+    if (existing.installedBy !== ownerName) {
         res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'Not your cortex extension' });
-        return;
-    }
-
-    // The node's install ceiling. Omitting the manifest is the documented way to install anything
-    // over ~1 kB, and it was the one road past a limit both manifest-carrying doors apply.
-    // Replacing your own cortex adds nothing, so only a new name is counted.
-    const overQuota = await cortexInstallRefusal({ storage, config }, !existing);
-    if (overQuota) {
-        res.status(overQuota.status).json({ success: false, error: overQuota.code, message: overQuota.message });
         return;
     }
 
@@ -614,13 +654,16 @@ async function handleCortexUpload(
         }
     }
 
-    // Re-uploading your own cortex replaces it, matching PUT /v1/cortex/:name. Before the ownership
-    // gate above this path always called create, so a second upload of your own bundle wrote the new
-    // lib bytes and then failed on the duplicate name.
-    const record = existing
-        ? (await storage.updateCortexExtension(incoming.name, incoming)) ?? incoming
-        : await storage.createCortexExtension(incoming);
-    logger.info(`Cortex installed via upload: ${record.name}`, { version: record.version, by: sub, replaced: !!existing });
+    const record = (await storage.updateCortexExtension(incoming.name, incoming)) ?? incoming;
+    emitChange('cortex');
+    respondCortexInstalled(res, record, true, sub);
+}
+
+/** The upload's answer, shared by the install branch and the replace branch above. */
+function respondCortexInstalled(
+    res: Response, record: CortexExtensionRecord, replaced: boolean, sub: string,
+): void {
+    logger.info(`Cortex installed via upload: ${record.name}`, { version: record.version, by: sub, replaced });
     emitResourceListChanged(sub);
 
     res.json({

@@ -14,6 +14,19 @@
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   v1.3.0 -- 2026-08-11 -- aimeat_operator_agent_configure writes through
+ *     services/agent-profile-write.ts, which the two REST doors for these fields already call.
+ *     Three things the shared writer does and this tool did not. Tags were stored verbatim, so
+ *     "Ops Team!" landed here and was refused by PATCH /v1/agents/:name/tags and by
+ *     aimeat_agent_tags_set, with no cap on how many; they are now trimmed, lowercased,
+ *     de-duplicated and capped at 20, and a malformed one refuses the call. A mode change did not
+ *     re-derive the Hello Integration step list, so an agent moved to task-runner kept the long
+ *     flow and read 7/16 where the truth was 7/7. And an empty scope list was accepted, which left
+ *     an agent holding nothing and its whole tool surface filtered away; PATCH
+ *     /v1/agents/:name/scopes has always refused that. The field rules now run at PROPOSE time too,
+ *     so the diff the owner reads is the value that will be stored, and the SSE wake is the global
+ *     'agents' broadcast both REST doors emit rather than an owner-scoped one an operator view
+ *     never saw.
  *   v1.2.0 -- 2026-08-11 -- aimeat_operator_ai_config writes through services/memory-write.ts and
  *     resolves its target through routes/memory/owner-target.ts, which is where the reserved-key
  *     guard lives. It wrote `openrouter.settings` straight to storage before, so the one key class
@@ -37,11 +50,14 @@ import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
-import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { uncoveredScopes } from '../utils/scope-coverage.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import {
+    normaliseAgentProfile, resolveAgentTarget, setAgentProfile,
+    type AgentProfileFields,
+} from '../services/agent-profile-write.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
 
@@ -60,6 +76,17 @@ function currentView(agent: AgentRecord): AgentConfigChange {
         mode: (agent as { mode?: string }).mode ?? 'interactive',
         tags: agent.tags ?? [],
         scopes: (agent as { defaultScopes?: string[] }).defaultScopes ?? [],
+    };
+}
+
+/** The tool's snake_case payload in the field names services/agent-profile-write.ts writes. */
+function profileFieldsOf(change: AgentConfigChange): AgentProfileFields {
+    return {
+        ...(change.display_name !== undefined ? { displayName: change.display_name } : {}),
+        ...(change.description !== undefined ? { description: change.description } : {}),
+        ...(change.mode !== undefined ? { mode: change.mode } : {}),
+        ...(change.tags !== undefined ? { tags: change.tags } : {}),
+        ...(change.scopes !== undefined ? { defaultScopes: change.scopes } : {}),
     };
 }
 
@@ -105,9 +132,12 @@ export function registerOperatorConfigTools(
         annotationsFor('aimeat_operator_agent_configure'),
         async ({ agent_name, display_name, description, mode, tags, scopes, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
-            const targetGaii = `${agent_name}#${callerOwner}@${config.nodeId}`;
+            // One target resolution, the writer's: a bare name becomes a GAII under the CALLER's
+            // own owner, and anything already GAII-shaped has to survive the ownership check below
+            // before it is read or written. Both doors resolve a name the same way now.
+            const targetGaii = resolveAgentTarget(config, callerOwner, agent_name);
             const agent = await storage.getAgent(targetGaii);
-            if (!agent) return err(`No agent "${agent_name}" under owner ${callerOwner}`);
+            if (!agent || agent.owner !== callerOwner) return err(`No agent "${agent_name}" under owner ${callerOwner}`);
 
             const proposed: AgentConfigChange = {};
             if (display_name !== undefined) proposed.display_name = display_name;
@@ -141,6 +171,15 @@ export function registerOperatorConfigTools(
                 }
             }
 
+            // The field vocabulary is services/agent-profile-write.ts, and it runs HERE as well as
+            // on the write, so a malformed tag or an empty scope list is refused before a token is
+            // minted and the diff the owner reads is the value that will be stored. Tags come back
+            // trimmed, lowercased and de-duplicated; the token binds to that form, and it has to,
+            // because that is what the confirm call will write.
+            const normalised = normaliseAgentProfile(config, profileFieldsOf(proposed));
+            if (!normalised.ok) return err(`${normalised.code}: ${normalised.message}`);
+            if (normalised.updates.tags !== undefined) proposed.tags = normalised.updates.tags;
+
             const current = currentView(agent);
             const diff = diffOf(current, proposed);
             if (Object.keys(diff).length === 0) {
@@ -170,18 +209,15 @@ export function registerOperatorConfigTools(
                 throw e;
             }
 
-            const updates: Partial<AgentRecord> = {};
-            if (proposed.display_name !== undefined) updates.displayName = proposed.display_name;
-            if (proposed.description !== undefined) updates.description = proposed.description;
-            if (proposed.mode !== undefined) (updates as { mode?: string }).mode = proposed.mode;
-            if (proposed.tags !== undefined) updates.tags = proposed.tags;
-            if (proposed.scopes !== undefined) (updates as { defaultScopes?: string[] }).defaultScopes = proposed.scopes;
-
-            const updated = await storage.updateAgent(targetGaii, updates);
-            if (!updated) return err('Update failed — agent disappeared mid-flight');
+            // ONE implementation. services/agent-profile-write.ts owns the same-owner check, the
+            // field rules and the Hello Integration step-list re-derive a mode change owes, the same
+            // way PATCH /v1/agents/:name/tags and /mode do. This door used to write the record
+            // itself, so a tag nobody else would accept got stored and a mode change left the
+            // onboarding flow counting against the wrong denominator.
+            const outcome = await setAgentProfile({ storage, config }, callerOwner, agent_name, profileFieldsOf(proposed));
+            if (!outcome.ok) return err(`${outcome.code}: ${outcome.message}`);
             logger.info(`Operator-configure applied to ${targetGaii}`, { by: agentGaii, fields: Object.keys(diff) });
-            emitChange('agents', `${callerOwner}@${config.nodeId}`);
-            return ok({ mode: 'applied', agent: agent_name, applied: diff, current: currentView(updated) });
+            return ok({ mode: 'applied', agent: agent_name, applied: diff, current: currentView(outcome.agent) });
         },
     );
 
