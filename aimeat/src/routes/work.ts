@@ -10,6 +10,12 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   v1.2.0 — 2026-08-11 — the two Tier 0.5 doors are gone: GET /v1/work/:tc/accept?otk= and
+ *     GET /v1/work/:tc/reject?otk=. RFC v4.0 deprecates one-time keys, and these two were a third
+ *     implementation of accept and reject that wrote the status straight to storage: no work→task
+ *     bridge, no callback webhook, no extension hook and no change event, so a Work tab watching SSE
+ *     never saw the transition. They also ran outside the keyedBrowseEnabled flag the deprecation
+ *     put the feature behind. The POST routes above are the remaining doors.
  *   v1.1.0 — 2026-08-11 — accept and deliver call services/work-lifecycle.ts, the same functions
  *     aimeat_work_accept and aimeat_work_deliver call. The tools were a second implementation that
  *     skipped the work→task bridge, the requester's callback webhook and both extension hooks.
@@ -29,7 +35,6 @@ import { logger } from '../utils/logger.js';
 import { createWorkTabService } from '../services/db/work-tab-db-service.js';
 import { executeHooks } from '../services/hooks.js';
 import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
-import { checkOtkSession } from './auth.js';
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
@@ -553,88 +558,6 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       rating: { rating, comment },
     }));
     emitChange('work');
-  });
-
-  // -----------------------------------------------
-  // Tier 0.5 — GET-based OTK operations
-  // -----------------------------------------------
-
-  // GET /v1/work/:tc/accept?otk= — accept work via OTK (Tier 0.5)
-  router.get('/v1/work/:tc/accept', async (req, res) => {
-    const otkKey = req.query.otk as string;
-    if (!otkKey) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
-      return;
-    }
-    const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
-    if (!otk) {
-      res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
-      return;
-    }
-    if (!await checkOtkSession(otk, storage)) {
-      res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
-      return;
-    }
-    const tc = param(req.params.tc);
-    const work = await storage.getWork(tc);
-    if (!work) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
-      return;
-    }
-    if (work.providerGaii !== otk.ownerGaii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'OTK agent is not the provider of this work'));
-      return;
-    }
-    if (work.status !== 'pending') {
-      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", cannot accept`));
-      return;
-    }
-    const updated = await storage.updateWork(tc, { status: 'accepted', updatedAt: new Date().toISOString() });
-    res.json(success(config.nodeId, {
-      tracking_code: updated!.trackingCode,
-      status: updated!.status,
-      tier: '0.5',
-    }));
-  });
-
-  // GET /v1/work/:tc/reject?otk= — reject work via OTK (Tier 0.5)
-  router.get('/v1/work/:tc/reject', async (req, res) => {
-    const otkKey = req.query.otk as string;
-    if (!otkKey) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
-      return;
-    }
-    const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
-    if (!otk) {
-      res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
-      return;
-    }
-    if (!await checkOtkSession(otk, storage)) {
-      res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
-      return;
-    }
-    const tc = param(req.params.tc);
-    const work = await storage.getWork(tc);
-    if (!work) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Work item not found: ${tc}`));
-      return;
-    }
-    if (work.providerGaii !== otk.ownerGaii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'OTK agent is not the provider of this work'));
-      return;
-    }
-    if (work.status !== 'pending') {
-      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", cannot reject`));
-      return;
-    }
-    const { returnEscrow: returnEscrowFn } = await import('../services/morsel.js');
-    await returnEscrowFn(storage, work);
-    const updated = await storage.updateWork(tc, { status: 'cancelled', updatedAt: new Date().toISOString() });
-    res.json(success(config.nodeId, {
-      tracking_code: updated!.trackingCode,
-      status: updated!.status,
-      tier: '0.5',
-    }));
   });
 
   return router;

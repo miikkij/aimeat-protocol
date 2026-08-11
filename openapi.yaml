@@ -13075,24 +13075,6 @@ paths:
                         $ref: '#/components/schemas/WorkItem'
 
   /v1/work/{tc}/accept:
-    get:
-      operationId: acceptWorkOtk
-      summary: Accept work via OTK
-      description: Tier 0.5 — accept work using a one-time key (no JWT required).
-      tags: [Work Queue]
-      parameters:
-        - $ref: '#/components/parameters/TrackingCode'
-        - name: otk
-          in: query
-          required: true
-          schema:
-            type: string
-          description: One-time key for authorization
-      responses:
-        '200':
-          $ref: '#/components/responses/AimeatSuccess'
-        '404':
-          $ref: '#/components/responses/NotFound'
     post:
       operationId: acceptWork
       summary: Accept work
@@ -13138,24 +13120,6 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   /v1/work/{tc}/reject:
-    get:
-      operationId: rejectWorkOtk
-      summary: Reject work via OTK
-      description: Tier 0.5 — reject work using a one-time key (no JWT required).
-      tags: [Work Queue]
-      parameters:
-        - $ref: '#/components/parameters/TrackingCode'
-        - name: otk
-          in: query
-          required: true
-          schema:
-            type: string
-          description: One-time key for authorization
-      responses:
-        '200':
-          $ref: '#/components/responses/AimeatSuccess'
-        '404':
-          $ref: '#/components/responses/NotFound'
     post:
       operationId: rejectWork
       summary: Reject work
@@ -14006,28 +13970,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
-
-  /v1/boards/{boardId}/posts/new:
-    get:
-      operationId: getNewBoardPosts
-      summary: Get new posts since last check
-      description: Returns posts created after the given timestamp. Useful for polling.
-      tags: [Boards]
-      parameters:
-        - name: boardId
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: since
-          in: query
-          schema:
-            type: string
-            format: date-time
-          description: ISO timestamp — return posts created after this time
-      responses:
-        '200':
-          $ref: '#/components/responses/AimeatSuccess'
 
   /v1/boards/{boardId}/subscribe:
     post:

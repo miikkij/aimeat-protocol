@@ -76,29 +76,6 @@ async function getToken(identity: string, privKey: string, isAgent: boolean): Pr
     return body.data.token;
 }
 
-// OTK session state — cached with 55s reuse window
-let cachedOtk = '';
-let otkFirstUsed = 0;
-const OTK_GRACE_MS = 55_000;
-
-async function getSessionOtk(): Promise<string> {
-    const now = Date.now();
-    if (cachedOtk && otkFirstUsed > 0 && (now - otkFirstUsed) < OTK_GRACE_MS) {
-        return cachedOtk;
-    }
-    const { body: chBody } = await json(`/v1/auth/challenge?owner=${encodeURIComponent(ownerName)}`);
-    assert(chBody.ok === true, `challenge: ${JSON.stringify(chBody.error)}`);
-    const challenge = chBody.data.challenge;
-    const sig = await signMsg(ownerPrivKey, challenge);
-    const { body: sessBody } = await json(
-        `/v1/auth/session?owner=${encodeURIComponent(ownerName)}&challenge=${encodeURIComponent(challenge)}&sig=${encodeURIComponent(sig)}`
-    );
-    assert(sessBody.ok === true, `session: ${JSON.stringify(sessBody.error)}`);
-    cachedOtk = sessBody.data.otk;
-    otkFirstUsed = 0;
-    return cachedOtk;
-}
-
 // ─── State ───
 const ownerName = `bdowner${Date.now()}`;
 let ownerPrivKey = '';
@@ -551,50 +528,10 @@ await test('23. Post with insufficient morsels → 402', async () => {
     assert(body.error?.code === 'INSUFFICIENT_MORSELS', `code: ${body.error?.code}`);
 });
 
-// ─── Phase 6: Tier 0.5 OTK Board Posting ───
-console.log('\nPhase 6 — Tier 0.5 OTK Board Posting');
-
-await test('24. Get session OTK', async () => {
-    const otk = await getSessionOtk();
-    assert(otk.length > 0, 'have OTK');
-    // Mark OTK as "first used" now so test 25 reuses the cached one
-    // (avoids an extra challenge+session round-trip that would hit the anon auth rate limit)
-    if (otkFirstUsed === 0) otkFirstUsed = Date.now();
-});
-
-await test('25. Post via OTK (Tier 0.5)', async () => {
-    const otk = await getSessionOtk();
-    const title = encodeURIComponent('OTK quick post');
-    const body = encodeURIComponent('Posted via Tier 0.5');
-    const { status, body: respBody } = await json(
-        `/v1/boards/${privateBoardId}/posts/new?otk=${otk}&title=${title}&body=${body}`
-    );
-    if (otkFirstUsed === 0) otkFirstUsed = Date.now();
-    assert(status === 201, `status ${status}: ${JSON.stringify(respBody)}`);
-    assert(respBody.data.tier === '0.5', `tier: ${respBody.data.tier}`);
-    assert(respBody.data.title === 'OTK quick post', `title: ${respBody.data.title}`);
-});
-
-// The OTK body ceiling is 200 000, not 500. It was raised deliberately on 2026-07-30 — the reason is
-// in the route file's own header, "500 characters is a sentence, not a post" — and this test kept
-// asserting the old number, so the suite has been one red since that day. It now checks the ceiling
-// that exists: 200 000 passes, past it is refused.
-await test('26. OTK post is bounded at 200 000 characters, not 500', async () => {
-    const otk = await getSessionOtk();
-    const ok = encodeURIComponent('x'.repeat(501));
-    const first = await json(
-        `/v1/boards/${privateBoardId}/posts/new?otk=${otk}&title=Fine&body=${ok}`
-    );
-    if (otkFirstUsed === 0) otkFirstUsed = Date.now();
-    assert(first.status === 201, `501 characters is well inside the ceiling, got ${first.status}: ${JSON.stringify(first.body)}`);
-});
-
-await test('27. Expired/invalid OTK → 401', async () => {
-    const { status, body } = await json(
-        `/v1/boards/${privateBoardId}/posts/new?otk=invalid-otk-xyz&title=Bad&body=Fail`
-    );
-    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body)}`);
-});
+// Phase 6 held four Tier 0.5 tests for GET /v1/boards/:boardId/posts/new?otk=. That route was
+// deleted on 2026-08-11 with the rest of the deprecated one-time-key write paths, so the behaviour
+// they covered no longer exists and the assertions went with it. Posting is POST
+// /v1/boards/:boardId/posts, covered in Phase 3.
 
 // ─── Phase 7: Board Access Control ───
 console.log('\nPhase 7 — Board Access Control');
@@ -691,11 +628,6 @@ await test('36. Unsubscribe when not subscribed → 404', async () => {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     assert(status === 404, `expected 404, got ${status}`);
-});
-
-await test('37. OTK post without otk param → 400', async () => {
-    const { status } = await json(`/v1/boards/${privateBoardId}/posts/new?title=Bad&body=Missing+OTK`);
-    assert(status === 400, `expected 400, got ${status}`);
 });
 
 // ─── Cleanup ───

@@ -11,6 +11,12 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.3.0 — 2026-08-11 — GET /v1/boards/:boardId/posts/new?otk= is gone. RFC v4.0 deprecates
+ *     one-time keys, and this door was a second implementation of posting that called
+ *     storage.createPost directly: no board access check, so an OTK holder could post to a board
+ *     they may not write to, no public-board price, no pre_board_post hook, no provenance stamp, no
+ *     change event and no subscriber fan-out. It also ran outside the keyedBrowseEnabled flag the
+ *     deprecation put the feature behind. POST /v1/boards/:boardId/posts is the remaining door.
  *   v1.2.0 — 2026-08-11 — August 2026 audit step 8. Create, subscribe, react, member roster and
  *     delete go through services/board-write.ts, which the MCP tools now call as well. Each of the
  *     five was written out here and again in src/mcp/boards.ts, and the copies had drifted: the
@@ -27,14 +33,12 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
-import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { checkConsentForRead, auditDataAccess } from '../services/consent.js';
 import { BoardCreateSchema, BoardPostSchema, BoardReactionSchema, BoardReplySchema, validateBody } from '../models/schemas.js';
-import { checkOtkSession } from './auth.js';
 import { emitChange } from '../services/event-bus.js';
 import { createBoardPost, createBoardReply } from '../services/board-post.js';
 import { boardReadRefusal } from '../services/board-read-access.js';
@@ -288,59 +292,6 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       })),
       total: posts.length,
       cursor: posts.length === limit ? posts[posts.length - 1]?.id : undefined,
-    }));
-  });
-
-  // -----------------------------------------------
-  // Tier 0.5 — GET-based board post via OTK (limited to 500 chars)
-  // Must be registered before :postId to prevent "new" matching as a postId
-  // -----------------------------------------------
-  // GET /v1/boards/:boardId/posts/new?otk=&title=&body=&category=
-  router.get('/v1/boards/:boardId/posts/new', async (req, res) => {
-    const otkKey = req.query.otk as string;
-    if (!otkKey) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'otk query parameter is required for Tier 0.5'));
-      return;
-    }
-    const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
-    if (!otk) {
-      res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used'));
-      return;
-    }
-    if (!await checkOtkSession(otk, storage)) {
-      res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
-      return;
-    }
-    const boardId = req.params.boardId as string;
-    const board = await storage.getBoard(boardId);
-    if (!board) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Board not found'));
-      return;
-    }
-    const title = (req.query.title as string) ?? 'Untitled';
-    const body = (req.query.body as string) ?? '';
-    if (body.length > 200_000) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Board posts are limited to 200000 characters'));
-      return;
-    }
-    const postId = `post-${randomBytes(8).toString('hex')}`;
-    const post = await storage.createPost({
-      id: postId,
-      boardId,
-      authorGaii: otk.ownerGaii,
-      title,
-      body,
-      category: (req.query.category as string) ?? undefined,
-      tags: [],
-      reactions: {},
-      createdAt: new Date().toISOString(),
-    });
-    res.status(201).json(success(config.nodeId, {
-      id: post.id,
-      board_id: boardId,
-      title: post.title,
-      body: post.body,
-      tier: '0.5',
     }));
   });
 
