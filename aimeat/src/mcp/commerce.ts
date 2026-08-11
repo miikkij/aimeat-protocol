@@ -95,6 +95,14 @@ export function registerCommerceTools(
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
 ): void {
+    // The operator kill switch, honoured here too. routes/commerce.ts:139-146 turns the WHOLE
+    // /v1/commerce surface off with a 503 when AIMEAT_COMMERCE_ENABLED=false, and that middleware
+    // sits on the router, so it covers the payout routes as well. The MCP tools were registered
+    // regardless, so an agent could still write and destroy the seller's payment credentials on a
+    // node where the operator had switched commerce off. Not registering them is the same answer
+    // the route gives, in this protocol's terms.
+    if (!config.commerceEnabled) return;
+
     const agentGaii = getAgentGaii();
     const owner = parseGaiiLoose(agentGaii).owner;
     const ownerGhii = `${owner}@${config.nodeId}`;
@@ -120,11 +128,18 @@ export function registerCommerceTools(
         },
         annotationsFor('aimeat_commerce_psp_set'),
         async ({ provider, secret_key }) => {
+            // Same bound the route applies (routes/commerce.ts:210-214). This tool stored whatever
+            // arrived, so a blank or truncated key became the seller's configured PSP credential
+            // and every money sale failed at settlement instead of at configuration.
+            const key = String(secret_key ?? '').trim();
+            if (key.length < 8 || key.length > 200) {
+                return fail('INVALID_PSP: secret_key must be your PSP secret (8-200 characters). It is stored server-side and never returned.');
+            }
             // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
             // wholesale would silently delete the other rail's setting (and vice versa).
             const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: secret_key }, 'private', ['commerce']);
-            return ok({ configured: true, provider, key_hint: maskSecret(secret_key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
+            await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce']);
+            return ok({ configured: true, provider, key_hint: maskSecret(key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
         },
     );
 
