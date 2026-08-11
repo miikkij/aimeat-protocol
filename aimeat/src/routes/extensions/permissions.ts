@@ -32,9 +32,33 @@ export function hasExtWritePermission(req: Request, config: AimeatConfig): boole
 export function canManageInstalledExt(req: Request, config: AimeatConfig, installedBy: string): boolean {
   const auth = req.auth;
   if (!auth) return false;
-  if ((auth.roles || []).includes('operator')) return true;
-  if (auth.owner !== installedBy) return false;
-  return hasExtWritePermission(req, config);
+  return canManageExtensionAs(
+    { owner: auth.owner, roles: auth.roles || [], scopes: (auth as { scopes?: string[] }).scopes || [] },
+    config, installedBy,
+  );
+}
+
+/**
+ * The same rule, without an Express request.
+ *
+ * The MCP tools activate, deactivate and delete extensions too, and they had NO ownership check at
+ * all: any agent holding `ext:write` could take another owner's extension offline or uninstall it
+ * outright. The HTTP door has refused that since it was written, through the function above — but
+ * the function needed a `req`, so the surface without one simply did not call it. That is the whole
+ * shape of the drift: a guard shaped like one door does not reach the other.
+ *
+ * Operators bypass. Otherwise the caller's owner must BE the installer, and they must hold the write
+ * permission (owner role, or the ext:write scope for an agent).
+ */
+export function canManageExtensionAs(
+  caller: { owner: string; roles: string[]; scopes: string[] },
+  config: AimeatConfig,
+  installedBy: string,
+): boolean {
+  if (caller.roles.includes('operator')) return true;
+  if (caller.owner !== installedBy) return false;
+  if (config.extInstallRole === 'owner' && caller.roles.includes('owner') && !caller.roles.includes('agent')) return true;
+  return caller.scopes.includes('*') || caller.scopes.includes('ext:*') || caller.scopes.includes('ext:write');
 }
 
 /**

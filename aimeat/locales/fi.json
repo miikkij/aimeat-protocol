@@ -5705,7 +5705,11 @@
         "domainExchange": "Markkinapaikka",
         "domainCommerce": "Myynti ja ostot",
         "domainOrganism": "Jaetut tilat",
-        "domainProvenance": "AI-merkinnät"
+        "domainProvenance": "AI-merkinnät",
+        "domainAgent": "Muut agenttisi",
+        "domainApp": "Sovellukset",
+        "domainCapability": "Myymäsi palvelut",
+        "permInvoke": "Aja"
       },
       "deviceAuth": {
         "title": "Laitehyväksyntä",

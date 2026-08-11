@@ -5705,7 +5705,11 @@
         "domainExchange": "Marketplace",
         "domainCommerce": "Selling and buying",
         "domainOrganism": "Shared spaces",
-        "domainProvenance": "AI labelling"
+        "domainProvenance": "AI labelling",
+        "domainAgent": "Your other agents",
+        "domainApp": "Apps",
+        "domainCapability": "Services you sell",
+        "permInvoke": "Run"
       },
       "deviceAuth": {
         "title": "Device Authorization",

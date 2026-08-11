@@ -43,6 +43,7 @@ import { createRefusalRecorder, refusalText } from '../routes/extensions/metered
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
+import { canManageExtensionAs } from '../routes/extensions/permissions.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { makeExtensionFiles } from '../services/extension-files.js';
@@ -57,6 +58,8 @@ export function registerExtensionsTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's own scopes, for the ownership guard on activate/deactivate/delete. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -489,6 +492,18 @@ export function registerExtensionsTools(
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
+            // Only the installer may activate their extension. This tool had no ownership check at
+            // all, so any agent holding ext:write reached every extension on the node — including
+            // another owner's. routes/extensions/crud.ts has refused that since it was written, via
+            // canManageInstalledExt; that function needed an Express request, so the surface without
+            // one never called it. Same rule, same wording: not found rather than not yours.
+            if (!canManageExtensionAs(
+                { owner: parseGAII(getAgentGaii())?.owner ?? '', roles: ['agent'], scopes: sessionScopes },
+                config, ext.installedBy,
+            )) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
             try {
                 await storage.updateExtension(name, {
                     status: 'active',
@@ -528,6 +543,18 @@ export function registerExtensionsTools(
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
+            // Only the installer may deactivate their extension. This tool had no ownership check at
+            // all, so any agent holding ext:write reached every extension on the node — including
+            // another owner's. routes/extensions/crud.ts has refused that since it was written, via
+            // canManageInstalledExt; that function needed an Express request, so the surface without
+            // one never called it. Same rule, same wording: not found rather than not yours.
+            if (!canManageExtensionAs(
+                { owner: parseGAII(getAgentGaii())?.owner ?? '', roles: ['agent'], scopes: sessionScopes },
+                config, ext.installedBy,
+            )) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
             try {
                 await storage.updateExtension(name, { status: 'inactive' });
 
@@ -556,6 +583,18 @@ export function registerExtensionsTools(
         async ({ name }) => {
             const ext = await storage.getExtension(name);
             if (!ext) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
+            }
+
+            // Only the installer may delete their extension. This tool had no ownership check at
+            // all, so any agent holding ext:write reached every extension on the node — including
+            // another owner's. routes/extensions/crud.ts has refused that since it was written, via
+            // canManageInstalledExt; that function needed an Express request, so the surface without
+            // one never called it. Same rule, same wording: not found rather than not yours.
+            if (!canManageExtensionAs(
+                { owner: parseGAII(getAgentGaii())?.owner ?? '', roles: ['agent'], scopes: sessionScopes },
+                config, ext.installedBy,
+            )) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 

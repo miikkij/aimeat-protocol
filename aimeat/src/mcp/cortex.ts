@@ -35,6 +35,9 @@ export function registerCortexTools(
     emitResourceListChanged: (agentGaii: string) => void,
 ): void {
 
+    /** The owner behind this session. Every ownership check here compares against it. */
+    const callerOwner = parseGAII(getAgentGaii())?.owner ?? '';
+
     // ── Tool 1: aimeat_cortex_list ──
     mcp.tool(
         'aimeat_cortex_list',
@@ -211,6 +214,15 @@ export function registerCortexTools(
                 return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
             }
 
+            // Only the installing owner may activate it. This tool had no ownership check, so any agent
+            // holding cortex:write reached every cortex extension on the node, including another
+            // owner's. routes/cortex.ts:265 has refused that on its own update path all along; the
+            // agent surface never got the same line. No operator bypass here: an MCP session is an
+            // agent, and an operator managing somebody else's cortex does it through the HTTP door.
+            if (ext.installedBy !== callerOwner) {
+                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
+            }
+
             // Idempotent - already active
             if (ext.status === 'active') {
                 return {
@@ -268,6 +280,15 @@ export function registerCortexTools(
                 return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
             }
 
+            // Only the installing owner may deactivate it. This tool had no ownership check, so any agent
+            // holding cortex:write reached every cortex extension on the node, including another
+            // owner's. routes/cortex.ts:265 has refused that on its own update path all along; the
+            // agent surface never got the same line. No operator bypass here: an MCP session is an
+            // agent, and an operator managing somebody else's cortex does it through the HTTP door.
+            if (ext.installedBy !== callerOwner) {
+                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
+            }
+
             // Idempotent - already inactive
             if (ext.status === 'inactive') {
                 return {
@@ -314,6 +335,15 @@ export function registerCortexTools(
             const ext = await storage.getCortexExtension(name);
 
             if (!ext) {
+                return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
+            }
+
+            // Only the installing owner may delete it. This tool had no ownership check, so any agent
+            // holding cortex:write reached every cortex extension on the node, including another
+            // owner's. routes/cortex.ts:265 has refused that on its own update path all along; the
+            // agent surface never got the same line. No operator bypass here: an MCP session is an
+            // agent, and an operator managing somebody else's cortex does it through the HTTP door.
+            if (ext.installedBy !== callerOwner) {
                 return { content: [{ type: 'text' as const, text: `Cortex extension not found: ${name}` }], isError: true };
             }
 
