@@ -70,6 +70,13 @@ export default tseslint.config(
       // same change that added this rule (August 2026 audit, step 4).
       'aimeat/no-adhoc-extension-ctx': 'error',
 
+      // One capability, one implementation, whatever the interface. These two are the rule made
+      // enforceable: an MCP tool may not talk to storage itself, and a service may not take an
+      // Express request — which is what made canManageInstalledExt unreachable from MCP while
+      // being the correct check all along. Both carry a seeded exemption list that only shrinks.
+      'aimeat/no-storage-in-mcp': 'error',
+      'aimeat/no-express-in-service': 'error',
+
       // A caught error must be rethrown with its cause attached, not replaced by a fresh one that
       // loses the original. Already 'error' for public/ since 2026-07-13; extended to src/ as part
       // of the silent-exception cleanup, since `{ cause }` is what makes a rethrown error traceable.
