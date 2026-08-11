@@ -15,6 +15,7 @@ import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../../storage
 import { requireAuth, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
+import { extensionInstallRefusal } from '../../services/install-quotas.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { logger } from '../../utils/logger.js';
 import { reconcileAfterExtensionWrite } from '../../services/exchange-projection.js';
@@ -125,24 +126,12 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const record = built.record;
       const name = record.name;
 
-      // Enforce max installed limit
-      const existing = await storage.listExtensions();
-      if (existing.length >= config.extensionMaxInstalled) {
-        res.status(409).json(error(config.nodeId, 'LIMIT_EXCEEDED',
-          `Maximum ${config.extensionMaxInstalled} extensions allowed`));
+      // Both install ceilings — the node's and this owner's — live in services/install-quotas.ts,
+      // because aimeat_extension_install answers to the same two numbers.
+      const overQuota = await extensionInstallRefusal({ storage, config }, req.auth!.owner as string, isOperator);
+      if (overQuota) {
+        res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
         return;
-      }
-
-      // Owner-level limit check — counts installs by the OWNER (or any of
-      // their agents installing on the owner's behalf with ext:write).
-      // Operators bypass.
-      if (!isOperator) {
-        const ownerExts = existing.filter(e => e.installedBy === req.auth!.owner);
-        if (ownerExts.length >= config.maxExtensionsPerOwner) {
-          res.status(429).json(error(config.nodeId, 'EXTENSION_LIMIT',
-            `Maximum ${config.maxExtensionsPerOwner} extensions per owner`));
-          return;
-        }
       }
       // Silence unused-var warning for legacy isOwner reference.
       void isOwner;
@@ -226,21 +215,15 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
-      // ── CREATE branch — brand-new extension. Mirrors POST quota checks. ──
+      // ── CREATE branch — brand-new extension, so the same two ceilings apply. It used to say
+      // "mirrors POST quota checks" and then write them out again, which is a mirror that has to be
+      // kept in step by hand. Third copy of the same numbers; now the same call.
       if (!existing) {
-        const all = await storage.listExtensions();
-        if (all.length >= config.extensionMaxInstalled) {
-          res.status(409).json(error(config.nodeId, 'LIMIT_EXCEEDED',
-            `Maximum ${config.extensionMaxInstalled} extensions allowed`));
+        const overQuota = await extensionInstallRefusal({ storage, config }, req.auth!.owner as string,
+          req.auth!.roles.includes('operator'));
+        if (overQuota) {
+          res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
           return;
-        }
-        if (!req.auth!.roles.includes('operator')) {
-          const ownerExts = all.filter(e => e.installedBy === req.auth!.owner);
-          if (ownerExts.length >= config.maxExtensionsPerOwner) {
-            res.status(429).json(error(config.nodeId, 'EXTENSION_LIMIT',
-              `Maximum ${config.maxExtensionsPerOwner} extensions per owner`));
-            return;
-          }
         }
         const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
         if (encConfig === null) {

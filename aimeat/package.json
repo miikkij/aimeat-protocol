@@ -131,9 +131,10 @@
     "check:ext-entrypoints": "tsx scripts/check-ext-entrypoints.ts --strict",
     "check:shared-impl": "tsx scripts/check-shared-implementation.ts --strict",
     "check:sse-parity": "tsx scripts/check-sse-parity.ts --strict",
+    "check:copied-logic": "tsx scripts/check-copied-logic.ts --strict",
     "check:liaison-surface": "tsx scripts/check-liaison-surface.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
-    "check:audit-gates": "pnpm check:route-scopes && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:sse-parity && pnpm check:liaison-surface"
+    "check:audit-gates": "pnpm check:route-scopes && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface"
   },
   "keywords": [
     "aimeat",

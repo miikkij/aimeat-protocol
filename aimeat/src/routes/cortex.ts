@@ -21,6 +21,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { parseCortexManifest, validateNamespaceOwnership } from '../services/cortex-manifest.js';
+import { cortexInstallRefusal } from '../services/install-quotas.js';
 import { activateExtension, deactivateExtension } from './cortex/activation.js';
 
 // Re-exported so existing consumers (e.g. services/generator-registration.ts) keep importing
@@ -81,11 +82,11 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
-    // Check install limit
-    const existing = await storage.listCortexExtensions();
-    if (existing.length >= config.cortexMaxInstalled) {
-      res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-        `Maximum ${config.cortexMaxInstalled} cortex extensions allowed. Uninstall unused extensions first.`));
+    // The node's cortex ceiling, from services/install-quotas.ts — the inline MCP branch and the
+    // presigned upload handler answer to the same number.
+    const overQuota = await cortexInstallRefusal({ storage, config }, true);
+    if (overQuota) {
+      res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
       return;
     }
 
@@ -231,12 +232,12 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
 
     const existing = await storage.getCortexExtension(name);
 
-    // ── CREATE branch — brand-new cortex. Mirrors POST, including the quota check. ──
+    // ── CREATE branch — brand-new cortex, so the node's ceiling applies. It used to say "mirrors
+    // POST" and then write the check out again; a mirror kept in step by hand is not a mirror.
     if (!existing) {
-      const all = await storage.listCortexExtensions();
-      if (all.length >= config.cortexMaxInstalled) {
-        res.status(413).json(error(config.nodeId, 'QUOTA_EXCEEDED',
-          `Maximum ${config.cortexMaxInstalled} cortex extensions allowed. Uninstall unused extensions first.`));
+      const overQuota = await cortexInstallRefusal({ storage, config }, true);
+      if (overQuota) {
+        res.status(overQuota.status).json(error(config.nodeId, overQuota.code, overQuota.message));
         return;
       }
       for (const [filename, content] of Object.entries(newLibs)) {

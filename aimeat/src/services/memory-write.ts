@@ -41,7 +41,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateMemoryWrite } from './schema-validator.js';
-import { checkMemoryQuota, chargeOverage } from './quota.js';
+import { memoryCeilings } from './memory-ceilings.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
 import { isKeyArchived } from './archive.js';
 import { provenanceForWrite } from './ai-provenance.js';
@@ -238,54 +238,19 @@ export async function writeMemoryRecord(
         }
     }
 
-    // The three memory ceilings. Every one of them lived in the HTTP route, so a write over MCP had
-    // no size limit, no key limit and no byte budget — on a store whose whole shape argument is that
-    // a value holds a record rather than a field.
-    const maxValueBytes = config.memoryMaxValueSizeKb * 1024;
-    const valueSize = Buffer.byteLength(JSON.stringify(input.value), 'utf8');
-    if (valueSize > maxValueBytes) {
-        return {
-            ok: false, status: 413, code: 'QUOTA_EXCEEDED',
-            message: `Value size ${valueSize} bytes exceeds limit of ${maxValueBytes} bytes`,
-        };
+    // The three memory ceilings — value size, key count, byte budget — from the one place that
+    // holds them (services/memory-ceilings.ts). A single write is a set of one; the workspace batch
+    // path passes its whole set to the same function, which is what stops fifty small records each
+    // passing on their own while the batch lands over the byte line.
+    const ceiling = await memoryCeilings({ storage, config }, caller.targetGaii, [{ key: input.key, value: input.value }]);
+    if (!ceiling.ok) {
+        return { ok: false, status: ceiling.refusal.status, code: ceiling.refusal.code, message: ceiling.refusal.message };
     }
 
-    // An UPDATE never grows the key count, so the count is only taken on a new key.
-    let keyCount: number | undefined;
-    if (!existing) {
-        keyCount = await storage.countMemory([caller.targetGaii]);
-        if (keyCount >= config.memoryMaxKeysPerAgent) {
-            // The remedy named here matters: "delete unused keys" sends someone who hit the wall
-            // through one-key-per-small-fact off to delete data instead of fixing the shape that
-            // will refill the space next week.
-            return {
-                ok: false, status: 413, code: 'QUOTA_EXCEEDED',
-                message: `Memory key limit reached (${config.memoryMaxKeysPerAgent}). One value may hold `
-                    + `${config.memoryMaxValueSizeKb} kB, so fold a set of small keys into one record holding `
-                    + 'an array or an object keyed by id, rather than deleting data.',
-            };
-        }
-    }
-
-    const existingSize = existing ? Buffer.byteLength(JSON.stringify(existing.value), 'utf8') : 0;
-    const quotaCheck = await checkMemoryQuota(config, storage, caller.targetGaii, valueSize, existingSize);
-    if (!quotaCheck.allowed) {
-        return { ok: false, status: 413, code: 'QUOTA_EXCEEDED', message: quotaCheck.reason! };
-    }
-
-    // Overage is charged where the quota is measured. It was billed on the HTTP path only, so a
-    // write over MCP consumed the space and nobody paid for it.
-    if (quotaCheck.overageMorsels > 0) {
-        await chargeOverage(storage, caller.targetGaii, quotaCheck.overageMorsels, 'memory_overage');
-    }
-
-    // Warn the owner at 80% and 95%, while reshaping is still cheap. Both numbers are already in
-    // hand, so this costs no extra query, and it is fire-and-forget: a warning must never fail the
+    // Warn the owner at 80% and 95%, while reshaping is still cheap. Both numbers came back from the
+    // check, so this costs no extra query, and it is fire-and-forget: a warning must never fail the
     // write it is warning about.
-    void checkMemoryQuotaAlarm(config, storage, caller.targetGaii, {
-        ...(keyCount !== undefined ? { keyCount: keyCount + 1 } : {}),
-        usedBytes: quotaCheck.currentBytes - existingSize + valueSize,
-    });
+    void checkMemoryQuotaAlarm(config, storage, caller.targetGaii, ceiling.measured);
 
     // 3. The optimistic lock is compared against the record in the TARGET namespace, which is why it
     //    comes after the target is resolved and not before.

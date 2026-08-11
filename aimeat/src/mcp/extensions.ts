@@ -51,6 +51,7 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { canManageExtensionAs } from '../routes/extensions/permissions.js';
+import { extensionInstallRefusal } from '../services/install-quotas.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { makeExtensionFiles } from '../services/extension-files.js';
@@ -428,21 +429,14 @@ export function registerExtensionsTools(
                 }
             }
 
-            // The node-wide and per-owner install ceilings, which POST and PUT /v1/extensions have
-            // always applied (routes/extensions/crud.ts:128-146). This tool had neither, so the
-            // agent door was an unlimited road past both. Only a NEW name adds to the count; an
-            // in-place update replaces what is already there.
+            // The node-wide and per-owner install ceilings, from the one place that holds them
+            // (services/install-quotas.ts). This tool had neither, so the agent door was an
+            // unlimited road past both — and writing them out HERE would have been the same
+            // mistake in the other direction. Only a NEW name counts; an in-place update replaces
+            // what is already there.
             if (!existingExt) {
-                const installed = await storage.listExtensions();
-                if (installed.length >= config.extensionMaxInstalled) {
-                    return { content: [{ type: 'text' as const, text: `LIMIT_EXCEEDED: maximum ${config.extensionMaxInstalled} extensions allowed on this node` }], isError: true };
-                }
-                if (!caller.roles.includes('operator')) {
-                    const mine = installed.filter(e => e.installedBy === callerOwner);
-                    if (mine.length >= config.maxExtensionsPerOwner) {
-                        return { content: [{ type: 'text' as const, text: `EXTENSION_LIMIT: maximum ${config.maxExtensionsPerOwner} extensions per owner` }], isError: true };
-                    }
-                }
+                const overQuota = await extensionInstallRefusal({ storage, config }, callerOwner, caller.roles.includes('operator'));
+                if (overQuota) return { content: [{ type: 'text' as const, text: `${overQuota.code}: ${overQuota.message}` }], isError: true };
             }
 
             // Encrypt secrets before any write, as POST/PUT /v1/extensions do. This path wrote config straight to storage, so a `type: secret` value was persisted in the clear and served unauthenticated.

@@ -43,6 +43,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interface.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
 import { resumeIfStalled } from '../services/task-resume.js';
+import { resolveAutoActivation, canProposeTodos, todoProposeRefusal, statusAfterProposal, AUTO_ACTIVATED_EVENT_MESSAGE } from '../services/agent-task-rules.js';
 import { commissionFingerprint } from '../routes/agent-tasks/dedupe.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -124,8 +125,7 @@ export function registerAgentTaskTools(
             const id = randomUUID();
             // The target agent's mode decides whether a queued task starts on its own.
             const targetRecord = await storage.getAgent(targetGaii);
-            const autoActivated = (status ?? 'queued') === 'queued' && targetRecord?.mode === 'task-runner';
-            const effectiveStatus = (autoActivated ? 'active' : (status ?? 'queued')) as AgentTaskRecord['status'];
+            const { autoActivated, effectiveStatus } = resolveAutoActivation(targetRecord, status as AgentTaskRecord['status'] | undefined);
             const record: AgentTaskRecord = {
                 id,
                 agentGaii: targetGaii,
@@ -159,7 +159,7 @@ export function registerAgentTaskTools(
                     id: randomUUID(),
                     taskId: created.id,
                     type: 'started',
-                    message: 'Task auto-activated (agent mode: task-runner)',
+                    message: AUTO_ACTIVATED_EVENT_MESSAGE,
                     timestamp: now,
                 });
             }
@@ -303,17 +303,12 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            // An ACTIVE task that already has a live plan is not re-plannable here. The preserve
-            // step below keeps only todos already marked 'outdated', so a re-proposal mid-run drops
-            // every in-progress and completed todo, their completedAt stamps included — the plan the
-            // owner approved and the record of what was already done, both gone with no refusal.
-            // POST /v1/agents/:name/tasks/:id/propose-todos has answered 409 for this since it was
-            // written; mid-execution changes go through PATCH.
-            const hasLivePlan = (task.todos ?? []).some(t => t.status !== 'outdated');
-            const canPropose = task.status === 'queued' || task.status === 'revision_requested'
-                || (task.status === 'active' && !hasLivePlan);
-            if (!canPropose) {
-                return { content: [{ type: 'text' as const, text: `TODOs can only be proposed on queued, revision_requested, or plan-less active tasks (current: ${task.status})` }], isError: true };
+            // An ACTIVE task that already has a live plan is not re-plannable: the preserve step
+            // below keeps only todos already marked 'outdated', so a mid-run re-proposal drops every
+            // in-progress and completed todo, their completedAt stamps included. The rule and its
+            // wording are services/agent-task-rules.ts, because the HTTP door decides it too.
+            if (!canProposeTodos(task)) {
+                return { content: [{ type: 'text' as const, text: todoProposeRefusal(task.status) }], isError: true };
             }
 
             const now = new Date().toISOString();
@@ -342,15 +337,7 @@ export function registerAgentTaskTools(
             // the owner pre-authorized a task-runner agent to start work without per-task gating, so a
             // proposal on a plain 'queued' task activates it immediately (zero-click onboarding). A
             // revision cycle still returns to 'queued' -- the owner explicitly asked to review the plan.
-            let nextStatus: AgentTaskRecord['status'] = task.status === 'revision_requested' ? 'queued' : task.status;
-            let autoActivated = false;
-            if (task.status === 'queued') {
-                const agent = await storage.getAgent(task.agentGaii);
-                if (agent?.mode === 'task-runner') {
-                    nextStatus = 'active';
-                    autoActivated = true;
-                }
-            }
+            const { nextStatus, autoActivated } = await statusAfterProposal(g => storage.getAgent(g), task);
 
             const updated = await storage.updateAgentTask(task_id, {
                 todos: [...preserved, ...newTodos],

@@ -77,6 +77,7 @@
     "check:ext-entrypoints": "cd aimeat && pnpm check:ext-entrypoints",
     "check:shared-impl": "cd aimeat && pnpm check:shared-impl",
     "check:sse-parity": "cd aimeat && pnpm check:sse-parity",
+    "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates"

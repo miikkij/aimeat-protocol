@@ -13,6 +13,7 @@
  */
 
 import type { Router } from 'express';
+import { resolveAutoActivation, AUTO_ACTIVATED_EVENT_MESSAGE } from '../../services/agent-task-rules.js';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentTaskScope } from '../../storage/interface.js';
@@ -161,8 +162,9 @@ export function registerTaskCreateReadRoutes(
     // the owner has pre-authorized this agent to start work without per-task
     // gating; interactive/autonomous/coordinator modes still go through the
     // standard queued -> (owner /start) -> active gate.
-    const autoActivated = body.status === 'queued' && agent.mode === 'task-runner';
-    const effectiveStatus: AgentTaskRecord['status'] = autoActivated ? 'active' : body.status;
+    // services/agent-task-rules.ts — aimeat_task_create makes the same call, and the owner's
+    // standing instruction is not about which door the delegation came down.
+    const { autoActivated, effectiveStatus } = resolveAutoActivation(agent, body.status);
 
     const record: AgentTaskRecord = {
       id,
@@ -213,7 +215,7 @@ export function registerTaskCreateReadRoutes(
         id: randomUUID(),
         taskId: record.id,
         type: 'started',
-        message: 'Task auto-activated (agent mode: task-runner)',
+        message: AUTO_ACTIVATED_EVENT_MESSAGE,
         timestamp: now,
       });
     }

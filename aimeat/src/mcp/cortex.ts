@@ -26,6 +26,7 @@ import { runCapabilityAggregation } from '../services/capability-aggregator.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
+import { cortexInstallRefusal } from '../services/install-quotas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { emitChange } from '../services/event-bus.js';
@@ -127,11 +128,8 @@ export function registerCortexTools(
                 return { content: [{ type: 'text' as const, text: `Manifest size ${Math.round(manifestSizeKb)}KB exceeds limit of ${config.cortexMaxLibSizeKb}KB` }], isError: true };
             }
 
-            // Check install limit
-            const existing = await storage.listCortexExtensions();
-            if (existing.length >= config.cortexMaxInstalled) {
-                return { content: [{ type: 'text' as const, text: `Maximum ${config.cortexMaxInstalled} cortex extensions allowed. Uninstall unused extensions first.` }], isError: true };
-            }
+            const overQuota = await cortexInstallRefusal({ storage, config }, true);
+            if (overQuota) return { content: [{ type: 'text' as const, text: `${overQuota.code}: ${overQuota.message}` }], isError: true };
 
             // Validate lib sizes
             if (libs) {

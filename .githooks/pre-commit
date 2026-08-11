@@ -22,7 +22,8 @@
 #  16. Sandbox entry points on builder — pnpm check:ext-entrypoints
 #  17. One capability one impl       — pnpm check:shared-impl
 #  18. An agent writes, page hears it — pnpm check:sse-parity
-#  19. Published surfaces + release   — pnpm check:liaison-surface
+#  19. No decision written out twice  — pnpm check:copied-logic
+#  20. Published surfaces + release   — pnpm check:liaison-surface
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -105,6 +106,9 @@ pnpm -s check:shared-impl
 
 echo "[pre-commit] An agent writes, and the open page hears about it (check:sse-parity)…"
 pnpm -s check:sse-parity
+
+echo "[pre-commit] No decision is written out on two sides (check:copied-logic)…"
+pnpm -s check:copied-logic
 
 echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
 pnpm -s check:liaison-surface

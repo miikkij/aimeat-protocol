@@ -78,6 +78,7 @@ import type { Storage, ExtensionRecord, StorageFileRecord } from '../storage/int
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { validateNamespaceOwnership } from '../services/cortex-manifest.js';
+import { cortexInstallRefusal } from '../services/install-quotas.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
@@ -598,19 +599,13 @@ async function handleCortexUpload(
         return;
     }
 
-    // The node's install ceiling. Both manifest-carrying doors (POST /v1/cortex and the inline
-    // branch of aimeat_cortex_install) refuse at cortexMaxInstalled; this one did not, which made
-    // omitting the manifest — the documented way to install anything over ~1 kB — the unmetered
-    // road past the limit. Replacing your own cortex adds nothing, so only a new name is counted.
-    if (!existing) {
-        const installed = await storage.listCortexExtensions();
-        if (installed.length >= config.cortexMaxInstalled) {
-            res.status(413).json({
-                success: false, error: 'QUOTA_EXCEEDED',
-                message: `Maximum ${config.cortexMaxInstalled} cortex extensions allowed. Uninstall unused extensions first.`,
-            });
-            return;
-        }
+    // The node's install ceiling. Omitting the manifest is the documented way to install anything
+    // over ~1 kB, and it was the one road past a limit both manifest-carrying doors apply.
+    // Replacing your own cortex adds nothing, so only a new name is counted.
+    const overQuota = await cortexInstallRefusal({ storage, config }, !existing);
+    if (overQuota) {
+        res.status(overQuota.status).json({ success: false, error: overQuota.code, message: overQuota.message });
+        return;
     }
 
     if (result.libs) {

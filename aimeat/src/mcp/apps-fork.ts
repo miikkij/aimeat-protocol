@@ -14,6 +14,7 @@ import type { Storage, AppManifest } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { appQuotaRefusal } from '../services/install-quotas.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 
@@ -71,15 +72,10 @@ export function registerAppForkTool(
                 return { content: [{ type: 'text' as const, text: `You already have an app named "${new_filename}". Choose a different new_filename.` }], isError: true };
             }
 
-            // The per-owner app quota, the same rule publish applies on both doors. Forking had it
-            // over HTTP and not here, so this tool was the unlimited way past a cap the other two
-            // roads enforce.
-            if (config.maxAppsPerAgent > 0) {
-                const { total } = await storage.listApps({ ownerGaii: callerGhii, limit: 1 });
-                if (total >= config.maxAppsPerAgent) {
-                    return { content: [{ type: 'text' as const, text: `QUOTA_EXCEEDED: you have reached the maximum of ${config.maxAppsPerAgent} published apps` }], isError: true };
-                }
-            }
+            // The per-owner app quota, from the one place that holds it. Forking had it over HTTP
+            // and not here, so this tool was the unlimited way past a cap the other two roads apply.
+            const overQuota = await appQuotaRefusal({ storage, config }, callerGhii);
+            if (overQuota) return { content: [{ type: 'text' as const, text: `${overQuota.code}: ${overQuota.message}` }], isError: true };
 
             const now = new Date().toISOString();
             const forkedManifest: AppManifest = {

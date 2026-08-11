@@ -11,6 +11,7 @@
  */
 
 import type { Router } from 'express';
+import { canProposeTodos, todoProposeRefusal, statusAfterProposal } from '../../services/agent-task-rules.js';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from '../../storage/interface.js';
@@ -333,12 +334,9 @@ export function registerTaskLifecycleRoutes(
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
       return;
     }
-    const hasLivePlan = (task.todos ?? []).some(t => t.status !== 'outdated');
-    const canPropose = task.status === 'queued' || task.status === 'revision_requested'
-      || (task.status === 'active' && !hasLivePlan);
-    if (!canPropose) {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `TODOs can only be proposed on queued, revision_requested, or plan-less active tasks (current: ${task.status})`));
+    // services/agent-task-rules.ts — aimeat_task_propose_todos answers to the same rule.
+    if (!canProposeTodos(task)) {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE', todoProposeRefusal(task.status)));
       return;
     }
 
@@ -382,15 +380,7 @@ export function registerTaskLifecycleRoutes(
     // review again. Plain queued stays queued -- UNLESS the agent's mode is 'task-runner',
     // where the owner pre-authorized work to start without per-task gating (the same signal
     // create-time auto-activation keys off in create-read.ts). Active (plan-less) stays active.
-    let nextStatus: AgentTaskRecord['status'] = task.status === 'revision_requested' ? 'queued' : task.status;
-    let autoActivated = false;
-    if (task.status === 'queued') {
-      const agent = await storage.getAgent(task.agentGaii);
-      if (agent?.mode === 'task-runner') {
-        nextStatus = 'active';
-        autoActivated = true;
-      }
-    }
+    const { nextStatus, autoActivated } = await statusAfterProposal(g => storage.getAgent(g), task);
 
     const updated = await storage.updateAgentTask(id, {
       todos: [...preserved, ...newTodos],
