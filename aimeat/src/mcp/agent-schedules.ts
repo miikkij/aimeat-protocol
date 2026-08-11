@@ -28,6 +28,7 @@ import { getActiveScheduler } from '../services/scheduler.js';
 import { mergeConstraintDefaults } from '../services/schedule-constraints.js';
 import { emitChange } from '../services/event-bus.js';
 import { checkScheduleGate } from '../services/schedule-gate.js';
+import { writeMemoryRecord } from '../services/memory-write.js';
 
 export function registerAgentScheduleTools(
   mcp: McpServer,
@@ -234,14 +235,24 @@ export function registerAgentScheduleTools(
       const key = `agents.${selfName}.scheduler`;
       const now = new Date().toISOString();
       const entries = a.entries.map(e => ({ id: e.id ?? randomUUID(), ...e }));
-      const existing = await storage.getMemory(agentGaii, key);
-      await storage.setMemory({
-        key, ownerGaii: agentGaii,
+      // The mirror is a memory record, so it answers to memory's rules. Writing it straight to
+      // storage meant no value-size limit, no key ceiling, no byte budget, no archive guard, no
+      // schema lock and no memory change event — and the entries list is an unbounded array from the
+      // caller, so the ceiling was the only thing that would ever have bounded it.
+      const written = await writeMemoryRecord({ storage, config }, {
+        principal: agentGaii,
+        targetGaii: agentGaii,
+        scopes: sessionScopes,
+        roles: ['agent'],
+      }, {
+        key,
         value: { version: 1, updatedAt: now, entries },
-        visibility: 'owner', tags: ['scheduler', 'internal'], ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? now, updatedAt: now,
+        visibility: 'owner',
+        tags: ['scheduler', 'internal'],
+        pipeline: 'mcp.schedule_report_internal',
+        ownerScoped: true,
       });
+      if (!written.ok) return err(`${written.code}: ${written.message}`);
       emitChange('scheduler');
       return text({ reported: true, count: entries.length, key });
     },
