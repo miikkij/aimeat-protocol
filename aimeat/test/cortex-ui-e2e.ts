@@ -2,6 +2,9 @@
  * @file cortex-ui-e2e.ts
  * @description E2E tests for aimeat-ui cortex library (install, activate, serve, deactivate)
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Phase 1 asserts the refusal instead of tolerating it. "201 or 409" was
+ *     accepting a state in which the served bytes had already been replaced, because the old POST
+ *     wrote libs before it checked who held the name.
  *   v1.0.0 — 2026-03-16 — Initial: lifecycle tests for all 5 UI cortexes
  */
 import { readFileSync } from 'node:fs';
@@ -62,18 +65,48 @@ await test('Login owner', async () => {
   if (!ownerToken) throw new Error('No token in response');
 });
 
-// ── Phase 1: Install all 5 UI cortexes ──────────────────
-console.log('\n── Phase 1: Install UI Cortexes ──');
+// ── Phase 1: These five ship with the node, and a user cannot overwrite them ──
+//
+// The node seeds the bundled cortexes at boot under `system@<nodeId>`
+// (server-bootstrap/service-init.ts, services/cortex-seeder.ts), so by the time any owner exists
+// the five records are already there and installed by nobody in particular.
+//
+// This phase used to accept "201 or 409" and that tolerance was hiding a hole. POST /v1/cortex
+// wrote the lib BYTES first and only then asked storage.createCortexExtension, which threw on the
+// name collision and produced the 409. So a plain owner could replace the JavaScript this node
+// serves to every browser under a bundled pack's name, and be told "conflict" after it had already
+// happened. That is the C-4 shape: a cortex upload overwriting served JavaScript that is not the
+// uploader's. It closed on 2026-08-11 when the install moved into services/cortex-lifecycle.ts,
+// which asks who holds the name BEFORE writing anything.
+//
+// So the assertion is now the refusal, plus the thing the refusal is for: the served bytes did not
+// move. 201 is still accepted for a node that has not seeded (the flag is off, or the bundle is
+// absent), because there the name is genuinely free.
+console.log('\n── Phase 1: Bundled cortexes refuse a foreign install ──');
 for (const name of UI_CORTEXES) {
-  await test(`Install ${name}`, async () => {
+  await test(`Install ${name} is refused, and the served bytes are untouched`, async () => {
     const yaml = readFileSync(join(CORTEX_DIR, `${name}.yaml`), 'utf-8');
     const js = readFileSync(join(CORTEX_DIR, `${name}.js`), 'utf-8');
+
+    const before = await fetch(`${BASE}/v1/cortex/${name}/libs/${name}.js`);
+    const bytesBefore = before.ok ? await before.text() : null;
+
     const r = await json('/v1/cortex', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${ownerToken}` },
-      body: JSON.stringify({ manifest: yaml, libs: { [`${name}.js`]: js } }),
+      body: JSON.stringify({ manifest: yaml, libs: { [`${name}.js`]: `/* not yours */\n${js}` } }),
     });
-    if (r.status !== 201 && r.status !== 409) throw new Error(`Expected 201 or 409, got ${r.status}: ${JSON.stringify(r.body)}`);
+
+    if (r.status === 201) return;   // unseeded node: the name was free
+    if (r.status !== 403) {
+      throw new Error(`Expected 403 (name held by system@node) or 201 (unseeded), got ${r.status}: ${JSON.stringify(r.body)}`);
+    }
+    if (bytesBefore === null) throw new Error('refused the install but serves no bytes for the seeded pack');
+    const after = await fetch(`${BASE}/v1/cortex/${name}/libs/${name}.js`);
+    const bytesAfter = await after.text();
+    if (bytesAfter !== bytesBefore) {
+      throw new Error(`the refused install still changed the served bytes (${bytesBefore.length} → ${bytesAfter.length})`);
+    }
   });
 }
 
