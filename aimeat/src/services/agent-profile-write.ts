@@ -31,6 +31,9 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   v1.2.0 -- 2026-08-11 -- recordSelfReportedPlatform() also sets the mode the reported platform
+ *     implies (workstation), because an agent in the user's own tool cannot pass configure_delivery
+ *     and was left at a checklist that never completes. Only an unchosen mode is overwritten.
  *   v1.1.0 -- 2026-08-11 -- setAgentProfile() and normaliseAgentProfile(), for the multi-field write
  *     aimeat_operator_agent_configure was making on its own. That tool wrote tags verbatim where
  *     this file trims, lowercases, de-duplicates and caps them; it wrote a mode without re-deriving
@@ -46,8 +49,9 @@ import type { AimeatConfig } from '../config.js';
 import type { AgentRecord, AgentTechnicalCapability, Storage } from '../storage/interface.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
-import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
+import { deriveStepsForMode } from '../models/agent-onboarding-schemas.js';
 import { AgentCapabilitiesUpdateSchema } from '../models/agent-capabilities-schemas.js';
+import { inferModeFromPlatform } from './platform-detector.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { logger } from '../utils/logger.js';
 
@@ -333,18 +337,9 @@ async function syncOnboardingFlowToMode(storage: Storage, gaii: string, mode: Ag
     try {
         const onboarding = await storage.getOnboarding(gaii);
         if (!onboarding) return;
-        const target = createDefaultSteps(mode);
-        const currentIds = new Set(onboarding.steps.map(s => s.id));
-        const flowChanged = target.length !== onboarding.steps.length || target.some(s => !currentIds.has(s.id));
-        if (!flowChanged) return;
+        const steps = deriveStepsForMode(onboarding.steps, mode);
+        if (!steps) return;
 
-        const prevById = new Map(onboarding.steps.map(s => [s.id, s] as const));
-        const steps = target.map(fresh => {
-            const prev = prevById.get(fresh.id);
-            return prev
-                ? { ...fresh, status: prev.status, validatedAt: prev.validatedAt, details: prev.details, failureReason: prev.failureReason }
-                : fresh;
-        });
         const allRequiredPassed = steps.filter(s => s.required).every(s => s.status === 'passed');
         await storage.updateOnboarding(gaii, {
             steps,
@@ -402,21 +397,54 @@ export async function setAgentCapabilities(
 }
 
 /**
- * Stamp the platform (and model) an agent reported about itself during the identify_platform step.
- * Attribution only: it is self-reported, and a platform delegates to subagents on other models
- * mid-session, so this is never evidence of what ran.
+ * Stamp the platform (and model) an agent reported about itself during the identify_platform step,
+ * and put the agent in the mode that platform implies.
+ *
+ * Attribution first: platform and model are self-reported, and a platform delegates to subagents on
+ * other models mid-session, so neither is evidence of what ran.
+ *
+ * The mode part is what stops an agent stranding itself. A Claude Desktop / VS Code agent registers
+ * in the default 'interactive' mode and therefore gets the full 13-step Hello Integration, which
+ * includes `configure_delivery` — a step that wants a webhook or a watchdog seen within ten minutes.
+ * A conversation-triggered agent has neither and never will, so its checklist can never complete: it
+ * sits at 9/12 forever while being, in fact, fully connected. That is a real production case (an
+ * external user, August 2026), and the agent's own attempt to fix it made it worse, because it
+ * guessed at the mode vocabulary ("MCP") instead of the value the node accepts.
+ *
+ * The node already knows better than the agent does: `identify_platform` is step two, and the
+ * platform string says whether the agent is node-resident. So the inference happens here, before the
+ * checklist has anything to strand on.
+ *
+ * Only an UNCHOSEN mode is overwritten ('interactive' is the registration default, and undefined is
+ * an older record). A mode someone deliberately set — task-runner, autonomous, coordinator — is left
+ * exactly as it is, and so is an agent already in workstation mode.
+ *
+ * This writes the AGENT RECORD only and returns the mode it moved the agent to. The step list is the
+ * caller's, deliberately: it is confirming a step against an onboarding record it already holds in
+ * memory, and a second writer re-deriving that list underneath would be overwritten by the caller's
+ * own persist a moment later. The caller re-derives with `deriveStepsForMode` and persists once.
  */
 export async function recordSelfReportedPlatform(
     storage: Storage,
     agentGaii: string,
     body: Record<string, unknown>,
-): Promise<void> {
+): Promise<{ modeSetTo?: NonNullable<AgentRecord['mode']> }> {
     const model = typeof body.model === 'string' && body.model.trim()
         ? body.model.trim().toLowerCase().slice(0, 64) : undefined;
+    const platform = body.platform as string;
+
+    const current = await storage.getAgent(agentGaii);
+    const inferred = inferModeFromPlatform(platform);
+    const modeIsUnchosen = !current?.mode || current.mode === 'interactive';
+    const modeSetTo = inferred && inferred !== current?.mode && modeIsUnchosen ? inferred : undefined;
+
     await storage.updateAgent(agentGaii, {
-        platform: body.platform as string,
+        platform,
         platformVersion: typeof body.platform_version === 'string' ? body.platform_version : undefined,
         platformDetectedBy: 'self_report',
         ...(model ? { model, modelDetectedBy: 'self_report' as const } : {}),
+        ...(modeSetTo ? { mode: modeSetTo } : {}),
     });
+
+    return { modeSetTo };
 }

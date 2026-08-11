@@ -7,6 +7,8 @@
  * @structure MessageAttachmentInputSchema, InteractivePayloadSchema, MessageSendSchema
  * @usage import { MessageSendSchema } from '../models/message-schemas.js';
  * @version-history
+ *   v1.3.0 -- 2026-08-11 -- `to` accepts a named group address (support@operators) and is optional
+ *     when conversation_id names a group thread: a reply into a group is addressed to the thread.
  *   Text limits raised — 2026-07-30 — prompts/labels to 10 000 and bodies to 200 000.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 2: local messaging).
  *   v1.2.0 -- 2026-08-01 -- Voice messages: an attachment may carry `duration_seconds` and a
@@ -98,8 +100,13 @@ export const InteractivePayloadSchema = z.discriminatedUnion('role', [
 ]);
 
 export const MessageSendSchema = z.object({
-  /** Recipient — a human GHII (owner@node). */
-  to: z.string().min(3).max(256),
+  /**
+   * Recipient: a human GHII (`owner@node`), an agent (`agent#owner@node`), an app
+   * (`eco:app#owner@node`), or a NAMED GROUP address — `support@operators`, which reaches whoever
+   * runs this node. Optional when `conversation_id` names an existing group thread, because a reply
+   * into a group is addressed to the thread rather than to one of the people in it.
+   */
+  to: z.string().min(3).max(256).optional().default(''),
   /** GFM markdown body. May be empty when sending attachment-only. */
   body: z.string().max(200_000).optional().default(''),
   /** Id of a message being replied to (same conversation). */

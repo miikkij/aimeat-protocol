@@ -39,6 +39,12 @@ Three grounds carry most of the work:
 - Apps are single-file web apps published on this node. aimeat_app_list gives each one a \`url\`, which is the address to hand the person when they want to open it.
 - Organisms and workspaces are how the person shares knowledge with others. Skills (aimeat_skill_list, aimeat_skill_get) are the operating guide for one named capability.
 
+When something here does not work, when a step will not complete, or when you need a decision only a
+human can make: send it to \`support@operators\` with aimeat_dm_send. That address reaches the people
+who run this node, in one thread they answer in. Say what you were doing and what happened instead;
+you will get a conversation id to continue in. Asking is the expected move, not a last resort, and
+what you report is how this node gets better.
+
 Speak to the person in their own language, and reach for the handbook whenever a task is new to you.`;
 
 /**

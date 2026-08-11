@@ -10,7 +10,7 @@
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
  */
 
-import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../interface.js';
 
 /** One row of the conversations list — the per-thread summary {@link DirectMessageRepository.listConversations}
  *  (and its batched sibling {@link DirectMessageRepository.listConversationsForOwners}) return. */
@@ -91,6 +91,16 @@ export interface DirectMessageRepository {
   /** Persist (re)resolved attachment descriptors after duplication/quota handling. */
   updateMessageAttachments(id: string, ownerGhii: string, attachments: DirectMessageRecord['attachments']): Promise<DirectMessageRecord | null>;
   deleteDirectMessage(id: string, ownerGhii: string): Promise<boolean>;
+
+  // ── Group conversations (a thread with more than two participants) ──
+  // A PAIR thread has no record: its id is derived from the two identities. So `getConversation`
+  // returning null means "this is an ordinary two-party thread", never "not found".
+  createConversation(record: ConversationRecord): Promise<ConversationRecord>;
+  getConversation(id: string): Promise<ConversationRecord | null>;
+  /** Replace the membership and/or subject. Bumps updatedAt. Returns null when there is no row. */
+  updateConversation(id: string, updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>): Promise<ConversationRecord | null>;
+  /** Every group thread `identity` is a participant of, newest first. */
+  listConversationsForParticipant(identity: string): Promise<ConversationRecord[]>;
 
   // ── Delivery telemetry (operator dashboard; no content/identities) ──
   appendMessageDeliveryLog(log: MessageDeliveryLog): Promise<void>;

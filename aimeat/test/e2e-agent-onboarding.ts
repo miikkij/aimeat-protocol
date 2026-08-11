@@ -1354,6 +1354,90 @@ await test('46. Workstation onboarding completes once all 4 steps pass (happy pa
     assert(ob.status === 'completed', `expected completed (all 4 steps passed), got ${ob.status}`);
 });
 
+// ─── Mode inferred from the reported platform ───
+// An agent in the user's own tool (Claude Desktop, VS Code) registers in the default 'interactive'
+// mode and would get the full flow, including configure_delivery — a step wanting a webhook or a
+// watchdog seen within ten minutes, which a conversation-triggered agent has no way to satisfy. It
+// then sits at 9/12 forever while being fully connected (a real production case). identify_platform
+// is where the node learns enough to fix that, and it is step two, before anything can strand.
+const inferName = 'onboard-desktop';
+let inferToken = '';
+
+await test('47. An agent registering with no mode gets the full flow, configure_delivery included', async () => {
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: inferName, owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    inferToken = await getToken(body.data.agent.gaii, body.data.private_key, true);
+
+    const { status: sStatus, body: sBody } = await json(`/v1/agents/${inferName}/onboarding/start`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(sStatus === 200, `start ${sStatus}: ${JSON.stringify(sBody)}`);
+    const steps = sBody.data.onboarding.steps;
+    assert(steps.find((s: any) => s.id === 'configure_delivery'),
+        `precondition: the default flow must include configure_delivery, got ${steps.map((s: any) => s.id).join(',')}`);
+});
+
+await test('48. Reporting a workstation platform switches the mode and drops the steps that cannot pass', async () => {
+    const { status, body } = await json(`/v1/agents/${inferName}/onboarding/step/identify_platform`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${inferToken}` },
+        body: JSON.stringify({ platform: 'Claude Desktop', model: 'claude-opus-5' }),
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.mode_set_to === 'workstation', `expected mode_set_to=workstation, got ${body.data.mode_set_to}`);
+    assert(body.data.total === 4, `expected the 4-step workstation flow, got total=${body.data.total}`);
+    assert(typeof body.data.mode_note === 'string' && body.data.mode_note.length > 0,
+        'a mode change must be explained, not just applied');
+
+    const { body: obBody } = await json(`/v1/agents/${inferName}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const ids = obBody.data.onboarding.steps.map((s: any) => s.id);
+    assert(!ids.includes('configure_delivery'), `configure_delivery should be gone, got ${ids.join(',')}`);
+    assert(ids.includes('identify_platform'), `identify_platform must survive the re-derive, got ${ids.join(',')}`);
+    const identify = obBody.data.onboarding.steps.find((s: any) => s.id === 'identify_platform');
+    assert(identify.status === 'passed', `progress must carry over, got ${identify.status}`);
+});
+
+await test('49. The inferred mode is on the agent record, marked as the agent read it', async () => {
+    const { status, body } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const agent = body.data.agents.find((a: any) => a.name === inferName);
+    assert(agent?.mode === 'workstation', `expected mode=workstation on the record, got ${agent?.mode}`);
+    assert(agent?.model === 'claude-opus-5', `expected the reported model to persist, got ${agent?.model}`);
+});
+
+await test('50. A deliberately chosen mode is never overwritten (failure mode)', async () => {
+    const runnerInferName = 'onboard-runner-infer';
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: runnerInferName, owner: ownerName, capabilities: ['memory'], mode: 'task-runner' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    const runnerToken = await getToken(body.data.agent.gaii, body.data.private_key, true);
+
+    await json(`/v1/agents/${runnerInferName}/onboarding/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const { status: pStatus, body: pBody } = await json(`/v1/agents/${runnerInferName}/onboarding/step/identify_platform`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${runnerToken}` },
+        body: JSON.stringify({ platform: 'Claude Desktop' }),
+    });
+    assert(pStatus === 200, `status ${pStatus}: ${JSON.stringify(pBody)}`);
+    assert(pBody.data.mode_set_to === undefined, `an owner-chosen mode must survive, got mode_set_to=${pBody.data.mode_set_to}`);
+
+    const { body: listBody } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const runner = listBody.data.agents.find((a: any) => a.name === runnerInferName);
+    assert(runner?.mode === 'task-runner', `expected task-runner to be untouched, got ${runner?.mode}`);
+});
+
 // ─── Agent self-tagging (PATCH /tags is same-owner gated, not owner-role) ───
 
 await test('Agent can set tags on its own record', async () => {

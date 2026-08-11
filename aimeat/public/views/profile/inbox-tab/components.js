@@ -334,6 +334,11 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
           </div>`}
         <div class="inbox-bubble-meta">
           ${trk ? html`<span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`} title=${t('inbox.trackResponse')}>🔗 ${trk.text}</span>` : null}
+          <!-- Which model wrote this, when an AI wrote it and named one. The name is the agent's own
+               claim (the node cannot verify it), so the tooltip says so rather than the badge
+               implying a measurement. -->
+          ${msg.ai?.model ? html`<span class="inbox-model-badge"
+            title=${t('inbox.modelClaimed', { model: msg.ai.model })}>${escHtml(msg.ai.model)}</span>` : null}
           <span>${timeShort(msg.createdAt)}</span>
           ${mine && msg.status ? html`<span class=${`inbox-tick${msg.status === 'read' ? ' inbox-tick--read' : ''}${(msg.status === 'failed' || msg.status === 'undeliverable') ? ' inbox-tick--err' : ''}`}>${statusTick(msg.status)}</span>` : null}
         </div>

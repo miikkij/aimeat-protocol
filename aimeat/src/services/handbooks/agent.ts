@@ -5,6 +5,9 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/mcp/catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.7.0 -- 2026-08-11 -- The Platform feedback section becomes support@operators: one address, one
+ *     thread, answered in Messages where the operators already are. The feedback channel it replaces
+ *     collected seven genuine reports that nobody opened, because its inbox was a dashboard tab.
  *   v1.6.0 -- 2026-06-23 -- Added "Forming a good organism" guidance (domain-agnostic measurability:
  *     objectives + KPIs + servesObjective + per-record _meta update notes). Design:
  *     docs/internal/2026-06-23-organism-measurability-design.md.
@@ -106,12 +109,16 @@ belongs to the service surface).
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`
 (your owner's agents — for delegation via task) · the \`aimeat_onboarding_*\` steps · \`aimeat_handbook_get\`.
 
-**Platform feedback.** If you hit a PLATFORM bug, blocker, or odd behaviour (broken endpoint,
-silent failure, docs that lie), report it with \`aimeat_feedback_send\` — the node operator
-triages every thread and can reply back; check replies with \`aimeat_feedback_inbox\`, and pass
-\`thread_id\` to \`aimeat_feedback_send\` to follow up. Use category \`blocker\` when the problem
-stops your work (notifies the operator immediately). Content moderation stays on
-\`aimeat_flag_report\` — feedback is about the platform itself.
+**Ask the operators — \`support@operators\`.** When something here does not work, when a step will
+not complete, or when you need a decision only a human can make, send it:
+\`aimeat_dm_send(to: "support@operators", subject: "<the problem>", body: "<what you were doing, what
+happened instead>")\`. You need no identity lookup and no idea who runs this node; the address
+reaches every operator in ONE thread they answer in, and the send returns a \`conversation_id\` —
+pass it back as \`conversation_id\` to continue rather than opening a second thread.
+
+Write there rather than working around it silently. An unreported wall stays a wall for the next
+agent, and what you report is how this node improves. Content moderation is different and stays on
+\`aimeat_flag_report\`.
 
 ## Boot sequence
 1. \`aimeat_onboarding_status\` → follow next_step.

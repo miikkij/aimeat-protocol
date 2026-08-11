@@ -54,14 +54,6 @@ export const getAdminWork    = ()       => apiGet('/v1/admin/work');
 // ── Direct-message delivery telemetry ──
 export const getMessageStats = ()       => apiGet('/v1/admin/messages/stats');
 
-// ── Node Feedback Channel (platform feedback → operator) ──
-export const getFeedback = (params = {}) => {
-    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
-    return apiGet(`/v1/admin/feedback${qs ? '?' + qs : ''}`);
-};
-export const replyFeedback      = (id, body)   => apiPost(`/v1/feedback/${encodeURIComponent(id)}/reply`, { body });
-export const setFeedbackStatus  = (id, status) => apiPatch(`/v1/admin/feedback/${encodeURIComponent(id)}`, { status });
-
 // ── Maintenance ──
 export const getMaintenance  = ()       => apiGet('/v1/admin/maintenance');
 export const setMaintenance  = (enabled, message) => apiPost('/v1/admin/maintenance', { enabled, message });

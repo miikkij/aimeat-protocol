@@ -14,9 +14,9 @@
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
-import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
 import type { ConversationSummary } from '../../../repositories/direct-message.repository.js';
-import type { DirectMessage, ContactConsent, MessageDeliveryLog as MessageDeliveryLogRow } from '../db-types.js';
+import type { DirectMessage, ContactConsent, Conversation as ConversationRow, JsonValue, MessageDeliveryLog as MessageDeliveryLogRow } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
 
@@ -51,6 +51,20 @@ function toDirectMessageRecord(r: Selectable<DirectMessage>): DirectMessageRecor
   if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId;
   if (r.deliveredAt) record.deliveredAt = iso(r.deliveredAt);
   if (r.readAt) record.readAt = iso(r.readAt);
+  return record;
+}
+
+function toConversationRecord(r: Selectable<ConversationRow>): ConversationRecord {
+  const record: ConversationRecord = {
+    id: r.id,
+    kind: 'group',
+    participants: (r.participants ?? []) as unknown as string[],
+    createdBy: r.createdBy,
+    createdAt: iso(r.createdAt),
+    updatedAt: iso(r.updatedAt),
+  };
+  if (r.subject) record.subject = r.subject;
+  if (r.alias) record.alias = r.alias;
   return record;
 }
 
@@ -331,6 +345,51 @@ export const directMessageMethods = {
     if (!cutoff) return 0;
     const r = await this.db.deleteFrom('MessageDeliveryLog').where('createdAt', '<', cutoff.createdAt).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
+  },
+
+  // ── Group conversations (only a >2-participant thread has a row) ──
+  async createConversation(this: PostgresKyselyStorage, record: ConversationRecord): Promise<ConversationRecord> {
+    await this.db.insertInto('Conversation').values({
+      id: record.id,
+      kind: record.kind,
+      subject: record.subject ?? null,
+      // jsonb() is a `::jsonb` sql fragment; Kysely types the column as the parsed JSON value, so the
+      // cast is the parameter-vs-value distinction rather than a type being dodged.
+      participants: jsonb(record.participants) as unknown as JsonValue,
+      createdBy: record.createdBy,
+      alias: record.alias ?? null,
+      createdAt: new Date(record.createdAt),
+      updatedAt: new Date(record.updatedAt),
+    }).execute();
+    return record;
+  },
+
+  async getConversation(this: PostgresKyselyStorage, id: string): Promise<ConversationRecord | null> {
+    const r = await this.db.selectFrom('Conversation').selectAll().where('id', '=', id).executeTakeFirst();
+    return r ? toConversationRecord(r) : null;
+  },
+
+  async updateConversation(
+    this: PostgresKyselyStorage,
+    id: string,
+    updates: Partial<Pick<ConversationRecord, 'participants' | 'subject' | 'alias'>>,
+  ): Promise<ConversationRecord | null> {
+    const rows = await this.db.updateTable('Conversation').set({
+      ...(updates.participants ? { participants: jsonb(updates.participants) as unknown as JsonValue } : {}),
+      ...(updates.subject !== undefined ? { subject: updates.subject } : {}),
+      ...(updates.alias !== undefined ? { alias: updates.alias } : {}),
+      updatedAt: new Date(),
+    }).where('id', '=', id).returningAll().execute();
+    return rows[0] ? toConversationRecord(rows[0]) : null;
+  },
+
+  async listConversationsForParticipant(this: PostgresKyselyStorage, identity: string): Promise<ConversationRecord[]> {
+    // Membership is a JSONB array, so this is a containment test rather than a string match: it
+    // cannot confuse `alice@node` with `alice@node-2` the way a LIKE would.
+    const rows = await this.db.selectFrom('Conversation').selectAll()
+      .where(sql<boolean>`"participants" @> ${jsonb([identity])}`)
+      .orderBy('updatedAt', 'desc').execute();
+    return rows.map(toConversationRecord);
   },
 
   // ── Contact consent (first-contact gate) ──

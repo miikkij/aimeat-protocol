@@ -330,6 +330,32 @@ export function createDefaultSteps(mode?: AgentMode): AgentOnboardingStep[] {
     }));
 }
 
+/**
+ * Re-derive the step list for `mode`, carrying progress over to every step that exists in both
+ * flows. Returns null when the flow is already the right one, so a caller can tell "nothing to do"
+ * from "here is the new list" without comparing the arrays itself.
+ *
+ * A step that only the OLD flow had is dropped, which is the point: an agent that turns out to be a
+ * workstation is not failing `configure_delivery`, it was never being asked.
+ */
+export function deriveStepsForMode(
+  current: AgentOnboardingStep[],
+  mode?: AgentMode,
+): AgentOnboardingStep[] | null {
+  const target = createDefaultSteps(mode);
+  const currentIds = new Set(current.map(s => s.id));
+  const flowChanged = target.length !== current.length || target.some(s => !currentIds.has(s.id));
+  if (!flowChanged) return null;
+
+  const prevById = new Map(current.map(s => [s.id, s] as const));
+  return target.map(fresh => {
+    const prev = prevById.get(fresh.id);
+    return prev
+      ? { ...fresh, status: prev.status, validatedAt: prev.validatedAt, details: prev.details, failureReason: prev.failureReason }
+      : fresh;
+  });
+}
+
 export const IdentifyPlatformSchema = z.object({
   platform: z.string().min(1).max(50),
   platform_version: z.string().max(50).optional(),

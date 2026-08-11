@@ -54,6 +54,10 @@ import { dismissConversationNotifications } from '../services/notify.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
+import { resolveGroupTarget } from '../services/message-alias.js';
+import { sendGroupMessage } from '../services/conversation-group.js';
+import { withMessageProvenance } from '../services/message-provenance.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 import { resolveAudience, sendBroadcast, broadcastToFederation } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { createMessagingDbService } from '../services/db/messaging-db-service.js';
@@ -92,6 +96,65 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const input = parsed.data;
     const senderGhii = resolve(req);
     const recipientGhii = input.to.trim();
+
+    // TARGET-058. An agent or app sending through REST is doing exactly what it does through
+    // aimeat_dm_send: writing AI-authored text delivered to a named person. The MCP tool stamped it
+    // and this door did not, so the same act was recorded on one surface and unstated on the other —
+    // the drift the one-capability-one-implementation rule exists to prevent. It is also what makes
+    // "which model wrote this" answerable in the inbox. A human sender is left alone: the stamp is a
+    // no-op for a GHII principal, and stamping a person's own words would be a false statement.
+    const aiProvenanceId = await provenanceForWrite(storage, {
+      principal: senderGhii,
+      content: input.body ?? '',
+      pipeline: 'rest.messages_send',
+      surface: { visibility: 'private', humanAudience: true },
+      labelPolicy: config.aiLabelPublic,
+      nodeId: config.nodeId,
+      baseUrl: config.baseUrl,
+      enabled: config.aiProvenance,
+    });
+
+    // A GROUP thread is addressed by its conversation, not by a person: continuing one is the same
+    // door as starting one, so an agent that can send a DM can answer in a group without learning a
+    // second tool. `support@operators` (a named group address) opens or continues such a thread.
+    const group = await resolveGroupTarget(deliveryCtx, config, senderGhii, {
+      to: recipientGhii, conversationId: input.conversation_id, subject: input.subject,
+    });
+    if (group.kind === 'refused') {
+      res.status(group.status).json(error(config.nodeId, group.code, group.message));
+      return;
+    }
+    if (group.kind === 'group') {
+      const attachmentsForGroup = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
+      const sent = await sendGroupMessage(deliveryCtx, {
+        conversationId: group.conversation.id,
+        senderGhii,
+        body: input.body,
+        attachments: attachmentsForGroup,
+        interactive: input.interactive,
+        replyToId: input.reply_to,
+        aiProvenanceId,
+      });
+      if (!sent.ok) {
+        const status = sent.code === 'CONVERSATION_NOT_FOUND' ? 404 : 403;
+        res.status(status).json(error(config.nodeId, sent.code, sent.code === 'CONVERSATION_NOT_FOUND'
+          ? 'No such conversation'
+          : 'You are not a participant in this conversation'));
+        return;
+      }
+      res.status(201).json(success(config.nodeId, {
+        message_id: sent.messageId,
+        conversation_id: group.conversation.id,
+        participants: group.conversation.participants,
+        delivered_to: sent.delivered,
+        // The id is the handle for everything after the first message. Saying so here is what stops
+        // a second question opening a second thread nobody connects to the first.
+        reply_with: 'POST /v1/messages with conversation_id set to the value above',
+      }, [
+        { description: 'View conversation', method: 'GET', url: `/v1/messages/conversations/${group.conversation.id}` },
+      ]));
+      return;
+    }
 
     if (!isAddressableRecipient(recipientGhii)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Recipient must be a GHII (owner@node), an agent (agent#owner@node) or an app (eco:app#owner@node)'));
@@ -137,6 +200,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const result = await sendDirectMessage(deliveryCtx, {
       senderGhii, recipientGhii, body: input.body, replyToId: input.reply_to, attachments,
       conversationId: input.conversation_id, subject: input.subject, interactive: input.interactive,
+      aiProvenanceId,
     });
     if (!result.ok) {
       if (result.code === 'RECIPIENT_NOT_FOUND') {
@@ -247,7 +311,11 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const pending = new Set((await storage.listContacts(ghii, { state: 'pending' })).map(c => c.contactId));
     const visible = messages.filter(m => !pending.has(m.senderGhii));
 
-    res.json(success(config.nodeId, { messages: visible, total, unread, page, per_page: perPage }));
+    // Each message says which model wrote it, when an agent wrote it and said so. A person reading
+    // AI-written text addressed to them has been able to see THAT since TARGET-058 and not WHICH.
+    res.json(success(config.nodeId, {
+      messages: await withMessageProvenance(storage, visible), total, unread, page, per_page: perPage,
+    }));
   });
 
   /* ── GET /v1/messages/conversations — thread list (accepted) ──
@@ -288,7 +356,19 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       readAs = asAgent;
     }
     const result = await storage.listConversation(readAs, conversationId, { page, perPage });
-    res.json(success(config.nodeId, { messages: result.messages, total: result.total, page, per_page: perPage }));
+    // A group thread carries its membership: who else is reading this is part of reading it, and in
+    // a support thread it is the answer to "am I talking to one operator or to all of them".
+    const conversation = await storage.getConversation(conversationId);
+    res.json(success(config.nodeId, {
+      messages: await withMessageProvenance(storage, result.messages),
+      total: result.total, page, per_page: perPage,
+      ...(conversation ? {
+        conversation: {
+          id: conversation.id, kind: conversation.kind, subject: conversation.subject,
+          participants: conversation.participants, alias: conversation.alias, created_by: conversation.createdBy,
+        },
+      } : {}),
+    }));
   });
 
   /* ── GET /v1/messages/agent-inbox — federated DMs ADDRESSED TO the calling agent ──

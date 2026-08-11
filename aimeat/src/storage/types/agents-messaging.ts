@@ -5,7 +5,6 @@
  *   v1.2.0 — 2026-08-01 — The Capability Layer moved to ./capabilities.ts (max-file-lines) and is
  *     re-exported from here, so nothing that imported it has to change. Pure extraction — a
  *     capability is not a message, and it was the block least tied to this file's name.
- *   v1.1.0 — 2026-07-16 — Add Node Feedback Channel types (FeedbackRecord/Message + enums).
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 // ── Capability Layer — extracted to ./capabilities.ts, re-exported here ──
@@ -598,6 +597,39 @@ export interface DirectMessageRecord {
 }
 
 /**
+ * A conversation with MORE than two participants.
+ *
+ * A two-party thread has no record: its id is derived from the sorted pair (conversationIdFor), so
+ * both nodes agree on it without storing anything. The absence of a record IS the statement "this is
+ * a pair", which is why adding groups migrated nothing.
+ *
+ * `participants` is the MEMBERSHIP, not a delivery list. Every participant still holds their own
+ * mailbox copy of each message, so read state, deletion and federation stay per person rather than
+ * per thread — the same model a pair thread uses, applied to n people.
+ */
+export interface ConversationRecord {
+  /** The conversationId every message in this thread carries. */
+  id: string;
+  kind: 'group';
+  /** Thread title. A group without one is a group nobody can tell apart in a list. */
+  subject?: string;
+  /** Identities that may read and write here: GHII, GAII or GEAI. */
+  participants: string[];
+  /** Who opened it (an identity, not necessarily a human — an agent may open a support thread). */
+  createdBy: string;
+  /**
+   * The named address this thread was opened through, when it was opened through one.
+   *
+   * `support@operators` resolves to whoever holds the operator role AT THAT MOMENT, and that set
+   * changes. Keeping the alias records what the sender actually addressed, which stays true even
+   * after the membership does not.
+   */
+  alias?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
  * Operator-facing delivery telemetry for one direct-message send attempt. Deliberately carries NO
  * message content and NO participant identities — only the routing/outcome metadata an operator
  * needs to see whether sends succeed or pile up in errors (status, target node, http/error, latency).
@@ -711,37 +743,3 @@ export interface AgentOnboardingRecord {
   };
 }
 
-// ── Node Feedback Channel (principal → operator) ─────────────────────
-
-/** One message in a feedback thread's sender↔operator conversation. */
-export interface FeedbackMessage {
-  from: 'sender' | 'operator';
-  body: string;
-  at: string;
-}
-
-export const FEEDBACK_CATEGORIES = ['bug', 'blocker', 'idea', 'ux', 'question', 'other'] as const;
-export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
-
-export const FEEDBACK_STATUSES = ['new', 'ack', 'in_progress', 'resolved', 'wont_fix'] as const;
-export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
-
-/**
- * A platform-feedback thread from an authenticated principal (GHII/GAII/GEAI) to the node
- * operator — bugs, blockers, ideas about the PLATFORM itself (distinct from content flags).
- * `sender` is the RESOLVED principal id (resolveIdentity), so an agent's threads stay
- * attributed to the agent, not collapsed onto its owner.
- */
-export interface FeedbackRecord {
-  id: string;
-  sender: string;
-  category: FeedbackCategory;
-  title: string;
-  body: string;
-  /** Optional free-form pointers: { app?, endpoint?, version?, url? }. */
-  context?: Record<string, string>;
-  status: FeedbackStatus;
-  messages: FeedbackMessage[];
-  createdAt: string;
-  updatedAt: string;
-}

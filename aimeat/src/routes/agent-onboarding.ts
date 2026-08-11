@@ -31,6 +31,13 @@
  *                            call too. The handler keeps its status codes, its translated
  *                            messages and the owner's webhook; the validate-apply-persist middle
  *                            is no longer written twice.
+ *   v1.6.0 -- 2026-08-11 -- Security audit H-2. POST /onboarding/start and DELETE /onboarding move
+ *                            from requireRole('owner') to requireScope('agent:write') plus
+ *                            canAccessAgent: the owner keeps the door on the role, and an agent may
+ *                            start or cancel ITS OWN onboarding with the word its owner granted.
+ *                            They used to admit any agent token, because POST /v1/auth/token copied
+ *                            the owner's roles onto it, so this was an owner-only gate that no
+ *                            agent ever met.
  */
 
 import { Router, type Request } from 'express';
@@ -39,7 +46,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireRole, agentNotFoundResponse } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, agentNotFoundResponse } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
@@ -178,6 +185,19 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       hints.next_step = summary.next_required_step ?? pendingSteps[0].id;
     }
 
+    // A step that has FAILED is where an agent starts inventing remedies. It has tried, it has been
+    // told no, and until now nothing in this response said there was anyone to ask — so it guessed,
+    // or it stopped, and its owner found out days later through a human. Name the address here, at
+    // the exact point of being stuck.
+    const failedSteps = onboarding.steps.filter(s => s.status === 'failed');
+    if (failedSteps.length > 0) {
+      hints.stuck = {
+        steps: failedSteps.map(s => s.id),
+        ask: 'support@operators',
+        how: 'POST /v1/messages { "to": "support@operators", "subject": "<the step that will not pass>", "body": "<what you tried and what the node answered>" }, or aimeat_dm_send with the same fields. It reaches everyone who runs this node in one thread they answer in.',
+      };
+    }
+
     // Post-onboarding checklist -- surfaces the SKILL.md "After Onboarding" items as a
     // machine-readable signal alongside the onboarding step list. commands_registered
     // and config_published mirror the publish_commands / publish_config steps (always
@@ -200,8 +220,22 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   });
 
   /* -- POST /v1/agents/:name/onboarding/start -- */
-  router.post('/v1/agents/:name/onboarding/start', requireAuth(), requireRole('owner'), async (req, res) => {
+  // Two principals legitimately start onboarding: the owner, and the agent whose onboarding it is.
+  // Running the Hello Integration is the agent's own work, and requiring a person to press a button
+  // before an agent can begin (or begin again, after a mode change) is the shape this platform is
+  // built to avoid. requireScope answers both: an owner session passes on the role, and any scoped
+  // principal needs `agent:write`, the word that covers acting on an agent record. It sits in
+  // GRANDFATHERED_SCOPES (services/scope-vocabulary-migration.ts), so every agent that existed on
+  // 2026-08-10 already carries it and nothing needs re-approval.
+  //
+  // The scope decides WHO may act on an agent record; canAccessAgent decides WHOSE, because
+  // agent:write also covers reaching sideways at a sibling and an agent may only start its own.
+  router.post('/v1/agents/:name/onboarding/start', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const agentName = req.params.name as string;
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
+      return;
+    }
     const agentGaii = resolveAgentGaii(req, agentName);
 
     const agent = await storage.getAgent(agentGaii);
@@ -390,6 +424,11 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       readinessScore: outcome.completed?.readinessScore,
       readinessLevel: outcome.completed?.readinessLevel,
       ...(outcome.testTaskAutoStarted ? { next_action: 'Test task auto-started. Execute the todos now and then POST /complete.' } : {}),
+      // The reported platform can imply the mode, which changes which steps apply. The count can
+      // therefore drop mid-onboarding, and a drop with no explanation reads as lost progress.
+      ...(outcome.modeSetTo
+        ? { mode_set_to: outcome.modeSetTo, mode_note: t(req, 'agentOnboarding.modeInferred', { mode: outcome.modeSetTo, total: String(outcome.total) }) }
+        : {}),
     }));
   });
 
@@ -453,8 +492,16 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
   });
 
   /* -- DELETE /v1/agents/:name/onboarding -- */
-  router.delete('/v1/agents/:name/onboarding', requireAuth(), requireRole('owner'), async (req, res) => {
+  // Cancelling is the other half of starting, so it is the same gate: the owner, or the agent whose
+  // record it is, holding `agent:write`. It removes the onboarding record and nothing else; the
+  // readiness override above stays owner-only, because that one is the owner's judgement about an
+  // agent rather than the agent's own progress.
+  router.delete('/v1/agents/:name/onboarding', requireAuth(), requireScope('agent:write'), async (req, res) => {
     const agentName = req.params.name as string;
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', t(req, 'agentOnboarding.errors.accessDenied')));
+      return;
+    }
     const agentGaii = resolveAgentGaii(req, agentName);
 
     const deleted = await storage.deleteOnboarding(agentGaii);

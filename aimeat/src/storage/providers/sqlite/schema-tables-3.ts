@@ -399,6 +399,22 @@ export function applySchemaTables3(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_direct_messages_convo ON direct_messages(ownerGhii, conversationId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_direct_messages_status ON direct_messages(status, origin);
 
+    -- ── Group conversations (a thread with MORE than two participants) ──
+    -- A row exists ONLY for a group thread. A two-party thread derives its id from the participant
+    -- pair and needs no row, which is why nothing here migrates: every conversation that existed
+    -- before groups keeps working untouched.
+    CREATE TABLE IF NOT EXISTS conversations (
+      id            TEXT PRIMARY KEY,
+      kind          TEXT NOT NULL DEFAULT 'group',
+      subject       TEXT,
+      participants  TEXT NOT NULL,
+      createdBy     TEXT NOT NULL,
+      alias         TEXT,
+      createdAt     TEXT NOT NULL,
+      updatedAt     TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_conversations_alias ON conversations(alias, updatedAt);
+
     -- ── Contact consent (first-contact gate for direct messages + the owner's address book) ──
     CREATE TABLE IF NOT EXISTS contact_consents (
       ownerGhii      TEXT NOT NULL,

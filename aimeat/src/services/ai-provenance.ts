@@ -63,6 +63,7 @@ import {
 import { disclosureFor, type SurfaceContext, type DisclosureLabelPolicy } from './ai-disclosure.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { createT, LOCALES } from '../i18n.js';
+import { logger } from '../utils/logger.js';
 
 /** What a caller may state. Everything the node can work out itself is deliberately absent. */
 export interface MintProvenanceInput {
@@ -274,6 +275,24 @@ export async function stampAgentWrite(
   if (input.enabled === false) return undefined;
   if (!isNonHumanPrincipal(input.principal)) return undefined;
 
+  // WHICH model wrote this, when the agent has said. It reported one at identify_platform and the
+  // node has been storing it ever since; not carrying it here meant every stamped write said "an AI
+  // wrote this" and nothing about which. That answer matters most in a message: a person reading
+  // text an agent sent them can now see what produced it, and an operator reading a support thread
+  // can tell a capable model's report from a weak one's.
+  //
+  // SELF-REPORTED, and marked as such by `observed: false` below: the agent named its own model, the
+  // node cannot verify it, and a platform delegating to a cheaper subagent mid-session makes the
+  // agent-level answer indicative rather than exact. A declaration that carries its own model
+  // (`ai_provenance.model`) takes the other branch in provenanceForWrite and wins, because that one
+  // is about THESE bytes rather than about the agent in general.
+  let model: string | undefined;
+  try {
+    model = (await storage.getAgent(input.principal))?.model;
+  } catch (err) {
+    logger.warn('stampAgentWrite: continuing without the agent model', { error: String(err) });
+  }
+
   const row = await mintProvenance(storage, {
     stampedBy: 'node',
     ownerGhii: ownerGhiiOf(input.principal),
@@ -285,7 +304,9 @@ export async function stampAgentWrite(
     // whole design.
     observed: false,
     content: input.content,
-    generator: input.pipeline ? { pipeline: input.pipeline } : undefined,
+    generator: input.pipeline || model
+      ? { ...(input.pipeline ? { pipeline: input.pipeline } : {}), ...(model ? { model } : {}) }
+      : undefined,
     notes: INFERRED_FROM_PRINCIPAL_NOTE,
     surface: input.surface,
     labelPolicy: input.labelPolicy,

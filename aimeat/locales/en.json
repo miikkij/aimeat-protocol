@@ -149,36 +149,6 @@
       }
     }
   },
-  "admin.feedback.allCategories": "All categories",
-  "admin.feedback.allStatuses": "All statuses",
-  "admin.feedback.back": "Back to inbox",
-  "admin.feedback.cat.blocker": "Blocker",
-  "admin.feedback.cat.bug": "Bug",
-  "admin.feedback.cat.idea": "Idea",
-  "admin.feedback.cat.other": "Other",
-  "admin.feedback.cat.question": "Question",
-  "admin.feedback.cat.ux": "UX",
-  "admin.feedback.category": "Category",
-  "admin.feedback.context": "Context",
-  "admin.feedback.desc": "Feedback threads from users and agents to you, the node operator — bugs, blockers, ideas, UX issues. Reply in a thread and the sender sees it; replying acknowledges a new thread.",
-  "admin.feedback.empty": "No feedback threads yet.",
-  "admin.feedback.from": "From",
-  "admin.feedback.messagesCol": "Messages",
-  "admin.feedback.operator": "Operator",
-  "admin.feedback.replyPlaceholder": "Write a reply to the sender…",
-  "admin.feedback.replySent": "Reply sent",
-  "admin.feedback.send": "Send reply",
-  "admin.feedback.sender": "Sender",
-  "admin.feedback.st.ack": "Acknowledged",
-  "admin.feedback.st.in_progress": "In progress",
-  "admin.feedback.st.new": "New",
-  "admin.feedback.st.resolved": "Resolved",
-  "admin.feedback.st.wont_fix": "Won't fix",
-  "admin.feedback.statusCol": "Status",
-  "admin.feedback.statusSaved": "Status updated",
-  "admin.feedback.title": "Platform feedback",
-  "admin.feedback.titleCol": "Title",
-  "admin.feedback.when": "When",
   "admin.messages.desc": "Delivery telemetry for user-to-user messages. No message content or participant identities are shown.",
   "admin.messages.detail": "Detail",
   "admin.messages.failedCol": "Failed",
@@ -241,6 +211,7 @@
     "startButton": "Start Hello Integration",
     "restartButton": "Re-run Hello Integration",
     "cancelButton": "Cancel",
+    "modeInferred": "The platform you reported runs in your own environment, so this agent is now in {{mode}} mode and its Hello Integration is the {{total}}-step flow. The steps that assume a node-resident runtime (delivery channel, telemetry, task queue) do not apply to you and have been removed rather than left to fail.",
     "steps": {
       "authenticate": "Authenticate",
       "identify_platform": "Identify Platform",
@@ -412,7 +383,8 @@
       "workflow": "your automations",
       "ai": "your AI budget",
       "notifications": "notifications to you",
-      "organism": "your workspaces"
+      "organism": "your workspaces",
+      "app": "apps published in your name"
     }
   },
   "auth": {
@@ -3028,6 +3000,7 @@
   "inbox.loading": "Loading…",
   "inbox.markImportant": "Mark important (needs a reply)",
   "inbox.messageThis": "Send a message",
+  "inbox.modelClaimed": "The agent says {model} wrote this. Self-reported: the node cannot verify it, and a platform may hand work to a different model mid-session.",
   "inbox.new": "New message",
   "inbox.noConversations": "No conversations yet.",
   "inbox.noThread": "No messages in this conversation yet.",
@@ -5698,6 +5671,9 @@
           },
           "capability": {
             "write": "Offer, change and withdraw the services you sell to others. These speak in your name."
+          },
+          "account": {
+            "security": "Change your password, your recovery email address and your two-step login, and delete or export the whole account. An agent with this can sign in as you, so grant it only to one you would hand your password to."
           }
         },
         "domainAi": "AI",
@@ -5714,6 +5690,7 @@
         "domainAgent": "Your other agents",
         "domainApp": "Apps",
         "domainCapability": "Services you sell",
+        "domainAccount": "Your account and how you sign in",
         "permInvoke": "Run"
       },
       "deviceAuth": {

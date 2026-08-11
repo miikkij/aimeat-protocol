@@ -787,6 +787,19 @@ export interface DeviceAuth {
   userCode: string;
 }
 
+/** A thread with more than two participants. A PAIR thread has no row here — its id is derived from
+ *  the two identities — so the absence of a row is what says "this is a pair". */
+export interface Conversation {
+  alias: string | null;
+  createdAt: Generated<Timestamp>;
+  createdBy: string;
+  id: string;
+  kind: Generated<string>;
+  participants: Json;
+  subject: string | null;
+  updatedAt: Generated<Timestamp>;
+}
+
 export interface DirectMessage {
   /** TARGET-058: the provenance record describing this message's body. NULL = unstated. */
   aiProvenanceId: string | null;
@@ -1008,19 +1021,6 @@ export interface Flag {
   status: Generated<string>;
   targetId: string;
   targetType: string;
-}
-
-export interface Feedback {
-  body: string;
-  category: string;
-  context: Json | null;
-  createdAt: Generated<Timestamp>;
-  id: Generated<string>;
-  messages: Generated<Json>;
-  sender: string;
-  status: Generated<string>;
-  title: string;
-  updatedAt: Generated<Timestamp>;
 }
 
 export interface GenesisPeer {
@@ -1872,6 +1872,7 @@ export interface DB {
   Consent: Consent;
   ConsentAudit: ConsentAudit;
   ContactConsent: ContactConsent;
+  Conversation: Conversation;
   CortexExtension: CortexExtension;
   CortexLibFile: CortexLibFile;
   Csm: Csm;
@@ -1888,7 +1889,6 @@ export interface DB {
   Extension: Extension;
   ExtensionInstance: ExtensionInstance;
   FederationPeer: FederationPeer;
-  Feedback: Feedback;
   FinanceCounter: FinanceCounter;
   FinanceFiscalYear: FinanceFiscalYear;
   FinanceInvoice: FinanceInvoice;
