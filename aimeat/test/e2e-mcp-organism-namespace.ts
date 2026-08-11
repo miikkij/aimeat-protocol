@@ -266,6 +266,41 @@ async function run() {
         assert(!r.isError, `the creator was refused their own meta namespace: ${r.text.slice(0, 300)}`);
     });
 
+    // ── The publish gate, read from wherever the config actually lives ──────────────────────────
+    //
+    // The gate is a field in organism.{id}.meta.config, and that record belongs to whoever wrote it
+    // — normally the organism's creator. The MCP publish tool read it from the CALLING agent's own
+    // namespace, so for every member but the creator it found nothing, read the gate as absent, and
+    // published. "Publishing requires human approval" was true in the browser and false through a
+    // tool call, for exactly the members the gate is there to hold.
+    await test('A turns the publish gate on, and grants B contributor so B can write drafts', async () => {
+        const cfg = await callTool(A, 'aimeat_memory_write', {
+            key: `organism.${orgId}.meta.config`,
+            value: { gates: { publish: { enabled: true } } },
+        });
+        assert(!cfg.isError, `writing the config failed: ${cfg.text.slice(0, 300)}`);
+
+        const grant = await callTool(A, 'aimeat_workspace_member_grant', {
+            organism_id: orgId, ws: wsId, grantee: B.owner, role: 'contributor',
+        });
+        assert(!grant.isError, `grant failed: ${grant.text.slice(0, 300)}`);
+    });
+
+    await test('B, a contributor and not the creator, CAN write a draft with the gate on', async () => {
+        const w = await callTool(B, 'aimeat_workspace_write', {
+            organism_id: orgId, ws: wsId, space: 'doc', id: 'gated', value: { title: 'B draft' },
+        });
+        assert(!w.isError, `B could not write a draft: ${w.text.slice(0, 300)}`);
+    });
+
+    await test('B cannot PUBLISH it — the gate is found even though the config is A\'s record', async () => {
+        const p = await callTool(B, 'aimeat_workspace_publish', {
+            organism_id: orgId, ws: wsId, namespace: 'shared.docs', id: 'gated',
+        });
+        assert(p.isError, `the publish gate did not hold: ${p.text.slice(0, 300)}`);
+        assert(/approval|gate/i.test(p.text), `expected the gate's own wording, got: ${p.text.slice(0, 300)}`);
+    });
+
     await test('A, the workspace creator, CAN still write its content over MCP', async () => {
         const r = await callTool(A, 'aimeat_memory_write', {
             key: `organism.${orgId}.w.${wsId}.doc.own`,

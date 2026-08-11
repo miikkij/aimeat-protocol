@@ -47,16 +47,25 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * 44 when the number was first taken (the diagram the developer asked for, commit 846f21f4).
  * 43 after aimeat_memory_write moved onto services/memory-write.ts — the capability whose same
  * defect had been fixed three separate times. Lower this line with every tool that follows.
+ *
+ * 45 on 2026-08-11, and the two extra files are NOT new offenders: apps-fork.ts and
+ * workspace-create.ts are pure extractions out of apps.ts and workspaces.ts, which grew past
+ * max-file-lines while their gates were being fixed. The same code, counted in two places instead
+ * of one. Raising a ratchet needs a reason in writing, and that is the reason; the backlog did not
+ * grow, and clearing either parent clears its extraction with it.
  */
-const SEED = 43;
+const SEED = 45;
 
 /**
  * The number that actually matters. A READ through storage is the same read whichever door asks;
  * a WRITE is where the two implementations drift, because a write carries a gate, a validation and
- * a side effect that one copy can forget. 29 of the 43 files write. Reported separately so progress
+ * a side effect that one copy can forget. 30 of the 45 files write. Reported separately so progress
  * on the risky half is visible even while the file-level count sits still.
+ *
+ * 30 rather than 28 for the same reason as SEED above: two pure extractions, no new capability
+ * writing on its own. Both parents still write, so both extractions count as writers too.
  */
-const WRITE_SEED = 28;
+const WRITE_SEED = 30;
 
 /** Storage methods that change something. Everything else is a read. */
 const WRITEISH = /^(create|set|update|delete|add|remove|insert|upsert|write|debit|credit|transfer|enqueue|revoke|grant|mint|save|publish|archive|deactivate|activate|link|unlink)/i;

@@ -21,22 +21,40 @@
  *   const bad = await archivedRefusal(storage, `${root}.`);
  *   if (bad) return fail(bad);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — The byte budget and the per-RECORD archive flag, both of which the
+ *     HTTP door applies and this path did not: a batch could clear the value and key limits
+ *     and still write past the owner's paid storage, and a single archived record was
+ *     overwritten by a draft write.
  *   v1.0.0 — 2026-08-11 — Extracted from mcp/workspaces.ts (max-file-lines), no behaviour change.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { isKeyArchived } from './archive.js';
+import { checkMemoryQuota, chargeOverage } from './quota.js';
 
 /**
  * Is this key inside something the owner archived? Archived is read-only, and it means it on every
  * surface. These tools checked nothing, so an archived workspace kept accepting drafts, publishes
  * and structure edits through an agent while the web door refused them with 409.
+ *
+ * `ownerGhii` and `recordKey` add the third level the HTTP door also checks: a SINGLE record the
+ * owner archived, not only the workspace and the organism around it. isKeyArchived resolves the
+ * organism column and the workspace registry marker; the row's own `archived` flag is a separate
+ * fact, and services/memory-write.ts refuses on it. Without it, "this document is finished" held
+ * for /v1/memory and not for a workspace draft written through a tool.
  */
-export async function archivedRefusal(storage: Storage, key: string): Promise<string | null> {
+export async function archivedRefusal(
+    storage: Storage,
+    key: string,
+    record?: { ownerGhii: string; key: string },
+): Promise<string | null> {
     const guard = await isKeyArchived(storage, key);
-    return guard.archived
-        ? `This ${guard.level} is archived (read-only). Unarchive it before writing.`
-        : null;
+    if (guard.archived) return `This ${guard.level} is archived (read-only). Unarchive it before writing.`;
+    if (record) {
+        const row = await storage.getMemory(record.ownerGhii, record.key);
+        if (row?.archived) return 'This record is archived (read-only). Unarchive it before writing.';
+    }
+    return null;
 }
 
 /**
@@ -68,6 +86,23 @@ export async function checkWorkspaceWriteLimits(
             return `Memory key limit reached (${config.memoryMaxKeysPerAgent}). One value may hold `
                 + `${config.memoryMaxValueSizeKb} kB, so fold small records together rather than deleting data.`;
         }
+    }
+
+    // The BYTE budget, which is a different limit from the two above and was missing here entirely:
+    // a batch could sit under the per-value ceiling and under the key count and still write past the
+    // owner's paid storage. The same bytes posted to /v1/memory are refused, and the overage there
+    // is charged in morsels. Measured as one batch, replacing what the existing rows already hold.
+    let additional = 0;
+    let replacing = 0;
+    for (const p of planned) {
+        additional += Buffer.byteLength(JSON.stringify(p.v), 'utf8');
+        const row = await storage.getMemory(ownerGhii, p.key);
+        if (row) replacing += Buffer.byteLength(JSON.stringify(row.value), 'utf8');
+    }
+    const quota = await checkMemoryQuota(config, storage, ownerGhii, additional, replacing);
+    if (!quota.allowed) return quota.reason ?? 'Storage quota exceeded';
+    if (quota.overageMorsels > 0) {
+        await chargeOverage(storage, ownerGhii, quota.overageMorsels, 'memory_overage');
     }
     return null;
 }

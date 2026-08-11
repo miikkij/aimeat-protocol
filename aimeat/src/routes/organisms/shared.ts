@@ -43,6 +43,24 @@ import { logger } from '../../utils/logger.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 /**
+ * The organism's runtime config record (organism.{id}.meta.config), which is where the gates live —
+ * the publish gate among them. Absent means defaults.
+ *
+ * It is read across EVERY owner, not from the caller's own namespace, and that is the whole point:
+ * the config normally belongs to the organism's creator, so a per-owner read returns nothing for
+ * any other member. The MCP publish tool did a per-owner read, so for every member but the creator
+ * the gate registered as absent and the publish went straight through — the human review step
+ * bypassed by the door that needed it most.
+ */
+export async function readOrganismConfig(
+    storage: Storage, organismId: string,
+): Promise<Record<string, unknown> | null> {
+    const key = `organism.${organismId}.meta.config`;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
+}
+
+/**
  * Who may write in which namespace of a workspace: `meta.*` is the organism's own structure — its
  * manifest, its config, the roster of spaces — so only a creator or an admin may change it. Every
  * other namespace is content, and membership is enough.
@@ -155,11 +173,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   };
 
   // Read the organism's runtime config entry (organism.{id}.meta.config) — UI-editable; absent = defaults.
-  const readConfig = async (organismId: string): Promise<Record<string, unknown> | null> => {
-    const key = `organism.${organismId}.meta.config`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    return (items.find(r => r.key === key)?.value as Record<string, unknown> | undefined) ?? null;
-  };
+  const readConfig = (organismId: string) => readOrganismConfig(storage, organismId);
 
   // Delegates to the module-level rule below, which the MCP workspace tools also use.
   const canWriteNamespace = canWriteNamespaceRule;

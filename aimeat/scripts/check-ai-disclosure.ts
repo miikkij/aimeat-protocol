@@ -495,8 +495,9 @@ const CREATE_APP_DISTINCT_ACTS: Record<string, string> = {
   'src/routes/apps/fork-manage.ts':
     'A fork COPIES bytes rather than generating them: it carries the source record forward and must '
     + 'not mint a new one, must not announce, and must not fire the publish feed.',
-  'src/mcp/apps.ts':
-    'aimeat_app_fork — the MCP half of the same act. (Its publish tools go through app-publish.ts.)',
+  'src/mcp/apps-fork.ts':
+    'aimeat_app_fork — the MCP half of the same act, moved out of mcp/apps.ts by pure extraction on '
+    + '2026-08-11 when that file passed max-file-lines. Same code, same reason.',
   'src/services/apps-backup-import.ts':
     'Restoring a backup replays rows that were already published; re-announcing a restore would '
     + 'spam the feed with history.',

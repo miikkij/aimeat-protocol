@@ -102,7 +102,8 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { canWriteNamespaceRule } from '../routes/organisms/shared.js';
+import { canWriteNamespaceRule, readOrganismConfig } from '../routes/organisms/shared.js';
+import { registerWorkspaceCreateTool } from './workspace-create.js';
 import { archivedRefusal, checkWorkspaceWriteLimits } from '../services/workspace-write-guards.js';
 import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
@@ -111,7 +112,7 @@ import { validateMemoryWrite } from '../services/schema-validator.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace, listOrganismWorkspaceEntries, backfillManifestEnvelope } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, isMemoryBackedSpace, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
@@ -486,6 +487,12 @@ export function registerWorkspaceTools(
             // marked finished.
             const wsArchived = await archivedRefusal(storage, `${root}.`);
             if (wsArchived) return fail(wsArchived);
+            // And the RECORD's own archive flag, which is a separate fact from the workspace's:
+            // "this document is finished" was honoured by /v1/memory and not by a draft written here.
+            for (const [i, p] of planned.entries()) {
+                const rowArchived = await archivedRefusal(storage, `${root}.`, { ownerGhii, key: p.key });
+                if (rowArchived) return fail(`${batch ? `items[${i}]: ` : ''}${rowArchived}`);
+            }
 
             const overLimit = await checkWorkspaceWriteLimits(
                 storage, config, ownerGhii, planned, i => (batch ? `items[${i}]: ` : ''),
@@ -549,8 +556,11 @@ export function registerWorkspaceTools(
             }
             const archived = await archivedRefusal(storage, `${wsRoot(organism_id, ws)}.`);
             if (archived) return fail(archived);
-            const cfg = await storage.getMemory(ownerGhii, `organism.${organism_id}.meta.config`);
-            const gate = (cfg?.value as { gates?: { publish?: { enabled?: boolean } } } | undefined)?.gates?.publish?.enabled;
+            // Read across every owner, as routes/organisms/shared.ts does. The config normally
+            // belongs to the organism's creator, so the per-owner read this used to do returned
+            // nothing for any OTHER member — the gate read as absent and the publish went through.
+            const cfg = await readOrganismConfig(storage, organism_id);
+            const gate = (cfg as { gates?: { publish?: { enabled?: boolean } } } | null)?.gates?.publish?.enabled;
             if (gate) return fail('Publishing requires human approval (the publish gate is on). Leave it as a draft for the owner to review and publish.');
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
             // Value-free version handling: the scan skips `.version.N` rows (their full values were
@@ -655,6 +665,12 @@ export function registerWorkspaceTools(
         async ({ organism_id, ws, name, readme, add_spaces, manifest, schemas, apps }): Promise<TextResult> => {
             const role = await roleOf(organism_id);
             if (!role) return fail('You are not a member of this organism.');
+            // Archived is read-only, and structure is exactly what it protects. The web door has
+            // refused a rename, a manifest replacement, a new space or a repinned app inside an
+            // archived organism since the archive shipped; this tool checked nothing, so the owner's
+            // "this is finished" held on one surface.
+            const archived = await archivedRefusal(storage, `organism.${organism_id}.w.${ws}.`);
+            if (archived) return fail(archived);
             try {
                 const addParsed = parseObj(add_spaces);
                 const appsParsed = parseObj(apps);
@@ -725,59 +741,9 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_create ──
-    mcp.tool('aimeat_workspace_create', descriptionFor('aimeat_workspace_create'),
-        {
-            organism_id: z.string(),
-            name: z.string().describe('Workspace name'),
-            manifest: z.any().describe('The workspace manifest (objectTypes + policy) as a JSON OBJECT, not a string.'),
-            schemas: z.any().optional().describe('Map of namespace → JSON Schema for records types, as a JSON OBJECT.'),
-            readme: z.string().optional().describe('Optional markdown intro'),
-        },
-        annotationsFor('aimeat_workspace_create'),
-        async ({ organism_id, name, manifest, schemas, readme }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const man = parseObj(manifest) as Manifest | undefined;
-            if (!man || typeof man !== 'object' || !Array.isArray(man.objectTypes)) {
-                return fail('manifest must be an object with an objectTypes array.');
-            }
-            // Gate: reject unsupported backings + infer mode from kind BEFORE anything is written,
-            // so a misdeclared space fails the very first call instead of becoming invisible data.
-            try {
-                man.objectTypes = normalizeObjectTypes(man.objectTypes as Array<Record<string, unknown>>) as ObjType[];
-            } catch (e) {
-                if (e instanceof WorkspaceMetaError) return fail(e.message);
-                throw e;
-            }
-            const schemaMap = (parseObj(schemas) ?? {}) as Record<string, Record<string, unknown>>;
-            const wsId = 'ws-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-            const root = wsRoot(organism_id, wsId);
-            const now = new Date().toISOString();
-            // 1. Lock the records schemas under the owner GHII (direct storage — bypasses the route's
-            //    owner/operator gate, which an agent token would fail).
-            for (const [namespace, schema] of Object.entries(schemaMap)) {
-                if (!schema || typeof schema !== 'object') continue;
-                await storage.setSchema({ keyPattern: `${root}.${namespace}`, applyTo: 'prefix', schemaJson: schema, schemaMode: 'strict', lockedBy: ownerGhii, setAt: now, updatedAt: now });
-            }
-            // 2. Write the manifest (validated against the manifest meta-schema). Backfill the envelope
-            //    (manifestVersion/id/name/kind/status) the model routinely omits — so a create with just
-            //    objectTypes validates first try instead of bouncing off the required-field check.
-            const manifestValue = backfillManifestEnvelope(man as Record<string, unknown>, { orgId: organism_id, fallbackName: name });
-            const mkey = `${root}.meta.manifest`;
-            const valid = await validateMemoryWrite(mkey, manifestValue, storage);
-            if (!valid.valid) return fail('Manifest rejected by schema: ' + JSON.stringify(valid.errors));
-            await writeRecord(mkey, manifestValue, null, ownerGhii);          // manifest = creator meta
-            // 3. Readme.
-            const summary = (man as Record<string, unknown>).summary;
-            await writeRecord(`${root}.meta.readme`, readme || `# ${String(man.name || name)}\n\n${typeof summary === 'string' ? summary : ''}`, null, ownerGhii);
-            // 4. Register in the workspace registry.
-            const regKey = `organism.${organism_id}.meta.workspaces`;
-            const regRec = await storage.getMemory(ownerGhii, regKey);
-            const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
-            await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: ownerName }] }, regRec, ownerGhii);
-            emitChange('organisms');
-            void updateOrganismStructure(storage, config, organism_id, { event: 'workspace created', actor: writerGaii }).catch(err => { logger.warn('workspaces: timeline best-effort', { error: String(err) }); });
-            return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
-        });
+    // Extracted to workspace-create.ts (max-file-lines); registered here to preserve tool order.
+    registerWorkspaceCreateTool(mcp, storage, config, { ownerName, ownerGhii, writerGaii, ok, fail,
+        denyReason, parseObj, wsRoot, writeRecord });
 
     // ── aimeat_workspace_access + the member-role tools (member_grant, member_revoke, members) ──
     // Extracted to workspace-members.ts — access is the REQUEST half of the same membership
