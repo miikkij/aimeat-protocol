@@ -325,6 +325,77 @@ async function main() {
         assert(r.status === 400 || r.status === 403, `"*" must be refused, got ${r.status}`);
     });
 
+    // ── 5b. A hosted app, which is the principal a subscription button actually runs as ──
+    console.log('\nPhase 5b: a hosted app with an app-grant');
+
+    await test('an APP-GRANT token with share:manage can create a share; without it, cannot', async () => {
+        // This is the path a "Subscribe" button in a published app takes. It matters that it works
+        // WITH the permission and fails WITHOUT it, because the whole subscription flow hangs on
+        // whether the app can hand the buyer access itself or has to ask an agent to do it.
+        const FILENAME = `ks-share-app-${stamp}.html`;
+        const REDIRECT = 'http://localhost:9911/callback';
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+            body: JSON.stringify({
+                filename: FILENAME, content: Buffer.from('<!DOCTYPE html><html><body>s</body></html>', 'utf8').toString('base64'),
+                name: 'Share App', description: 'share flow', category: 'utility',
+            }),
+        });
+        assert(pub.status === 201, `publish app: ${pub.status} ${JSON.stringify(pub.body)}`);
+
+        const mint = async (scope: string) => {
+            const verifier = createHash('sha256').update(`v${scope}${stamp}`).digest('base64url');
+            const challenge = createHash('sha256').update(verifier).digest('base64url');
+            const q = new URLSearchParams({
+                app: `${A.name}/${FILENAME}`, response_type: 'code', scope,
+                redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+            });
+            const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+            const rid = decodeURIComponent(/req=([^&]+)/.exec(res.headers.get('location') ?? '')![1]);
+            const con = await json('/v1/app-grants/authorize-consent', {
+                method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+                body: JSON.stringify({ request_id: rid }),
+            });
+            const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+            const tok = await json('/v1/app-grants/token', {
+                method: 'POST',
+                body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+            });
+            assert(tok.body.ok === true, `token exchange (${scope}): ${JSON.stringify(tok.body.error)}`);
+            return tok.body.data.access_token as string;
+        };
+
+        const withScope = await mint('memory:read memory:write share:manage');
+        const granted = await json(`/v1/groups/${g1}/shares`, {
+            method: 'POST', headers: { Authorization: `Bearer ${withScope}` },
+            body: JSON.stringify({ key_pattern: `appmade${stamp}.**` }),
+        });
+        assert(granted.status === 201, `app WITH share:manage: expected 201, got ${granted.status} ${JSON.stringify(granted.body)}`);
+        assert(granted.body.data.share.owner_gaii === A.ghii, `lands under the owner, got ${granted.body.data.share.owner_gaii}`);
+
+        const withoutScope = await mint('memory:read memory:write');
+        const refused = await json(`/v1/groups/${g1}/shares`, {
+            method: 'POST', headers: { Authorization: `Bearer ${withoutScope}` },
+            body: JSON.stringify({ key_pattern: `appdenied${stamp}.**` }),
+        });
+        assert(refused.status === 403, `app WITHOUT share:manage: expected 403, got ${refused.status} ${JSON.stringify(refused.body)}`);
+
+        // The boundary an app builder needs to know: it can hand out access to a key space, but the
+        // AUDIENCE stays the owner's to define. Creating a group and admitting people to it are
+        // owner-role acts, and an app-grant carries roles ['app'], so those two still go through
+        // the owner or an agent acting for them.
+        const groupAttempt = await json('/v1/groups', {
+            method: 'POST', headers: { Authorization: `Bearer ${withScope}` },
+            body: JSON.stringify({ name: 'app-made group', members: [] }),
+        });
+        assert(groupAttempt.status === 403, `an app must not create a group, got ${groupAttempt.status}`);
+        const memberAttempt = await json(`/v1/groups/${g1}/members`, {
+            method: 'POST', headers: { Authorization: `Bearer ${withScope}` },
+            body: JSON.stringify({ identifier: C.ghii, identifier_type: 'ghii' }),
+        });
+        assert(memberAttempt.status === 403, `an app must not admit a member, got ${memberAttempt.status}`);
+    });
+
     // ── 6. Still a read share ────────────────────────────────────────────────
     console.log('\nPhase 6: a share never grants a write');
 
