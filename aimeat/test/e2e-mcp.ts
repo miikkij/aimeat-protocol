@@ -603,18 +603,31 @@ await test('23. aimeat_agent_profile', async () => {
 });
 
 await test('24. aimeat_board_read', async () => {
-    // Create a board first via REST so we can read it
-    await json('/v1/boards', {
+    // The board_id is an ID, not a name. This test used to pass the NAME and assert only that an
+    // array came back — and it did, empty, because the tool listed posts for a board id that never
+    // existed and never loaded the board to find out. Once the tool started ruling on visibility
+    // (services/board-read-access.ts) the same call answered "Board not found", which is the honest
+    // answer to the question the test was actually asking.
+    //
+    // SHARED rather than private, and that distinction is the rule rather than a test convenience:
+    // a private board belongs to the person and not to their agents, so an agent session reading its
+    // own owner's private board is refused on both doors. isSameOwner grants access on a shared
+    // board only. The board here is created by the OWNER and read by the AGENT, which is exactly the
+    // same-owner case.
+    const made = await json('/v1/boards', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'mcp-test-board', description: 'Board for MCP test' }),
+        body: JSON.stringify({ name: 'mcp-test-board', description: 'Board for MCP test', visibility: 'shared' }),
     });
+    const boardId = made.body?.data?.board?.id ?? made.body?.data?.id;
+    assert(typeof boardId === 'string' && boardId.length > 0, `no board id: ${JSON.stringify(made.body)}`);
 
     const { status, body } = await mcpRpc('tools/call', {
         name: 'aimeat_board_read',
-        arguments: { board_id: 'mcp-test-board' },
+        arguments: { board_id: boardId },
     }, 16);
     assert(status === 200, `status ${status}`);
+    assert(body.result?.isError !== true, `the board's own owner was refused: ${body.result?.content?.[0]?.text}`);
     const result = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(result), 'is array');
 });
