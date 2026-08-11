@@ -100,6 +100,10 @@ const ALL_SUITES = [
     // 2026-08-11. Every one of those gates passed the existing suites on its first run, which is
     // the finding rather than the reassurance: nothing had ever asked.
     'test/e2e-mcp-cross-owner.ts',
+    // The organism namespace rule, which lived in an Express middleware the MCP write path could
+    // not call — so the consent layer, the meta.* admin rule and the member.* self-write rule held
+    // on the browser and not on the agent.
+    'test/e2e-mcp-organism-namespace.ts',
     // Self-spawns its own node with AIMEAT_PACING_TOLL_DEFAULT set: the feature IS the node-wide
     // default, so it cannot be proven on the shared server.
     'test/e2e-pacing.ts',

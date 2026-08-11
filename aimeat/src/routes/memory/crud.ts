@@ -35,24 +35,16 @@ import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   //  is no longer destructured here: identity for a write now comes from
   // resolveWriteTarget, which also decides whether the owner namespace was asked for.
-  const { config, storage, memoryDb, stats, onDirectoryChange, peers, workspaceAccess } = ctx;
+  const { config, storage, memoryDb, stats, onDirectoryChange, peers } = ctx;
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
     const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, workspace_refs, agent: agentParam, ai_provenance_id } = req.body ?? {};
 
-    // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
-    if (typeof key === 'string' && key.startsWith('organism.')) {
-      (req.params as Record<string, string>).key = key;
-      const wsAllowed = await new Promise<boolean>(resolve => {
-        const result = workspaceAccess(req, res, () => { resolve(true); });
-        // workspaceAccess is async — if it rejects or sends a response, resolve false
-        void Promise.resolve(result).then(() => {
-          if (res.headersSent) resolve(false);
-        });
-      });
-      if (!wsAllowed) return;
-    }
+    // Phase 2.3 — the organism.* access rule. It used to be run here by hand-driving the Express
+    // middleware through a promise, because the key arrives in the body rather than in :key. The
+    // rule now lives in services/organism-namespace-access.ts and writeMemoryRecord applies it
+    // below, on this door and the MCP one alike, so this route needs no copy of it.
 
     // Ecosystem (GEAI) data-area allowlist: an organism deposit needs an owner-granted area.
     if (typeof key === 'string' && req.auth!.roles.includes('ecosystem')) {

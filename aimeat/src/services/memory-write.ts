@@ -38,6 +38,7 @@ import { isKeyArchived } from './archive.js';
 import { provenanceForWrite } from './ai-provenance.js';
 import { memoryContentBytes, isAnonymousGaii } from '../routes/memory/shared.js';
 import { emitChange } from './event-bus.js';
+import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { parseGAII } from '../utils/gaii.js';
 
 /** Who is writing, in the terms every surface can supply. */
@@ -83,7 +84,10 @@ export type MemoryWriteResult =
         ok: false;
         status: number;
         code: 'SCOPE_DENIED' | 'SCHEMA_VALIDATION_FAILED' | 'VERSION_CONFLICT'
-            | 'ACCESS_DENIED' | 'ARCHIVED' | 'QUOTA_EXCEEDED';
+            | 'ACCESS_DENIED' | 'ARCHIVED' | 'QUOTA_EXCEEDED'
+            // From the organism namespace rule, which answers with the same codes the HTTP door
+            // has always sent for these three cases.
+            | 'AUTH_REQUIRED' | 'NOT_FOUND' | 'CONSENT_REQUIRED';
         message: string;
         details?: unknown;
     };
@@ -127,35 +131,19 @@ export async function writeMemoryRecord(
         };
     }
 
-    // 1c. An organism.* key belongs to a shared space, and writing into one requires being in it.
-    //     middleware/workspace-access.ts enforces this on the HTTP door and is Express-shaped, so
-    //     the MCP write path had nothing: an agent whose owner holds no role in an organism could
-    //     write its content by naming the key. What is checked here is the FLOOR that every branch
-    //     of that middleware requires — an active membership, or an organism agent writing under
-    //     .shared. — so this refuses nothing the HTTP door allows. The consent layer above it stays
-    //     where it is until it stops needing a request.
-    const orgMatch = /^organism\.([^.]+)\./.exec(input.key);
-    if (orgMatch) {
-        const orgId = orgMatch[1];
-        const organism = await storage.getOrganism(orgId);
-        if (!organism) {
-            return { ok: false, status: 404, code: 'ACCESS_DENIED', message: `Organism not found: ${orgId}` };
-        }
-        if (organism.agentGaiis?.includes(caller.principal)) {
-            if (!input.key.startsWith(`organism.${orgId}.shared.`)) {
-                return {
-                    ok: false, status: 403, code: 'ACCESS_DENIED',
-                    message: 'Agent not authorized for this workspace namespace',
-                };
-            }
-        } else {
-            const ownerName = parseGAII(caller.principal)?.owner
-                ?? caller.principal.split('@')[0].split('#').pop() ?? '';
-            const membership = await storage.getMembership(orgId, ownerName);
-            if (!membership || membership.status !== 'active') {
-                return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'Not an active member of this organism' };
-            }
-        }
+    // 1c. An organism.* key belongs to a shared space, and who may write one is decided by
+    //     services/organism-namespace-access.ts — the whole rule, not a floor under it. This used to
+    //     check only membership, because the rest of it lived in an Express middleware the MCP path
+    //     could not call. What that cost: a member holding a VIEWER grant wrote another member's
+    //     workspace content, any active member rewrote the meta.* workspace registry that every
+    //     access decision reads, and one member overwrote another's private member namespace.
+    if (input.key.startsWith('organism.')) {
+        const ownerName = parseGAII(caller.principal)?.owner
+            ?? caller.principal.split('@')[0].split('#').pop() ?? '';
+        const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
+            principal: caller.principal, owner: ownerName, roles: caller.roles,
+        }, input.key, 'write');
+        if (refusal) return { ok: false, ...refusal };
     }
     // 2. Schema locks apply on EVERY write surface. MCP used to call setMemory directly, so a write
     //    that REST answered with 422 sailed through there.
