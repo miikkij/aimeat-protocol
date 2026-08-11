@@ -5,7 +5,9 @@
  *   and owner-level agent defaults.
  * @structure
  *   - AccessTab (default export) -- main tab component
- *   - SharingGroupsSection -- CRUD for sharing groups with expandable member lists
+ *   - SharingGroupsSection -- CRUD for sharing groups with expandable member lists, and the key
+ *     spaces each group can reach
+ *   - SharesIncomingSection -- what other people have shared with this account
  *   - AgentDefaultsSection -- owner-level default rules and token budget for agents
  * @version-history
  *   v1.0.0 -- 2026-03-16 -- Initial access tab
@@ -40,6 +42,7 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { SharingGroupsSection } from './access-tab/sharing-groups.js';
+import { SharesIncomingSection } from './access-tab/shares-incoming.js';
 import { AgentDefaultsSection } from './access-tab/agent-defaults.js';
 import { ConnectedAppsSection } from './access-tab/connected-apps.js';
 import { AccessTokensSection } from './access-tab/access-tokens.js';
@@ -258,6 +261,7 @@ export default function AccessTab({ session, showToast }) {
       <${AccessTokensSection} session=${session} showToast=${showToast} initial=${overview?.accessTokens} />
       <${ConnectionsSection} showToast=${showToast} />
       <${SharingGroupsSection} showToast=${showToast} initial=${overview?.groups} />
+      <${SharesIncomingSection} />
       <${AgentDefaultsSection} showToast=${showToast} initial=${overview?.agentDefaults} />
     ` : null}
   `;

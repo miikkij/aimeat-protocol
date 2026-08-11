@@ -6784,7 +6784,12 @@
       "cartSendBtn": "Add as sources",
       "cartNoOrgs": "You are not in any organism workspaces yet.",
       "cartSourcesAdded": "Added {n} sources to the workspace",
-      "cartSourcesExist": "All items already attached to that workspace"
+      "cartSourcesExist": "All items already attached to that workspace",
+      "shSharedBadge": "shared",
+      "shSharedWith": "Shared with {names}",
+      "shShareThis": "Share this key space",
+      "shNoGroups": "Create a sharing group first, then come back here.",
+      "shPickGroup": "Share with"
     },
     "files": {
       "title": "Stored Files",
@@ -7169,7 +7174,7 @@
         "cancel": "Cancel"
       },
       "sgTitle": "Sharing Groups",
-      "sgDesc": "Define groups of identities to share memory entries with. Assign a sharing group to memory keys to control who can read or write.",
+      "sgDesc": "Groups of people and agents you can share parts of your memory with. A group says WHO; what they actually reach is a share you add below.",
       "sgEmpty": "No sharing groups yet.",
       "sgLoading": "Loading...",
       "sgCreate": "New Group",
@@ -7277,7 +7282,27 @@
       "cxOwnInUse": "Disconnect the {n} account(s) made with this app first.",
       "cxOwnKeepsExisting": "Accounts you already connected keep the app that connected them: a token can only be renewed by the app that issued it. Reconnect one to move it.",
       "cxNoteLinkedinBefore": "A LinkedIn connection stops working after about two months and asks to be reconnected. Renewing it in the background is a partner-only feature at LinkedIn, so this is the one service you will have to come back to a few times a year.",
-      "cxNoteXBefore": "Posting to X costs a small amount per post, charged to whoever registered the app. When those credits run out, publishing stops until they are topped up."
+      "cxNoteXBefore": "Posting to X costs a small amount per post, charged to whoever registered the app. When those credits run out, publishing stops until they are topped up.",
+      "shTitle": "Shared key spaces",
+      "shNone": "Nothing shared with this group yet.",
+      "shAdd": "Share a key space",
+      "shPattern": "Key or pattern",
+      "shPatternHelp": "* is one level, ** is everything below. Keys written later are covered automatically.",
+      "shNote": "Note to yourself (optional)",
+      "shNotePlaceholder": "What is this for?",
+      "shCreate": "Share",
+      "shCreated": "Key space shared",
+      "shCreateError": "Could not share that key space",
+      "shRevoke": "Stop sharing",
+      "shConfirmRevoke": "Stop sharing \"{pattern}\"? They lose access at once. Anything they already copied stays with them.",
+      "shRevoked": "Sharing stopped",
+      "shRevokeError": "Could not stop sharing",
+      "shIncomingTitle": "Shared with you",
+      "shIncomingDesc": "Key spaces other people have opened to you. Open one to read what is in it.",
+      "shIncomingNone": "Nobody has shared anything with you yet.",
+      "shIncomingFrom": "from",
+      "shOpen": "Open",
+      "shCancel": "Cancel"
     },
     "nodes": {
       "title": "Personal Nodes",

@@ -3,6 +3,9 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Key-space shares: each group shows what it can actually reach, with add
+ *     and revoke, and a count on the collapsed header. The group was only ever half the answer —
+ *     it says WHO, and until now nothing on this page said WHAT they get.
  *   v1.1.0 — 2026-07-16 — Member-add identifier input is the shared ContactPicker (contacts +
  *     directory suggestions, full-id mode).
  *   v1.0.0 — 2026-07-13 — Extracted from access-tab.js (max-file-lines)
@@ -16,6 +19,7 @@ import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
+import * as sharesApi from '/js/services/shares.js';
 import { swallowed } from '/js/swallowed.js';
 
 export function SharingGroupsSection({ showToast, initial }) {
@@ -44,6 +48,26 @@ export function SharingGroupsSection({ showToast, initial }) {
   const [editWrite, setEditWrite] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Key-space shares: what each group actually reaches. Loaded in ONE call for every group rather
+  // than per expanded card, because the count belongs on the collapsed header — a group whose
+  // shares you only see after opening it is a group you cannot audit at a glance, and "who can see
+  // what of mine" is the question this whole page answers.
+  const [shares, setShares] = useState([]);
+  const [sharingIn, setSharingIn] = useState(null);
+  const [sharePattern, setSharePattern] = useState('');
+  const [shareNote, setShareNote] = useState('');
+  const [sharingBusy, setSharingBusy] = useState(false);
+
+  const loadShares = useCallback(async () => {
+    try {
+      const resp = await sharesApi.listOutgoing();
+      setShares(resp?.data?.shares || []);
+    } catch (err) {
+      swallowed('sharing-groups: loadShares', err);
+      setShares([]);
+    }
+  }, []);
+
   const loadGroups = useCallback(async () => {
     try {
       const resp = await groupsApi.listGroups();
@@ -52,9 +76,51 @@ export function SharingGroupsSection({ showToast, initial }) {
       swallowed('sharing-groups: SharingGroupsSection', err);
       setGroups([]);
     }
-  }, []);
+    loadShares();
+  }, [loadShares]);
+
+  const sharesOf = useCallback((groupId) => shares.filter(s => s.group_id === groupId), [shares]);
+
+  const handleCreateShare = useCallback(async (groupId) => {
+    const pattern = sharePattern.trim();
+    if (!pattern) return;
+    setSharingBusy(true);
+    try {
+      await sharesApi.createShare(groupId, { key_pattern: pattern, note: shareNote.trim() || undefined });
+      showToast(t('profile.access.shCreated'));
+      setSharingIn(null);
+      setSharePattern('');
+      setShareNote('');
+      loadShares();
+    } catch (e) {
+      showToast(e.message || t('profile.access.shCreateError'));
+    } finally {
+      setSharingBusy(false);
+    }
+  }, [sharePattern, shareNote, showToast, loadShares]);
+
+  const handleRevokeShare = useCallback((share) => {
+    confirm(
+      t('profile.access.shConfirmRevoke').replace('{pattern}', share.key_pattern),
+      async () => {
+        try {
+          await sharesApi.revokeShare(share.id);
+          showToast(t('profile.access.shRevoked'));
+          loadShares();
+        } catch (e) {
+          showToast(e.message || t('profile.access.shRevokeError'));
+        }
+      },
+      { danger: true },
+    );
+  }, [confirm, showToast, loadShares]);
 
   useEffect(() => { if (!initial) loadGroups(); }, [loadGroups]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
+
+  // Shares are fetched on mount WHATEVER the seed did. They are not in /v1/access/overview, so
+  // hanging them off loadGroups() meant a seeded page never asked for them and every group showed
+  // as sharing nothing — which is worse than showing nothing at all, because it reads as an answer.
+  useEffect(() => { loadShares(); }, [loadShares]);
 
   // Deep link from the Memory tab's "Create a group →": scroll here and open the form.
   useEffect(() => {
@@ -201,10 +267,21 @@ export function SharingGroupsSection({ showToast, initial }) {
     </div>
   `;
 
+  const renderShareRow = (share) => html`
+    <div class="mem-item" key=${share.id}>
+      <span class="mem-key" title=${share.key_pattern}>${escHtml(share.key_pattern)}</span>
+      ${share.note && html`<span class="text-meta-sm">${escHtml(share.note)}</span>`}
+      <button class="btn-ghost btn-danger btn-sm" onClick=${(e) => { e.stopPropagation(); handleRevokeShare(share); }}>
+        ${t('profile.access.shRevoke')}
+      </button>
+    </div>
+  `;
+
   const renderGroupCard = (group) => {
     const isExpanded = expandedId === group.id;
     const isEditing = editingId === group.id;
     const memberCount = (group.members || []).length;
+    const groupShares = sharesOf(group.id);
 
     return html`
       <div class="card ${isExpanded ? 'card-expanded' : ''}" key=${group.id}>
@@ -212,6 +289,9 @@ export function SharingGroupsSection({ showToast, initial }) {
           <span class="expand-icon">${isExpanded ? '▼' : '▶'}</span>
           <div class="card-title">${escHtml(group.name)}</div>
           <span class="badge badge-muted">${memberCount} ${t('profile.access.sgMembers') || 'members'}</span>
+          ${groupShares.length > 0 && html`
+            <span class="badge badge-info">${groupShares.length} ${t('profile.access.shTitle')}</span>
+          `}
         </div>
         ${group.description && html`
           <div class="card-subtitle">${escHtml(group.description)}</div>
@@ -239,6 +319,43 @@ export function SharingGroupsSection({ showToast, initial }) {
               ? html`<div class="empty">${t('profile.access.sgNoMembers') || 'No members yet'}</div>`
               : (group.members || []).map(m => renderMemberRow(group.id, m))
             }
+
+            <h4 class="card-h3 mt-section">${t('profile.access.shTitle')}</h4>
+            ${groupShares.length === 0
+              ? html`<div class="empty">${t('profile.access.shNone')}</div>`
+              : groupShares.map(renderShareRow)
+            }
+            ${sharingIn === group.id ? html`
+              <div class="create-form" onClick=${(e) => e.stopPropagation()}>
+                <div class="form-row">
+                  <label>${t('profile.access.shPattern')}</label>
+                  <input type="text" class="input-field input-sm" placeholder="deliveries.abc.**"
+                    value=${sharePattern} onInput=${e => setSharePattern(e.target.value)}
+                    onKeyDown=${e => e.key === 'Enter' && handleCreateShare(group.id)} />
+                  <div class="text-meta-sm">${t('profile.access.shPatternHelp')}</div>
+                </div>
+                <div class="form-row">
+                  <label>${t('profile.access.shNote')}</label>
+                  <input type="text" class="input-field input-sm"
+                    placeholder=${t('profile.access.shNotePlaceholder')}
+                    value=${shareNote} onInput=${e => setShareNote(e.target.value)} />
+                </div>
+                <div class="form-actions">
+                  <button class="btn-primary btn-sm" onClick=${() => handleCreateShare(group.id)} disabled=${sharingBusy}>
+                    ${sharingBusy ? '...' : t('profile.access.shCreate')}
+                  </button>
+                  <button class="btn-ghost btn-sm" onClick=${() => setSharingIn(null)}>
+                    ${t('profile.access.shCancel')}
+                  </button>
+                </div>
+              </div>
+            ` : html`
+              <div class="mb-half">
+                <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setSharingIn(group.id); setSharePattern(''); setShareNote(''); }}>
+                  ${t('profile.access.shAdd')}
+                </button>
+              </div>
+            `}
 
             ${addingTo === group.id ? html`
               <div class="create-form">
@@ -332,7 +449,7 @@ export function SharingGroupsSection({ showToast, initial }) {
 
   return html`
     <h3 class="card-h3 access-h3 mt-section" id="access-sharing-groups">${t('profile.access.sgTitle') || 'Sharing Groups'}</h3>
-    <div class="section-desc">${t('profile.access.sgDesc') || 'Define groups of identities to share memory entries with. Assign a sharing group to memory keys to control who can read or write.'}</div>
+    <div class="section-desc">${t('profile.access.sgDesc')}</div>
 
     ${groups === null
       ? html`<div class="empty">${t('profile.access.sgLoading') || 'Loading...'}</div>`

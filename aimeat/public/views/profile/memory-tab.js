@@ -3,6 +3,8 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v2.9.0 — 2026-08-11 — Key-space sharing (./memory-tab/sharing.js): rows show which of them a
+ *     group can read and offer "share this key space"; the visibility menus dropped "group".
  *   v2.8.0 — 2026-07-31 — File upload goes through the PRESIGNED path (mint URL, raw PUT) instead of
  *     base64-in-JSON, which capped uploads at ~3.7 MB with a bare 413 regardless of the node's
  *     configured 50 MB. Upload failures now surface their reason instead of "Upload failed".
@@ -88,6 +90,8 @@ import { listAgents } from '/js/services/agents.js';
 import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { listGroups } from '/js/services/sharing-groups.js';
+import { useKeySpaceSharing } from './memory-tab/sharing.js';
+import { useMemoryBackup } from './memory-tab/backup.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
 import { shortTok } from './memory-tab/helpers.js';
@@ -154,8 +158,6 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [searchResults, setSearchResults] = useState(null);  // null = not searching; array = results
   const [searchScopePrefix, setSearchScopePrefix] = useState('');  // optional namespace/group scope
   const [searchLoading, setSearchLoading] = useState(false);
-  const [importMode, setImportMode] = useState('skip');   // skip | overwrite | rename
-  const [importing, setImporting] = useState(false);
   const [discoverEntries, setDiscoverEntries] = useState(null);
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverError, setDiscoverError] = useState(null);
@@ -310,7 +312,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // (dynamic) memory re-fetches on agent/archived change; on failure we fall back to the six loaders.
   async function loadTab() {
     const ov = await apiGet('/v1/memory/tab').then(r => r?.data).catch(err => { swallowed('memory-tab: loadTab', err); return null; });
-    if (!ov) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadOrgNames(); return; }
+    if (!ov) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadShares(); loadOrgNames(); return; }
     setAgents(Array.isArray(ov.agents) ? ov.agents : []);
     // memory (metadata-only default view — mirrors loadMemories meta path)
     const items = ov.memory?.items || [];
@@ -334,6 +336,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
     setAllConsents(consents.filter(c => !c.status || c.status === 'active'));
     // sharing groups
     setGroups(ov.groups?.groups || []);
+    // Key-space shares are not in the composite (it predates them), so they cost one extra request
+    // rather than a stale "shared" badge on every row.
+    loadShares();
     // organism names (mirrors loadOrgNames)
     const orgs = ov.organisms?.organisms || [];
     const nameMap = {};
@@ -422,58 +427,9 @@ export default function MemoryTab({ session, showToast, onStats }) {
   }
 
   // Export all (or a prefix) of the caller's memory as a downloaded JSON backup.
-  async function handleExport(prefix) {
-    try {
-      const data = await memoryService.exportMemory(selectedAgent || undefined, prefix || undefined);
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const stamp = new Date().toISOString().slice(0, 10);
-      a.href = url;
-      a.download = `aimeat-memory-${stamp}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      showToast((t('profile.memory.exportDone') || 'Exported {n} entries').replace('{n}', String(data.count ?? (data.entries || []).length)));
-    } catch (e) { showToast(e.message || t('profile.error'), true); }
-  }
-
-  // Import a JSON backup; the user picks a conflict mode (skip/overwrite/rename) before it runs.
-  const importFileRef = useRef(null);
-  function triggerImport() { importFileRef.current?.click(); }
-  async function handleImportFile(e) {
-    const file = e.target.files?.[0];
-    e.target.value = '';   // allow re-picking the same file
-    if (!file) return;
-    let parsed;
-    try {
-      const text = await file.text();
-      parsed = JSON.parse(text);
-    } catch { showToast(t('profile.memory.importBadJson') || 'Not a valid JSON backup', true); return; }
-    const entries = Array.isArray(parsed) ? parsed : (Array.isArray(parsed?.entries) ? parsed.entries : null);
-    if (!entries || entries.length === 0) { showToast(t('profile.memory.importEmpty') || 'No entries found in file', true); return; }
-
-    const modeLabel = (m) => t('profile.memory.importMode.' + m) || m;
-    confirm(
-      (t('profile.memory.importConfirm') || 'Import {n} entries? Existing keys are handled by mode: {mode}.')
-        .replace('{n}', String(entries.length)).replace('{mode}', modeLabel(importMode)),
-      async () => {
-        setImporting(true);
-        try {
-          const resp = await memoryService.importMemory(entries, importMode, selectedAgent || undefined);
-          if (resp.ok === false) { showToast(resp.error?.message || t('profile.error'), true); return; }
-          const s = resp.data || {};
-          showToast((t('profile.memory.importDone') || 'Imported: {c} new, {u} updated, {s} skipped')
-            .replace('{c}', String(s.created || 0)).replace('{u}', String(s.updated || 0)).replace('{s}', String(s.skipped || 0))
-            + ((s.failed && s.failed.length) ? ` · ${s.failed.length} ${t('profile.error') || 'failed'}` : ''),
-            !!(s.failed && s.failed.length));
-          loadMemories();
-        } catch (e) { showToast(e.message || t('profile.error'), true); }
-        finally { setImporting(false); }
-      },
-    );
-  }
+  // Backup export/import lives in ./memory-tab/backup.js (max-file-lines). Same behaviour, and
+  // it needs loadMemories, so it is created after that function exists.
+  const backup = useMemoryBackup({ selectedAgent, showToast, confirm, loadMemories });
 
   // Delete a whole namespace/group at once (server-side bulk-delete by prefix).
   function deleteGroup(g, count) {
@@ -612,6 +568,11 @@ export default function MemoryTab({ session, showToast, onStats }) {
     loadMemories();
   }
 
+  // Key-space sharing: the share list, the row badge lookup and the per-row panel, in one hook
+  // (./memory-tab/sharing.js). A group is an audience; a share is what it reaches.
+  const sharing = useKeySpaceSharing({ groups, showToast });
+  const { loadShares } = sharing;
+
   // Bulk edit: checkbox-select rows, then change visibility (or delete) for all at once.
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [bulkVis, setBulkVis] = useState('private');
@@ -716,9 +677,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
     expandedMem, setExpandedMem, ensureValue, selectedKeys, toggleSelected, setSelectedKeys, visPopoverFor,
     setVisPopoverFor, keyHasRules, loadKeyPerms, fedConsents, inCart, memCartItem, fileCartItem, toggleCartItem,
     addCartItems, applyVis, groups, handleQuickVis, fullLoaded, loadingValueKeys, editingMemTags, setEditingMemTags,
+    ...sharing,
     keyRulesPopover, setKeyRulesPopover, handleUpdateMemoryTags, setEditModal, togglingFed, handleStopSharing,
-    handleShareToFederation, doPull, doPush, handleDeleteMemory, memQuota, loadFullContents, handleExport, importing,
-    triggerImport, importMode, setImportMode, importFileRef, handleImportFile, searchInput, setSearchInput,
+    handleShareToFederation, doPull, doPush, handleDeleteMemory, memQuota, loadFullContents,
+    ...backup, searchInput, setSearchInput,
     runServerSearch, searchScopePrefix, setSearchScopePrefix, searchLoading, searchResults, clearServerSearch,
     memArchived, setMemArchived, showMemForm, setShowMemForm, handleCreateMemory, bulkVis, setBulkVis, applyBulkVis,
     bulkDelete, collapsedGroups, toggleGroupCollapsed, groupLabel, orgNames, deleteGroup,

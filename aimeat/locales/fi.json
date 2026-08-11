@@ -6784,7 +6784,12 @@
       "cartSendBtn": "Lisää lähteiksi",
       "cartNoOrgs": "Et ole vielä minkään organismin työtiloissa.",
       "cartSourcesAdded": "Lisättiin {n} lähdettä työtilaan",
-      "cartSourcesExist": "Kaikki kohteet on jo liitetty siihen työtilaan"
+      "cartSourcesExist": "Kaikki kohteet on jo liitetty siihen työtilaan",
+      "shSharedBadge": "jaettu",
+      "shSharedWith": "Jaettu: {names}",
+      "shShareThis": "Jaa tämä avainavaruus",
+      "shNoGroups": "Luo ensin jakoryhmä, palaa sitten tänne.",
+      "shPickGroup": "Jaa ryhmälle"
     },
     "files": {
       "title": "Tallennetut tiedostot",
@@ -7169,7 +7174,7 @@
         "cancel": "Peruuta"
       },
       "sgTitle": "Jakoryhmät",
-      "sgDesc": "Määrittele identiteettiryhmiä joiden kanssa jakaa muistimerkintöjä. Liitä jakoryhmä muistiavaimiin hallitaksesi kuka voi lukea tai kirjoittaa.",
+      "sgDesc": "Ihmis- ja agenttiryhmät joiden kanssa voit jakaa osia muististasi. Ryhmä kertoo KENELLE; mihin he pääsevät käsiksi on alla lisättävä jako.",
       "sgEmpty": "Ei jakoryhmiä vielä.",
       "sgLoading": "Ladataan...",
       "sgCreate": "Uusi ryhmä",
@@ -7277,7 +7282,27 @@
       "cxOwnInUse": "Katkaise ensin ne {n} tiliä jotka on liitetty tällä sovelluksella.",
       "cxOwnKeepsExisting": "Jo liittämäsi tilit pitävät sen sovelluksen jolla ne liitettiin: tokenin voi uusia vain se sovellus joka sen myönsi. Liitä tili uudelleen, jos haluat siirtää sen.",
       "cxNoteLinkedinBefore": "LinkedIn-liitos lakkaa toimimasta noin kahden kuukauden kuluttua ja pyytää uudelleenliittämistä. Tokenin uusiminen taustalla on LinkedInissä vain kumppaneiden ominaisuus, joten tämä on se palvelu jonka luo joudut palaamaan muutaman kerran vuodessa.",
-      "cxNoteXBefore": "X:ään julkaiseminen maksaa pienen summan per julkaisu, ja se veloitetaan siltä joka sovelluksen rekisteröi. Kun krediitit loppuvat, julkaisu pysähtyy kunnes niitä lisätään."
+      "cxNoteXBefore": "X:ään julkaiseminen maksaa pienen summan per julkaisu, ja se veloitetaan siltä joka sovelluksen rekisteröi. Kun krediitit loppuvat, julkaisu pysähtyy kunnes niitä lisätään.",
+      "shTitle": "Jaetut avainavaruudet",
+      "shNone": "Tälle ryhmälle ei ole vielä jaettu mitään.",
+      "shAdd": "Jaa avainavaruus",
+      "shPattern": "Avain tai kuvio",
+      "shPatternHelp": "* on yksi taso, ** on kaikki sen alta. Myöhemmin kirjoitetut avaimet tulevat mukaan itsestään.",
+      "shNote": "Muistiinpano itsellesi (valinnainen)",
+      "shNotePlaceholder": "Mitä varten tämä on?",
+      "shCreate": "Jaa",
+      "shCreated": "Avainavaruus jaettu",
+      "shCreateError": "Avainavaruuden jakaminen ei onnistunut",
+      "shRevoke": "Lopeta jakaminen",
+      "shConfirmRevoke": "Lopetetaanko \"{pattern}\" jakaminen? Pääsy katkeaa heti. Se mitä he ovat jo kopioineet jää heille.",
+      "shRevoked": "Jakaminen lopetettu",
+      "shRevokeError": "Jakamisen lopettaminen ei onnistunut",
+      "shIncomingTitle": "Sinulle jaettu",
+      "shIncomingDesc": "Avainavaruudet jotka muut ovat avanneet sinulle. Avaa jokin lukeaksesi mitä siellä on.",
+      "shIncomingNone": "Kukaan ei ole vielä jakanut sinulle mitään.",
+      "shIncomingFrom": "jakaja",
+      "shOpen": "Avaa",
+      "shCancel": "Peruuta"
     },
     "nodes": {
       "title": "Henkilökohtaiset solmut",

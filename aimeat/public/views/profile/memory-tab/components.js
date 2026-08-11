@@ -5,6 +5,9 @@
  *   universal file preview modal, the drag-and-drop upload form, and the edit-memory modal.
  *   Extracted from memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-11 — The create form and the edit modal no longer offer "group" as a
+ *     visibility, and their group pickers are gone with it. A group is an audience, not a tier:
+ *     give the record the visibility it has for everyone else, then share the key space.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -154,43 +157,29 @@ export function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) 
     </div>`;
 }
 
-export function MemoryForm({ onSave, onCancel, groups }) {
+export function MemoryForm({ onSave, onCancel }) {
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
   const [vis, setVis] = useState('private');
   const [tags, setTags] = useState('');
-  const [groupId, setGroupId] = useState('');
   return html`
     <div class="create-form">
       <div class="form-row"><label>${t('profile.memory.keyLabel')}</label><input class="input-field" placeholder=${t('profile.memory.keyPlaceholder')} value=${key} onInput=${e => setKey(e.target.value)} /></div>
       <div class="form-row"><label>${t('profile.memory.valueLabel')}</label><textarea class="input-field" rows="3" placeholder=${t('profile.memory.valuePlaceholder')} value=${value} onInput=${e => setValue(e.target.value)}></textarea></div>
       <div class="form-row"><label>${t('profile.memory.visLabel')}</label>
         <select class="input-field" value=${vis} onChange=${e => setVis(e.target.value)}>
+          ${/* No "group" option: a group is an audience, not a visibility. Create the record with
+                the visibility it should have for everyone else, then share the key space with a
+                group from the row or from Access — one share covers the keys written after it. */''}
           <option value="private">${t('profile.memory.visPrivate')}</option>
           <option value="shared">${t('profile.memory.visShared')}</option>
-          <option value="group">${t('knowledge.visibility.group')}</option>
           <option value="members">${t('knowledge.visibility.members')}</option>
           <option value="public">${t('profile.memory.visPublic')}</option>
         </select>
       </div>
-      ${vis === 'group' && html`
-        <div class="form-row"><label>${t('profile.memory.selectGroup')}</label>
-          ${(groups || []).length === 0
-            ? html`
-              <div class="text-meta-sm mb-xs">${t('profile.memory.noGroups')}</div>
-              <button type="button" class="btn-outline btn-sm" onClick=${() => {
-                window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
-              }}>${t('profile.memory.createGroupBtn')}</button>`
-            : html`
-              <select class="input-field" value=${groupId} onChange=${e => setGroupId(e.target.value)}>
-                <option value="">-- ${t('profile.memory.selectGroup')} --</option>
-                ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
-              </select>`}
-        </div>
-      `}
       <div class="form-row"><label>${t('profile.memory.tagsLabel')}</label><input class="input-field" placeholder=${t('profile.memory.tagsPlaceholder')} value=${tags} onInput=${e => setTags(e.target.value)} /></div>
       <div class="form-actions">
-        <button class="btn-primary" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, vis === 'group' ? groupId : undefined); }}>${t('profile.memory.saveBtn')}</button>
+        <button class="btn-primary" onClick=${() => { if (!key || !value) return; onSave(key, value, vis, tags, undefined); }}>${t('profile.memory.saveBtn')}</button>
         <button class="btn-outline" onClick=${onCancel}>${t('profile.memory.cancelBtn')}</button>
       </div>
     </div>`;
@@ -385,10 +374,9 @@ export function FileUploadForm({ onUpload, onCancel }) {
     </div>`;
 }
 
-export function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, isJson, onSave, onCancel, groups }) {
+export function EditMemoryModal({ memKey, initialValue, initialVisibility, initialVersion, isJson, onSave, onCancel }) {
   const [value, setValue] = useState(initialValue);
   const [vis, setVis] = useState(initialVisibility || 'private');
-  const [groupId, setGroupId] = useState('');
 
   // Broken JSON in a memory key crashes the agent that reads it — validate before save.
   // Validation applies when the stored value was an object, or the draft clearly is one.
@@ -397,42 +385,24 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
   if (looksJson) {
     try { JSON.parse(value); } catch (e) { jsonError = e.message; }
   }
-  const groupMissing = vis === 'group' && !groupId && (groups || []).length === 0;
-  const canSave = !jsonError && !(vis === 'group' && !groupId);
+  const canSave = !jsonError;
 
   return html`
     <${Modal} open=${true} onClose=${onCancel} title=${`${t('profile.memory.editTitle')}: ${memKey}`}>
         <div class="form-row flex-row mb-half">
           <label class="pf-label-inline">${t('profile.memory.visLabel')}</label>
-          <select class="input-field mem-vis-select" value=${vis}
-            onChange=${e => { setVis(e.target.value); if (e.target.value !== 'group') setGroupId(''); }}>
-            ${['private', 'owner', 'group', 'members', 'public'].map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
+          ${/* Same as the create form: a group is an audience, not a visibility. Sharing a key
+                space with one is done from the row's share panel or the Access tab. */''}
+          <select class="input-field mem-vis-select" value=${vis} onChange=${e => setVis(e.target.value)}>
+            ${['private', 'owner', 'members', 'public'].map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
           </select>
         </div>
-        ${vis === 'group' && html`
-          <div class="form-row mb-half">
-            <label>${t('profile.memory.selectGroup')}</label>
-            ${(groups || []).length === 0
-              ? html`
-                <div class="text-meta-sm mb-xs">${t('profile.memory.noGroups')}</div>
-                <button class="btn-outline btn-sm" onClick=${() => {
-                  onCancel();
-                  try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
-                  window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
-                }}>${t('profile.memory.createGroupBtn')}</button>`
-              : html`
-                <select class="input-field" value=${groupId} onChange=${e => setGroupId(e.target.value)}>
-                  <option value="">-- ${t('profile.memory.selectGroup')} --</option>
-                  ${(groups || []).map(g => html`<option value=${g.id}>${g.name}</option>`)}
-                </select>`}
-          </div>
-        `}
         <textarea class="input-field mem-edit-textarea ${jsonError ? 'mem-edit-textarea--error' : ''}" rows="14"
           value=${value} onInput=${e => setValue(e.target.value)}></textarea>
         ${jsonError && html`<div class="mem-json-error">${t('profile.memory.invalidJson')} — ${jsonError}</div>`}
         <div class="form-actions mt-1">
-          <button class="btn-primary" disabled=${!canSave || groupMissing}
-            onClick=${() => onSave(value, vis, initialVersion, vis === 'group' ? groupId : undefined)}>${t('profile.save')}</button>
+          <button class="btn-primary" disabled=${!canSave}
+            onClick=${() => onSave(value, vis, initialVersion, undefined)}>${t('profile.save')}</button>
           <button class="btn-outline" onClick=${onCancel}>${t('profile.cancel')}</button>
         </div>
     <//>`;

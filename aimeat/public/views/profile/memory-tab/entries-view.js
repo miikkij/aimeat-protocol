@@ -5,6 +5,10 @@
  *   of memory rows with per-row visibility/rules/cart/federation controls. Extracted verbatim from
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Sharing left the visibility menu. A row shows a "shared · N" badge when a
+ *     key-space share covers its key (with the group names in the title), and the expanded row can
+ *     open a share panel pre-filled with the key's own space. Picking a group from a VISIBILITY
+ *     list shared exactly one record, which went stale the moment the next one was written.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -51,6 +55,8 @@ export function renderEntries(ctx) {
     searchResults, clearServerSearch, memArchived, setMemArchived, showMemForm, setShowMemForm,
     handleCreateMemory, bulkVis, setBulkVis, applyBulkVis, bulkDelete, collapsedGroups,
     toggleGroupCollapsed, groupLabel, orgNames, deleteGroup,
+    sharedWith, sharePanelFor, openSharePanel, setSharePanelFor, sharePattern, setSharePattern,
+    shareGroupId, setShareGroupId, submitShare,
   } = ctx;
 
   if (!memories) return html`<${Spinner} text=${t('profile.memory.loading')} />`;
@@ -106,6 +112,16 @@ export function renderEntries(ctx) {
         </span>
         <${VisibilityPill} visibility=${m.visibility || 'private'}
           onClick=${(e) => { e.stopPropagation(); setVisPopoverFor(visPopoverFor === m.key ? null : m.key); }} />
+        ${(() => {
+          // A key covered by a share reads as private in the pill above, because it IS private —
+          // the share is the exception on top. Saying so on the row is the only way the owner can
+          // see, while scanning, which of their records somebody else can also read.
+          const via = sharedWith(m.key);
+          return via.length > 0 && html`
+            <span class="badge badge-info" title=${t('profile.memory.shSharedWith').replace('{names}', via.map(g => g.name).join(', '))}>
+              ${t('profile.memory.shSharedBadge')} · ${via.length}
+            </span>`;
+        })()}
         ${keyHasRules(m.key) && html`<span class="shield-icon" title=${t('permissions.sharingRules')} onClick=${(e) => { e.stopPropagation(); loadKeyPerms(m.key); }}>\u{1F6E1}️</span>`}
         ${fedConsents[m.key] && html`<span class="badge badge-success pf-fed-badge">${t('profile.memory.syncedToFederation')}</span>`}
         <button class="mem-cart-btn ${inCart(memCartItem(m)) ? 'mem-cart-btn--on' : ''}"
@@ -118,15 +134,6 @@ export function renderEntries(ctx) {
             <button key=${v} class="mem-vis-opt ${(m.visibility || 'private') === v ? 'mem-vis-opt--current' : ''}"
               onClick=${() => applyVis(m, v)}>${t('knowledge.visibility.' + v)}</button>
           `)}
-          ${groups.length > 0
-            ? groups.map(grp => html`
-                <button key=${grp.id} class="mem-vis-opt ${m.visibility === 'group' && m.group_id === grp.id ? 'mem-vis-opt--current' : ''}"
-                  onClick=${() => applyVis(m, 'group', grp.id)}>${t('knowledge.visibility.group')}: ${escHtml(grp.name)}</button>
-              `)
-            : html`<button class="mem-vis-opt mem-vis-opt--dim" onClick=${() => {
-                try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
-                window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
-              }}>${t('profile.memory.createGroupBtn')}</button>`}
         </div>
       `}
       ${expandedMem === m.key && html`
@@ -153,7 +160,38 @@ export function renderEntries(ctx) {
             <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); if (keyRulesPopover?.key === m.key) setKeyRulesPopover(null); else loadKeyPerms(m.key); }}>
               \u{1F6E1}️ ${t('permissions.sharingRules')}
             </button>
+            <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); if (sharePanelFor === m.key) setSharePanelFor(null); else openSharePanel(m.key); }}>
+              ${t('profile.memory.shShareThis')}
+            </button>
           </div>
+          ${sharePanelFor === m.key && html`
+            <div class="key-rules-box" onClick=${(e) => e.stopPropagation()}>
+              ${groups.length === 0 ? html`
+                <div class="text-meta-sm mb-half">${t('profile.memory.shNoGroups')}</div>
+                <button class="btn-outline btn-sm" onClick=${() => {
+                  try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
+                  window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
+                }}>${t('profile.memory.createGroupBtn')}</button>
+              ` : html`
+                <div class="form-row">
+                  <label>${t('profile.access.shPattern')}</label>
+                  <input type="text" class="input-field input-sm" value=${sharePattern}
+                    onInput=${e => setSharePattern(e.target.value)} />
+                  <div class="text-meta-sm">${t('profile.access.shPatternHelp')}</div>
+                </div>
+                <div class="form-row">
+                  <label>${t('profile.memory.shPickGroup')}</label>
+                  <select class="input-field input-sm" value=${shareGroupId} onChange=${e => setShareGroupId(e.target.value)}>
+                    ${groups.map(g => html`<option key=${g.id} value=${g.id}>${g.name}</option>`)}
+                  </select>
+                </div>
+                <div class="form-actions">
+                  <button class="btn-primary btn-sm" onClick=${submitShare}>${t('profile.access.shCreate')}</button>
+                  <button class="btn-ghost btn-sm" onClick=${() => setSharePanelFor(null)}>${t('profile.access.shCancel')}</button>
+                </div>
+              `}
+            </div>
+          `}
           ${editingMemTags === m.key && html`
             <div class="mb-half">
               <${TagEditor} tags=${m.tags || []} onSave=${(tags) => handleUpdateMemoryTags(m.key, tags, m.version)} />
@@ -272,9 +310,11 @@ export function renderEntries(ctx) {
     ${selectedKeys.size > 0 && html`
       <div class="mem-bulkbar">
         <span class="mem-bulkbar-count">${(t('profile.memory.bulkSelected') || '{n} selected').replace('{n}', String(selectedKeys.size))}</span>
+        ${/* Sharing is not a visibility any more, so the bulk bar changes visibility only. Sharing
+              many keys at once is one share over a pattern that covers them, which is the Access
+              tab or the row's own share panel — not a per-record loop dressed up as a bulk edit. */''}
         <select class="input-field mem-vis-select" value=${bulkVis} onChange=${e => setBulkVis(e.target.value)}>
           ${VIS_OPTIONS.filter(v => v !== 'group').map(v => html`<option key=${v} value=${v}>${t('knowledge.visibility.' + v)}</option>`)}
-          ${groups.map(grp => html`<option key=${grp.id} value=${'group:' + grp.id}>${t('knowledge.visibility.group')}: ${grp.name}</option>`)}
         </select>
         <button class="btn-outline btn-sm" onClick=${applyBulkVis}>${t('profile.memory.bulkApply') || 'Change visibility'}</button>
         <button class="btn-outline btn-sm" onClick=${() => { addCartItems((memories || []).filter(m => selectedKeys.has(m.key)).map(memCartItem)); }}>🛒 ${t('profile.memory.cartAddSelected') || 'Add to collection'}</button>
