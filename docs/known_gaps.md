@@ -32,17 +32,18 @@ Each gap must include all of these fields:
 ### GAP-001: GDPR Cascade Delete Lacks Transactional Atomicity
 
 - **Discovered:** 2026-05-21 (security audit)
-- **Related to:** Security audit finding C2 (GDPR cascade delete), Plan 2
-- **Description:** The owner deletion flow (`DELETE /v1/owners/:name`) performs 15+ separate delete operations across the route handler (`owners.ts:639-712`) and storage layer. In SQLite, the storage-level `deleteOwner()` is transactional, but the route-level pre-deletions (capabilities, scheduled_jobs, device_auth, apps, extension_instances, knowledge) run outside that transaction. In MongoDB, `deleteOwner()` is not wrapped in a Prisma `$transaction` at all -- it uses sequential awaits with error swallowing.
-- **Impact:** If the server crashes or a storage call fails mid-cascade, the owner could end up in a partially-deleted state with some data removed and some remaining. This is a data consistency issue, not a data leak -- the deletion was already requested and partially executed.
-- **Severity:** LOW -- All data categories ARE deleted (functionally complete). The gap is about atomicity, not missing deletions. A partial failure during owner deletion is an edge case that would require a crash at the exact right moment. The owner can re-request deletion to clean up any remaining data.
-- **What needs to be done:**
-  1. Add a transaction primitive to the `Storage` interface (e.g., `storage.transaction(async (tx) => { ... })`)
-  2. Wrap the MongoDB `deleteOwner()` in a Prisma `$transaction`
-  3. Move route-level pre-deletions into the storage layer so they participate in the same transaction
-  4. Alternatively, add a "deletion pending" state to owner records so incomplete cascades can be retried
-- **Why deferred:** The `Storage` interface does not currently expose a transaction primitive. Adding one is a cross-cutting change that affects both SQLite and MongoDB providers and every call site. This is an architectural change that should be designed carefully, not rushed as part of a security fix batch.
-- **Revisit when:** The Storage interface is being refactored, or if GDPR compliance auditing requires provable atomicity.
+- **Updated:** 2026-08-11 — narrowed. The storage half is done; the route half is not.
+- **Related to:** Security audit finding C2 (GDPR cascade delete), Plan 2, audit finding H-30
+- **Description:** The owner deletion flow (`DELETE /v1/owners/:name`) performs 15+ separate delete operations across the route handler and the storage layer. `storage.deleteOwner()` is now transactional on **both** providers, and both clear the same set of tables. The route-level pre-deletions (consents, memberships, matches, capabilities, scheduled jobs, device auth, apps, extension instances, knowledge links and reviews) still run outside that transaction, each in its own `try/catch` that logs and continues.
+- **2026-08-11, what changed and what it revealed:** the Postgres `deleteOwner()` cleared five tables where SQLite cleared forty-one, and both returned true — so on the production backend a deleted account left its work, disputes, wallet ledger, board posts, files, consents, telemetry, OAuth tokens and push subscriptions in place. That was not an atomicity gap but a **missing-deletion** gap, and it is fixed (`providers/postgres-kysely/methods/owner-cascade.ts`, mirroring the SQLite cascade, in one transaction). Both gates built to catch it had missed: `check:storage-parity` only inspects columns named ownerGaii/ownerName/buyerOwner/sellerOwner/agentGaii/flaggedBy and the wallet ledger's is `gaii`; `storage-conformance.test.ts` passed `databaseUrl` where the factory takes `dbUrl`, and `test/` is outside tsconfig's include, so its Postgres arm had never run.
+- **Impact:** If the server crashes between two of the route-level pre-deletions, the owner ends up partially deleted: the storage-level cascade either happened whole or not at all, but the route's own deletions have no such boundary. This is a data-consistency issue, not a leak — the deletion was requested and partially executed.
+- **Severity:** LOW — all data categories are deleted on a normal run. A partial failure needs a crash at the exact right moment, and the owner can re-request deletion.
+- **What remains:**
+  1. Add a transaction primitive to the `Storage` interface (`storage.transaction(fn)`), implemented on both providers
+  2. Move the route-level pre-deletions into a service function and run the whole erasure inside that one transaction
+  3. Alternatively, add a "deletion pending" state to owner records so an incomplete cascade can be retried
+- **Why still deferred:** the `Storage` interface still exposes no transaction primitive, so the route half has no boundary to join. That primitive is the next piece of work in `docs/internal/aug2026_arkkitehtuuri/05-repository-ja-tallennuskerros.md`.
+- **Revisit when:** `Storage.transaction()` lands.
 
 ---
 

@@ -38,7 +38,10 @@ beforeAll(async () => {
     provs.push({ name: 'sqlite', storage: await createStorage({ provider: 'sqlite', sqlitePath: SQLITE_PATH }) });
     if (PG_URL) {
         try {
-            provs.push({ name: 'postgres-kysely', storage: await createStorage({ provider: 'postgres-kysely', databaseUrl: PG_URL }) });
+            // `dbUrl`, not `databaseUrl` — StorageOptions names it dbUrl, and test/ is outside tsconfig's
+            // include, so the wrong key type-checked fine and pg fell back to env vars with no password.
+            // The postgres arm of this suite had therefore never run once. Fixed 2026-08-11.
+            provs.push({ name: 'postgres-kysely', storage: await createStorage({ provider: 'postgres-kysely', dbUrl: PG_URL }) });
         } catch (err) {
             console.warn(`[conformance] postgres unavailable, comparing sqlite only: ${String(err)}`);
         }
@@ -54,7 +57,12 @@ afterAll(() => {
     }
 });
 
-/** One owner carrying data in several owner-scoped tables, so a partial cascade is visible. */
+/**
+ * One owner carrying data in several owner-scoped tables, so a partial cascade is visible. Rows land
+ * under BOTH identities on purpose: the GHII (where an owner session and an app grant write) and the
+ * agent GAII. The cascade runs per identity, and a version of it that only walked agents would still
+ * pass a GHII-only seed.
+ */
 async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii: string }> {
     const node = 'aimeat-conformance-001';
     const ghii = `${name}@${node}`;
@@ -77,29 +85,54 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
     await s.addTransaction({
         id: `tx-${randomUUID()}`, gaii: ghii, type: 'welcome_bonus', amount: 10, timestamp: now,
     });
+    await s.createConsent({
+        id: randomUUID(), ownerGaii: ghii, dataPattern: 'profile.*', recipient: '*', purpose: 'discovery',
+        scope: 'dmz', expires: null, status: 'active', grantedAt: now, revokedAt: null,
+    });
+    await s.createStorageFile({
+        key: 'conformance.txt', ownerGaii: ghii, visibility: 'private', mimeType: 'text/plain',
+        size: 3, data: Buffer.from('abc'), tags: [], createdAt: now,
+    });
+    await s.createSharingGroup({
+        id: randomUUID(), name: 'conformance group', ownerGaii: ghii, members: [],
+        defaultPermissions: { read: true, write: false }, createdAt: now, updatedAt: now,
+    });
+    // Under the AGENT identity, so the per-agent branch of the cascade is exercised too.
+    await s.setMicroMemory({ gaii, set: 'conf', entries: { a: '1' }, visibility: 'private', updatedAt: now });
     return { ghii, gaii };
+}
+
+/** Everything the cascade must leave empty, read back through the Storage interface. */
+async function leftovers(s: Storage, owner: string, ghii: string, gaii: string) {
+    return {
+        memory: (await s.listMemory(ghii, {})).length,
+        transactions: (await s.getTransactions(ghii)).length,
+        consents: (await s.listConsents(ghii)).length,
+        files: (await s.listStorageFiles(ghii)).length,
+        sharingGroups: (await s.listSharingGroups(ghii)).length,
+        microMemory: (await s.listMicroMemorySets(gaii)).length,
+        agents: (await s.getAgentsByOwner(owner)).length,
+        ghii: !!(await s.getGHII(ghii)),
+    };
 }
 
 describe('storage providers agree on what they do, not just on their signatures', () => {
     it('deleteOwner leaves nothing owner-scoped behind, identically on every provider', async () => {
-        const results: Record<string, { memory: number; transactions: number; agents: number; ghii: boolean }> = {};
+        const results: Record<string, Awaited<ReturnType<typeof leftovers>>> = {};
 
         for (const { name, storage } of provs) {
             const owner = `conf${Date.now()}${Math.floor(Math.random() * 1000)}`;
-            const { ghii } = await seedOwner(storage, owner);
+            const { ghii, gaii } = await seedOwner(storage, owner);
 
-            // The seed is real: without this the next assertion could pass on an empty database.
-            expect((await storage.listMemory(ghii, {})).length, `${name}: seed wrote memory`).toBeGreaterThan(0);
-            expect((await storage.getTransactions(ghii)).length, `${name}: seed wrote a transaction`).toBeGreaterThan(0);
+            // The seed is real: without this the assertions below could pass on an empty database.
+            const seeded = await leftovers(storage, owner, ghii, gaii);
+            for (const [field, value] of Object.entries(seeded)) {
+                if (field === 'ghii') continue;
+                expect(value, `${name}: seed wrote ${field}`).toBeGreaterThan(0);
+            }
 
             await storage.deleteOwner(owner);
-
-            results[name] = {
-                memory: (await storage.listMemory(ghii, {})).length,
-                transactions: (await storage.getTransactions(ghii)).length,
-                agents: (await storage.getAgentsByOwner(owner)).length,
-                ghii: !!(await storage.getGHII(ghii)),
-            };
+            results[name] = await leftovers(storage, owner, ghii, gaii);
         }
 
         // Every provider must reach the same end state. This is the assertion H-30 needed: on the
@@ -110,10 +143,9 @@ describe('storage providers agree on what they do, not just on their signatures'
             expect(r, `${name} must match ${first[0]} after deleteOwner`).toEqual(first[1]);
         }
         for (const [name, r] of Object.entries(results)) {
-            expect(r.memory, `${name}: memory survived the delete`).toBe(0);
-            expect(r.agents, `${name}: agents survived the delete`).toBe(0);
-            expect(r.ghii, `${name}: the GHII record survived the delete`).toBe(false);
-            expect(r.transactions, `${name}: transactions survived the delete`).toBe(0);
+            for (const [field, value] of Object.entries(r)) {
+                expect(value, `${name}: ${field} survived the delete`).toBe(field === 'ghii' ? false : 0);
+            }
         }
     }, 60_000);
 

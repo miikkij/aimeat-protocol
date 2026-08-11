@@ -19,6 +19,7 @@ import type { AgentRecord, GHIIRecord, OwnerRecord } from '../../../interface.js
 import type { Agent, Ghii, Owner } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb, dbError } from '../helpers.js';
+import { deleteOwnerCascade, cascadeDeleteIdentityData } from './owner-cascade.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -96,17 +97,16 @@ export const identityMethods = {
     const rows = await this.db.updateTable('Owner').set(data).where('name', '=', name).returningAll().execute();
     return rows[0] ? toOwnerRecord(rows[0]) : null;
   },
+  /**
+   * Erase an owner and everything owner-scoped underneath, in ONE transaction. Until 2026-08-11 this
+   * cleared five tables where SQLite cleared forty-one and still returned true, so on the production
+   * backend a deleted account left its work, disputes, wallet ledger, board posts, files, consents,
+   * telemetry, OAuth tokens and push subscriptions behind. The table list now lives in
+   * ./owner-cascade.ts next to the SQLite one it mirrors.
+   */
   async deleteOwner(this: PostgresKyselyStorage, name: string): Promise<boolean> {
     try {
-      const ghiis = (await this.db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).execute()).map(g => g.ghii);
-      const agents = (await this.db.selectFrom('Agent').select('gaii').where('owner', '=', name).execute()).map(a => a.gaii);
-      const owned = [...ghiis, ...agents];
-      if (owned.length) await this.db.deleteFrom('Memory').where('ownerGaii', 'in', owned).execute();
-      await this.db.deleteFrom('Agent').where('owner', '=', name).execute();
-      await this.db.deleteFrom('Ghii').where('ownerName', '=', name).execute();
-      await this.db.deleteFrom('Session').where('owner', '=', name).execute();
-      const r = await this.db.deleteFrom('Owner').where('name', '=', name).executeTakeFirst();
-      return Number(r.numDeletedRows ?? 0) > 0;
+      return await this.db.transaction().execute(trx => deleteOwnerCascade(trx, name));
     } catch (err) { throw dbError('deleteOwner', err); }
   },
 
@@ -177,11 +177,16 @@ export const identityMethods = {
       return rows[0] ? toAgentRecord(rows[0]) : null;
     } catch (err) { throw dbError('updateAgent', err); }
   },
+  /** Same cascade as deleteOwner, for one agent — matching SQLite, which has always run the full
+   *  cascade here. This cleared only Memory until 2026-08-11, so disconnecting an agent left its
+   *  tasks, messages, telemetry, directives, OAuth tokens and webhook log behind. */
   async deleteAgent(this: PostgresKyselyStorage, gaii: string): Promise<boolean> {
     try {
-      await this.db.deleteFrom('Memory').where('ownerGaii', '=', gaii).execute();
-      const r = await this.db.deleteFrom('Agent').where('gaii', '=', gaii).executeTakeFirst();
-      return Number(r.numDeletedRows ?? 0) > 0;
+      return await this.db.transaction().execute(async (trx) => {
+        await cascadeDeleteIdentityData(trx, gaii);
+        const r = await trx.deleteFrom('Agent').where('gaii', '=', gaii).executeTakeFirst();
+        return Number(r.numDeletedRows ?? 0) > 0;
+      });
     } catch (err) { throw dbError('deleteAgent', err); }
   },
 
