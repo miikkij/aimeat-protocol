@@ -381,7 +381,15 @@ export function registerCommerceTools(
                     },
                     120,
                 );
-                const completed = await completeSession(storage, config, session, handler, undefined, callerJwt);
+                // The completing principal, which this call used to omit entirely. Today it is
+                // dormant — appSpendRefusal only bites role 'app', and an MCP session is always an
+                // agent record — but "a fifth door cannot forget it" is exactly what the per-app
+                // spend gate was written for, and this door forgot it. Passing the caller means the
+                // day an app-grant or ecosystem principal can open an MCP session, contract:spend
+                // and the per-app cap apply here without anyone remembering to come back.
+                const completed = await completeSession(storage, config, session, handler, undefined, callerJwt, {
+                    roles: ['agent'], scopes: sessionScopes, appGrantId: null,
+                });
                 return ok({ session: completed });
             } catch (err) { return commerceFail(err); }
         },

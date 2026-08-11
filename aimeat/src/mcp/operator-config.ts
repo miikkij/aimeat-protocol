@@ -31,7 +31,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
-import { uncoveredScopes } from '../utils/scope-coverage.js';
+import { uncoveredScopes, scopeIsCovered } from '../utils/scope-coverage.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
 
@@ -71,6 +71,8 @@ export function registerOperatorConfigTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's own scopes, for the write-as-owner requirement on the AI settings tool. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
     const callerOwner = parseGAII(agentGaii)?.owner ?? null;
@@ -199,6 +201,16 @@ export function registerOperatorConfigTools(
         annotationsFor('aimeat_operator_ai_config'),
         async ({ daily_budget_usd, model, reasoning_model, execution_model, confirm_token }) => {
             if (!callerOwner) return err('Could not resolve the calling agent\'s owner');
+            // This tool writes into the OWNER's namespace, and the platform's own rule for that move
+            // is memory:write-as-owner on top of whatever else the write needs
+            // (routes/memory/owner-target.ts). The redirect was implicit here, so an agent granted
+            // memory:write-reserved but deliberately NOT memory:write-as-owner wrote the owner's
+            // openrouter.settings through this door and was refused through /v1/memory. They are
+            // separate ticks in the permission dialog, so that combination is one an owner can pick.
+            if (!scopeIsCovered(sessionScopes, 'memory:write-as-owner')) {
+                return err('Changing the owner\'s AI settings writes into their namespace, which needs the '
+                    + '"memory:write-as-owner" permission as well. This session does not carry it.');
+            }
             const ownerGhii = `${callerOwner}@${config.nodeId}`;
             const record = await storage.getMemory(ownerGhii, AI_SETTINGS_KEY);
             const settings = (record?.value ?? {}) as Record<string, unknown>;

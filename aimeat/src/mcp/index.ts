@@ -188,7 +188,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
         registerAppdevProofTools(mcp, storage, config, () => agentGaii);
         registerSkillsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerOperatorConfigTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerOperatorConfigTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerCatalogueTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerMemoryExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
