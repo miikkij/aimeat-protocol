@@ -162,7 +162,11 @@ await test('Setup: operator, provider, beneficiary and consumer, each with an MC
     benef = await setupOwner('ben');
 
     opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read']);
-    provAgent = await agentSession(provider.token, provider.name, 'prova', ['commerce:sell', 'wallet:read', 'ext:write']);
+    // ext:invoke is separate from ext:write since the 2026-08-10 scope work: publishing an extension
+    // and running one are different promises, and running one can spend the caller's morsels. An
+    // agent that does both needs both words. (The REST invoke route asks for no scope at all, so
+    // this door is deliberately the stricter of the two.)
+    provAgent = await agentSession(provider.token, provider.name, 'prova', ['commerce:sell', 'wallet:read', 'ext:write', 'ext:invoke']);
     benefAgent = await agentSession(benef.token, benef.name, 'bena', ['wallet:read']);
     narrowAgent = await agentSession(provider.token, provider.name, 'narrow', ['memory:read']);
 

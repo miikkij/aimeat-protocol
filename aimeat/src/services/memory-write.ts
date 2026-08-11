@@ -27,6 +27,9 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-08-11 — The organism namespace rule (services/organism-namespace-access.ts) and
+ *     input.authorisingScope, so a capability with its own permission word can come in the front
+ *     door instead of writing to storage itself.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
 import type { AimeatConfig } from '../config.js';
@@ -69,6 +72,18 @@ export interface MemoryWriteInput {
     pipeline: string;
     /** Skip the shadowing check when the caller already knows the write is owner-scoped. */
     ownerScoped?: boolean;
+    /**
+     * The permission that authorises THIS write, when it is not `memory:write`.
+     *
+     * Some capabilities are a memory record underneath but have their own permission word at their
+     * own door: a seller's PSP configuration and an app's tool manifest are gated on `commerce:sell`
+     * and nothing else. Those tools used to call storage.setMemory directly, which is how they came
+     * to skip the archive guard, the value-size ceiling, the key ceiling, the byte quota and the
+     * overage charge — the whole reason this service exists. Naming the governing scope here lets
+     * them come in through the front door without being told to hold a permission their owner never
+     * granted them, and without a second implementation to keep in step.
+     */
+    authorisingScope?: string;
 }
 
 export type MemoryWriteResult =
@@ -115,10 +130,11 @@ export async function writeMemoryRecord(
     //    two places to forget it and the reason the audit could find surfaces that had neither.
     //    Owner and operator pass on the role, exactly as requireScope lets them.
     const privileged = caller.roles.includes('owner') || caller.roles.includes('operator');
-    if (!privileged && !hasScope(caller.scopes, 'memory:write')) {
+    const needed = input.authorisingScope ?? 'memory:write';
+    if (!privileged && !hasScope(caller.scopes, needed)) {
         return {
             ok: false, status: 403, code: 'SCOPE_DENIED',
-            message: 'Writing memory needs the "memory:write" permission, which this session does not carry.',
+            message: `Writing this needs the "${needed}" permission, which this session does not carry.`,
         };
     }
 

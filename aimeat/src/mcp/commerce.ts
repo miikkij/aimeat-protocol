@@ -18,6 +18,9 @@
  * @version-history
  *   Limits aligned with the raised model schemas -- 2026-07-30 -- the tool kept its own max(40) on
  *     `tools`, which shadowed the manifest's raised 200 and refused a 41st tool anyway.
+ *   v1.2.0 — 2026-08-11 — putOwnerRecord goes through services/memory-write.ts, so the PSP record
+ *     and the app-tool manifest answer to memory's ceilings, archive guard and byte quota. The
+ *     authorising permission stays commerce:sell, named through the service rather than replaced.
  *   v1.1.0 — 2026-08-10 — The fulfillment re-issue carries the agent's own scopes.
  *   v1.0.0 — 2026-07-14 — Initial commerce MCP surface (PSP, app-tools, offer pricing, checkout)
  */
@@ -41,6 +44,7 @@ import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/ben
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
 import { emitChange } from '../services/event-bus.js';
+import { writeMemoryRecord } from '../services/memory-write.js';
 import { logger } from '../utils/logger.js';
 
 const PSP_KEY = 'commerce.psp';
@@ -94,6 +98,8 @@ export function registerCommerceTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's own scopes, for the shared memory write behind putOwnerRecord(). */
+    sessionScopes: string[] = [],
 ): void {
     // The operator kill switch, honoured here too. routes/commerce.ts:139-146 turns the WHOLE
     // /v1/commerce surface off with a 503 when AIMEAT_COMMERCE_ENABLED=false, and that middleware
@@ -107,14 +113,29 @@ export function registerCommerceTools(
     const owner = parseGaiiLoose(agentGaii).owner;
     const ownerGhii = `${owner}@${config.nodeId}`;
 
-    /** Upsert one memory record under the caller's OWNER GHII (the seller identity resolvers read). */
-    async function putOwnerRecord(key: string, value: Record<string, unknown>, visibility: 'private' | 'public', tags: string[]): Promise<void> {
-        const existing = await storage.getMemory(ownerGhii, key);
-        const now = new Date().toISOString();
-        await storage.setMemory({
-            key, ownerGaii: ownerGhii, value, visibility, tags, ttlHours: null,
-            version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+    /**
+     * Upsert one memory record under the caller's OWNER GHII (the seller identity resolvers read).
+     *
+     * It goes through the shared write, because a seller's PSP configuration and an app's tool
+     * manifest are memory records and answer to memory's rules. Writing them straight to storage
+     * meant no archive guard, no value-size ceiling, no key count and no byte quota or overage
+     * charge — the manifest in particular is up to 200 entries of unbounded records, so the only
+     * thing that would ever have bounded it was the ceiling that was missing.
+     *
+     * The authorising permission is commerce:sell and not memory:write: that is the word the owner
+     * granted for exactly this, and the registration filter and this tool both already check it.
+     * Naming it says which permission governs instead of demanding one nobody was asked for.
+     */
+    async function putOwnerRecord(key: string, value: Record<string, unknown>, visibility: 'private' | 'public', tags: string[]): Promise<string | null> {
+        const written = await writeMemoryRecord({ storage, config }, {
+            principal: agentGaii, targetGaii: ownerGhii, scopes: sessionScopes, roles: ['agent'],
+        }, {
+            key, value, visibility, tags,
+            pipeline: 'mcp.commerce',
+            ownerScoped: true,
+            authorisingScope: 'commerce:sell',
         });
+        return written.ok ? null : `${written.code}: ${written.message}`;
     }
 
     // ── Seller: PSP credentials (secret in, masked status out — NEVER the secret) ──
@@ -138,7 +159,8 @@ export function registerCommerceTools(
             // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
             // wholesale would silently delete the other rail's setting (and vice versa).
             const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
-            await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce']);
+            const pspRefusal = await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: key }, 'private', ['commerce']);
+            if (pspRefusal) return { content: [{ type: 'text' as const, text: pspRefusal }], isError: true };
             return ok({ configured: true, provider, key_hint: maskSecret(key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
         },
     );
@@ -191,7 +213,8 @@ export function registerCommerceTools(
                 ...(parsed.data.provenance ? { provenance: parsed.data.provenance } : {}),
                 tools: parsed.data.tools,
             };
-            await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools']);
+            const manifestRefusal = await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools']);
+            if (manifestRefusal) return { content: [{ type: 'text' as const, text: manifestRefusal }], isError: true };
             // TARGET-050: the manifest is the source of truth for the EXCHANGE listing — project it now.
             await reconcileAfterSourceWrite(storage, ownerGhii, key);
             return ok({

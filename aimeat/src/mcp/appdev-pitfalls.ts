@@ -10,6 +10,9 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.1.0 -- 2026-08-11 -- The entry write goes through services/memory-write.ts: archive guard,
+ *     value-size and key ceilings, byte quota and overage. Every {category, slug} is a new key on
+ *     a tool built to be called repeatedly, and nothing bounded that.
  *   Limits raised -- 2026-07-30 -- symptom to 10 000, resolution to 40 000.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 4): report=upsert (+status outdated,
  *     +share→public), paginated merged list with facets, delete with manifest cleanup.
@@ -22,6 +25,7 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
+import { writeMemoryRecord } from '../services/memory-write.js';
 import {
     PITFALL_PACKAGE_ID, PITFALL_PREFIX, PITFALL_MANIFEST_KEY, PITFALL_SLUG_RE, slugifyKb,
     listOwnerScopeMemory as kbListOwnerScope, ownIdentitySet as kbOwnIdentitySet,
@@ -61,6 +65,8 @@ export function registerAppdevPitfallTools(
     config: AimeatConfig,
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
+    /** The session's own scopes, for the shared memory write in the report tool. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -115,17 +121,26 @@ export function registerAppdevPitfallTools(
             const visibility = share === true ? 'public' : share === false ? 'owner' : (existing?.visibility ?? 'owner');
             const tags = ['knowledge-entry', 'pitfall', `model:${normModel}`, ...value.applies_to.map(a => `applies:${a}`)];
 
-            await storage.setMemory({
-                key,
-                ownerGaii: existing?.ownerGaii ?? agentGaii,
-                value,
-                visibility,
-                tags,
-                ttlHours: null,
-                version: (existing?.version ?? 0) + 1,
-                createdAt: existing?.createdAt ?? now,
-                updatedAt: now,
+            // The entry is a memory record, so it answers to memory's rules. Writing it straight to
+            // storage meant no archive guard ("this is finished, stop changing it" held on the REST
+            // door and not on the tool that writes these most), no key ceiling — every distinct
+            // {category, slug} is a NEW key on a tool designed to be called repeatedly, which is
+            // exactly the unbounded-key shape the memory audit exists to catch — no value-size
+            // ceiling, and no byte quota or overage charge, so the space was consumed and nobody
+            // paid for it.
+            const written = await writeMemoryRecord({ storage, config }, {
+                principal: agentGaii,
+                targetGaii: existing?.ownerGaii ?? agentGaii,
+                scopes: sessionScopes,
+                roles: ['agent'],
+            }, {
+                key, value, visibility, tags,
+                pipeline: 'mcp.appdev_pitfall_report',
+                ownerScoped: true,
             });
+            if (!written.ok) {
+                return { content: [{ type: 'text' as const, text: `${written.code}: ${written.message}` }], isError: true };
+            }
             await upsertManifest(key, title);
             emitResourceUpdated(agentGaii, `aimeat://knowledge/${PITFALL_PACKAGE_ID}`);
 

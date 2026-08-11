@@ -183,7 +183,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
+        registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes);
         registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
         registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
         registerAppdevProofTools(mcp, storage, config, () => agentGaii);
@@ -194,7 +194,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerMemoryExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWalletExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerConsentTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
-        registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerExchangeTools(mcp, storage, config, () => agentGaii);
         registerExchangeRunTools(mcp, storage, config, () => agentGaii, getToken);
         registerChatInstancesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

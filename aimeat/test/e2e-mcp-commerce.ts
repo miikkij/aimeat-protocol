@@ -239,6 +239,26 @@ await test('7. app_tools_get reads own manifest; invalid manifest is rejected lo
     assert(bad.isError && bad.text.includes('INVALID_TOOL_MANIFEST'), `invalid manifest: ${bad.text}`);
 });
 
+await test('7c. A manifest past the memory value ceiling is refused, and the good one survives', async () => {
+    // The manifest is a memory record, and it used to be written straight to storage — so none of
+    // memory's ceilings applied to it. The schema allows 200 tools and a 10 000-character
+    // description each, which is 2 MB against a 1024 kB per-value budget, so the only thing that
+    // would ever have bounded this record was the check that was missing. Every later read of that
+    // key would have paid for it.
+    const fat = Array.from({ length: 200 }, (_, i) => ({
+        name: `bloat${i}`, description: 'x'.repeat(10_000),
+    }));
+    const r = await mcp.call('aimeat_app_tools_publish', { app_id: 'mcpfat.html', tools: fat });
+    assert(r.isError, `a 2 MB manifest was accepted: ${r.text.slice(0, 200)}`);
+    assert(/QUOTA_EXCEEDED|exceeds limit/i.test(r.text), `expected a size refusal, got: ${r.text.slice(0, 200)}`);
+
+    // The positive control, and the "nothing was half-written" check in one: the manifest published
+    // in test 6 is still readable and unchanged.
+    const still = await mcp.call('aimeat_app_tools_get', { app_id: 'mcpshop.html' });
+    assert(!still.isError && still.data.manifest.tools[0].name === 'summarize',
+        `the earlier manifest did not survive: ${still.text.slice(0, 200)}`);
+});
+
 await test('7b. A missed app id NAMES the manifests this owner does publish', async () => {
     // An app id is a filename and carries its extension; the app's own subdomain does not. An agent
     // that read `mcpshop.apps.…` asked for "mcpshop", was told the app declares no manifest, believed
