@@ -104,6 +104,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { canWriteNamespaceRule, readOrganismConfig } from '../routes/organisms/shared.js';
 import { registerWorkspaceCreateTool } from './workspace-create.js';
+import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
 import { archivedRefusal, checkWorkspaceWriteLimits } from '../services/workspace-write-guards.js';
 import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
@@ -263,21 +264,21 @@ export function registerWorkspaceTools(
         const m = await storage.getMembership(orgId, ownerName);
         return m && m.status === 'active' ? m.role : null;
     };
-    /** May the caller WRITE this workspace's content? The creator's own owner (incl. its agents) always
-     *  can; another member needs a granted workspace-contribution consent. Mirrors workspaceAccessMiddleware
-     *  so the MCP-serve write path enforces the SAME per-workspace gate as the REST path (no looser side). */
+    /**
+     * May the caller WRITE this workspace's content?
+     *
+     * The rule is services/organism-namespace-access.ts, the one the HTTP door answers to. This used
+     * to be a local retelling of it, and the retelling was looser in two places that mattered:
+     * a workspace with no registry entry returned true outright ("bootstrap"), so any active
+     * member's agent wrote into an unregistered workspace the HTTP door refuses; and it never asked
+     * whether the caller was an ORGANISM agent, which may write under .shared. and nowhere else, so
+     * one wrote workspace content here that /v1/memory answers 403 to.
+     */
     const canWriteWs = async (orgId: string, ws: string): Promise<boolean> => {
-        const entry = await findWsEntry(orgId, ws);
-        if (!entry) return true;                              // no registry yet (bootstrap) — membership already checked
-        if (entry.createdBy === ownerName) return true;      // the workspace's own creator (or its agent)
-        // Write requires the creator's 'contributor' role grant — and ONLY that, so the creator can
-        // revoke write by removing the grant. A 'viewer' grant gives read only (not matched here). The
-        // role is granted to the OWNER (recipient ghii:owner@node), so all the owner's agents inherit it.
-        const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
-        const myRecipient = `ghii:${ownerName}@${config.nodeId}`;
-        const pattern = `organism.${orgId}.w.${ws}.**`;
-        const grants = await storage.listConsents(creatorGhii, { status: 'active' });
-        return grants.some(c => c.purpose === 'workspace-contributor' && c.dataPattern === pattern && c.recipient === myRecipient);
+        const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
+            principal: agentGaii, owner: ownerName, roles: ['agent'],
+        }, `${wsRoot(orgId, ws)}.probe`, 'write');
+        return refusal === null;
     };
     /** Create a consent grant if no equivalent active one exists (idempotent). */
     const ensureConsent = async (owner: string, dataPattern: string, recipient: string, purpose: string): Promise<void> => {

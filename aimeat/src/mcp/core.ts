@@ -9,6 +9,10 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.16.0 — 2026-08-11 — aimeat_action_execute calls routes/work.ts createWorkItem, the same
+ *     function POST /v1/work/request calls. It was a second, thinner implementation: no provider
+ *     resolution (so cross-node work held escrow here while the provider's node heard nothing),
+ *     no visiting-tier peer policy, no pending-queue ceiling.
  *   v1.13.0 — 2026-08-10 — aimeat_memory_write calls services/memory-write.ts. It had the same
  *     defect fixed inside it three separate times — schema locks, the write target, the provenance
  *     stamp — because it reimplemented what POST /v1/memory does instead of calling it.
@@ -81,8 +85,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { generateTrackingCode } from '../utils/tracking-code.js';
-import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
+import { settlePayment } from '../services/morsel.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
@@ -101,8 +104,9 @@ import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
+import { createWorkItem } from '../routes/work.js';
+import type { PeerInfo } from '../services/federation.js';
 import { createBoardPost } from '../services/board-post.js';
-import { executeHooks } from '../services/hooks.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -120,6 +124,8 @@ export function registerCoreTools(
     emitResourceListChanged: (agentGaii: string) => void,
     /** This session's granted scopes. Needed by the owner_scope write gate; empty = no delegation. */
     sessionScopes: string[] = [],
+    /** Known peers, for the provider resolution createWorkItem does on a cross-node commission. */
+    peers: Map<string, PeerInfo> = new Map(),
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -563,68 +569,39 @@ export function registerCoreTools(
         },
         annotationsFor('aimeat_action_execute'),
         async ({ action_id, provider_gaii, input, ttl_hours }) => {
-            // The three refusals POST /v1/work/request makes before it holds any escrow, and this
-            // tool made none of them.
-            //
-            // SELF-WORK and SAME-OWNER WORK exist to stop trust-score manipulation: an agent
-            // commissioning itself, or its owner's other agent, would rate its own delivery. Over
-            // MCP both were free, on the surface agents actually use.
-            //
-            // pre_work_request lets an installed extension refuse a commission. It never ran here,
-            // so an extension policy on work requests was advisory on this door.
-            if (agentGaii === provider_gaii) {
-                return { content: [{ type: 'text' as const, text: 'SELF_WORK: Cannot create work request to yourself' }], isError: true };
+            // One implementation, called from both doors. This tool used to re-do the commission by
+            // hand and got a thinner version of it: it never resolved the provider, so cross-node
+            // work created a LOCAL row and held the requester's morsels in escrow while the
+            // provider's node heard nothing and the item sat pending until TTL; it skipped the
+            // visiting-tier peer policy, the cap that makes the lightweight join safe; and it
+            // skipped the pending-queue ceiling, so one agent could flood another's work inbox past
+            // a limit the HTTP door enforces. The self-work, same-owner and pre_work_request checks
+            // added on 2026-08-11 live in there too, so this is now one place rather than two.
+            const result = await createWorkItem(
+                config, storage, agentGaii,
+                { action_id, provider_gaii, input, ttl_hours },
+                peers,
+            );
+            if ('error' in result) {
+                return { content: [{ type: 'text' as const, text: `${result.code}: ${result.error}` }], isError: true };
             }
-            const requesterAg = await storage.getAgent(agentGaii);
-            const providerAg = await storage.getAgent(provider_gaii);
-            if (requesterAg && providerAg && requesterAg.owner === providerAg.owner) {
-                return { content: [{ type: 'text' as const, text: 'SAME_OWNER_WORK: Cannot create work request between your own agents' }], isError: true };
+            const { work } = result;
+            if (!work) {
+                // A cross-node commission that was forwarded: the provider's node owns the row, and
+                // this node has nothing local to report. The HTTP door answers the same way.
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ forwarded: true, note: 'The request was routed to the provider node that holds this agent.' }, null, 2) }] };
             }
-            const workHook = await executeHooks(config, storage, 'pre_work_request', {
-                requester_gaii: agentGaii, action_id, provider_gaii,
-            });
-            if (!workHook.allowed) {
-                return { content: [{ type: 'text' as const, text: `HOOK_REJECTED: ${workHook.reason ?? 'Work request denied by extension hook'}` }], isError: true };
-            }
-
-            const ttl = ttl_hours ?? 24;
-            const trackingCode = generateTrackingCode();
-            const actions = await storage.listActions();
-            const action = actions.find(a => a.id === action_id && a.providerGaii === provider_gaii);
-            const baseMorsels = action?.pricing.baseMorsels ?? 0;
-            const cost = calculateWorkCost(baseMorsels, config.burnRate);
-
-            const held = await holdEscrow(storage, agentGaii, provider_gaii, trackingCode, cost.total);
-            if (!held) {
-                const requesterAgent = await storage.getAgent(agentGaii);
-                const requesterGhii = requesterAgent ? await storage.getGHIIByOwner(requesterAgent.owner) : null;
-                const requesterBalance = requesterGhii?.morselBalance ?? 0;
-                return {
-                    content: [{ type: 'text' as const, text: `Insufficient morsels. Need ${cost.total}, have ${requesterBalance}` }],
-                    isError: true,
-                };
-            }
-
-            const work = await storage.createWork({
-                trackingCode,
-                status: 'pending',
-                actionId: action_id,
-                providerGaii: provider_gaii,
-                requesterGaii: agentGaii,
-                input,
-                cost,
-                ttlExpiresAt: new Date(Date.now() + ttl * 3600_000).toISOString(),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
-
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
                         tracking_code: work.trackingCode,
                         status: work.status,
-                        cost: { base_price: cost.basePrice, network_fee: cost.networkFee, total: cost.total },
+                        cost: {
+                            base_price: work.cost.basePrice,
+                            network_fee: work.cost.networkFee,
+                            total: work.cost.total,
+                        },
                     }, null, 2),
                 }],
             };

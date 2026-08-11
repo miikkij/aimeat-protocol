@@ -109,7 +109,18 @@ function fireWebhook(url: string, payload: Record<string, unknown>, maxRetries: 
   doFetch(1);
 }
 
-async function createWorkItem(
+/**
+ * Commission one work item, from wherever the request arrived.
+ *
+ * Exported since 2026-08-11 because aimeat_action_execute was a second implementation of it, and a
+ * thinner one: it never resolved the provider, so cross-node work commissioned over MCP created a
+ * local row and held the requester's morsels in escrow while the provider's node heard nothing; it
+ * skipped the visiting-tier peer policy that makes the lightweight join safe; and it skipped the
+ * pending-queue ceiling, so one agent could flood another's inbox past a cap this door enforces.
+ *
+ * Returns a refusal as { error, status, code } — the caller renders it in its own terms.
+ */
+export async function createWorkItem(
   config: AimeatConfig,
   storage: Storage,
   requesterGaii: string,
