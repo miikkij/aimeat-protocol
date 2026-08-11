@@ -9,6 +9,10 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.3.0 — 2026-08-11 — Security audit H-1/H-7: DELETE /v1/owners/:name is behind
+ *     requireOwnerPrincipal(). Its own check answers "is this a DIFFERENT owner", which every one
+ *     of the owner's machine principals passes, because req.auth.owner holds the human's account
+ *     name on an agent, ecosystem and app-grant token alike.
  *   v1.2.0 — 2026-08-07 — Writes onboarding.track at account creation (remake phase 0) so the
  *     programmatic door produces the same cohort marker as POST /v1/ghii.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -20,7 +24,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { calculateTrustScore } from '../services/trust.js';
@@ -231,8 +235,10 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   // still one list.
   registerOwnerExportRoute(router, config, storage);
 
-  // DELETE /v1/owners/:name — GDPR delete (cascade) (owner auth)
-  router.delete('/v1/owners/:name', requireAuth(), async (req, res) => {
+  // DELETE /v1/owners/:name — GDPR delete (cascade) (account holder or operator)
+  // The check below says which ACCOUNT may be erased; requireOwnerPrincipal says which of that
+  // account's principals may ask. Erasing everything the person owns is the person's decision.
+  router.delete('/v1/owners/:name', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
     const name = req.params.name as string;
     if (req.auth!.owner !== name && !req.auth!.roles.includes('operator')) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own account'));

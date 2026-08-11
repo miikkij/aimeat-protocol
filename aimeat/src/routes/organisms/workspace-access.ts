@@ -24,8 +24,12 @@
  *   v1.6.0 — 2026-08-11 — the email-invite cancel route calls cancelEmailInvitation() instead of
  *     flipping the record itself, so it and aimeat_organism_invitation_email_cancel share one write
  *     (August 2026 MCP audit step 8).
+ *   v1.7.0 — 2026-08-11 — SECURITY (H-28): the code-invite mint authorizes what it hands out. An org
+ *     role of 'admin' needs the organism's creator/admin; every per-workspace grant goes through the
+ *     same requireWsManager check the email twin has always made, now in one shared
+ *     authorizeWorkspaceGrants() used by all three invite doors.
  */
-import type { Router } from 'express';
+import type { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -42,7 +46,7 @@ import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
-import type { InvitationRecord } from '../../storage/repositories/invitation.repository.js';
+import type { InvitationRecord, InvitationWorkspaceGrant } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -51,6 +55,27 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     memberRolesForWs, setWorkspaceRole, revokeWorkspaceRole,
     requireWsManager, requireOrgAdmin, requireOrgMember, codeInviteGuards,
   } = H;
+
+  /**
+   * Normalize the per-workspace grants an invitation asks for, and authorize EACH one against the
+   * caller. An invitation may only hand out access its sender could hand out directly, and
+   * requireWsManager is where that rule is written: the workspace's own creator, or an org
+   * creator/admin. The grant itself is later written on the workspace CREATOR's behalf
+   * (applyInvitationWorkspaceGrants), which is precisely why the sender has to be checked here — the
+   * consent that comes out of it carries no trace of who asked for it.
+   *
+   * Returns the normalized grants, or null when one was refused: requireWsManager has already sent
+   * that response (404 for a workspace that does not exist, 403 for one the caller does not manage).
+   */
+  const authorizeWorkspaceGrants = async (
+    req: Request, res: Response, id: string, raw: unknown,
+  ): Promise<InvitationWorkspaceGrant[] | null> => {
+    const grants = normalizeWorkspaceGrants(raw);
+    for (const g of grants) {
+      if (!(await requireWsManager(req, res, id, g.ws))) return null;
+    }
+    return grants;
+  };
 
   /* ── GET /v1/organisms/:id/workspaces — discover every workspace in the org (membership-gated,
    * names + creator + your access status). Discovery is open to members; content stays gated. ── */
@@ -370,11 +395,8 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const { email, orgRole, workspaces, message, expiresInDays, return_url } = req.body ?? {};
 
     // Normalize + authorize each selected workspace grant (the inviter must be able to manage it).
-    const wsGrants = normalizeWorkspaceGrants(workspaces);
-    for (const g of wsGrants) {
-      const createdBy = await requireWsManager(req, res, id, g.ws);
-      if (!createdBy) return; // requireWsManager already responded (ws missing / not permitted)
-    }
+    const wsGrants = await authorizeWorkspaceGrants(req, res, id, workspaces);
+    if (!wsGrants) return;
 
     try {
       const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, {
@@ -425,11 +447,8 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const updates: Partial<InvitationRecord> = {};
     if (orgRole !== undefined) updates.orgRole = normalizeOrgRole(orgRole);
     if (workspaces !== undefined) {
-      const wsGrants = normalizeWorkspaceGrants(workspaces);
-      for (const g of wsGrants) {
-        const createdBy = await requireWsManager(req, res, id, g.ws);
-        if (!createdBy) return; // requireWsManager already responded (ws missing / not permitted)
-      }
+      const wsGrants = await authorizeWorkspaceGrants(req, res, id, workspaces);
+      if (!wsGrants) return;
       updates.workspaces = wsGrants;
     }
     const updated = await storage.updateInvitation(invId, updates);
@@ -459,8 +478,10 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
    * exclusivity spread virally; the org creator/admin is unlimited. Cancellable while un-activated →
    * deletes the account + frees the slot. Authorized by ORG MEMBERSHIP + the organism:invite scope
    * (not role) via requireExternalPrincipal, so it works from an H-2 app origin (role 'app') for the
-   * operator AND for keyholders. Service-specific naming/format/email copy stays in the CLIENT: the
-   * caller supplies username + code (its password) + a localized message + landing_url. */
+   * operator AND for keyholders. Membership opens the door; it does not decide what comes through it —
+   * the admin role and each workspace grant are authorized separately (see the mint handler).
+   * Service-specific naming/format/email copy stays in the CLIENT: the caller supplies username +
+   * code (its password) + a localized message + landing_url. */
 
   /* POST /v1/organisms/:id/invitations/code — mint a key (provisions an account, emails the code). */
   router.post('/v1/organisms/:id/invitations/code', ...codeInviteGuards, rateLimit({ max: 30, windowMs: 10 * 60 * 1000 }), async (req, res) => {
@@ -471,6 +492,21 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const { organism, unlimited } = gate;
 
     const { email, username, code, display_name, locale, message, landing_url, workspaces, org_role, expires_in_days } = req.body ?? {};
+
+    // A key may not hand out more than the person minting it holds. Both of these used to be applied
+    // unchecked on plain membership: any active member could mint a key that joined its recipient as an
+    // ORG ADMIN, or that granted a workspace the minter had no say over — and because the grant is
+    // written on the workspace creator's behalf, it looked legitimate afterwards. The email twin above
+    // has always required creator/admin and re-authorized every workspace; the two doors now decide the
+    // same way, with the code door still open to a plain member for the ordinary member-level key.
+    // Both checks run BEFORE the account is provisioned, so a refused key leaves no orphan owner behind.
+    const orgRole = normalizeOrgRole(org_role);
+    if (orgRole === 'admin' && !unlimited) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the organism creator or an admin can mint a key that grants the admin role')); return;
+    }
+    const wsGrants = await authorizeWorkspaceGrants(req, res, id, workspaces);
+    if (!wsGrants) return;
+
     const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
     if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid "email" is required')); return; }
     if (!code || typeof code !== 'string' || code.length < 8) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A "code" (min 8 chars) is required')); return; }
@@ -509,7 +545,6 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
     // Join the organism (mirrors the accept handler: membership row + roster arrays in sync).
     const nowIso = new Date().toISOString();
-    const orgRole = normalizeOrgRole(org_role);
     await storage.createMembership({ id: uuidv4(), organismId: id, ghii: uname, role: orgRole, status: 'active', invitedBy: inviter, joinedAt: nowIso });
     await storage.updateOrganism(id, {
       members: [...new Set([...organism.members, uname])],
@@ -517,8 +552,8 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       updatedAt: nowIso,
     });
 
-    // Grant the selected workspaces (creator-owned viewer/contributor consents — shared core).
-    const wsGrants = normalizeWorkspaceGrants(workspaces);
+    // Grant the selected workspaces (creator-owned viewer/contributor consents — shared core). The
+    // grants were authorized against the minter at the top of this handler.
     const grantedWs = await applyInvitationWorkspaceGrants(storage, config, { orgId: id, grants: wsGrants, grantee: uname, invitedBy: inviter });
 
     // Record the invitation (type 'code'; the token is unused — the provisioned account is the artifact).

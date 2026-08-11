@@ -47,10 +47,16 @@
  *     branch also stops hand-writing the token meta: it dropped `group_id` and `workspace_refs`, so a
  *     presigned upload asking for visibility 'group' landed bound to no group and was readable by
  *     nobody. Chunked complete still writes its own copy; it has no tool twin.
+ *   v1.11.0 -- 2026-08-11 -- August 2026 audit H-26: every response that carries file bytes goes
+ *     through setStoredFileHeaders() (utils/file-download-headers.ts), which adds nosniff, a
+ *     Content-Disposition and a file-only CSP to the content type it already set. A file's type
+ *     comes from whoever uploaded it, and GET /v1/pub serves a public file to anyone from the apex
+ *     origin, so uploaded text/html or image/svg+xml was a page running next to the portal's
+ *     session. Images, media, PDFs and plain text still render inline; everything else downloads.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import { sniffedContentType } from '../utils/app-content-type.js';
+import { setStoredFileHeaders } from '../utils/file-download-headers.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -131,15 +137,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 const end = match[2] ? parseInt(match[2], 10) : file.size - 1;
                 const chunk = file.data.subarray(start, end + 1);
                 res.status(206);
+                setStoredFileHeaders(res, file);
                 res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
                 res.setHeader('Content-Length', chunk.length);
-                res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
                 res.end(chunk);
                 return;
             }
         }
 
-        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
+        setStoredFileHeaders(res, file);
         res.setHeader('Content-Length', file.size);
         res.setHeader('Cache-Control', 'private, max-age=300');
         res.end(file.data);
@@ -565,7 +571,11 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // Lets the bytes be drawn into a canvas and read back, which is what any app doing
             // something WITH a public image (resize, re-encode, hand to a tool) has to do.
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-            res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
+            // The door this hardening exists for. Anyone on the internet reaches this branch, the
+            // bytes come back from the apex origin, and their type is whatever the uploader said it
+            // was, so an uploaded page would run as the portal. Images, media, PDFs and plain text
+            // still render; everything else is saved rather than shown.
+            setStoredFileHeaders(res, file);
             res.setHeader('Content-Length', file.size);
             res.end(file.data);
             return;
@@ -617,7 +627,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         if (handleMode) { await sendHandle(accessorGaii); return; }
-        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
+        setStoredFileHeaders(res, file);
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
     });
@@ -647,7 +657,9 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
+        // Same headers as the GET below, so a client cannot learn one answer from HEAD and meet a
+        // different one when it fetches the bytes.
+        setStoredFileHeaders(res, file);
         res.setHeader('Content-Length', file.size);
         res.setHeader('X-AIMEAT-Visibility', file.visibility);
         res.setHeader('X-AIMEAT-Created', file.createdAt);
@@ -704,15 +716,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 const end = match[2] ? parseInt(match[2], 10) : file.size - 1;
                 const chunk = file.data.subarray(start, end + 1);
                 res.status(206);
+                setStoredFileHeaders(res, file);
                 res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
                 res.setHeader('Content-Length', chunk.length);
-                res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
                 res.end(chunk);
                 return;
             }
         }
 
-        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
+        setStoredFileHeaders(res, file);
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
     });

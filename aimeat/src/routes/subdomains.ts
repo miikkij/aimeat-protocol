@@ -11,6 +11,11 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.14.0 — 2026-08-11 — Audit H-19: a gated app (access code, or a price) is served here when
+ *     the request carries a valid app-access grant minted by the apex, and answers the uniform 404
+ *     without one. Before this the app origin refused gated apps outright, which is why the apex
+ *     kept serving them itself — on the origin holding the session. The path form forwards its
+ *     query to the per-app subdomain so the grant survives that hop.
  *   v1.x — 2026-08-08 — The co origin serves a company's own page (front page 'portfolio')
  *     through servePortfolio, the same path the portfolio origin uses.
  *   v1.13.0 — 2026-08-07 — Company origin: `{slug}.co.<apex>` serves a registered company's front
@@ -79,6 +84,7 @@ import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
+import { appAccessGranted } from '../services/app-access-token.js';
 import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace, buildAppAgentFace } from '../services/agent-face.js';
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
@@ -541,7 +547,14 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     }
 
     const app = await resolveAppTarget(storage, site.target);
-    if (!app || appIsRestricted(config, app)) return notFound();
+    if (!app) return notFound();
+    // A gated app is served here only against a grant the APEX issued after it checked the access
+    // code or the licence (services/app-access-token.ts). This origin holds no session, so the
+    // grant is the whole authorization. Without one the answer stays the uniform 404 an unmapped
+    // subdomain gets, so the origin still tells a stranger nothing about which apps exist.
+    if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {
+      return notFound();
+    }
 
     // Agent Face: an agent preferring text/markdown (Accept negotiation, or ?format=md) gets the
     // app's markdown read-surface (public agentface record, else converted HTML) instead of the
@@ -701,7 +714,7 @@ Sitemap: ${origin}/sitemap.xml
     const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
     const app = await resolveAppTarget(storage, `${bareOwner}/${filename}`);
     if (!app) return next();
-    if (appIsRestricted(config, app)) {
+    if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app'));
       return;
     }
@@ -711,7 +724,10 @@ Sitemap: ${origin}/sitemap.xml
       // eslint-disable-next-line aimeat/no-silent-catch -- keep https
       try { const b = new URL(config.baseUrl); scheme = b.protocol.replace(':', ''); portSuffix = b.port ? `:${b.port}` : ''; } catch { /* keep https */ }
       res.setHeader('Cache-Control', 'no-store');
-      res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/`);
+      // The query travels: an access grant rides in it, and dropping it here would send a visitor
+      // who has just unlocked the app to a 404 on the per-app origin.
+      const q = req.originalUrl.indexOf('?');
+      res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/${q >= 0 ? req.originalUrl.slice(q) : ''}`);
       return;
     }
     const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };

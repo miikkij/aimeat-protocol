@@ -10,6 +10,9 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   v1.7.0 — 2026-08-11 — push_subscriptions re-keyed to (ownerName, endpoint) by table rebuild, so
+ *     an owner's second device joins the first rather than evicting it (audit H-8). The rebuild is
+ *     gated on PRAGMA table_info, like the invitations one. Mirrors Postgres migration 0032.
  *   v1.6.0 — 2026-08-01 — AI provenance visibility follows the content (TARGET-058 Phase 2): the
  *     `ai_provenance.visibility` column is gone, `apps.aiProvenanceId` joins `memory.aiProvenanceId`
  *     as the second link carrier, and both link columns are indexed AFTER their safeAddColumn.
@@ -397,6 +400,10 @@ export function initializeSchema(db: Database.Database): void {
   // Per-variant extras. The registration invite (agent door) stores the AI's self-report
   // (model/vendor/client) beside the server's own observation (ip/userAgent/at) here.
   safeAddColumn('invitations', 'meta', 'TEXT');
+  // A push subscription belongs to a device, not to a person: rebuild an older push_subscriptions,
+  // whose only key was ownerName. Mirrors Postgres migration 0032.
+  splitPushSubscriptionsPerDevice(db);
+
   // organismId became NULLable when the node-level registration invite joined this table.
   // SQLite cannot drop a NOT NULL constraint with ALTER, and an upgraded database keeps it —
   // harmless, because every row it refuses is one this node would only write on a FRESH
@@ -528,6 +535,45 @@ export function initializeSchema(db: Database.Database): void {
     DELETE FROM memory_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 1);
     DELETE FROM memory_archive_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 0);
   `);
+}
+
+/**
+ * Re-key push_subscriptions from (ownerName) to (ownerName, endpoint) for databases created before
+ * 2026-08-11.
+ *
+ * WHY. With ownerName as the primary key, registering a subscription replaced the one already there:
+ * the owner's laptop went silent when their phone subscribed, and any principal holding a token for
+ * the account could redirect the person's whole notification stream to a destination of its choosing
+ * by subscribing once (audit H-8). SQLite cannot change a primary key with ALTER, so this is the
+ * standard rebuild, gated on PRAGMA table_info so a fresh database (which already has the composite
+ * key from schema-tables-1) pays nothing. Every existing row is carried over as it is, and there can
+ * be no duplicate to collapse because ownerName was unique.
+ */
+function splitPushSubscriptionsPerDevice(db: Database.Database): void {
+  const cols = db.prepare("PRAGMA table_info('push_subscriptions')").all() as Array<{ name: string; pk: number }>;
+  if (!cols.length) return;                                   // table not created yet
+  const endpoint = cols.find(c => c.name === 'endpoint');
+  if (!endpoint || endpoint.pk > 0) return;                   // endpoint is already part of the key
+
+  db.exec('PRAGMA foreign_keys=OFF');
+  const tx = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE push_subscriptions_new (
+        ownerName      TEXT NOT NULL,
+        endpoint       TEXT NOT NULL,
+        keys           TEXT NOT NULL DEFAULT '{}',
+        createdAt      TEXT NOT NULL,
+        lastUsedAt     TEXT NOT NULL,
+        PRIMARY KEY (ownerName, endpoint)
+      );
+      INSERT INTO push_subscriptions_new (ownerName, endpoint, keys, createdAt, lastUsedAt)
+        SELECT ownerName, endpoint, keys, createdAt, lastUsedAt FROM push_subscriptions;
+      DROP TABLE push_subscriptions;
+      ALTER TABLE push_subscriptions_new RENAME TO push_subscriptions;
+    `);
+  });
+  tx();
+  db.exec('PRAGMA foreign_keys=ON');
 }
 
 /**

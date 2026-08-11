@@ -4,6 +4,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-11 — SECURITY (H-29): leaving an organism also detaches the leaver's agents from
+ *     organism.agentGaiis and revokes their workspace-role consents (revokeDepartedMemberAccess) —
+ *     the membership row went away while both of those kept working.
  *   v1.5.0 — 2026-08-11 — create/update/join/leave call services/organism-lifecycle.ts, the one copy
  *     of those writes shared with the MCP organism tools (August 2026 MCP audit step 8). The routes
  *     keep their gate and their envelope; the record build, the validation and the side effects moved.
@@ -28,6 +31,7 @@ import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { getOrganismReadme } from '../../services/organism-readme.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../../services/organism-lifecycle.js';
+import { revokeDepartedMemberAccess } from '../../services/invitations.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
@@ -318,6 +322,12 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       res.status(result.status).json(error(config.nodeId, result.code, result.message));
       return;
     }
+    // Two grants outlive the membership row and both behave like membership: the leaver's agents stay
+    // listed on the organism, where every membership gate reads them as members in their own right,
+    // and the workspace-role consents granted to them are owned by each workspace's creator. Someone
+    // who walked out keeps neither. This call belongs inside leaveOrganism(), which is also the leave
+    // door aimeat_organism_leave uses; that tool leaves both behind until the call moves there.
+    await revokeDepartedMemberAccess(storage, config, { organism, departing: ghii });
     res.json(success(config.nodeId, { left: true }));
   });
 }

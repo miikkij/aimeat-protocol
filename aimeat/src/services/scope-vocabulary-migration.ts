@@ -20,11 +20,20 @@
  *   WHAT IT DOES NOT DO. An agent holding `*` is left alone: the wildcard already covers everything
  *   at runtime, and adding words to it would only make the owner's list harder to read. Nothing is
  *   ever removed, and running it twice changes nothing the first run did not.
- * @structure GRANDFATHERED_SCOPES · migrateAgentScopeVocabulary(storage) → how many agents changed
+ *   WHAT MUST NEVER GO IN HERE. A word that names a capability agents did NOT already have. The
+ *   lists below exist to preserve reach, never to hand out new reach, and the difference is easy to
+ *   lose because both look like "add a string". `account:security` (utils/scope-coverage.ts) is the
+ *   worked example: it gates the password, the recovery address, the second factor and account
+ *   deletion, no agent could reach those before it existed, so it appears in NEITHER list and no
+ *   wildcard carries it. An owner ticks it per agent or no agent has it.
+ * @structure GRANDFATHERED_SCOPES · CONDITIONAL_SCOPES · migrateAgentScopeVocabulary(storage) →
+ *   how many agents changed
  * @usage
  *   // fire-and-forget at boot, after storage is ready
  *   migrateAgentScopeVocabulary(storage).catch(err => logger.error(…));
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Says in writing that account:security is in neither list, and why a word
+ *     that names NEW reach never belongs in either. Nothing executable changed.
  *   v1.1.0 — 2026-08-11 — CONDITIONAL_SCOPES: a word handed only to agents already holding the
  *     one it replaces. The four beneficiary tools moved from commerce:sell to the word REST
  *     always required, and that must not widen anyone's reach.

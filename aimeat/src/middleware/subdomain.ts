@@ -5,7 +5,14 @@
  *              backend with an `X-Subdomain: <sub>` header (apex requests carry
  *              no such header). A hostname fallback covers dev setups where the
  *              header is absent but the Host matches `<sub>.<apex-host>`.
+ *              The origin-family markers (`X-App-Origin`, `X-Portfolio-Origin`,
+ *              `X-Co-Origin`) are honoured only on a Host in that family, so a
+ *              client cannot claim one by sending the header.
  * @structure subdomainMiddleware(config) — Express middleware factory.
+ *   - hostOf(req) — the addressed host, port stripped, from the raw `Host` header
+ *   - inFamily(host, parent) — host is `parent` or one label under it
+ *   - marked(req, header, familyHost) — marker set AND allowed on this Host
+ *   - labelFromHost(req) — leftmost label under app/portfolio/co/apex host
  * @usage app.use(subdomainMiddleware(config)); // before route mounting
  * @version-history
  *   v1.3.0 — 2026-07-28 — On the header path, a missing `X-Subdomain` falls back to the Host label
@@ -22,9 +29,15 @@
  *     (x-co-origin header / hostname fallback). Same two-level shape as the app host, and
  *     checked in the same pass — the co host is itself an apex subdomain and would otherwise
  *     be misread as the single-label subdomain "co".
+ *   v1.5.0 — 2026-08-11 — An origin-family marker is honoured only when the Host belongs to that
+ *     family. `X-App-Origin: 1` from any client used to be enough to be treated as an app origin,
+ *     which is the whole of the app-origin isolation, and the apex nginx block that was supposed to
+ *     blank the three markers had stopped doing so with nothing anywhere reporting it. A dropped
+ *     marker is logged and leaves the request looking like one that never carried it.
  */
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -61,6 +74,11 @@ declare global {
  * The app host (`config.appHost`, e.g. `apps.aimeat.io`) is itself a subdomain of
  * the apex, so it is checked FIRST — otherwise `apps.aimeat.io` would be misread as
  * the single-label subdomain "apps" under the apex.
+ *
+ * DEPLOYMENT REQUIREMENT: the reverse proxy must forward the client's Host verbatim
+ * (`proxy_set_header Host $host`, which is what production does). Everything below reads the
+ * family from that Host, so a proxy that rewrites it to an internal name would demote every
+ * app, portfolio and company origin to the apex.
  */
 export function subdomainMiddleware(config: AimeatConfig) {
   // "https://aimeat.io" → "aimeat.io" (empty for unparseable baseUrls)
@@ -74,6 +92,63 @@ export function subdomainMiddleware(config: AimeatConfig) {
   const coHost = (config.coHost || '').toLowerCase();
 
   /**
+   * The host the client addressed, port stripped, read from the raw `Host` header.
+   *
+   * Deliberately NOT `req.hostname`: that prefers `X-Forwarded-Host` whenever `trust proxy`
+   * matches the peer, and in production it matches — nginx sits on loopback and the default
+   * profile trusts loopback. `X-Forwarded-Host` is a header any client can send, so reading it
+   * here would hand the family check back to the caller it exists to check. `Host` is what nginx
+   * forwards verbatim, so it names the host nginx routed on.
+   */
+  const hostOf = (req: Request): string => {
+    const raw = (req.headers.host ?? '').trim().toLowerCase();
+    // An IPv6 literal is bracketed (`[::1]:40050`) and never belongs to a named family.
+    if (raw.startsWith('[')) return raw.slice(0, raw.indexOf(']') + 1);
+    const colon = raw.indexOf(':');
+    return colon === -1 ? raw : raw.slice(0, colon);
+  };
+
+  /**
+   * True when `host` is `parent` itself or exactly one label under it. A parent that is not
+   * configured owns nothing, so an unprovisioned family can never be claimed.
+   */
+  const inFamily = (host: string, parent: string): boolean => {
+    if (!parent || !host) return false;
+    if (host === parent) return true;
+    if (!host.endsWith('.' + parent)) return false;
+    const label = host.slice(0, -(parent.length + 1));
+    // Single-level only, matching labelFromHost and nginx's one-label server_name regex.
+    return label !== '' && !label.includes('.');
+  };
+
+  /**
+   * Whether an origin-family marker is set AND belongs on this request's Host.
+   *
+   * The marker is a claim the caller makes; the Host is what nginx routed on. Until now the claim
+   * was taken on its own, so `X-App-Origin: 1` on any request was enough to be served as an app
+   * origin — session-less host, own CSP, own protected-resource identity — from the apex. The
+   * proxy was supposed to blank the three markers on the apex server block and had stopped doing
+   * so, which is the kind of drift that reports itself nowhere. The Host was already trusted for
+   * exactly this question: since v1.3.0 the subdomain label comes from it.
+   *
+   * A dropped marker is logged (a misconfigured proxy and an attack both deserve a line) and the
+   * request continues as if it had never carried one, so the hostname fallback below still gets to
+   * read the family off the Host.
+   */
+  const marked = (req: Request, header: string, familyHost: string): boolean => {
+    const raw = req.get(header);
+    if (!raw) return false;
+    const value = raw.trim();
+    if (value === '' || value === '0') return false;
+    const host = hostOf(req);
+    if (inFamily(host, familyHost)) return true;
+    logger.warn('subdomain: origin marker dropped, its Host is outside that family', {
+      header, host: host || '(none)', family: familyHost || '(not configured)', path: req.path,
+    });
+    return false;
+  };
+
+  /**
    * The leftmost label of the request's Host under the app, portfolio or apex host — or null when
    * the Host is one of those hosts bare, or something else entirely. Used both by the hostname
    * fallback (dev, no proxy) and to fill the label in on proxied requests whose location block
@@ -82,7 +157,13 @@ export function subdomainMiddleware(config: AimeatConfig) {
   const labelFromHost = (req: Request): string | null => {
     const host = (req.hostname || '').toLowerCase();
     for (const parent of [appHost, portfolioHost, coHost, apexHost]) {
-      if (!parent || !host.endsWith('.' + parent)) continue;
+      if (!parent) continue;
+      // The BARE family host names no subdomain. Without this the loop fell through to the apex,
+      // where `apps.aimeat.io` reads as the single label "apps" and the path-form app origin starts
+      // describing itself as a subdomain site that does not exist. It stayed hidden while the unit
+      // test passed a Host no family matched; a Host the way nginx actually sends one exposes it.
+      if (host === parent) return null;
+      if (!host.endsWith('.' + parent)) continue;
       const label = host.slice(0, -(parent.length + 1));
       // Single-level subdomains only — nginx's server_name regex matches one label.
       return label && !label.includes('.') ? label : null;
@@ -97,15 +178,18 @@ export function subdomainMiddleware(config: AimeatConfig) {
     req.coOrigin = false;
 
     // Header path (production behind nginx). x-app-origin marks the app host
-    // family, x-portfolio-origin the portfolio host family.
+    // family, x-portfolio-origin the portfolio host family. Each marker only counts on a Host in
+    // its own family; one Host belongs to at most one family, so at most one of these is true, and
+    // a request left with none of them drops to the hostname fallback below rather than being
+    // pinned to the apex by the header it was not allowed to use.
     const fromHeader = req.get('x-subdomain');
-    const appHeader = req.get('x-app-origin');
-    const portfolioHeader = req.get('x-portfolio-origin');
-    const coHeader = req.get('x-co-origin');
-    if (appHeader || portfolioHeader || coHeader || fromHeader) {
-      if (appHeader && appHeader.trim() !== '' && appHeader.trim() !== '0') req.appOrigin = true;
-      if (portfolioHeader && portfolioHeader.trim() !== '' && portfolioHeader.trim() !== '0') req.portfolioOrigin = true;
-      if (coHeader && coHeader.trim() !== '' && coHeader.trim() !== '0') req.coOrigin = true;
+    const isApp = marked(req, 'x-app-origin', appHost);
+    const isPortfolio = marked(req, 'x-portfolio-origin', portfolioHost);
+    const isCo = marked(req, 'x-co-origin', coHost);
+    if (isApp || isPortfolio || isCo || fromHeader) {
+      req.appOrigin = isApp;
+      req.portfolioOrigin = isPortfolio;
+      req.coOrigin = isCo;
       // The proxy marks the HOST FAMILY on every location, but only some of them add the label.
       // `/.well-known/*` is one that does not, and reading the label as absent there made an app
       // origin describe itself as the bare app host — the whole family answering as one resource.

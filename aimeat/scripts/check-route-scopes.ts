@@ -22,6 +22,8 @@
  *   cd aimeat && pnpm check:route-scopes --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:route-scopes --seed     # rewrite the exemption file from today's state
  * @version-history
+ *   v1.1.0 — 2026-08-11 — requireOwnerPrincipal counts as a gate (August 2026 audit H-1/H-7), so
+ *     the fourteen account-security routes it now carries could leave the exemption file.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, systemic pattern 1).
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
@@ -32,8 +34,11 @@ const ROUTES_DIR = join(ROOT, 'src', 'routes');
 const EXEMPTIONS = join(ROOT, 'security', 'route-scope-exemptions.json');
 
 /** Middleware that constitutes an explicit authorization decision. `requireAuth` is NOT one: it
- *  answers "is anyone there", never "may this principal do this". */
-const GATES = ['requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator'];
+ *  answers "is anyone there", never "may this principal do this". `requireOwnerPrincipal` is one:
+ *  it answers "is this the account holder, or something acting for them", which is the decision the
+ *  account-security doors need and the one no scope word can express. */
+const GATES = ['requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
+    'requireOwnerPrincipal'];
 
 /** Verbs that change state. A GET is only checked when it already carries requireAuth (below). */
 const MUTATING = ['post', 'put', 'patch', 'delete'];

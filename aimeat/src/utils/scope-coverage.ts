@@ -28,6 +28,10 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.1.0 — 2026-08-11 — ACCOUNT_SECURITY_SCOPE. Out of the wildcard from the day it exists,
+ *     because the narrow-only check on the agent-configure surface asks THIS file whether a scope
+ *     is already covered: a '*' agent would have been told yes and could have written the word
+ *     onto itself, which is the exact path the two cases above describe.
  *   v1.0.0 — 2026-08-08 — Initial, closing the two paths that let an agent grant itself
  *     memory:write-reserved without the owner's tick.
  */
@@ -41,6 +45,18 @@ export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
  * directory). For an agent that administers the account on the owner's behalf.
  */
 export const WRITE_RESERVED_SCOPE = 'memory:write-reserved';
+
+/**
+ * The doors that decide who can get back INTO the account: the password, the recovery address, the
+ * second factor, the identity proof, and deleting or exporting everything. Enforced by
+ * requireOwnerPrincipal() in auth/middleware.ts, which admits an owner principal outright and any
+ * other principal only on this exact word.
+ *
+ * It is out of every wildcard for the same reason the reserved-write scope is, only sharper: an
+ * agent that can set the password can become the person. Nobody was grandfathered onto it either
+ * (services/scope-vocabulary-migration.ts), so an agent holding it was ticked by hand.
+ */
+export const ACCOUNT_SECURITY_SCOPE = 'account:security';
 
 /**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
@@ -72,7 +88,8 @@ const OWN_TICK_SCOPES = [
     'social:members',          // change who may read a shared board
 ] as const;
 
-export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [WRITE_RESERVED_SCOPE, ...OWN_TICK_SCOPES];
+export const SCOPES_OUTSIDE_WILDCARD: readonly string[] =
+    [WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, ...OWN_TICK_SCOPES];
 
 /** True when `scope` is one of the scopes only an exact grant can confer. */
 export function isOutsideWildcard(scope: string): boolean {

@@ -10,6 +10,15 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   v1.4.0 — 2026-08-11 — Phase 7 (audit H-19): a code-gated app is redirected like every other app,
+ *     the apex hands out a one-app grant only once the code matches, and the app origin serves
+ *     against that grant and nothing else — cross-app and cross-owner grants refused, and the app's
+ *     unauthenticated discovery documents stay closed.
+ *   v1.3.0 — 2026-08-11 — Phases 8–9: a forged origin marker. Every app-origin request now carries a
+ *     real Host in the app family (helpers/host-request.ts), because the marker alone stopped being
+ *     believed; two new tests send the marker from the apex Host and expect the apex answer. The
+ *     apex-only guards on the node's discovery documents and robots.txt moved here from
+ *     e2e-agent-readiness.ts, which runs on a server with no app host at all.
  *   v1.2.0 — 2026-07-30 — Phase 4: the app-origin CSP permits WebAssembly compilation
  *     ('wasm-unsafe-eval'), still refuses eval(), and COEP stays off (no cross-origin isolation).
  *   v1.1.0 — 2026-07-28 — Phase 6: the app origin answers as itself — RFC 9728 protected-resource
@@ -21,9 +30,9 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { request as httpRequest } from 'node:http';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { hostRequest, type HostResponse } from './helpers/host-request.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -53,25 +62,25 @@ async function signMsg(privB64: string, message: string): Promise<string> {
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
 /**
- * GET with an explicit Host header, on the app origin. `fetch` refuses to set Host, and Host is the
- * whole point here: production's proxy marks the host family without always naming the label, so the
- * label has to come from Host — a case no fetch-based assertion can even express.
+ * A GET the way an app origin actually receives it: a real Host in the app family, plus the family
+ * marker nginx stamps. Both halves are load-bearing. `fetch` refuses to set Host, so nothing in it
+ * can express this shape — and since subdomain.ts v1.5.0 the marker is only believed on a Host in
+ * that family, so a fetch with the header alone is no longer an app origin at all.
+ *
+ * `sub` names the per-app subdomain, or null for the bare app host (the path form).
+ * `label: 'header'` also sends `x-subdomain`, which most nginx locations do; `label: 'host'` leaves
+ * it out, which is what `/.well-known/*` does, so the server has to read the label off the Host.
  */
-function rawJson(path: string, hostHeader: string): Promise<any> {
-    return new Promise((resolve, reject) => {
-        const req = httpRequest({
-            host: 'localhost', port: Number(PORT), path, method: 'GET',
-            headers: { host: hostHeader, 'x-app-origin': '1', accept: 'application/json' },
-        }, (res) => {
-            let data = '';
-            res.on('data', (c) => { data += c; });
-            res.on('end', () => {
-                try { resolve(JSON.parse(data)); } catch (err) { reject(new Error(`${res.statusCode}: ${data.slice(0, 200)} (${String(err)})`)); }
-            });
-        });
-        req.on('error', reject);
-        req.end();
-    });
+function onAppOrigin(
+    path: string,
+    sub: string | null,
+    label: 'header' | 'host' = 'header',
+    extra: Record<string, string> = {},
+): Promise<HostResponse> {
+    const host = sub ? `${sub}.${APP_HOST}:${PORT}` : `${APP_HOST}:${PORT}`;
+    const headers: Record<string, string> = { 'x-app-origin': '1', ...extra };
+    if (sub && label === 'header') headers['x-subdomain'] = sub;
+    return hostRequest(BASE, path, host, { headers });
 }
 
 function cleanupDb() {
@@ -170,24 +179,23 @@ async function main() {
         });
 
         console.log('\nPhase 2: bare-host path form auto-redirects to the per-app subdomain');
-        await test('app-origin path form (x-app-origin) 302-redirects to the auto-assigned subdomain', async () => {
-            const res = await fetch(`${BASE}/${owner}/${filename}`, { headers: { 'x-app-origin': '1' }, redirect: 'manual' });
+        await test('app-origin path form (bare app host) 302-redirects to the auto-assigned subdomain', async () => {
+            const res = await onAppOrigin(`/${owner}/${filename}`, null);
             assert(res.status === 302, `expected 302, got ${res.status}`);
-            assert((res.headers.get('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.headers.get('location')}`);
+            assert((res.header('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.header('location')}`);
         });
 
         await test('app-origin path form ignores non-.html paths (API still reachable)', async () => {
             // /v1/spec on the app host must NOT be swallowed by the path-form app route.
-            const res = await fetch(`${BASE}/v1/spec`, { headers: { 'x-app-origin': '1' } });
+            const res = await onAppOrigin('/v1/spec', null);
             assert(res.status === 200, `/v1/spec on app host should still 200, got ${res.status}`);
         });
 
         console.log('\nPhase 3: the per-app subdomain serves the app HTML with the SSO shim');
-        await test('subdomain form (x-app-origin + x-subdomain) serves the app HTML at /', async () => {
-            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+        await test('the per-app subdomain serves the app HTML at /', async () => {
+            const res = await onAppOrigin('/', SUB);
             assert(res.status === 200, `expected 200, got ${res.status}`);
-            const body = await res.text();
-            assert(body.includes('app origin demo'), 'subdomain-served body contains the app content');
+            assert(res.body.includes('app origin demo'), 'subdomain-served body contains the app content');
         });
 
         // ── The agent arriving with nothing but the URL ─────────────────────────────────────
@@ -198,9 +206,9 @@ async function main() {
         // manifest all existed. These two assertions are that agent's whole journey.
 
         await test('the served app names its own owner and app id, without running any script', async () => {
-            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            const res = await onAppOrigin('/', SUB);
             assert(res.status === 200, `expected 200, got ${res.status}`);
-            const body = await res.text();
+            const body = res.body;
             assert(body.includes('<noscript id="aimeat-agent-discovery">'), 'a script-free discovery block is present');
             assert(body.includes(`app_id: ${filename}`), `the app id is stated with its extension: ${filename}`);
             assert(body.includes(`owner:  ${owner}`), 'the owner is stated');
@@ -209,9 +217,9 @@ async function main() {
         });
 
         await test('llms.txt on an app origin is THAT app, not the node builder guide', async () => {
-            const res = await fetch(`${BASE}/llms.txt`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            const res = await onAppOrigin('/llms.txt', SUB);
             assert(res.status === 200, `expected 200, got ${res.status}`);
-            const body = await res.text();
+            const body = res.body;
             // The node-wide guide is app-BUILDING instructions; serving it here sent an agent that
             // habitually tries /llms.txt to the wrong manual, which is worse than a 404.
             assert(!body.includes('{{LIBRARY_PACKS_TABLE}}') && !/Client SDK Libraries/i.test(body),
@@ -228,12 +236,14 @@ async function main() {
         console.log('\nPhase 4: CSP header size is bounded and does NOT scale with app count');
 
         const cspOf = async (sub: string, query = '') => {
-            const res = await fetch(`${BASE}/${query}`, { headers: { 'x-app-origin': '1', 'x-subdomain': sub } });
-            return { csp: res.headers.get('content-security-policy') ?? '', res };
+            const res = await onAppOrigin(`/${query}`, sub);
+            return { csp: res.header('content-security-policy') ?? '', res };
         };
-        const headerBytes = (res: Response) => {
+        // Counted off rawHeaders, which is the wire form the proxy buffer actually holds: name,
+        // value, ': ' and CRLF per header. A parsed Headers object would hide repeats and casing.
+        const headerBytes = (res: HostResponse) => {
             let n = 0;
-            res.headers.forEach((v, k) => { n += k.length + v.length + 4; });
+            for (let i = 0; i + 1 < res.rawHeaders.length; i += 2) n += res.rawHeaders[i].length + res.rawHeaders[i + 1].length + 4;
             return n;
         };
 
@@ -254,7 +264,7 @@ async function main() {
             assert(!scriptSrc.includes("'unsafe-eval'"), `script-src must not permit eval(): ${scriptSrc}`);
             // Wasm here is single-threaded: no COOP/COEP, so crossOriginIsolated stays false and
             // node libs without CORP keep loading.
-            assert(!res.headers.get('cross-origin-embedder-policy'), 'COEP must stay off on app origins');
+            assert(!res.header('cross-origin-embedder-policy'), 'COEP must stay off on app origins');
             // Compiling is half of it: a wasm runtime fetches its own module from a blob: URL the
             // app made (the ffmpeg.wasm toBlobURL idiom). Without blob: here a real encode dies at
             // "Refused to connect", after the module has already been allowed to compile.
@@ -339,10 +349,10 @@ async function main() {
         });
 
         await test('X-Frame-Options is dropped only WHEN a grant applies', async () => {
-            const granted = await fetch(`${BASE}/?${grantUrl.split('?')[1]}`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
-            assert(granted.headers.get('x-frame-options') === null, 'with a grant the legacy header must be gone');
-            const plain = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
-            assert(plain.headers.get('x-frame-options') !== null, 'without a grant it must stay');
+            const granted = await onAppOrigin(`/?${grantUrl.split('?')[1]}`, SUB);
+            assert(granted.header('x-frame-options') === null, 'with a grant the legacy header must be gone');
+            const plain = await onAppOrigin('/', SUB);
+            assert(plain.header('x-frame-options') !== null, 'without a grant it must stay');
         });
 
         await test('another owner cannot mint a grant for someone else\'s app', async () => {
@@ -376,9 +386,9 @@ async function main() {
         });
 
         await test('the app origin names ITSELF as the resource, and the node as its authorization server', async () => {
-            const res = await fetch(`${BASE}/.well-known/oauth-protected-resource`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            const res = await onAppOrigin('/.well-known/oauth-protected-resource', SUB);
             assert(res.status === 200, `status ${res.status}`);
-            const body = await res.json() as any;
+            const body = res.json<any>();
             assert(body.resource === APP_ORIGIN, `resource is this origin, got: ${body.resource}`);
             assert(JSON.stringify(body.authorization_servers) === JSON.stringify([BASE]),
                 `the node issues the tokens: ${JSON.stringify(body.authorization_servers)}`);
@@ -391,36 +401,34 @@ async function main() {
         // as the bare app host — one resource identifier for all 76 of them, which is exactly the
         // wrong answer the metadata was rewritten to stop giving.
         await test('the label comes from Host when the proxy sends only the family marker', async () => {
-            const body = await rawJson('/.well-known/oauth-protected-resource', `${SUB}.${APP_HOST}:${PORT}`);
+            const body = (await onAppOrigin('/.well-known/oauth-protected-resource', SUB, 'host')).json<any>();
             assert(body.resource === APP_ORIGIN, `expected this app's origin, got: ${body.resource}`);
             assert(body.aimeat?.app === `${owner}/${filename}`, `and the app it serves: ${JSON.stringify(body.aimeat)}`);
         });
 
         await test('the BARE app host stays the bare app host (no label invented)', async () => {
-            const body = await rawJson('/.well-known/oauth-protected-resource', `${APP_HOST}:${PORT}`);
+            const body = (await onAppOrigin('/.well-known/oauth-protected-resource', null)).json<any>();
             assert(body.resource === `http://${APP_HOST}:${PORT}`, `bare host resource: ${body.resource}`);
             assert(body.aimeat === undefined, 'no app is named for the bare host');
         });
 
         await test('its scopes_supported are the ones the app itself declares', async () => {
-            const res = await fetch(`${BASE}/.well-known/oauth-protected-resource`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
-            const body = await res.json() as any;
+            const body = (await onAppOrigin('/.well-known/oauth-protected-resource', SUB)).json<any>();
             const scopes: string[] = body.scopes_supported ?? [];
             assert(scopes.includes('memory:read') && scopes.includes('ai:use'),
                 `expected the app's <meta name="aimeat-scopes">, got: ${JSON.stringify(scopes)}`);
         });
 
         await test('a 401 on the app origin points at THAT origin\'s metadata (RFC 9728 hint)', async () => {
-            const res = await fetch(`${BASE}/v1/memory`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            const res = await onAppOrigin('/v1/memory', SUB);
             assert(res.status === 401, `expected 401, got ${res.status}`);
-            const wa = res.headers.get('www-authenticate') ?? '';
+            const wa = res.header('www-authenticate') ?? '';
             assert(wa.includes(`resource_metadata="${APP_ORIGIN}/.well-known/oauth-protected-resource"`),
                 `WWW-Authenticate should name this origin, got: ${wa}`);
         });
 
         await test('the served app loads the WebMCP bridge, self-activating, from its OWN origin', async () => {
-            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
-            const body = await res.text();
+            const body = (await onAppOrigin('/', SUB)).body;
             assert(body.includes('src="/v1/libs/aimeat-webmcp.js?expose=app"'),
                 'the bridge is loaded relatively, so an app CSP of script-src \'self\' still allows it');
             assert(body.includes(`data-app="${filename}"`) && body.includes(`data-owner="${owner}"`),
@@ -436,9 +444,9 @@ async function main() {
             });
             assert(pub.status === 201, `publish: ${pub.status}`);
             await fetch(`${BASE}/v1/apps/${owner}/${quiet}?mode=inline`, { redirect: 'manual' }); // assigns the subdomain
-            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'origin-quiet' } });
+            const res = await onAppOrigin('/', 'origin-quiet');
             assert(res.status === 200, `expected 200, got ${res.status}`);
-            const body = await res.text();
+            const body = res.body;
             assert(!body.includes('aimeat-webmcp.js'), 'no bridge was injected');
             assert(body.includes('<noscript id="aimeat-agent-discovery">'), 'the script-free discovery block still is');
         });
@@ -457,6 +465,196 @@ async function main() {
         await test('an app that does not exist is still a 404', async () => {
             const r = await json(`/v1/apps/${owner}/no-such-app.html/webmcp`);
             assert(r.status === 404, `expected 404, got ${r.status}`);
+        });
+
+        // ── Phase 7: a code-gated app is isolated like every other app ─────────────────────
+        // It used to be the exception: the apex refused to redirect an access-coded app, so after
+        // the visitor typed the right code the app ran on the SAME origin as their session — the
+        // one place an author who asked for protection least wants it. The gate now sits on the
+        // UNLOCK. The apex still checks the code and then hands out a grant naming this one app;
+        // the app origin has no session and verifies nothing but that grant.
+        console.log('\nPhase 7: the gate moved from the app HTML to the unlock (H-19)');
+
+        const gatedFile = 'gated-demo.html';
+        const GATED_SUB = 'gated-demo';
+        const CODE = 'sekret99';
+        const GATED_HTML = '<!DOCTYPE html><html><head><title>Gated</title></head><body>gated secret body</body></html>';
+        const gatedPath = `/v1/apps/${owner}/${gatedFile}`;
+        let grantQuery = '';
+
+        await test('publish a code-gated app', async () => {
+            const r = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    filename: gatedFile, content: b64(GATED_HTML), name: 'Gated', description: 'd',
+                    category: 'utility', tags: [], access_code: CODE,
+                }),
+            });
+            assert(r.status === 201, `publish: ${r.status} ${JSON.stringify(r.body.error ?? '')}`);
+        });
+
+        await test('a browser without the code gets the unlock page, never a redirect', async () => {
+            const res = await fetch(`${BASE}${gatedPath}?mode=inline`, {
+                headers: { Accept: 'text/html' }, redirect: 'manual',
+            });
+            assert(res.status === 403, `expected the unlock page, got ${res.status}`);
+            const body = await res.text();
+            assert(body.includes('<form') && body.includes('name="code"'), 'the code field is the page');
+            assert(!body.includes('gated secret body'), 'and it carries none of the app');
+        });
+
+        await test('the WRONG code still gets the unlock page', async () => {
+            const res = await fetch(`${BASE}${gatedPath}?mode=inline&code=nope`, {
+                headers: { Accept: 'text/html' }, redirect: 'manual',
+            });
+            assert(res.status === 403, `expected 403, got ${res.status}`);
+        });
+
+        await test('the RIGHT code 302s to the app origin with a grant, and serves nothing here', async () => {
+            const res = await fetch(`${BASE}${gatedPath}?mode=inline&code=${CODE}`, {
+                headers: { Accept: 'text/html' }, redirect: 'manual',
+            });
+            // The whole point of H-19: the apex answers with a redirect rather than the app bytes.
+            assert(res.status === 302, `expected 302, got ${res.status}`);
+            const loc = res.headers.get('location') ?? '';
+            assert(loc.startsWith(`http://${GATED_SUB}.${APP_HOST}:${PORT}/`), `unexpected Location: ${loc}`);
+            assert(loc.includes('access='), `no grant in the redirect: ${loc}`);
+            // A 301 to an address holding an expiring grant is one the browser keeps reusing after
+            // the grant is dead, which is why this one must not be cacheable.
+            assert((res.headers.get('cache-control') ?? '').includes('no-store'), 'the gated redirect must not be cached');
+            assert(!(await res.text()).includes('gated secret body'), 'the apex must not have served the app');
+            grantQuery = loc.slice(loc.indexOf('?'));
+        });
+
+        await test('the app origin serves the gated app WITH the grant', async () => {
+            const res = await onAppOrigin(`/${grantQuery}`, GATED_SUB);
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert(res.body.includes('gated secret body'), 'the app bytes belong on the app origin');
+        });
+
+        await test('and answers the uniform 404 WITHOUT one', async () => {
+            for (const q of ['', '?access=', '?access=not-a-token']) {
+                const res = await onAppOrigin(`/${q}`, GATED_SUB);
+                assert(res.status === 404, `"${q}" should look like an unknown subdomain, got ${res.status}`);
+            }
+        });
+
+        await test('a grant for ANOTHER app does not open this one', async () => {
+            // origin-demo is ungated, so it has no grant of its own; mint one for a second gated
+            // app instead and spend it on the first.
+            const otherFile = 'gated-other.html';
+            const pub = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    filename: otherFile, content: b64(GATED_HTML), name: 'Gated2', description: 'd',
+                    category: 'utility', tags: [], access_code: CODE,
+                }),
+            });
+            assert(pub.status === 201, `publish: ${pub.status}`);
+            const red = await fetch(`${BASE}/v1/apps/${owner}/${otherFile}?mode=inline&code=${CODE}`, {
+                headers: { Accept: 'text/html' }, redirect: 'manual',
+            });
+            assert(red.status === 302, `the second app must redirect with a grant, got ${red.status}`);
+            const otherLoc = red.headers.get('location') ?? '';
+            const otherQuery = otherLoc.slice(otherLoc.indexOf('?'));
+            const res = await onAppOrigin(`/${otherQuery}`, GATED_SUB);
+            assert(res.status === 404, `a grant for a different app must not open this one, got ${res.status}`);
+        });
+
+        await test('a grant does not open the SAME filename owned by someone else', async () => {
+            const other = `gatedout${Date.now() % 100000}`;
+            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
+            assert(reg.status === 201, `register: ${reg.status}`);
+            const ts = new Date().toISOString();
+            const tk = await json('/v1/auth/token', {
+                method: 'POST',
+                body: JSON.stringify({ owner: other, timestamp: ts, signature: await signMsg(reg.body.data.private_key, other + NODE_ID + ts) }),
+            });
+            const otherToken = tk.body.data.token;
+            const pub = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
+                body: JSON.stringify({
+                    filename: gatedFile, content: b64('<html><body>someone else</body></html>'), name: 'Gated', description: 'd',
+                    category: 'utility', tags: [], access_code: CODE,
+                }),
+            });
+            assert(pub.status === 201, `publish: ${pub.status}`);
+            // The second owner's app gets its own subdomain; their grant carries their name, so it
+            // must be worthless against the first owner's app of the same filename.
+            const red = await fetch(`${BASE}/v1/apps/${other}/${gatedFile}?mode=inline&code=${CODE}`, {
+                headers: { Accept: 'text/html' }, redirect: 'manual',
+            });
+            assert(red.status === 302, `the other owner's app must redirect with a grant, got ${red.status}`);
+            const loc = red.headers.get('location') ?? '';
+            const res = await onAppOrigin(`/${loc.slice(loc.indexOf('?'))}`, GATED_SUB);
+            assert(res.status === 404, `a cross-owner grant must not open this app, got ${res.status}`);
+        });
+
+        await test('the gated app publishes no agent-facing documents of its own', async () => {
+            // A grant opens the app for whoever unlocked it; it does not make the app public. These
+            // documents are read with no credential at all, so they describe the NODE here, exactly
+            // as they did before a gated app could be served on this origin.
+            const llms = await onAppOrigin(`/llms.txt${grantQuery}`, GATED_SUB);
+            assert(!llms.body.includes(`${owner}/${gatedFile}`), `llms.txt names the gated app: ${llms.body.slice(0, 160)}`);
+            const card = await onAppOrigin(`/.well-known/mcp.json${grantQuery}`, GATED_SUB);
+            let described: string | undefined;
+            try { described = card.json<{ app?: { app_id?: string } }>().app?.app_id; }
+            catch (err) { console.log(`     (mcp.json was not JSON, which is also not the app card: ${String(err).slice(0, 60)})`); }
+            assert(described !== gatedFile, 'the MCP server card must not describe a gated app');
+        });
+
+        // ── Phase 8: the marker is a claim, and the Host is what decides it ─────────────────
+        // Until 2026-08-11 `X-App-Origin: 1` was believed on its own. Anything the app origin is
+        // trusted to be — a separate origin, a resource with its own identity, the one place user
+        // HTML is allowed to run — was therefore available to any client willing to add a request
+        // header, and the apex nginx block that was supposed to blank the three markers had stopped
+        // doing so with nothing anywhere reporting it. These two send the marker from the apex Host.
+        console.log('\nPhase 8: an origin marker from the apex Host is not an app origin');
+
+        await test('a forged X-App-Origin leaves the apex answering as the apex (RFC 9728)', async () => {
+            const body = (await hostRequest(BASE, '/.well-known/oauth-protected-resource', `localhost:${PORT}`, {
+                headers: { 'x-app-origin': '1', 'x-subdomain': SUB },
+            })).json<any>();
+            assert(body.resource === `${BASE}/v1/mcp`, `the apex must keep its own identity, got: ${body.resource}`);
+            assert(body.aimeat === undefined, `no app may be named for an apex request: ${JSON.stringify(body.aimeat)}`);
+        });
+
+        // The escalation the header bought: `?mode=inline` is redirected to the isolated origin
+        // precisely BECAUSE the request is on the apex, and the redirect is skipped for a request
+        // already on the app origin. A forged marker took that exit and ran the app's HTML on the
+        // origin that holds the session.
+        await test('a forged X-App-Origin does not get app HTML executed on the apex', async () => {
+            const res = await hostRequest(BASE, `/v1/apps/${owner}/${filename}?mode=inline`, `localhost:${PORT}`, {
+                headers: { 'x-app-origin': '1' },
+            });
+            assert(res.status === 301, `expected the apex redirect, got ${res.status}`);
+            assert((res.header('location') ?? '') === `http://${SUB}.${APP_HOST}:${PORT}/`, `unexpected Location: ${res.header('location')}`);
+            assert(!res.body.includes('app origin demo'), 'the app body was served on the apex origin');
+        });
+
+        // ── Phase 9: the node's own documents stay on the apex ─────────────────────────────
+        // These lived in e2e-agent-readiness.ts, which runs against the shared CI server. That
+        // server has no app host configured at all, so after the Host check there is no way to be
+        // on an app origin there and the assertions could only ever have been made with a forged
+        // header. Here the origin is real.
+        console.log('\nPhase 9: node discovery documents do not answer on an app origin');
+
+        const UNMAPPED = 'nosuchapp';
+
+        await test('sitemap.md, AGENTS.md and llms-full.txt 404 on an app origin', async () => {
+            for (const p of ['/sitemap.md', '/AGENTS.md', '/agents.md', '/llms-full.txt']) {
+                const r = await onAppOrigin(p, UNMAPPED);
+                assert(r.status === 404, `${p} on an app origin → ${r.status}, expected 404`);
+            }
+        });
+
+        await test('the node robots.txt does not leak onto an app origin', async () => {
+            const apex = await json('/robots.txt');
+            assert(String(apex.body._raw ?? '').includes('Content-Signal'), 'apex robots.txt missing');
+            const onApp = await onAppOrigin('/robots.txt', UNMAPPED);
+            // Its Sitemap: line names the apex, so serving it here would be a crawl policy about
+            // somebody else published under the app's name.
+            assert(!onApp.body.includes('Content-Signal'), 'the node robots.txt answered on an app origin');
         });
 
         console.log('\n─────────────────────────────────────');

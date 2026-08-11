@@ -25,6 +25,9 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Security audit H-2: the owner/operator bypass in gate() now excludes agent
+ *     and ecosystem sessions, matching requireScope. Agent tokens carried the owner's roles until
+ *     today, so the bypass applied to principals whose consent:manage the owner had withheld.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit step 3, option B: shared service, gate inside).
  */
 import { randomUUID } from 'node:crypto';
@@ -81,7 +84,15 @@ function hasScope(scopes: string[], needed: string): boolean {
 type ConsentRefusal = Extract<ConsentResult<never>, { ok: false }>;
 
 function gate(caller: ConsentCaller): ConsentRefusal | null {
-    const privileged = caller.roles.includes('owner') || caller.roles.includes('operator');
+    // The owner/operator bypass, and the exclusion requireScope carries with it: an agent or
+    // ecosystem session is a SCOPED principal and never rides its owner's role, whatever else its
+    // role list says. The exclusion was missing (audit H-2), and POST /v1/auth/token was copying the
+    // owner's owner/operator roles onto agent tokens, so an agent without consent:manage could
+    // still rewrite who may read the owner's data, which is the one record whose whole job is to
+    // answer that question.
+    const scopedPrincipal = caller.roles.includes('agent') || caller.roles.includes('ecosystem');
+    const privileged = !scopedPrincipal
+        && (caller.roles.includes('owner') || caller.roles.includes('operator'));
     if (privileged || hasScope(caller.scopes, 'consent:manage')) return null;
     return {
         ok: false, status: 403, code: 'SCOPE_DENIED',

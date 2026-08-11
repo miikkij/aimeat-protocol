@@ -16,6 +16,10 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.3.0 — 2026-08-11 — account:security, a sixth word outside the wildcard: the password, the
+ *     recovery address, the second factor, the identity proof, and deleting or exporting the whole
+ *     account. Its own domain, because it is not a permission over the person's data but over
+ *     whether they still reach it.
  *   v1.2.0 — 2026-08-11 — Five words that no wildcard carries: commerce:psp,
  *     commerce:beneficiary-verify, agent:permissions, consent:groups and social:members. Each names
  *     a call the web door reserves to a logged-in person, so it costs its own tick rather than
@@ -53,6 +57,11 @@ export const NOT_IN_WILDCARD = [
   'agent:permissions',
   'consent:groups',
   'social:members',
+  // ── Added 2026-08-11 ─────────────────────────────────────────────────────────────────────────
+  // The account itself: the password, the recovery address, the second factor, the identity proof,
+  // and deleting or exporting everything. An agent that can set the password can become the person,
+  // so this one is never granted by a preset, a bulk header or Full access — only by this box.
+  'account:security',
 ];
 
 /**
@@ -144,6 +153,13 @@ export const SCOPE_DOMAINS = [
   { key: 'agent',      permissions: ['write', 'permissions'] },
   { key: 'app',        permissions: ['write', 'manage'] },
   { key: 'capability', permissions: ['write'] },
+
+  // ── Added 2026-08-11 (August 2026 audit, H-1/H-7) ────────────────────────────────────────────
+  // account:security — the doors that decide who can sign in as this person: the password, the
+  //   recovery address, the second factor, the identity proof, and deleting or exporting the whole
+  //   account. Enforced by requireOwnerPrincipal() in src/auth/middleware.ts. Nobody was
+  //   grandfathered onto it, so an agent has it only if the owner ticked this box.
+  { key: 'account',    permissions: ['security'] },
 ];
 
 export const SCOPE_TEMPLATES = {

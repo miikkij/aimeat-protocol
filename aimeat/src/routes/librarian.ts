@@ -19,6 +19,9 @@
  *     an app/agent grant that resolves to the owner's GHII previously searched only GHII-owned rows
  *     (missing every agent-authored namespace); with `memory:read` it searches the owner's full read
  *     surface. Consent lives in the grant (mirrors discovery/memory-source). Fixes DROP librarian_assess.
+ *   v1.3.0 — 2026-08-11 — Security audit H-2: gateOwnerOrAiUse excludes agent and ecosystem sessions
+ *     from the owner branch, matching requireScope and routes/ai.ts. classify/plan/distribute spend
+ *     the owner's AI key, so an agent reaches them on `ai:use`.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -43,7 +46,11 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
    *  so a sandboxed app-origin session (role 'app') works once the owner granted ai:use. */
   function gateOwnerOrAiUse(req: Request, res: Response): boolean {
     const roles = req.auth?.roles ?? [];
-    if (roles.includes('owner')) return true;
+    // Same owner branch as requireScope, exclusions included: an agent or ecosystem session is a
+    // scoped principal and comes in on `ai:use`. Until 2026-08-11 (audit H-2) POST /v1/auth/token
+    // copied the owner's roles onto agent tokens, so `roles.includes('owner')` on its own was a way
+    // to run the owner's AI over the owner's material without holding the word for it.
+    if (roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
     if (scopes.includes('ai:use') || scopes.includes('*')) return true;
     res.status(403).json(error(config.nodeId, 'FORBIDDEN',

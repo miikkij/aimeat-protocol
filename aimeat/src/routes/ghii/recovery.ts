@@ -4,6 +4,11 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-11 — Security audit H-1/H-7: the password and the recovery address are behind
+ *     requireOwnerPrincipal(). H-5 stopped a repointed address from opening the reset rail on the
+ *     PREVIOUS address's verification mark; it left the loop, because the principal that repointed
+ *     the address also owns the new mailbox and could confirm it. Every handler here keys off
+ *     req.auth.owner, which is the human's account name on an agent, ecosystem or app-grant token.
  *   v1.1.0 — 2026-08-10 — Security audit H-5: changing notificationEmail un-verifies it. The
  *     unauthenticated reset flow mails its code to that address and gates only on emailVerifiedAt,
  *     a mark from the PREVIOUS address, so repointing it was an account-takeover step.
@@ -15,7 +20,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { createHash, randomBytes } from 'node:crypto';
@@ -32,8 +37,14 @@ export function registerRecoveryRoutes(
 ): void {
     // ── Phase 1.4 — Email Verification, Password Reset, Account Recovery ──
 
-    // POST /v1/ghii/email/verify — Send verification code to verify email (auth required)
-    router.post('/v1/ghii/email/verify', requireAuth(), rateLimit({ max: 3, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    // POST /v1/ghii/email/verify — Send verification code to verify email (account holder only)
+    //
+    // SECURITY (audit H-7): this writes notificationEmail AND returns the verification id, so one
+    // principal could point the recovery address at its own mailbox, confirm it below, and then
+    // have the unauthenticated reset rail mail a reset code there. Four calls, ending in a password
+    // the person does not know, and it worked from an agent JWT, a GEAI token or an app grant
+    // because every one of them carries the human's account name in req.auth.owner.
+    router.post('/v1/ghii/email/verify', requireAuth(), requireOwnerPrincipal(), rateLimit({ max: 3, windowMs: 10 * 60 * 1000 }), async (req, res) => {
         const ownerName = req.auth!.owner;
         const { email } = req.body ?? {};
 
@@ -103,8 +114,9 @@ export function registerRecoveryRoutes(
         }));
     });
 
-    // POST /v1/ghii/email/confirm — Confirm email verification code (auth required)
-    router.post('/v1/ghii/email/confirm', requireAuth(), async (req, res) => {
+    // POST /v1/ghii/email/confirm — Confirm email verification code (account holder only)
+    // The other half of the loop above: confirming is what re-opens the reset rail on the address.
+    router.post('/v1/ghii/email/confirm', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
         const ownerName = req.auth!.owner;
         const { code, verification_id } = req.body ?? {};
 
@@ -296,8 +308,14 @@ export function registerRecoveryRoutes(
         emitChange('ghii');
     });
 
-    // POST /v1/ghii/password/change — Change password (requires auth)
-    router.post('/v1/ghii/password/change', requireAuth(), rateLimit({ max: 5, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+    // POST /v1/ghii/password/change — Change password (account holder only)
+    //
+    // SECURITY (audit H-7): the current-password check below is gated on the account HAVING a
+    // password, so on an account created through OAuth there was nothing to prove. Any principal of
+    // that owner could set the first password and then sign in as the person with it. Closing the
+    // passwordless branch itself needs its own design (there is nowhere to send a confirmation on
+    // an account with no email); refusing every principal but the account holder closes the reach.
+    router.post('/v1/ghii/password/change', requireAuth(), requireOwnerPrincipal(), rateLimit({ max: 5, windowMs: 10 * 60 * 1000 }), async (req, res) => {
         const ownerName = req.auth!.owner;
         const { current_password, new_password } = req.body ?? {};
 

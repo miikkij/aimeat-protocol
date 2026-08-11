@@ -9,6 +9,8 @@
  *   - nodeInfraMethods: push-subscription upsert+CRUD, trusted-issuer CRUD, nonce CRUD + expiry sweep,
  *     realtime-room CRUD, site-change-log append + cursor-paginated list
  * @version-history
+ *   v1.1.0 — 2026-08-11 — Push subscriptions key on (ownerName, endpoint), so an owner's second
+ *     device joins the first instead of evicting it (audit H-8). Needs migration 0032.
  *   v1.0.0 — 2026-07-15 — Phase 5: node-infra domain on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -53,22 +55,33 @@ function toSiteChangeLog(r: Selectable<SiteChangeLog>): SiteChangeLogEntry {
 }
 
 export const nodeInfraMethods = {
-  // ── Push subscriptions (one per owner; upsert on ownerName) ──
+  // ── Push subscriptions (one row per DEVICE; upsert on (ownerName, endpoint)) ──
   async createPushSubscription(this: PostgresKyselyStorage, record: PushSubscriptionRecord): Promise<PushSubscriptionRecord> {
+    // `id` is omitted so the column default (migration 0003, gen_random_uuid()) mints one. It used to
+    // be set to ownerName, which is a second per-owner key and would collide on the owner's second
+    // device. Rows written before 2026-08-11 keep their id = ownerName; nothing reads it.
     const shared = { endpoint: record.endpoint, keys: jsonb(record.keys), lastUsedAt: new Date(record.lastUsedAt) };
     await this.db.insertInto('PushSubscription')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .values({ id: record.ownerName, ownerName: record.ownerName, createdAt: new Date(record.createdAt), ...shared } as any)
+      .values({ ownerName: record.ownerName, createdAt: new Date(record.createdAt), ...shared } as any)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .onConflict(oc => oc.column('ownerName').doUpdateSet(shared as any)).execute();
+      .onConflict(oc => oc.columns(['ownerName', 'endpoint']).doUpdateSet({ keys: shared.keys, lastUsedAt: shared.lastUsedAt } as any)).execute();
     return record;
   },
   async getPushSubscription(this: PostgresKyselyStorage, ownerName: string): Promise<PushSubscriptionRecord | null> {
-    const r = await this.db.selectFrom('PushSubscription').selectAll().where('ownerName', '=', ownerName).executeTakeFirst();
+    const r = await this.db.selectFrom('PushSubscription').selectAll().where('ownerName', '=', ownerName)
+      .orderBy('lastUsedAt', 'desc').orderBy('endpoint', 'asc').executeTakeFirst();
     return r ? toPushSub(r) : null;
   },
-  async deletePushSubscription(this: PostgresKyselyStorage, ownerName: string): Promise<boolean> {
-    const r = await this.db.deleteFrom('PushSubscription').where('ownerName', '=', ownerName).executeTakeFirst();
+  async listPushSubscriptionsByOwner(this: PostgresKyselyStorage, ownerName: string): Promise<PushSubscriptionRecord[]> {
+    const rows = await this.db.selectFrom('PushSubscription').selectAll().where('ownerName', '=', ownerName)
+      .orderBy('createdAt', 'asc').orderBy('endpoint', 'asc').execute();
+    return rows.map(toPushSub);
+  },
+  async deletePushSubscription(this: PostgresKyselyStorage, ownerName: string, endpoint?: string): Promise<boolean> {
+    let q = this.db.deleteFrom('PushSubscription').where('ownerName', '=', ownerName);
+    if (endpoint !== undefined) q = q.where('endpoint', '=', endpoint);
+    const r = await q.executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
   },
   async listPushSubscriptions(this: PostgresKyselyStorage): Promise<PushSubscriptionRecord[]> {
