@@ -102,6 +102,7 @@ import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { versionConflict } from './memory-version-lock.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { createBoardPost } from '../services/board-post.js';
+import { executeHooks } from '../services/hooks.js';
 
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
@@ -562,6 +563,30 @@ export function registerCoreTools(
         },
         annotationsFor('aimeat_action_execute'),
         async ({ action_id, provider_gaii, input, ttl_hours }) => {
+            // The three refusals POST /v1/work/request makes before it holds any escrow, and this
+            // tool made none of them.
+            //
+            // SELF-WORK and SAME-OWNER WORK exist to stop trust-score manipulation: an agent
+            // commissioning itself, or its owner's other agent, would rate its own delivery. Over
+            // MCP both were free, on the surface agents actually use.
+            //
+            // pre_work_request lets an installed extension refuse a commission. It never ran here,
+            // so an extension policy on work requests was advisory on this door.
+            if (agentGaii === provider_gaii) {
+                return { content: [{ type: 'text' as const, text: 'SELF_WORK: Cannot create work request to yourself' }], isError: true };
+            }
+            const requesterAg = await storage.getAgent(agentGaii);
+            const providerAg = await storage.getAgent(provider_gaii);
+            if (requesterAg && providerAg && requesterAg.owner === providerAg.owner) {
+                return { content: [{ type: 'text' as const, text: 'SAME_OWNER_WORK: Cannot create work request between your own agents' }], isError: true };
+            }
+            const workHook = await executeHooks(config, storage, 'pre_work_request', {
+                requester_gaii: agentGaii, action_id, provider_gaii,
+            });
+            if (!workHook.allowed) {
+                return { content: [{ type: 'text' as const, text: `HOOK_REJECTED: ${workHook.reason ?? 'Work request denied by extension hook'}` }], isError: true };
+            }
+
             const ttl = ttl_hours ?? 24;
             const trackingCode = generateTrackingCode();
             const actions = await storage.listActions();
