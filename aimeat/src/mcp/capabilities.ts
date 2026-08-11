@@ -86,6 +86,15 @@ export function registerCapabilitiesTools(
             const cap = await storage.getCapability(args.id);
             if (!cap) return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
 
+            // A PRIVATE capability may only be invoked by its owner. The read path hides private
+            // capabilities from everyone else, so invoke has to as well, and it answers "not found"
+            // rather than "forbidden" so the id is not confirmed. routes/capabilities.ts:244 has said
+            // this since it was written; this tool invoked anything by id, including another owner's
+            // private manual webhook capability.
+            if (cap.visibility === 'private' && cap.ownerGhii !== getAgentGaii()) {
+                return { content: [{ type: 'text' as const, text: `Capability not found: ${args.id}` }], isError: true };
+            }
+
             if (cap.source.type === 'cortex') {
                 return { content: [{ type: 'text' as const, text: `This capability is browser-only. Use it in an AIMEAT app: ${cap.usage}` }], isError: true };
             }
@@ -128,6 +137,18 @@ export function registerCapabilitiesTools(
         },
         annotationsFor('aimeat_capabilities_create'),
         async (args) => {
+            // The node's publishing policy, which this tool ignored entirely. The default is
+            // 'disabled' (config.ts:613), so on an ordinary node POST /v1/capabilities refuses a
+            // non-operator outright while the same account created capabilities freely over MCP.
+            // A capability is how an account offers work to others, so who may publish one is the
+            // operator's decision and not a per-surface accident.
+            if (config.capabilityPublishing === 'disabled') {
+                return { content: [{ type: 'text' as const, text: 'PUBLISHING_DISABLED: Only the operator can create capabilities on this node' }], isError: true };
+            }
+            if (config.capabilityPublishing === 'self_only' && args.visibility === 'public') {
+                return { content: [{ type: 'text' as const, text: 'PUBLIC_DISABLED: Public capabilities require operator approval. Use visibility: private' }], isError: true };
+            }
+
             const now = new Date().toISOString();
             const ownerGhii = getAgentGaii();
 
@@ -142,7 +163,12 @@ export function registerCapabilitiesTools(
                 ownerGhii,
                 visibility: args.visibility || 'private',
                 scope: 'local',
-                status: 'active',
+                // Moderation, matching routes/capabilities.ts:153-156. This wrote 'active' whatever
+                // the node's policy said, so a public capability that the web door would have parked
+                // for review went live the moment an agent asked.
+                status: config.capabilityPublishing === 'moderated' && args.visibility === 'public'
+                    ? 'pending_review'
+                    : 'active',
                 rejectionReason: null,
                 deprecationMessage: null,
                 replacedBy: null,
