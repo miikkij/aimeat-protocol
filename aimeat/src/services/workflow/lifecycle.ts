@@ -18,6 +18,7 @@
 import type { Storage, ScheduledJobRecord } from '../../storage/interface.js';
 import type { Scheduler } from '../scheduler.js';
 import type { WorkflowDef, WorkflowRun } from '../../models/workflow-schemas.js';
+import { getRun } from './store.js';
 
 const EVENT_INDEX_KEY = 'workflows.eventindex';
 const ECO_EVENT_INDEX_KEY = 'workflows.ecoeventindex';
@@ -179,4 +180,55 @@ export async function removeWorkflowTriggers(storage: Storage, scheduler: Schedu
   }
   await clearEventTrigger(storage, nodeId, workflowId);
   await clearEcosystemEventTrigger(storage, nodeId, workflowId);
+}
+
+/** One step waiting on a person, with everything either surface renders it from. */
+export interface PendingHumanInput {
+    workflowId: string;
+    runId: string;
+    stepId: string;
+    workflowTitle: WorkflowDef['title'];
+    mode: WorkflowRun['mode'];
+    question: WorkflowRun['steps'][string]['human'] extends { question: infer Q } | undefined ? Q : unknown;
+    askedAt: string;
+    deadline: string;
+}
+
+/**
+ * Every step across this owner's active runs that is waiting on a person.
+ *
+ * The walk existed twice — GET /v1/workflows/pending-inputs and aimeat_workflow_pending_inputs —
+ * including the deadline arithmetic. A deadline computed two ways is a deadline: an agent told one
+ * time and a dashboard showing another is worse than either being wrong on its own.
+ *
+ * Returns every field both surfaces need; each renders and names them its own way.
+ */
+export async function pendingHumanInputs(
+    storage: Storage,
+    nodeId: string,
+    ownerGhii: string,
+    humanTimeoutMinDefault: number,
+): Promise<PendingHumanInput[]> {
+    const active = (await readActiveRuns(storage, nodeId)).filter(a => a.ownerGhii === ownerGhii);
+    const out: PendingHumanInput[] = [];
+    for (const a of active) {
+        const run = await getRun(storage, ownerGhii, a.workflowId, a.runId);
+        if (!run) continue;
+        for (const step of run.defSnapshot.steps) {
+            const rs = run.steps[step.id];
+            if (rs?.state !== 'waiting-human' || !rs.human) continue;
+            out.push({
+                workflowId: a.workflowId,
+                runId: a.runId,
+                stepId: step.id,
+                workflowTitle: run.defSnapshot.title,
+                mode: run.mode,
+                question: rs.human.question,
+                askedAt: rs.human.askedAt,
+                deadline: new Date(new Date(rs.human.askedAt).getTime()
+                    + (step.timeout_min ?? humanTimeoutMinDefault) * 60_000).toISOString(),
+            });
+        }
+    }
+    return out;
 }

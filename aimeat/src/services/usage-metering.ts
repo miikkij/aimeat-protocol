@@ -191,3 +191,38 @@ export function extractUsageFields(data: Record<string, unknown>): {
     provenanceId: str(data.provenance_id),
   };
 }
+
+/**
+ * Turn one telemetry event into a priced usage event, when it carries what pricing needs.
+ *
+ * An `llm_call` with a model becomes an append-only ledger row; a bare one only bumps the activity
+ * counters its caller already wrote. A ledger failure never fails the telemetry report — the
+ * client's own buffer and retry is the durability guarantee, and refusing the report would cost the
+ * counters too.
+ *
+ * Both doors did this, written out twice. The ledger is what an owner is billed from, so two copies
+ * of "does this count" is two answers to what something cost.
+ */
+export async function recordTelemetryUsage(
+    storage: Storage,
+    ctx: { agentGaii: string; ownerGhii: string; taskId?: string },
+    type: string,
+    data: Record<string, unknown> | undefined,
+): Promise<void> {
+    if (type !== 'llm_call') return;
+    const fields = extractUsageFields(data ?? {});
+    if (!fields) return;
+    try {
+        await recordUsageEvent(storage, {
+            ...fields,
+            agentGaii: ctx.agentGaii,
+            ownerGhii: ctx.ownerGhii,
+            runId: fields.runId ?? ctx.taskId,
+            source: 'telemetry',
+        });
+    } catch (err) {
+        logger.warn('ledger: usage event write failed (telemetry accepted)', {
+            agentGaii: ctx.agentGaii, error: String(err),
+        });
+    }
+}

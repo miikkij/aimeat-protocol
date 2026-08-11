@@ -24,15 +24,14 @@
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { refreshOnboarding, persistStepResult } from '../services/onboarding-progress.js';
+import { validateStep } from '../services/onboarding-validator.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { ONBOARDING_STEP_IDS, STEP_SCHEMAS, type OnboardingStepId } from '../models/agent-onboarding-schemas.js';
-import { emitChange } from '../services/event-bus.js';
-import { checkAutoSteps, validateStep } from '../services/onboarding-validator.js';
 import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
-import { calculateReadiness } from '../services/readiness-scorer.js';
 import { createT, DEFAULT_LOCALE } from '../i18n.js';
-import type { AgentOnboardingRecord, Storage } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -72,37 +71,10 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
     let onboarding = await storage.getOnboarding(agentGaii);
     if (!onboarding) return { onboarding: null, status: 'not_started' };
 
-    if (onboarding.status === 'in_progress') {
-        const updatedSteps = await checkAutoSteps(agentGaii, onboarding, storage);
-        const allRequiredPassed = updatedSteps.filter(step => step.required).every(step => step.status === 'passed');
-
-        if (allRequiredPassed) {
-            // Mark untouched optional steps as 'skipped' at completion -- mirrors the REST GET
-            // handler so the MCP and REST surfaces stay byte-identical (the agent chose not to
-            // do them; that's a final state, not pending).
-            for (const s of updatedSteps) {
-                if (!s.required && s.status === 'pending') {
-                    s.status = 'skipped';
-                    s.validatedAt = new Date().toISOString();
-                }
-            }
-            const readiness = await calculateReadiness(agentGaii, updatedSteps, storage, onboarding.readinessOverride);
-            onboarding = (await storage.updateOnboarding(agentGaii, {
-                steps: updatedSteps,
-                status: 'completed',
-                completedAt: new Date().toISOString(),
-                readinessScore: readiness.effectiveScore,
-                readinessLevel: readiness.level,
-                onboardingBaseline: readiness.baseline,
-                operationalHealth: readiness.health,
-                healthComponents: readiness.healthComponents,
-                healthRecalculatedAt: new Date().toISOString(),
-            }))!;
-            emitChange('agent-onboarding');
-        } else {
-            onboarding = (await storage.updateOnboarding(agentGaii, { steps: updatedSteps }))!;
-        }
-    }
+    // Reading the onboarding re-runs the auto-checked steps and may complete it — the same act on
+    // both doors, so services/onboarding-progress.ts decides it.
+    onboarding = (await refreshOnboarding(storage, agentGaii, onboarding)).onboarding;
+    if (!onboarding) return { onboarding: null, status: 'not_started' };
 
     const pendingSteps = onboarding.steps.filter(step => step.status === 'pending');
     const testTaskStep = onboarding.steps.find(step => step.id === 'accept_test_task');
@@ -198,33 +170,10 @@ async function confirmOnboardingStep(
         step.failureReason = result.failureReason;
     }
 
-    const allRequiredPassed = onboarding.steps.filter(candidate => candidate.required).every(candidate => candidate.status === 'passed');
-    let completedOnboarding: AgentOnboardingRecord | null = null;
-
-    if (result.passed && allRequiredPassed) {
-        const readiness = await calculateReadiness(agentGaii, onboarding.steps, storage, onboarding.readinessOverride);
-        completedOnboarding = await storage.updateOnboarding(agentGaii, {
-            steps: onboarding.steps,
-            status: 'completed',
-            completedAt: new Date().toISOString(),
-            readinessScore: readiness.effectiveScore,
-            readinessLevel: readiness.level,
-            onboardingBaseline: readiness.baseline,
-            operationalHealth: readiness.health,
-            healthComponents: readiness.healthComponents,
-            healthRecalculatedAt: new Date().toISOString(),
-            detectedPlatform: onboarding.detectedPlatform,
-            installedRuntime: onboarding.installedRuntime,
-        });
-    } else {
-        await storage.updateOnboarding(agentGaii, {
-            steps: onboarding.steps,
-            detectedPlatform: onboarding.detectedPlatform,
-            installedRuntime: onboarding.installedRuntime,
-        });
-    }
-
-    emitChange('agent-onboarding');
+    // services/onboarding-progress.ts. This used to be written out here, and the copy had lost the
+    // step that retires untouched OPTIONAL steps on completion — so an agent finishing through MCP
+    // kept them in pendingSteps forever, and the driver reads that list to decide what to do next.
+    const completedOnboarding = await persistStepResult(storage, agentGaii, onboarding, result.passed);
     emitResourceUpdated(agentGaii, `aimeat://agents/${getAgentName(agentGaii)}/onboarding`);
 
     const testTaskAutoStarted = stepId === 'accept_test_task' && result.passed && result.details?.autoStarted;

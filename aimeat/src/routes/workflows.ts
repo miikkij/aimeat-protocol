@@ -32,6 +32,7 @@
  *   v1.0.0 — 2026-06-13 — Phase 3: memory-backed CRUD + blueprint; runs read-only (engine = Phase 4).
  */
 import { Router } from 'express';
+import { pendingHumanInputs } from '../services/workflow/lifecycle.js';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -45,7 +46,7 @@ import {
   getWorkflow, listWorkflows, saveWorkflow, deleteWorkflow,
   listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
-import { syncWorkflowTriggers, removeWorkflowTriggers, readActiveRuns } from '../services/workflow/lifecycle.js';
+import { syncWorkflowTriggers, removeWorkflowTriggers } from '../services/workflow/lifecycle.js';
 import { HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import { WorkflowHumanAnswerSchema, type WorkflowDef, type WorkflowRun } from '../models/workflow-schemas.js';
 
@@ -111,23 +112,8 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   // Express doesn't swallow it as a workflow id.
   router.get('/v1/workflows/pending-inputs', requireAuth(), requireScope('workflow:read'), async (req: Request, res: Response) => {
     const owner = ownerGhiiOf(req);
-    const active = (await readActiveRuns(storage, config.nodeId)).filter(a => a.ownerGhii === owner);
-    const inputs: Array<Record<string, unknown>> = [];
-    for (const a of active) {
-      const run = await getRun(storage, owner, a.workflowId, a.runId);
-      if (!run) continue;
-      for (const step of run.defSnapshot.steps) {
-        const rs = run.steps[step.id];
-        if (rs?.state !== 'waiting-human' || !rs.human) continue;
-        const deadline = new Date(new Date(rs.human.askedAt).getTime()
-          + (step.timeout_min ?? HUMAN_TIMEOUT_MIN_DEFAULT) * 60_000).toISOString();
-        inputs.push({
-          workflowId: a.workflowId, runId: a.runId, stepId: step.id,
-          workflowTitle: run.defSnapshot.title, mode: run.mode,
-          question: rs.human.question, askedAt: rs.human.askedAt, deadline,
-        });
-      }
-    }
+    // services/workflow/lifecycle.ts — aimeat_workflow_pending_inputs walks the same runs.
+    const inputs = await pendingHumanInputs(storage, config.nodeId, owner, HUMAN_TIMEOUT_MIN_DEFAULT);
     res.json(success(config.nodeId, { inputs, count: inputs.length }));
   });
 

@@ -16,6 +16,7 @@
  *   v1.0.0 — 2026-06-13 — Phase 8: tight MCP surface (save/get/run) for agent-authored workflows.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { pendingHumanInputs } from '../services/workflow/lifecycle.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -26,9 +27,9 @@ import { parseGAII } from '../utils/gaii.js';
 import { getActiveScheduler } from '../services/scheduler.js';
 import { getActiveWorkflowEngine, HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import {
-  saveWorkflow, getWorkflow, listWorkflows, listRuns, getRun, validateWorkflow, buildBlueprint,
+  saveWorkflow, getWorkflow, listWorkflows, listRuns, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
-import { syncWorkflowTriggers, readActiveRuns } from '../services/workflow/lifecycle.js';
+import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 
 export function registerWorkflowTools(
@@ -156,22 +157,14 @@ export function registerWorkflowTools(
     {},
     annotationsFor('aimeat_workflow_pending_inputs'),
     async () => {
-      const active = (await readActiveRuns(storage, config.nodeId)).filter(a => a.ownerGhii === ownerGhii);
-      const inputs: Array<Record<string, unknown>> = [];
-      for (const a of active) {
-        const run = await getRun(storage, ownerGhii, a.workflowId, a.runId);
-        if (!run) continue;
-        for (const step of run.defSnapshot.steps) {
-          const rs = run.steps[step.id];
-          if (rs?.state !== 'waiting-human' || !rs.human) continue;
-          const deadline = new Date(new Date(rs.human.askedAt).getTime()
-            + (step.timeout_min ?? HUMAN_TIMEOUT_MIN_DEFAULT) * 60_000).toISOString();
-          inputs.push({
-            workflow_id: a.workflowId, run_id: a.runId, step_id: step.id,
-            question: rs.human.question, asked_at: rs.human.askedAt, deadline,
-          });
-        }
-      }
+      // The walk and the deadline arithmetic are services/workflow/lifecycle.ts. A deadline
+      // computed two ways is a deadline: an agent told one time and the dashboard showing another
+      // is worse than either being wrong on its own.
+      const pending = await pendingHumanInputs(storage, config.nodeId, ownerGhii, HUMAN_TIMEOUT_MIN_DEFAULT);
+      const inputs = pending.map(p => ({
+        workflow_id: p.workflowId, run_id: p.runId, step_id: p.stepId,
+        question: p.question, asked_at: p.askedAt, deadline: p.deadline,
+      }));
       return text({ inputs, count: inputs.length });
     },
   );

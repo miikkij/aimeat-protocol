@@ -20,13 +20,12 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { recordTelemetryUsage } from '../services/usage-metering.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import { pushTelemetry, recordTelemetryActivity } from '../services/telemetry-buffer.js';
-import { recordUsageEvent, extractUsageFields } from '../services/usage-metering.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
-import { logger } from '../utils/logger.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
@@ -69,26 +68,12 @@ export function registerAgentTelemetryTools(
         pushTelemetry(event);
         recordTelemetryActivity(agentGaii, { type, data: data ?? {} });
 
-        // LEDGER (TARGET-016): an llm_call carrying a model becomes a priced, append-only
-        // usage event. Backward compatible; a ledger failure never fails the report.
-        if (type === 'llm_call') {
-            const fields = extractUsageFields(data ?? {});
-            if (fields) {
-                try {
-                    await recordUsageEvent(storage, {
-                        ...fields,
-                        agentGaii,
-                        ownerGhii: `${agent.owner}@${config.nodeId}`,
-                        runId: fields.runId ?? task_id,
-                        source: 'telemetry',
-                    });
-                } catch (err) {
-                    logger.warn('ledger: usage event write failed (telemetry accepted)', {
-                        agentGaii, error: String(err),
-                    });
-                }
-            }
-        }
+        // LEDGER (TARGET-016): an llm_call carrying a model becomes a priced, append-only usage
+        // event. services/usage-metering.ts decides that, because the ledger is what an owner is
+        // billed from and two copies of "does this count" is two answers to what something cost.
+        await recordTelemetryUsage(storage,
+            { agentGaii, ownerGhii: `${agent.owner}@${config.nodeId}`, taskId: task_id },
+            type, data ?? {});
 
         return { content: [{ type: 'text' as const, text: JSON.stringify({ id: event.id }, null, 2) }] };
     });

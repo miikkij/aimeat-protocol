@@ -29,6 +29,7 @@
  */
 
 import { Router, type Request } from 'express';
+import { refreshOnboarding, persistStepResult } from '../services/onboarding-progress.js';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -136,37 +137,15 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       return;
     }
 
-    if (onboarding.status === 'in_progress') {
-      const updatedSteps = await checkAutoSteps(agentGaii, onboarding, storage);
-      const allRequiredPassed = updatedSteps.filter(s => s.required).every(s => s.status === 'passed');
-
-      if (allRequiredPassed) {
-        // Mark untouched optional steps as 'skipped' so they don't show up
-        // in pendingSteps after the onboarding is completed. They're optional
-        // and the agent chose not to do them; that's a final state, not pending.
-        for (const s of updatedSteps) {
-          if (!s.required && s.status === 'pending') {
-            s.status = 'skipped';
-            s.validatedAt = new Date().toISOString();
-          }
-        }
-        const readiness = await calculateReadiness(agentGaii, updatedSteps, storage, onboarding.readinessOverride);
-        onboarding = (await storage.updateOnboarding(agentGaii, {
-          steps: updatedSteps,
-          status: 'completed',
-          completedAt: new Date().toISOString(),
-          readinessScore: readiness.effectiveScore,
-          readinessLevel: readiness.level,
-          onboardingBaseline: readiness.baseline,
-          operationalHealth: readiness.health,
-          healthComponents: readiness.healthComponents,
-          healthRecalculatedAt: new Date().toISOString(),
-        }))!;
-        emitChange('agent-onboarding');
-        try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('GET /v1/agents/:name/onboarding: MCP not connected', { error: String(err) }); }
-      } else {
-        onboarding = (await storage.updateOnboarding(agentGaii, { steps: updatedSteps }))!;
-      }
+    // services/onboarding-progress.ts — aimeat_onboarding_status does the same re-evaluation.
+    const refreshed = await refreshOnboarding(storage, agentGaii, onboarding);
+    onboarding = refreshed.onboarding;
+    if (!onboarding) {
+      res.json(success(config.nodeId, { onboarding: null, status: 'not_started' }));
+      return;
+    }
+    if (refreshed.completed) {
+      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('GET /v1/agents/:name/onboarding: MCP not connected', { error: String(err) }); }
     }
 
     const pendingSteps = onboarding.steps.filter(s => s.status === 'pending');
@@ -433,39 +412,9 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       onboarding.steps = refreshed;
     }
 
-    // Check if all required steps are now passed -> auto-complete
-    const allRequiredPassed = onboarding.steps.filter(s => s.required).every(s => s.status === 'passed');
-    let completedOnboarding = null;
-    if (result.passed && allRequiredPassed) {
-      // Mark untouched optional steps as 'skipped' on completion (see GET handler).
-      for (const s of onboarding.steps) {
-        if (!s.required && s.status === 'pending') {
-          s.status = 'skipped';
-          s.validatedAt = new Date().toISOString();
-        }
-      }
-      const readiness = await calculateReadiness(agentGaii, onboarding.steps, storage, onboarding.readinessOverride);
-      completedOnboarding = await storage.updateOnboarding(agentGaii, {
-        steps: onboarding.steps,
-        status: 'completed',
-        completedAt: new Date().toISOString(),
-        readinessScore: readiness.effectiveScore,
-        readinessLevel: readiness.level,
-        onboardingBaseline: readiness.baseline,
-        operationalHealth: readiness.health,
-        healthComponents: readiness.healthComponents,
-        healthRecalculatedAt: new Date().toISOString(),
-        detectedPlatform: onboarding.detectedPlatform,
-        installedRuntime: onboarding.installedRuntime,
-      });
-    } else {
-      await storage.updateOnboarding(agentGaii, {
-        steps: onboarding.steps,
-        detectedPlatform: onboarding.detectedPlatform,
-        installedRuntime: onboarding.installedRuntime,
-      });
-    }
-    emitChange('agent-onboarding');
+    // Auto-complete when that was the last required step — services/onboarding-progress.ts, which
+    // aimeat_onboarding_* also calls.
+    const completedOnboarding = await persistStepResult(storage, agentGaii, onboarding, result.passed);
     try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('POST /v1/agents/:name/onboarding/step/:id: MCP not connected', { error: String(err) }); }
 
     if (webhookDispatcher) {

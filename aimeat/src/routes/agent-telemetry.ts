@@ -18,6 +18,7 @@
  */
 
 import { Router } from 'express';
+import { recordTelemetryUsage } from '../services/usage-metering.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
@@ -26,8 +27,6 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { pushTelemetry, recordTelemetryActivity, listTelemetryBuffered } from '../services/telemetry-buffer.js';
-import { recordUsageEvent, extractUsageFields } from '../services/usage-metering.js';
-import { logger } from '../utils/logger.js';
 
 /* ── Zod validation schema ── */
 const TelemetryAppendSchema = z.object({
@@ -102,28 +101,10 @@ export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Ro
     pushTelemetry(event);
     recordTelemetryActivity(agentGaii, { type, data });
 
-    // LEDGER (TARGET-016): an llm_call carrying a model is also recorded as a priced,
-    // append-only usage event. Backward compatible — a bare llm_call without model only
-    // bumps the activity counters above. A ledger write failure never fails the telemetry
-    // post (the client's own buffer/retry is the durability guarantee).
-    if (type === 'llm_call') {
-      const fields = extractUsageFields(data);
-      if (fields) {
-        try {
-          await recordUsageEvent(storage, {
-            ...fields,
-            agentGaii,
-            ownerGhii: `${agent.owner}@${config.nodeId}`,
-            runId: fields.runId ?? task_id,
-            source: 'telemetry',
-          });
-        } catch (err) {
-          logger.warn('ledger: usage event write failed (telemetry accepted)', {
-            agentGaii, error: String(err),
-          });
-        }
-      }
-    }
+    // LEDGER (TARGET-016) — services/usage-metering.ts, which aimeat_agent_telemetry_report calls.
+    await recordTelemetryUsage(storage,
+      { agentGaii, ownerGhii: `${agent.owner}@${config.nodeId}`, taskId: task_id },
+      type, data);
 
     res.status(201).json(success(config.nodeId, { id: event.id }));
   });
