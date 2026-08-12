@@ -7,6 +7,11 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   v1.3.0 — 2026-08-12 — `coFetch` opens its own socket so the company Host really arrives.
+ *     It passed `Host` in a `fetch` headers bag, and undici drops that as a forbidden header, so
+ *     every serving assertion reached the server as plain `localhost`. subdomain.ts v1.5.0 honours
+ *     `x-co-origin` only on a Host in the co family, which turned the silent drop into 404s; the
+ *     404-expecting cases had been passing on the same wrong request all along.
  *   v1.2.0 — 2026-08-08 — Phase 6: the company's own page (publish switches the front
  *     page, re-publish replaces, removal falls back to none, cross-owner refused).
  *   v1.1.0 — 2026-08-07 — Phase 5: the company's own SMTP identity (the password never leaves
@@ -18,11 +23,14 @@
 
 import { createHash } from 'node:crypto';
 import * as ed from '@noble/ed25519';
+import { hostRequest } from './helpers/host-request.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 /** The runner pins AIMEAT_CO_HOST for the spawned server; the suite must agree with it. */
 const CO_HOST = process.env.AIMEAT_CO_HOST ?? 'co.localhost';
+/** The port goes into the company Host the way a browser writes it on a non-80 server. */
+const PORT = new URL(BASE).port || '80';
 
 let passed = 0;
 let failed = 0;
@@ -55,17 +63,24 @@ async function json(path: string, opts: RequestInit = {}): Promise<{ status: num
   }
 }
 
-/** A request that arrives "on" the company origin, the way nginx marks it in production. */
+/**
+ * A request that arrives on the company origin the way nginx delivers it: the company Host, plus
+ * the `x-co-origin` marker and the label.
+ *
+ * Over `fetch` this could not be expressed. `Host` is a forbidden header name in undici, so the
+ * one this function used to pass was dropped without a word and every request below arrived as
+ * plain `localhost`. Since subdomain.ts v1.5.0 the marker is honoured only on a Host in the co
+ * family, which is what a browser and nginx both send, so the helper opens the socket itself.
+ */
 async function coFetch(slug: string, path = '/'): Promise<{ status: number; body: string; location: string | null; contentType: string | null }> {
-  const res = await fetch(`${BASE}${path}`, {
-    redirect: 'manual',
-    headers: { 'X-Co-Origin': '1', 'X-Subdomain': slug, Host: `${slug}.${CO_HOST}` },
+  const res = await hostRequest(BASE, path, `${slug}.${CO_HOST}:${PORT}`, {
+    headers: { 'x-co-origin': '1', 'x-subdomain': slug },
   });
   return {
     status: res.status,
-    body: await res.text(),
-    location: res.headers.get('location'),
-    contentType: res.headers.get('content-type'),
+    body: res.body,
+    location: res.header('location'),
+    contentType: res.header('content-type'),
   };
 }
 

@@ -12,6 +12,9 @@
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial multi-node federation E2E tests
  *   v1.1.0 -- 2026-05-21 -- Add cross-catalogue discovery tests
+ *   v1.2.0 -- 2026-08-12 -- Security audit H-14: the ping tests now sign the way the heartbeat
+ *     client signs, Node A pins the node key of each peer it is pinged by, and an unsigned and a
+ *     wrong-key ping are asserted to be refused.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-multinode.ts
@@ -31,6 +34,15 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
     const privKey = Buffer.from(privateKeyB64, 'base64');
     const sig = await ed.signAsync(new TextEncoder().encode(message), privKey);
     return Buffer.from(sig).toString('base64');
+}
+
+async function generateKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
+    const privateKeyBytes = ed.utils.randomSecretKey();
+    const publicKeyBytes = await ed.getPublicKeyAsync(privateKeyBytes);
+    return {
+        publicKey: Buffer.from(publicKeyBytes).toString('base64'),
+        privateKey: Buffer.from(privateKeyBytes).toString('base64'),
+    };
 }
 
 // ─── Test helpers ───
@@ -75,6 +87,8 @@ interface NodeState {
     ownerToken: string;
     ownerPrivKey: string;
     adminPw: string;
+    /** This node's own Ed25519 identity, the key it signs federation traffic with. */
+    nodeKey: { publicKey: string; privateKey: string };
 }
 
 // ─── Boot a node ───
@@ -101,10 +115,20 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
     config.storageProvider = 'memory';
     config.federationAuthPolicy = 'all_peers';
 
-    const { app } = await createServer(config);
+    const { app, storage } = await createServer(config);
     const server = await new Promise<Server>((resolve) => {
         const s = app.listen(port, () => resolve(s));
     });
+
+    // The node keypair is created by initializeNode(), which service-init fires without awaiting,
+    // so it can land a tick or two after createServer() resolves. Peers pin this public key and the
+    // node signs its federation traffic with the private half, so the test needs both.
+    let nodeKey: { publicKey: string; privateKey: string } | null = null;
+    for (let attempt = 0; attempt < 100 && !nodeKey; attempt++) {
+        nodeKey = await storage.getNodeKey();
+        if (!nodeKey) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    if (!nodeKey) throw new Error(`node ${nodeId} never produced a node keypair`);
 
     return {
         server,
@@ -115,7 +139,50 @@ async function bootNode(port: number, nodeId: string): Promise<NodeState> {
         ownerToken: '',
         ownerPrivKey: '',
         adminPw,
+        nodeKey,
     };
+}
+
+/**
+ * Body of a federation ping, signed the way the heartbeat client signs it in
+ * src/services/federation.ts: Ed25519 over JSON.stringify({ node_id, timestamp, version,
+ * software_version, stats }) in exactly that order. The receiver rebuilds the same string from the
+ * body it received (src/routes/federation-peer/lifecycle.ts), so the field order is part of the
+ * contract and a signature over any other byte string fails the same way a forged one does.
+ *
+ * `idField` picks which spelling of the sender id goes on the wire. The route accepts both.
+ *
+ * One limit to read these tests with: all three nodes boot in one process on one machine, so
+ * initializeNode() hands each of them the same persisted ~/.aimeat/node-key.json identity. A ping
+ * "from C" therefore carries bytes B could also have produced. The wrong-key test below is what
+ * proves the route verifies a pinned key at all, and it uses a keypair no node holds.
+ */
+async function signedPingBody(
+    from: NodeState,
+    idField: 'node_id' | 'from_node',
+    privateKey = from.nodeKey.privateKey,
+): Promise<string> {
+    const timestamp = new Date().toISOString();
+    const version = 'v1';
+    const softwareVersion = '0.0.0-test';
+    const stats = { agents_active: 0, actions_published: 0, uptime_hours: 0, catalogue_hash: '' };
+    const signedBytes = JSON.stringify({
+        node_id: from.config.nodeId,
+        timestamp,
+        version,
+        software_version: softwareVersion,
+        stats,
+    });
+    const signature = await signMsg(privateKey, signedBytes);
+    const wire: Record<string, unknown> = {
+        timestamp,
+        version,
+        software_version: softwareVersion,
+        stats,
+        signature,
+    };
+    wire[idField] = from.config.nodeId;
+    return JSON.stringify(wire);
 }
 
 /** Register owner via admin API and get token */
@@ -142,17 +209,24 @@ async function setupOwner(node: NodeState, ownerName: string): Promise<void> {
     assert(typeof node.ownerToken === 'string' && node.ownerToken.length > 0, `got token on ${node.config.nodeId}`);
 }
 
-/** Add a peer and activate it */
+/**
+ * Add a peer and activate it.
+ *
+ * `peerPublicKey` is the peer's node identity. Every signed federation endpoint verifies against
+ * the key pinned here and fails closed when there is none, so a peer added without one can be
+ * reached but cannot prove it is itself.
+ */
 async function addAndActivatePeer(
     node: NodeState,
     peerNodeId: string,
     peerUrl: string,
+    peerPublicKey?: string,
 ): Promise<void> {
     // Add peer
     const { status, body } = await node.json('/v1/federation/peers', {
         method: 'POST',
         headers: { Authorization: `Bearer ${node.ownerToken}` },
-        body: JSON.stringify({ node_id: peerNodeId, url: peerUrl }),
+        body: JSON.stringify({ node_id: peerNodeId, url: peerUrl, public_key: peerPublicKey }),
     });
     assert(status === 201, `add peer ${peerNodeId} on ${node.config.nodeId}: status ${status}: ${JSON.stringify(body)}`);
 
@@ -215,11 +289,12 @@ await test('Register operator on Node C', async () => {
 console.log('\nStep 3: Establish peering (A <-> B, A <-> C)');
 
 await test('Node A adds Node B as peer', async () => {
-    await addAndActivatePeer(nodeA!, 'aimeat-node-001-testb', nodeB!.baseUrl);
+    // A pins B's node key, which is what B's pings are verified against below.
+    await addAndActivatePeer(nodeA!, 'aimeat-node-001-testb', nodeB!.baseUrl, nodeB!.nodeKey.publicKey);
 });
 
 await test('Node A adds Node C as peer', async () => {
-    await addAndActivatePeer(nodeA!, 'aimeat-node-001-testc', nodeC!.baseUrl);
+    await addAndActivatePeer(nodeA!, 'aimeat-node-001-testc', nodeC!.baseUrl, nodeC!.nodeKey.publicKey);
 });
 
 await test('Node B adds Node A as peer', async () => {
@@ -727,7 +802,7 @@ console.log('\nAdditional: Cross-node connectivity');
 await test('Node C can ping Node A', async () => {
     const { status, body } = await nodeA!.json('/v1/federation/ping', {
         method: 'POST',
-        body: JSON.stringify({ from_node: 'aimeat-node-001-testc' }),
+        body: await signedPingBody(nodeC!, 'from_node'),
     });
     assert(status === 200, `ping: ${status}: ${JSON.stringify(body)}`);
     assert(body.data.pong === true, 'pong is true');
@@ -737,10 +812,34 @@ await test('Node C can ping Node A', async () => {
 await test('Node B can ping Node A', async () => {
     const { status, body } = await nodeA!.json('/v1/federation/ping', {
         method: 'POST',
-        body: JSON.stringify({ from_node: 'aimeat-node-001-testb' }),
+        body: await signedPingBody(nodeB!, 'node_id'),
     });
-    assert(status === 200, `ping: ${status}`);
+    assert(status === 200, `ping: ${status}: ${JSON.stringify(body)}`);
     assert(body.data.pong === true, 'pong');
+});
+
+// SECURITY (audit H-14, commit 846f21f4): POST /v1/federation/ping ran no signature check at all
+// and set status = 'active' from a body-supplied node id, so one unauthenticated request from
+// anywhere cancelled a de-peering an operator had started. These two tests are the finding. Do not
+// relax them back into an unsigned ping: a suite that only ever sends a good signature would not
+// notice the check being deleted again.
+await test('An unsigned ping is refused', async () => {
+    const { status, body } = await nodeA!.json('/v1/federation/ping', {
+        method: 'POST',
+        body: JSON.stringify({ from_node: 'aimeat-node-001-testb', timestamp: new Date().toISOString() }),
+    });
+    assert(status === 401, `unsigned ping must be 401, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'UNAUTHORIZED', `error code: ${JSON.stringify(body.error)}`);
+});
+
+await test('A ping signed by the wrong key is refused', async () => {
+    const impostor = await generateKeyPair();
+    const { status, body } = await nodeA!.json('/v1/federation/ping', {
+        method: 'POST',
+        body: await signedPingBody(nodeB!, 'node_id', impostor.privateKey),
+    });
+    assert(status === 401, `wrong-key ping must be 401, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'UNAUTHORIZED', `error code: ${JSON.stringify(body.error)}`);
 });
 
 await test('Each node has its own identity', async () => {

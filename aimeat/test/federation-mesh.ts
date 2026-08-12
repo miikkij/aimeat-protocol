@@ -9,6 +9,13 @@
  *   v1.2.0 — 2026-05-21 — Add federated login E2E tests (Phase 3 Task 6)
  *   v1.3.0 — 2026-05-21 — Add cross-node data access tests (Phase 4 Task 4)
  *   v1.4.0 — 2026-05-21 — Add auth/refresh and wildcard consent tests
+ *   v1.5.0 — 2026-08-12 — August 2026 audit fallout, two findings:
+ *     H-2: the federated PUBLIC board is created by the OWNER session, because an agent JWT no
+ *     longer carries its owner's roles. The same test now also shows the refusal is about `public`
+ *     and not about `federate`.
+ *     H-14: the federation ping is signed the way the heartbeat client signs it, and an unsigned
+ *     ping from a known peer is asserted to be refused. The fake peer is registered with a real
+ *     Ed25519 public key so there is something to verify against.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-mesh.ts
@@ -93,6 +100,13 @@ let isOperator = false;
 
 const fakePeerNodeId = `aimeat-mesh-peer-${Date.now()}`;
 const fakePeerUrl = 'http://localhost:9999';
+
+// The fake peer needs a real key: since audit finding H-14 the node verifies the signature on a
+// federation ping instead of taking the body's word for who sent it, and a peer registered with an
+// empty public key can never produce one that verifies.
+const fakePeerSecret = ed.utils.randomSecretKey();
+const fakePeerPrivKey = Buffer.from(fakePeerSecret).toString('base64');
+const fakePeerPubKey = Buffer.from(await ed.getPublicKeyAsync(fakePeerSecret)).toString('base64');
 
 console.log('\n=== Federation Mesh Phase 1 E2E Tests ===\n');
 
@@ -189,6 +203,7 @@ await test('POST /v1/federation/peers -- add peer', async () => {
         body: JSON.stringify({
             node_id: fakePeerNodeId,
             url: fakePeerUrl,
+            public_key: fakePeerPubKey,
         }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
@@ -336,10 +351,45 @@ console.log('\nBoard Federate Flag');
 
 let federatedBoardId = '';
 
+// A PUBLIC board is the operator's to create (services/board-write.ts). This test used agentToken,
+// which worked because POST /v1/auth/token copied the owner's 'owner' and 'operator' roles onto the
+// agent JWT. Audit finding H-2 closed that: an agent session is exactly ['agent'] now, matching what
+// device-auth, the MCP OAuth path and the refresh path always issued. So the operator credential is
+// ownerToken. DO NOT switch this back to agentToken: the create would 403 again, federatedBoardId
+// would stay empty, and the three board tests after it would run against `/v1/boards//visibility`.
+// The two probes below say which word in the request the refusal is about: with the SAME agent
+// credential a shared board is created and a public one is refused, so the gate is `public` rather
+// than `federate`. The operator dimension of the same gate (a non-operator OWNER session is refused
+// too) is proven in e2e-board-ttl test 35, which is where it belongs.
 await test('POST /v1/boards -- create board with federate=true', async () => {
-    const { status, body } = await json('/v1/boards', {
+    const { status: sharedStatus, body: sharedBody } = await json('/v1/boards', {
         method: 'POST',
         headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            name: `mesh-board-fed-shared-${Date.now()}`,
+            visibility: 'shared',
+            description: 'A federated board an agent may create',
+            federate: true,
+        }),
+    });
+    assert(sharedStatus === 201, `agent shared+federate board: status ${sharedStatus}: ${JSON.stringify(sharedBody)}`);
+    assert(sharedBody.data.federate === true, `shared board federate: ${sharedBody.data.federate}`);
+
+    const { status: refusedStatus } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            name: `mesh-board-fed-refused-${Date.now()}`,
+            visibility: 'public',
+            description: 'An agent session is not an operator',
+            federate: true,
+        }),
+    });
+    assert(refusedStatus === 403, `agent public board: expected 403, got ${refusedStatus}`);
+
+    const { status, body } = await json('/v1/boards', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({
             name: `mesh-board-fed-${Date.now()}`,
             visibility: 'public',
@@ -366,10 +416,13 @@ await test('GET /v1/boards -- verify federate=true in listing', async () => {
     assert(board.federate === true, `board federate in listing: ${board.federate}`);
 });
 
+// Owner credential again, and for a second reason: this route admits the BOARD OWNER alone, not an
+// operator and not another session of the same person. The board above is the owner session's, so
+// only the owner session may turn its federate flag off.
 await test('PATCH /v1/boards/:id/visibility -- set federate=false', async () => {
     const { body } = await json(`/v1/boards/${federatedBoardId}/visibility`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ federate: false }),
     });
     assert(body.ok === true, `update: ${JSON.stringify(body.error)}`);
@@ -482,15 +535,36 @@ await test('GET /v1/federation/service-summary -- includes only federated items'
     assert(!actionIds.includes(unfederatedActionId), `unfederated action ${unfederatedActionId} should NOT be in summary`);
 });
 
-await test('POST /v1/federation/ping -- response includes service_summary_hash', async () => {
+// This asked for a pong with `{ from_node }` and nothing else, which is the shape audit finding
+// H-14 refuses: a liveness signal used to be taken on the body's word alone and it wrote
+// status = 'active', so one unauthenticated request from anywhere cancelled a de-peering the
+// operator had started. The heartbeat client in services/federation.ts has always signed this
+// payload, so the test signs the same fields in the same order the client sends them. The unsigned
+// arm below is the rule itself: a known peer that does not sign gets 401, not a pong.
+await test('POST /v1/federation/ping -- signed ping pongs, unsigned is refused', async () => {
+    const pingPayload = {
+        node_id: fakePeerNodeId,
+        timestamp: new Date().toISOString(),
+        version: 'v1',
+        software_version: '0.0.0-mesh-test',
+        stats: { agents_active: 0, actions_published: 0, uptime_hours: 0, catalogue_hash: 'mesh-test' },
+    };
+    const signature = await signMsg(fakePeerPrivKey, JSON.stringify(pingPayload));
     const { status, body } = await json('/v1/federation/ping', {
         method: 'POST',
-        body: JSON.stringify({ from_node: fakePeerNodeId }),
+        body: JSON.stringify({ ...pingPayload, signature }),
     });
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(body.data.pong === true, 'pong is true');
     assert(typeof body.data.service_summary_hash === 'string', `service_summary_hash is string: ${body.data.service_summary_hash}`);
+
+    const { status: unsignedStatus, body: unsignedBody } = await json('/v1/federation/ping', {
+        method: 'POST',
+        body: JSON.stringify({ from_node: fakePeerNodeId }),
+    });
+    assert(unsignedStatus === 401, `unsigned ping: expected 401, got ${unsignedStatus}`);
+    assert(unsignedBody.error?.code === 'UNAUTHORIZED', `unsigned ping code: ${unsignedBody.error?.code}`);
 });
 
 await test('GET /v1/federation/cross-catalogue -- supports source=network filter', async () => {

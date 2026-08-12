@@ -20,6 +20,10 @@
  * @structure owner + two agents (one with provenance:write, one without) · write · read · lie · gate · DM
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-agent-plane
  * @version-history
+ *   v1.3.0 — 2026-08-12 — The Phase 8b agent asks for `organism:write`. Three of the tools this
+ *     suite drives are mapped to that scope, and the MCP surface never registers a tool the
+ *     session's scopes do not allow, so two tests were failing on a setup that predated the
+ *     mapping rather than on anything about provenance.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 9 step 0 (§8). The two surfaces that were stamped with
  *     nowhere to keep the id now have one, and these tests read the record OFF THE ITEM rather than
  *     off the write result — which is the difference between "the record exists" and "a label can be
@@ -397,8 +401,17 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
     // is stamped when it is PUBLISHED, so a second record at save time would describe bytes nobody
     // has been shown. That reason is recorded next to the tool in scripts/check-ai-disclosure.ts.
 
+    // `organism:write` is the word src/mcp/catalog/scopes.ts maps aimeat_organism_create,
+    // aimeat_workspace_create and aimeat_workspace_comment to, and an unheld scope DELETES a tool
+    // from the session's surface rather than refusing the call (src/mcp/index.ts wraps mcp.tool).
+    // The list below predates that mapping — it was written on 2026-08-01, the mapping landed on
+    // 2026-08-10 in "name what 55 tools do" — so the suite asked for seven words that never
+    // included it and then asserted the tool was offered anyway. It is an ORDINARY scope: it is not
+    // in SCOPES_OUTSIDE_WILDCARD (src/utils/scope-coverage.ts), so naming it grants nothing that a
+    // '*' agent would not already carry, and the section below still proves what it set out to.
     const writer = await connectAgent(o.token, o.name, `w8b${Date.now()}`,
-        ['memory:read', 'memory:write', 'social:write', 'messages:send', 'messages:read', 'exchange:write', 'exchange:read']);
+        ['memory:read', 'memory:write', 'social:write', 'messages:send', 'messages:read',
+            'exchange:write', 'exchange:read', 'organism:write']);
 
     const PHASE_8B_TOOLS = [
         'aimeat_board_reply', 'aimeat_message_send', 'aimeat_dm_ask',

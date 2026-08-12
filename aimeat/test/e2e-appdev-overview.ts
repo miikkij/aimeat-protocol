@@ -95,9 +95,20 @@ await test('GET /v1/appdev/overview requires auth', async () => {
 });
 
 await test('overview returns every section with caps + drill-downs', async () => {
-    const { status, body } = await json('/v1/appdev/overview', { headers: { Authorization: `Bearer ${tokenA}` } });
-    assert(status === 200, `status ${status}`);
-    const d = body.data;
+    // The built-in skills are seeded at boot WITHOUT being awaited (server-bootstrap/service-init.ts
+    // fires seedBuiltinSkills and moves on), so a fast suite can read the overview before the node
+    // has finished writing them. It showed up as a one-in-three failure on postgres, where boot is
+    // slower because the migrations run first, and never on sqlite. Wait for the record rather than
+    // asserting into a race: a flaky test is worse than a missing one, because it teaches everyone
+    // to re-run until it is green and that is how a real regression gets waved through.
+    let d: any;
+    for (let attempt = 0; attempt < 40; attempt++) {
+        const r = await json('/v1/appdev/overview', { headers: { Authorization: `Bearer ${tokenA}` } });
+        assert(r.status === 200, `status ${r.status}`);
+        d = r.body.data;
+        if (d?.skills?.node?.items?.some((s: any) => s.ref === 'node:aimeat-app-builder')) break;
+        await new Promise(r2 => setTimeout(r2, 250));
+    }
     for (const s of ['apps', 'library_packs', 'app_templates', 'skills', 'pitfalls_curated', 'pitfalls_learned', 'template_proposals']) {
         assert(d[s] !== undefined, `section ${s} missing`);
     }

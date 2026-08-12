@@ -15,12 +15,19 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-portfolio-origin.ts
  * @version-history
  *   v1.0.0 — 2026-07-03 — Initial (portfolio origin phases 0–5).
+ *   v1.1.0 — 2026-08-12 — Every request that claims the portfolio origin now addresses one.
+ *     subdomain.ts v1.5.0 honours `x-portfolio-origin` only on a Host in the portfolio family,
+ *     because the header alone was enough to be served as an isolated origin from anywhere. The
+ *     suite sent the marker to `localhost`, which is the shape the check exists to refuse, so it
+ *     had been describing an attacker's request as the production one. `fetch` cannot set Host at
+ *     all, hence the node:http helper.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { hostRequest, type HostResponse } from './helpers/host-request.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -49,12 +56,19 @@ async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(sig).toString('base64');
 }
 
-/** GET / as the portfolio origin would receive it from nginx. */
-async function portfolioGet(sub: string | null) {
+/**
+ * GET `path` as the portfolio origin actually receives it from nginx: a real Host in the portfolio
+ * family plus the marker nginx stamps. Both halves are load-bearing since subdomain.ts v1.5.0 —
+ * the marker counts only on a Host in its own family, and `fetch` cannot send a Host at all
+ * (undici drops it as a forbidden header), so the helper opens the socket itself.
+ *
+ * `sub` is the username label, or null for the bare portfolio host.
+ */
+function portfolioGet(sub: string | null, path = '/'): Promise<HostResponse> {
+    const host = sub ? `${sub}.${PORTFOLIO_HOST}:${PORT}` : `${PORTFOLIO_HOST}:${PORT}`;
     const headers: Record<string, string> = { 'x-portfolio-origin': '1' };
     if (sub) headers['x-subdomain'] = sub;
-    const res = await fetch(`${BASE}/`, { headers, redirect: 'manual' });
-    return { status: res.status, text: await res.text(), headers: res.headers };
+    return hostRequest(BASE, path, host, { headers });
 }
 
 function cleanupDb() {
@@ -136,26 +150,26 @@ async function main() {
         await test('GET / (x-portfolio-origin + x-subdomain) serves the portfolio HTML', async () => {
             const r = await portfolioGet(owner);
             assert(r.status === 200, `expected 200, got ${r.status}`);
-            assert((r.headers.get('content-type') ?? '').includes('text/html'), `content-type: ${r.headers.get('content-type')}`);
-            assert(r.text.includes('PORTFOLIO ORIGIN DEMO'), 'body contains the portfolio content');
+            assert((r.header('content-type') ?? '').includes('text/html'), `content-type: ${r.header('content-type')}`);
+            assert(r.body.includes('PORTFOLIO ORIGIN DEMO'), 'body contains the portfolio content');
         });
 
         await test('response carries a CSP header + nosniff', async () => {
             const r = await portfolioGet(owner);
-            assert((r.headers.get('content-security-policy') ?? '').includes('script-src'), 'CSP header present');
-            assert(r.headers.get('x-content-type-options') === 'nosniff', 'nosniff present');
+            assert((r.header('content-security-policy') ?? '').includes('script-src'), 'CSP header present');
+            assert(r.header('x-content-type-options') === 'nosniff', 'nosniff present');
         });
 
         await test('standalone bridge injected (auth SDK + shim + scopes meta)', async () => {
             const r = await portfolioGet(owner);
-            assert(r.text.includes('/v1/libs/aimeat-auth.js'), 'aimeat-auth.js injected');
-            assert(r.text.includes('/v1/libs/portfolio-standalone.js'), 'portfolio-standalone.js injected');
-            assert(r.text.includes('name="aimeat-scopes"'), 'aimeat-scopes meta injected');
+            assert(r.body.includes('/v1/libs/aimeat-auth.js'), 'aimeat-auth.js injected');
+            assert(r.body.includes('/v1/libs/portfolio-standalone.js'), 'portfolio-standalone.js injected');
+            assert(r.body.includes('name="aimeat-scopes"'), 'aimeat-scopes meta injected');
         });
 
         await test('aimeat badge present by default (showBadge unset)', async () => {
             const r = await portfolioGet(owner);
-            assert(r.text.includes(BADGE_MARKER), 'badge injected by default');
+            assert(r.body.includes(BADGE_MARKER), 'badge injected by default');
         });
 
         await test('showBadge:false removes the badge', async () => {
@@ -166,7 +180,7 @@ async function main() {
             assert(cfg.status === 200, `config status ${cfg.status}`);
             const r = await portfolioGet(owner);
             assert(r.status === 200, `expected 200, got ${r.status}`);
-            assert(!r.text.includes(BADGE_MARKER), 'badge absent when showBadge=false');
+            assert(!r.body.includes(BADGE_MARKER), 'badge absent when showBadge=false');
         });
 
         console.log('\n404 parity + origin isolation');
@@ -199,12 +213,12 @@ async function main() {
         await test('bare portfolio host (no label) 301s to the apex showcase', async () => {
             const r = await portfolioGet(null);
             assert(r.status === 301, `expected 301, got ${r.status}`);
-            assert((r.headers.get('location') ?? '').startsWith(BASE), `location: ${r.headers.get('location')}`);
+            assert((r.header('location') ?? '').startsWith(BASE), `location: ${r.header('location')}`);
         });
 
         await test('/v1 API unaffected on the portfolio origin', async () => {
-            const res = await fetch(`${BASE}/v1/spec`, { headers: { 'x-portfolio-origin': '1', 'x-subdomain': owner } });
-            assert(res.status === 200, `expected 200, got ${res.status}`);
+            const r = await portfolioGet(owner, '/v1/spec');
+            assert(r.status === 200, `expected 200, got ${r.status}`);
         });
 
         console.log('\nAdvertised URLs + shim library');

@@ -1,6 +1,21 @@
-// E2E tests for all Profile Tab API endpoints
-// Ensures every API call made by profile tab UI components works correctly
-// Run: cd aimeat && AIMEAT_PORT=40251 npx tsx test/e2e-profile-tabs.ts
+/**
+ * @file e2e-profile-tabs.ts
+ * @description Every API call the profile tab components make, driven the way the tab drives it.
+ *   A tab is an owner surface, so a probe that reaches it with an agent token proves the wrong
+ *   thing, and several here did until the August 2026 audit took the owner's roles off agent JWTs.
+ * @structure One block per tab, in the order the profile shows them, plus the onboarding gate and a
+ *   cascade-delete cleanup at the end.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
+ *   test/run-e2e-ci.ts --test=profile-tabs
+ * @version-history
+ *   v1.1.0 — 2026-08-12 — Audit H-2 fallout in two tabs. Boards: the agent token created a PUBLIC
+ *     board, which only an operator may do, and it worked because the token mint copied the owner's
+ *     roles; it now asserts the refusal and creates the shared board a normal principal gets.
+ *     Notifications: all three push routes were driven with the agent token under `status < 500`,
+ *     which the new push:manage 403 passes, so the block reported green while proving nothing — it
+ *     is the owner's session now, with the scope refusal and the per-device keying both asserted.
+ *   v1.0.0 — earlier — Initial per-tab endpoint coverage.
+ */
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -807,10 +822,24 @@ console.log('\n--- Boards Tab ---');
 let boardId = '';
 let postId = '';
 
+// Audit H-2 again, one tab further down. A public board is the operator's to create, and this
+// section used to create one with the agent token. It passed because POST /v1/auth/token copied the
+// owner's roles onto the agent JWT, so the agent arrived holding 'operator'. The mint now issues
+// ['agent'] alone, and both halves of that are asserted here: the public board is refused, and the
+// board the tab actually gives a normal principal is 'shared'.
+await test('POST /v1/boards — an agent token cannot create a public board', async () => {
+    const { status, body } = await authJson('/v1/boards', agentToken, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'E2E Operator Board', description: 'Operator-only', visibility: 'public' }),
+    });
+    assert(status === 403 && body.error?.code === 'ACCESS_DENIED',
+        `an agent must not reach the operator's board, got ${status} ${JSON.stringify(body.error)}`);
+});
+
 await test('POST /v1/boards — create board', async () => {
     const { body } = await authJson('/v1/boards', agentToken, {
         method: 'POST',
-        body: JSON.stringify({ name: 'E2E Test Board', description: 'Testing boards', visibility: 'public' }),
+        body: JSON.stringify({ name: 'E2E Test Board', description: 'Testing boards', visibility: 'shared' }),
     });
     assert(body.ok === true, `create board: ${JSON.stringify(body.error)}`);
     boardId = body.data?.board_id || body.data?.id || '';
@@ -1057,33 +1086,83 @@ await test('DELETE /v1/personal/anchor/:nodeId — detach node', async () => {
 // ══════════════════════════════════════════════════════════════════
 console.log('\n--- Notifications Tab ---');
 
+// Audit H-8: the three push routes now require the `push:manage` scope, and a subscription is keyed
+// on (owner, endpoint) so a second browser joins instead of evicting the first. This block used to
+// drive all three with the agent token and assert only `status < 500`, which a 403 passes, so it
+// went on reporting green while proving nothing. The tab is an owner surface, and requireScope lets
+// an owner-role session through on its role, so the owner token is what it is driven with.
+//
+// The endpoints are loopback: validateOutboundUrl (audit H-8's other half) resolves the host, so a
+// name that does not exist would be refused for the wrong reason, and the runner allows private
+// egress. Nothing listens there, which is what a delivery attempt is supposed to survive.
+const pushEndpointA = 'https://127.0.0.1:40961/push/e2e-device-a';
+const pushEndpointB = 'https://127.0.0.1:40961/push/e2e-device-b';
+const pushKeys = { p256dh: 'test-key', auth: 'test-auth' };
+
 await test('GET /v1/push/vapid-key — VAPID public key', async () => {
     const { status, body } = await authJson('/v1/push/vapid-key', agentToken);
-    // VAPID might not be configured, accept 200 or error with code
-    assert(status === 200 || (body.error && typeof body.error.code === 'string'), `vapid: ${JSON.stringify(body)}`);
+    // A node without VAPID keys says so; one with them hands the key out. Both are answers.
+    assert(status === 200 || (status === 503 && body.error?.code === 'FEATURE_DISABLED'),
+        `vapid: ${status} ${JSON.stringify(body)}`);
+});
+
+await test('POST /v1/push/subscribe — an agent without push:manage is refused', async () => {
+    // narrowToken holds memory:read only. `agentToken` would prove nothing: the E2E runner pins
+    // AIMEAT_DEFAULT_AGENT_SCOPES='*', so the tab's own agent arrives holding the wildcard.
+    const { status, body } = await authJson('/v1/push/subscribe', narrowToken, {
+        method: 'POST',
+        body: JSON.stringify({ endpoint: pushEndpointA, keys: pushKeys }),
+    });
+    assert(status === 403 && body.error?.code === 'SCOPE_DENIED',
+        `push:manage must gate this, got ${status} ${JSON.stringify(body.error)}`);
 });
 
 await test('POST /v1/push/subscribe — subscribe to push', async () => {
-    const { status, body } = await authJson('/v1/push/subscribe', agentToken, {
+    const { status, body } = await authJson('/v1/push/subscribe', ownerToken, {
         method: 'POST',
-        body: JSON.stringify({
-            endpoint: 'https://fcm.example.com/test',
-            keys: { p256dh: 'test-key', auth: 'test-auth' },
-        }),
+        body: JSON.stringify({ endpoint: pushEndpointA, keys: pushKeys }),
     });
-    // Push might not be configured, accept success or known error
-    assert(status < 500, `subscribe: status ${status}`);
+    assert(status === 201, `subscribe: status ${status} ${JSON.stringify(body.error)}`);
+    assert(body.data?.subscription?.endpoint === pushEndpointA, 'the subscription names the device');
+});
+
+await test('POST /v1/push/subscribe — a second device joins instead of replacing the first', async () => {
+    const { status } = await authJson('/v1/push/subscribe', ownerToken, {
+        method: 'POST',
+        body: JSON.stringify({ endpoint: pushEndpointB, keys: pushKeys }),
+    });
+    assert(status === 201, `second device: status ${status}`);
 });
 
 await test('POST /v1/push/test — test push notification', async () => {
-    const { status } = await authJson('/v1/push/test', agentToken, { method: 'POST' });
-    // May fail if not subscribed or VAPID not configured
-    assert(status < 500, `push test: status ${status}`);
+    const { status } = await authJson('/v1/push/test', ownerToken, { method: 'POST' });
+    // 200 when a device took it. Nothing is listening on either endpoint, and a node without VAPID
+    // keys sends nothing at all, so 404 ("no device took it") is the outcome to expect here. A 403
+    // would mean the owner's own browser had been locked out of its own tab.
+    assert(status === 200 || status === 404, `push test: status ${status}`);
 });
 
-await test('DELETE /v1/push/subscribe — unsubscribe from push', async () => {
-    const { status } = await authJson('/v1/push/subscribe', agentToken, { method: 'DELETE' });
-    assert(status < 500, `unsubscribe: status ${status}`);
+await test('DELETE /v1/push/subscribe — unsubscribe one device by endpoint', async () => {
+    const { status } = await authJson('/v1/push/subscribe', ownerToken, {
+        method: 'DELETE',
+        body: JSON.stringify({ endpoint: pushEndpointA }),
+    });
+    assert(status === 200, `unsubscribe A: status ${status}`);
+
+    // A repeat of the same removal has nothing left to remove.
+    const again = await authJson('/v1/push/subscribe', ownerToken, {
+        method: 'DELETE',
+        body: JSON.stringify({ endpoint: pushEndpointA }),
+    });
+    assert(again.status === 404, `A was already gone, expected 404, got ${again.status}`);
+});
+
+await test('DELETE /v1/push/subscribe — the other device survived, and clears on its own', async () => {
+    const { status } = await authJson('/v1/push/subscribe', ownerToken, {
+        method: 'DELETE',
+        body: JSON.stringify({ endpoint: pushEndpointB }),
+    });
+    assert(status === 200, `device B was taken down with device A, got ${status}`);
 });
 
 // ══════════════════════════════════════════════════════════════════

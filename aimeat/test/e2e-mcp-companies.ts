@@ -13,16 +13,23 @@
  *   fence (the tools resolve the agent's OWNER, never a client-supplied id).
  * @version-history
  *   v1.0.0 — 2026-08-08 — Initial: list/create/update/front_page/portfolio_publish.
+ *   v1.1.0 — 2026-08-12 — The "it is served at the address" check opens its own socket. It passed
+ *     `Host` to `fetch`, which drops it as a forbidden header, so the request arrived as plain
+ *     `localhost`; subdomain.ts v1.5.0 honours `x-co-origin` only on a Host in the co family and
+ *     the silent drop became a 404.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-companies.ts
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { hostRequest } from './helpers/host-request.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const CO_HOST = process.env.AIMEAT_CO_HOST ?? 'co.localhost';
+/** The port goes into the company Host the way a browser writes it on a non-80 server. */
+const PORT = new URL(BASE).port || '80';
 
 let passed = 0;
 let failed = 0;
@@ -252,12 +259,13 @@ await test('6. aimeat_company_portfolio_publish serves the page at the address',
     assert(out.company.frontPage.kind === 'portfolio', `front page did not switch: ${out.company.frontPage.kind}`);
     assert(out.portfolio.published === true, 'the page reports as unpublished');
 
-    const served = await fetch(`${BASE}/`, {
-        redirect: 'manual',
-        headers: { 'X-Co-Origin': '1', 'X-Subdomain': slug, Host: `${slug}.${CO_HOST}` },
+    // The company Host is half the request: the marker alone is refused, and `fetch` cannot
+    // send a Host, so this goes over the raw-socket helper.
+    const served = await hostRequest(BASE, '/', `${slug}.${CO_HOST}:${PORT}`, {
+        headers: { 'x-co-origin': '1', 'x-subdomain': slug },
     });
     assert(served.status === 200, `the address must serve the page, got ${served.status}`);
-    assert((await served.text()).includes(MARKER), 'the served document is not the published page');
+    assert(served.body.includes(MARKER), 'the served document is not the published page');
 });
 
 await test("7. an app front page pointing at someone else's app is refused", async () => {

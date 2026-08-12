@@ -408,9 +408,15 @@ await test('SHELL: /local/call/aimeat_memory_read returns the record too', async
 console.log('\nPhase 5 — A door that cannot carry a declaration says so out loud');
 
 await test('A write tool whose REST door takes no declaration reports recorded:false with a reason', async () => {
+  // SHARED rather than public. A PUBLIC board is operator-gated (services/board-write.ts), and this
+  // probe has to be made by the DECLARER agent itself, because what it measures is what that agent's
+  // own tool reports back. Swapping in an owner session to clear the gate would change the subject of
+  // the test. The visibility is incidental here: the board exists so there is somewhere to post.
+  // It read `public` and passed until audit H-2 stopped POST /v1/auth/token from copying the owner's
+  // operator role onto agent JWTs, which is what had been clearing that gate.
   const boards = await json(BASE, '/v1/boards', {
     method: 'POST', headers: { Authorization: `Bearer ${declarerToken}` },
-    body: JSON.stringify({ name: `provboard${stamp}`, description: 'Phase 11 probe board', visibility: 'public' }),
+    body: JSON.stringify({ name: `provboard${stamp}`, description: 'Phase 11 probe board', visibility: 'shared' }),
   });
   assert(boards.status === 201, `board create: ${boards.status} ${JSON.stringify(boards.body?.error ?? {})}`);
   const boardId = boards.body.data.id ?? boards.body.data.board_id;

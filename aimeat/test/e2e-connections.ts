@@ -19,6 +19,9 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.2.1 — 2026-08-12 — The attach-refusal check probed with the password 'wrong', which the error
+ *     envelope's own support hint carries as ordinary prose, so the "secret was not echoed"
+ *     assertion failed on a response that had leaked nothing. The probe is a sentinel now.
  *   v1.2.0 — 2026-08-08 — Three guards for the silences a production user actually met: a send that
  *     failed can be sent again (its own dead row used to answer "already sent" forever), the
  *     double-post guard still holds for one that landed, a scheduled fire that published nothing is
@@ -570,12 +573,17 @@ async function main(): Promise<void> {
       assert(!JSON.stringify(list.data).includes('good-secret'), 'the secret appeared in a response');
     });
     await test('a wrong secret is refused with something the user can act on', async () => {
+      // The rejected secret is a sentinel, not a word. It used to be 'wrong', which the error
+      // envelope's own support hint contains as ordinary prose ("subject":"What went wrong"), so
+      // the echo check failed on a response that had leaked nothing. A value that cannot occur in
+      // English is what makes the assertion mean what it says.
+      const badSecret = 'zzq-not-the-secret-8f3a1c';
       const r = await api('/v1/connections/attach', {
         bearer: jwtA,
-        body: { provider: 'fake-static', fields: { identifier: 'someone', password: 'wrong' } },
+        body: { provider: 'fake-static', fields: { identifier: 'someone', password: badSecret } },
       });
       assert(r.status === 400 && r.data.error.code === 'ATTACH_FAILED', `${r.status} ${r.data?.error?.code}`);
-      assert(!JSON.stringify(r.data).includes('wrong'), 'the rejected secret was echoed in the error');
+      assert(!JSON.stringify(r.data).includes(badSecret), 'the rejected secret was echoed in the error');
     });
     await test('a missing field is named, not swallowed', async () => {
       const r = await api('/v1/connections/attach', {

@@ -23,6 +23,11 @@
  *     for url-validator, add securityPostureWarnings() startup self-check. See security-development-dna.md.
  *   v1.5.1 -- 2026-08-01 -- Pure extraction: missingOperatorConfig / operatorTypeLabel moved to
  *     config-operator.ts (max-file-lines) and are re-exported here, so no importer changes.
+ *   v1.7.0 -- 2026-08-11 -- appOriginEnabled follows the security profile when
+ *     AIMEAT_APP_ORIGIN_ENABLED is unset (public node on, local node off). Audit H-24: an opt-in
+ *     default meant a node that never met the flag served every app on its own session origin.
+ *     parseSiteContacts moved to config-site-contacts.ts by pure extraction to stay under the
+ *     800-line limit; it is called from the same place and behaves identically.
  *   v1.6.0 -- 2026-08-10 -- extensionMaxPayMorsels: a ceiling on the price an action may put on
  *     itself in its manifest. securityPostureWarnings moved to config-posture.ts by pure
  *     extraction when this file reached the 800-line limit; it is re-exported from here.
@@ -35,6 +40,7 @@
  *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
  */
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
+import { parseSiteContacts } from './config-site-contacts.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
@@ -62,47 +68,7 @@ import type {
   RateLimitTier,
   LoadConfigOptions,
   LoadConfigResult,
-  SiteContact,
 } from './config-types.js';
-
-/**
- * The people printed on the public pages, from `AIMEAT_SITE_CONTACTS` (a JSON array of
- * `{ name, role, email, phone }`, ordered by who should field the first contact).
- *
- * Falls back to the single-contact vars this replaced, and finally to the operator email, so a
- * node configured before multi-contact keeps its card. An entry without an email is dropped:
- * a "talk to a human" card with no way to reach anyone is worse than no card.
- *
- * Malformed JSON degrades to the fallback and warns rather than refusing to boot — a typo in a
- * marketing contact must never take a node down.
- */
-function parseSiteContacts(): SiteContact[] {
-  const raw = (process.env.AIMEAT_SITE_CONTACTS ?? '').trim();
-  const clean = (c: Partial<SiteContact>): SiteContact => ({
-    name: String(c.name ?? '').trim(),
-    role: String(c.role ?? '').trim(),
-    email: String(c.email ?? '').trim(),
-    phone: String(c.phone ?? '').trim(),
-    linkedin: String(c.linkedin ?? '').trim(),
-  });
-  if (raw) {
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed.map(c => clean(c as Partial<SiteContact>)).filter(c => c.email !== '');
-      logger.warn('AIMEAT_SITE_CONTACTS is not a JSON array — ignoring it and falling back');
-    } catch (err) {
-      logger.warn('AIMEAT_SITE_CONTACTS is not valid JSON — ignoring it and falling back', { error: String(err) });
-    }
-  }
-  const single = clean({
-    name: process.env.AIMEAT_SITE_CONTACT_NAME,
-    role: process.env.AIMEAT_SITE_CONTACT_ROLE,
-    email: process.env.AIMEAT_SITE_CONTACT_EMAIL ?? process.env.AIMEAT_OPERATOR_EMAIL,
-    phone: process.env.AIMEAT_SITE_CONTACT_PHONE,
-    linkedin: process.env.AIMEAT_SITE_CONTACT_LINKEDIN,
-  });
-  return single.email ? [single] : [];
-}
 
 /**
  * True if `baseUrl` points at localhost / loopback / RFC1918 / link-local / IPv6-ULA — i.e. NOT a
@@ -211,6 +177,17 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   if (process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === undefined) {
     process.env.AIMEAT_ALLOW_PRIVATE_EGRESS = String(allowPrivateEgress);
   }
+  // Runnable app HTML must not execute on the origin that carries the user's session (H-2). The
+  // redirect that moves it to `apps.<apex>` was opt-in, so a node whose operator never met the flag
+  // ran every published app beside the SPA and the isolation existed only where someone had typed
+  // it out. The profile decides instead: a node reachable from the internet isolates apps, a
+  // localhost or personal node does not, having no wildcard DNS to redirect to. An explicit
+  // AIMEAT_APP_ORIGIN_ENABLED still wins, which is why aimeat.io and the E2E suites are unmoved.
+  // A public node that has not provisioned `apps.<domain>` (wildcard DNS + TLS, see
+  // docs/internal/app-origin-deployment.md) sets it to false and keeps the old behaviour.
+  const appOriginEnabled = process.env.AIMEAT_APP_ORIGIN_ENABLED !== undefined
+    ? process.env.AIMEAT_APP_ORIGIN_ENABLED === 'true'
+    : securityProfile === 'public';
   const aiProviderAllowlist = (process.env.AIMEAT_AI_PROVIDER_ALLOWLIST ?? '')
     .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
   // AI provenance (TARGET-058): ON unless explicitly switched off, and _DETAIL governs what is
@@ -234,7 +211,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // App origin: explicit AIMEAT_APP_HOST wins; otherwise derive `apps.<apexHost>`
     // from the baseUrl. Left empty for host-less baseUrls (so nothing breaks in dev).
     appHost: (process.env.AIMEAT_APP_HOST ?? deriveAppHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
-    appOriginEnabled: process.env.AIMEAT_APP_ORIGIN_ENABLED === 'true',
+    appOriginEnabled,
     // Portfolio origin: explicit AIMEAT_PORTFOLIO_HOST wins; otherwise derive
     // `portfolio.<apexHost>` from the baseUrl (empty for host-less baseUrls).
     portfolioHost: (process.env.AIMEAT_PORTFOLIO_HOST ?? derivePortfolioHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
