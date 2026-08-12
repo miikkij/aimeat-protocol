@@ -4,6 +4,58 @@
     {
       "date": "2026-08-12",
       "version": "2.8.0",
+      "kind": "security",
+      "title": {
+        "en": "Only you can change your own password, email and two-factor",
+        "fi": "Vain sinä voit vaihtaa salasanasi, sähköpostisi ja kaksivaiheisen tunnistuksesi"
+      },
+      "body": {
+        "en": "An app you granted access to, or an agent connected in your name, could reach the controls of your account itself: set a password, repoint the address your reset code is sent to, or switch on two-factor with a code you never see. None of them were things you had approved, and the last one could lock you out for good, because removing two-factor needs the code and nobody can reset it for you.\n\nThose fourteen controls now answer to you and to nobody acting on your behalf. Deleting your account and exporting everything it holds are on the same footing.\n\nIf you WANT an agent to handle them, that is still possible and it is now a permission with its own name, shown on its own line when you approve the agent. No agent has it by default, and \"full access\" does not include it: it is the one thing a blanket grant deliberately leaves out.\n\nOne related change you may notice: an agent no longer inherits your operator rights just because you hold them. Operator is something you give on purpose now.",
+        "fi": "Appi jolle olit antanut oikeuksia, tai sinun nimissäsi liitetty tekoäly, ylsi tilisi omiin hallintalaitteisiin: se pystyi asettamaan salasanan, vaihtamaan osoitteen johon palautuskoodi lähetetään, tai kytkemään kaksivaiheisen tunnistuksen päälle koodilla jota sinä et koskaan näe. Mitään näistä et ollut hyväksynyt, ja viimeinen olisi voinut sulkea sinut ulos lopullisesti, koska tunnistuksen poistaminen vaatii koodin eikä kukaan voi nollata sitä puolestasi.\n\nNe neljätoista hallintalaitetta kuuluvat nyt sinulle eivätkä kenellekään joka toimii nimissäsi. Tilin poisto ja kaiken sen sisällön vienti ovat samalla viivalla.\n\nJos HALUAT että tekoäly hoitaa ne, se onnistuu edelleen, ja se on nyt lupa jolla on oma nimensä ja oma rivinsä silloin kun hyväksyt agentin. Kenelläkään ei ole sitä valmiiksi, eikä \"täysi käyttöoikeus\" sisällä sitä: se on se yksi asia jonka kattava myöntö jättää tarkoituksella ulkopuolelle.\n\nYksi liittyvä muutos jonka saatat huomata: tekoäly ei enää peri operaattorin oikeuksiasi pelkästään siksi että sinulla on ne. Operaattorius annetaan nyt tarkoituksella."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "security",
+      "title": {
+        "en": "Your phone and your laptop both get the notification",
+        "fi": "Sekä puhelimesi että läppärisi saavat ilmoituksen"
+      },
+      "body": {
+        "en": "Push notifications were stored one per account, so signing up a second device replaced the first rather than joining it. You got notifications on whichever device you last enabled, and the other went quiet with nothing saying why.\n\nEvery device now keeps its own subscription and every one of them is notified. The same change closes the other half of it: an app could point your notifications at an address it chose and silence your own browser, because there was only ever one slot to take.",
+        "fi": "Push-ilmoitukset talletettiin yksi per tili, joten toisen laitteen käyttöönotto korvasi ensimmäisen sen sijaan että olisi liittynyt sen rinnalle. Sait ilmoitukset sille laitteelle jonka viimeksi otit käyttöön, ja toinen hiljeni kertomatta miksi.\n\nJokainen laite pitää nyt oman tilauksensa ja jokaiselle ilmoitetaan. Sama muutos sulkee toisen puolen asiasta: appi pystyi ohjaamaan ilmoituksesi valitsemaansa osoitteeseen ja vaientamaan oman selaimesi, koska paikkoja oli vain yksi ja sen sai vietyä."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "security",
+      "title": {
+        "en": "A file you download cannot run as a page",
+        "fi": "Lataamasi tiedosto ei voi ajautua sivuna"
+      },
+      "body": {
+        "en": "A stored file was served with whatever content type the uploader declared, and nothing else. An HTML or SVG file therefore opened as a live page on this node's own address, where your session lives.\n\nFiles are now marked so the browser does not sniff a type of its own, are handed over as a download unless they are a format that cannot run anything, and carry a policy that stops a rendered one from reaching your session even if it does open.\n\nAlongside it: an app whose name contained a quotation mark could break out of the app catalogue's own markup. Another owner's app title is just text now, which is what it always claimed to be.",
+        "fi": "Tallennettu tiedosto tarjoiltiin sillä sisältötyypillä jonka lataaja ilmoitti, eikä sen enempää. HTML- tai SVG-tiedosto aukesi siis elävänä sivuna tämän noden omassa osoitteessa, siellä missä istuntosi on.\n\nTiedostot merkitään nyt niin ettei selain arvaa tyyppiä itse, ne annetaan latauksena ellei kyseessä ole muoto joka ei voi ajaa mitään, ja mukana kulkee sääntö joka estää avattuakin tiedostoa yltämästä istuntoosi.\n\nSamalla: appi jonka nimessä oli lainausmerkki pystyi murtautumaan ulos appikatalogin omasta merkkauksesta. Toisen omistajan appin nimi on nyt pelkkää tekstiä, mitä se on aina väittänytkin olevansa."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "security",
+      "title": {
+        "en": "Leaving a shared space actually ends the access",
+        "fi": "Yhteisestä tilasta lähteminen päättää pääsyn oikeasti"
+      },
+      "body": {
+        "en": "Removing someone from an organism, blocking them, or their own decision to leave, took away their membership and left their agents behind. Those agents were listed separately and every check treated a listed agent as a member in its own right, so the person kept full access through their own AI. Their workspace permissions stayed too.\n\nAll of it goes now, in one act.\n\nThe invitation side had the mirror of the same problem: an ordinary member could mint an invite that handed out an admin role and access to workspaces they did not control. An invitation can no longer grant more than the person writing it holds.",
+        "fi": "Kun joku poistettiin organismista, estettiin, tai hän itse lähti, jäsenyys päättyi ja hänen agenttinsa jäivät. Agentit olivat omalla listallaan, ja jokainen tarkistus piti listattua agenttia jäsenenä omillaan, joten henkilö säilytti täyden pääsyn oman tekoälynsä kautta. Myös työtilojen oikeudet jäivät voimaan.\n\nNyt kaikki päättyy samalla kertaa.\n\nKutsujen puolella oli saman asian peilikuva: tavallinen jäsen pystyi tekemään kutsun joka jakoi ylläpitäjän roolin ja pääsyn työtiloihin joita hän ei itse hallinnut. Kutsu ei voi enää antaa enempää kuin sen kirjoittajalla on."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
       "kind": "feature",
       "title": {
         "en": "Ask for help without knowing who to ask",
