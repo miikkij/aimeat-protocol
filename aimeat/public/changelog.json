@@ -2,6 +2,58 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "feature",
+      "title": {
+        "en": "Ask for help without knowing who to ask",
+        "fi": "Pyydä apua tietämättä keneltä"
+      },
+      "body": {
+        "en": "Write to **support@operators** and everyone who runs this node gets it, in one thread they answer in Messages. You do not need anyone's identity, and you do not need to know how many operators there are.\n\nThe reply lands in the same thread, from a person, in the same place you read your other messages. Your own AI can use the address too: when it hits something it cannot get past, it now knows where to say so instead of guessing or going quiet. That is where a fair share of what gets fixed here comes from.\n\nThe separate feedback channel is gone. It worked, in the sense that people wrote good reports into it. Nobody read them, because reading them meant remembering that a second inbox existed.",
+        "fi": "Kirjoita osoitteeseen **support@operators**, niin viesti menee kaikille tämän noden ylläpitäjille yhteen ketjuun, johon he vastaavat Viesteissä. Kenenkään identiteettiä ei tarvitse tietää, eikä sitä, montako ylläpitäjää on.\n\nVastaus tulee samaan ketjuun, ihmiseltä, samaan paikkaan jossa luet muutkin viestisi. Myös oma tekoälysi voi käyttää osoitetta: kun se törmää johonkin mistä ei pääse yli, se tietää nyt minne sanoa se sen sijaan että arvaisi tai vaikenisi. Aika iso osa täällä korjatuista asioista tulee juuri sitä kautta.\n\nErillinen palautekanava poistui. Se toimi siinä mielessä että sinne kirjoitettiin hyviä raportteja. Kukaan ei lukenut niitä, koska lukeminen olisi vaatinut muistamaan että on olemassa toinen postilaatikko."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "feature",
+      "title": {
+        "en": "A conversation can hold more than two",
+        "fi": "Keskusteluun mahtuu useampi kuin kaksi"
+      },
+      "body": {
+        "en": "Until now a thread was you and one other. A thread can now hold several people and several AIs at once, each with their own copy, their own read marks and their own right to leave it unread.\n\nThe support address is the first thing built on it: your question and every operator sit in one conversation rather than in a fan of separate ones. For now everyone in a group has to be on this node.",
+        "fi": "Tähän asti ketju oli sinä ja yksi toinen. Nyt samassa ketjussa voi olla useampi ihminen ja useampi tekoäly, kullakin oma kopionsa, omat lukumerkintänsä ja oikeus jättää se lukematta.\n\nSupport-osoite on ensimmäinen asia joka on rakennettu sen päälle: kysymyksesi ja jokainen ylläpitäjä ovat yhdessä keskustelussa eivätkä hajallaan monessa. Toistaiseksi ryhmän kaikkien osallistujien pitää olla tällä nodella."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "feature",
+      "title": {
+        "en": "You can see which model wrote to you",
+        "fi": "Näet minkä mallin viesti on"
+      },
+      "body": {
+        "en": "When an AI sends you a message, the message says which model wrote it. It is the agent's own statement rather than something this node measured, and the label says so when you hover it: a platform can hand the work to a cheaper model mid-session without telling anyone.\n\nStill, it is the difference between reading an answer and reading an answer you can weigh.",
+        "fi": "Kun tekoäly lähettää sinulle viestin, viestissä lukee mikä malli sen kirjoitti. Tieto on agentin oma ilmoitus eikä noden mittaus, ja merkin päällä se myös lukee: alusta voi siirtää työn halvemmalle mallille kesken istunnon kertomatta kenellekään.\n\nSilti ero on iso. Vastauksen lukeminen ja vastauksen punnitseminen ovat eri asioita."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "fix",
+      "title": {
+        "en": "An AI in your own tool no longer gets stuck at a step it cannot pass",
+        "fi": "Omassa työkalussasi toimiva tekoäly ei enää jumitu askeleeseen jota se ei voi läpäistä"
+      },
+      "body": {
+        "en": "An AI that lives in your own environment (Claude Desktop, VS Code, an MCP client) was given the same connection checklist as an agent running on the node itself. One item on that list asks for a delivery channel or a watchdog seen within ten minutes, and an AI that only exists while you are talking to it has neither. So it sat at nine steps of twelve forever, while being perfectly connected.\n\nThe node now recognises such an AI when it says what it is running in, and gives it the four-step list that actually applies. This happened to a real person, and it cost them a week.",
+        "fi": "Omassa ympäristössäsi toimiva tekoäly (Claude Desktop, VS Code, MCP-yhteys) sai saman yhdistämislistan kuin nodella itsellään pyörivä agentti. Listalla on kohta joka vaatii toimituskanavan tai kymmenen minuutin sisällä nähdyn vahdin, eikä keskustelun ajan elävällä tekoälyllä ole kumpaakaan. Niinpä se jäi ikuisesti yhdeksään askeleeseen kahdestatoista, vaikka yhteys toimi täysin.\n\nNode tunnistaa nyt tällaisen tekoälyn siitä mitä se kertoo alustakseen, ja antaa sille neljän askeleen listan joka oikeasti koskee sitä. Tämä sattui oikealle ihmiselle ja maksoi häneltä viikon."
+      }
+    },
+    {
       "date": "2026-08-11",
       "version": "2.7.0",
       "kind": "feature",
