@@ -6,23 +6,28 @@
  *   'aimeat-lang' localStorage key + cookie the header uses so the choice stays in sync with the SPA.
  *   loadModalI18n fetches en.json (base) + <lang>.json (overrides) from the node and returns just the
  *   modal.* strings with the 'modal.' prefix stripped. Extracted from auth-lib-part2.ts.
- * @structure MODAL_LANG_KEY · currentModalLang() · flattenModalI18n() · loadModalI18n(lang).
+ * @structure MODAL_LANG_KEY · MODAL_LANGS · currentModalLang() · flattenModalI18n() · loadModalI18n(lang).
  * @usage import { currentModalLang, loadModalI18n } from './i18n.js';
  * @version-history
+ *   v1.1.0 — 2026-08-12 — Spanish added; the language list is one array rather than four comparisons.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
  */
 import { NODE_URL } from './config.js';
 
 export var MODAL_LANG_KEY = 'aimeat-lang';
 
+/** The languages the node ships modal text in. Mirrors LOCALES in src/i18n.ts. */
+export var MODAL_LANGS = ['en', 'fi', 'es'];
+
 export function currentModalLang() {
   try {
     var u = new URLSearchParams(location.search).get('lang');
-    if (u === 'en' || u === 'fi') return u;
+    if (MODAL_LANGS.indexOf(u) !== -1) return u;
     var s = localStorage.getItem(MODAL_LANG_KEY);
-    if (s === 'en' || s === 'fi') return s;
+    if (MODAL_LANGS.indexOf(s) !== -1) return s;
   } catch { /* storage blocked */ }
-  return (navigator.language || 'en').slice(0, 2).toLowerCase() === 'fi' ? 'fi' : 'en';
+  var nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
+  return MODAL_LANGS.indexOf(nav) !== -1 ? nav : 'en';
 }
 
 export function flattenModalI18n(obj, prefix, out) {

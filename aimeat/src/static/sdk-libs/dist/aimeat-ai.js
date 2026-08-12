@@ -504,8 +504,37 @@
     }
   };
 
+  // locales/es.json
+  var aiLabel3 = {
+    short: "Generado por IA",
+    assisted: "Con ayuda de IA",
+    original: "Escrito por una persona",
+    unstated: "Origen sin declarar",
+    chat: "Estás hablando con un asistente de IA.",
+    publicText: "Este texto lo escribió una IA sin que ninguna persona lo revisara.",
+    assistedLong: "Lo escribió una persona. La IA ayudó a editarlo o a pulirlo.",
+    reviewedGeneric: "La IA escribió el borrador y una persona revisó el contenido.",
+    originalLong: "Lo escribió una persona. No intervino ninguna IA.",
+    unstatedLong: "No sabemos si intervino una IA en esto.",
+    reviewed: "Borrador de IA, revisado por {{name}}.",
+    detailsLink: "Cómo se hizo esto",
+    policyLong: "Un modelo intervino en esto. Este nodo lo declara incluso donde la ley no lo exige.",
+    interactionTitle: "Estás hablando con un asistente de IA",
+    interactionBody: "Puede equivocarse, así que comprueba todo lo que te importe. Tus mensajes van a un modelo de lenguaje con tu propia clave de API.",
+    draftTitle: "Este borrador lo escribió una IA",
+    draftBody: "Léelo antes de enviarlo. Lo que salga con tu nombre es responsabilidad tuya.",
+    regionLabel: "Transparencia sobre la IA",
+    expand: "Ver la declaración sobre la IA",
+    iconAlt: {
+      aiGenerated: "Contenido generado por IA",
+      aiModified: "Contenido modificado en parte por IA",
+      aiBasic: "Una IA intervino en la creación de este contenido",
+      unstated: "Intervención de la IA sin declarar"
+    }
+  };
+
   // src/static/sdk-libs/ai/strings.js
-  var STRINGS2 = { en: aiLabel, fi: aiLabel2 };
+  var STRINGS2 = { en: aiLabel, fi: aiLabel2, es: aiLabel3 };
   function pick(key, loc) {
     const path = (key.startsWith("aiLabel.") ? key.slice("aiLabel.".length) : key).split(".");
     for (const bundle of [STRINGS2[loc], STRINGS2.en]) {

@@ -26,6 +26,7 @@ import type { PushService } from '../services/push.js';
 import type { GenesisPeeringService } from '../services/genesis-peering.js';
 import { TEMPLATE_IDS, SUPPORTED_LOCALES, getDefaultTemplate, seedDefaultTemplates } from '../services/notification-templates.js';
 import type { TemplateId } from '../services/notification-templates.js';
+import { LOCALES } from '../i18n.js';
 
 function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
@@ -315,11 +316,11 @@ export function adminFeaturesRouter(
         res.json(success(config.nodeId, { templates, locale, seeded }));
     }));
 
-    // POST /v1/admin/email/templates/seed — Seed all defaults (en + fi) into memory
+    // POST /v1/admin/email/templates/seed — Seed the defaults for every shipped language into memory
     // NOTE: static routes MUST be before parameterized /:id routes
     router.post('/v1/admin/email/templates/seed', ...auth, handle(async (_req, res) => {
         let count = 0;
-        for (const locale of ['en', 'fi']) {
+        for (const locale of LOCALES) {
             const defaults = emailTemplateDefaults(locale);
             for (const tpl of defaults) {
                 await writeEmailTplToMemory(tpl.id, locale, tpl.html, tpl.text);
@@ -333,14 +334,14 @@ export function adminFeaturesRouter(
     // POST /v1/admin/email/templates/reset — Delete all custom, re-seed defaults
     router.post('/v1/admin/email/templates/reset', ...auth, handle(async (_req, res) => {
         const validIds = ['verification', 'magic_link', 'notification', 'match_suggestion'];
-        for (const locale of ['en', 'fi']) {
+        for (const locale of LOCALES) {
             for (const id of validIds) {
                 await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/html`);
                 await storage.deleteMemory('__site__', `_email_tpl/${id}/${locale}/text`);
             }
         }
         let count = 0;
-        for (const locale of ['en', 'fi']) {
+        for (const locale of LOCALES) {
             const defaults = emailTemplateDefaults(locale);
             for (const tpl of defaults) {
                 await writeEmailTplToMemory(tpl.id, locale, tpl.html, tpl.text);

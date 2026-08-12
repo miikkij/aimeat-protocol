@@ -1,7 +1,8 @@
 /**
  * @file src/services/notification-templates.ts
- * @description Notification template service — bilingual (en/fi) default templates plus placeholder
- *   substitution and resolution for web-push and email mailbox notifications.
+ * @description Notification template service — default templates in every language the node ships
+ *   (en/fi/es) plus placeholder substitution and resolution for web-push and email mailbox
+ *   notifications.
  *
  * @structure
  *   - TEMPLATE_IDS / SUPPORTED_LOCALES: known template ids and locales
@@ -10,6 +11,7 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-12 — Spanish (es) defaults added for both templates.
  */
 
 import type { Storage } from '../storage/interface.js';
@@ -17,7 +19,7 @@ import type { Storage } from '../storage/interface.js';
 export const TEMPLATE_IDS = ['web_push_mailbox', 'email_mailbox'] as const;
 export type TemplateId = typeof TEMPLATE_IDS[number];
 
-export const SUPPORTED_LOCALES = ['en', 'fi'] as const;
+export const SUPPORTED_LOCALES = ['en', 'fi', 'es'] as const;
 
 interface TemplateFields {
   title?: string;
@@ -64,6 +66,24 @@ const DEFAULTS: Record<string, Record<TemplateId, DefaultTemplate>> = {
       fields: {
         subject: 'AIMEAT: {count} odottavaa viesti\u00e4 solmullesi',
         body: 'Henkil\u00f6kohtaisella solmullasi "{nodeId}" on {count} odottavaa viesti\u00e4.\n\nKorkein prioriteetti: {type}\nVanhin viesti: {age} minuuttia sitten\n\nYhdist\u00e4 solmusi uudelleen hakeaksesi viestit.',
+      },
+      placeholders: ['{count}', '{type}', '{nodeId}', '{age}'],
+    },
+  },
+  es: {
+    web_push_mailbox: {
+      id: 'web_push_mailbox',
+      fields: {
+        title: 'AIMEAT: mensajes en espera',
+        body: '{count} mensaje(s) esperando: {type}',
+      },
+      placeholders: ['{count}', '{type}'],
+    },
+    email_mailbox: {
+      id: 'email_mailbox',
+      fields: {
+        subject: 'AIMEAT: {count} mensaje(s) en espera para tu nodo',
+        body: 'Tu nodo personal "{nodeId}" tiene {count} mensaje(s) en espera.\n\nPrioridad más alta: {type}\nMensaje más antiguo: hace {age} minutos\n\nVuelve a conectar tu nodo personal para recogerlos.',
       },
       placeholders: ['{count}', '{type}', '{nodeId}', '{age}'],
     },

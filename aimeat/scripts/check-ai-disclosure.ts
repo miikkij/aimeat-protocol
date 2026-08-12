@@ -20,12 +20,15 @@
  *                                   shell-callable dispatch all carry what it promises
  *   3. one publish path           — storage.createApp() has one caller plus named distinct acts
  *   4. external vocabulary        — IPTC/IETF values live only in the adapter (comments ignored)
- *   5. locale parity              — every aiLabel.* key in both locales, no [TODO:fi]
+ *   5. locale parity              — every aiLabel.* key in every locale shipped, no [TODO:xx]
  *   6. the build prompt           — the transparency non-negotiable is still literally in it
  *   7. derived visibility         — both providers' PUBLICLY_LINKED cover the declared containers
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.4.0 — 2026-08-12 — Assertion 5 reads the language list off locales/ instead of naming en and
+ *     fi. Spanish was added, and a gate that had to be edited to notice a new language would have
+ *     reported green on a disclosure nobody had written.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 11b. Assertion 2c: the READ direction. Phase 11 fixed
  *     writes and left reads broken, which is the same mistake one layer along.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 11. Assertion 2b: the gate reads BOTH MCP surfaces and the
@@ -568,13 +571,22 @@ function checkVocabularyContainment(): void {
 
 // ── 5. LOCALE PARITY FOR THE LABEL COPY ─────────────────────────────────────────────────────────
 // Rule 4, enforced rather than remembered. A label string is a compliance string: an English
-// fallback shown to a Finnish reader is a disclosure they were not given in their own language.
+// fallback shown to a Finnish or Spanish reader is a disclosure they were not given in their own
+// language. The list of languages is read from locales/ rather than typed here, so the language
+// somebody adds next enforces itself on the commit that adds it.
+
+/** Every locale the node ships, taken from the files themselves. English first, then the rest. */
+function shippedLocales(): string[] {
+  const tags = readdirSync(join(root, 'locales'))
+    .filter(f => /^[a-z]{2}\.json$/.test(f))
+    .map(f => f.slice(0, 2));
+  return ['en', ...tags.filter(t => t !== 'en').sort()];
+}
 
 function checkLocaleParity(): void {
+  const [, ...others] = shippedLocales();
   const en = JSON.parse(read('locales/en.json')) as Record<string, Record<string, string>>;
-  const fi = JSON.parse(read('locales/fi.json')) as Record<string, Record<string, string>>;
   const enKeys = Object.keys(en.aiLabel ?? {});
-  const fiKeys = Object.keys(fi.aiLabel ?? {});
 
   if (enKeys.length === 0) {
     fail('locales', 'locales/en.json has no aiLabel.* keys at all',
@@ -582,21 +594,26 @@ function checkLocaleParity(): void {
       + 'raw key string.');
     return;
   }
-  for (const k of enKeys) {
-    if (!fiKeys.includes(k)) {
-      fail('locales', `aiLabel.${k} exists in en.json but not in fi.json`,
-        'add the Finnish. Written as Finnish, not translated English — this is the sentence a '
-        + 'Finnish reader is legally owed.');
+
+  for (const tag of others) {
+    const loc = JSON.parse(read(`locales/${tag}.json`)) as Record<string, Record<string, string>>;
+    const locKeys = Object.keys(loc.aiLabel ?? {});
+    for (const k of enKeys) {
+      if (!locKeys.includes(k)) {
+        fail('locales', `aiLabel.${k} exists in en.json but not in ${tag}.json`,
+          `add it in ${tag}, composed in that language rather than translated from the English. `
+          + 'This is the sentence that reader is legally owed.');
+      }
     }
-  }
-  for (const k of fiKeys) {
-    if (!enKeys.includes(k)) fail('locales', `aiLabel.${k} exists in fi.json but not in en.json`, 'add the English.');
-  }
-  for (const [k, v] of Object.entries(fi.aiLabel ?? {})) {
-    if (String(v).includes('[TODO:fi]')) {
-      fail('locales', `aiLabel.${k} in fi.json is still a [TODO:fi] placeholder`,
-        'write the Finnish. A placeholder shipped as a disclosure is worse than an English one, '
-        + 'because it reads as broken software rather than as a statement.');
+    for (const k of locKeys) {
+      if (!enKeys.includes(k)) fail('locales', `aiLabel.${k} exists in ${tag}.json but not in en.json`, 'add the English.');
+    }
+    for (const [k, v] of Object.entries(loc.aiLabel ?? {})) {
+      if (String(v).includes(`[TODO:${tag}]`)) {
+        fail('locales', `aiLabel.${k} in ${tag}.json is still a [TODO:${tag}] placeholder`,
+          `write the ${tag} text. A placeholder shipped as a disclosure is worse than an English `
+          + 'one, because it reads as broken software rather than as a statement.');
+      }
     }
   }
 }
@@ -688,7 +705,7 @@ function listProtected(): void {
     + `the ${CONNECTOR_SHELL_WRAPPER} wrapper must all carry them`);
   console.log(`  3. one publish path    — ${PUBLISH_PATH}; ${Object.keys(CREATE_APP_DISTINCT_ACTS).length} distinct acts named`);
   console.log(`  4. vocabulary          — ${EXTERNAL_VOCABULARY.length} value tokens confined to ${ADAPTERS}`);
-  console.log('  5. locales             — every aiLabel.* key in en + fi, no [TODO:fi]');
+  console.log(`  5. locales             — every aiLabel.* key in ${shippedLocales().join(' + ')}, no [TODO:xx]`);
   console.log(`  6. build prompt        — ${BUILD_PROMPT_NON_NEGOTIABLES.length} literals must be present`);
   console.log(`  7. derived visibility  — ${PUBLICLY_LINKED_CONTAINERS.map(c => c.name).join(', ')} on both providers\n`);
 }

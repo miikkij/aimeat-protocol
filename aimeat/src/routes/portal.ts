@@ -45,6 +45,9 @@
  *   v1.11.0 — 2026-08-01 — Add /v1/transparency, the public human page for TARGET-058: what this
  *     node marks, what it cannot do, who operates and supervises it. Distinct from the JSON
  *     statement at /v1/ai-transparency, which is mounted ahead of this router.
+ *   v1.12.0 — 2026-08-12 — The privacy/terms/connect language routes are generated from LOCALES
+ *     rather than written out per language, and a page with no file in the language asked for is
+ *     served in English instead of 404. Spanish added.
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -64,6 +67,7 @@ import { injectAgentFooter } from '../utils/agent-footer.js';
 import { findPublicPage } from '../data/public-pages.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
 import { injectPageHead } from '../utils/page-head.js';
+import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 
 /**
@@ -80,7 +84,7 @@ import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } f
  *    on the connect page
  *  - operator* -- privacy-page legal fields from `config.operator`
  */
-function templateVars(config: AimeatConfig, locale: 'en' | 'fi'): Record<string, string> {
+function templateVars(config: AimeatConfig, locale: Locale): Record<string, string> {
   // Derive nodeName from baseUrl host (e.g. "https://aimeat.io" -> "aimeat.io").
   let nodeName = config.nodeId;
   // eslint-disable-next-line aimeat/no-silent-catch -- keep nodeId fallback
@@ -101,7 +105,9 @@ function templateVars(config: AimeatConfig, locale: 'en' | 'fi'): Record<string,
     // Ready-made clause so a node with no business id renders nothing at all rather than a stray
     // separator: a natural person has no such number and must not appear to be missing one.
     operatorBusinessIdClause: config.operator.businessId
-      ? (locale === 'fi' ? `, Y-tunnus ${config.operator.businessId}` : `, business ID ${config.operator.businessId}`)
+      ? { en: `, business ID ${config.operator.businessId}`,
+          fi: `, Y-tunnus ${config.operator.businessId}`,
+          es: `, identificación fiscal ${config.operator.businessId}` }[locale]
       : '',
     operatorAddress: config.operator.address,
     operatorCountry: config.operator.country,
@@ -122,7 +128,7 @@ function templateVars(config: AimeatConfig, locale: 'en' | 'fi'): Record<string,
  * operator has not filled in the required env vars. Aimed at the operator,
  * not the end user -- it tells them which AIMEAT_OPERATOR_* fields to set.
  */
-function renderPrivacyNotConfiguredPage(missing: string[], locale: 'en' | 'fi'): string {
+function renderPrivacyNotConfiguredPage(missing: string[], locale: Locale): string {
   const envVars = missing.map(field => {
     const upper = field.replace(/[A-Z]/g, c => '_' + c).toUpperCase();
     return `AIMEAT_OPERATOR_${upper}`;
@@ -675,15 +681,26 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // still names the upstream author. See `missingOperatorConfig()` in
   // `src/config.ts` for the validation rule.
   const serveStaticPage = (filename: string, routePath?: string) => (_req: import('express').Request, res: import('express').Response) => {
-    const htmlPath = resolvePublicFile(filename);
+    // A page asked for in a language we have not written yet is served in English rather than as a
+    // 404: the policy exists, and a language switch that leads to a dead page is worse than one that
+    // leads to the English text. `locale` follows the file we actually serve, so the operator clause
+    // and the not-configured fallback are in the language on the screen.
+    const wanted = filename.match(/^(.+)\.([a-z]{2})\.html$/);
+    let htmlPath = resolvePublicFile(filename);
+    let served = filename;
+    if (!htmlPath && wanted) {
+      served = `${wanted[1]}.html`;
+      htmlPath = resolvePublicFile(served);
+    }
     if (!htmlPath) {
       res.status(404).type('text/plain').send('Page not found');
       return;
     }
-    const isPrivacyPage = filename.startsWith('privacy');
-    const isTermsPage = filename.startsWith('terms');
-    const isConnectPage = filename.startsWith('connect');
-    const locale: 'en' | 'fi' = filename.endsWith('.fi.html') ? 'fi' : 'en';
+    const isPrivacyPage = served.startsWith('privacy');
+    const isTermsPage = served.startsWith('terms');
+    const isConnectPage = served.startsWith('connect');
+    const servedTag = served.match(/\.([a-z]{2})\.html$/)?.[1];
+    const locale: Locale = LOCALES.includes(servedTag as Locale) ? (servedTag as Locale) : 'en';
 
     // Privacy + ToS both name the operator as a party / data controller.
     // Block both if operator config is incomplete.
@@ -727,16 +744,20 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     }
     res.type('text/html').send(html);
   };
+  // The English page at the bare path, and one localized path per other language the node ships.
+  // A language without its own file falls through to the English one inside serveStaticPage.
+  const nonEnglish = LOCALES.filter(l => l !== 'en');
   router.get('/v1/privacy', serveStaticPage('privacy.html', '/v1/privacy'));
-  router.get('/v1/privacy/fi', serveStaticPage('privacy.fi.html'));
   router.get('/v1/terms', serveStaticPage('terms.html', '/v1/terms'));
-  router.get('/v1/terms/fi', serveStaticPage('terms.fi.html'));
-
   // Connect / MCP attach page — standalone static HTML. Public-facing docs
   // required by the Anthropic Connectors Directory (3+ example prompts +
   // attach instructions for major MCP-aware clients).
   router.get('/v1/connect', serveStaticPage('connect.html', '/v1/connect'));
-  router.get('/v1/connect/fi', serveStaticPage('connect.fi.html'));
+  for (const l of nonEnglish) {
+    router.get(`/v1/privacy/${l}`, serveStaticPage(`privacy.${l}.html`));
+    router.get(`/v1/terms/${l}`, serveStaticPage(`terms.${l}.html`));
+    router.get(`/v1/connect/${l}`, serveStaticPage(`connect.${l}.html`));
+  }
 
   // Encrypted chat example app — standalone HTML (not SPA)
   router.get('/v1/echat', (_req, res) => {

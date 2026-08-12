@@ -352,6 +352,7 @@
     import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
+    import { LOCALES } from '/js/utils.js';
     import { initThemeSystem } from '/js/theme.js';
     import { siteLink } from '/js/site.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
@@ -818,8 +819,10 @@
                 `}
               `}
               <div class="topnav-center">
-                <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>
-                <button class="lang-btn ${locale === 'fi' ? 'active' : ''}" onClick=${() => handleLangSwitch('fi')}>FI</button>
+                ${LOCALES.map((l) => html`
+                  <button class="lang-btn ${locale === l ? 'active' : ''}"
+                    onClick=${() => handleLangSwitch(l)}>${l.toUpperCase()}</button>
+                `)}
               </div>
             </div>
             ${session && html`<${OpenItemsButton} t=${t} onNavigate=${(p) => navigate(p)} />`}

@@ -12,16 +12,19 @@
  *
  *   The strings come from the platform's own locales/*.json — one source, tree-shaken to this block
  *   at bundle time — so an app's label and the apex SPA's label say the same words.
- * @structure STRINGS — { en, fi } · pick(key, loc) — full dotted key → string
+ * @structure STRINGS — { en, fi, es } · pick(key, loc) — full dotted key → string
  * @usage import { pick } from './strings.js';  pick('aiLabel.short', 'fi')
  * @version-history
+ *   v1.1.0 — 2026-08-12 — Spanish (es) added. The disclosure the EU AI Act asks for is now carried
+ *     in every language the node declares at /v1/ai-transparency, not two of the three.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5, after a browser showed raw keys on the chip.
  */
 import { aiLabel as EN } from '../../../../locales/en.json';
 import { aiLabel as FI } from '../../../../locales/fi.json';
+import { aiLabel as ES } from '../../../../locales/es.json';
 
 /** The label strings, per language the node ships. */
-export const STRINGS = { en: EN, fi: FI };
+export const STRINGS = { en: EN, fi: FI, es: ES };
 
 /**
  * A platform string by its FULL dotted key, in `loc`, falling back to English and finally to the key

@@ -1,20 +1,21 @@
 /**
  * @file game/i18n.js
  * @description Translation for the aimeat-game kit's OWN handful of strings, and the merge point
- *   for the host's. The kit ships English and Finnish for the words it puts on screen itself
- *   (Close, Back, Locked, Coming soon, …); everything else — every label in your game — comes from
- *   the host, because the kit has no idea what your entries are called.
+ *   for the host's. The kit ships English, Finnish and Spanish for the words it puts on screen
+ *   itself (Close, Back, Locked, Coming soon, …); everything else — every label in your game —
+ *   comes from the host, because the kit has no idea what your entries are called.
  *
- *   The Finnish is written as Finnish, not as translated English.
+ *   Each language is written in that language, not as translated English.
  *
  *   It follows the PLATFORM language choice rather than inventing a second one: the current
  *   language is read from AIMEAT.auth.getLang() when the auth library is present, else the
  *   `aimeat-lang` storage key, else the browser, and it re-renders on the platform's
  *   `aimeat-lang-change` event. There is no language switch in this kit — the login pill has one.
- * @structure BASE (en/fi) · lang/setLang · use(dict) · t(key, vars) · onChange
+ * @structure BASE (en/fi/es) · lang/setLang · use(dict) · t(key, vars) · onChange
  * @usage  AIMEAT.game.i18n.use({ fi: { play: 'Pelaa' }, en: { play: 'Play' } });
  *         AIMEAT.game.i18n.t('play');
  * @version-history
+ *   v1.1.0 — 2026-08-12 — Spanish (es) added to BASE, HOST and langs.
  *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
  */
 
@@ -80,10 +81,40 @@ const BASE = {
     target: 'Tavoite {n}',
     fix: 'Korjaa tämä',
   },
+  es: {
+    close: 'Cerrar',
+    back: 'Atrás',
+    cancel: 'Cancelar',
+    confirm: 'Confirmar',
+    menu: 'Menú',
+    locked: 'Bloqueado',
+    done: 'Listo',
+    open: 'Abierto',
+    now: 'Ahora',
+    later: 'Después',
+    comingSoon: 'Próximamente',
+    notifyMe: 'Avísame cuando abra',
+    notified: 'Te avisamos',
+    eta: 'Previsto {when}',
+    empty: 'Aquí todavía no hay nada',
+    nobodyYet: 'Todavía no hay nadie en la tabla: el primero pone la marca',
+    you: 'Tú',
+    total: 'Total',
+    points: '{a} / {b}',
+    earned: 'Conseguido',
+    notEarned: 'Todavía sin conseguir',
+    earnedOn: 'Conseguido {when}',
+    best: 'Mejor {n}',
+    inARow: '{n} seguidos',
+    sortBy: 'Ordenar por',
+    morsels: 'morsels',
+    target: 'Objetivo {n}',
+    fix: 'Corrige esto',
+  },
 };
 
 /** Host dictionaries merged in by `use()`, keyed by language. */
-const HOST = { en: {}, fi: {} };
+const HOST = { en: {}, fi: {}, es: {} };
 
 /** @type {Array<(lang: string) => void>} */
 const listeners = [];
@@ -123,7 +154,7 @@ if (typeof window !== 'undefined') {
 
 export const i18n = {
   /** The languages the kit itself ships. A host may add more via `use()`. */
-  langs: ['en', 'fi'],
+  langs: ['en', 'fi', 'es'],
 
   /** The language in force right now. @returns {string} */
   lang() { return current; },

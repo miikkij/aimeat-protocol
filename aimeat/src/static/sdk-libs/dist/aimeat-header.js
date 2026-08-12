@@ -10,6 +10,7 @@
   function main() {
     var THEME_KEY = "aimeat-theme";
     var LANG_KEY = "aimeat-lang";
+    var LANGS = ["en", "fi", "es"];
     var NAV_FALLBACK = {
       "nav.howItWorks": "How it works",
       "nav.business": "For your business",
@@ -23,12 +24,13 @@
     function readLang() {
       try {
         var u = new URLSearchParams(location.search).get("lang");
-        if (u === "en" || u === "fi") return u;
+        if (LANGS.indexOf(u) !== -1) return u;
         var s = localStorage.getItem(LANG_KEY);
-        if (s === "en" || s === "fi") return s;
+        if (LANGS.indexOf(s) !== -1) return s;
       } catch {
       }
-      return (navigator.language || "en").slice(0, 2).toLowerCase() === "fi" ? "fi" : "en";
+      var nav = (navigator.language || "en").slice(0, 2).toLowerCase();
+      return LANGS.indexOf(nav) !== -1 ? nav : "en";
     }
     function readTheme() {
       try {
@@ -178,7 +180,10 @@
       }
       var nav = document.createElement("nav");
       nav.className = "topnav";
-      nav.innerHTML = '<div style="display:flex;align-items:center;gap:20px"><a href="' + nodeHref("/v1/portal") + '" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a><span class="brand-morsels" data-morsels style="display:none"></span></div><div class="topnav-right"><button class="topnav-burger" aria-label="Menu" data-burger>☰</button><div class="topnav-menu" data-menu><a href="' + nodeHref("/v1/how-it-works") + '" data-anon-only>' + label("nav.howItWorks") + '</a><a href="' + nodeHref("/v1/business") + '" data-anon-only>' + label("nav.business") + '</a><a href="' + nodeHref("/v1/help") + '">' + label("nav.help") + '</a><a href="' + nodeHref("/app-catalog.html") + '" target="_blank" data-auth-only style="display:none">' + label("nav.apps") + '</a><a href="' + nodeHref("/v1/profile") + '" class="profile-link visible" data-auth-only style="display:none">' + label("nav.profile") + '</a><a href="' + nodeHref("/v1/admin") + '" data-operator-only style="display:none">' + label("nav.admin") + '</a><div class="topnav-center"><button class="lang-btn" data-lang="en">EN</button><button class="lang-btn" data-lang="fi">FI</button></div></div><span class="header-auth-slot" id="headerAuth"></span></div>';
+      nav.innerHTML = '<div style="display:flex;align-items:center;gap:20px"><a href="' + nodeHref("/v1/portal") + '" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a><span class="brand-morsels" data-morsels style="display:none"></span></div><div class="topnav-right"><button class="topnav-burger" aria-label="Menu" data-burger>☰</button><div class="topnav-menu" data-menu><a href="' + nodeHref("/v1/how-it-works") + '" data-anon-only>' + label("nav.howItWorks") + '</a><a href="' + nodeHref("/v1/business") + '" data-anon-only>' + label("nav.business") + '</a><a href="' + nodeHref("/v1/help") + '">' + label("nav.help") + '</a><a href="' + nodeHref("/app-catalog.html") + '" target="_blank" data-auth-only style="display:none">' + label("nav.apps") + '</a><a href="' + nodeHref("/v1/profile") + '" class="profile-link visible" data-auth-only style="display:none">' + label("nav.profile") + '</a><a href="' + nodeHref("/v1/admin") + '" data-operator-only style="display:none">' + label("nav.admin") + '</a><div class="topnav-center">' + // Theme toggle now lives inside the login pill (mountLoginButton) — see init().
+      LANGS.map(function(l) {
+        return '<button class="lang-btn" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
+      }).join("") + '</div></div><span class="header-auth-slot" id="headerAuth"></span></div>';
       return nav;
     }
     function wire(nav, t, lang) {

@@ -102,6 +102,7 @@
     "check:silent-catch": "tsx scripts/check-silent-catch.ts",
     "check:js-syntax": "node --experimental-vm-modules --import tsx scripts/check-js-syntax.ts",
     "check:ai-disclosure": "tsx scripts/check-ai-disclosure.ts",
+    "check:locales": "tsx scripts/check-locales.ts",
     "screenshot:worker": "tsx scripts/screenshot-worker.ts",
     "generate:types": "openapi-typescript ../openapi.yaml -o src/generated/api-types.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",

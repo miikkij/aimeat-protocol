@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.3.0 — 2026-08-12 — The language switch is generated from MODAL_LANGS instead of two written-out
+ *     buttons. Spanish arrived and the modal kept offering EN and FI while serving Spanish text.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2/3.ts (SDK-libs migration Phase 3).
  *   v1.0.1 — 2026-07-25 — Fix: adopt the node's full locale dict when any key differs, so newer modal
  *     keys (email-step strings) missing from a host's opts.i18n no longer fall back to English.
@@ -26,7 +28,7 @@
  */
 import { auth, api } from './session.js';
 import { escHtml } from './theme.js';
-import { currentModalLang, loadModalI18n, MODAL_LANG_KEY } from './i18n.js';
+import { currentModalLang, loadModalI18n, MODAL_LANG_KEY, MODAL_LANGS } from './i18n.js';
 import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
 
 /** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
@@ -132,9 +134,15 @@ export function showLoginModal(opts, renderBtn) {
       + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
       + '<div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? 'animation:aimeatModalIn .3s ease' : '') + '">'
       + '<div style="padding:28px 32px 0;position:relative">'
+      // One button per language the NODE ships, from MODAL_LANGS — the modal loads its strings from
+      // that node's /locales/<tag>.json, so the list of buttons and the list of files are the same
+      // list. Writing the languages out here is how the switch came to offer two while the node
+      // served three.
       + '<div class="aimeat-langsw">'
-      + '<button type="button" class="aimeat-lang' + (lang === 'en' ? ' active' : '') + '" data-lang="en">EN</button>'
-      + '<button type="button" class="aimeat-lang' + (lang === 'fi' ? ' active' : '') + '" data-lang="fi">FI</button>'
+      + MODAL_LANGS.map(function (l) {
+        return '<button type="button" class="aimeat-lang' + (lang === l ? ' active' : '')
+          + '" data-lang="' + l + '">' + l.toUpperCase() + '</button>';
+      }).join('')
       + '</div>'
       + '<h2 style="margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;color:#1A1A2E">'
       + 'AIME <span style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#E8564A,#D4493F);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:14px">♥</span> AT'

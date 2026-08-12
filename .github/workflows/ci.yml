@@ -111,6 +111,11 @@ jobs:
         working-directory: aimeat
         run: pnpm check:ai-disclosure
 
+      # Three language files now, so "they change together" cannot rest on a person seeing both.
+      - name: Language files agree with en.json (check:locales)
+        working-directory: aimeat
+        run: pnpm check:locales
+
       # The August 2026 audit gates. Each is a ratchet seeded with that day's count, so it fails only
       # on a NEW offender: route authorization, outbound fetch through safeFetch, server-trusted
       # memory keys, owner-scoped tables in both deletion cascades, and every sandbox entry point

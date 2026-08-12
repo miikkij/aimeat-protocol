@@ -1,16 +1,19 @@
 /**
  * @file src/i18n.ts
- * @description Server-side i18n core: loads locales/en.json + fi.json at startup and produces
- *   bound translation functions with dot-path key resolution, {{var}} interpolation, and fallback.
+ * @description Server-side i18n core: loads every locales/<tag>.json in LOCALES at startup and
+ *   produces bound translation functions with dot-path key resolution, {{var}} interpolation, and
+ *   fallback to English for any key a locale has not translated yet.
  *
  * @structure
- *   - LOCALES / DEFAULT_LOCALE / Locale: supported locale set (en, fi)
+ *   - LOCALES / DEFAULT_LOCALE / Locale: supported locale set (en, fi, es)
  *   - createT(locale): returns a TFunction that resolves keys, falls back to en, then to the key
  *   - detectLocale(acceptLang): picks best locale from an Accept-Language header
  *   - toLocale(val): validates/coerces an arbitrary value to a Locale
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-12 — Spanish (es) added. localeFromCookie now matches any two-letter tag and
+ *     validates it against LOCALES, so a fourth language needs one edit here rather than two.
  */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -20,8 +23,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 interface Dict { [key: string]: string | string[] | Dict; }
 
-export type Locale = 'en' | 'fi';
-export const LOCALES: readonly Locale[] = ['en', 'fi'] as const;
+export type Locale = 'en' | 'fi' | 'es';
+export const LOCALES: readonly Locale[] = ['en', 'fi', 'es'] as const;
 export const DEFAULT_LOCALE: Locale = 'en';
 
 export type TFunction = (key: string, vars?: Record<string, string | number>) => string;
@@ -86,8 +89,11 @@ export function toLocale(val: unknown): Locale {
 /** Extract locale from cookie header string (looks for aimeat-lang=xx). */
 export function localeFromCookie(cookieHeader: string | undefined): Locale | undefined {
   if (!cookieHeader) return undefined;
-  const match = cookieHeader.match(/(?:^|;\s*)aimeat-lang=(en|fi)(?:;|$)/);
-  return match ? (match[1] as Locale) : undefined;
+  // Match any two-letter tag, then validate against LOCALES — a regex that spells the languages out
+  // is one more place a fourth language has to be remembered, and the one most easily missed.
+  const match = cookieHeader.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+  if (!match) return undefined;
+  return LOCALES.includes(match[1] as Locale) ? (match[1] as Locale) : undefined;
 }
 
 /** Resolve locale from request: ?lang= query > cookie > Accept-Language > default. */

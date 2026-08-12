@@ -171,6 +171,78 @@ const i18n: Record<string, Record<string, string>> = {
     footer: 'Lähetetty AIMEAT-protokollan kautta',
     footerUnsubscribe: 'Hallinnoi ilmoitusasetuksiasi AIMEAT-profiilissasi.',
   },
+  es: {
+    regInviteSubject: 'Alguien nos pidió crear una cuenta de AIMEAT para esta dirección',
+    regInviteHeading: 'Una IA pidió una cuenta aquí',
+    regInviteLead: 'Un asistente de IA le pidió a AIMEAT crear una cuenta para esta dirección de correo. Todavía no existe ninguna cuenta, y no se creará ninguna a menos que presiones el botón de abajo.',
+    regInviteWhoHeading: 'De dónde vino la solicitud',
+    regInviteClaimNote: 'Esto es lo que la IA contó sobre sí misma. No tenemos forma de comprobarlo, así que tómalo como lo que ella afirma y no como un hecho:',
+    regInviteObservedNote: 'Esto lo vimos nosotros mismos:',
+    regInviteFieldModel: 'Modelo',
+    regInviteFieldVendor: 'Creado por',
+    regInviteFieldClient: 'Aplicación',
+    regInviteFieldIp: 'Dirección IP',
+    regInviteFieldAgent: 'Navegador o cliente',
+    regInviteFieldAt: 'Hora',
+    regInviteUnstated: 'sin especificar',
+    regInviteButton: 'Continuar y elegir un nombre de usuario',
+    regInviteNoCode: 'No hay ningún código que escribir. Este enlace es la prueba de que la dirección es tuya.',
+    regInviteFallback: 'Si el botón no funciona, abre esta dirección:',
+    regInviteExpiry: 'El enlace funciona hasta',
+    regInviteIgnore: 'Si no pediste esto, no hagas nada. No se crea ninguna cuenta, y esta dirección no se guarda más allá de la fecha de arriba.',
+    regInviteReport: 'Puedes denunciar un uso indebido aquí:',
+    verificationSubject: 'Tu código de verificación de AIMEAT',
+    verificationHeading: 'Verificación del correo',
+    verificationBody: 'Usa este código para verificar tu dirección de correo:',
+    verificationExpiry: 'El código caduca en 15 minutos.',
+    verificationIgnore: 'Si no pediste esto, puedes ignorar este correo sin problema.',
+    magicLinkSubject: 'Tu enlace de acceso a AIMEAT',
+    magicLinkHeading: 'Inicia sesión en AIMEAT',
+    magicLinkBody: 'Presiona el botón de abajo para iniciar sesión en tu cuenta:',
+    magicLinkButton: 'Iniciar sesión',
+    magicLinkExpiry: 'El enlace caduca en 15 minutos.',
+    magicLinkIgnore: 'Si no pediste esto, puedes ignorar este correo sin problema.',
+    magicLinkFallback: 'O copia esta dirección en tu navegador:',
+    notificationHeading: 'Aviso de AIMEAT',
+    matchSubject: 'Nuevas coincidencias para ti en AIMEAT',
+    matchHeading: 'Coincidencias',
+    matchBody: 'Encontramos algunas coincidencias que te pueden interesar:',
+    matchSharedInterests: 'Intereses en común:',
+    matchDistance: 'Distancia:',
+    matchViewProfile: 'Ver el perfil',
+    inviteSubject: 'Te invitaron a unirte a {org} en AIMEAT',
+    inviteHeading: 'Tienes una invitación a AIMEAT',
+    inviteSentence: '{inviter} te invitó a unirte a {org} en AIMEAT.',
+    inviteNewAccount: 'Todavía no necesitas una cuenta: el enlace de abajo te deja registrarte y unirte en un solo paso.',
+    inviteWorkspacesLabel: 'Tendrás acceso a:',
+    inviteButton: 'Aceptar la invitación',
+    inviteExpiryPrefix: 'Esta invitación caduca el',
+    inviteFallback: 'O copia esta dirección en tu navegador:',
+    inviteIgnore: 'Si no esperabas esta invitación, puedes ignorar este correo sin problema.',
+    inviteMessageLabel: 'Mensaje personal:',
+    keySubject: 'Tu clave de acceso a {org} en AIMEAT',
+    keyHeading: 'Recibiste una clave de acceso',
+    keyCodeLabel: 'Tu código de acceso:',
+    keyInstructions: 'El código es tu contraseña, no lo compartas con nadie.',
+    keyButton: 'Iniciar sesión',
+    keyExpiryPrefix: 'Esta clave caduca el',
+    keyFallback: 'O copia esta dirección en tu navegador:',
+    keyIgnore: 'Si no esperabas esta clave, puedes ignorar este correo sin problema.',
+    keyFooter: 'Enviado desde la sala de máquinas de AIMEAT',
+    credSubject: 'Tu acceso a {org} en AIMEAT',
+    credHeading: 'Ya estás dentro. Estos son tus datos de acceso.',
+    credIntro: 'Tu código de acceso abrió la puerta. Estos son tus datos de acceso permanentes a AIMEAT. Úsalos para iniciar sesión de nuevo desde cualquier dispositivo y para abrir las aplicaciones enlazadas en modo de solo lectura.',
+    credUserLabel: 'Nombre de usuario',
+    credPwLabel: 'Contraseña',
+    credInstructions: 'Inicia sesión con estos datos en la dirección de abajo:',
+    credButton: 'Iniciar sesión',
+    credNote: 'Guárdalos solo para ti. Puedes cambiar la contraseña más adelante en los ajustes de tu perfil.',
+    credIgnore: 'Si no usaste ningún código de acceso, puedes ignorar este correo sin problema.',
+    roleViewer: 'lector',
+    roleContributor: 'colaborador',
+    footer: 'Enviado por AIMEAT Protocol',
+    footerUnsubscribe: 'Gestiona tus avisos en tu perfil de AIMEAT.',
+  },
 };
 
 /** Minimal HTML escape for user-controlled fields interpolated into email HTML. */
@@ -183,9 +255,14 @@ function esc(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
+/** The language this email is written in: the requested one when we have it, else English. */
+function emailLang(locale: string | undefined): string {
+  const tag = (locale ?? '').slice(0, 2).toLowerCase();
+  return Object.prototype.hasOwnProperty.call(i18n, tag) ? tag : 'en';
+}
+
 function t(locale: string | undefined, key: string): string {
-  const lang = locale === 'fi' ? 'fi' : 'en';
-  return i18n[lang][key] ?? i18n['en'][key] ?? key;
+  return i18n[emailLang(locale)][key] ?? i18n['en'][key] ?? key;
 }
 
 // ── Shared layout ────────────────────────────────────────
@@ -195,7 +272,7 @@ function wrapHtml(heading: string, bodyHtml: string, locale?: string, opts?: { b
   const brand = opts?.brand ?? 'AIMEAT';
   const footer = opts?.footer ?? t(locale, 'footer');
   return `<!DOCTYPE html>
-<html lang="${locale === 'fi' ? 'fi' : 'en'}">
+<html lang="${emailLang(locale)}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">

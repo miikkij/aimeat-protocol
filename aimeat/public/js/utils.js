@@ -8,12 +8,14 @@ import { swallowed } from '/js/swallowed.js';
  * @structure
  *   - escHtml/escAttr/decodeEntities: XSS-safe escaping + reversal of double-escaped names
  *   - timeAgo/formatBytes: human-readable time and size formatting
- *   - detectLocale/persistLocale: en/fi preference via URL → localStorage → cookie → navigator
+ *   - LOCALES/detectLocale/persistLocale: language preference via URL → localStorage → cookie → navigator
  *   - sanitizeHtml: strip to a safe tag/attribute whitelist
  *   - copyToClipboard/generateStars/handleImgError: clipboard, background stars, image error placeholder
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-12 — Spanish added. detectLocale reads the LOCALES list instead of naming two
+ *     languages in four places.
  */
 
 /** Micros per whole currency unit — money amounts are 6-decimal micro-units (matches USDC/x402). */
@@ -107,24 +109,27 @@ export async function copyToClipboard(text) {
   }
 }
 
+/** The languages this node ships UI text in. Mirrors LOCALES in src/i18n.ts. */
+export const LOCALES = ['en', 'fi', 'es'];
+
 /** Detect user's preferred locale from URL → localStorage → cookie → navigator. */
 export function detectLocale() {
   // 1. URL parameter
   const params = new URLSearchParams(window.location.search);
   const langParam = params.get('lang');
-  if (langParam === 'en' || langParam === 'fi') return langParam;
+  if (LOCALES.includes(langParam)) return langParam;
 
   // 2. localStorage
   const stored = localStorage.getItem('aimeat-lang');
-  if (stored === 'en' || stored === 'fi') return stored;
+  if (LOCALES.includes(stored)) return stored;
 
   // 3. Cookie
-  const match = document.cookie.match(/(?:^|;\s*)aimeat-lang=(en|fi)(?:;|$)/);
-  if (match) return match[1];
+  const match = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+  if (match && LOCALES.includes(match[1])) return match[1];
 
-  // 4. Browser language
+  // 4. Browser language. 'es-CO' and 'es-419' both answer 'es'.
   const nav = (navigator.language || '').split('-')[0].toLowerCase();
-  if (nav === 'fi') return 'fi';
+  if (LOCALES.includes(nav)) return nav;
 
   return 'en';
 }

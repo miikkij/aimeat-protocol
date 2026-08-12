@@ -230,9 +230,39 @@
       morsels: "morselia",
       target: "Tavoite {n}",
       fix: "Korjaa tämä"
+    },
+    es: {
+      close: "Cerrar",
+      back: "Atrás",
+      cancel: "Cancelar",
+      confirm: "Confirmar",
+      menu: "Menú",
+      locked: "Bloqueado",
+      done: "Listo",
+      open: "Abierto",
+      now: "Ahora",
+      later: "Después",
+      comingSoon: "Próximamente",
+      notifyMe: "Avísame cuando abra",
+      notified: "Te avisamos",
+      eta: "Previsto {when}",
+      empty: "Aquí todavía no hay nada",
+      nobodyYet: "Todavía no hay nadie en la tabla: el primero pone la marca",
+      you: "Tú",
+      total: "Total",
+      points: "{a} / {b}",
+      earned: "Conseguido",
+      notEarned: "Todavía sin conseguir",
+      earnedOn: "Conseguido {when}",
+      best: "Mejor {n}",
+      inARow: "{n} seguidos",
+      sortBy: "Ordenar por",
+      morsels: "morsels",
+      target: "Objetivo {n}",
+      fix: "Corrige esto"
     }
   };
-  var HOST = { en: {}, fi: {} };
+  var HOST = { en: {}, fi: {}, es: {} };
   var listeners = [];
   var current = detect();
   function detect() {
@@ -273,7 +303,7 @@
   }
   var i18n = {
     /** The languages the kit itself ships. A host may add more via `use()`. */
-    langs: ["en", "fi"],
+    langs: ["en", "fi", "es"],
     /** The language in force right now. @returns {string} */
     lang() {
       return current;

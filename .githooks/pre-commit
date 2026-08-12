@@ -15,6 +15,7 @@
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
 #  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
+#  11b. Language files agree with en.json  — pnpm check:locales
 #  12. Route authorization gates        — pnpm check:route-scopes
 #  13. Outbound fetch through safeFetch — pnpm check:outbound-fetch
 #  14. Server-trusted memory keys       — pnpm check:trusted-keys
@@ -79,6 +80,9 @@ pnpm -s check:silent-catch -- --strict
 
 echo "[pre-commit] AI disclosure gates: one LLM path, one publish path, labels intact (check:ai-disclosure)…"
 pnpm -s check:ai-disclosure
+
+echo "[pre-commit] Language files agree with en.json (check:locales)…"
+pnpm -s check:locales
 
 
 # ── August 2026 audit gates ──────────────────────────────────────────────────

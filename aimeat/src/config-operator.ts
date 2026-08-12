@@ -14,9 +14,12 @@
  * @usage
  *   import { missingOperatorConfig } from './config-operator.js';
  * @version-history
+ *   v1.1.0 — 2026-08-12 — operatorTypeLabel takes the shared Locale type and carries Spanish, so a
+ *     Spanish privacy policy names its controller in Spanish.
  *   v1.0.0 — 2026-08-01 — Pure extraction from config.ts (max-file-lines), unchanged.
  */
 import type { OperatorConfig, OperatorType } from './config-types.js';
+import type { Locale } from './i18n.js';
 
 /**
  * Required operator fields that MUST be set for the privacy page to be
@@ -49,12 +52,12 @@ export function missingOperatorConfig(operator: OperatorConfig): string[] {
  * Human-readable label for the operator type, used in the privacy policy
  * Controller section ("Controller: X, a natural person").
  */
-export function operatorTypeLabel(type: OperatorType, locale: 'en' | 'fi' = 'en'): string {
-  const labels: Record<OperatorType, { en: string; fi: string }> = {
-    natural_person: { en: 'a natural person', fi: 'luonnollinen henkilö' },
-    company: { en: 'a company', fi: 'yritys' },
-    organisation: { en: 'an organisation', fi: 'organisaatio' },
-    association: { en: 'an association', fi: 'yhdistys' },
+export function operatorTypeLabel(type: OperatorType, locale: Locale = 'en'): string {
+  const labels: Record<OperatorType, Record<Locale, string>> = {
+    natural_person: { en: 'a natural person', fi: 'luonnollinen henkilö', es: 'una persona física' },
+    company: { en: 'a company', fi: 'yritys', es: 'una empresa' },
+    organisation: { en: 'an organisation', fi: 'organisaatio', es: 'una organización' },
+    association: { en: 'an association', fi: 'yhdistys', es: 'una asociación' },
   };
   return labels[type][locale];
 }

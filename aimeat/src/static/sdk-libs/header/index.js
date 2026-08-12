@@ -13,6 +13,8 @@
  *   modalI18n/buildMarkup/wire/refreshSession/init — runs init() on DOM ready.
  * @usage <div id="aimeat-header"></div><script src="/v1/libs/aimeat-header.js"></script>
  * @version-history
+ *   v1.2.0 — 2026-08-12 — Spanish added. The language switch and readLang() come off one LANGS list
+ *     instead of naming the languages in five places.
  *   v1.1.0 — 2026-08-09 — Same anon/auth split as the SPA header: "How it works" and "For your
  *     business" (data-anon-only) step aside for Apps/Profile/Admin once there is a session. Drops
  *     "Try it" (it pointed at /v1/classic, which the landing already leads to) and "For Developers"
@@ -28,6 +30,8 @@ if (!window.__AIMEAT_HEADER_MOUNTED__) {
 function main() {
   var THEME_KEY = 'aimeat-theme';
   var LANG_KEY = 'aimeat-lang';
+  // The languages the node ships UI text in. Mirrors LOCALES in src/i18n.ts.
+  var LANGS = ['en', 'fi', 'es'];
   var NAV_FALLBACK = {
     'nav.howItWorks': 'How it works', 'nav.business': 'For your business', 'nav.help': 'Help',
     'nav.apps': 'Apps', 'nav.profile': 'Profile', 'nav.admin': 'Admin',
@@ -37,11 +41,12 @@ function main() {
   function readLang() {
     try {
       var u = new URLSearchParams(location.search).get('lang');
-      if (u === 'en' || u === 'fi') return u;
+      if (LANGS.indexOf(u) !== -1) return u;
       var s = localStorage.getItem(LANG_KEY);
-      if (s === 'en' || s === 'fi') return s;
+      if (LANGS.indexOf(s) !== -1) return s;
     } catch { /* storage blocked */ }
-    return (navigator.language || 'en').slice(0, 2).toLowerCase() === 'fi' ? 'fi' : 'en';
+    var nav = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    return LANGS.indexOf(nav) !== -1 ? nav : 'en';
   }
 
   function readTheme() {
@@ -168,8 +173,9 @@ function main() {
           '<a href="' + nodeHref('/v1/admin') + '" data-operator-only style="display:none">' + label('nav.admin') + '</a>' +
           '<div class="topnav-center">' +
             // Theme toggle now lives inside the login pill (mountLoginButton) — see init().
-            '<button class="lang-btn" data-lang="en">EN</button>' +
-            '<button class="lang-btn" data-lang="fi">FI</button>' +
+            LANGS.map(function (l) {
+              return '<button class="lang-btn" data-lang="' + l + '">' + l.toUpperCase() + '</button>';
+            }).join('') +
           '</div>' +
         '</div>' +
         '<span class="header-auth-slot" id="headerAuth"></span>' +

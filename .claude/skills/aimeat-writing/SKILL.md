@@ -1,12 +1,12 @@
 ---
 name: aimeat-writing
-description: How prose is written on this project: the AI tells that give a text away and how to remove them, and how Finnish is composed rather than translated. Use before writing or editing any user-visible text: UI copy, locale strings, documentation, a handbook page, a changelog entry, a commit message, an organism document, a prompt's human-facing parts, or a longer chat answer.
+description: How prose is written on this project: the AI tells that give a text away and how to remove them, and how Finnish and Spanish are composed rather than translated. Use before writing or editing any user-visible text: UI copy, locale strings, documentation, a handbook page, a changelog entry, a commit message, an organism document, a prompt's human-facing parts, or a longer chat answer.
 ---
 
 # Writing
 
-Two jobs. Remove the tells that make a text read as machine-written, and write Finnish that was
-composed in Finnish.
+Two jobs. Remove the tells that make a text read as machine-written, and write each language as
+that language rather than as translated English.
 
 ## The tells
 
@@ -72,11 +72,64 @@ What gives a translation away, in the order it shows up here:
 stage labels and identifiers a person reads as a machine's vocabulary (`AUTH`, `DELIVR`, `SNIF`,
 `FRESH`, `done`, `failed`) are not translated. Everything a person reads as a sentence is.
 
+## Spanish
+
+**Compose in Spanish**, the same standing instruction the Finnish carries. Two decisions were made
+once, and every string on the node follows them:
+
+- **Latin American Spanish (es-419), written for Bogotá.** Not peninsular. `computadora` not
+  `ordenador` · `celular` not `móvil` · `presiona` / `haz clic` not `pulsa` · `agregar` not `añadir`
+  · `felicitaciones` not `enhorabuena` · `carro`-free, plain register.
+- **`tú`, never `usted` and never `vos`.** Spoken Bogotá leans on `usted`, but software addresses
+  the reader as `tú` across the region, and the whole UI has to pick one and hold it.
+
+Vocabulary is fixed so 8000 strings agree with each other:
+
+| English | Spanish | Note |
+|---|---|---|
+| memory | memoria | |
+| workspace | espacio de trabajo | |
+| organism | organismo | |
+| node | nodo | |
+| agent | agente | |
+| app | aplicación | `app` only where a button has no room |
+| home (the product metaphor) | hogar | a person's own space here |
+| skill | habilidad | |
+| consent | consentimiento | |
+| provenance | procedencia | |
+| trust score | puntuación de confianza | |
+| owner (the role) | propietario | the human who owns the account |
+| deal (CRM) | oportunidad | |
+| viewer / contributor | lector / colaborador | |
+
+**Never translated**, in any language: `AIMEAT`, `morsel` / `morsels`, `MCP`, `GHII` / `GAII` /
+`GEAI`, `cortex`, `EXCHANGE`, `TURBO`, product names, and machine tokens (`done`, `failed`, `AUTH`).
+
+What gives a translation away here:
+
+- **Gendered address.** "Welcome" is not `Bienvenido`, which assumes a man reads it. `Te damos la
+  bienvenida`. Same for `tranquilo`, `listo`, `seguro` used about the reader: rephrase.
+- **English word order kept.** `Puedes copiar el prompt de arriba y pegarlo` is fine; a chain of
+  `de`s (`la configuración de los permisos de los agentes del usuario`) is English noun-stacking
+  wearing Spanish. Break it into a clause.
+- **Missing `¿` and `¡`.** They open the sentence, not just close it.
+- **`el enlace` vs `el link`, `el correo` vs `el email`.** Pick the Spanish one, both times.
+- **Calques.** `soportar` for support → `admitir` · `aplicar` for apply a setting → `aplicar` is
+  fine, but `aplicar para` a job is not · `remover` → `quitar` / `eliminar` · `accesar` is not a
+  word.
+- **Accents always.** The node is UTF-8 throughout and an append-only namespace makes a missing
+  tilde permanent. `á é í ó ú ñ ü ¿ ¡`.
+
+**Length.** Spanish runs 15–25 % longer than English. A string that fits a button in English may not
+in Spanish, and that is checked in a browser at three viewports, not guessed.
+
 ## Where each kind of text lands
 
-- **UI text** goes through `t()` and into both `locales/en.json` and `locales/fi.json` in the same
-  change. If the Finnish is not ready, ship the English string with a `[TODO:fi]` prefix rather than
-  a bad translation. A placeholder is honest; a calque is not.
+- **UI text** goes through `t()` and into `locales/en.json`, `locales/fi.json` and `locales/es.json`
+  in the same change. If a language is not ready, ship the English string with a `[TODO:fi]` /
+  `[TODO:es]` prefix rather than a bad translation — or leave the key out of that file entirely,
+  which falls back to English per key and is the cleaner option while a language is being filled in.
+  A placeholder is honest; a calque is not.
 - **A prompt string** is English, and follows `docs/coding-guidelines/prompt-writing.md`: say what
   TO do rather than what to avoid. Do not rewrite a prompt that works; additive changes only.
 - **A changelog entry** says what a person gets, not what the code does, and only for platform-level

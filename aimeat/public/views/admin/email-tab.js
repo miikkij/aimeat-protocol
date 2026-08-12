@@ -13,6 +13,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { LOCALES } from '/js/utils.js';
 import { EconRow, Empty, ExpandableHelp } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
@@ -401,7 +402,7 @@ export default function EmailTab({ data, reload, locale }) {
       <div class="adm-flex-between adm-mb-md">
         <h4 style="margin:0">${t('dashboard.emailTemplatesTitle')}</h4>
         <div style="display:flex;gap:4px">
-          ${['en', 'fi'].map(l => html`
+          ${LOCALES.map(l => html`
             <button class=${tplLocale === l ? 'adm-btn' : 'adm-btn-action'} style="padding:4px 10px;font-size:.75rem"
               onClick=${() => setTplLocale(l)}>${l.toUpperCase()}</button>
           `)}

@@ -52,6 +52,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
 import { sendMarkdown, prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { LOCALES } from '../i18n.js';
 import { AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_SCHEMA_PATH } from '../models/ai-provenance-schemas.js';
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
@@ -144,7 +145,10 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
       // The rule a caller has to understand before reading an empty answer as an acquittal.
       scope: 'Records describing content that is publicly readable on this node. Absence means UNSTATED, never "a human wrote it".',
     },
-    labelling: { icons: 'eu-ai-office-2026-06-10', languages: ['en', 'fi'] },
+    // The languages are the ones the node actually ships, not a list kept by hand. check:ai-disclosure
+    // assertion 5 holds the other end: every aiLabel.* key exists in each of them, so this statement
+    // cannot claim a disclosure that has not been written.
+    labelling: { icons: 'eu-ai-office-2026-06-10', languages: [...LOCALES] },
     // The correction procedure the Code of Practice asks for (Section 2, Commitment 2), named in the
     // artefact a regulator or a reader reads first. It routes into the node's existing moderation
     // queue — the one that already has reviewers, an auto-hide threshold and an appeal path —
