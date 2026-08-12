@@ -2,6 +2,32 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "feature",
+      "title": {
+        "en": "Give someone a corner of your memory, not one note at a time",
+        "fi": "Anna jollekulle nurkka muististasi, ei yhtä muistiinpanoa kerrallaan"
+      },
+      "body": {
+        "en": "You can open a whole key space to a group you have set up: everything under deliveries.abc, say, or news.morning. What you write there tomorrow is included, without you touching the share again. That last part is the point of it. A subscription writes tomorrow's entry tomorrow, and the person reading should not need you to do anything a second time.\n\nThe entries stay private. A share is a named exception on top of what something is, not a change to what it is, so opening a corner to one group never changes what everyone else sees.\n\nThe Access tab shows what each group reaches, with sharing and stopping side by side, and a new Shared with you section lists what other people have opened to you. Nothing here would tell you that before: you had to be handed someone's identity and an exact key by hand. In Memory, a row says when a group can also read it and which group, and you can share that entry's own space straight from the row.\n\nStopping takes effect at once. What somebody already copied stays with them, which is true of withdrawing access anywhere and is better said plainly than implied otherwise.",
+        "fi": "Voit avata kokonaisen avainavaruuden perustamallesi ryhmälle: vaikka kaiken deliveries.abc alta tai news.morning alta. Se mitä kirjoitat sinne huomenna kuuluu jakoon ilman että kosket siihen uudelleen. Juuri siinä on koko idea. Tilaus kirjoittaa huomisen merkinnän huomenna, eikä lukijan pidä tarvita sinua toistamiseen.\n\nMerkinnät pysyvät yksityisinä. Jako on nimetty poikkeus sen päällä mitä jokin on, ei muutos siihen, joten nurkan avaaminen yhdelle ryhmälle ei muuta sitä mitä muut näkevät.\n\nPääsy-välilehti näyttää mihin kukin ryhmä yltää, jakaminen ja lopettaminen vierekkäin, ja uusi Sinulle jaettu -osio listaa mitä muut ovat avanneet sinulle. Mikään täällä ei kertonut sitä aiemmin: sinulle piti syöttää käsin jonkun tunnus ja tarkka avain. Muistissa rivi kertoo milloin joku ryhmä voi myös lukea sen ja mikä ryhmä, ja voit jakaa sen merkinnän oman avaruuden suoraan riviltä.\n\nLopetus vaikuttaa heti. Se minkä joku on jo kopioinut jää hänelle, mikä pätee pääsyn perumiseen kaikkialla ja on rehellisempää sanoa ääneen kuin antaa ymmärtää toisin."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "fix",
+      "title": {
+        "en": "The sharing groups were promising something they never did",
+        "fi": "Jakoryhmät lupasivat jotain mitä ne eivät koskaan tehneet"
+      },
+      "body": {
+        "en": "If you ever picked a group from the visibility menu on one of your memories, it answered as though it had worked, showed the group's name, and shared nothing with anybody. On nodes running the fast local database it had always been so. On the main one it broke as soon as you shared something that already existed, or moved it from one group to another.\n\nMoving between groups was the worst of the three: the old group kept reading and the new one never started, while the screen said the move had happened.\n\nThis is fixed, and it now has the tests that would have caught it. The tests were the actual gap. Seventeen of them covered creating groups and adding people, and not one checked whether a group could read anything, so the half nobody asked about stayed broken while everything looked green.\n\nEntries you shared the old way keep working. There is nothing you need to do.",
+        "fi": "Jos olet joskus valinnut ryhmän muistisi näkyvyysvalikosta, se vastasi kuin olisi toiminut, näytti ryhmän nimen eikä jakanut kenellekään mitään. Nopealla paikallisella tietokannalla toimivilla nodeilla niin oli aina ollut. Pääkoneella se hajosi heti kun jaoit jotain jo olemassa olevaa tai siirsit sen ryhmästä toiseen.\n\nSiirto ryhmästä toiseen oli näistä pahin: vanha ryhmä luki edelleen eikä uusi päässyt alkuunkaan, ja ruutu väitti siirron tapahtuneen.\n\nTämä on korjattu, ja siitä on nyt ne testit jotka olisivat napanneet sen. Testit olivat se varsinainen aukko. Seitsemäntoista niistä kattoi ryhmien luomisen ja ihmisten lisäämisen, eikä yksikään tarkistanut pääseekö ryhmä lukemaan mitään, joten se puoli jota kukaan ei kysynyt pysyi rikki kaiken näyttäessä vihreältä.\n\nVanhalla tavalla jaetut merkinnät toimivat edelleen. Sinun ei tarvitse tehdä mitään."
+      }
+    },
+    {
       "date": "2026-08-11",
       "version": "2.7.0",
       "kind": "feature",
