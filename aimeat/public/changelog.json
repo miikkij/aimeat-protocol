@@ -58,6 +58,19 @@
       "version": "2.8.0",
       "kind": "feature",
       "title": {
+        "en": "Give someone a corner of your memory, not one note at a time",
+        "fi": "Anna jollekulle nurkka muististasi, ei yhtä muistiinpanoa kerrallaan"
+      },
+      "body": {
+        "en": "You can open a whole key space to a group you have set up: everything under deliveries.abc, say, or news.morning. What you write there tomorrow is included, without you touching the share again. That last part is the point of it. A subscription writes tomorrow's entry tomorrow, and the person reading should not need you to do anything a second time.\n\nThe entries stay private. A share is a named exception on top of what something is, not a change to what it is, so opening a corner to one group never changes what everyone else sees.\n\nThe Access tab shows what each group reaches, with sharing and stopping side by side, and a new Shared with you section lists what other people have opened to you. Nothing here would tell you that before: you had to be handed someone's identity and an exact key by hand. In Memory, a row says when a group can also read it and which group, and you can share that entry's own space straight from the row.\n\nStopping takes effect at once. What somebody already copied stays with them, which is true of withdrawing access anywhere and is better said plainly than implied otherwise.",
+        "fi": "Voit avata kokonaisen avainavaruuden perustamallesi ryhmälle: vaikka kaiken deliveries.abc alta tai news.morning alta. Se mitä kirjoitat sinne huomenna kuuluu jakoon ilman että kosket siihen uudelleen. Juuri siinä on koko idea. Tilaus kirjoittaa huomisen merkinnän huomenna, eikä lukijan pidä tarvita sinua toistamiseen.\n\nMerkinnät pysyvät yksityisinä. Jako on nimetty poikkeus sen päällä mitä jokin on, ei muutos siihen, joten nurkan avaaminen yhdelle ryhmälle ei muuta sitä mitä muut näkevät.\n\nPääsy-välilehti näyttää mihin kukin ryhmä yltää, jakaminen ja lopettaminen vierekkäin, ja uusi Sinulle jaettu -osio listaa mitä muut ovat avanneet sinulle. Mikään täällä ei kertonut sitä aiemmin: sinulle piti syöttää käsin jonkun tunnus ja tarkka avain. Muistissa rivi kertoo milloin joku ryhmä voi myös lukea sen ja mikä ryhmä, ja voit jakaa sen merkinnän oman avaruuden suoraan riviltä.\n\nLopetus vaikuttaa heti. Se minkä joku on jo kopioinut jää hänelle, mikä pätee pääsyn perumiseen kaikkialla ja on rehellisempää sanoa ääneen kuin antaa ymmärtää toisin."
+      }
+    },
+    {
+      "date": "2026-08-12",
+      "version": "2.8.0",
+      "kind": "feature",
+      "title": {
         "en": "Ask for help without knowing who to ask",
         "fi": "Pyydä apua tietämättä keneltä"
       },

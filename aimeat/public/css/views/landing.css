@@ -302,7 +302,11 @@
 .ld-log-item:first-child { border-top: none; padding-top: 4px; }
 .ld-log-meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .3rem; }
 .ld-log-title { margin: 0 0 .25rem; font-size: 1rem; font-weight: 700; color: var(--text); }
-.ld-log-body { margin: 0; font-size: .87rem; line-height: 1.55; color: var(--text-dim); }
+/* pre-line, because an entry body carries its own paragraph breaks. Without it every blank line in
+   changelog.json collapsed into a space and a four-paragraph entry rendered as one wall. Nothing
+   parses markdown here, so an entry is written as plain text and its \n\n are the only structure
+   it gets. */
+.ld-log-body { margin: 0; font-size: .87rem; line-height: 1.55; color: var(--text-dim); white-space: pre-line; }
 @media (max-width: 600px) {
   .ld-log .collapsible-header { padding: 12px 14px; }
   .ld-log-list { padding: 0 14px 14px; max-height: 320px; }
