@@ -34,7 +34,7 @@ Every request runs as exactly one **principal**. Get the principal + its trust t
 
 ---
 
-## 2. The ten invariants (the DNA — every change must preserve these)
+## 2. The sixteen invariants (the DNA — every change must preserve these)
 
 ### 1. Authorize against the *resolved* identity, never a client-supplied id
 Every route that stores/reads by identity MUST call `resolveIdentity(req.auth!, config.nodeId)` and
@@ -100,6 +100,77 @@ If a safe value differs local vs public, add it to `.env.example` with a safe **
 documented local override. Never hardcode a permissive value, never delete functionality to be safe. See §3.
 
 ---
+
+### 11. The owner name is not a principal
+`req.auth!.owner` carries the HUMAN's account name on every principal that belongs to them: an
+app-grant token (`roles:['app']`), an ecosystem app, an agent JWT and an agent PAT alike. So a check
+written as `req.auth!.owner !== name` is a CROSS-OWNER check and nothing more. It refuses a different
+person and admits everything acting in this person's name, which is not what its author meant and not
+what its name says.
+
+The August 2026 audit produced this finding eleven times, and the report's own status pass then
+recorded one of them as fixed because an operator clause had been added: `owner !== name &&
+!roles.includes('operator')` WIDENS the door, and reading it as a narrowing cost a second pass.
+
+*Check:* every authorization names WHICH KIND of principal may do this, never only whose data it is.
+A change to the account itself, its password, its recovery address, its second factor, its deletion or
+its export, goes behind `requireOwnerPrincipal()`: role `owner` present, `agent`, `ecosystem` and
+`app` absent. `requireRole('owner')` alone is not that test, because a role can be inherited (see 12).
+
+### 12. A role is granted, never inherited at mint time
+`POST /v1/auth/token` read the owner record and copied the owner's `owner` and `operator` roles onto
+the AGENT's JWT, so every agent of an operator was an operator. The consequence was not the role test
+but the laundering: that token passed `requireRole('owner')` at the PAT mint, `isOperator` was true so
+`grant_operator` was permitted, and the resulting PAT resolved to `['owner','operator']` with
+`scopes: []` and no `agent` role, at which point `requireScope` bypasses entirely. Two calls turned a
+scope-limited agent into an unscoped operator credential.
+
+*Check:* a mint issues the roles the PRINCIPAL was granted. Privilege comes from an approval somebody
+made on purpose, never from who your owner happens to be. When you add a mint, diff its role list
+against the other mints; there were four and one of them disagreed for months.
+
+### 13. A gate reads the normalized value, never the raw request
+`POST /v1/capabilities` checks the webhook allowlist against `body.source.type === 'manual'`, and the
+record builder defaults a MISSING type to `'manual'`. So omitting `source` entirely skips both
+`WEBHOOKS_DISABLED` and the domain allowlist, and the record is then built as exactly the manual
+capability the gate would have refused. The gate and the record disagree about what the request was.
+
+The same shape reached the isolation boundary: `middleware/subdomain.ts` set `req.appOrigin` from the
+`X-App-Origin` REQUEST header, so one header made the node believe a request had arrived on the
+isolated app origin and serve app HTML on the session origin instead.
+
+*Check:* normalize first, then gate on the normalized value. If a header or a field decides
+authorization, the code must be able to verify it independently of the sender, or it is not a gate.
+
+### 14. Refuse before you write
+Three separate defects in one audit, one shape. `installCortex` read who held a cortex name, wrote the
+lib BYTES, and inserted last, so an install aimed at a bundled pack during boot seeding replaced the
+JavaScript this node serves to every browser and only then collided. `enforcePaywall` stood down on a
+`settled` internal pass without comparing the pass's product coordinate to the action it was about to
+run. `POST /.../tasks/:id/complete` sent its response before awaiting the completion fan-out, so on
+Postgres the caller's next read raced the counters it had just been told about.
+
+*Check:* nothing an attacker controls is written, served or answered before the check that would
+refuse it. When a handler both writes and validates, read the ORDER, not just the presence.
+
+### 15. A permission word is enforced on every door or it does not exist
+`organism:write` deletes `aimeat_organism_create` from an agent's MCP surface, because a `TOOL_SCOPES`
+entry removes the tool rather than refusing the call. The same agent gets `201 Created` from
+`POST /v1/organisms`, because `requireRoleOrScope('agent', 'organism:write')` admits any principal
+holding the `agent` role BEFORE it looks at scopes. The word is real on the surface an owner reads and
+decorative on the door that writes.
+
+*Check:* when you add a scope word, name every door that reaches the capability and gate all of them.
+A word enforced on one door teaches an owner that they have controlled something they have not.
+
+### 16. Deprecated is not removed
+RFC v4.0 marks One-Time Keys / Tier 0.5 deprecated and says the feature sits behind
+`keyedBrowseEnabled`. Three of its write paths were behind no flag at all, and the flag defaults to
+ON, so they were live on every node: two wrote work status with no task bridge and no event, and the
+third created a board post with no access check, no price, no hook and no provenance.
+
+*Check:* deprecating something names the flag, the default and the version it is removed in. A
+deprecation note with none of those is a comment, and the code keeps running.
 
 ## 3. Security posture: one codebase, localhost-flexible → public-strict
 
