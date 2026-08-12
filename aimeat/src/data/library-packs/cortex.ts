@@ -12,6 +12,9 @@
  *   v1.2.0 — 2026-07-16 — aimeat-dag (auto-layout DAG canvas with live state layer) +
  *     aimeat-ui-motion (count-up stat tiles, skeletons, view transitions, stagger, micro-bling) —
  *     extracted as generic packs while building MISSIONS; first consumer proves them.
+ *   v1.3.0 — 2026-08-12 — aimeat-input: the platform's first answer for touch INPUT (the mobile
+ *     rules covered layout only), with a keyboard equivalent per gesture so one implementation
+ *     serves phone and desktop.
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -266,6 +269,64 @@ export const CORTEX_PACKS: LibraryPack[] = [
     sizeEstimate: '~18KB',
     status: 'preview',
     modelTier: 'needs-doc',
+  },
+  {
+    id: 'aimeat-input',
+    kind: 'cortex',
+    category: 'ui',
+    title: 'Input / touch gestures',
+    description: 'Touch and pointer input as one implementation: tap, double-tap, long-press, swipe, drag, a virtual thumbstick, and a keyboard equivalent for each, so the same code answers a finger, a mouse and a keyboard. Derives touch-action from the handlers you register, so a horizontal swipe leaves vertical scrolling alive.',
+    url: '/v1/cortex/aimeat-input/libs/aimeat-input.js',
+    include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-input/libs/aimeat-input.js"></script>'],
+    requires: [],
+    version: '1.0.0',
+    license: 'MIT',
+    apiSurface: 'AIMEAT.input',
+    apiCaveat: 'Use tappable() for buttons, cards and rows — it is built on `click`, so a tap, a mouse and Enter/Space all arrive once. A hand-rolled touchstart listener fires twice, triggers mid-scroll, and cannot be reached by keyboard.',
+    aiDoc: [
+      'AIMEAT.input — gestures ON AN ELEMENT. For a movable surface with its own camera (pan, zoom,',
+      'pinch over arbitrary content) use aimeat-viewport, which owns that and composes with this',
+      'pack through claimFor(). A graph, diagram or drawing surface (aimeat-dag / aimeat-flow /',
+      'aimeat-canvas) already handles its own pointers.',
+      'START HERE, because it decides most cases correctly on its own:',
+      'AIMEAT.input.tappable(elOrSelector, onActivate, { size?, role?, label?, haptic? })',
+      'Use it for EVERY button, card, tile, chip and list row. It listens for `click`, not for',
+      'touchstart: the browser already turns a tap into a correct click, routes Enter and Space to',
+      'it, and announces it to a screen reader. What it adds is what the browser does not do —',
+      'touch-action: manipulation (no 300ms delay), no grey iOS flash, the 44px minimum target via',
+      '--ai-touch, and role + tabindex on an element that is not natively a button.',
+      'WHEN A CLICK IS NOT ENOUGH (canvas, map, a row that both taps and swipes):',
+      'const g = AIMEAT.input.on(el, { tap, doubleTap, longPress, swipe, dragStart, dragMove,',
+      '  dragEnd }, { axis, keyboard, slop, longPressMs, doubleTapMs, swipeMinPx, swipeMaxMs,',
+      '  touchAction, haptic }) → { el, update(handlers), destroy() }',
+      "swipe receives ('left'|'right'|'up'|'down', info); every handler receives info { dx, dy,",
+      "duration, velocity, pointerType, source } where source is 'pointer', 'keyboard' or",
+      "'contextmenu'.",
+      "DECLARE `axis` ON ANYTHING THAT ALSO SCROLLS. touch-action is derived from the handlers you",
+      "registered: swipe + axis 'x' → pan-y, so vertical scrolling survives while a row swipes",
+      "sideways. Leaving axis at 'both' takes the element out of scrolling entirely — right for a",
+      'canvas, wrong for a list.',
+      'EVERY GESTURE HAS A DESKTOP PATH, on by default: arrows fire swipe, Enter/Space fire tap, a',
+      'right click fires longPress. The synthetic click after a consumed gesture is suppressed for',
+      '400ms, so a handler runs once.',
+      'AIMEAT.input.pad(host, { mode:"stick"|"dpad", floating, deadZone, keyboard, onChange }) →',
+      '{ value(), destroy() } is a virtual thumbstick for a game; WASD and the arrows drive the same',
+      'vector. The host needs a SIZE, and the pad renders unpainted geometry only (.ai-pad-base,',
+      '.ai-pad-stick, sized by --ai-pad-size / --ai-pad-stick) so the app skins it.',
+      'haptic(kind) buzzes where the device allows and is silent elsewhere, so call it freely — as',
+      'reinforcement of on-screen feedback, never as the only feedback. isCoarse() and hasHover()',
+      'report the device and are for CHOOSING a layout; both inputs stay supported whatever they',
+      'return, because a laptop with a touchscreen answers true to both.',
+    ].join('\n'),
+    changelog: [
+      { version: '1.0.0', date: '2026-08-12', summary: 'Initial release. Written because mobile INPUT was the gap in an otherwise covered mobile story: the layout rules (overflow, viewport, the bottom chrome strip) live in the build-app prompt and in fifteen appdev pitfalls, while touch handling was hand-rolled per app and duplicated across aimeat-viewport, -dag, -flow and -canvas, and aimeat-game listened for `click` alone. One Pointer Events state machine, keyboard equivalence on by default, touch-action derived from the registered handlers, and the trailing synthetic click suppressed once a gesture has consumed the interaction.' },
+    ],
+    tierHint: 'T2',
+    interviewTriggers: ['touch', 'tap', 'swipe', 'mobile', 'gesture', 'drag', 'joystick', 'kosketus', 'mobiili', 'ele', 'pyyhkäisy', 'raahaus'],
+    sizeEstimate: '~14KB',
+    status: 'preview',
+    modelTier: 'needs-doc',
+    promptLine: '- aimeat-input — tap/swipe/long-press/drag + a virtual thumbstick, each with a keyboard equivalent (`AIMEAT.input`). Use `tappable()` for every button, card and row.',
   },
   {
     id: 'aimeat-viewport',

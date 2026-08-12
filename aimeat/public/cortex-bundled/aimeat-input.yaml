@@ -1,0 +1,149 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-input
+  namespace: aimeat
+  description: "Touch and pointer input as one implementation: tap, double-tap, long-press, swipe, drag, a virtual thumbstick, and a keyboard equivalent for each so the same code answers a finger, a mouse and a keyboard. Derives touch-action from the handlers you register, so a horizontal swipe leaves vertical scrolling alive. Zero dependencies, structural CSS only, composes with aimeat-viewport rather than competing with it."
+  author: AIMEAT
+  tags: [input, touch, gesture, tap, swipe, mobile, pointer, accessibility, ui]
+  labels:
+    domain: ui
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: input-assistant
+      content: |
+        You are an input assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        aimeat-input is GESTURES ON AN ELEMENT. Reach for it when a control has to answer a finger
+        as well as a mouse: a card that opens on tap, a row that archives on swipe, a canvas that
+        drags, a game that needs a thumbstick. For a movable surface with its own camera (pan, zoom,
+        pinch over arbitrary content) use aimeat-viewport, which owns that and is designed to
+        compose with this pack through claimFor(). For a graph, a diagram or freehand drawing use
+        aimeat-dag, aimeat-flow or aimeat-canvas, each of which already handles its own pointers.
+
+        Include ONE tag:
+        <script src="{{node_url}}/v1/cortex/aimeat-input/libs/aimeat-input.js"></script>
+
+        START HERE, because it decides most cases correctly on its own:
+
+        AIMEAT.input.tappable(elOrSelector, onActivate, { size?, role?, label?, haptic? })
+
+        Use it for every button, card, tile, chip and list row. It listens for `click`, not for
+        touchstart, and that is deliberate: the browser already turns a tap into a correct click,
+        routes Enter and Space to it, and announces it to a screen reader. What it does not do is
+        remove the 300ms tap delay or the grey iOS flash, so tappable() adds `touch-action:
+        manipulation`, enforces the 44px minimum target through --ai-touch, and gives a plain
+        element the role, tabindex and key handling a real button already has.
+
+        Hand-rolling `addEventListener('touchstart', …)` produces three bugs at once: the handler
+        fires twice (touch then the synthetic click), it triggers while the user is scrolling past,
+        and the control becomes unreachable by keyboard. Reach for tappable() instead.
+
+        WHEN A CLICK IS NOT ENOUGH — a canvas, a map, a row that both taps and swipes:
+
+        const g = AIMEAT.input.on(elOrSelector, {
+          tap(ev, info) {}, doubleTap(ev, info) {}, longPress(ev, info) {},
+          swipe(dir, info) {},                       // 'left' | 'right' | 'up' | 'down'
+          dragStart(ev, info) {}, dragMove(ev, info) {}, dragEnd(ev, info) {},
+        }, {
+          axis: 'x' | 'y' | 'both',                  // default 'both'
+          keyboard: true, slop: 10, longPressMs: 500, doubleTapMs: 300,
+          swipeMinPx: 40, swipeMaxMs: 600, touchAction: 'pan-y', haptic: 'light',
+        })
+        g.update(newHandlers) · g.destroy()
+
+        `info` carries { dx, dy, duration, velocity, pointerType, source }, and `source` is
+        'pointer', 'keyboard' or 'contextmenu' so a handler can tell a flick from an arrow key.
+
+        DECLARE `axis` ON ANYTHING THAT ALSO SCROLLS. The pack sets touch-action from the handlers
+        you registered: swipe with axis 'x' becomes `pan-y`, so the user can still scroll the list
+        vertically while swiping a row sideways. Leaving axis at 'both' takes the element out of
+        scrolling entirely, which is right for a canvas and wrong for a list. This one line is the
+        difference between a swipeable list and a list nobody can scroll.
+
+        EVERY GESTURE HAS A DESKTOP PATH, on by default: arrow keys fire `swipe`, Enter and Space
+        fire `tap`, a right click fires `longPress`. An element that reports taps is given
+        tabindex="0" when it has none, so it can be reached at all. Keep this on unless the app
+        provides its own keyboard route to the same action.
+
+        THE DOUBLE-FIRE IS ALREADY HANDLED: once a gesture consumes an interaction, the synthetic
+        click that follows a tap is swallowed for 400ms, so a handler runs once.
+
+        A GAME PAD, for a game that needs continuous direction:
+
+        const stick = AIMEAT.input.pad(hostElOrSelector, {
+          mode: 'stick' | 'dpad', floating: true, deadZone: 0.12, keyboard: true,
+          onChange({ x, y, angle, distance, active, source }) {},
+        })
+        stick.value()   // read this from the game loop; WASD and the arrows drive the same vector
+
+        The host needs a SIZE. The pad renders two unpainted elements (.ai-pad-base, .ai-pad-stick)
+        and positions them; how they LOOK is the app's own CSS, the same way a skin for aimeat-game
+        is written through --ag-* variables alone. Geometry comes from --ai-pad-size and
+        --ai-pad-stick.
+
+        WITH aimeat-viewport, when the app has both a camera and draggable children:
+          onClaimPointer: (ev) => {
+            const card = ev.target.closest('[data-card]');
+            return card ? AIMEAT.input.claimFor({ onMove: (dx, dy) => nudge(card, dx, dy) }) : null;
+          }
+        The viewport keeps pan, zoom and pinch; this pack says what a gesture on a child means.
+
+        ALSO: AIMEAT.input.haptic('light'|'medium'|'heavy'|'success'|'warning') buzzes where the
+        device allows it and is silent everywhere else, so it is safe to call unconditionally — make
+        it a reinforcement of feedback that is already on screen, never the only feedback.
+        AIMEAT.input.isCoarse() and .hasHover() report the device, and they are for CHOOSING a
+        layout. Both inputs stay supported whatever they return: a laptop with a touchscreen answers
+        true to both.
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-input
+      filename: aimeat-input.js
+      exports:
+        - on
+        - tappable
+        - haptic
+        - pad
+        - claimFor
+        - isCoarse
+        - hasHover
+        - injectCss
+      api_surface: |
+        AIMEAT.input.tappable(elOrSelector, onActivate, { size?, role?, label?, haptic? })
+          -> { destroy() }
+          The default choice for buttons, cards, tiles and rows. Built on `click`, so a tap, a
+          mouse and Enter/Space all arrive the same way and a screen reader announces the control.
+          Adds touch-action: manipulation (no 300ms delay), removes the iOS grey flash, enforces the
+          44px minimum target via --ai-touch, and gives a non-native element role + tabindex.
+
+        AIMEAT.input.on(elOrSelector, { tap, doubleTap, longPress, swipe, dragStart, dragMove,
+          dragEnd }, { axis?, keyboard?, slop?, longPressMs?, doubleTapMs?, swipeMinPx?,
+          swipeMaxMs?, touchAction?, haptic? })
+          -> { el, update(handlers), destroy() }
+          Pointer Events only, one gesture per element, a second finger never corrupts one in
+          flight, and pointercancel ends a drag cleanly. touch-action is derived from the handlers
+          registered: drag -> none, swipe axis 'x' -> pan-y, axis 'y' -> pan-x, tap only ->
+          manipulation. Handlers receive info { dx, dy, duration, velocity, pointerType, source }.
+
+        AIMEAT.input.pad(hostElOrSelector, { mode?, floating?, deadZone?, keyboard?, onChange? })
+          -> { host, value(), destroy() }
+          Virtual thumbstick or 8-way dpad, with WASD and the arrow keys driving the same normalized
+          vector on a desktop. Renders unpainted geometry only; the app skins it.
+
+        AIMEAT.input.claimFor({ onMove, onEnd }) -> a drag handle for aimeat-viewport's
+          onClaimPointer delegate, so the camera and the gestures never fight for one pointer.
+
+        AIMEAT.input.haptic(kind) -> boolean · isCoarse() · hasHover() · injectCss()
+
+        Keyboard equivalence is ON by default: arrows fire swipe, Enter/Space fire tap, a right
+        click fires longPress. The synthetic click following a consumed gesture is suppressed for
+        400ms, so a handler runs once.
+
+        Zero dependencies. Structural CSS only (touch-action, target size, pad geometry) — the app
+        owns every colour, radius and shadow. Idempotent namespace guard.

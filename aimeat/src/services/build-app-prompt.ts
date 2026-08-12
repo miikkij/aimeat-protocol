@@ -13,6 +13,12 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-12 — ADDITIVE: "Mobile input" section after the mobile safety checklist, plus the
+ *     aimeat-input pack in the Ready-made UI list (registry-driven). Everything the prompt said
+ *     about phones was LAYOUT — overflow, viewport, the bottom chrome strip, fifteen appdev
+ *     pitfalls — and none of it about how a control answers a finger, so touch was hand-rolled per
+ *     app and got the same three bugs each time. The section names one default (tappable) and the
+ *     one option that must be declared (axis). Existing text untouched.
  *   2026-08-11 — ADDITIVE: the spec token. buildAppSpecToken(config) digests this document, the
  *     prompt names it once in the MCP-agent section, and services/app-spec-gate.ts checks it at
  *     publish. Born from an app that went live on 2026-08-11 with three defects this text already
@@ -434,6 +440,23 @@ function composeAppPrompt(
   body += '- **Wrap wide content** — put tables / code blocks / diagrams in a `overflow-x:auto` container, and `flex-wrap: wrap` any toolbar/nav row whose item count can grow (tabs, pager dots).\n';
   body += '- **Verify**: at 390px (portrait) AND ~844px (landscape), `document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and body text stays ≥14px.\n';
   body += 'For a focused view (chat/editor/wizard) on ≤760px, go full-screen (`position:fixed; inset:0` gated on an is-active class) with a Back affordance, rather than sharing the screen with app chrome.\n\n';
+
+  // Mobile INPUT, which is a different failure from mobile layout and was missing until
+  // aimeat-input v1.0.0 (2026-08-12). Everything above this point is about what the page LOOKS
+  // like on a phone; a layout that passes every check above is still unusable if its controls only
+  // answer a mouse. The rule is stated as one default (tappable) plus the one option that has to
+  // be declared (axis), because that is what a builder gets wrong unaided.
+  body += '### Mobile input — make a control answer a finger, a mouse and a keyboard\n';
+  body += 'A layout that passes every check above is still unusable if its controls were built for a mouse. Load `aimeat-input` and let it decide:\n';
+  body += '```html\n';
+  body += '<script src="' + nodeUrl + '/v1/cortex/aimeat-input/libs/aimeat-input.js"></' + 'script>\n';
+  body += '```\n';
+  body += '- **`AIMEAT.input.tappable(el, onActivate)` for every button, card, tile, chip and list row.** It is built on `click`, so a tap, a mouse and Enter/Space all arrive once and a screen reader announces the control. It adds what the browser does not: `touch-action: manipulation` (removes the 300ms tap delay), no grey iOS flash, the 44px minimum target, and `role` + `tabindex` on an element that is not natively a button.\n';
+  body += '- **Do not hand-roll `addEventListener("touchstart", …)`.** It produces three bugs at once: the handler fires twice (touch, then the synthetic click), it triggers while the user is scrolling past, and the control becomes unreachable by keyboard.\n';
+  body += '- **`AIMEAT.input.on(el, { tap, longPress, swipe, dragStart, dragMove, dragEnd }, { axis })` when a click is genuinely not enough** — a canvas, a map, a row that both taps and swipes. Every gesture gets a desktop path by default: arrows fire `swipe`, Enter/Space fire `tap`, a right click fires `longPress`.\n';
+  body += '- **Declare `axis` on anything that also scrolls.** The pack sets `touch-action` from the handlers you registered, and `axis: "x"` becomes `pan-y`, so the user can still scroll a list vertically while swiping a row sideways. Leaving it at `"both"` takes the element out of scrolling entirely: right for a canvas, wrong for a list.\n';
+  body += '- **A game that needs continuous direction** uses `AIMEAT.input.pad(host, { onChange })`, a virtual thumbstick whose vector WASD and the arrow keys also drive. Read `pad.value()` from the game loop.\n';
+  body += '- **Verify with a real touch:** every interactive element measures at least 44x44 CSS px, and a tap handler runs ONCE (log a counter and tap once — two entries means a hand-rolled touch listener is still there).\n\n';
 
   // The reserved bottom strip. Two fixed node marks (the AI-disclosure label bottom-left, the
   // aimeat.io attribution badge bottom-right) ride every served app and always win the paint, so an
