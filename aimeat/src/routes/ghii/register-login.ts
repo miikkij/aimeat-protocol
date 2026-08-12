@@ -4,6 +4,10 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.1 — 2026-08-12 — POST /v1/ghii now answers WEAK_PASSWORD for a TOO SHORT password as well.
+ *     The schema's own min(8) refused it first as VALIDATION_ERROR, so the handler's strength check
+ *     was unreachable for that one case; the length rule now has a single home in
+ *     validatePasswordStrength. No API break: same 400, a more specific code and a usable message.
  *   v1.3.0 — 2026-08-07 — POST /v1/ghii writes onboarding.track at account creation (remake phase 0):
  *     new accounts are created on the remake path (K3), and the marker is what keeps the two paths'
  *     funnel numbers apart.
@@ -89,7 +93,10 @@ export function registerRegisterLoginRoutes(
             display_name = display_name.split('@')[0];
         }
 
-        // SECURITY: Validate password strength if provided
+        // SECURITY: Validate password strength if provided. This is the ONLY strength gate on the
+        // route, and it has to stay that way: GhiiRegistrationSchema deliberately carries no
+        // min-length rule, because validateBody runs first and would refuse a short password as
+        // VALIDATION_ERROR, which is the wrong code and carries no reason a person can act on.
         if (password !== undefined && password !== null) {
             if (typeof password !== 'string') {
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Password must be a string'));

@@ -30,6 +30,10 @@
  * @structure stub AI provider · owner/agent setup · one describe-ish block per acceptance item
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance
  * @version-history
+ *   v1.4.0 — 2026-08-12 — The markdown mirror's signatory line is held against what the JSON route
+ *     answered rather than against this process's AIMEAT_AI_COP_SECTIONS. The server fills unset keys
+ *     from aimeat/.env, so on a machine whose own node has signed the Code of Practice the two
+ *     surfaces were compared to a value neither of them had used. The route itself was never wrong.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8b: the legacy raw completion route
  *     (POST /v1/openrouter/complete) now runs through the same chokepoint, so it mints provenance
  *     AND lands in the usage ledger. Both halves read back from outside; the route's `content` and
@@ -808,6 +812,11 @@ async function startStub(): Promise<void> {
         // node that has signed, and pinning `true` would be a false claim everywhere else. What is
         // asserted is the DERIVATION and the internal consistency — a `true` that names no section,
         // or a `false` that carries sections, is the shape a reader would be misled by.
+        //
+        // Reading it from THIS process only works because run-e2e-ci.ts pins the pair into the server's
+        // environment. Without that pin the server fills any unset key from aimeat/.env (src/index.ts),
+        // so a developer whose own node has signed the Code produced a `true` here that the test process
+        // had no way to know about. Do not drop the pin and leave this line.
         const wantCopSections = (process.env.AIMEAT_AI_COP_SECTIONS ?? '')
             .split(',').map(s => s.trim()).filter(Boolean);
         const cop = d.code_of_practice;
@@ -860,12 +869,19 @@ async function startStub(): Promise<void> {
         assert(text.includes('Visible label on public surfaces: **strict**'), 'the mirror omits the label posture');
         // The markdown is a SEPARATE rendering of the same statement, and it used to carry the
         // signatory answer as a literal "no" — the exact way two surfaces drift apart.
-        const mdCop = (process.env.AIMEAT_AI_COP_SECTIONS ?? '').split(',').map(s => s.trim()).filter(Boolean);
-        assert(text.includes(mdCop.length
+        //
+        // Compared against what the JSON route ACTUALLY answered, never against this process's own
+        // environment. Mirroring is the whole job of this surface, so the thing to hold it against is
+        // the statement it mirrors; deriving both sides from the same env variable checked the harness
+        // and left the two renderings free to disagree. It also survives a server configured from a
+        // file this process cannot read, which is how the assertion came to fail on one backend only.
+        const jsonCop = (await json('/v1/ai-transparency')).body.data.code_of_practice as
+            { signatory: boolean; sections: string[] };
+        assert(text.includes(jsonCop.signatory
             ? 'Code of Practice signatory: **yes**'
             : 'Code of Practice signatory: **no**'),
-        'the mirror\'s signatory line disagrees with AIMEAT_AI_COP_SECTIONS');
-        for (const s of mdCop) {
+        'the mirror\'s signatory line disagrees with the JSON statement');
+        for (const s of jsonCop.sections) {
             assert(text.includes(`Section ${s}`), `the mirror does not name signed Section ${s}`);
         }
     });

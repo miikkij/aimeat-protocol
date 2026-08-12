@@ -15,6 +15,14 @@
  * @structure owner + agent setup · agent publishes an app · four fetches · serve-time HTML
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-surfaces
  * @version-history
+ *   v1.2.0 — 2026-08-12 — The viewport half of the top-layer test now asserts the rule instead of
+ *     one spelling of the CSS. It had been failing since the mobile presentation changed on
+ *     2026-08-03 (ai-provenance-marks.ts v1.5.0, which updated the golden fixture but not this
+ *     suite): a substring regex hunting for a rule that hides the details link alone also matched
+ *     the rule that collapses the text and the link together behind a tap. The assertions now read
+ *     the label's stylesheet as rules — the mark is never hidden, anything collapsed has a state
+ *     that restores it, the toggle stays keyboard-reachable — and the browser numbers behind them
+ *     are in the comment beside them.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the VISIBLE label on the inline serve (official EU
  *     icon in both theme variants, lockup proportions, aria-label, Accept-Language), and the
  *     stored-bundle assertion extended to prove the chip does not leak into the author's bytes either.
@@ -32,6 +40,48 @@ async function test(name: string, fn: () => Promise<void>) {
     catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
+
+/**
+ * `selector{declarations}` pairs from a stylesheet, each tagged with the at-rule it sits inside.
+ *
+ * The visible label's CSS is one long string built in services/ai-provenance-marks.ts, and matching
+ * it with a substring regex is what let this suite rot: a pattern hunting for a rule that hides ONLY
+ * the details link also matched `#aimeat-ai-label b,#aimeat-ai-label a{display:none}`, which hides
+ * the link together with the text and is a different statement. Selectors and declarations in that
+ * stylesheet carry no braces of their own, so this small scanner is exact where the regex was not.
+ *
+ * Deliberately not a CSS parser: it splits a selector list on commas, which would be wrong inside
+ * `:is(a,b)`. The sheet it reads has no such selector, and a test that needs one should stop reading
+ * CSS and measure a browser instead.
+ */
+function cssRules(sheet: string): { at: string; selectors: string[]; decls: string }[] {
+    const rules: { at: string; selectors: string[]; decls: string }[] = [];
+    let at = '';
+    let i = 0;
+    while (i < sheet.length) {
+        const open = sheet.indexOf('{', i);
+        if (open < 0) break;
+        const head = sheet.slice(i, open).trim();
+        if (head.startsWith('@')) { at = head; i = open + 1; continue; }
+        const close = sheet.indexOf('}', open);
+        if (close < 0) break;
+        rules.push({ at, selectors: head.split(',').map((s) => s.trim()).filter(Boolean), decls: sheet.slice(open + 1, close) });
+        i = close + 1;
+        // A `}` here closes the at-rule the last rule sat in.
+        while (i < sheet.length && (sheet[i] === '}' || sheet[i] === ' ' || sheet[i] === '\n')) {
+            if (sheet[i] === '}') at = '';
+            i++;
+        }
+    }
+    return rules;
+}
+
+/** The label's own scoped stylesheet, taken from the served document rather than from the source. */
+function labelStylesheet(html: string): string {
+    const m = /<div id="aimeat-ai-label"[^>]*><style>([\s\S]*?)<\/style>/.exec(html);
+    assert(!!m, 'the visible label carries no scoped stylesheet');
+    return m![1];
+}
 
 async function json(path: string, opts: RequestInit = {}) {
     const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });
@@ -234,7 +284,7 @@ const APP_HTML = [
         assert(html.includes('const trap = "</" + "body>";'), 'the app script was corrupted by injection');
     });
 
-    await test('The visible label reaches the TOP LAYER, so an app overlay cannot cover it', async () => {
+    await test('The visible label reaches the TOP LAYER and survives every viewport', async () => {
         // A browser measurement caught this: `position:fixed` at the maximum z-index loses to an app
         // that appends its own fixed layer at the SAME z-index, because DOM order breaks the tie. The
         // Code requires placement "where no intervening overlay elements exist", and a manual popover
@@ -248,13 +298,52 @@ const APP_HTML = [
         // it would make the label VANISH wherever the script does not run.
         assert(!/<div id="aimeat-ai-label"[^>]*\spopover[=\s>]/.test(html),
             'a hard-coded popover attribute would hide the label whenever the script is blocked');
-        // The interactive second layer survives every viewport — an earlier version hid it below 520px.
-        assert(!/#aimeat-ai-label a\{[^}]*display:none/.test(html),
-            'the "How this was made" link is hidden at some viewport — the second layer must not disappear');
-        // ...and on a narrow viewport it moves off the bottom row, which the aimeat.io attribution
-        // badge expands across. Measured at 390px: the two chips were landing on top of each other.
-        assert(/@media \(max-width:640px\)\{#aimeat-ai-label[^}]*bottom:58px/.test(html),
-            'the label shares the bottom row with the attribution badge on a narrow viewport');
+        // WHAT "SURVIVES EVERY VIEWPORT" MEANS, and why it is not "nothing is ever collapsed".
+        // A viewport of 640px or less shows the EU icon alone, on the same 34px row as the aimeat.io
+        // attribution badge, and moves the words plus the details link behind one tap (developer
+        // decision 2026-08-02, after the always-expanded chip collided with an app dialog in Oma
+        // talo). Measured in a browser on 2026-08-12 against this served document: at 390x844 the
+        // collapsed pill is 69x34 at x=12 carrying the official 47x15 lockup, the badge button is
+        // 36x36 at x=328, and the two do not overlap; one tap gives a 301x42 panel at bottom:58px
+        // whose link is 114x18 and hit-tests as the topmost element, so it is clickable through the
+        // toggle overlay. At 320x568, 642x800 and 1280x460 the mark is inside the viewport with no
+        // overflow, and above 640px the words and the link are on screen without any tap.
+        //
+        // So the standing rules are: the MARK itself is never hidden at any viewport, anything
+        // collapsed away has a state that brings it back, and the control that opens it is reachable
+        // without a pointer.
+        const rules = cssRules(labelStylesheet(html));
+        const HIDDEN = /display\s*:\s*none|visibility\s*:\s*hidden/;
+        const SHOWN = /display\s*:\s*(?!none)[a-z-]+/;
+        for (const sel of ['#aimeat-ai-label', '#aimeat-ai-label i']) {
+            const hidden = rules.filter((r) => r.selectors.includes(sel) && HIDDEN.test(r.decls));
+            assert(hidden.length === 0,
+                `"${sel}" is hidden ${hidden[0]?.at || 'unconditionally'} — a reader at that viewport is told nothing`);
+        }
+        // The details link is the interactive second layer the Code encourages. Collapsed behind a
+        // tap is allowed; gone is not, and an earlier version did hide it outright below 520px.
+        const linkRules = rules
+            .map((r, ix) => ({ r, ix }))
+            .filter(({ r }) => r.selectors.some((s) => s.startsWith('#aimeat-ai-label') && s.endsWith(' a')));
+        for (const { r: hide, ix } of linkRules.filter(({ r }) => HIDDEN.test(r.decls))) {
+            const restored = linkRules.some(({ r, ix: jx }) => jx > ix && r.at === hide.at && SHOWN.test(r.decls));
+            assert(restored,
+                `"How this was made" is hidden ${hide.at || 'unconditionally'} with no later rule that shows it again`);
+        }
+        // display:none would take the toggle out of the tab order and strand a keyboard reader with
+        // no way to open that second layer, so it is visually hidden instead.
+        const toggle = rules.filter((r) => r.selectors.includes('#aimeat-ai-label input'));
+        assert(toggle.length > 0 && !toggle.some((r) => HIDDEN.test(r.decls)),
+            'the expand toggle is display:none — a keyboard reader cannot reach the second layer');
+        assert(html.includes('<input type="checkbox" id="aimeat-ai-label-open">')
+            && /<label for="aimeat-ai-label-open"[^>]*aria-label="[^"]+"/.test(html),
+            'the tap-to-expand control lost its markup, so the collapsed pill cannot be opened at all');
+        // The EXPANDED panel moves off the bottom row rather than covering the attribution badge,
+        // which is the other overlay element the Code asks for spacing from.
+        const narrow = rules.filter((r) => r.at === '@media (max-width:640px)');
+        assert(narrow.length > 0, 'the narrow-viewport rules are gone — the two marks would fight over one corner');
+        assert(narrow.some((r) => r.selectors.some((s) => s.includes(':has(input:checked)')) && /bottom:58px/.test(r.decls)),
+            'the expanded label sits on the attribution badge row on a narrow viewport');
     });
 
     await test('The visible label follows Accept-Language — the Finnish reader gets Finnish', async () => {

@@ -2,6 +2,9 @@
  * @file src/routes/agent-tasks/completion.ts
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-12 — /complete answers after the fan-out rather than before it. The response
+ *     used to overtake the agent's own counters, so a caller reading them back saw the pre-completion
+ *     numbers on Postgres and the post-completion ones on SQLite.
  *   v1.3.0 — 2026-08-11 — The event append and the single-todo update move to
  *     services/agent-task-write.ts. The event write is unchanged here; the todo update now bumps
  *     lastEventAt and appends the matching todo_completed / todo_failed event, which this door never
@@ -117,14 +120,22 @@ export function registerTaskCompletionRoutes(
       timestamp: now,
     });
 
-    res.json(success(config.nodeId, { task: updated }));
-
     // Everything a completion sets off is services/agent-task-fanout.ts, because it belongs to
     // COMPLETING rather than to this door: the workflow run that dispatched the task advances, the
     // open item behind it closes, the agent's counters move, the runner's live-trace key is
     // reclaimed, the automation report is sent and its advisory outbox drained, and a public
     // deliverable reaches the feed. aimeat_task_complete did none of it.
+    //
+    // The door answers AFTER it. Only the agent's counters are awaited inside; the slow steps stay
+    // fire-and-forget. Answering first made those counters a race against whatever the caller does
+    // next, and the next thing is always a read: the Activity tab reloads on the change event, and
+    // an agent that just finished asks for its own /capabilities. On SQLite the counter write landed
+    // inside the same tick and the race was invisible; on Postgres every query is a round trip, the
+    // read arrived first and activityStats came back null for a task the caller had been told was
+    // done. The MCP door has always awaited this before replying — this is the same order.
     await afterTaskCompleted({ storage, config }, task, updated ?? null, message, deliverableKey, resolve(req));
+
+    res.json(success(config.nodeId, { task: updated }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/fail -- Fail task (active -> failed) ── */

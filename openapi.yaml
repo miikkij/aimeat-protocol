@@ -40911,7 +40911,7 @@ paths:
                 bio: { type: string }
                 avatar: { type: string }
                 locale: { type: string }
-                password: { type: string, description: Optional; min 8 chars, strength-validated }
+                password: { type: string, description: 'Optional; min 8 chars plus upper/lower/digit and not a common password. A password failing any of those is refused with 400 WEAK_PASSWORD, whose message names the rule that failed.' }
                 email: { type: string, format: email, description: 'Optional; REQUIRED when the email gate is on. Recorded + a verification code sent.' }
       responses:
         '201':
@@ -40949,7 +40949,7 @@ paths:
                           has_password: { type: boolean }
                           note: { type: string }
         '400':
-          description: Invalid input, or EMAIL_REQUIRED when the node's email gate is on and no email was supplied
+          description: INVALID_INPUT for a bad username or display_name, WEAK_PASSWORD when the password fails a strength rule, or EMAIL_REQUIRED when the node's email gate is on and no email was supplied
         '409':
           description: NAME_TAKEN, or EMAIL_TAKEN when the email is already verified on another account
     put:

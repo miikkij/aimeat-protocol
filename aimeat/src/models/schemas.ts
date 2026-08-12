@@ -13,6 +13,9 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Password floor unsplit — 2026-08-12 — GhiiRegistrationSchema drops password.min(8). The rule was
+ *     duplicated in validatePasswordStrength, and the schema copy answered first, so a short password
+ *     came back VALIDATION_ERROR instead of the WEAK_PASSWORD the route documents and clients branch on.
  *   Text limits raised — 2026-07-30 — descriptions/reasons/messages to 10 000, bodies to 200 000.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -383,11 +386,20 @@ export const GhiiRegistrationSchema = z.object({
     bio: z.string().max(10_000).optional(),
     avatar: z.string().max(128).optional(),
     locale: z.string().max(10).optional(),
-    // 8 is the floor for a NEW password (was: any length, with the sign-in modal advertising
-    // "min 4 chars" — a 4-character password on an account that owns data and can spend is not a
-    // defensible default). Existing accounts are unaffected: this gates registration only, and
-    // login still accepts whatever an account already has.
-    password: z.string().min(8).max(256).optional(),
+    // No min() here on purpose, and the 8-character floor it used to carry still holds: every
+    // strength rule for a NEW password lives in validatePasswordStrength (utils/password-validation.ts),
+    // which the POST /v1/ghii handler calls and which answers WEAK_PASSWORD plus the sentence naming
+    // what to fix. A min(8) at this layer refused a short password one step earlier as
+    // VALIDATION_ERROR with the message "Request body validation failed": the same 400, but the
+    // caller lost both the code it branches on and any way to tell the user what was wrong. Length
+    // was the only one of the five strength rules split across two layers, so it was the only one
+    // that answered with the wrong code.
+    // The floor exists because the sign-in modal once advertised "min 4 chars", and a 4-character
+    // password on an account that owns data and can spend is not a defensible default. Existing
+    // accounts are unaffected either way: this gates registration, and login still accepts whatever
+    // an account already has. max(256) stays here: it bounds the string before scrypt hashes it,
+    // which no strength rule does.
+    password: z.string().max(256).optional(),
     // Optional at the schema level; REQUIRED at runtime when the node runs with the email gate on
     // (AIMEAT_EMAIL_CONFIRMATION_REQUIRED). When present it is recorded + a verification code is sent.
     email: z.string().email().max(256).optional(),

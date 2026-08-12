@@ -2,6 +2,9 @@
  * @file cortex-ui-e2e.ts
  * @description E2E tests for aimeat-ui cortex library (install, activate, serve, deactivate)
  * @version-history
+ *   v1.2.0 — 2026-08-12 — Phase 1 waits for the pack to serve before probing it. The assertion was
+ *     landing inside boot seeding, where the name is already held and nothing is served yet, and
+ *     reporting that setup state as a rule violation.
  *   v1.1.0 — 2026-08-11 — Phase 1 asserts the refusal instead of tolerating it. "201 or 409" was
  *     accepting a state in which the served bytes had already been replaced, because the old POST
  *     wrote libs before it checked who held the name.
@@ -77,19 +80,53 @@ await test('Login owner', async () => {
 // serves to every browser under a bundled pack's name, and be told "conflict" after it had already
 // happened. That is the C-4 shape: a cortex upload overwriting served JavaScript that is not the
 // uploader's. It closed on 2026-08-11 when the install moved into services/cortex-lifecycle.ts,
-// which asks who holds the name BEFORE writing anything.
+// which asks who holds the name BEFORE writing anything, and on 2026-08-12 for the case that check
+// cannot see, where the name is claimed by boot seeding between the read and the write: the install
+// now creates the record first, so a collision refuses with no bytes written.
 //
 // So the assertion is now the refusal, plus the thing the refusal is for: the served bytes did not
-// move. 201 is still accepted for a node that has not seeded (the flag is off, or the bundle is
-// absent), because there the name is genuinely free.
+// move. A node that ships no bundle is still allowed its 201, because there the name is free.
+//
+// The precondition has to be waited for rather than assumed, which is what this phase got wrong on
+// the day it was written. seedBundledCortexes is fired WITHOUT await at boot and writes each pack in
+// three steps: the lib bytes, the record, then the flip to `active`. The lib route serves an ACTIVE
+// extension only, so from the moment the record lands until the flip the name is held while the lib
+// still answers 404. The suite starts as soon as /v1/spec responds, which is inside that stretch:
+// measured idle, the last of these five packs first serves 91 ms after the server answers on sqlite
+// and 507 ms on postgres, and the suite needs about that long to register, log in and get here. That
+// is why the postgres sweep failed on aimeat-ui-viewers, the last of the five to be seeded, and only
+// there. Waiting for the pack to serve turns the 403 and the byte comparison back into statements
+// about the rule.
 console.log('\n── Phase 1: Bundled cortexes refuse a foreign install ──');
+
+/** Generous beside the half second the seeding takes when idle, so a loaded sweep fits inside it. */
+const SEED_WAIT_MS = 30_000;
+/** Resolved by the first wait, so a node shipping no bundle at all waits once instead of five times. */
+let bundleSeeds: boolean | null = null;
+
+async function servedLib(name: string): Promise<string | null> {
+  const res = await fetch(`${BASE}/v1/cortex/${name}/libs/${name}.js`);
+  const body = await res.text();
+  return res.ok ? body : null;
+}
+
+/** The pack's own bytes once it serves them, or null when it never did within the bound. */
+async function waitForBundledLib(name: string): Promise<string | null> {
+  const deadline = Date.now() + (bundleSeeds === false ? 0 : SEED_WAIT_MS);
+  for (;;) {
+    const body = await servedLib(name);
+    if (body !== null) { bundleSeeds = true; return body; }
+    if (Date.now() >= deadline) { bundleSeeds ??= false; return null; }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+}
+
 for (const name of UI_CORTEXES) {
   await test(`Install ${name} is refused, and the served bytes are untouched`, async () => {
     const yaml = readFileSync(join(CORTEX_DIR, `${name}.yaml`), 'utf-8');
     const js = readFileSync(join(CORTEX_DIR, `${name}.js`), 'utf-8');
 
-    const before = await fetch(`${BASE}/v1/cortex/${name}/libs/${name}.js`);
-    const bytesBefore = before.ok ? await before.text() : null;
+    const bytesBefore = await waitForBundledLib(name);
 
     const r = await json('/v1/cortex', {
       method: 'POST',
@@ -97,15 +134,20 @@ for (const name of UI_CORTEXES) {
       body: JSON.stringify({ manifest: yaml, libs: { [`${name}.js`]: `/* not yours */\n${js}` } }),
     });
 
-    if (r.status === 201) return;   // unseeded node: the name was free
-    if (r.status !== 403) {
-      throw new Error(`Expected 403 (name held by system@node) or 201 (unseeded), got ${r.status}: ${JSON.stringify(r.body)}`);
+    if (bytesBefore === null) {
+      // Nothing came up under this name. On a node that ships no bundle the name is free and the
+      // install is a plain 201. A refusal here means the name is held by a record that never began
+      // serving, which is a seeding fault worth naming rather than passing over.
+      if (r.status === 201) return;
+      throw new Error(`${name} served nothing in ${SEED_WAIT_MS} ms and the install answered ${r.status}: the name is held by a pack that never became active`);
     }
-    if (bytesBefore === null) throw new Error('refused the install but serves no bytes for the seeded pack');
-    const after = await fetch(`${BASE}/v1/cortex/${name}/libs/${name}.js`);
-    const bytesAfter = await after.text();
+
+    if (r.status !== 403) {
+      throw new Error(`Expected 403 (name held by system@node), got ${r.status}: ${JSON.stringify(r.body)}`);
+    }
+    const bytesAfter = await servedLib(name);
     if (bytesAfter !== bytesBefore) {
-      throw new Error(`the refused install still changed the served bytes (${bytesBefore.length} → ${bytesAfter.length})`);
+      throw new Error(`the refused install still changed the served bytes (${bytesBefore.length} → ${bytesAfter?.length ?? 'none'})`);
     }
   });
 }

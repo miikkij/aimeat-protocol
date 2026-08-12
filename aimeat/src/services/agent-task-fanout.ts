@@ -32,6 +32,9 @@
  *   await storage.updateAgentTask(id, { status: 'done', … });
  *   await afterTaskCompleted({ storage, config }, task, updated, message, deliverableKey);
  * @version-history
+ *   v1.1.0 — 2026-08-12 — recordTaskCompleted logs and continues instead of rejecting. Both doors
+ *     await this function, and the REST door now answers after it, so a storage hiccup in the
+ *     counters must not turn a task that IS done into a 500.
  *   v1.0.0 — 2026-08-11 — Extracted from routes/agent-tasks/completion.ts (August 2026 audit, the
  *     side-effect sweep) so the tool surface stops being a completion that completes nothing.
  */
@@ -69,7 +72,14 @@ export async function afterTaskCompleted(
     const { storage, config } = deps;
     const id = task.id;
 
-    await recordTaskCompleted(storage, task.agentGaii, task.telemetry);
+    // The agent's counters are the ONE step a caller waits for, because a completion is read
+    // straight back: the Activity tab refreshes on the change event and an agent reads its own
+    // /capabilities. Everything below is fire-and-forget by design.
+    //
+    // It still may not fail a completion that already happened, so it logs and continues rather than
+    // rejecting into the door. Both doors await this function, so the guarantee lives here, once.
+    await recordTaskCompleted(storage, task.agentGaii, task.telemetry)
+        .catch(e => logger.error('moving the agent counters after a completed task failed', { taskId: id, error: String(e) }));
 
     // If this task came from the owner's intent pool, the intent closes here. The SERVER does it:
     // the agent never writes into the owner's namespace, so the pool's one indirect write is this,

@@ -6,6 +6,11 @@
  *   node --import tsx test/run-e2e-ci.ts
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  * @version-history
+ *   v1.12.0 -- 2026-08-12 -- Pin AIMEAT_AI_COP_SECTIONS / _SIGNED_ON on the shared server. The server
+ *            fills any unset key from ./aimeat/.env, so the developer's own Code of Practice signature
+ *            reached the test node while the test process could not see it, and e2e-ai-provenance
+ *            failed on the backend whose .env.test.* file lacked the pair. Same class as the
+ *            AIMEAT_SMTP_HOST pin below.
  *   v1.0.0 -- 2026-05-28 -- Add redacted MongoDB cleanup error details.
  *   v1.0.1 -- 2026-06-14 -- Disable e2e-email suite (no SMTP credentials to send mail).
  *   v1.1.0 -- 2026-07-01 -- Pin AIMEAT_SECRETARY_ENABLED=true on the shared server (feature is off by
@@ -464,6 +469,16 @@ async function startServer(): Promise<ChildProcess> {
         // send once reached the real SMTP server through exactly this hole. An empty string counts
         // as present, so pinning '' here keeps the test server's email service disabled.
         AIMEAT_SMTP_HOST: process.env.AIMEAT_SMTP_HOST ?? '',
+        // The same hole, and what came through it is a public compliance claim. AIMEAT_AI_COP_SECTIONS
+        // names the EU Code of Practice sections the OPERATOR signed, and /v1/ai-transparency reports
+        // `signatory: true` from it. A developer's own .env holds a real signature, so the test server
+        // inherited it on any backend whose .env.test.* file did not carry the pair, while the test
+        // process, which derives what it expects from its own env, saw nothing. e2e-ai-provenance then
+        // failed on postgres and passed on sqlite off the same code, which reads as a route regression
+        // and is not one. Pinned as a PAIR because a signature date without sections is half a claim,
+        // and an empty string counts as present, so an unset var gives the shipped "not a signatory".
+        AIMEAT_AI_COP_SECTIONS: process.env.AIMEAT_AI_COP_SECTIONS ?? '',
+        AIMEAT_AI_COP_SIGNED_ON: process.env.AIMEAT_AI_COP_SIGNED_ON ?? '',
         // Finvoice delivery uses the in-process mock operator in every e2e run so the
         // submit/refresh loop is provable without an operator account.
         AIMEAT_FINVOICE_OPERATOR: process.env.AIMEAT_FINVOICE_OPERATOR ?? 'mock',

@@ -33,7 +33,7 @@
  *   parameter and neither door's answer is assumed here.
  * @structure
  *   - CortexRefusal / CortexOutcome — the refusal both doors render in their own format
- *   - installCortex() — validate, parse, gate the namespace and the prior owner, write libs, create
+ *   - installCortex() — validate, parse, gate the namespace and the prior owner, create, write libs
  *   - activateCortex() — materialise the components, record the artifacts
  *   - deactivateCortex() — tear them down, preserving seed-data and lib files
  *   - deleteCortex() — deactivate, drop seed-data, drop lib files, drop the record
@@ -41,6 +41,10 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   v1.1.0 — 2026-08-12 — install creates the record before writing lib bytes. The owner check
+ *     reads a name that boot seeding may be writing at that same moment, and on that interleaving
+ *     the caller's JavaScript was already served under a bundled pack's name by the time the
+ *     insert collided and answered 409.
  *   v1.0.0 — 2026-08-11 — Extracted from routes/cortex.ts and mcp/cortex.ts (August 2026 audit
  *     step 8). The four differences above were what the extraction turned up.
  */
@@ -184,10 +188,14 @@ export async function installCortex(
         return refuse(403, 'FORBIDDEN', 'Not your extension');
     }
 
-    for (const [filename, content] of Object.entries(libs)) {
-        await storage.setCortexLibFile(ext.name, filename, content);
-    }
-
+    // Claim the name FIRST, then write the bytes. The read above cannot settle who holds a name that
+    // is being written at the same moment, and the node writes several itself: seedBundledCortexes
+    // installs the thirteen bundled packs at boot without awaiting, so for a few hundred
+    // milliseconds after the port opens a pack has no record yet. An install aimed at that pack in
+    // that window read "free", wrote its own JavaScript under the pack's name, and only then
+    // collided on the insert and answered 409 CONFLICT, leaving the node serving the caller's bytes
+    // for a name it did not win. The insert is the only check that cannot be raced, so it goes
+    // first: a collision now refuses with nothing written.
     let record: CortexExtensionRecord;
     try {
         record = await storage.createCortexExtension(ext);
@@ -197,6 +205,10 @@ export async function installCortex(
             return refuse(409, 'CONFLICT', `Extension "${ext.name}" is already installed`);
         }
         throw e;
+    }
+
+    for (const [filename, content] of Object.entries(libs)) {
+        await storage.setCortexLibFile(ext.name, filename, content);
     }
 
     emitChange('cortex');
