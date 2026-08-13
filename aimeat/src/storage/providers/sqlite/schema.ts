@@ -10,6 +10,10 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   v1.8.0 — 2026-08-13 — Two more index-before-ALTER crashes, both moved here from block 1: the
+ *     provider_clients pair (reported from a self-hosted node upgrading 2.7.0 -> 3.0.0, which could
+ *     not boot: "no such column: principal") and idx_ghii_emailHash, which had the same shape and
+ *     had not bitten anyone yet. Both are created after the migration that adds their column.
  *   v1.7.0 — 2026-08-11 — push_subscriptions re-keyed to (ownerName, endpoint) by table rebuild, so
  *     an owner's second device joins the first rather than evicting it (audit H-8). The rebuild is
  *     gated on PRAGMA table_info, like the invitations one. Mirrors Postgres migration 0032.
@@ -228,6 +232,9 @@ export function initializeSchema(db: Database.Database): void {
                ) ranked WHERE ranked.rn = 1
              )`);
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_ghii_emailHash ON ghiis(emailHash) WHERE emailHash IS NOT NULL');
+  // The plain lookup index on the same column, here rather than in block 1 for the reason above:
+  // a ghiis table old enough to predate emailHash would be indexed on a column it does not have.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_ghii_emailHash ON ghiis(emailHash)');
 
   // One-live-grant-per-(owner, app) invariant. The authorization_code exchange used to INSERT
   // unconditionally while the silent SSO bridge upserted, so every pass through the consent flow

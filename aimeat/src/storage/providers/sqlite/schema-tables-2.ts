@@ -4,6 +4,9 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.3.0 — 2026-08-13 — idx_ghii_emailHash moves to schema.ts, after safeAddColumn('ghiis',
+ *     'emailHash'). Same shape as the provider_clients crash reported the same day: a block-1 index
+ *     on a column that only an ALTER further down adds.
  *   v1.2.0 — 2026-08-11 — Drop the feedback indexes with the table (see schema-tables-1).
  *   v1.1.0 — 2026-07-16 — Add feedback sender/status indexes (Node Feedback Channel).
  *   v1.0.0 — 2026-07-13 — Extracted from sqlite/schema.ts (max-file-lines)
@@ -339,9 +342,10 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_micro_memory_gaii ON micro_memory(gaii);
     CREATE INDEX IF NOT EXISTS idx_storage_files_ownerGaii ON storage_files(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_ghii_ownerName ON ghiis(ownerName);
-    CREATE INDEX IF NOT EXISTS idx_ghii_emailHash ON ghiis(emailHash);
-    -- idx_ghii_googleSub is created AFTER the safeAddColumn migration below, so the
-    -- column exists on upgraded databases before it is indexed (see note there).
+    -- idx_ghii_emailHash and idx_ghii_googleSub are created AFTER their safeAddColumn migrations
+    -- in schema.ts, so the column exists on an upgraded database before it is indexed (see the
+    -- notes there). An old enough ghiis table has neither column, and CREATE TABLE IF NOT EXISTS
+    -- above does not add them.
     CREATE INDEX IF NOT EXISTS idx_chat_ownerName ON chat_instances(ownerName);
     CREATE INDEX IF NOT EXISTS idx_email_ver_ownerName ON email_verifications(ownerName);
     CREATE INDEX IF NOT EXISTS idx_personal_ownerName ON personal_nodes(ownerName);

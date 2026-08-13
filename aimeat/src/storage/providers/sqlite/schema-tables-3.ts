@@ -4,6 +4,9 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.1.0 — 2026-08-13 — Both provider_clients indexes move to schema.ts, after the rebuild that
+ *     adds `principal`. They named a column an upgraded table did not have yet, so a SQLite node
+ *     created before that column crashed on boot with "no such column: principal".
  *   v1.0.0 — 2026-07-13 — Extracted from sqlite/schema.ts (max-file-lines)
  */
 import type Database from 'better-sqlite3';
@@ -687,15 +690,12 @@ export function applySchemaTables3(db: Database.Database): void {
       clientSecret TEXT NOT NULL,
       registeredAt TEXT NOT NULL
     );
-    -- Two users arriving from the same instance at the same moment must converge on ONE
-    -- registration rather than each minting their own. Partial, so a principal's own rows (which
-    -- carry no instance) do not collapse into a single row per provider.
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_clients_key
-      ON provider_clients(provider, instance) WHERE instance IS NOT NULL AND principal IS NULL;
-    -- One brought-along client per principal per provider: a second replaces the first rather than
-    -- leaving two rows and a coin toss over which one a refresh uses.
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_clients_principal
-      ON provider_clients(provider, principal) WHERE principal IS NOT NULL;
+    -- idx_provider_clients_key and idx_provider_clients_principal are created in schema.ts, AFTER
+    -- the guarded rebuild that gives an upgraded table its principal column. BOTH definitions
+    -- name principal (the _key one in its WHERE clause), so creating them here crashed the boot
+    -- of every SQLite node whose provider_clients predated that column: CREATE TABLE IF NOT EXISTS
+    -- is a no-op on the old table, and the index then indexes a column that does not exist yet.
+    -- Reported from a self-hosted node on 2026-08-13, upgrading 2.7.0 -> 3.0.0.
 
   `);
 }
