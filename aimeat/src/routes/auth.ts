@@ -9,6 +9,9 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.3.0 -- 2026-08-13 -- Session revocation started being ENFORCED (auth/middleware.ts), so the
+ *     two session surfaces here were scoped to the human's own sign-ins: the device list hides agent
+ *     rows, and "sign out everywhere" no longer disconnects the owner's fleet.
  *   v1.0.0 -- 2026-02-25 -- Initial authentication routes
  *   v1.2.0 -- 2026-07-16 -- Add GET /v1/security/overview composite (GHII + per-agent CORS + sessions)
  *     folding the Security tab's CORS-per-agent fan-out (SecurityTabService).
@@ -32,7 +35,7 @@ import { requireAuth, requireRole, optionalAuth, isAnonymousMode, getAnonymousCr
 import { success, error } from '../middleware/envelope.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
-import { parseGAII, validateAgentName, buildGAII } from '../utils/gaii.js';
+import { parseGAII, validateAgentName, buildGAII, isExternalPrincipal } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
 import { randomBytes } from 'node:crypto';
 import { generateOtk } from '../utils/otk.js';
@@ -530,10 +533,13 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     ]));
   });
 
-  // GET /v1/auth/sessions — list active sessions for the authenticated owner
+  // GET /v1/auth/sessions — list active sessions for the authenticated owner.
+  // The human's own sign-ins only. An agent's session row carries the same `owner` but its `gaii` is
+  // a GAII, and this list is a device list: it shows a label, a user agent and a Sign out button.
+  // The owner's agents have their own surface, with far more to say about each one.
   router.get('/v1/auth/sessions', requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;
-    const sessions = await storage.listActiveSessions(owner);
+    const sessions = (await storage.listActiveSessions(owner)).filter(s => !isExternalPrincipal(s.gaii));
     const currentSessionId = req.auth!.sessionId;
 
     res.json(success(config.nodeId, {
@@ -569,10 +575,19 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     res.json(success(config.nodeId, { revoked: true, session_id: sessionId }));
   });
 
-  // DELETE /v1/auth/sessions — revoke all sessions for the authenticated owner (P3-7)
+  // DELETE /v1/auth/sessions — sign the owner out everywhere (P3-7).
+  //
+  // "Everywhere" means the person's own devices, not their fleet. Session revocation only started
+  // being enforced on 2026-08-13 (it was checked in a branch that the global optionalAuth made
+  // unreachable), so this call used to be inert for agents; enforcing it without scoping it would
+  // turn "sign out of my other browser" into disconnecting every agent, each of which then needs the
+  // owner to approve device authorization again. An agent is ended from the Agents surface, one at a
+  // time, deliberately. Erasing the account still takes everything (services/owner-erasure.ts).
   router.delete('/v1/auth/sessions', requireAuth(), async (req, res) => {
     const owner = req.auth!.owner;
-    const count = await storage.revokeAllSessions(owner);
+    const mine = (await storage.listActiveSessions(owner)).filter(s => !isExternalPrincipal(s.gaii));
+    let count = 0;
+    for (const s of mine) if (await storage.revokeSession(s.sessionId)) count++;
     clearRefreshCookie(req, res); // the caller's own device is included in "all"
 
     res.json(success(config.nodeId, {

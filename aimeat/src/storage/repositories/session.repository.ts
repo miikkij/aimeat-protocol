@@ -6,6 +6,8 @@
  * @structure SessionRecord shape; SessionRepository interface (create/list/rotate/revoke/prune).
  * @usage Implemented by each storage provider (SQLite, MongoDB) and composed into the Storage interface.
  * @version-history
+ * v1.2.0 - 2026-08-13 - Add revokeSessionsByGaii: end one principal's sessions without touching its
+ *   siblings', which is what deleting an agent needs.
  * v1.1.0 - 2026-06-03 - Add owner refresh-token fields + createOwnerSession,
  *   getSessionByRefreshHash, rotateSessionRefresh, pruneExpiredSessions
  *   (owner session refresh tokens, plan 2026-06-03-owner-session-refresh-tokens).
@@ -71,6 +73,18 @@ export interface SessionRepository {
 
   revokeSession(sessionId: string): Promise<boolean>;
   revokeAllSessions(owner: string): Promise<number>;
+  /**
+   * Revoke every live session belonging to ONE identity (an agent GAII, or a bare owner name).
+   *
+   * This is how a principal is signed out when its record goes away. An agent JWT lives 90 days and
+   * can otherwise only be revoked by exact token hash, which the owner pressing Delete does not
+   * have: they never see the string. Deleting the agent therefore left every credential it held
+   * authenticating against a record that no longer existed.
+   *
+   * Scoped by `gaii` rather than by owner, because the sibling agents of the same person must keep
+   * working; revokeAllSessions(owner) is the account-wide answer and a different question.
+   */
+  revokeSessionsByGaii(gaii: string): Promise<number>;
   isSessionRevoked(sessionId: string): Promise<boolean>;
 
   /** Delete revoked or fully-expired session rows. Returns the number removed. */

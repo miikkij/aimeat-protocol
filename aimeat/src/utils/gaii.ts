@@ -13,6 +13,9 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.4.0 — 2026-08-13 — `isExternalPrincipal`: does this identity act FOR a person, or is it the
+ *     person. Session rows share an owner column, so the device list and "sign out everywhere" need
+ *     to tell the human's own sign-ins from their agents'.
  *   v1.3.0 — 2026-07-28 — `callerPrincipal` + `appSlug`: a hosted app is named `eco:{app}#{owner}@{node}`
  *     where the question is who acted. Storage identity is untouched, so no app's data moves.
  *   v1.2.0 — 2026-07-27 — `ownerGhiiOf`: the identity anything about MONEY keys on, since the wallet
@@ -235,6 +238,20 @@ export function ownerGhiiOf(principal: string): string {
   if (!namePart) return principal;
   const owner = namePart.includes('#') ? (namePart.split('#').pop() as string) : namePart;
   return host ? `${owner}@${host}` : owner;
+}
+
+/**
+ * Is this identity something acting FOR a person rather than the person themselves?
+ *
+ * `bot#alice@node` (GAII) and `eco:drum#alice@node` (GEAI) are; `alice` and `alice@node` are not.
+ * The '#' is what separates them, which is why both forms were given one.
+ *
+ * Used where a surface is about the human's own sign-ins: their device list, and signing out
+ * everywhere. Those rows share an `owner` column with every agent session, and treating the two the
+ * same turns "sign out of my other browser" into disconnecting a fleet.
+ */
+export function isExternalPrincipal(id: string): boolean {
+  return id.includes('#');
 }
 
 // Chat Instance ID format: platform-appname#owner@node

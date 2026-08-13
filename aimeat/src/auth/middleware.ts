@@ -12,6 +12,12 @@
  *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
  *
  * @version-history
+ *   v1.3.0 — 2026-08-13 — The session-revocation check moved into optionalAuth(), where the token is
+ *     actually verified. It lived in requireAuth() behind an early return that server.ts makes
+ *     unconditional: optionalAuth() is mounted globally, so requireAuth() always found req.auth
+ *     already set and returned at its first line. Session revocation was therefore enforced on no
+ *     route at all — logout revoked the row and the bearer kept working, and deleting an agent could
+ *     not end the ninety-day credential it held.
  *   v1.2.0 — 2026-08-11 — Security audit H-1/H-7: requireOwnerPrincipal(), the gate for the doors
  *     that decide who can get back INTO the account. Not one authenticated route under /v1/ghii
  *     carried a role gate, and every one of them keys off req.auth.owner — which holds the HUMAN's
@@ -142,6 +148,15 @@ declare global {
 }
 
 /**
+ * Has this token's session been ended? True only for a token that names a session the store has and
+ * has marked revoked; a token with no `jti`, or one naming a session nobody tracked, is unaffected.
+ */
+async function sessionRevoked(verified: VerifiedToken): Promise<boolean> {
+  if (!verified.sessionId || !_sessionStorage) return false;
+  return _sessionStorage.isSessionRevoked(verified.sessionId);
+}
+
+/**
  * Optional auth middleware — parses JWT if present, does not reject if absent.
  * Use requireAuth() or requireRole() for endpoints that need auth.
  */
@@ -159,7 +174,16 @@ export function optionalAuth() {
         req.auth = undefined;
       } else {
         const verified = await verifyJWT(token);
-        if (verified) {
+        // SECURITY: the session check belongs HERE, not only in requireAuth(). This middleware is
+        // mounted globally (server.ts), so requireAuth() finds req.auth already set and returns at
+        // its first line — its own session check has therefore never run on a single route. That
+        // made session revocation decorative everywhere: logout revoked the row and the bearer kept
+        // working, and deleting an agent could not end the credential it held.
+        //
+        // Uncached on purpose. The token-hash cache in jwt.ts can afford 60 seconds because the
+        // revoking caller writes its own entry; here the revocation happens in storage, and an owner
+        // pressing Delete means now. One keyed read per authenticated request that carries a jti.
+        if (verified && !(await sessionRevoked(verified))) {
           req.auth = verified;
         }
       }
@@ -250,10 +274,12 @@ export function requireAuth() {
       return;
     }
 
-    // P3-7: Check if the session has been revoked
+    // P3-7: Check if the session has been revoked. Reached only when this middleware ran without the
+    // global optionalAuth() ahead of it (unit tests, a router mounted standalone) — in the server
+    // the check above has already happened and this is a second, harmless look.
     if (verified.sessionId && _sessionStorage) {
-      const sessionRevoked = await _sessionStorage.isSessionRevoked(verified.sessionId);
-      if (sessionRevoked) {
+      const revokedSession = await _sessionStorage.isSessionRevoked(verified.sessionId);
+      if (revokedSession) {
         const stats = getStats();
         if (stats) stats.increment('auth_failures_total');
         const prom = getPromMetrics();

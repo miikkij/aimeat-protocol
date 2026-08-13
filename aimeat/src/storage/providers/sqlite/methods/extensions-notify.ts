@@ -2,6 +2,7 @@
  * @file src/storage/providers/sqlite/methods/extensions-notify.ts
  * @description Site-log, Extension, Escrow, Cortex, Push, Notification, Session, PAT, Email-invitation methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.1.0 — 2026-08-13 — revokeSessionsByGaii, matching the Postgres provider.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
@@ -547,6 +548,11 @@ export const extensionsNotifyMethods = {
 
   async revokeAllSessions(this: SqliteStorage, owner: string): Promise<number> {
     const result = this.db.prepare('UPDATE sessions SET revoked = 1 WHERE owner = ? AND revoked = 0').run(owner);
+    return result.changes;
+  },
+
+  async revokeSessionsByGaii(this: SqliteStorage, gaii: string): Promise<number> {
+    const result = this.db.prepare('UPDATE sessions SET revoked = 1 WHERE gaii = ? AND revoked = 0').run(gaii);
     return result.changes;
   },
 

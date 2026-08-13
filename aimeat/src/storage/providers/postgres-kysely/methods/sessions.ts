@@ -4,6 +4,7 @@
  *   owner refresh-token sessions (rotating hashes, idle+absolute windows), and revocation. Translated
  *   1:1 from the Prisma implementation. Backs POST /v1/auth/token and the owner refresh flow.
  * @version-history
+ *   v1.1.0 — 2026-08-13 — revokeSessionsByGaii, matching the SQLite provider.
  *   v1.0.0 — 2026-07-15 — Phase 5: session domain on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -78,6 +79,11 @@ export const sessionMethods = {
 
   async revokeAllSessions(this: PostgresKyselyStorage, owner: string): Promise<number> {
     const r = await this.db.updateTable('Session').set({ revoked: true }).where('owner', '=', owner).where('revoked', '=', false).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0);
+  },
+
+  async revokeSessionsByGaii(this: PostgresKyselyStorage, gaii: string): Promise<number> {
+    const r = await this.db.updateTable('Session').set({ revoked: true }).where('gaii', '=', gaii).where('revoked', '=', false).executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0);
   },
 

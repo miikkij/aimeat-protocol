@@ -2,6 +2,9 @@
  * @file src/routes/agents/management.ts
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-13 — DELETE /v1/agents/:name revokes the agent's sessions BEFORE removing the
+ *     record. The record went and its 90-day tokens kept authenticating, with no handle left to
+ *     revoke them by. The response now says how many credentials it ended.
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -398,6 +401,16 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
+    // Sign it out BEFORE the record goes. An agent JWT lives 90 days, carries its own signature and
+    // is checked against the agent table by nothing at all, so a deleted agent used to keep acting:
+    // storage.getAgent returned null while the bearer authenticated perfectly. The owner pressing
+    // Delete cannot revoke by token hash — they never see the string — so the session id inside the
+    // token is the only handle, and it is only a handle while the row is still findable by GAII.
+    //
+    // Order matters: revoke, then delete. The other way round, a failure here would leave a live
+    // credential for a record nobody can look up any more.
+    const endedSessions = await storage.revokeSessionsByGaii(agent.gaii);
+
     const deleted = await storage.deleteAgent(agent.gaii);
     if (!deleted) {
       res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to delete agent'));
@@ -405,7 +418,12 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }
     evictAgentTelemetry(agent.gaii);
 
-    res.json(success(config.nodeId, { deleted: true, name: agentName, gaii: agent.gaii }));
+    res.json(success(config.nodeId, {
+      deleted: true, name: agentName, gaii: agent.gaii,
+      // Say how many credentials this ended. "Deleted" and "and it can no longer act" are different
+      // claims, and the owner is entitled to the second one.
+      sessions_revoked: endedSessions,
+    }));
     emitChange('agents');
   });
 

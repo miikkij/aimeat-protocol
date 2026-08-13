@@ -10,6 +10,7 @@
  *   - OAuth: client, refresh-token, and approval record CRUD
  *
  * @version-history
+ *   v1.1.0 — 2026-08-13 — revokeSessionsByGaii (one principal's sessions, not the whole account).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
@@ -116,6 +117,11 @@ export function revokeSession(db: Database.Database, sessionId: string): boolean
 
 export function revokeAllSessions(db: Database.Database, owner: string): number {
   const result = db.prepare('UPDATE sessions SET revoked = 1 WHERE owner = ? AND revoked = 0').run(owner);
+  return result.changes;
+}
+
+export function revokeSessionsByGaii(db: Database.Database, gaii: string): number {
+  const result = db.prepare('UPDATE sessions SET revoked = 1 WHERE gaii = ? AND revoked = 0').run(gaii);
   return result.changes;
 }
 

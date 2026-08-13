@@ -155,6 +155,20 @@ async function approveDeviceAuth(
 
   const expiresAt = new Date(Date.now() + config.agentJwtTtlSeconds * 1000).toISOString();
 
+  // Track the session, which is what makes this credential REVOCABLE. The token has always carried
+  // a `jti` and requireAuth has always checked it against the session table, but this path wrote no
+  // row — and isSessionRevoked answers "not revoked" for a session it has never heard of. So the
+  // ninety-day bearer handed out here could be ended only by its exact hash, a string the owner
+  // never sees, and deleting the agent left it authenticating. POST /v1/auth/token has written this
+  // row since P3-7; device authorization is how real agents connect, and it was the path without it.
+  await storage.createSession({
+    sessionId,
+    gaii,
+    owner: request.ownerName,
+    issuedAt: now,
+    expiresAt,
+  });
+
   // Store credentials + JWT for agent to poll
   await storage.updateDeviceAuth(request.deviceCode, {
     status: 'approved',
