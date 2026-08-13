@@ -10,6 +10,11 @@
  * @structure mountPill(auth, selector, opts) → render() + event wiring.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.3.0 — 2026-08-13 — The pill speaks the reader's language on its own. It draws the language
+ *     switch, so it always knows which language was chosen, yet its own labels fell back to English
+ *     literals unless the host passed opts.i18n — which only the SPA did, so a Spanish CADENCE
+ *     showed an English "Logout". Labels now come from pill-strings.js under whatever the caller
+ *     passes, and the pill re-renders on 'aimeat-lang-change' so they follow its own switch.
  *   v1.2.0 — 2026-08-07 — The host's onLogout fires from the auth lib's 'logout' event (after the
  *     session is gone) instead of synchronously after the un-awaited logout() — the race that left
  *     hosts rendering a signed-in header next to a "Sign In" button.
@@ -21,7 +26,8 @@
 import { isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
 import { showLoginModal } from './modal.js';
 import { escHtml, modeSwitchHtml, wireModeSwitch, ensureAuthPillStyles, pillInitials } from './theme.js';
-import { readLocales, langSwitchHtml, wireLangSwitch } from './locale.js';
+import { readLocales, langSwitchHtml, wireLangSwitch, aimeatReadLang } from './locale.js';
+import { pillStrings } from './pill-strings.js';
 import { paletteControlHtml, wirePaletteControl } from './palette.js';
 import { ensureClusterStyles, clampPopover } from './cluster.js';
 import { load, remove } from './crypto.js';
@@ -42,14 +48,19 @@ export function mountPill(auth, selector, opts = {}) {
     if (!container) { console.error('AIMEAT: mountLoginButton container not found for selector:', selector, '— pass a CSS selector string, a DOM element, or an options object.'); return; }
   }
 
-  const i = opts.i18n || {};
   // Languages the APP says it has: opts.locales, else <meta name="aimeat-locales" content="en fi">.
   // Empty when the app declares none or only one, and then no language control renders at all.
   const locales = readLocales(opts);
+  // The pill's own labels follow the reader's language. The caller's strings always win, so the SPA
+  // (which passes the node's full dictionary) is unaffected; an app that passes nothing stops
+  // getting an English "Logout" under a Spanish page. Recomputed per render, because the pill's own
+  // switch can change the language while the page is open.
+  let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ['en'])), opts.i18n);
   // Compact pill (account button + popover on ≤600px) is the mobile-safe DEFAULT on app origins.
   const useCompact = opts.compact !== undefined ? !!opts.compact : isAppOrigin();
 
   function render() {
+    i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ['en'])), opts.i18n);
     // Prefer the live session (carries the H-2 _app/_own grant metadata) over the persisted copy.
     const stored = auth.getSession() || load('session');
     if (stored) {
@@ -149,6 +160,9 @@ export function mountPill(auth, selector, opts = {}) {
   }
   ensureClusterStyles();
   render();
+  // The pill's own switch fires this, and so does an app that sets the language itself. Re-render so
+  // the pill's labels follow the language it just changed rather than staying in the old one.
+  window.addEventListener('aimeat-lang-change', render);
   // Close any open cluster popover (palette / language list) on an outside click or Escape.
   document.addEventListener('click', (ev) => {
     container.querySelectorAll('.aimeat-pop-wrap.aimeat-open').forEach((w) => {

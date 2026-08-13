@@ -1056,6 +1056,56 @@
     });
   }
 
+  // src/static/sdk-libs/auth/pill-strings.js
+  var PILL_STRINGS = {
+    en: {
+      loggedIn: "logged in",
+      logoutBtn: "Logout",
+      signInBtn: "❤️ Sign In",
+      account: "Account",
+      federated: "Federated",
+      manageAccess: "Manage permissions",
+      lightMode: "Light mode",
+      darkMode: "Dark mode",
+      themeLabel: "Theme",
+      chooseLook: "Choose look",
+      switchLanguage: "Language"
+    },
+    fi: {
+      loggedIn: "kirjautuneena",
+      logoutBtn: "Kirjaudu ulos",
+      signInBtn: "❤️ Kirjaudu",
+      account: "Tili",
+      federated: "Federoitu",
+      manageAccess: "Hallitse oikeuksia",
+      lightMode: "Vaalea tila",
+      darkMode: "Tumma tila",
+      themeLabel: "Teema",
+      chooseLook: "Valitse tyyli",
+      switchLanguage: "Kieli"
+    },
+    es: {
+      loggedIn: "sesión iniciada",
+      logoutBtn: "Cerrar sesión",
+      signInBtn: "❤️ Entrar",
+      account: "Cuenta",
+      federated: "Federado",
+      manageAccess: "Gestionar permisos",
+      lightMode: "Modo claro",
+      darkMode: "Modo oscuro",
+      themeLabel: "Tema",
+      chooseLook: "Elige el aspecto",
+      switchLanguage: "Idioma"
+    }
+  };
+  function pillStrings(lang) {
+    var base = PILL_STRINGS.en;
+    var over = PILL_STRINGS[lang] || {};
+    var out = {};
+    for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = over[k] || base[k];
+    return out;
+  }
+
   // src/static/sdk-libs/auth/palette.js
   var AIMEAT_PALETTE_KEY = "aimeat-palette";
   var PALETTES = [
@@ -1220,10 +1270,11 @@
         return;
       }
     }
-    const i = opts.i18n || {};
     const locales = readLocales(opts);
+    let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
     const useCompact = opts.compact !== void 0 ? !!opts.compact : isAppOrigin();
     function render() {
+      i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
       const stored = auth2.getSession() || load("session");
       if (stored) {
         var pillHtml = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);border-radius:10px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);font-family:system-ui;font-size:14px"><span class="aimeat-auth-dot" style="display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);box-shadow:0 0 5px rgba(0,200,83,.7),0 0 12px rgba(0,200,83,.3),inset 0 -1px 2px rgba(0,0,0,.3)"></span><span class="aimeat-auth-label" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:.5px;color:#a0ffb8;text-shadow:0 0 4px rgba(0,210,80,.6),0 0 10px rgba(0,180,70,.3)">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii" style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);-webkit-text-stroke:.2px rgba(120,85,20,.3)">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '" style="background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout" style="background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);text-shadow:0 1px 1px rgba(0,0,0,.4)">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
@@ -1271,6 +1322,7 @@
     }
     ensureClusterStyles();
     render();
+    window.addEventListener("aimeat-lang-change", render);
     document.addEventListener("click", (ev) => {
       container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
         if (!w.contains(
