@@ -1,6 +1,6 @@
 /**
  * @file agent-management.ts
- * @description Public MCP tools for owner-managed agent attributes (mode, tags).
+ * @description Public MCP tools for owner-managed agent attributes (mode, tags, console address).
  *   Mirrors the connector-side module at src/cli/connect/mcp/tools/agent-management.ts
  *   so Claude Desktop and other public MCP clients have parity with what
  *   aimeat-crewai liaisons see via the local connector.
@@ -9,7 +9,8 @@
  *   classification metadata (mode, tags). The caller must be authenticated
  *   as an agent; same-owner ownership is enforced before any mutation.
  * @structure
- *   - registerAgentManagementTools() -- registers aimeat_agent_mode_set and aimeat_agent_tags_set
+ *   - registerAgentManagementTools() -- registers aimeat_agent_mode_set, aimeat_agent_tags_set and
+ *     aimeat_agent_console_set
  * @usage
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii);
@@ -19,6 +20,9 @@
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.2.0 -- 2026-06-24 -- Tag pattern allows ':' (faceted prefix:value tags compose with
  *     aimeat_discover's tags filter); '@' stays excluded.
+ *   v1.4.0 -- 2026-08-13 -- aimeat_agent_console_set: where an agent's HOST manages it. An agent
+ *     created by a sibling in a fleet runtime the node cannot see left the owner with a card and no
+ *     way through to the thing itself; the sibling that built it is the party that knows the address.
  *   v1.3.0 -- 2026-08-11 -- Both writes go through services/agent-profile-write.ts, shared with
  *     PATCH /v1/agents/:name/tags and PATCH /v1/agents/:name/mode. The mode copy here never
  *     re-derived the Hello Integration step list, so a crew self-setting task-runner through this
@@ -31,7 +35,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
-import { setAgentTags, setAgentMode } from '../services/agent-profile-write.js';
+import { setAgentTags, setAgentMode, setAgentConsoleUrl } from '../services/agent-profile-write.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -110,6 +114,41 @@ export function registerAgentManagementTools(
                         gaii: outcome.agent.gaii,
                         name: outcome.agent.name,
                         mode: outcome.agent.mode ?? 'interactive',
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── Tool: aimeat_agent_console_set ──
+    // Where a same-owner agent is managed by whatever hosts it. The caller for this is normally the
+    // sibling that just created the agent somewhere the node cannot see, reporting the address back
+    // so the owner's profile can link to it.
+    mcp.tool(
+        'aimeat_agent_console_set',
+        descriptionFor('aimeat_agent_console_set'),
+        {
+            target_agent_name: z.string().describe('Agent whose console address to set (must be owned by the same owner as the calling agent).'),
+            console_url: z.string().describe("Absolute http(s) URL of that agent's page in its host, or '' to clear it."),
+        },
+        annotationsFor('aimeat_agent_console_set'),
+        async ({ target_agent_name, console_url }) => {
+            const callerParsed = parseGAII(agentGaii);
+            if (!callerParsed) {
+                return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            }
+
+            const outcome = await setAgentConsoleUrl({ storage, config }, callerParsed.owner, target_agent_name, console_url);
+            if (!outcome.ok) {
+                return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
+            }
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        gaii: outcome.agent.gaii,
+                        name: outcome.agent.name,
+                        console_url: outcome.agent.consoleUrl ?? null,
                     }, null, 2),
                 }],
             };

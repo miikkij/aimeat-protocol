@@ -29,6 +29,9 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   v1.7.0 — 2026-08-13 — "Run now" moved to services/schedule-write.ts alongside create, edit and
+ *     cancel, and this route calls it. It was the last schedule operation that existed on HTTP only,
+ *     which is why an agent could set up a morning job and had no way to prove it worked.
  *   v1.6.0 — 2026-08-11 — August 2026 audit step 8: the record build, the per-kind input checks and the
  *     write moved to services/schedule-write.ts, which the MCP schedule tools now call too. They built
  *     their own record next to this one and the two had drifted: no length cut on description/purpose,
@@ -72,9 +75,8 @@ import type { Scheduler } from '../services/scheduler.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII, resolveIdentity } from '../utils/gaii.js';
-import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
-import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, canManageSchedule } from '../services/schedule-write.js';
+import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 
 // The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
@@ -104,11 +106,6 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     isOwnerSession: isOwnerSession(req),
     scopes: req.auth!.scopes ?? [],
   });
-
-  /** Owner manages every schedule it owns; agents only their own (same owner). The rule itself lives
-   *  in services/schedule-write.ts, where edit and cancel apply it, so "run it now" cannot drift. */
-  const canManage = (req: Express.Request, job: ScheduledJobRecord) =>
-    canManageSchedule(writeCaller(req), ownerGhii(req), job);
 
   /** Read an agent's self-reported internal scheduler mirror (display-only). */
   async function readAgentInternal(agentName: string, agentGaii: string): Promise<unknown[]> {
@@ -341,25 +338,17 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   // ── POST /v1/schedules/:id/trigger — run now ──
   router.post('/v1/schedules/:id/trigger', requireAuth(), async (req, res) => {
     const id = req.params.id as string;
-    const job = await storage.getScheduledJob(id);
-    if (!job) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Schedule "${id}" not found`)); return; }
-    if (!canManage(req, job)) { res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not allowed to trigger this schedule')); return; }
-    try {
-      const outcome = await scheduler.triggerNow(id);
-      const updated = await storage.getScheduledJob(id);
-      // Relay what actually happened so the UI can tell the owner whether a task
-      // was created and, if not, why (e.g. a previous run is still active).
-      res.json(success(config.nodeId, {
-        triggered: true,
-        outcome: outcome.code,
-        ...(outcome.taskId ? { task_id: outcome.taskId } : {}),
-        ...(outcome.detail ? { reason: outcome.detail } : {}),
-        schedule: updated,
-      }));
-      emitChange('scheduler');
-    } catch (err) {
-      res.status(500).json(error(config.nodeId, 'TRIGGER_FAILED', `Run failed: ${(err as Error).message}`));
-    }
+    const out = await triggerScheduleRecord({ storage, config, scheduler }, writeCaller(req), id);
+    if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
+    // Relay what actually happened so the UI can tell the owner whether a task
+    // was created and, if not, why (e.g. a previous run is still active).
+    res.json(success(config.nodeId, {
+      triggered: true,
+      outcome: out.outcome.code,
+      ...(out.outcome.taskId ? { task_id: out.outcome.taskId } : {}),
+      ...(out.outcome.detail ? { reason: out.outcome.detail } : {}),
+      schedule: out.schedule,
+    }));
   });
 
   // ── GET /v1/agents/:name/schedules — per-agent view ──

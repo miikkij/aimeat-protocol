@@ -18,6 +18,8 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.8.0 -- 2026-08-13 -- aimeat_schedule_trigger -> task:write (it creates the same work its cron
+ *     would) and aimeat_agent_console_set -> agent:write (beside mode_set and tags_set).
  *   v1.7.1 -- 2026-08-11 -- Note beside the onboarding entries in SCOPE_EXEMPT_TOOLS: the four tools
  *     mirror the step-confirm route, which is still ungated, while start/cancel now ask for
  *     agent:write (audit H-2) and have no tool. No mapping changed.
@@ -104,6 +106,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Reconfigure ANOTHER of the owner's agents. An agent describing itself needs nothing;
     // reaching sideways at a sibling principal with its own identity and trust score does.
     aimeat_agent_mode_set:                    'agent:write',
+    aimeat_agent_console_set:                 'agent:write',
     aimeat_agent_tags_set:                    'agent:write',
     // Rewriting an agent's PERMISSIONS is its own word, and no wildcard carries it. PATCH
     // /v1/agents/:name/scopes is owner-only, and the propose-then-confirm dance here binds the
@@ -199,6 +202,8 @@ export const TOOL_SCOPES: Record<string, string> = {
 
     // Creates work that will run.
     aimeat_schedule_create:                   'task:write',
+    // Running a schedule now creates the same work its cron would, only sooner.
+    aimeat_schedule_trigger:                  'task:write',
     aimeat_task_create:                       'task:write',
 
     // Asks somebody else to do work, which can cost.

@@ -7,14 +7,18 @@
  *     - ai         : server-side OpenRouter completion over predefined memory keys
  *     - agent_task : materialise a task into the agent's own queue each fire
  *     - extension  : run an installed extension action (zero-token)
- *   Plus aimeat_schedule_report_internal, which writes the agent's self-reported
- *   internal scheduler mirror (agents.<name>.scheduler) for display in the UI.
+ *   Plus aimeat_schedule_trigger, which runs one now so a freshly created schedule can be
+ *   PROVEN rather than assumed, and aimeat_schedule_report_internal, which writes the agent's
+ *   self-reported internal scheduler mirror (agents.<name>.scheduler) for display in the UI.
  * @structure
  *   - registerAgentScheduleTools() — registers the schedule tools on an McpServer
  * @usage
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.2.0 — 2026-08-13 — aimeat_schedule_trigger: run one now, through the same
+ *     services/schedule-write.ts the HTTP trigger route uses. Creating a morning job from a chat
+ *     was possible; proving it works before the user is told it works was not.
  *   v1.1.0 — 2026-08-11 — August 2026 audit step 8: create, update and delete go through
  *     services/schedule-write.ts, the same service POST/PATCH/DELETE /v1/schedules use. The record
  *     these tools built by hand had drifted from the route's: description and purpose were stored
@@ -31,7 +35,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
-import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord } from '../services/schedule-write.js';
+import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 
@@ -179,6 +183,33 @@ export function registerAgentScheduleTools(
       const out = await deleteScheduleRecord({ storage, config }, writeCaller, a.schedule_id);
       if (!out.ok) return err(`${out.code}: ${out.message}`);
       return text({ deleted: a.schedule_id });
+    },
+  );
+
+  // ── aimeat_schedule_trigger (run now) ──
+  // The proving step. A schedule that has never fired is a guess, so the tool that creates one is
+  // worth little without the one that runs it while the caller is still there to read the result.
+  mcp.tool(
+    'aimeat_schedule_trigger',
+    descriptionFor('aimeat_schedule_trigger'),
+    { schedule_id: z.string() },
+    annotationsFor('aimeat_schedule_trigger'),
+    async (a) => {
+      // Same service as POST /v1/schedules/:id/trigger: same manage rule, same clock, same outcome.
+      const out = await triggerScheduleRecord({ storage, config }, writeCaller, a.schedule_id);
+      if (!out.ok) return err(`${out.code}: ${out.message}`);
+      const { code, taskId, detail } = out.outcome;
+      // The outcome is relayed whole, and `succeeded` is stated rather than left to be inferred:
+      // 'busy', 'limited' and 'error' all come back from a call that did not throw, and a caller
+      // reading only "triggered: true" would report a working job that wrote nothing.
+      return text({
+        triggered: true,
+        succeeded: code === 'created' || code === 'ran',
+        outcome: code,
+        ...(taskId ? { task_id: taskId } : {}),
+        ...(detail ? { reason: detail } : {}),
+        next: 'Read the key this job writes to and check it has content. That is the proof, not this reply.',
+      });
     },
   );
 

@@ -19,6 +19,8 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-08-13 — Place aimeat_schedule_trigger and aimeat_agent_console_set on `agent`, beside the
+ *     tools they belong with (the other schedule tools, and mode_set/tags_set).
  *   2026-08-10 — Place aimeat_portfolio_publish on `agent`. It shipped into the catalog with no
  *     surface, so no v2 client could call the one tool that writes the person's own welcome page.
  *     It sits beside aimeat_company_portfolio_publish, which is the same act for a company.
@@ -76,7 +78,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
         'aimeat_task_event', 'aimeat_task_todo', 'aimeat_task_complete', 'aimeat_task_fail',
         'aimeat_schedule_create', 'aimeat_schedule_list', 'aimeat_schedule_update',
-        'aimeat_schedule_delete', 'aimeat_schedule_report_internal',
+        'aimeat_schedule_delete', 'aimeat_schedule_trigger', 'aimeat_schedule_report_internal',
         'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run', 'aimeat_workflow_answer', 'aimeat_workflow_pending_inputs',
         'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
         'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread',
@@ -155,7 +157,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
         'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',
         'aimeat_consent_grant', 'aimeat_consent_list', 'aimeat_consent_revoke',
-        'aimeat_agent_mode_set', 'aimeat_agent_tags_set',
+        'aimeat_agent_mode_set', 'aimeat_agent_tags_set', 'aimeat_agent_console_set',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
     ],
     // The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take

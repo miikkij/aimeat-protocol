@@ -6149,6 +6149,7 @@
         "sharedTags": "Shared tags",
         "lastSeen": "Last seen",
         "popOut": "Open in its own window",
+        "openInHost": "Open in {host}",
         "deliveryMcp": "MCP notifications",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Polling",

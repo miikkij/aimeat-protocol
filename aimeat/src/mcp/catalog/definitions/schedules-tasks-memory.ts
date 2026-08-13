@@ -58,6 +58,13 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
         input: { schedule_id: { type: 'string', required: true, description: 'The schedule id.' } },
     },
     {
+        name: 'aimeat_schedule_trigger',
+        description: 'Run one of your schedules once, right now, without waiting for its cron. Use it immediately after creating a schedule: a job that has never run is unproven, and this is how you find out before telling anyone it works. The reply says what actually happened — "created" queued a task, "ran" executed a server-side job, "busy" means a previous run is still going, "limited" means a constraint stopped it, "error" means it ran and failed. Only "created" and "ran" are success. Then read the key the job writes to and check there is content in it; that, not this reply, is the proof.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: { schedule_id: { type: 'string', required: true, description: 'The schedule id.' } },
+    },
+    {
         name: 'aimeat_schedule_report_internal',
         description: 'If you run your OWN recurring jobs outside AIMEAT (your own cron/heartbeat), report them here so the owner sees them in the scheduler. Pass your full current set each time (it replaces the previous report). AIMEAT only displays these — it does not run them.',
         caller: 'agent',

@@ -9,6 +9,7 @@
  *     a same-owner sibling's mode, so a device-authed crew self-sets task-runner at startup.
  *
  * @version-history
+ *   v1.4.0 -- 2026-08-13 -- Add aimeat_agent_console_set, parity with the server MCP surface.
  *   v1.0.0 -- 2026-05-29 -- Initial creation: tags_set + mode_set
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.2.0 -- 2026-06-24 -- tags_set is now agent-callable on its own/same-owner record
@@ -61,6 +62,21 @@ export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegi
     async ({ agent_name, target_agent_name, mode }) => {
       const { client } = pickAgent(registry, agent_name);
       const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/mode`, { mode });
+      return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    },
+  );
+
+  mcp.tool(
+    'aimeat_agent_console_set',
+    descriptionFor('aimeat_agent_console_set'),
+    {
+      agent_name: agentNameSchema,
+      target_agent_name: z.string().describe('Agent whose console address to set (same owner as the calling agent; pass the caller\'s own name to record your own).'),
+      console_url: z.string().describe('Absolute http(s) URL of that agent\'s page in its host, or \'\' to clear it.'),
+    },
+    async ({ agent_name, target_agent_name, console_url }) => {
+      const { client } = pickAgent(registry, agent_name);
+      const resp = await client.patch(`/v1/agents/${encodeURIComponent(target_agent_name)}/console-url`, { console_url });
       return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
     },
   );

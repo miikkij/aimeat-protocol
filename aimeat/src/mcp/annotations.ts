@@ -21,6 +21,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   v1.x — 2026-08-13 — Annotations for aimeat_schedule_trigger and aimeat_agent_console_set.
  *   v1.x — 2026-08-08 — Annotations for the five aimeat_company_* tools.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 -- 2026-05-29 -- Initial annotation map covering all 94 registered tools
@@ -168,6 +169,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_schedule_list: { title: 'List Schedules', readOnlyHint: true },
     aimeat_schedule_update: { title: 'Update Schedule', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_schedule_delete: { title: 'Delete Schedule', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // Not idempotent: each call is another real run of the job, with whatever that job does to the
+    // world. openWorld because the job it runs may itself reach outside the node (ai, extension).
+    aimeat_schedule_trigger: { title: 'Run Schedule Now', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_schedule_report_internal: { title: 'Report Internal Schedules', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workflow_save: { title: 'Save Workflow', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_workflow_get: { title: 'Get Workflow', readOnlyHint: true },
@@ -200,6 +204,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Owner-managed agent classification ──
     aimeat_agent_tags_set: { title: 'Set Agent Tags', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_mode_set: { title: 'Set Agent Mode', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_agent_console_set: { title: 'Set Agent Console Address', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Knowledge packages ──
     aimeat_knowledge_list: { title: 'List Knowledge Packages', readOnlyHint: true },

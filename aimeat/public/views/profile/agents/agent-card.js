@@ -3,6 +3,10 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.22.0 -- 2026-08-13 -- Footer link through to wherever the agent actually runs, when its host
+ *     has reported the address (agent.console_url). An agent created from a chat lives in a runtime
+ *     this node has never heard of, so the card described something the owner could not reach. The
+ *     button names the host from the URL rather than a translated word for "host".
  *   v1.21.0 -- 2026-08-09 -- Renders the server's health verdict instead of deriving one. Removed
  *     the dead reads: agent.webhookFailCount (never in the response), agent.mcpEnabled (not a
  *     field on any record) and onboarding.previousReadinessLevel (likewise), plus the second
@@ -317,6 +321,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
         <div class="pf-agd-card-footer">
           <div class="pf-agd-card-actions">
             ${renderPopOut(onPopOut, agent)}
+            ${renderHostConsole(agent)}
             ${onScopesClick && html`
               <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); onScopesClick(agent); }}>
                 ${t('profile.agents.scopeUi.manage')}
@@ -377,6 +382,26 @@ function renderPopOut(onPopOut, agent) {
   if (!onPopOut) return null;
   return html`<button class="pf-agd-popout-btn" title=${t('profile.agents.detail.popOut')}
     onClick=${(e) => { e.stopPropagation(); onPopOut(agent); }}>⤢</button>`;
+}
+
+// The way through to wherever this agent actually runs, when its host has said where that is
+// (PATCH /v1/agents/:name/console-url). An agent created from a chat lives in a fleet runtime this
+// node has never heard of, and until this link existed the owner had a card describing something
+// they could not get to. The host name is read off the URL rather than translated: the person
+// recognises "hatchery.example.com" and would learn nothing from the word "host".
+// rel=noopener because the target is an address a principal supplied.
+function renderHostConsole(agent) {
+  const url = agent.console_url;
+  if (!url) return null;
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- an unparseable address is simply not offered
+    return null;
+  }
+  return html`<a class="btn-outline btn-sm" href=${url} target="_blank" rel="noopener noreferrer"
+    title=${url} onClick=${(e) => e.stopPropagation()}>${t('profile.agents.detail.openInHost', { host })}</a>`;
 }
 
 // Collapsed-card mini-badge: total unseen changes across Tasks/Messages/Memory,

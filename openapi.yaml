@@ -39880,6 +39880,65 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+  /v1/agents/{name}/console-url:
+    patch:
+      operationId: patchAgentConsoleUrl
+      tags: [Agents]
+      summary: Set where an agent's host manages it
+      description: |
+        Requires authentication; the agent must belong to the caller's owner, so a same-owner
+        sibling (such as the concierge agent that created this one) may report it.
+
+        An agent created from a chat runs in a fleet runtime this node has never heard of, and the
+        node cannot derive that runtime's address. The host reports it once here, and the owner's
+        profile then links straight to the agent's own settings or brain page.
+
+        Must be an absolute http(s) URL of at most 2048 characters. Send null or an empty string to
+        clear it. Display only: the node stores and links this address and never fetches it.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [console_url]
+              properties:
+                console_url:
+                  type: string
+                  nullable: true
+                  maxLength: 2048
+                  example: https://hatchery.example.com/agents/newsbot/settings
+      responses:
+        '200':
+          description: Console address updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          gaii: { type: string }
+                          name: { type: string }
+                          console_url: { type: string, nullable: true }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/boards/{boardId}/visibility:
     patch:
       operationId: patchBoardVisibility

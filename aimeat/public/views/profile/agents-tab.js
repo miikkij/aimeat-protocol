@@ -61,6 +61,9 @@
  *     active tasks already fetched in loadData, so no extra requests); clicking a
  *     row deep-links into that agent's Tasks tab and auto-opens the task
  *     (expandedAgent + deepLink → AgentCard preSelectedTab/openTaskId).
+ *   v3.10.0 -- 2026-08-13 -- `?tab=agents&agent=<name>` expands that agent, so an agent has an
+ *     address a chat can hand to the person who asked for it. The parameter is consumed on arrival
+ *     (replaceState) — it is a way in, not part of the URL you keep.
  *   v3.9.0 -- 2026-08-08 -- Copy control unified: the bespoke .copy-prompt-btn is the shared .btn-primary, whose
  *       .copied state now lives in theme.css. Copy labels come from the shared common.* keys.
  */
@@ -105,6 +108,14 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [activeTasksMap, setActiveTasksMap] = useState({});
   // Deep-link request from the running-now panel: { agent, taskId, nonce }.
   // The nonce makes a repeat click re-fire the open even for the same task.
+  // Read during the first RENDER, not in an effect: the profile shell replaces the URL with a bare
+  // `/v1/profile?tab=<id>` on its own first-mount effect, so anything still living in the query
+  // string by then is gone. Captured here, consumed by the deep-link effect below.
+  const [urlAgent] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('agent'); }
+    // eslint-disable-next-line aimeat/no-silent-catch -- no query string, no deep link
+    catch { return null; }
+  });
   const [deepLink, setDeepLink] = useState(null);
   const deepLinkNonce = useRef(0);
   // Per-agent unseen-change counts { name: { tasks, messages, memory } } driving
@@ -345,11 +356,20 @@ export default function AgentsTab({ session, showToast, onStats }) {
     setExpandedAgent(prev => prev === name ? null : name);
   }
 
-  // External deep-link: the home dashboard's Agents card primes `aimeat.agents.open` with an
-  // agent name before opening this tab — expand that agent and scroll its card into view.
+  // External deep-link, two ways in:
+  //   • ?tab=agents&agent=<name> — an ADDRESS, so a chat that just created an agent can hand the
+  //     person a link straight to it. The parameter is stripped once used, so Back does not
+  //     re-expand and the URL the person keeps is the plain tab.
+  //   • sessionStorage `aimeat.agents.open` — the home dashboard's Agents card, which primes a name
+  //     before switching tab (in-app, no URL to write).
   useEffect(() => {
     try {
-      const name = sessionStorage.getItem('aimeat.agents.open');
+      if (urlAgent) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('agent');
+        window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+      }
+      const name = urlAgent || sessionStorage.getItem('aimeat.agents.open');
       if (!name) return;
       sessionStorage.removeItem('aimeat.agents.open');
       setExpandedAgent(name);
@@ -358,6 +378,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
       }, 500);
     // eslint-disable-next-line aimeat/no-silent-catch -- noop
     } catch { /* noop */ }
+    // urlAgent is captured once at first render and never changes; the empty-deps intent is
+    // "on mount", and re-running this would re-expand an agent the person had since collapsed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Running-now panel → open a specific agent's Tasks tab on a specific task.

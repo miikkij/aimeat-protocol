@@ -2,6 +2,8 @@
  * @file src/storage/providers/sqlite/methods/owner.ts
  * @description Owner, Agent, and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.4.0 — 2026-08-13 — createAgent/updateAgent/deserializeAgent carry `consoleUrl`, matching the
+ *     Postgres provider (migration 0034).
  *   v1.3.0 — 2026-08-11 — The memory writes persist `groupId` (shared rule in storage/memory-sharing.ts).
  *     This backend had never written the column on any path, so every `visibility:'group'` record on a
  *     SQLite node was unreadable by every member of the group it named, permanently and silently — the
@@ -149,8 +151,8 @@ export const ownerMethods = {
     try {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
-         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -168,6 +170,7 @@ export const ownerMethods = {
         agent.tags ? JSON.stringify(agent.tags) : null,
         agent.mode ?? 'interactive',
         agent.maxConcurrentTasks ?? 1,
+        agent.consoleUrl ?? null,
       );
       return agent;
     } catch (err: unknown) {
@@ -215,7 +218,7 @@ export const ownerMethods = {
        modulesLoaded = ?, agentLimitations = ?, languages = ?,
        webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
-       dailySpendLimit = ?, scheduleConstraintDefaults = ?
+       dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -242,6 +245,7 @@ export const ownerMethods = {
       updated.maxConcurrentTasks ?? 1,
       updated.dailySpendLimit ?? null,
       updated.scheduleConstraintDefaults ? JSON.stringify(updated.scheduleConstraintDefaults) : null,
+      updated.consoleUrl ?? null,
       gaii,
     );
     return updated;
@@ -387,6 +391,7 @@ export const ownerMethods = {
     if (row.maxConcurrentTasks != null) record.maxConcurrentTasks = row.maxConcurrentTasks as number;
     if (row.dailySpendLimit != null) record.dailySpendLimit = row.dailySpendLimit as number;
     if (row.scheduleConstraintDefaults) record.scheduleConstraintDefaults = JSON.parse(row.scheduleConstraintDefaults as string);
+    if (row.consoleUrl) record.consoleUrl = row.consoleUrl as string;
     return record;
   },
 

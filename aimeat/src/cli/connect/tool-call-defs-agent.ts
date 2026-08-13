@@ -2,6 +2,8 @@
  * @file cli/connect/tool-call-defs-agent.ts
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 -- 2026-08-13 -- Add the aimeat_agent_console_set handler (PATCH
+ *     /v1/agents/:name/console-url).
  *   v1.2.0 -- 2026-07-19 -- Add shell handlers for operator_agent_configure + operator_ai_config so an
  *     operator-privileged principal can configure the system via `aimeat connect call`. Direct-apply
  *     through the per-field routes (PATCH /v1/agents/:name/{mode,tags,scopes}, POST /v1/ai/settings);
@@ -137,6 +139,21 @@ export const agentTools: ConnectCliToolDefinition[] = [
             if (!target) throw new Error('target_agent_name is required');
             if (!mode) throw new Error('mode is required');
             return client.patch(`/v1/agents/${encodeURIComponent(target)}/mode`, { mode });
+        },
+    },
+    {
+        name: 'aimeat_agent_console_set',
+        description: "Record where an agent is managed by whatever HOSTS it (its settings or brain page in the fleet runtime it runs in), so the owner's profile can link straight to it. Absolute http(s) URL; '' clears it.",
+        input: {
+            target_agent_name: { type: 'string', description: 'Agent whose console address to set.' },
+            console_url: { type: 'string', description: "Absolute http(s) URL of that agent's page in its host, or '' to clear it." },
+        },
+        handler: ({ client }, input) => {
+            const target = optionalString(input, 'target_agent_name');
+            if (!target) throw new Error('target_agent_name is required');
+            return client.patch(`/v1/agents/${encodeURIComponent(target)}/console-url`, {
+                console_url: optionalString(input, 'console_url') ?? '',
+            });
         },
     },
     {

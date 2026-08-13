@@ -3,6 +3,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.1.0 — 2026-08-13 — aimeat_agent_console_set: an agent that creates a sibling in a fleet
+ *     runtime reports back where the owner can go and look at it.
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
 
@@ -123,6 +125,16 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent whose mode to update (must be owned by the calling owner).' },
             mode: { type: 'string', required: true, enum: ['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation'], description: 'New mode.' },
+        },
+    },
+    {
+        name: 'aimeat_agent_console_set',
+        description: "Record where an agent is managed by whatever HOSTS it: its settings or brain page in the fleet runtime it runs in. Call this after creating and starting an agent somewhere the node cannot see — an agent hatchery instance, a cockpit, your own daemon's UI — so the owner's profile can link straight to it. Without it the person is told their agent is running and has nowhere to go and look at it. Must be an absolute http(s) URL; send an empty string to clear it. Display only: the node links this address and never fetches it.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            target_agent_name: { type: 'string', required: true, description: 'Agent whose console address to set (must be owned by the same owner as the caller). Pass your own name to record your own.' },
+            console_url: { type: 'string', required: true, description: "Absolute http(s) URL of that agent's page in its host, or '' to clear it." },
         },
     },
     {

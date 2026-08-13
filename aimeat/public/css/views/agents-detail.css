@@ -4,6 +4,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.21.0 -- 2026-08-13 -- The card-footer host link truncates instead of wrapping: a hostname is
+ *     one unbreakable token, and wrapping it took the footer row from 31px to 54px at 390px.
  *   v1.20.0 -- 2026-07-17 -- Generalize the card scheme: .pf-agd-card (standalone or
  *     grid child) + .pf-agd-card-grid/--full replace the integration-only
  *     .pf-agd-prod-grid; quality section titles drop the stacked-layout margin-top.
@@ -3186,6 +3188,15 @@
 .pf .pf-agd-card-actions {
   display: flex;
   gap: 0.5rem;
+}
+/* The link through to the agent's host carries a hostname, which can be long and is one
+   unbreakable token. Left to wrap it doubled the footer row on a phone (31px → 54px measured at
+   390px), so it stays on one line and truncates; the full address is in the title. */
+.pf .pf-agd-card-actions a {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Input wrapper for autocomplete ── */

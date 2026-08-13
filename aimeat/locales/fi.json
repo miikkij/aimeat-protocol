@@ -6149,6 +6149,7 @@
         "sharedTags": "Jaetut tunnisteet",
         "lastSeen": "Viimeksi nähty",
         "popOut": "Avaa omaan ikkunaan",
+        "openInHost": "Avaa {host}",
         "deliveryMcp": "MCP-ilmoitukset",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Pollaus",

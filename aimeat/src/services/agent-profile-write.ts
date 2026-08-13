@@ -22,7 +22,7 @@
  * @structure
  *   - AgentWriteOutcome: a stored record or a refusal code each surface renders its own way
  *   - normaliseAgentProfile(): the field vocabulary (tags, mode, scopes, name, description)
- *   - setAgentTags() / setAgentMode(): same-owner gated writes on a named sibling agent
+ *   - setAgentTags() / setAgentMode() / setAgentConsoleUrl(): same-owner gated writes on a sibling
  *   - setAgentProfile(): several of those fields in one write, for the operator configure tool
  *   - syncOnboardingFlowToMode(): re-derive the Hello Integration steps after a mode change
  *   - setAgentCapabilities(): validated capability self-report
@@ -31,6 +31,10 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   v1.3.0 -- 2026-08-13 -- setAgentConsoleUrl(): where the agent's HOST manages it. An agent created
+ *     from a chat runs in a fleet runtime the node has never heard of, so the person is told it is
+ *     running and has nowhere to go and look at it. Same-owner gated like tags and mode, because the
+ *     party that knows the address is usually the sibling that created the agent, not a person.
  *   v1.2.0 -- 2026-08-11 -- recordSelfReportedPlatform() also sets the mode the reported platform
  *     implies (workstation), because an agent in the user's own tool cannot pass configure_delivery
  *     and was left at a checklist that never completes. Only an unchosen mode is overwritten.
@@ -82,6 +86,7 @@ const MAX_SCOPES = 50;
 const MAX_SCOPE_LENGTH = 64;
 const MAX_DISPLAY_NAME = 128;
 const MAX_DESCRIPTION = 10_000;
+const MAX_CONSOLE_URL = 2048;
 
 /**
  * Resolve what a caller named into a GAII under the caller's OWN owner. A bare name is built into
@@ -239,6 +244,65 @@ export function normaliseAgentProfile(
     }
 
     return { ok: true, updates };
+}
+
+/**
+ * Where the agent's HOST manages it, checked before it is stored.
+ *
+ * This value is rendered as a link the owner clicks, and it arrives from a principal rather than
+ * from the node, so the scheme is the gate: `javascript:` and `data:` are links too, and a stored
+ * one would run in the owner's own session the moment they clicked the agent card. http and https
+ * are the whole vocabulary. Length is capped because nothing legitimate needs more and a URL column
+ * is not a place to park text.
+ *
+ * Empty or null clears it, which is how a host that moved says so.
+ */
+function normaliseConsoleUrl(raw: unknown): { ok: true; consoleUrl: string | null } | AgentWriteRefusal {
+    if (raw === null || raw === undefined || raw === '') return { ok: true, consoleUrl: null };
+    if (typeof raw !== 'string') {
+        return { ok: false, code: 'INVALID_INPUT', message: 'console_url must be a string, or null to clear it' };
+    }
+    const value = raw.trim();
+    if (value.length > MAX_CONSOLE_URL) {
+        return { ok: false, code: 'INVALID_INPUT', message: `console_url must be at most ${MAX_CONSOLE_URL} characters` };
+    }
+    let parsed: URL;
+    try {
+        parsed = new URL(value);
+    } catch {
+        // The exception IS the answer: an address that will not parse is not one.
+        return { ok: false, code: 'INVALID_INPUT', message: 'console_url must be an absolute http(s) URL' };
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        return { ok: false, code: 'INVALID_INPUT', message: 'console_url must be an absolute http(s) URL' };
+    }
+    return { ok: true, consoleUrl: value };
+}
+
+/**
+ * Point a same-owner agent at the page where its HOST manages it.
+ *
+ * Same-owner rather than owner-only, matching tags and mode, and for the same reason those are: the
+ * writer is usually not a person. An agent created by a sibling (a hatchery concierge acting on a
+ * task) is the case this exists for, and that sibling is the only party that knows the address.
+ */
+export async function setAgentConsoleUrl(
+    deps: AgentWriteDeps,
+    callerOwner: string,
+    identifier: string,
+    rawUrl: unknown,
+): Promise<AgentWriteOutcome> {
+    const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
+        'You can only set the console address of agents owned by the same owner');
+    if (!target.ok) return target;
+
+    const normalised = normaliseConsoleUrl(rawUrl);
+    if (!normalised.ok) return normalised;
+
+    const updated = await deps.storage.updateAgent(target.gaii, { consoleUrl: normalised.consoleUrl });
+    if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
+    emitChange('agents');
+    return { ok: true, agent: updated };
 }
 
 /** Replace the tag list on a same-owner agent, normalised by the rules in normaliseTags(). */

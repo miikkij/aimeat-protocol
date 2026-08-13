@@ -4,6 +4,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.3.0 — 2026-08-13 — agents.consoleUrl (see migration 0034 for why). schema.ts adds it to an
+ *     existing database; this is the fresh-install shape.
  *   v1.2.0 — 2026-08-11 — Drop the feedback table. The Node Feedback Channel is gone; its job is
  *     done by support@operators, an ordinary group conversation the operators answer in Messages.
  *   v1.2.0 — 2026-08-11 — push_subscriptions is keyed on (ownerName, endpoint): one row per device
@@ -54,7 +56,8 @@ export function applySchemaTables1(db: Database.Database): void {
       platformDetectedBy TEXT,
       model              TEXT,
       modelDetectedBy    TEXT,
-      tags               TEXT
+      tags               TEXT,
+      consoleUrl         TEXT
     );
 
     -- ── Memory ──

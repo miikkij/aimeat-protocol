@@ -33,10 +33,15 @@
  *   - createScheduleRecord() — gate, per-kind checks, record build, store, register, emit
  *   - updateScheduleRecord() — manage check, patch validation, store, reschedule, emit
  *   - deleteScheduleRecord() — manage check, unregister, delete, emit
+ *   - triggerScheduleRecord() — manage check, run once on the live clock, re-read, emit
  * @usage
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.1.0 — 2026-08-13 — triggerScheduleRecord(): "run it now" joins the other three. It was the one
+ *     schedule operation living in the router alone, which is why it existed on HTTP and nowhere else
+ *     — and a chat that can create a morning job but cannot run it once has no way to prove the job
+ *     works before the user is told it does.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8: the schedule WRITE, both doors).
  */
 import { randomUUID } from 'node:crypto';
@@ -46,7 +51,7 @@ import { buildGAII, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
 import { checkScheduleGate, isValidCron, type ScheduleKind } from './schedule-gate.js';
-import { getActiveScheduler, type Scheduler } from './scheduler.js';
+import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 
 export interface ScheduleWriteDeps {
     storage: Storage;
@@ -79,7 +84,8 @@ export type ScheduleWriteErrorCode =
     | 'INVALID_EXTENSION_JOB' | 'EXTENSION_NOT_FOUND'
     | 'INVALID_AI_JOB' | 'NAMESPACE_DENIED'
     | 'INVALID_TASK_TEMPLATE'
-    | 'INVALID_ECO_JOB' | 'ECO_APP_NOT_FOUND' | 'CAPABILITY_NOT_DECLARED';
+    | 'INVALID_ECO_JOB' | 'ECO_APP_NOT_FOUND' | 'CAPABILITY_NOT_DECLARED'
+    | 'SCHEDULER_UNAVAILABLE' | 'TRIGGER_FAILED';
 
 export interface ScheduleWriteRefusal {
     ok: false;
@@ -92,6 +98,14 @@ export type ScheduleWriteResult = { ok: true; schedule: ScheduledJobRecord } | S
 
 /** updateScheduledJob answers null when the row vanished between the read and the write. */
 export type ScheduleUpdateResult = { ok: true; schedule: ScheduledJobRecord | null } | ScheduleWriteRefusal;
+
+/**
+ * A manual run answers with what the clock actually did, not only that it was asked. `outcome.code`
+ * separates "a task was queued" from "skipped, a previous run is still going" and from "it ran and
+ * failed" — the three a caller must be able to tell apart before reporting success to anyone.
+ */
+export type ScheduleTriggerResult =
+    { ok: true; schedule: ScheduledJobRecord | null; outcome: JobOutcome } | ScheduleWriteRefusal;
 
 /** Normalise a constraints array from the request body (drop unknown types). */
 function sanitizeConstraints(raw: unknown): ScheduleConstraint[] | undefined {
@@ -447,4 +461,46 @@ export async function deleteScheduleRecord(
     await storage.deleteScheduledJob(id);
     emitChange('scheduler');
     return { ok: true, schedule: job };
+}
+
+/**
+ * Run one schedule now, off its cron.
+ *
+ * This is how a schedule is PROVEN rather than assumed. A job that was created correctly and fires
+ * at 07:00 tells you nothing until it has run once and written something, so whoever sets one up
+ * runs it here and then reads the result key back. `outcome` is relayed rather than flattened into
+ * a boolean: "skipped, a run is already going" and "ran and failed" are not success, and a caller
+ * that cannot tell them apart will report a working morning job that never wrote a line.
+ *
+ * A node with no clock refuses instead of quietly doing nothing, because the whole point of the
+ * call is that something happens while the caller is watching.
+ */
+export async function triggerScheduleRecord(
+    deps: ScheduleWriteDeps,
+    caller: ScheduleWriteCaller,
+    id: string,
+): Promise<ScheduleTriggerResult> {
+    const { storage, config } = deps;
+    const ownerScope = `${caller.owner}@${config.nodeId}`;
+    const job = await storage.getScheduledJob(id);
+    if (!job) return { ok: false, status: 404, code: 'NOT_FOUND', message: `Schedule "${id}" not found` };
+    if (!canManageSchedule(caller, ownerScope, job)) {
+        return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Not allowed to trigger this schedule' };
+    }
+    const scheduler = deps.scheduler ?? getActiveScheduler();
+    if (!scheduler) {
+        return {
+            ok: false, status: 503, code: 'SCHEDULER_UNAVAILABLE',
+            message: 'This node is running without a scheduler, so nothing can be run on demand.',
+        };
+    }
+    let outcome: JobOutcome;
+    try {
+        outcome = await scheduler.triggerNow(id);
+    } catch (err) {
+        return { ok: false, status: 500, code: 'TRIGGER_FAILED', message: `Run failed: ${(err as Error).message}` };
+    }
+    const updated = await storage.getScheduledJob(id);
+    emitChange('scheduler');
+    return { ok: true, schedule: updated, outcome };
 }

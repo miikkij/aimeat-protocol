@@ -52,6 +52,7 @@ export interface Agent {
   createdAt: Generated<Timestamp>;
   dailySpendLimit: number | null;
   defaultScopes: string[] | null;
+  consoleUrl: string | null;
   description: string | null;
   displayName: string | null;
   domainCapabilities: Json | null;

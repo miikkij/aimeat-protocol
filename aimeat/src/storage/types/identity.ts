@@ -2,6 +2,8 @@
  * @file src/storage/types/identity.ts
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-13 — AgentRecord.consoleUrl: where the agent's HOST manages it. The node knows
+ *     an agent exists and had no way to send its owner to the place it actually runs.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 import type { SemanticAnnotation } from './common.js';
@@ -84,6 +86,17 @@ export interface AgentRecord {
    * exposes the number — it does not enforce concurrency server-side.
    */
   maxConcurrentTasks?: number;
+  /**
+   * Where this agent is managed by whatever HOSTS it: the settings or brain page in the fleet
+   * runtime it lives in (an agent hatchery instance, a CrewAI cockpit, a self-hosted daemon's UI).
+   *
+   * The node cannot know this address and must not guess it, so the host reports it: the owner, or a
+   * same-owner sibling such as the concierge agent that created this one, writes it once. It exists
+   * because the person who asked a chat for an agent gets told the agent is running and then has
+   * nowhere to go to look at it. Display only, never fetched by the node — an http(s) URL is the
+   * whole contract, checked where it is written (services/agent-profile-write.ts).
+   */
+  consoleUrl?: string | null;
 }
 
 /**

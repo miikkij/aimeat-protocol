@@ -2,6 +2,8 @@
  * @file cli/connect/tool-call-defs-organism.ts
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 -- 2026-08-13 -- Add the aimeat_schedule_trigger connect-call handler (POST
+ *     /v1/schedules/:id/trigger), parity with both MCP surfaces.
  *   v1.2.0 -- 2026-07-31 -- workspace_write takes `items: [...]` (batch, all-or-nothing) through the
  *     shared services/workspace-write-items normalisation — parity with both MCP surfaces.
  *   v1.1.0 -- 2026-07-16 -- invite passes role + workspaces; add member_add / invitation_update /
@@ -179,6 +181,10 @@ export const organismTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_schedule_delete',
         handler: ({ client }, input) => client.delete(`/v1/schedules/${encodeURIComponent(requiredString(input, 'schedule_id'))}`),
+    },
+    {
+        name: 'aimeat_schedule_trigger',
+        handler: ({ client }, input) => client.post(`/v1/schedules/${encodeURIComponent(requiredString(input, 'schedule_id'))}/trigger`, {}),
     },
     {
         name: 'aimeat_schedule_report_internal',

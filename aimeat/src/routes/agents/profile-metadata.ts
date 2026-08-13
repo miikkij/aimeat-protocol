@@ -2,6 +2,9 @@
  * @file src/routes/agents/profile-metadata.ts
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-13 — PATCH /v1/agents/:name/console-url, and `console_url` on the agent list.
+ *     Same-owner gated like /tags and /mode: the party that knows where an agent is hosted is
+ *     usually the sibling that created it there.
  *   v1.3.0 — 2026-08-11 — PATCH /tags and PATCH /mode call services/agent-profile-write.ts, which
  *     aimeat_agent_tags_set and aimeat_agent_mode_set now call too. The mode handler's step-list
  *     re-derive was written for a caller that arrives through MCP and never ran for it.
@@ -18,14 +21,14 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { calculateTrustScore } from '../../services/trust.js';
 import { emitChange } from '../../services/event-bus.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
 import { listByAgent as listEngagementsByAgent } from '../../services/workspace-engagements.js';
-import { setAgentTags, setAgentMode, type AgentWriteRefusal } from '../../services/agent-profile-write.js';
+import { setAgentTags, setAgentMode, setAgentConsoleUrl, type AgentWriteRefusal } from '../../services/agent-profile-write.js';
 import { logger } from '../../utils/logger.js';
 import { computeAgentHealthMany } from '../../services/agent-health.js';
 import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
@@ -178,6 +181,9 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         model_detected_by: a.modelDetectedBy ?? null,
         max_concurrent_tasks: a.maxConcurrentTasks ?? 1,
         daily_spend_limit: a.dailySpendLimit ?? null,
+        // Where the agent's HOST manages it, when the host has said. Null for an agent that lives
+        // in a tool with no such page (a chat client), which is most of them.
+        console_url: a.consoleUrl ?? null,
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
         ...(wantStats ? {
           stats: {
@@ -279,6 +285,30 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
       gaii: outcome.agent.gaii,
       name: outcome.agent.name,
       mode: outcome.agent.mode ?? 'interactive',
+    }));
+  });
+
+  // PATCH /v1/agents/:name/console-url — where this agent's HOST manages it.
+  // Same-owner gated (mirrors /tags and /mode), and deliberately so: the party that knows the
+  // address is usually the sibling that created the agent — a hatchery concierge reporting back
+  // after it built and started one — not a person at a keyboard. Body: { console_url } — an
+  // absolute http(s) URL, or null/'' to clear it. The node stores and links it; it never fetches it.
+  // `agent:write` names what this is, matching aimeat_agent_console_set. An owner session passes on
+  // its role, an agent needs the word, and a published app cannot reach it at all: the scope is
+  // deliberately absent from APP_GRANTABLE_SCOPES, and an app editing where an agent is "managed"
+  // would be editing a link its owner is invited to click.
+  router.patch('/v1/agents/:name/console-url', requireAuth(), requireScope('agent:write'), async (req, res) => {
+    const identifier = decodeURIComponent(req.params.name as string);
+    const outcome = await setAgentConsoleUrl({ storage, config }, req.auth!.owner, identifier, req.body?.console_url);
+    if (!outcome.ok) {
+      res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
+      return;
+    }
+
+    res.json(success(config.nodeId, {
+      gaii: outcome.agent.gaii,
+      name: outcome.agent.name,
+      console_url: outcome.agent.consoleUrl ?? null,
     }));
   });
 

@@ -6142,6 +6142,7 @@
         "sharedTags": "Etiquetas compartidas",
         "lastSeen": "Visto por última vez",
         "popOut": "Abrir en su propia ventana",
+        "openInHost": "Abrir en {host}",
         "deliveryMcp": "Avisos por MCP",
         "deliveryWebhook": "Webhook",
         "deliveryPolling": "Consultas periódicas",

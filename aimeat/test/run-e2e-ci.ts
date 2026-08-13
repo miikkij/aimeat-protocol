@@ -121,6 +121,15 @@ const ALL_SUITES = [
     // The MCP task lifecycle, which nothing exercised — which is why five differences from the REST
     // routes survived every green run.
     'test/e2e-mcp-agent-tasks.ts',
+    // Running a schedule NOW from the surface that creates them. Creating a 07:00 job over MCP has
+    // always worked; proving it works could only be done over HTTP, so nobody did.
+    'test/e2e-mcp-schedule-trigger.ts',
+    // Where an agent's HOST manages it: a sibling may report the address (that is the whole point),
+    // and the scheme check, because the stored value becomes a link in the owner's own session.
+    'test/e2e-agent-console-url.ts',
+    // Deleting an agent has to end its sessions. Nothing asked until this suite, and the answer was
+    // no: the record went and every 90-day credential it held kept authenticating.
+    'test/e2e-agent-token-revocation.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',

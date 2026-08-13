@@ -6,6 +6,9 @@
  *   has no dedicated REST route (it is a structured memory write), so it writes the
  *   `agents.<name>.scheduler` mirror via /v1/memory.
  * @version-history
+ *   v1.1.0 -- 2026-08-13 -- Add aimeat_schedule_trigger (run one now), keeping parity with the
+ *     server MCP surface where it was added for the same reason: a new schedule is unproven until
+ *     it has run once.
  *   v1.0.0 -- 2026-06-09 -- Initial: close the connector-surfaces gap for schedule_* (create/list/
  *     update/delete/report_internal).
  */
@@ -60,6 +63,12 @@ export function registerSchedulesTools(mcp: McpServer, registry: AgentRegistry):
     schedule_id: z.string(),
   }, annotationsFor('aimeat_schedule_delete'), async ({ schedule_id }) => {
     return out(await client.delete(`/v1/schedules/${encodeURIComponent(schedule_id)}`));
+  });
+
+  mcp.tool('aimeat_schedule_trigger', descriptionFor('aimeat_schedule_trigger'), {
+    schedule_id: z.string(),
+  }, annotationsFor('aimeat_schedule_trigger'), async ({ schedule_id }) => {
+    return out(await client.post(`/v1/schedules/${encodeURIComponent(schedule_id)}/trigger`, {}));
   });
 
   // No dedicated REST route: the internal-scheduler mirror is a structured memory record under
