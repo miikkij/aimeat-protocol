@@ -2,6 +2,7 @@
  * @file src/routes/agents/profile-metadata.ts
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-13 — `registered_by` joins the agent list: who asked for each agent.
  *   v1.4.0 — 2026-08-13 — PATCH /v1/agents/:name/console-url, and `console_url` on the agent list.
  *     Same-owner gated like /tags and /mode: the party that knows where an agent is hosted is
  *     usually the sibling that created it there.
@@ -184,6 +185,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         // Where the agent's HOST manages it, when the host has said. Null for an agent that lives
         // in a tool with no such page (a chat client), which is most of them.
         console_url: a.consoleUrl ?? null,
+        // Who asked for this agent: the owner's name, or the sibling that registered it. Null on
+        // every agent that predates the field. The owner's own answer to "where did these come
+        // from", and the fence on which agents a sibling may delete.
+        registered_by: a.registeredBy ?? null,
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
         ...(wantStats ? {
           stats: {

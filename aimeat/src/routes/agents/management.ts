@@ -2,6 +2,10 @@
  * @file src/routes/agents/management.ts
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-13 — DELETE /v1/agents/:name accepts an AGENT caller under three conditions:
+ *     same owner, `agent:delete`, and `registeredBy` naming the caller. A fleet concierge has to be
+ *     able to clear away what it built when its container goes; same-owner alone would let every
+ *     agent kill every sibling, and the scope alone would hand one agent the whole fleet.
  *   v1.1.0 — 2026-08-13 — DELETE /v1/agents/:name revokes the agent's sessions BEFORE removing the
  *     record. The record went and its 90-day tokens kept authenticating, with no handle left to
  *     revoke them by. The response now says how many credentials it ended.
@@ -12,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII } from '../../utils/gaii.js';
 import { calculateTrustScore } from '../../services/trust.js';
@@ -385,10 +389,33 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     emitChange('agents');
   });
 
-  // DELETE /v1/agents/:name — delete an agent (owner only)
-  router.delete('/v1/agents/:name', requireAuth(), requireRole('owner'), async (req, res) => {
+  /**
+   * DELETE /v1/agents/:name — end an agent.
+   *
+   * Two callers, and the second one is narrow on purpose.
+   *
+   * The OWNER may delete any of their own agents, as before.
+   *
+   * An AGENT may delete an agent only when all three hold: same owner, it is the principal that
+   * authorized this agent's registration (`registeredBy`), and it carries `agent:delete`. The case
+   * is a fleet concierge clearing away what it built when its container is deprovisioned — it has to
+   * be able to end those agents, and must not be able to end the ones it never made.
+   *
+   * Why not same-owner alone, which is what /tags, /mode and /console-url use. Those write a field;
+   * this ends another principal's work and its credentials. Same-owner on THIS door would mean every
+   * agent an owner has may kill every sibling it has never seen, granted by nothing more than
+   * existing. Why not the scope alone: it would hand a single approved agent the whole fleet. The
+   * two conditions together are the narrow thing, and neither is sufficient by itself.
+   */
+  router.delete('/v1/agents/:name', requireAuth(), requireRoleOrScope('owner', 'agent:delete'), async (req, res) => {
     const agentName = req.params.name as string;
     const ownerName = req.auth!.owner;
+    const roles = req.auth!.roles;
+    // The account layer, matching requireRole('owner'): an operator satisfies owner, and an agent or
+    // ecosystem principal never does even when its token carries the owner's name (that field is the
+    // human this acts FOR, which is exactly the confusion invariant 11 exists about).
+    const isOwnerSession = (roles.includes('owner') || roles.includes('operator'))
+      && !roles.includes('agent') && !roles.includes('ecosystem');
 
     const agents = await storage.getAgentsByOwner(ownerName);
     const agent = agents.find(a => a.name === agentName);
@@ -399,6 +426,26 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     if (agent.owner !== req.auth!.owner) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own agents'));
       return;
+    }
+
+    if (!isOwnerSession) {
+      // The scope was already required at the door (requireRoleOrScope above, which is also what
+      // makes the gate visible to check:route-scopes). This is the second condition, and the reason
+      // the scope alone is not enough. `registeredBy` is written once, at
+      // creation, so it names the principal that actually asked for this agent — not whoever
+      // reconnected it last. An agent with no entry (created before this field existed) is not
+      // deletable this way at all, which is the safe direction: absence is not evidence of parentage.
+      if (agent.registeredBy !== req.auth!.sub) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+          `You may only delete agents you registered yourself. "${agentName}" was not registered under your authorization.`));
+        return;
+      }
+      // Nothing may delete itself: the caller would be revoking the credential mid-request, and an
+      // instance tearing itself down first has no principal left to clean up with.
+      if (agent.gaii === req.auth!.sub) {
+        res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'An agent cannot delete itself'));
+        return;
+      }
     }
 
     // Sign it out BEFORE the record goes. An agent JWT lives 90 days, carries its own signature and

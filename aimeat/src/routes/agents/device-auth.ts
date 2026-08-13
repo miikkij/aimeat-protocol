@@ -31,6 +31,8 @@
  *     verbatim, narrowing included, except that a scope no wildcard carries survives either way
  *     (the consent card's templates cannot express it, so re-approval is not where it was meant to
  *     be dropped).
+ *   v1.7.0 — 2026-08-13 — The created agent records WHO authorized it (`registeredBy`), and
+ *     `expires_in` comes from the shared constant now that the window is two hours.
  *   v1.6.0 — 2026-08-08 — /verify/info reports `existing_agent`, so the consent screen can tell a
  *     RETURN from a first approval and preselect "keep its current access" instead of Standard. A
  *     boolean only — that endpoint is unauthenticated and rate-limited against user-code
@@ -53,7 +55,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
-import { DEVICE_AUTH_EXPIRY_MS, VALID_MODES } from './constants.js';
+import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
 import { uncoveredScopes, SCOPES_OUTSIDE_WILDCARD } from '../../utils/scope-coverage.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
@@ -137,6 +139,13 @@ async function approveDeviceAuth(
       createdAt: now,
       lastSeen: now,
       mode: request.mode ?? 'interactive',
+      // Who asked for this agent: the owner's name when a person approved on the consent screen,
+      // the approving sibling's GAII when same-owner auto-approval did. The same value goes on the
+      // device-authorization record as `approvedBy`, and that record is swept when it expires — so
+      // without this line the answer to "where did this agent come from" survives half an hour.
+      // Written here and nowhere else: re-approval is an ordinary event, and letting a later
+      // approver take the entry over would move the right to delete this agent with it.
+      registeredBy: approvedBy,
     });
 
     // Post-registration hook
@@ -401,7 +410,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       user_code: userCode,
       verification_uri: verificationUri,
       verification_uri_complete: verificationUriComplete,
-      expires_in: 1800,
+      expires_in: DEVICE_AUTH_EXPIRY_SECONDS,
       interval: 5,
       status: autoApproved ? 'approved' : 'pending',
       auto_approved: autoApproved,

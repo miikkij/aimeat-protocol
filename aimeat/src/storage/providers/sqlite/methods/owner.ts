@@ -2,6 +2,9 @@
  * @file src/storage/providers/sqlite/methods/owner.ts
  * @description Owner, Agent, and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.5.0 — 2026-08-13 — …and `registeredBy`. It is carried through updateAgent rather than
+ *     omitted from the SET list: the write-once rule lives where the value is set (createAgent
+ *     alone), so both providers behave the same way.
  *   v1.4.0 — 2026-08-13 — createAgent/updateAgent/deserializeAgent carry `consoleUrl`, matching the
  *     Postgres provider (migration 0034).
  *   v1.3.0 — 2026-08-11 — The memory writes persist `groupId` (shared rule in storage/memory-sharing.ts).
@@ -151,8 +154,8 @@ export const ownerMethods = {
     try {
       this.db.prepare(
         `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
-         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags, mode, maxConcurrentTasks, consoleUrl, registeredBy)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         agent.gaii, agent.name, agent.owner,
         agent.displayName ?? null, agent.description ?? null,
@@ -171,6 +174,7 @@ export const ownerMethods = {
         agent.mode ?? 'interactive',
         agent.maxConcurrentTasks ?? 1,
         agent.consoleUrl ?? null,
+        agent.registeredBy ?? null,
       );
       return agent;
     } catch (err: unknown) {
@@ -218,7 +222,7 @@ export const ownerMethods = {
        modulesLoaded = ?, agentLimitations = ?, languages = ?,
        webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
        platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?, mode = ?, maxConcurrentTasks = ?,
-       dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?
+       dailySpendLimit = ?, scheduleConstraintDefaults = ?, consoleUrl = ?, registeredBy = ?
        WHERE gaii = ?`
     ).run(
       updated.name, updated.owner,
@@ -246,6 +250,11 @@ export const ownerMethods = {
       updated.dailySpendLimit ?? null,
       updated.scheduleConstraintDefaults ? JSON.stringify(updated.scheduleConstraintDefaults) : null,
       updated.consoleUrl ?? null,
+      // Carried through rather than fixed here: the write-once rule lives where the value is SET
+      // (only createAgent writes it), so both providers behave the same way. Postgres passes any
+      // key through generically, and a column one backend silently refuses is a worse trap than a
+      // rule stated in one place.
+      updated.registeredBy ?? null,
       gaii,
     );
     return updated;
@@ -392,6 +401,7 @@ export const ownerMethods = {
     if (row.dailySpendLimit != null) record.dailySpendLimit = row.dailySpendLimit as number;
     if (row.scheduleConstraintDefaults) record.scheduleConstraintDefaults = JSON.parse(row.scheduleConstraintDefaults as string);
     if (row.consoleUrl) record.consoleUrl = row.consoleUrl as string;
+    if (row.registeredBy) record.registeredBy = row.registeredBy as string;
     return record;
   },
 

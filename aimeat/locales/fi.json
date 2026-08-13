@@ -5663,7 +5663,8 @@
           },
           "agent": {
             "write": "Muuta muiden agenttiesi asetuksia: missä tilassa ne toimivat ja millä tunnisteilla.",
-            "permissions": "Muuta mitä muut agenttisi saavat tehdä. Eri asia kuin niiden asetukset: tämä on itse lupalista."
+            "permissions": "Muuta mitä muut agenttisi saavat tehdä. Eri asia kuin niiden asetukset: tämä on itse lupalista.",
+            "delete": "Poista itse luomansa agentit, eikä muita. Ajoympäristölle joka rakentaa sinulle agentteja ja joutuu myös siivoamaan ne pois."
           },
           "app": {
             "write": "Julkaise ja päivitä tilisi sovelluksia, luonnokset mukaan lukien.",

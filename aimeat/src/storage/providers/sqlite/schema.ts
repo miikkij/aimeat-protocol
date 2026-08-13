@@ -10,6 +10,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   v1.10.0 — 2026-08-13 — agents.registeredBy for existing databases too.
  *   v1.9.0 — 2026-08-13 — agents.consoleUrl, so an existing database gets the column too.
  *   v1.8.0 — 2026-08-13 — Two more index-before-ALTER crashes, both moved here from block 1: the
  *     provider_clients pair (reported from a self-hosted node upgrading 2.7.0 -> 3.0.0, which could
@@ -360,6 +361,10 @@ export function initializeSchema(db: Database.Database): void {
   // Where the agent's HOST manages it (hatchery/cockpit settings page). Reported by the owner or a
   // same-owner sibling; the node stores and links it and never fetches it.
   safeAddColumn('agents', 'consoleUrl', 'TEXT');
+
+  // Who authorized this agent's registration: the owner's name, or the approving sibling's GAII.
+  // The creation ledger, and the fence on agent-initiated deletion. See migration 0035.
+  safeAddColumn('agents', 'registeredBy', 'TEXT');
 
   // device_auth.mode -- mode the CLI passed to /v1/agents/device-authorize.
   // verify-route reads this when the owner approves, and propagates it to

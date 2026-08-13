@@ -5,6 +5,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-08-13 — registeredBy on create and on read (migration 0035).
  *   2026-08-13 — consoleUrl on create and on read (migration 0034); updateAgent needs nothing, it
  *     passes unknown keys through.
  *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
@@ -48,7 +49,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     model: r.model ?? undefined, modelDetectedBy: (r.modelDetectedBy ?? undefined) as AgentRecord['modelDetectedBy'],
     tags: arr(r.tags), mode: (r.mode ?? 'interactive') as AgentRecord['mode'], maxConcurrentTasks: r.maxConcurrentTasks ?? 1,
     dailySpendLimit: r.dailySpendLimit ?? undefined,
-    consoleUrl: r.consoleUrl ?? undefined,
+    consoleUrl: r.consoleUrl ?? undefined, registeredBy: r.registeredBy ?? undefined,
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
     createdAt: iso(r.createdAt), lastSeen: iso(r.lastSeen),
   };
@@ -128,7 +129,7 @@ export const identityMethods = {
       webhookLastSuccess: a.webhookLastSuccess ? new Date(a.webhookLastSuccess) : null,
       webhookLastFailure: a.webhookLastFailure ? new Date(a.webhookLastFailure) : null, webhookFailCount: a.webhookFailCount ?? 0,
       platform: a.platform ?? null, platformVersion: a.platformVersion ?? null, platformDetectedBy: a.platformDetectedBy ?? null,
-      model: a.model ?? null, modelDetectedBy: a.modelDetectedBy ?? null, consoleUrl: a.consoleUrl ?? null,
+      model: a.model ?? null, modelDetectedBy: a.modelDetectedBy ?? null, consoleUrl: a.consoleUrl ?? null, registeredBy: a.registeredBy ?? null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();

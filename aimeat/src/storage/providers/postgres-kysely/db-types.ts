@@ -69,6 +69,7 @@ export interface Agent {
   owner: string;
   platform: string | null;
   platformDetectedBy: string | null;
+  registeredBy: string | null;
   platformVersion: string | null;
   model: string | null;
   modelDetectedBy: string | null;

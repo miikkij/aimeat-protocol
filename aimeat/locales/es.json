@@ -5656,7 +5656,8 @@
           },
           "agent": {
             "write": "Cambiar los ajustes de tus OTROS agentes: en qué modo corren y cómo están etiquetados.",
-            "permissions": "Cambiar lo que pueden hacer tus OTROS agentes. Va aparte de sus ajustes, porque esto es la lista de permisos en sí."
+            "permissions": "Cambiar lo que pueden hacer tus OTROS agentes. Va aparte de sus ajustes, porque esto es la lista de permisos en sí.",
+            "delete": "Borrar los agentes que ha creado él mismo, y ninguno más. Para un entorno que te construye agentes y luego tiene que retirarlos."
           },
           "app": {
             "write": "Publicar y actualizar aplicaciones en tu cuenta, incluido guardar y publicar borradores.",

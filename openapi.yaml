@@ -6251,7 +6251,13 @@ paths:
                             type: string
                           expires_in:
                             type: integer
-                            example: 600
+                            example: 7200
+                            description: |
+                              How long the request waits for its human, in seconds. Two hours since
+                              2026-08-13, raised from thirty minutes: the person starting the flow is
+                              often not the person at the keyboard (a fleet instance being
+                              provisioned approves whenever its owner next looks), and an expired
+                              request costs a whole round of provisioning to redo.
                           interval:
                             type: integer
                             example: 5
@@ -39802,7 +39808,20 @@ paths:
       operationId: deleteAgentByName
       tags: [Agents]
       summary: Delete an agent
-      description: Requires an owner session. Deletes one of the owner's own agents and evicts its telemetry.
+      description: |
+        Ends an agent: revokes its live sessions, deletes the record, and evicts its telemetry. The
+        sessions go first, so a deleted agent's tokens stop working immediately rather than staying
+        valid for the rest of their 90 days.
+
+        Two callers. An **owner session** may delete any of its own agents.
+
+        An **agent** may delete another agent only when all three hold: same owner, it is the
+        principal that authorized that agent's registration (`registeredBy`, written once at
+        creation), and it carries the `agent:delete` scope, which the owner grants per agent. This
+        exists for a fleet runtime clearing away what it built when its container is deprovisioned:
+        it can end what it created and nothing else. An agent may not delete itself, and an agent
+        with no `registeredBy` entry (created before that field existed) cannot be deleted this way
+        at all.
       security:
         - BearerAuth: []
       parameters:
@@ -39826,6 +39845,9 @@ paths:
                           deleted: { type: boolean }
                           name: { type: string }
                           gaii: { type: string }
+                          sessions_revoked:
+                            type: integer
+                            description: How many live sessions this ended. Deleted and "can no longer act" are different claims.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

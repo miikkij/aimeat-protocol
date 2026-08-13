@@ -2,6 +2,8 @@
  * @file src/routes/agents/registration.ts
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-13 — The created agent records `registeredBy`: this door is owner-only, so it
+ *     is the owner's own name.
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
  *   v1.1.0 — 2026-08-08 — The pending device-auth listing carries `existing_agent` +
  *     `current_scopes`, so the consent card can tell an agent coming BACK from a first approval.
@@ -223,6 +225,9 @@ export function registerRegistrationRoutes(
       createdAt: now,
       lastSeen: now,
       mode: mode ?? 'interactive',
+      // This door is owner-only (requireRole('owner') + requireLocalSession), so the person asked
+      // for it themselves. Same field the device-authorization path writes; see AgentRecord.
+      registeredBy: req.auth!.owner,
     });
 
     // Extension hook: post_agent_registration (fire-and-forget)

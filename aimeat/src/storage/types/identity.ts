@@ -2,6 +2,9 @@
  * @file src/storage/types/identity.ts
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-13 — AgentRecord.registeredBy: who asked for this agent. The node recorded it
+ *     on the device-authorization record and swept that record on expiry, so the answer survived
+ *     about half an hour. Creation ledger, and the fence on agent-initiated deletion.
  *   v1.1.0 — 2026-08-13 — AgentRecord.consoleUrl: where the agent's HOST manages it. The node knows
  *     an agent exists and had no way to send its owner to the place it actually runs.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
@@ -97,6 +100,21 @@ export interface AgentRecord {
    * whole contract, checked where it is written (services/agent-profile-write.ts).
    */
   consoleUrl?: string | null;
+  /**
+   * Who authorized this agent's registration: the owner's bare name when a person approved it, or
+   * the approving sibling's GAII when same-owner auto-approval did (a hatchery concierge creating
+   * the agent it was asked for).
+   *
+   * Written once, at creation, and never rewritten. Re-running device authorization is a normal
+   * event — a token expires, a machine is reinstalled — and letting a later approver take the entry
+   * over would move the right to delete this agent along with it.
+   *
+   * Two jobs. It is the creation ledger: without it, "where did these forty agents come from" has no
+   * answer, because `approvedBy` lives on the device-authorization record and those are swept when
+   * they expire. And it is the fence on agent-initiated deletion: a sibling may end an agent only if
+   * it is the one that asked for it.
+   */
+  registeredBy?: string | null;
 }
 
 /**

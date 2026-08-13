@@ -16,6 +16,9 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.4.0 — 2026-08-13 — agent:delete, the word a fleet runtime needs to clear away the agents it
+ *     created. Inside the wildcard on purpose: the route's second condition (only agents this
+ *     caller registered) is the real fence, and a box nobody can find protects nothing.
  *   v1.3.0 — 2026-08-11 — account:security, a sixth word outside the wildcard: the password, the
  *     recovery address, the second factor, the identity proof, and deleting or exporting the whole
  *     account. Its own domain, because it is not a permission over the person's data but over
@@ -157,7 +160,12 @@ export const SCOPE_DOMAINS = [
   //               how this account offers work to others, so writing one speaks in the owner's name.
   // agent:permissions — rewrite what another of the owner's agents is allowed to do. Separate
   //   from agent:write, which is its mode and its tags: this one changes the permission set itself.
-  { key: 'agent',      permissions: ['write', 'permissions'] },
+  // agent:delete — end another of the owner's agents for good. Its own word rather than part of
+  //   agent:write, because reconfiguring a sibling and ending it are different sizes of act, and
+  //   because the caller that needs it is a fleet concierge cleaning up what it created. The route
+  //   adds a second condition the box cannot express: an agent may only delete an agent whose
+  //   registration it authorized itself.
+  { key: 'agent',      permissions: ['write', 'permissions', 'delete'] },
   { key: 'app',        permissions: ['write', 'manage'] },
   { key: 'capability', permissions: ['write'] },
 

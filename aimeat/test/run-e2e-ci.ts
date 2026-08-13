@@ -130,6 +130,9 @@ const ALL_SUITES = [
     // Deleting an agent has to end its sessions. Nothing asked until this suite, and the answer was
     // no: the record went and every 90-day credential it held kept authenticating.
     'test/e2e-agent-token-revocation.ts',
+    // A fleet concierge ending the agents it created, and the three conditions that let it — each
+    // one proven load-bearing on its own, because two of them are individually far too wide.
+    'test/e2e-agent-delete-by-sibling.ts',
     // Does an open page hear about work an agent does? 21 of the 31 writing tool files emitted no
     // SSE change domain at all, so the write landed and the screen stayed as it was.
     'test/e2e-mcp-sse-parity.ts',

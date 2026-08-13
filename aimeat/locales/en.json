@@ -5663,7 +5663,8 @@
           },
           "agent": {
             "write": "Change the settings of your OTHER agents: what mode they run in and how they are tagged.",
-            "permissions": "Change what your OTHER agents are allowed to do. Separate from their settings, because this is the permission list itself."
+            "permissions": "Change what your OTHER agents are allowed to do. Separate from their settings, because this is the permission list itself.",
+            "delete": "Delete agents it created itself, and only those. For a runtime that builds agents for you and has to clear them away again."
           },
           "app": {
             "write": "Publish and update apps on your account, including saving and publishing drafts.",
