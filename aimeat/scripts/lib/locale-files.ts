@@ -118,6 +118,24 @@ export function varsOf(v: LocaleValue): Set<string> {
 export interface Defect { key: string; what: string; fix: string; }
 
 /**
+ * Words that mix two writing systems inside a single token — "информativa" for "informativa".
+ * A keyboard layout left in the wrong state produces a word that LOOKS right at a glance and is
+ * unsearchable, unpronounceable and unfixable-by-eye. Script-agnostic on purpose: a future Russian
+ * locale would write whole Cyrillic words, which this does not touch; only the mixture is wrong.
+ * The check is one this repo earned — the example above shipped into a merge on 2026-08-13.
+ */
+function mixedScriptWords(v: LocaleValue): string[] {
+  const text = Array.isArray(v) ? v.join(' ') : v;
+  const out: string[] = [];
+  for (const word of text.split(/\s+/)) {
+    const latin = /[A-Za-zÀ-ÖØ-öø-ÿ]/.test(word);
+    const other = /[Ͱ-ϿЀ-ӿ԰-֏֐-׿؀-ۿ]/.test(word);
+    if (latin && other) out.push(word);
+  }
+  return out;
+}
+
+/**
  * What is wrong with a translation, given English. Deliberately NOT "incomplete": a missing key
  * falls back to English per key, which is the design and is how a language gets filled in over
  * several passes. These are the four ways a key that IS there can still be broken.
@@ -157,6 +175,13 @@ export function findDefects(tag: string, en: Record<string, LocaleValue>, loc: R
     // {{muuttuja}}. Counting names alone reports both as bugs, and a gate that cries wolf on
     // correct text gets switched off. Compare how MANY tokens each side carries: a rename keeps
     // the count, and only a genuine drop lowers it.
+    const mixed = mixedScriptWords(value);
+    if (mixed.length) {
+      out.push({ key, what: `${key} in ${tag}.json mixes writing systems inside a word: ${mixed.slice(0, 3).join(', ')}`,
+        fix: 'retype the word. A Cyrillic or Greek letter sitting inside a Latin word passes every '
+          + 'spellcheck by eye and none by machine.' });
+    }
+
     const srcVars = varsOf(source), locVars = varsOf(value);
     const missing = [...srcVars].filter((v) => !locVars.has(v));
     const renamed = [...locVars].filter((v) => !srcVars.has(v));
