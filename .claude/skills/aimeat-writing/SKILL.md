@@ -123,13 +123,45 @@ What gives a translation away here:
 **Length.** Spanish runs 15–25 % longer than English. A string that fits a button in English may not
 in Spanish, and that is checked in a browser at three viewports, not guessed.
 
+## Adding a language, and filling one in
+
+Three commands, repeated until the coverage line says 100 %. There is no fourth step and no other
+file to remember.
+
+```bash
+pnpm locale:extract es --prefix profile.agents.   # → locales/.todo-es.json, the English to work from
+#   … replace every value with the target-language text …
+pnpm locale:merge es locales/.todo-es.json        # → back into es.json, in en.json's shape
+pnpm check:locales                                # the gate; --list for coverage only
+```
+
+**A NEW language is the same loop plus two lines:** add the tag to `LOCALES` in `src/i18n.ts`, create
+`locales/<tag>.json` containing `{}`, then extract → translate → merge. Nothing else in the code
+needs touching, because every locale-aware surface (the two language switches, the sign-in modal,
+the served header, the email and notification templates, the static privacy/terms/connect pages, the
+EU AI Act disclosure declaration) reads that one list.
+
+Four things worth knowing about the loop:
+
+- **Slice by `--prefix`, not by `--limit` alone.** A translator needs one screen's strings together
+  or the same noun comes out three ways. `--prefix profile.agents.` is a screen; the first 200 keys
+  alphabetically are four half-screens.
+- **A missing key is not a defect.** It falls back to English per key, which is how a language gets
+  filled in over several passes without ever shipping a half-Spanish screen. Leaving a key out is
+  cleaner than a `[TODO:xx]` placeholder, and far cleaner than a calque.
+- **`locale:merge` refuses before it writes.** Unknown key, string where English has a list, dropped
+  `{n}`, shipped `[TODO:xx]`: it checks the merged result first and writes nothing if any of it
+  fails. A half-merged file is worse than an unmerged one, because the next extract no longer knows
+  what is outstanding.
+- **Nothing calls a model and nothing is billed.** The extract file is filled in by whoever is doing
+  the language, reading the rules above. A machine translation merged unread is exactly the
+  "translated English" this skill exists to prevent.
+
 ## Where each kind of text lands
 
-- **UI text** goes through `t()` and into `locales/en.json`, `locales/fi.json` and `locales/es.json`
-  in the same change. If a language is not ready, ship the English string with a `[TODO:fi]` /
-  `[TODO:es]` prefix rather than a bad translation — or leave the key out of that file entirely,
-  which falls back to English per key and is the cleaner option while a language is being filled in.
-  A placeholder is honest; a calque is not.
+- **UI text** goes through `t()` and into `locales/en.json` first; that file is the source of truth
+  for what keys exist. The other languages follow through the loop above, in the same change when
+  the text is ready and in a later pass when it is not.
 - **A prompt string** is English, and follows `docs/coding-guidelines/prompt-writing.md`: say what
   TO do rather than what to avoid. Do not rewrite a prompt that works; additive changes only.
 - **A changelog entry** says what a person gets, not what the code does, and only for platform-level

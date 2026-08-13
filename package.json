@@ -28,6 +28,8 @@
     "check:silent-catch": "cd aimeat && pnpm check:silent-catch",
     "check:ai-disclosure": "cd aimeat && pnpm check:ai-disclosure",
     "check:locales": "cd aimeat && pnpm check:locales",
+    "locale:extract": "cd aimeat && pnpm locale:extract",
+    "locale:merge": "cd aimeat && pnpm locale:merge",
     "check:packs-doc": "cd aimeat && pnpm check:packs-doc",
     "vendor:libs": "cd aimeat && pnpm vendor:libs",
     "check:vendored": "cd aimeat && pnpm check:vendored",

@@ -104,7 +104,7 @@ grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
 - **E2E on both backends.** `postgres-kysely` is the production backend and `sqlite` is the fast local one; both must pass. Run the suites your change can plausibly affect — targeted runs are what you owe, and they are enough for Jouni to do acceptance testing. **The full sweep (`pnpm test:e2e:postgres-kysely` + `pnpm test:e2e:sqlite`) is NEVER started on your own initiative:** it takes about two hours, and it runs only after Jouni has looked at the work and approved it, or when he asks for it. If he says to go with lighter testing only, that is the instruction. A failure in an area you touched means not done. A failure elsewhere: confirm it pre-exists on `main`, mention it, leave it. New features ship with E2E tests (happy path plus a failure mode). Never report done without having run them. → `docs/coding-guidelines/testing-requirements.md`
 - **Finished frontend changes are verified by driving a real browser** through the Playwright MCP server. The `.spec.ts` Playwright suite is unreliable: do not write or run it. → skill `aimeat-frontend-verify`
 - **`openapi.yaml` changes in the same commit as the route**, then `pnpm generate:types`.
-- **`locales/en.json` and `locales/fi.json` change together.** Unsure of the Finnish: English text with a `[TODO:fi]` prefix.
+- **`locales/en.json` is the source of truth for what keys exist**; the other languages (`fi`, `es`) follow through `pnpm locale:extract <tag> --prefix … ` → translate → `pnpm locale:merge <tag> <file>`, gated by `pnpm check:locales`. A key left out of a language falls back to English on its own, which is how a language gets filled in over several passes; a `[TODO:xx]` placeholder and a calque both fail the gate or the reader. A NEW language is that same loop plus two lines: the tag in `LOCALES` (`src/i18n.ts`) and an empty `locales/<tag>.json`. → skill `aimeat-writing`
 - **Six rules the August 2026 audit had to be written to discover.** Full text and the evidence for each: `docs/coding-guidelines/security-development-dna.md` invariants 11 to 16.
   - **The owner name is not a principal.** `req.auth!.owner` carries the human's name on app grants, ecosystem apps, agent JWTs and PATs alike, so `owner !== name` refuses a different PERSON and admits everything acting in this person's name. Naming the principal is the check. A change to the account itself goes behind `requireOwnerPrincipal()`, and `requireRole('owner')` is not that test.
   - **A role is granted, never inherited at mint time.** One mint copied the owner's roles onto the agent's token, and two calls then turned a scope-limited agent into an unscoped operator credential. When you add a mint, diff its role list against the other mints.
@@ -205,6 +205,9 @@ From the project root; the root `package.json` proxies to `aimeat/`.
 pnpm test:e2e:postgres-kysely    # E2E, production backend
 pnpm test:e2e:sqlite             # E2E, fast local backend
 pnpm check:importmap             # spa.html importmap vs absolute imports
+pnpm check:locales --list        # how much of en.json each language carries
+pnpm locale:extract es --prefix profile.agents.   # the next slice to translate
+pnpm locale:merge es locales/.todo-es.json        # …and back in, validated
 pnpm start -- --db postgres-kysely --db-url postgresql://localhost:5432/aimeat
 pnpm start -- --db sqlite --db-path ./data/aimeat.db
 ```

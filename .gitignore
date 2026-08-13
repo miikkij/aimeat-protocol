@@ -188,3 +188,6 @@ scripts/.env
 # the sha256; `pnpm check:vendored` says whether they are in place. Everything else under
 # public/lib/ IS committed, including the small .js loaders next to these.
 aimeat/public/lib/**/*.wasm
+
+# locale:extract working files — a slice being translated, never committed
+aimeat/locales/.todo-*.json
