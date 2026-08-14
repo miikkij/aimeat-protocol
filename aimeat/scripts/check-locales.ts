@@ -19,7 +19,41 @@
  *   v1.1.0 — 2026-08-13 — Rules moved into lib/locale-files.ts, shared with locale:extract and
  *     locale:merge so the three tools cannot disagree about what a valid translation is.
  */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { shippedLocales, loadLocale, flatten, findDefects } from './lib/locale-files.js';
+
+/**
+ * The agent permission editor builds its labels from key NAMES: a domain `share` is rendered with
+ * `profile.agents.scopeUi.domainShare`, and each permission with `scopeUi.scopeText.<domain>.<perm>`.
+ * A missing key therefore does not fall back to English — t() returns the key itself, and the owner
+ * reads `profile.agents.scopeUi.domainShare` as a section heading over their permissions.
+ *
+ * This is a different failure from the one the rest of this file guards. en.json is the source of
+ * truth for what keys EXIST, so nothing can notice a key that was never written in any language.
+ * Here the source of truth is the code: SCOPE_DOMAINS says which labels the editor is going to ask
+ * for, and this checks that en.json has them. Found on 2026-08-14 in production UI, where the
+ * `share` domain — added with the audit's out-of-wildcard words — had never had a heading.
+ */
+function missingScopeLabels(en: Record<string, unknown>): string[] {
+  const modelPath = join(dirname(fileURLToPath(import.meta.url)), '..',
+    'public', 'views', 'profile', 'agents', 'scope-model.js');
+  const src = readFileSync(modelPath, 'utf-8');
+  const out: string[] = [];
+  for (const m of src.matchAll(/\{\s*key:\s*'([a-z-]+)',\s*permissions:\s*\[([^\]]*)\]/g)) {
+    const [, domain, permsRaw] = m;
+    const cap = domain[0].toUpperCase() + domain.slice(1);
+    if (!(`profile.agents.scopeUi.domain${cap}` in en)) {
+      out.push(`profile.agents.scopeUi.domain${cap} — the heading for the "${domain}" permission group`);
+    }
+    for (const p of permsRaw.matchAll(/'([a-z:-]+)'/g)) {
+      const key = `profile.agents.scopeUi.scopeText.${domain}.${p[1]}`;
+      if (!(key in en)) out.push(`${key} — what "${domain}:${p[1]}" lets an agent do`);
+    }
+  }
+  return out;
+}
 
 const listOnly = process.argv.includes('--list');
 const [, ...others] = shippedLocales();
@@ -38,6 +72,12 @@ for (const tag of others) {
 }
 
 if (listOnly) process.exit(0);
+
+// The scope editor's labels are keyed by NAME, so a missing one renders the raw key to the owner
+// rather than falling back to English. en.json cannot notice a key nobody ever wrote; the code can.
+for (const missing of missingScopeLabels(en)) {
+  failures.push(`✖ [en] the agent permission editor will render a raw key: ${missing}\n      → add it to locales/en.json (and fi/es), beside the other scopeUi labels`);
+}
 
 if (failures.length) {
   console.error(`\n✖ ${failures.length} locale violation(s):\n`);

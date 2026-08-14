@@ -5546,6 +5546,7 @@
         "domainMessages": "Direct messages (inbox)",
         "domainWallet": "Wallet",
         "domainConsent": "Consent",
+        "domainShare": "Sharing",
         "domainTunnel": "Tunnel",
         "domainCatalogue": "Catalogue",
         "domainTask": "Tasks",
