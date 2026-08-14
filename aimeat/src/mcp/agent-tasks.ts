@@ -7,6 +7,15 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.9.0 — 2026-08-14 — aimeat_task_complete calls services/agent-task-fanout.ts:completeTask(),
+ *     the last tool surface in this repo that still wrote its own records. Three drifts close with
+ *     it. A STALLED task can now be completed here as it always could over HTTP, so an agent that
+ *     crashed and came back can hand in what it finished instead of being told only active tasks
+ *     count. The tool gains `deliverable_key`, which it had no way to send at all: it is the pointer
+ *     the owner's card follows and the one thing that puts a public deliverable on the node's
+ *     activity feed, so an MCP completion published its result into silence. And the provenance
+ *     stamp moved into the shared home rather than staying on this door, because who wrote the
+ *     message decides the label, not which client sent it.
  *   2026-08-14 — aimeat_task_create takes `scope`. The shared service and the HTTP route both took
  *     it; this tool could not express it, so a caller told to put a dispatch `kind` in the scope —
  *     which is what a fleet runner reads — built a task nothing would ever pick up, successfully.
@@ -51,7 +60,6 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import { readinessRefusal } from '../middleware/readiness-gate.js';
@@ -60,10 +68,9 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
-import { afterTaskCompleted, failTask } from '../services/agent-task-fanout.js';
+import { completeTask, failTask } from '../services/agent-task-fanout.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
 
 export function registerAgentTaskTools(
     mcp: McpServer,
@@ -439,10 +446,18 @@ export function registerAgentTaskTools(
         {
             task_id: z.string().describe('The task ID to complete'),
             message: z.string().optional().describe('Completion message'),
+            // ADDITIVE, and that is why it could simply be added: a tool's declared parameters are its
+            // published contract, so a new OPTIONAL one changes nothing for a caller that never sends
+            // it. What it closes is a capability that only existed on the HTTP door.
+            deliverable_key: z.string().max(256).optional().describe(
+                'The memory key, under YOUR OWN namespace, where you published the result. Write the '
+                + 'deliverable first (aimeat_memory_write), then name its key here: it is what the '
+                + "owner's task card links to, and a deliverable you wrote with visibility=public is "
+                + "put on the node's activity feed when it is named this way."),
             ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_task_complete'),
-        async ({ task_id, message, ai_provenance, ai_provenance_id }) => {
+        async ({ task_id, message, deliverable_key, ai_provenance, ai_provenance_id }) => {
             // The same readiness bar the event path answers to. requireReadiness('standard') sits on
             // the REST completion route, and this tool had nothing: an agent that may not report
             // progress could still declare the whole task done.
@@ -456,57 +471,22 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
-            if (task.status !== 'active') {
-                return { content: [{ type: 'text' as const, text: `Only active tasks can be completed (current: ${task.status})` }], isError: true };
-            }
-
-            const now = new Date().toISOString();
-            const completionMessage = message ?? 'Task completed';
-
-            const updated = await storage.updateAgentTask(task_id, {
-                status: 'done',
-                completedAt: now,
-                lastEventAt: now,
-                updatedAt: now,
-            });
-
-            // TARGET-058. The completion message is what the OWNER reads when they look at what their
-            // agent did, so it is stamped like any other text an agent writes for a person.
-            //
-            // The link lives in the event's `details` rather than in a column of its own, unlike
-            // memory / apps / direct messages. That is deliberate: `details` is already the designed
-            // home for per-event metadata, and a column carried by exactly one of thirteen event
-            // types would be the odd row out in every query that touches the table. The RECORD is the
-            // same record everywhere; only where the pointer sits differs.
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content: completionMessage,
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
+            // The whole completion is services/agent-task-fanout.ts, which POST /v1/agents/:name/
+            // tasks/:id/complete calls as well: which states may complete, the record, the provenance
+            // stamp on the message the owner reads, the 'completed' event, and the eight things a
+            // completion sets off. The copy that used to live here had narrowed and thinned it in
+            // three ways at once: only an ACTIVE task could be completed, so an agent flipped to
+            // stalled by the detector's clock could not report finished work; there was no way to
+            // name a deliverable, so the result reached neither the owner's card nor the feed; and
+            // the stamp sat on this door alone, which made the label depend on which client wrote it.
+            const done = await completeTask({ storage, config }, task, {
+                message,
+                deliverableKey: deliverable_key,
+                declaredProvenanceId: ai_provenance_id,
+                declaredProvenance: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.task_complete',
-                surface: { visibility: 'private', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
-            });
-
-            await storage.appendTaskEvent({
-                id: randomUUID(),
-                taskId: task_id,
-                type: 'completed',
-                message: completionMessage,
-                ...(aiProvenanceId ? { details: { aiProvenanceId } } : {}),
-                timestamp: now,
-            });
-
-            // Everything a completion sets off, which this tool used to do none of: the workflow run
-            // that dispatched the task advances, the open item behind it closes, the agent's own
-            // counters move, the runner's live-trace key is reclaimed, the automation report is sent
-            // and its advisory outbox drained, and a public deliverable reaches the feed. The tool
-            // answered "completed: true" and everything downstream simply never happened.
-            await afterTaskCompleted({ storage, config }, task, updated ?? null, completionMessage,
-                (updated ?? task).deliverableKey, agentGaii);
+            }, agentGaii);
+            if (!done.ok) return { content: [{ type: 'text' as const, text: `${done.code}: ${done.message}` }], isError: true };
 
             emitResourceUpdated(agentGaii, `aimeat://tasks/${task_id}`);
 
@@ -516,9 +496,12 @@ export function registerAgentTaskTools(
                     text: JSON.stringify({
                         completed: true,
                         task_id,
-                        status: updated?.status ?? 'done',
-                        completed_at: now,
-                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                        status: done.task.status,
+                        completed_at: done.task.completedAt,
+                        // Echoed back because a caller that named a key deserves to see the key the
+                        // node actually stored: it is trimmed and capped at 256 characters.
+                        ...(done.task.deliverableKey ? { deliverable_key: done.task.deliverableKey } : {}),
+                        ...(await writeProvenanceEcho(storage, config, done.aiProvenanceId)),
                     }, null, 2),
                 }],
             };

@@ -1,12 +1,19 @@
 /**
  * @file run-e2e-ci.ts
  * @description Cross-platform E2E test runner with automatic server lifecycle and backend cleanup.
- * @structure Suite list, argument parsing, per-suite execution, and summary reporting. The node
- *   under test -- its environment, its lifecycle and its database -- lives in run-e2e-server.ts.
+ * @structure Suite list, the reconciliation that holds it against the directory, argument parsing,
+ *   per-suite execution, and summary reporting. The node under test -- its environment, its
+ *   lifecycle and its database -- lives in run-e2e-server.ts.
  * @usage
  *   node --import tsx test/run-e2e-ci.ts
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  * @version-history
+ *   v1.16.0 -- 2026-08-14 -- Add e2e-capability-webhook-update.ts, and stop the list drifting from
+ *            the directory it describes. The list cannot notice its own gaps, so the runner now
+ *            reads test/ and compares: a suite file on no list is fatal on a full run and a warning
+ *            on a filtered one, and every non-suite file in test/ is named in NOT_SUITES with the
+ *            reason it is out. Registering the file once fixes today; reconciling fixes the class,
+ *            and this list has now been found short twice (2026-08-10, 2026-08-14).
  *   v1.15.0 -- 2026-08-14 -- Add e2e-organism-scope-gate.ts (August 2026 audit: organism:write on the
  *            three organism write doors, plus the boot migration that keeps an existing agent from
  *            losing the capability).
@@ -71,7 +78,9 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readdirSync } from 'node:fs';
 import { basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
     cleanDatabase,
     pinnedEnv,
@@ -325,6 +334,9 @@ const ALL_SUITES = [
     // The other side of the capability record: the fields the NODE writes about it. PUT merged the
     // whole body, so an owner could award themselves the operator's review.
     'test/e2e-capability-trust-guard.ts',
+    // Updating the webhook a capability is invoked through, which is the field that decides where a
+    // paying caller's payload is delivered.
+    'test/e2e-capability-webhook-update.ts',
     'test/e2e-upload.ts',
     'test/cortex-ui-e2e.ts',
     // The cortex CORE suite, as opposed to cortex-ui above. Left out on 2026-07-10 over "2
@@ -387,6 +399,71 @@ const ALL_SUITES = [
     'test/e2e-public-totals.ts',
     'test/e2e-cortex-upload-ownership.ts',
 ];
+
+// Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone
+// reading this a year from now needs to tell a file that was judged and left out from one nobody
+// ever noticed, and the list above cannot make that distinction on its own.
+const NOT_SUITES = new Map<string, string>([
+    ['run-e2e-ci.ts', 'this runner'],
+    ['run-e2e-server.ts', "the runner's server lifecycle, environment pins and database cleanup: imported, never spawned"],
+    ['run-playwright-ci.ts', 'the Playwright runner; that suite is not run here, frontend changes are verified by driving a real browser'],
+    ['manual-dm-helper.ts', 'manual helper for browser verification: it needs a person watching the Inbox tab, and it writes to whichever node DM_BASE names'],
+    ['pg-kysely-memory.ts', 'storage-provider integration test: it drives a live Postgres over AIMEAT_TEST_PG_URL with no HTTP server, so it has nothing to say to BASE_URL'],
+    ['e2e-email.ts', 'disabled; the reason and the date are on the commented-out entry in ALL_SUITES'],
+]);
+
+// Filled by reconcileSuiteList so the summary can repeat the finding. A warning printed before a
+// two-hour run has scrolled well out of sight by the time anyone reads the result.
+let unregistered: string[] = [];
+
+/**
+ * Hold ALL_SUITES against the directory it claims to describe.
+ *
+ * A suite on no list does not report as skipped. It produces no row, no assertion count and no exit
+ * code, so the run looks complete and the file looks fine. Six suites were in that state on
+ * 2026-08-10, one of them for a month and several assertions away from green, and every one was
+ * found by reading the directory rather than the list. A list cannot notice its own gaps, so the
+ * check has to come from the other side.
+ *
+ * Drift is fatal on a full run and a warning on a filtered one. Only a full run claims to have
+ * tested everything, and an unregistered file is exactly what makes that claim false; a run of one
+ * named suite claims nothing else, so it says its piece and continues, which also keeps a
+ * half-written file from blocking every other run in the tree. AIMEAT_E2E_ALLOW_UNREGISTERED=1
+ * downgrades the fatal case for whoever needs the sweep while a new suite is still being written.
+ *
+ * The reverse drift, registered with no file, is reported and not fatal. It is already loud: the
+ * suite exits non-zero having reported nothing, which the summary prints as DID NOT RUN and which
+ * fails the run. Registering a suite slightly before it lands is the safer order of the two, because
+ * late is visible and absent is not.
+ *
+ * This runs here rather than in a pre-commit check because the runner is the file that owns the
+ * list. A check script would catch drift earlier, at commit time, and is worth adding whenever
+ * scripts/ is being touched anyway.
+ */
+function reconcileSuiteList(filtered: boolean): void {
+    const testDir = fileURLToPath(new URL('.', import.meta.url));
+    const onDisk = readdirSync(testDir).filter(f => f.endsWith('.ts'));
+    const registered = new Set(ALL_SUITES.map(s => basename(s)));
+
+    for (const suite of ALL_SUITES) {
+        if (!onDisk.includes(basename(suite))) {
+            console.warn(`Registered suite has no file yet: ${suite}. It reports DID NOT RUN until the file lands.`);
+        }
+    }
+
+    unregistered = onDisk.filter(f => !registered.has(f) && !NOT_SUITES.has(f)).sort();
+    if (unregistered.length === 0) return;
+
+    console.error(`\n${unregistered.length} file(s) in test/ are on no list, so they run nowhere:`);
+    for (const f of unregistered) console.error(`  test/${f}`);
+    console.error('Put each one in ALL_SUITES, or in NOT_SUITES with the reason it is not a suite.');
+
+    if (filtered || process.env.AIMEAT_E2E_ALLOW_UNREGISTERED === '1') {
+        console.error('Continuing: this run does not claim to have covered everything.\n');
+        return;
+    }
+    process.exit(1);
+}
 
 const TARGET = resolveTarget();
 const BASE_URL = TARGET.baseUrl;
@@ -484,6 +561,10 @@ function parseResults(output: string): { passed: number; failed: number; total: 
 // ── Main ──
 async function main() {
     const suites = parseArgs();
+    // parseArgs hands back the ALL_SUITES array itself when no --test was given, so identity is the
+    // exact test for "this is the full sweep". If that ever becomes a copy, the check degrades to a
+    // warning rather than to a false pass.
+    reconcileSuiteList(suites !== ALL_SUITES);
     console.log(`\n${'='.repeat(50)}`);
     console.log(`  AIMEAT E2E Test Runner`);
     console.log(`  Server: ${TARGET.external ? BASE_URL + ' (external)' : `auto-start on :${TARGET.port}`}`);
@@ -583,6 +664,10 @@ async function main() {
     console.log(`  Total: ${totalPassed} passed, ${totalFailed} failed out of ${totalTests}`);
     if (crashed > 0) {
         console.log(`  ${crashed} suite(s) DID NOT RUN — they exited non-zero without reporting a single test.`);
+    }
+    // Repeated from the start of the run, because the summary is the part anyone reads.
+    if (unregistered.length > 0) {
+        console.log(`  ${unregistered.length} file(s) in test/ are on no list and ran nowhere: ${unregistered.join(', ')}`);
     }
 
     process.exit(anyFailed ? 1 : 0);

@@ -2,6 +2,11 @@
  * @file src/routes/agent-tasks/completion.ts
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-14 — /complete and /fail are now nothing but the door: the state gate, the
+ *     records and the tail all live in services/agent-task-fanout.ts, which aimeat_task_complete and
+ *     aimeat_task_fail call as well. One behaviour change reaches this side of the pair: an AGENT
+ *     completing over REST now gets the provenance stamp it has always got over MCP. A human owner
+ *     is untouched, because the stamp is decided by the writing principal rather than by the door.
  *   v1.4.0 — 2026-08-12 — /complete answers after the fan-out rather than before it. The response
  *     used to overtake the agent's own counters, so a caller reading them back saw the pre-completion
  *     numbers on Postgres and the post-completion ones on SQLite.
@@ -28,7 +33,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
-import { afterTaskCompleted, failTask } from '../../services/agent-task-fanout.js';
+import { completeTask, failTask } from '../../services/agent-task-fanout.js';
 import { recomputeAndCacheStatistics } from '../../services/agent-statistics.js';
 import { recordTaskEvent, setTodoStatus } from '../../services/agent-task-write.js';
 import { AgentTaskRateSchema, AgentTaskTriageSchema } from '../../models/agent-task-schemas.js';
@@ -83,59 +88,34 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    // Allow completing from 'stalled' as well: if the agent comes back with
-    // a deliverable after a stall, accept it -- a late deliverable is more
-    // useful than rejecting the agent's work because the stall detector flipped
-    // the state. Active -> done and stalled -> done are both valid completion
-    // paths; failed/done/draft/queued/paused are not (those need explicit
-    // owner-driven transitions, e.g. /start, before they can complete).
-    if (task.status !== 'active' && task.status !== 'stalled') {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Only active or stalled tasks can be completed (current: ${task.status})`));
+    // The whole completion is services/agent-task-fanout.ts, because it belongs to COMPLETING rather
+    // than to this door: which states may complete (active AND stalled, so an agent that came back
+    // after a stall still gets to hand its work in), the record, the provenance stamp on the message
+    // the owner reads, the 'completed' event, and the eight things a completion sets off: the
+    // workflow run advances, the open item behind it closes, the agent's counters move, the runner's
+    // live-trace key is reclaimed, the automation report is sent and its advisory outbox drained, and
+    // a public deliverable reaches the feed.
+    //
+    // The door answers AFTER all of it. Only the agent's counters are awaited inside the fan-out; the
+    // slow steps stay fire-and-forget. Answering first made those counters a race against whatever
+    // the caller does next, and the next thing is always a read: the Activity tab reloads on the
+    // change event, and an agent that just finished asks for its own /capabilities. On SQLite the
+    // counter write landed inside the same tick and the race was invisible; on Postgres every query
+    // is a round trip, the read arrived first and activityStats came back null for a task the caller
+    // had been told was done.
+    const done = await completeTask({ storage, config }, task, {
+      message: typeof req.body?.message === 'string' ? req.body.message : undefined,
+      // The memory key, under the agent's namespace, where the deliverable was published. Lets the
+      // owner UI link straight to the output, and puts a PUBLIC deliverable on the activity feed.
+      deliverableKey: typeof req.body?.deliverable_key === 'string' ? req.body.deliverable_key : undefined,
+      pipeline: 'rest.task_complete',
+    }, resolve(req));
+    if (!done.ok) {
+      res.status(done.status).json(error(config.nodeId, done.code, done.message));
       return;
     }
 
-    const now = new Date().toISOString();
-    const message = typeof req.body?.message === 'string' ? req.body.message : 'Task completed';
-    // Optional: the memory key (under the agent's namespace) where the agent
-    // published the deliverable. Lets the owner UI link straight to the output.
-    const rawDeliverable = req.body?.deliverable_key;
-    const deliverableKey = (typeof rawDeliverable === 'string' && rawDeliverable.trim())
-      ? rawDeliverable.trim().slice(0, 256)
-      : undefined;
-
-    const updated = await storage.updateAgentTask(id, {
-      status: 'done',
-      completedAt: now,
-      lastEventAt: now,
-      updatedAt: now,
-      ...(deliverableKey ? { deliverableKey } : {}),
-    });
-
-    await storage.appendTaskEvent({
-      id: randomUUID(),
-      taskId: id,
-      type: 'completed',
-      message,
-      timestamp: now,
-    });
-
-    // Everything a completion sets off is services/agent-task-fanout.ts, because it belongs to
-    // COMPLETING rather than to this door: the workflow run that dispatched the task advances, the
-    // open item behind it closes, the agent's counters move, the runner's live-trace key is
-    // reclaimed, the automation report is sent and its advisory outbox drained, and a public
-    // deliverable reaches the feed. aimeat_task_complete did none of it.
-    //
-    // The door answers AFTER it. Only the agent's counters are awaited inside; the slow steps stay
-    // fire-and-forget. Answering first made those counters a race against whatever the caller does
-    // next, and the next thing is always a read: the Activity tab reloads on the change event, and
-    // an agent that just finished asks for its own /capabilities. On SQLite the counter write landed
-    // inside the same tick and the race was invisible; on Postgres every query is a round trip, the
-    // read arrived first and activityStats came back null for a task the caller had been told was
-    // done. The MCP door has always awaited this before replying — this is the same order.
-    await afterTaskCompleted({ storage, config }, task, updated ?? null, message, deliverableKey, resolve(req));
-
-    res.json(success(config.nodeId, { task: updated }));
+    res.json(success(config.nodeId, { task: done.task }));
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/fail -- Fail task (active -> failed) ── */
@@ -153,17 +133,11 @@ export function registerTaskCompletionRoutes(
       return;
     }
 
-    // Stalled tasks can also be marked failed -- e.g. the agent realises it
-    // can't recover and explicitly reports failure rather than letting the
-    // task linger in stalled state forever.
-    if (task.status !== 'active' && task.status !== 'stalled') {
-      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Only active or stalled tasks can be failed (current: ${task.status})`));
-      return;
-    }
-
     const message = typeof req.body?.message === 'string' ? req.body.message : 'Task failed';
-    // services/agent-task-fanout.ts — aimeat_task_fail makes the same transition.
+    // services/agent-task-fanout.ts, which aimeat_task_fail calls for the same transition. The state
+    // gate that used to stand here as well (active or stalled, because an agent that cannot recover
+    // still gets to say so rather than leaving the task stalled forever) was a second copy of
+    // FAILABLE_STATES, the shape this whole pass exists to remove. failTask answers with the same 409.
     const failed = await failTask({ storage, config }, task, message, resolve(req));
     if (!failed.ok) {
       res.status(failed.status).json(error(config.nodeId, failed.code, failed.message));

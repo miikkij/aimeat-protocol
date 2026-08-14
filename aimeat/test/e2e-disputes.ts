@@ -1,5 +1,15 @@
-// T-3: Dispute Escalation Flow E2E Tests
-// Run: cd aimeat && pnpm exec tsx test/e2e-disputes.ts
+/**
+ * @file e2e-disputes.ts
+ * @description T-3, the dispute escalation flow end to end: open and view, counter-dispute,
+ *   re-delivery, accept-fault, partial refund (including the C-3 over-escrow refusal), withdraw,
+ *   escalation, operator ruling, and the tamper-evident hash chain the audit log is built on.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
+ *   test/run-e2e-ci.ts --test=e2e-disputes
+ * @version-history
+ *   v1.0.0 — 2026-08-14 — Header added; file pre-dates header standard.
+ *   v1.1.0 — 2026-08-14 — Phase 8 removed with the routes it covered. GET accept-redelivery?otk=
+ *     and GET escalate?otk= are deleted, so tests 20 and 21 and their two setups are deleted too.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -612,76 +622,11 @@ await test('19. Operator rules in favor of provider', async () => {
     assert(body.data.ruling.distribution.to_provider === 10, `to_provider: ${body.data.ruling.distribution.to_provider}`);
 });
 
-// ─── Phase 8: Tier 0.5 (OTK-based) ───
-console.log('\nPhase 8 — Tier 0.5 (OTK)');
-
-// OTK accept-redelivery
-await test('Setup: Create work + dispute + redeliver for OTK accept', async () => {
-    const tc = await createDeliveredWork();
-    trackingCodes.push(tc); // trackingCodes[6]
-
-    const { body: dBody } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
-        body: JSON.stringify({ reason: 'OTK accept-redelivery test' }),
-    });
-    assert(dBody.ok === true, `open: ${JSON.stringify(dBody.error)}`);
-    disputeIds.push(dBody.data.dispute_id); // disputeIds[6]
-
-    // Provider re-delivers
-    const { body: rBody } = await json(`/v1/work/${tc}/redeliver`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${providerToken}` },
-        body: JSON.stringify({ output: { result: 'redelivered for OTK' } }),
-    });
-    assert(rBody.ok === true, `redeliver: ${JSON.stringify(rBody.error)}`);
-});
-
-// Helper: Get a session OTK for an owner (challenge → sign → session)
-async function getSessionOtk(ownerNameParam: string, privKey: string): Promise<string> {
-    // Step 1: Get challenge
-    const { body: chBody } = await json(`/v1/auth/challenge?owner=${encodeURIComponent(ownerNameParam)}`);
-    assert(chBody.ok === true, `challenge: ${JSON.stringify(chBody.error)}`);
-    const challenge = chBody.data.challenge;
-
-    // Step 2: Sign challenge and open session
-    const sig = await signMsg(privKey, challenge);
-    const { body: sessBody } = await json(`/v1/auth/session?owner=${encodeURIComponent(ownerNameParam)}&challenge=${encodeURIComponent(challenge)}&sig=${encodeURIComponent(sig)}`);
-    assert(sessBody.ok === true, `session: ${JSON.stringify(sessBody.error)}`);
-    return sessBody.data.otk;
-}
-
-await test('20. Accept redelivery via OTK', async () => {
-    const tc = trackingCodes[6];
-    const otkKey = await getSessionOtk(ownerName, ownerPrivKey);
-    const { status, body } = await json(`/v1/work/${tc}/accept-redelivery?otk=${otkKey}`);
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.dispute_resolved === true, 'dispute_resolved');
-    assert(body.data.tier === '0.5', `tier: ${body.data.tier}`);
-});
-
-// OTK escalate
-await test('Setup: Create work + dispute for OTK escalation', async () => {
-    const tc = await createDeliveredWork();
-    trackingCodes.push(tc); // trackingCodes[7]
-
-    const { body: dBody } = await json(`/v1/work/${tc}/dispute`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${requesterToken}` },
-        body: JSON.stringify({ reason: 'OTK escalation test' }),
-    });
-    assert(dBody.ok === true, `open: ${JSON.stringify(dBody.error)}`);
-    disputeIds.push(dBody.data.dispute_id); // disputeIds[7]
-});
-
-await test('21. Escalate via OTK', async () => {
-    const tc = trackingCodes[7];
-    const otkKey = await getSessionOtk(ownerName, ownerPrivKey);
-    const { status, body } = await json(`/v1/work/${tc}/escalate?otk=${otkKey}`);
-    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.dispute_status === 'escalated', `status: ${body.data.dispute_status}`);
-    assert(body.data.tier === '0.5', `tier: ${body.data.tier}`);
-});
+// Phase 8 was Tier 0.5: the same two operations reached by GET with a one-time key in the query
+// string. Those routes are gone, so their four cases went with them rather than being turned into
+// 404 assertions, which would have proved only that Express has no such route. Numbering below is
+// left as it was; renumbering 22 and 23 down to 20 and 21 would make a later reader believe the
+// hash-chain test has always been test 20.
 
 // ─── Phase 9: Audit Log Integrity ───
 console.log('\nPhase 9 — Audit Log Integrity');

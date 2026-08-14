@@ -1,5 +1,5 @@
 {
-  "note": "Routes that mutate (or read while authenticated) without an explicit scope or role gate. Seeded from the state on 2026-08-10 so the gate can only ratchet down. Remove an entry when the route gets its gate; never add one without a written reason and an approver.",
+  "note": "Routes that mutate (or read while authenticated) without an explicit scope or role gate. Seeded from the state on 2026-08-10 so the gate can only ratchet down. Remove an entry when the route gets its gate, and remove it when the route goes away, because an entry naming a file that no longer exists reads as a reviewed decision and is nothing of the sort. Never add one without a written reason and an approver. `pnpm check:route-scopes` names the entries that have gone stale under 'Already gated'.",
   "exempt": {
     "src/routes/access-tokens.ts:POST:/v1/auth/token/exchange": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/admin.ts:POST:/v1/admin/setup/auth": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
@@ -184,10 +184,6 @@
     "src/routes/extensions/crud.ts:DELETE:/v1/extensions/:name": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/extensions/instances.ts:GET:/v1/extensions/:name/instances": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/extensions/instances.ts:GET:/v1/extensions/:name/instances/:instanceId": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
-    "src/routes/feedback.ts:POST:/v1/feedback": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
-    "src/routes/feedback.ts:GET:/v1/feedback/mine": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
-    "src/routes/feedback.ts:GET:/v1/feedback/:id": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
-    "src/routes/feedback.ts:POST:/v1/feedback/:id/reply": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/flags.ts:POST:/v1/flags": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/flags.ts:PUT:/v1/flags/:id": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/ghii/attach-email.ts:POST:/v1/ghii/login/attach-email": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",

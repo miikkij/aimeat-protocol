@@ -3,6 +3,7 @@
  * @description Capability Layer REST API: discovery, CRUD, invoke proxy, telemetry, vouch, test.
  * @structure
  *   - discovery: GET /v1/capabilities and /:id, with the private-row rules
+ *   - SERVER_OWNED_CAPABILITY_FIELDS, and the webhook gate a PUT has to pass
  *   - CRUD: POST / PUT / DELETE, each rendering what services/capability-record.ts decided
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
@@ -21,6 +22,10 @@
  *            write, so an owner could award themselves the node operator's review by patching
  *            `trust`, and could set their own invocation counters by patching `stats`. The body is
  *            now filtered against SERVER_OWNED_CAPABILITY_FIELDS before it leaves this file.
+ *   v1.3.0 - 2026-08-14 - August 2026 audit: PUT applied no webhook policy at all, so a node running
+ *            capabilityWebhooks 'disabled' or 'allowlist_only' was defeated in two requests - create
+ *            without a webhook, then PUT one on. The gate now fires on a CHANGE of the webhook the
+ *            node would end up calling, with the same three refusal codes createCapability gives.
  */
 import { Router } from 'express';
 import {
@@ -28,7 +33,7 @@ import {
 } from '../services/capability-record.js';
 import type { Request } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, CapabilityFilter } from '../storage/interface.js';
+import type { Storage, CapabilityFilter, CapabilityRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -73,6 +78,90 @@ const SERVER_OWNED_CAPABILITY_FIELDS = [
   'trust', 'stats', 'operatorOverride', 'rejectionReason', 'schemaHash', 'scope',
   'id', 'ownerGhii', 'createdAt', 'updatedAt',
 ] as const;
+
+/** A refusal this file renders itself, in the shape the envelope wants. */
+interface WebhookRefusal { status: number; code: string; message: string }
+
+/**
+ * The node's webhook policy, answered with the SAME three codes createCapability answers with:
+ * WEBHOOKS_DISABLED, INVALID_WEBHOOK_URL and WEBHOOK_DOMAIN_NOT_ALLOWED. A caller that gets a
+ * different code from PUT than from POST for the same URL learns nothing from either.
+ *
+ * WHY THIS RULE IS WRITTEN OUT HERE, in a route, when the create-time copy lives in
+ * services/capability-record.ts. The honest home is inside updateCapability(), next to the copy it
+ * mirrors, and that is where it should move the day anything else needs it. It is here because the
+ * gate this repairs is a gap in ONE door: `aimeat_capabilities_update` declares a fixed parameter
+ * list with no webhookUrl in it, so no webhook can reach the shared write from the tool surface at
+ * all, and the HTTP body is the only way in. check:copied-logic exists to catch a decision written
+ * out twice, so this comment is the answer to it: two copies, known, and the moment webhookUrl
+ * becomes settable on the MCP door this check belongs in the shared write instead of here.
+ */
+function webhookPolicyRefusal(config: AimeatConfig, url: string): WebhookRefusal | null {
+  if (config.capabilityWebhooks === 'disabled') {
+    return { status: 403, code: 'WEBHOOKS_DISABLED', message: 'Webhook capabilities are disabled on this node' };
+  }
+  if (config.capabilityWebhooks !== 'allowlist_only') return null;
+
+  let domain: string;
+  try {
+    domain = new URL(url).hostname;
+  } catch {
+    return { status: 400, code: 'INVALID_WEBHOOK_URL', message: 'Invalid webhook URL' };
+  }
+  if (config.capabilityWebhookDomainAllowlist.includes(domain)) return null;
+  return { status: 403, code: 'WEBHOOK_DOMAIN_NOT_ALLOWED', message: `Domain '${domain}' is not on the webhook allowlist` };
+}
+
+/** No webhook is the empty string, whatever shape "no webhook" arrived in. */
+function webhookString(value: unknown): string {
+  return value === null || value === undefined ? '' : String(value);
+}
+
+/**
+ * The source type the record will carry once this patch is applied. A `source` object with no
+ * `type` normalises to 'manual' at create (normaliseSource in services/capability-record.ts), so it
+ * is read the same way here. Reading it any other way is the NEW-1 defect again: the gate and the
+ * stored record disagreeing about what the request was.
+ *
+ * The two storage providers do not in fact agree on what a partial `source` does to the stored row
+ * (sqlite merges it over the existing one, postgres-kysely writes all three columns from what it was
+ * given), so there is no single answer to read. 'manual' is the reading that refuses.
+ */
+function patchedSourceType(cap: CapabilityRecord, patch: Record<string, unknown>): string {
+  const patched = patch.source;
+  if (!patched || typeof patched !== 'object') return cap.source.type;
+  const type = (patched as { type?: unknown }).type;
+  return typeof type === 'string' ? type : 'manual';
+}
+
+/**
+ * The webhook this patch is asking the node to start calling, or null if it is asking for nothing
+ * new. Null means the PUT goes through untouched.
+ *
+ * THE GATE FIRES ON A CHANGE, NOT ON PRESENCE. A UI PUTs the whole record back, so an unchanged
+ * webhookUrl arrives in the body of every unrelated patch: gating on presence would refuse a rename
+ * on a node running 'disabled', which is a capability the owner already has and the policy never
+ * meant to take away. What the policy is about is the node being made to call somewhere it has not
+ * agreed to call, so the comparison is against what is stored.
+ *
+ * The pair compared is (url, is it manual), not the url alone, because invoke only calls webhookUrl
+ * for a manual source. Both halves matter:
+ *   - a url appearing where there was none, or one domain becoming another  -> gate
+ *   - the same url on a record that was already a manual webhook            -> through
+ *   - clearing it                                                          -> through, always
+ *   - a source flipping to 'manual' while a webhook sits on the record      -> gate
+ * That last one is not hypothetical tidiness. Without it the two-step way in survives: PUT the
+ * webhook onto a non-manual source (ungated, because create does not gate those either and invoke
+ * ignores them), then PUT the source back to 'manual' with no webhookUrl in the body at all, and
+ * the record is the manual webhook capability the node refuses to be handed in one request.
+ */
+function proposedWebhook(cap: CapabilityRecord, patch: Record<string, unknown>): string | null {
+  const stored = webhookString(cap.webhookUrl);
+  const next = 'webhookUrl' in patch ? webhookString(patch.webhookUrl) : stored;
+  if (!next || patchedSourceType(cap, patch) !== 'manual') return null;
+  if (next === stored && cap.source.type === 'manual') return null;
+  return next;
+}
 
 export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -151,6 +240,24 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     // The body is the caller's, so the fields the node owns come out before it goes any further.
     const patch: Record<string, unknown> = { ...(req.body as Record<string, unknown> | null ?? {}) };
     for (const field of SERVER_OWNED_CAPABILITY_FIELDS) delete patch[field];
+
+    // The webhook policy, which this door applied nowhere. Only create was gated, so a node running
+    // capabilityWebhooks 'disabled' or 'allowlist_only' was two requests from being defeated: create
+    // a capability with no webhook, then PUT one on. The operator's setting decided nothing.
+    //
+    // The read costs an extra getCapability, so it happens only when the patch touches one of the two
+    // fields the answer depends on. NOT_FOUND and FORBIDDEN stay updateCapability's to give, and this
+    // gate stands aside for both: answering them here would make the refusal an oracle, telling a
+    // stranger whether some other owner's capability already carries the URL they just sent.
+    if ('webhookUrl' in patch || 'source' in patch) {
+      const who = caller(req);
+      const cap = await storage.getCapability(req.params.id as string);
+      if (cap && (cap.ownerGhii === who.gaii || who.isOperator)) {
+        const proposed = proposedWebhook(cap, patch);
+        const refusal = proposed ? webhookPolicyRefusal(config, proposed) : null;
+        if (refusal) return res.status(refusal.status).json(error(config.nodeId, refusal.code, refusal.message));
+      }
+    }
 
     const updated = await updateCapability({ storage, config }, caller(req), req.params.id as string, patch);
     if (!updated.ok) return res.status(updated.status).json(error(config.nodeId, updated.code, updated.message));

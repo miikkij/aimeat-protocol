@@ -22,6 +22,8 @@
  *   cd aimeat && pnpm check:shared-impl            # report
  *   cd aimeat && pnpm check:shared-impl --strict   # the hook/CI gate
  * @version-history
+ *   v1.2.0 — 2026-08-14 — SEED 39 → 38: src/mcp/feedback.ts is gone, and with it the last
+ *     `storage.listFeedbackBySender()` call under src/mcp/. WRITE_SEED is untouched at 1.
  *   v1.1.0 — 2026-08-11 — WRITE_SEED 2 → 1: aimeat_operator_agent_configure writes through
  *     services/agent-profile-write.ts. The remaining writer is named, with what its REST twin is
  *     and how the two already disagree.
@@ -64,8 +66,19 @@ const NOT_A_TOOL_SURFACE = new Set<string>([
  * not build has no shape to drift. The move found 169 places where the two copies had already
  * disagreed, 113 of them visible to whoever was using the tool. That is the argument for this rule
  * restated as measurement rather than as principle.
+ *
+ * 38 on 2026-08-14, and this one is bookkeeping rather than progress. Nothing moved onto a shared
+ * service: the Node Feedback Channel was folded into messaging as support@operators, and
+ * src/mcp/feedback.ts went with the capability, taking its `storage.listFeedbackBySender()` with it.
+ * A deletion counts the same as a fix here, because the seed measures what exists and the file does
+ * not. It is written down as a deletion so nobody later reads 39 → 38 as a tool that got fixed and
+ * goes looking for the service it moved to.
+ *
+ * src/mcp/tool-usage-wrap.ts arrived in the same window and calls no storage, so it does not offset
+ * the drop. Both halves were checked before this line was lowered; a seed moved on a guess is worse
+ * than no seed, because it looks like evidence.
  */
-const SEED = 39;
+const SEED = 38;
 
 /**
  * The number that actually matters. A READ through storage is the same read whichever door asks;
@@ -83,17 +96,21 @@ const SEED = 39;
  * tags were stored verbatim, a mode change skipped the Hello Integration step-list re-derive, and an
  * empty scope list was accepted where REST refuses it.
  *
- * The one that remains is mcp/agent-tasks.ts, and the step 8 note that it has "no REST twin at all"
- * is wrong: aimeat_task_complete writes the same two records POST /v1/agents/:name/tasks/:id/complete
- * writes, and the two have already drifted. REST completes an ACTIVE or a STALLED task and the tool
- * only an active one, so an agent that crashed and came back cannot report the work it finished --
- * the same narrowing services/agent-task-fanout.ts was written to close on the failure path. REST
- * takes a deliverable_key and the tool has no way to send one, so an MCP completion never reaches
- * the public feed. And the tool stamps AI provenance on the completion message where REST does not.
- * The shared home is a completeTask() in services/agent-task-fanout.ts, next to the failTask() that
- * is the same shape, and closing it means editing the REST door in the same pass.
+ * 0 on 2026-08-14. The last one was mcp/agent-tasks.ts, and the step 8 note that it had "no REST twin
+ * at all" was wrong: aimeat_task_complete wrote the same two records
+ * POST /v1/agents/:name/tasks/:id/complete writes, and the two had drifted three ways. REST completed
+ * an ACTIVE or a STALLED task and the tool only an active one, so an agent that crashed and came back
+ * could not report the work it finished, which is the same narrowing agent-task-fanout.ts was written
+ * to close on the failure path. REST took a deliverable_key and the tool had no way to send one, so
+ * an MCP completion never reached the public feed. And the provenance stamp depended on which door
+ * was used rather than on who was writing. completeTask() in services/agent-task-fanout.ts is the
+ * shared home, beside the failTask() of the same shape, and both doors call it.
+ *
+ * ZERO IS NOT THE END OF THE RULE. 38 tool-surface files still READ through storage directly. A read
+ * is the same read whichever door asks, so it does not drift the way a write does, but the number is
+ * not zero and this seed is what stops it climbing.
  */
-const WRITE_SEED = 1;
+const WRITE_SEED = 0;
 
 /** Storage methods that change something. Everything else is a read. */
 const WRITEISH = /^(create|set|update|delete|add|remove|insert|upsert|write|debit|credit|transfer|enqueue|revoke|grant|mint|save|publish|archive|deactivate|activate|link|unlink)/i;

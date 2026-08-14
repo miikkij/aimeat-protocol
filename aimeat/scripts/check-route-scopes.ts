@@ -22,6 +22,11 @@
  *   cd aimeat && pnpm check:route-scopes --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:route-scopes --seed     # rewrite the exemption file from today's state
  * @version-history
+ *   v1.2.0 — 2026-08-14 — The stale line names the routes it is counting. It reported "exemptions
+ *     now fixed 4" and nothing else, so acting on it meant re-deriving by hand what the script had
+ *     already worked out, and the four entries sat in the file for three days. Two dead constants
+ *     removed, one of which documented the exemption key as carrying a line number. It does not,
+ *     and a reader who believed it would have keyed new entries so they expire on the next edit.
  *   v1.1.0 — 2026-08-11 — requireOwnerPrincipal counts as a gate (August 2026 audit H-1/H-7), so
  *     the fourteen account-security routes it now carries could leave the exemption file.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, systemic pattern 1).
@@ -40,9 +45,6 @@ const EXEMPTIONS = join(ROOT, 'security', 'route-scope-exemptions.json');
 const GATES = ['requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
     'requireOwnerPrincipal'];
 
-/** Verbs that change state. A GET is only checked when it already carries requireAuth (below). */
-const MUTATING = ['post', 'put', 'patch', 'delete'];
-
 export interface Finding {
     file: string;
     line: number;
@@ -53,7 +55,10 @@ export interface Finding {
 interface ExemptionFile {
     /** Why this file exists, for whoever opens it in six months. */
     note: string;
-    /** "file:line:METHOD:path" → one-line reason. Seeded entries carry the audit's reason. */
+    /** "file:METHOD:path" → one-line reason, the softKey below. No line number: an entry keyed by
+     *  line would go stale the moment anything above the route was edited, and a stale entry stops
+     *  covering the route it was written for without anyone touching that route. Seeded entries
+     *  carry the audit's reason. */
     exempt: Record<string, string>;
 }
 
@@ -130,9 +135,19 @@ export function collectRoutes(files: string[]): Finding[] {
     return findings;
 }
 
-const key = (f: Finding) => `${f.file}:${f.line}:${f.method}:${f.path}`;
-/** Line numbers move; the identity that survives an edit is file + method + path. */
+/** Line numbers move; the identity that survives an edit is file + method + path. A line-numbered
+ *  key was written first and never used, and it is not coming back: see ExemptionFile above. */
 const softKey = (f: Finding) => `${f.file}:${f.method}:${f.path}`;
+
+/**
+ * A soft key read back as the three things it was made of, for the stale list. The path is put
+ * together again from what is left because a route path carries colons of its own
+ * (`/v1/agents/:name/tasks/:id`), so only the first two separators are separators.
+ */
+function readSoftKey(k: string): { file: string; method: string; path: string } {
+    const [file, method, ...rest] = k.split(':');
+    return { file, method, path: rest.join(':') };
+}
 
 function loadExemptions(): ExemptionFile {
     if (!existsSync(EXEMPTIONS)) return { note: '', exempt: {} };
@@ -186,6 +201,24 @@ function main(): void {
         console.log('  entry with a reason to security/route-scope-exemptions.json.');
         console.log('');
         for (const f of fresh) console.log(`    ${f.file}:${f.line}  ${f.method} ${f.path}`);
+        console.log('');
+    }
+
+    // The routes behind the count above, because a number nobody can act on gets read and left. Each
+    // one now carries a gate, so its exemption covers nothing and only keeps the door open for a
+    // later edit that drops the gate again: the entry would absorb the finding and this gate would
+    // stay green through it. Deleting the line is what makes the ratchet mean anything.
+    //
+    // Reported, not gated, even under --strict. A stale entry is the record of a fix, so failing a
+    // commit over one turns a gain into a blocked commit for whoever made the gain, and the file it
+    // asks them to edit is shared by every branch in flight.
+    if (stale.length) {
+        console.log('  Already gated, so these entries can go from security/route-scope-exemptions.json:');
+        console.log('');
+        for (const k of stale.sort()) {
+            const { file, method, path } = readSoftKey(k);
+            console.log(`    ${file}  ${method} ${path}`);
+        }
         console.log('');
     }
 

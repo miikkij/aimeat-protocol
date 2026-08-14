@@ -27,11 +27,16 @@
  * @structure
  *   - afterTaskCompleted() — the eight things a completion sets off
  *   - afterTaskFailed() — the two a failure sets off
+ *   - completeTask() — the whole completion: the state move, the stamp, the event and the fan-out
  *   - failTask() — the whole failure: the state move, the event and the fan-out
  * @usage
- *   await storage.updateAgentTask(id, { status: 'done', … });
- *   await afterTaskCompleted({ storage, config }, task, updated, message, deliverableKey);
+ *   const done = await completeTask({ storage, config }, task,
+ *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
+ *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.2.0 — 2026-08-14 — completeTask(). The last writing tool surface: aimeat_task_complete wrote
+ *     the same two records POST /v1/agents/:name/tasks/:id/complete writes, and the two copies had
+ *     drifted three ways. The reasons are on the function.
  *   v1.1.0 — 2026-08-12 — recordTaskCompleted logs and continues instead of rejecting. Both doors
  *     await this function, and the REST door now answers after it, so a storage hiccup in the
  *     counters must not turn a task that IS done into a 500.
@@ -49,6 +54,7 @@ import { closeItemsForTask } from './open-items.js';
 import { reclaimTaskLiveTrace } from '../routes/agent-tasks/helpers.js';
 import { recordPublicActivity } from './public-activity.js';
 import { emitChange } from './event-bus.js';
+import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
 import { logger } from '../utils/logger.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
@@ -135,6 +141,147 @@ export async function afterTaskFailed(
     emitChange('agent-tasks', actor);
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
         .catch(e => logger.error('workflow advance on task fail failed', { taskId: task.id, error: String(e) }));
+}
+
+/**
+ * The states a task may be completed from. STALLED counts, for the same reason it counts on
+ * FAILABLE_STATES: the stall detector flips the state on a clock, not on evidence that the work
+ * stopped, so an agent that went quiet and came back holding a deliverable is handing in real work.
+ * A late deliverable is more useful than a refusal.
+ *
+ * draft / queued / paused / revision_requested / done / failed are not completable. Those need an
+ * explicit owner-driven transition first (POST …/start), and a completion arriving before it would
+ * be reporting work on a task nobody has released.
+ */
+export const COMPLETABLE_STATES: readonly string[] = ['active', 'stalled'];
+
+/** What a door supplies about the completion itself. Everything else is read off the task. */
+export interface CompleteTaskInput {
+    /** What the owner reads under the task. Blank or absent becomes 'Task completed'. */
+    message?: string;
+    /**
+     * Memory key, under the AGENT's namespace, where the deliverable was published. It is what the
+     * owner's task card links to, and a PUBLIC record named here is what reaches the node's activity
+     * feed. Trimmed and capped at 256 characters here so both doors cap it the same way.
+     */
+    deliverableKey?: string;
+    /** A provenance record the caller already holds and is attaching. Checked against its own account. */
+    declaredProvenanceId?: string;
+    /** What the caller said about how the completion message was made. */
+    declaredProvenance?: DeclaredProvenance;
+    /** Which road this came down, for the provenance record: 'mcp.task_complete' | 'rest.task_complete'. */
+    pipeline: string;
+}
+
+export type CompleteResult =
+    | { ok: true; task: AgentTaskRecord; aiProvenanceId?: string }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Move a task to 'done', stamp the completion message, append the event, and run the fan-out.
+ *
+ * Written out on both doors until now, and the two copies had drifted three ways. Each one was
+ * measured, and not one of them was caught by a suite:
+ *
+ *   - THE TOOL ACCEPTED ONLY AN ACTIVE TASK. So an agent that crashed, was flipped to stalled by the
+ *     detector's clock and came back could not report the work it had finished. Exactly the
+ *     narrowing failTask() was written to close on the failure path.
+ *   - THE TOOL HAD NO WAY TO NAME A DELIVERABLE. `deliverable_key` is the pointer the owner's UI
+ *     follows and the one thing that puts a public deliverable on the node's activity feed, so an
+ *     agent working over MCP published its result into silence.
+ *   - ONLY THE TOOL STAMPED PROVENANCE. See the note on the stamp below.
+ */
+export async function completeTask(
+    deps: Deps,
+    task: AgentTaskRecord,
+    input: CompleteTaskInput,
+    /**
+     * The RESOLVED identity of whoever is completing: resolveIdentity(req.auth!) over REST, the
+     * agent's own GAII over MCP. It does double duty deliberately. It is the principal the
+     * provenance record names AND the live view that skips its own echo, and those are the same
+     * party by definition.
+     */
+    actor: string,
+): Promise<CompleteResult> {
+    if (!COMPLETABLE_STATES.includes(task.status)) {
+        return {
+            ok: false, status: 409, code: 'INVALID_STATE',
+            message: `Only active or stalled tasks can be completed (current: ${task.status})`,
+        };
+    }
+
+    // An empty completion message tells the owner nothing and hashes to nothing useful in the
+    // provenance record, so blank and absent get the same default.
+    const message = input.message?.trim() ? input.message : 'Task completed';
+    const deliverableKey = input.deliverableKey?.trim()
+        ? input.deliverableKey.trim().slice(0, 256)
+        : undefined;
+
+    // WHERE THE PROVENANCE STAMP BELONGS: here, so BOTH doors carry it.
+    //
+    // "The tool stamps and REST does not" looks like it could be correct, because a message an agent
+    // composes is model-written and a person's is not. It is half right, and the half it gets wrong
+    // is WHICH DOOR DECIDES. provenanceForWrite() already answers that question from the PRINCIPAL: a
+    // GHII writing through their own token is left alone, because stamping a person's own words would
+    // be a false statement about authorship, while a GAII or GEAI that declared nothing is recorded
+    // as model-written. So the owner clicking Complete in the dashboard gets no stamp and an agent
+    // completing over REST gets the same stamp it gets over MCP. Minting on one door only made the
+    // label depend on which client wrote it, which is a split a reader can neither see nor account
+    // for, and it is the same thing routes/boards.ts closed in TARGET-058 Phase 9.
+    //
+    // The DECLARATION stays an MCP-only parameter, which is that same precedent: `ai_provenance` is
+    // scope-gated on `provenance:write`, and an agent that wants to state how content was made has a
+    // tool that takes it. What arrives from REST is the node's own observation and nothing else.
+    //
+    // MINTED BEFORE THE STATE MOVE. A declaration without the scope raises ProvenanceScopeError, and
+    // minting after the update would leave a task marked done with no 'completed' event and a refusal
+    // handed back to the agent. Nothing is lost the other way round: an unreferenced provenance row
+    // is inert.
+    const aiProvenanceId = await provenanceForWrite(deps.storage, {
+        principal: actor,
+        content: message,
+        declaredId: input.declaredProvenanceId,
+        declared: input.declaredProvenance,
+        pipeline: input.pipeline,
+        // Never public, but a PERSON reads it, and that is what decides whether a label is owed.
+        surface: { visibility: 'private', humanAudience: true },
+        labelPolicy: deps.config.aiLabelPublic,
+        nodeId: deps.config.nodeId,
+        baseUrl: deps.config.baseUrl,
+        enabled: deps.config.aiProvenance,
+    });
+
+    const now = new Date().toISOString();
+    const updated = await deps.storage.updateAgentTask(task.id, {
+        status: 'done',
+        completedAt: now,
+        lastEventAt: now,
+        updatedAt: now,
+        ...(deliverableKey ? { deliverableKey } : {}),
+    });
+
+    // The provenance link rides in the event's `details` rather than in a column of its own, unlike
+    // memory / apps / direct messages. `details` is already the designed home for per-event metadata,
+    // and a column carried by exactly one of thirteen event types would be the odd row out in every
+    // query that touches the table. The RECORD is the same record everywhere; only the pointer's
+    // address differs.
+    await deps.storage.appendTaskEvent({
+        id: randomUUID(),
+        taskId: task.id,
+        type: 'completed',
+        message,
+        ...(aiProvenanceId ? { details: { aiProvenanceId } } : {}),
+        timestamp: now,
+    });
+
+    // The key this completion names, or one an earlier step already put on the task. REST passed only
+    // the first and the tool only the second, so between them a completion could carry a deliverable
+    // and still miss the feed. Reading it is safe either way: the fan-out publishes nothing unless the
+    // record at that key is actually public.
+    await afterTaskCompleted({ storage: deps.storage, config: deps.config }, task, updated ?? null,
+        message, deliverableKey ?? updated?.deliverableKey ?? task.deliverableKey, actor);
+
+    return { ok: true, task: updated ?? task, ...(aiProvenanceId ? { aiProvenanceId } : {}) };
 }
 
 /** The states a task may be failed from. STALLED counts: an agent that crashed still gets to say so. */

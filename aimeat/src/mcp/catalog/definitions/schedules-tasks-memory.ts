@@ -201,7 +201,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_complete',
-        description: 'Mark one of your ACTIVE tasks as done, with an optional completion message. Sets status to done, stamps completedAt, and appends a completed event. Only active tasks can be completed; if the work could not be done, use aimeat_task_fail instead.' + AI_PROVENANCE_TOOL_NOTE,
+        description: 'Mark one of your ACTIVE or STALLED tasks as done, with an optional completion message and an optional deliverable_key naming the memory record you produced. Sets status to done, stamps completedAt, appends a completed event, and runs everything a completion sets off: the workflow step advances, the open item closes, your counters move, and a PUBLIC deliverable reaches the node feed. A stalled task counts because an agent that crashed and came back still finished the work. If it could not be done, use aimeat_task_fail instead.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -212,7 +212,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_fail',
-        description: 'Mark one of your ACTIVE tasks as failed, recording the reason. Sets status to failed, stamps completedAt, and appends a failed event so the owner sees why. Only active tasks can be failed; if the work succeeded, use aimeat_task_complete instead.',
+        description: 'Mark one of your ACTIVE or STALLED tasks as failed, recording the reason. Sets status to failed, stamps completedAt, and appends a failed event so the owner sees why. A stalled task counts: an agent that crashed is exactly the one that needs to report a failure. If the work succeeded, use aimeat_task_complete instead.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {

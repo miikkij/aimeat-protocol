@@ -13287,47 +13287,6 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/accept-redelivery:
-    get:
-      operationId: getWorkAcceptRedelivery
-      tags: [Work Queue]
-      summary: Accept work re-delivery via OTK (Tier 0.5)
-      description: |
-        Requester accepts re-delivery of disputed work using a one-time key supplied as the `otk`
-        query parameter (no bearer auth). Settles payment and resolves the dispute. The OTK owner
-        must be the requester on the work.
-      parameters:
-        - name: tc
-          in: path
-          required: true
-          schema: { type: string }
-        - name: otk
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: Re-delivery accepted, dispute resolved
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          tracking_code: { type: string }
-                          dispute_resolved: { type: boolean }
-                          tier: { type: string }
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
     post:
       operationId: acceptRedelivery
       summary: Requester accepts re-delivery
@@ -13380,44 +13339,6 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
 
   /v1/work/{tc}/escalate:
-    get:
-      operationId: getWorkEscalate
-      tags: [Work Queue]
-      summary: Escalate a work dispute via OTK (Tier 0.5)
-      description: |
-        Escalates a disputed work item to an operator using a one-time key supplied as the `otk`
-        query parameter (no bearer auth). Appends a hash-chained audit entry to the dispute.
-      parameters:
-        - name: tc
-          in: path
-          required: true
-          schema: { type: string }
-        - name: otk
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        '200':
-          description: Dispute escalated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          tracking_code: { type: string }
-                          dispute_status: { type: string }
-                          tier: { type: string }
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
     post:
       operationId: escalateDispute
       summary: Escalate to operator
@@ -30622,6 +30543,13 @@ paths:
         schemaHash, scope, id, ownerGhii, createdAt and updatedAt. trust is the node operator's
         review and the vouch count, so it is never the owner's to claim; stats counts invocations
         that really happened. The response carries the stored record, which shows what took.
+
+
+        Changing the webhook asks the node's webhook policy the same question POST asks, and is
+        refused with the same three answers: 403 WEBHOOKS_DISABLED, 403 WEBHOOK_DOMAIN_NOT_ALLOWED
+        or 400 INVALID_WEBHOOK_URL. It is asked on a CHANGE of the address the node would call, so
+        sending the whole record back with webhookUrl untouched is accepted whatever the policy, and
+        clearing it is always accepted.
       security:
         - BearerAuth: []
       parameters:
