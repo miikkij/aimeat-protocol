@@ -68,14 +68,41 @@ const auth = (token: string, opts: RequestInit = {}): RequestInit =>
 
 let ownerToken = '';
 
-/** One authorize round, returning the user_code the owner would see on the consent screen. */
+/** One authorize round. The user_code is what the owner sees; the device_code fetches the token. */
+let lastDeviceCode = '';
 async function authorize(): Promise<string> {
     const r = await json('/v1/agents/device-authorize', {
         method: 'POST',
         body: JSON.stringify({ agent_name: AGENT, owner }),
     });
     assert(r.status === 200 && r.body.ok === true, `authorize ${r.status}: ${JSON.stringify(r.body.error)}`);
+    lastDeviceCode = r.body.data.device_code as string;
     return r.body.data.user_code as string;
+}
+
+/**
+ * The scopes on the CREDENTIAL this approval actually issued, read out of the JWT the agent polls
+ * for. Everything below used to be asserted against storage alone, and that is how a real bug
+ * shipped: re-approval wrote the corrected scopes to the agent record and minted the token from a
+ * different list, so `/v1/agents` looked right while the running agent was refused. Storage is the
+ * owner's intent; this is what the agent can actually do, and they are two different claims.
+ */
+async function issuedScopes(): Promise<string[]> {
+    const r = await json('/v1/agents/device-token', {
+        method: 'POST',
+        body: JSON.stringify({
+            device_code: lastDeviceCode,
+            grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        }),
+    });
+    // Flat, OAuth-shaped, NOT the node's success() envelope: an RFC 8628 client expects
+    // access_token at the top level and this route answers one. `token` is the same string under
+    // the name the rest of this API uses.
+    assert(r.status === 200, `device-token ${r.status}: ${JSON.stringify(r.body)}`);
+    const token = (r.body.access_token ?? r.body.token ?? r.body.data?.access_token ?? r.body.data?.token) as string;
+    assert(typeof token === 'string' && token.split('.').length === 3, `no JWT in the poll response: ${JSON.stringify(r.body)}`);
+    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    return (claims.scopes ?? []) as string[];
 }
 
 /** Approve exactly as the consent card does. `scopes` omitted entirely = "keep current access". */
@@ -201,6 +228,41 @@ await test('…and the reserved grant survives it, because no template can expre
     const after = await storedScopes();
     assert(after.includes('memory:write-reserved'),
         `the reserved grant was dropped by a template choice: ${JSON.stringify(after)}`);
+});
+
+// ── The credential, not the record ──────────────────────────────────────────────────────────────
+//
+// Everything above reads /v1/agents. That is the owner's intent, and until 2026-08-14 it was the
+// only thing this suite looked at, which is exactly why the bug below shipped: approveDeviceAuth
+// wrote the corrected scope list to the agent record and minted the JWT from a different variable.
+// The listing said what the owner had granted and the token said something else, so the suite was
+// green while a real agent on aimeat.io was refused a scope its owner had given it.
+//
+// Re-approval is the ONLY path that mints the long-lived token, so a scope that does not reach the
+// credential here does not reach the agent at all: /v1/auth/refresh reads defaultScopes correctly
+// but issues a one-hour token and the connector does not auto-refresh.
+
+await test('the TOKEN carries the out-of-wildcard grant, not only the agent record', async () => {
+    const issued = await issuedScopes();
+    assert(issued.includes('memory:write-reserved'),
+        `the record kept the reserved grant and the credential did not: ${JSON.stringify(issued)}`);
+});
+
+await test('re-approving with NO scopes issues the scopes the owner chose, not the node defaults', async () => {
+    // `finalScopes` falls back to config.defaultAgentScopes when the approver sends no array. The
+    // storage write has kept the owner's decision since v1.5.0; the token was still being minted
+    // from that fallback, so silence quietly narrowed a running agent to the node's four defaults.
+    const before = await storedScopes();
+    const r = await approve(await authorize());
+    assert(r.status === 200 && r.body.ok === true, `approve ${r.status}: ${JSON.stringify(r.body.error)}`);
+
+    const issued = await issuedScopes();
+    for (const s of before) {
+        assert(issued.includes(s), `the credential lost "${s}" that the owner had granted: ${JSON.stringify(issued)}`);
+    }
+    const stored = await storedScopes();
+    assert(JSON.stringify([...stored].sort()) === JSON.stringify([...issued].sort()),
+        `the record and the credential disagree: record ${JSON.stringify(stored)} vs token ${JSON.stringify(issued)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);

@@ -106,6 +106,30 @@ async function approveDeviceAuth(
   let keyPair: { privateKey: string; publicKey: string };
   const now = new Date().toISOString();
 
+  /**
+   * What this approval actually grants, which for an EXISTING agent is not `finalScopes`.
+   *
+   * The token, the stored `defaultScopes` and the device-auth record must all say the same thing.
+   * Until 2026-08-14 only the storage write used the corrected list and the other two used
+   * `finalScopes`, so re-approval wrote the right scopes and issued a credential without them. It
+   * cost two capabilities, in both directions:
+   *
+   *   - A scope no wildcard carries never reached a running agent AT ALL. Re-approval is the only
+   *     path that mints the long-lived token (`agentJwtTtlSeconds`), and it was the path that
+   *     dropped it. Measured on aimeat.io on 2026-08-14: agent `postman#happydude500001` had
+   *     defaultScopes `["*","share:manage"]` and a ninety-day token whose claim read `["*"]`, so
+   *     `aimeat_share_create` answered SCOPE_DENIED for a scope its owner had granted.
+   *   - Re-approving with NO scopes at all issued the NODE DEFAULT rather than what the owner had
+   *     chosen, because `finalScopes` falls back to `config.defaultAgentScopes` when the approver
+   *     sends no array. Storage kept the owner's decision and the token silently narrowed to the
+   *     node's, which is the same shape as the 1.33.1 outage.
+   *
+   * `POST /v1/auth/refresh` mints from `defaultScopes` correctly, so the stored value was never
+   * wrong; it is a one-hour token and the connector does not auto-refresh, so that was not a way
+   * out for anyone.
+   */
+  let grantedScopes = finalScopes;
+
   if (existing) {
     // Existing agent: generate new keypair (rotate keys) and issue JWT
     keyPair = await generateKeyPair();
@@ -115,10 +139,10 @@ async function approveDeviceAuth(
     // the consent card's templates or by an agent's request, so re-approval is never the place it
     // was meant to be dropped — the owner removes it in the editor, deliberately, as they added it.
     const preserved = SCOPES_OUTSIDE_WILDCARD.filter(s => held.includes(s) && !finalScopes.includes(s));
-    const nextScopes = scopesRequested ? [...finalScopes, ...preserved] : held;
+    grantedScopes = scopesRequested ? [...finalScopes, ...preserved] : held;
     await storage.updateAgent(gaii, {
       publicKey: keyPair.publicKey,
-      defaultScopes: nextScopes,
+      defaultScopes: grantedScopes,
       lastSeen: now,
     });
   } else {
@@ -159,7 +183,7 @@ async function approveDeviceAuth(
     owner: request.ownerName,
     node: config.nodeId,
     roles: ['agent'],
-    scopes: finalScopes,
+    scopes: grantedScopes,
   }, config.agentJwtTtlSeconds, sessionId);
 
   const expiresAt = new Date(Date.now() + config.agentJwtTtlSeconds * 1000).toISOString();
@@ -181,7 +205,7 @@ async function approveDeviceAuth(
   // Store credentials + JWT for agent to poll
   await storage.updateDeviceAuth(request.deviceCode, {
     status: 'approved',
-    scopes: finalScopes,
+    scopes: grantedScopes,
     approvedBy,
     agentCredentials: {
       gaii,
