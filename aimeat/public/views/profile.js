@@ -45,6 +45,7 @@ import EcosystemTab from './profile/ecosystem-tab.js';
 import ChatSessionsTab from './profile/chat-sessions-tab.js';
 import McpTab from './profile/mcp-tab.js';
 import WalletTab from './profile/wallet-tab.js';
+import UsageTab from './profile/usage-tab.js';
 import { PnlTab } from './profile/pnl-tab.js';
 import { CompaniesTab } from './profile/companies-tab.js';
 import MemoryTab from './profile/memory-tab.js';
@@ -109,6 +110,7 @@ const TABS = [
   // sent to. Gating it behind 'active' hid the onboarding surface from exactly the people it is for.
   { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'new' },
   { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },
+  { id: 'usage',         key: 'profile.tabs.usage',          component: UsageTab,          minTier: 'new' },
   { id: 'pnl',           key: 'profile.tabs.pnl',            component: PnlTab,            minTier: 'active' },
   { id: 'companies',     key: 'profile.tabs.companies',      component: CompaniesTab,      minTier: 'active' },
   { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },

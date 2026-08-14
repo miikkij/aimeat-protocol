@@ -1,20 +1,31 @@
 /**
  * @file ai-usage-admin.ts
- * @description Operator-only cross-user AI-spend aggregation. Every AI completion persists one
- *   per-owner, per-UTC-day usage record (`ai-usage.<gaii>.<day>`, retained forever). This service
- *   fans the shared `ai-usage.` key prefix across ALL owners via storage.listAllMemory() and folds
- *   the records into node-wide rollups: a per-day series (for a stacked bar), grand per-app totals,
- *   per-user "top spenders", and overall totals. Read-only reporting — no writes, no new tables.
+ * @description Operator-only cross-user AI-apps spend: a per-day series with a per-app split, grand
+ *   per-app totals, per-user top spenders, and overall totals.
+ *
+ *   IT NO LONGER PAGES THE MEMORY TABLE. This used to fan `listAllMemory({prefix:'ai-usage.'})`
+ *   across every owner on every request, 500 rows at a time, and fold the results in memory — a cost
+ *   that grows with how long the node has existed rather than with the size of the answer. It now
+ *   reads one precomputed cut of UsageRollup. The response shape is unchanged, so the operator Usage
+ *   tab needed no change. Design: docs/internal/telemetria/02-design.md
+ *
+ *   WHY THE SURFACE FILTER IS THE WHOLE POINT. "AI apps spend" has always meant what apps spent
+ *   through /v1/ai/complete and the transcription endpoint, NOT what an owner's agents spent
+ *   reporting their own LLM calls. Both now land in the same ledger, which is what makes per-app
+ *   model reporting possible at all — so the cut carries `surface`, and this reads only 'app'. Drop
+ *   that filter and the operator's app figure silently absorbs every agent call on the node.
  * @structure
- *   - getAdminAiUsage(storage, { from, to }) — node-wide AI usage over a date range
+ *   - getAdminAiUsage(storage, { from, to }) — node-wide AI-apps usage over a date range
  * @usage
  *   import { getAdminAiUsage } from '../services/ai-usage-admin.js';
  *   const data = await getAdminAiUsage(storage, { from: '2026-06-05', to: '2026-07-05' });
  * @version-history
+ *   v2.0.0 — 2026-08-14 — Read the precomputed `llm.owner.app.surface` cut instead of paging every
+ *     owner's ai-usage memory records. Response shape unchanged.
  *   v1.0.0 — 2026-07-05 — Initial: operator dashboard "AI Apps Usage" aggregate.
  */
-import type { Storage, MemoryRecord } from '../storage/interface.js';
-import type { UsageRecord } from './ai-completion.js';
+import type { Storage } from '../storage/interface.js';
+import { queryUsageRollupLive } from './usage/usage-read.js';
 
 type AppTotals = { cost_usd: number; tokens: number; calls: number };
 
@@ -50,8 +61,8 @@ function add(target: AppTotals, cost: number, tokens: number, calls: number): vo
 }
 
 /**
- * Aggregate AI spend across all owners for the given inclusive date range (defaults to the trailing
- * 30 days). Pages through the memory table so no single query has to hold every record in memory.
+ * Aggregate AI-apps spend across all owners for the inclusive date range (defaults to the trailing
+ * 30 days). One bounded read of the serving layer.
  */
 export async function getAdminAiUsage(
   storage: Storage,
@@ -60,50 +71,47 @@ export async function getAdminAiUsage(
   const to = opts.to || isoDay(0);
   const from = opts.from || isoDay(29);
 
-  // Page through every owner's `ai-usage.*` record.
-  const PAGE = 500;
-  let offset = 0;
-  const items: MemoryRecord[] = [];
-  for (;;) {
-    const { items: page, total } = await storage.listAllMemory({ prefix: 'ai-usage.', limit: PAGE, offset });
-    items.push(...page);
-    offset += page.length;
-    if (page.length === 0 || offset >= total) break;
-  }
+  // LIVE (see queryUsageRollupLive): the folded history plus whatever arrived since the last fold,
+  // so a spend that just happened is not missing from the operator's figure for five minutes.
+  const rows = await queryUsageRollupLive(storage, {
+    cut: 'llm.owner.app', grain: 'day', from, to,
+  }, 'llm');
 
   const dayMap = new Map<string, AdminAiUsageDay>();
   const perApp: Record<string, AppTotals> = {};
   const perUser = new Map<string, { owner_gaii: string } & AppTotals>();
   const totals: AppTotals = { cost_usd: 0, tokens: 0, calls: 0 };
 
-  for (const rec of items) {
-    const v = rec.value as UsageRecord | undefined;
-    if (!v || typeof v.date !== 'string') continue;
-    if (v.date < from || v.date > to) continue;
+  for (const r of rows) {
+    // Spend ATTRIBUTED TO AN APP, which is what this view has always meant. Defined by the app id
+    // rather than by the door the call came through, so an agent working on behalf of an app counts
+    // and an owner's own agent chatter does not. A row with no app id is not app spend.
+    if (!r.appId) continue;
 
-    let day = dayMap.get(v.date);
+    const tokens = r.tokensIn + r.tokensOut;
+    const app = r.appId;
+
+    let day = dayMap.get(r.bucket);
     if (!day) {
-      day = { date: v.date, total_cost_usd: 0, total_tokens: 0, total_calls: 0, per_app: {} };
-      dayMap.set(v.date, day);
+      day = { date: r.bucket, total_cost_usd: 0, total_tokens: 0, total_calls: 0, per_app: {} };
+      dayMap.set(r.bucket, day);
     }
-    day.total_cost_usd += v.total_cost_usd || 0;
-    day.total_tokens += v.total_tokens || 0;
-    day.total_calls += v.total_calls || 0;
+    day.total_cost_usd += r.costUsd;
+    day.total_tokens += tokens;
+    day.total_calls += r.calls;
+    const dp = day.per_app[app] ?? (day.per_app[app] = { cost_usd: 0, tokens: 0, calls: 0 });
+    add(dp, r.costUsd, tokens, r.calls);
 
-    let user = perUser.get(rec.ownerGaii);
+    const grand = perApp[app] ?? (perApp[app] = { cost_usd: 0, tokens: 0, calls: 0 });
+    add(grand, r.costUsd, tokens, r.calls);
+
+    let user = perUser.get(r.ownerGhii);
     if (!user) {
-      user = { owner_gaii: rec.ownerGaii, cost_usd: 0, tokens: 0, calls: 0 };
-      perUser.set(rec.ownerGaii, user);
+      user = { owner_gaii: r.ownerGhii, cost_usd: 0, tokens: 0, calls: 0 };
+      perUser.set(r.ownerGhii, user);
     }
-    add(user, v.total_cost_usd, v.total_tokens, v.total_calls);
-    add(totals, v.total_cost_usd, v.total_tokens, v.total_calls);
-
-    for (const [app, m] of Object.entries(v.per_app || {})) {
-      const grand = perApp[app] ?? (perApp[app] = { cost_usd: 0, tokens: 0, calls: 0 });
-      add(grand, m.cost_usd, m.tokens, m.calls);
-      const dp = day.per_app[app] ?? (day.per_app[app] = { cost_usd: 0, tokens: 0, calls: 0 });
-      add(dp, m.cost_usd, m.tokens, m.calls);
-    }
+    add(user, r.costUsd, tokens, r.calls);
+    add(totals, r.costUsd, tokens, r.calls);
   }
 
   const days = [...dayMap.values()].sort((a, b) => a.date.localeCompare(b.date));

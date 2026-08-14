@@ -163,6 +163,7 @@ export function extractUsageFields(data: Record<string, unknown>): {
   capabilityId?: string;
   consumerGhii?: string;
   provenanceId?: string;
+  appId?: string;
 } | null {
   const model = typeof data.model === 'string' ? data.model.trim() : '';
   if (!model) return null;
@@ -195,6 +196,11 @@ export function extractUsageFields(data: Record<string, unknown>): {
     // This is a CLAIM by the agent, stored on the agent's own row — it grants nothing: resolving
     // that id still goes through the authorized /v1/provenance/:id, which checks ownership itself.
     provenanceId: str(data.provenance_id),
+    // Which app this call was made FOR. Same class of field as organism_id and capability_id above:
+    // a CLAIM by the reporting agent, stored on its own row, granting nothing. It is what makes an
+    // agent's work on behalf of an app show up in the per-app view instead of vanishing into
+    // "unattributed" — the app is what the spend was for, whichever door reported it.
+    appId: str(data.app_id),
   };
 }
 

@@ -242,6 +242,20 @@ export const getLedger = (from, to) => {
   return apiGet('/v1/admin/ledger' + (qs ? '?' + qs : ''));
 };
 
+/**
+ * Operator-only usage REPORT off the precomputed serving layer. `report` names a question
+ * (surface / tool / apps-used / model / user / …); `owner` narrows a node report to one person.
+ * A different system from getLedger and getAiUsage above: those count LLM SPEND, this counts CALLS,
+ * and the two are never summed.
+ */
+export const getUsageSummary = (report, from, to, owner) => {
+  const params = new URLSearchParams({ report });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (owner) params.set('owner', owner);
+  return apiGet('/v1/admin/usage/summary?' + params.toString());
+};
+
 // ── Extensions & Instances ──
 export const getAvailableExtensions   = ()              => apiGet('/v1/admin/extensions/available');
 export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);

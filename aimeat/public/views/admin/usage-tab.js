@@ -15,6 +15,9 @@
  * @usage  Registered in views/admin.js NAV_GROUPS (replaces the old ai-usage entry); rendered with
  *   the shared admin tab props.
  * @version-history
+ *   v1.1.0 — 2026-08-14 — Third section: the CALL stream (surfaces, tools, apps, refusals) from
+ *     GET /v1/admin/usage/summary. It counts invocations, never spend, so it is never summed with
+ *     the two above. Body in usage-tab.calls.js.
  *   v1.0.0 — 2026-07-11 — Initial: unified operator usage tab (agent LLM ledger + AI apps spend),
  *     with per-user drill-down on the ledger's top-spenders table.
  */
@@ -27,6 +30,7 @@ import { num, StatsGrid, DataTable, Spinner, Empty } from './shared.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
+import { CallsSection } from './usage-tab.calls.js';
 
 const usd = (n) => { const v = Number(n) || 0; return '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)); };
 function fmtCompact(n) {
@@ -58,17 +62,25 @@ export default function UsageTab() {
   const [aiUsage, setAiUsage] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [calls, setCalls] = useState(null);
 
   const load = useCallback(async (p) => {
     setLoading(true);
     try {
       const range = getDateRange(p);
-      const [lr, ar] = await Promise.all([
-        api.getLedger(range.from, range.to).catch(err => { swallowed('usage-tab: UsageTab', err); return null; }),
-        api.getAiUsage(range.from, range.to).catch(err => { swallowed('usage-tab: UsageTab', err); return null; }),
+      const quiet = (err) => { swallowed('usage-tab: UsageTab', err); return null; };
+      // Five reads in parallel rather than in sequence: they are independent, and the tab is only as
+      // fast as its slowest one either way.
+      const [lr, ar, cs, ct, ca] = await Promise.all([
+        api.getLedger(range.from, range.to).catch(quiet),
+        api.getAiUsage(range.from, range.to).catch(quiet),
+        api.getUsageSummary('surface', range.from, range.to).catch(quiet),
+        api.getUsageSummary('tool', range.from, range.to).catch(quiet),
+        api.getUsageSummary('apps-used', range.from, range.to).catch(quiet),
       ]);
       if (lr && lr.data) setLedger(lr.data);
       if (ar && ar.data) setAiUsage(ar.data);
+      setCalls({ surface: cs?.data ?? null, tool: ct?.data ?? null, apps: ca?.data ?? null });
     } catch (err) { swallowed('usage-tab: UsageTab', err); }
     setLoading(false);
   }, []);
@@ -101,7 +113,7 @@ export default function UsageTab() {
       </span>
     </div>`;
 
-  if (!ledger && !aiUsage) {
+  if (!ledger && !aiUsage && !calls) {
     return html`<div>${timeRange}${loading ? html`<${Spinner} />` : html`<${Empty} text=${t('dashboard.aiUsageEmpty') || 'No AI usage yet.'} />`}</div>`;
   }
 
@@ -111,6 +123,8 @@ export default function UsageTab() {
       ${renderLedgerSection(ledger, metric, selectedUser, setSelectedUser)}
       <hr class="adm-mt-lg" />
       ${renderAiAppsSection(aiUsage, metric)}
+      <hr class="adm-mt-lg" />
+      <${CallsSection} data=${calls} />
     </div>`;
 }
 

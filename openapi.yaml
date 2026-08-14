@@ -30612,6 +30612,12 @@ paths:
       operationId: capabilityUpdate
       tags: [Capabilities]
       summary: Update own capability
+      description: >-
+        Patches the fields the owner controls. The fields the node writes about the record are
+        dropped from the body if they are sent: trust, stats, operatorOverride, rejectionReason,
+        schemaHash, scope, id, ownerGhii, createdAt and updatedAt. trust is the node operator's
+        review and the vouch count, so it is never the owner's to claim; stats counts invocations
+        that really happened. The response carries the stored record, which shows what took.
       security:
         - BearerAuth: []
       parameters:

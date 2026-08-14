@@ -74,6 +74,39 @@ async function seed(token: string, gaii: string, rec: any) {
   assert(status === 201 || status === 200, `seed ${gaii} ${rec.date} status ${status}`);
 }
 
+/**
+ * Seed the OPERATOR aggregate the way production writes it: a priced ledger event carrying an app
+ * id. `seed()` above still writes the per-day memory record, because that is what the OWNER's
+ * /v1/ai/usage/history reads and what the daily budget counts — the two are different records of the
+ * same call, and since 2026-08-14 a real completion writes both.
+ *
+ * Only "today" is seedable this way: the node stamps the timestamp, which is the honest limit of
+ * driving a real path instead of hand-writing storage. The range assertion below is written to that
+ * limit rather than around it.
+ */
+async function seedLedger(token: string, agent: string, appId: string, costUsd: number, tokens: number) {
+  const r = await json(`/v1/agents/${encodeURIComponent(agent)}/telemetry`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      type: 'llm_call',
+      data: {
+        model: 'anthropic/claude-opus-5', provider: 'openrouter',
+        prompt_tokens: Math.round(tokens / 2), completion_tokens: Math.round(tokens / 2),
+        cost_usd: costUsd, app_id: appId,
+      },
+    }),
+  });
+  assert(r.status === 201, `seedLedger ${agent}/${appId}: ${r.status} ${JSON.stringify(r.body.error)}`);
+}
+
+async function makeAgent(token: string, owner: string, name: string) {
+  const r = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ name, owner, capabilities: ['test'] }),
+  });
+  assert(r.status === 201 || r.status === 200, `agent ${name}: ${r.status} ${JSON.stringify(r.body.error)}`);
+}
+
 const opName = `aiusageop${Date.now()}`;
 const userName = `aiusageuser${Date.now()}`;
 const opGaii = `${opName}@${NODE_ID}`;
@@ -97,6 +130,16 @@ await test('Seed operator per-day usage records (today, yesterday, 10 days ago)'
 });
 await test('Seed non-operator usage record (today)', async () => {
   await seed(userToken, userGaii, { date: today, total_cost_usd: 0.08, total_calls: 1, total_tokens: 800, per_app: { drop: { cost_usd: 0.08, tokens: 800, calls: 1 } }, updated_at: new Date().toISOString() });
+});
+
+await test('Seed the ledger the way a real completion does (app-attributed spend, today)', async () => {
+  await makeAgent(opToken, opName, 'seeder');
+  await makeAgent(userToken, userName, 'seeder');
+  await seedLedger(opToken, 'seeder', 'drop', 0.06, 600);
+  await seedLedger(opToken, 'seeder', 'notebook', 0.04, 400);
+  await seedLedger(userToken, 'seeder', 'drop', 0.08, 800);
+  // Not attributed to any app: it must NOT appear in an "AI apps spend" figure.
+  await seedLedger(opToken, 'seeder', '', 0.99, 100);
 });
 
 await test('GET /v1/ai/usage/history requires auth → 401', async () => {
@@ -123,13 +166,14 @@ await test('GET /v1/admin/ai-usage (operator) aggregates across both owners', as
   const { status, body } = await json('/v1/admin/ai-usage', { headers: { Authorization: `Bearer ${opToken}` } });
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   const d = body.data;
-  // Default range = last 30 days, so the operator's 10-days-ago record is included; total = op(0.35) + user(0.08).
-  approx(d.totals.cost_usd, 0.43, 'grand total cost');
+  // op(0.06 drop + 0.04 notebook) + user(0.08 drop) = 0.18. The 0.99 call carries no app id, so it
+  // is the owner's own spend and not app spend — that exclusion is the definition this view uses.
+  approx(d.totals.cost_usd, 0.18, 'grand total cost');
   assert(d.per_app.drop && d.per_app.notebook, 'per_app has drop + notebook');
-  approx(d.per_app.drop.cost_usd, 0.19, 'per_app drop (0.06+0.05+0.08)');
+  approx(d.per_app.drop.cost_usd, 0.14, 'per_app drop (op 0.06 + user 0.08)');
+  assert(!d.per_app._unknown, 'an unattributed call is not an app, so there is no _unknown bucket');
   assert(Array.isArray(d.per_user) && d.per_user.length >= 2, `>=2 users, got ${d.per_user?.length}`);
   assert(d.per_user[0].cost_usd >= d.per_user[1].cost_usd, 'per_user sorted by spend desc');
-  assert(d.per_user[0].owner_gaii === opGaii, `top spender is the operator, got ${d.per_user[0].owner_gaii}`);
   assert(Array.isArray(d.days) && d.days.length >= 1, 'days series present');
 });
 
@@ -138,11 +182,16 @@ await test('GET /v1/admin/ai-usage with non-operator token → 403', async () =>
   assert(status === 403, `expected 403, got ${status}`);
 });
 
-await test('GET /v1/admin/ai-usage honors a narrow from/to range (excludes older records)', async () => {
-  const { status, body } = await json(`/v1/admin/ai-usage?from=${today}&to=${today}`, { headers: { Authorization: `Bearer ${opToken}` } });
-  assert(status === 200, `status ${status}`);
-  // today only: op(0.10) + user(0.08) = 0.18 — the 10-days-ago and yesterday records drop out.
-  approx(body.data.totals.cost_usd, 0.18, 'today-only total');
+await test('GET /v1/admin/ai-usage honors a narrow from/to range', async () => {
+  const inRange = await json(`/v1/admin/ai-usage?from=${today}&to=${today}`, { headers: { Authorization: `Bearer ${opToken}` } });
+  assert(inRange.status === 200, `status ${inRange.status}`);
+  approx(inRange.body.data.totals.cost_usd, 0.18, 'today-only total');
+
+  // A window that ends before anything was seeded must be empty, not merely smaller — a range
+  // filter that quietly ignored its bounds would still pass the assertion above.
+  const past = await json(`/v1/admin/ai-usage?from=${tenDaysAgo}&to=${tenDaysAgo}`, { headers: { Authorization: `Bearer ${opToken}` } });
+  assert(past.status === 200, `status ${past.status}`);
+  approx(past.body.data.totals.cost_usd, 0, 'a window with no data is empty');
 });
 
 await test('Cleanup owners', async () => {

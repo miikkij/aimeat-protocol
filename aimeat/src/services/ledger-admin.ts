@@ -1,9 +1,20 @@
 /**
  * @file ledger-admin.ts
  * @description Operator-only cross-user aggregation of the agent LLM usage ledger (LEDGER /
- *   TARGET-016). Reads the daily rollup across ALL owners (storage.queryUsageDailyAllOwners — NOT
- *   owner-scoped) and folds it into node-wide totals, a per-day series (stacked bar), per-user
- *   "top spenders", per-agent, and per-model breakdowns. Read-only — no writes, no new tables.
+ *   TARGET-016): node-wide totals, a per-day series with a per-model split, per-user "top spenders",
+ *   per-agent and per-model breakdowns.
+ *
+ *   IT NO LONGER SCANS. This used to read every AgentUsageDaily row for every owner in the range and
+ *   fold them in memory on each request, which grows with the node rather than with the answer. It
+ *   now reads two precomputed cuts of UsageRollup (`llm.model` for the model and time dimensions,
+ *   `llm.actor` for the agent and owner ones), which are bounded by real cardinality and already
+ *   aggregated. The response shape is byte-for-byte what it was, so the operator Usage tab needed no
+ *   change. Design: docs/internal/telemetria/02-design.md
+ *
+ *   THE ONE NUMBER THAT IS NOT A SUM. `per_user[].agents` is a distinct count, so it is derived from
+ *   the per-agent cut's ROWS rather than from the rollup's own `actorsSeen` — that column undercounts
+ *   an actor seen in two fold batches, and a "how many agents does this user run" that drifts
+ *   downward is worse than no number.
  *
  *   SECURITY: the cross-owner read is deliberately un-scoped; the calling route
  *   (GET /v1/admin/ledger) MUST gate on the operator role. This service performs NO caller check.
@@ -12,9 +23,12 @@
  * @usage
  *   import { getAdminLedger } from '../services/ledger-admin.js';
  * @version-history
+ *   v2.0.0 — 2026-08-14 — Read the precomputed UsageRollup cuts instead of scanning every owner's
+ *     daily rows. Response shape unchanged.
  *   v1.0.0 — 2026-07-11 — Initial: operator dashboard cross-user agent-ledger aggregate.
  */
-import type { Storage } from '../storage/interface.js';
+import type { Storage, UsageRollupRow } from '../storage/interface.js';
+import { queryUsageRollupLive } from './usage/usage-read.js';
 
 interface Totals {
   cost_usd: number;
@@ -53,16 +67,18 @@ function blank(): Totals {
   return { cost_usd: 0, total_tokens: 0, calls: 0, unpriced_calls: 0 };
 }
 
-function add(t: Totals, cost: number, tokens: number, calls: number, unpriced: number): void {
-  t.cost_usd += cost || 0;
-  t.total_tokens += tokens || 0;
-  t.calls += calls || 0;
-  t.unpriced_calls += unpriced || 0;
+/** Fold one rollup row's metrics into a totals accumulator. */
+function add(t: Totals, r: UsageRollupRow): void {
+  t.cost_usd += r.costUsd;
+  t.total_tokens += r.tokensIn + r.tokensOut;
+  t.calls += r.calls;
+  t.unpriced_calls += r.unpricedCalls;
 }
 
 /**
  * Aggregate agent LLM ledger spend across ALL owners for the inclusive date range (defaults to the
- * trailing 30 days). The daily table is already per-day aggregated, so one query covers the range.
+ * trailing 30 days). Two bounded reads of the serving layer, folded into the five shapes the
+ * operator tab renders.
  */
 export async function getAdminLedger(
   storage: Storage,
@@ -71,45 +87,35 @@ export async function getAdminLedger(
   const to = opts.to || isoDay(0);
   const from = opts.from || isoDay(29);
 
-  const rows = await storage.queryUsageDailyAllOwners({ from, to });
+  // LIVE, not merely folded: an operator who just watched a spend happen must see it. The top-up is
+  // bounded by the fold interval, so this stays two small reads however long the node has run.
+  const [modelRows, actorRows] = await Promise.all([
+    // (bucket × model × provider) — carries the time axis, the model axis, and the grand totals.
+    queryUsageRollupLive(storage, { cut: 'llm.model', grain: 'day', from, to }, 'llm'),
+    // (owner × agent) per day — carries the per-agent and per-user axes.
+    queryUsageRollupLive(storage, { cut: 'llm.actor', grain: 'day', from, to }, 'llm'),
+  ]);
 
   const totals = blank();
   const dayMap = new Map<string, AdminLedgerDay>();
-  const userMap = new Map<string, { owner_ghii: string; agents: Set<string> } & Totals>();
-  const agentMap = new Map<string, { agent_gaii: string; owner_ghii: string } & Totals>();
   const modelMap = new Map<string, { model: string; providers: Set<string> } & Totals>();
 
-  for (const r of rows) {
-    const tokens = (r.promptTokens || 0) + (r.completionTokens || 0);
-    add(totals, r.costUsd, tokens, r.calls, r.unpricedCalls);
+  for (const r of modelRows) {
+    add(totals, r);
 
-    let day = dayMap.get(r.date);
+    let day = dayMap.get(r.bucket);
     if (!day) {
-      day = { date: r.date, cost_usd: 0, total_tokens: 0, calls: 0, per_model: {} };
-      dayMap.set(r.date, day);
+      day = { date: r.bucket, cost_usd: 0, total_tokens: 0, calls: 0, per_model: {} };
+      dayMap.set(r.bucket, day);
     }
-    day.cost_usd += r.costUsd || 0;
+    const tokens = r.tokensIn + r.tokensOut;
+    day.cost_usd += r.costUsd;
     day.total_tokens += tokens;
-    day.calls += r.calls || 0;
+    day.calls += r.calls;
     const dm = day.per_model[r.model] ?? (day.per_model[r.model] = { cost_usd: 0, total_tokens: 0, calls: 0 });
-    dm.cost_usd += r.costUsd || 0;
+    dm.cost_usd += r.costUsd;
     dm.total_tokens += tokens;
-    dm.calls += r.calls || 0;
-
-    let u = userMap.get(r.ownerGhii);
-    if (!u) {
-      u = { owner_ghii: r.ownerGhii, agents: new Set<string>(), ...blank() };
-      userMap.set(r.ownerGhii, u);
-    }
-    u.agents.add(r.agentGaii);
-    add(u, r.costUsd, tokens, r.calls, r.unpricedCalls);
-
-    let a = agentMap.get(r.agentGaii);
-    if (!a) {
-      a = { agent_gaii: r.agentGaii, owner_ghii: r.ownerGhii, ...blank() };
-      agentMap.set(r.agentGaii, a);
-    }
-    add(a, r.costUsd, tokens, r.calls, r.unpricedCalls);
+    dm.calls += r.calls;
 
     let m = modelMap.get(r.model);
     if (!m) {
@@ -117,7 +123,28 @@ export async function getAdminLedger(
       modelMap.set(r.model, m);
     }
     if (r.provider && r.provider !== 'unknown') m.providers.add(r.provider);
-    add(m, r.costUsd, tokens, r.calls, r.unpricedCalls);
+    add(m, r);
+  }
+
+  const agentMap = new Map<string, { agent_gaii: string; owner_ghii: string } & Totals>();
+  const userMap = new Map<string, { owner_ghii: string; agents: Set<string> } & Totals>();
+
+  for (const r of actorRows) {
+    let a = agentMap.get(r.actorGaii);
+    if (!a) {
+      a = { agent_gaii: r.actorGaii, owner_ghii: r.ownerGhii, ...blank() };
+      agentMap.set(r.actorGaii, a);
+    }
+    add(a, r);
+
+    let u = userMap.get(r.ownerGhii);
+    if (!u) {
+      u = { owner_ghii: r.ownerGhii, agents: new Set<string>(), ...blank() };
+      userMap.set(r.ownerGhii, u);
+    }
+    // Distinct from the ROWS, not from actorsSeen: this is a count of agents, and it must not drift.
+    if (r.actorGaii) u.agents.add(r.actorGaii);
+    add(u, r);
   }
 
   const days = [...dayMap.values()].sort((a, b) => a.date.localeCompare(b.date));

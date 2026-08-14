@@ -3681,3 +3681,36 @@
    clipped them into a smudge. */
 .pf-adk-prompt-card { position: relative; }
 .pf-adk-prompt-head { padding-right: 2.4rem; }
+
+/* ── Usage tab ─────────────────────────────────────────────────────────────
+   The report chips wrap on a phone rather than scrolling sideways: there are
+   eight of them, and a horizontal scroller hides the ones a person has not
+   thought to look for, which is exactly what this page is for. */
+.pf-usage-controls {
+  display: flex; flex-wrap: wrap; justify-content: space-between;
+  gap: var(--space-3, 0.75rem); margin-bottom: var(--space-4, 1rem);
+}
+.pf-usage-chips, .pf-usage-periods { display: flex; flex-wrap: wrap; gap: var(--space-2, 0.5rem); }
+.pf-usage-chip { font-size: 0.85rem; padding: 0.35rem 0.75rem; }
+
+/* auto-fit rather than a fixed count: four stats sit in a row on a desktop and
+   two per row on a phone, without a breakpoint that guesses where that happens. */
+.pf-usage-stats {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3, 0.75rem); margin-bottom: var(--space-4, 1rem);
+}
+.pf-usage-stat {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--space-3, 0.75rem);
+  background: var(--card-bg-alt); border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+}
+.pf-usage-stat-value { font-size: 1.35rem; font-weight: 600; line-height: 1.1; }
+.pf-usage-stat-label { font-size: 0.78rem; color: var(--text-dim); }
+
+/* A fixed height so the canvas has something to be 100% of, and so switching
+   report does not make the table below it jump. */
+.pf-usage-chart { height: 200px; margin-bottom: var(--space-4, 1rem); }
+
+.pf-usage-empty { color: var(--text-dim); font-size: 0.9rem; padding: var(--space-4, 1rem) 0; }
+.pf-usage-error { color: var(--danger, #b3372c); font-size: 0.9rem; }

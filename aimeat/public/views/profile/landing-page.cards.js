@@ -639,6 +639,7 @@ export const SIDEBAR_GROUPS = [
   { titleKey: 'profile.landing.menuBusiness', items: [     // the company and its money
     { id: 'companies', labelKey: 'profile.tabs.companies' },
     { id: 'pnl', labelKey: 'profile.tabs.pnl' },
+    { id: 'usage', labelKey: 'profile.tabs.usage' },
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
     { id: 'apps', labelKey: 'profile.tabs.apps' },
