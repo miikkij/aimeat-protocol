@@ -78,7 +78,7 @@ Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and d
 - **Reuse what exists** rather than inventing a parallel list, surface or page type. A feature's data is a memory record under a key prefix plus a prompt that reads it; a new MCP tool, route or table needs a reason memory could not cover it.
 - **Do not rewrite prompts that work**: additive changes only, and only when asked.
 
-Tooling that has bitten before: the dev server does not watch backend `src/` (restart for a new route) · Playwright MCP needs `--isolated` and cannot use `file://` · `rm -rf` follows a junction · `cd x && python` can fail silently, so check the exit status · backticks vanish inside `python -c`, use Write instead · a curl argument mangles UTF-8 on Windows, use `--data-binary @file` · Python text mode rewrites a whole file to CRLF.
+Tooling that has bitten before: the dev server does not watch backend `src/` (restart for a new route) · Playwright MCP needs `--isolated` and cannot use `file://` · `rm -rf` follows a junction · `cd x && python` can fail silently, so check the exit status · backticks vanish inside `python -c`, use Write instead · a curl argument mangles UTF-8 on Windows, use `--data-binary @file` · **Python text mode rewrites a whole file to CRLF**, so a one-line edit lands as a whole-file diff (`write_bytes(read_bytes()...)` survives it; `check:line-endings` refuses the damage at commit).
 
 Git: parallel sessions work in a worktree · never `git add -A` (it sweeps another session's files) · the pre-commit hook reads the worktree, not the index, so an uncommitted fix greens it falsely · no scratch files in the repo root · no `Co-Authored-By` trailer.
 

@@ -117,4 +117,7 @@ pnpm -s check:copied-logic
 echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
 pnpm -s check:liaison-surface
 
+echo "[pre-commit] Staged diffs are edits, not whole-file rewrites (check:line-endings)…"
+pnpm -s check:line-endings
+
 echo "[pre-commit] ✓ all checks passed"

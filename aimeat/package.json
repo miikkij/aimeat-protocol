@@ -27,6 +27,7 @@
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
     "check:changelog": "tsx scripts/check-changelog.ts",
     "check:commit-msg": "tsx scripts/check-commit-msg.ts",
+    "check:line-endings": "tsx scripts/check-line-endings.ts",
     "build:sdk": "tsx scripts/build-sdk-libs.ts",
     "check:sdk": "tsx scripts/build-sdk-libs.ts --check",
     "check:mcp-tools": "tsx scripts/audit-mcp-tools.ts --check",
