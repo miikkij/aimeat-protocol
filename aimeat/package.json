@@ -132,6 +132,8 @@
     "check:route-scopes:report": "tsx scripts/check-route-scopes.ts",
     "check:outbound-fetch": "tsx scripts/check-outbound-fetch.ts --strict",
     "check:trusted-keys": "tsx scripts/check-trusted-keys.ts --strict",
+    "check:trusted-keys:report": "tsx scripts/check-trusted-keys.ts",
+    "check:trusted-keys:seed": "tsx scripts/check-trusted-keys.ts --seed",
     "check:ext-entrypoints": "tsx scripts/check-ext-entrypoints.ts --strict",
     "check:shared-impl": "tsx scripts/check-shared-implementation.ts --strict",
     "check:sse-parity": "tsx scripts/check-sse-parity.ts --strict",

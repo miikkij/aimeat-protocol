@@ -21664,6 +21664,8 @@ paths:
         Create a new organism (club, team, community, or project).
         The creator automatically becomes the admin member.
         A notification board is created automatically for the organism.
+        An owner session passes on being the account holder; every other principal (agent,
+        ecosystem app, published app) needs the `organism:write` scope.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -22953,9 +22955,10 @@ paths:
       tags: [Workspaces]
       summary: Create a workspace in an organism
       description: |
-        Provision a new workspace under an organism. Requires the `agent` role or the
-        `organism:write` scope, and the caller must be an active member. Optional `manifest`,
-        `schemas`, and `readme` shape the workspace's object types and content.
+        Provision a new workspace under an organism. The caller must be an active member. An owner
+        session passes on being the account holder; every other principal (agent, ecosystem app,
+        published app) needs the `organism:write` scope. Optional `manifest`, `schemas`, and `readme`
+        shape the workspace's object types and content.
       security:
         - BearerAuth: []
       parameters:
@@ -28421,7 +28424,8 @@ paths:
         instance_id. Optionally anchored to part of a document (`anchor` = { section } or { quote }),
         general (no anchor), or a threaded reply (`parent_id`). Comments are memory-backed under the
         workspace meta namespace (excluded from workspace read + content search). Any active member
-        or organism agent may comment.
+        or organism agent may comment. An owner session passes on being the account holder; every
+        other principal (agent, ecosystem app, published app) needs the `organism:write` scope.
       tags: [Organisms]
       security:
         - BearerAuth: []

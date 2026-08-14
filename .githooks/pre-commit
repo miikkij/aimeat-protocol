@@ -95,7 +95,7 @@ pnpm -s check:route-scopes
 echo "[pre-commit] Outbound fetch goes through safeFetch (check:outbound-fetch)…"
 pnpm -s check:outbound-fetch
 
-echo "[pre-commit] Server-trusted memory keys are guarded (check:trusted-keys)…"
+echo "[pre-commit] Server-trusted memory keys are guarded, and each exemption says why (check:trusted-keys)…"
 pnpm -s check:trusted-keys
 
 echo "[pre-commit] Owner-scoped tables are in both deletion cascades (check:storage-parity)…"

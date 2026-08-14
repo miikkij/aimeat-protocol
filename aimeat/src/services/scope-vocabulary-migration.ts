@@ -32,6 +32,17 @@
  *   // fire-and-forget at boot, after storage is ready
  *   migrateAgentScopeVocabulary(storage).catch(err => logger.error(…));
  * @version-history
+ *   v1.4.0 — 2026-08-14 — SECURITY: a conditional grant is decided from the OWNER-granted scopes, not
+ *     from a set this migration had already widened. agent:permissions is conditional on agent:write,
+ *     which is itself grandfathered, so the second boot handed every agent on the node the one word
+ *     that lets an agent rewrite its own permissions — a word kept out of every wildcard for exactly
+ *     that reason. Found by test/e2e-organism-scope-gate.ts asking whether a second run changes
+ *     anything; it changed two agents out of three.
+ *   v1.3.0 — 2026-08-14 — organism:write now gates three HTTP doors as well as the tools, so the
+ *     entry for it says what removing it would cost. No conditional entry was added: this list
+ *     already hands the word to every agent that has a scope list, and `*` covers it at the door, so
+ *     one would have been dead code that read like a safeguard. An agent with NO recorded scope list
+ *     is now counted and warned about instead of skipped in silence.
  *   v1.2.0 — 2026-08-11 — Says in writing that account:security is in neither list, and why a word
  *     that names NEW reach never belongs in either. Nothing executable changed.
  *   v1.1.0 — 2026-08-11 — CONDITIONAL_SCOPES: a word handed only to agents already holding the
@@ -54,6 +65,15 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
  *   ext:invoke       — run an installed extension's action
  *   organism:write   — create a workspace, write and publish in one, comment, revert
  *   organism:invite  — invite a member, grant or revoke a workspace role
+ *
+ * organism:write NOW ALSO CARRIES THREE HTTP DOORS, as of 2026-08-14: POST /v1/organisms, POST
+ * /v1/organisms/:id/workspaces and POST /v1/organisms/:id/comments. Until then all three used
+ * requireRoleOrScope('agent', 'organism:write'), whose role path admitted every agent before it read
+ * a scope, so the word bound the MCP tool surface and nothing else. Tightening them to requireScope
+ * is safe only because the word is already in this list: taking it out would not merely rename a
+ * permission, it would stop every agent on the node from creating an organism. There is deliberately
+ * NO conditional entry for it below — a conditional grant would be dead code here, because this list
+ * hands the word to every agent with a recorded scope list and `*` covers it at the door.
  */
 export const GRANDFATHERED_SCOPES = [
     'agent:write',
@@ -99,23 +119,37 @@ export const CONDITIONAL_SCOPES: ReadonlyArray<{ grant: string; when: string; wh
 export async function migrateAgentScopeVocabulary(storage: Storage): Promise<number> {
     const agents = await storage.listAgents();
     let changed = 0;
+    let noScopeList = 0;
 
     for (const agent of agents) {
         const held = agent.defaultScopes;
         // No recorded scopes at all: nothing to grandfather. An agent with none is minted from
-        // config.defaultAgentScopes, which is a separate decision.
-        if (!Array.isArray(held)) continue;
+        // config.defaultAgentScopes, which is a separate decision — and writing a list here would
+        // REPLACE that fallback rather than extend it, narrowing the agent to whatever this file
+        // happens to name. Counted instead, because it is a real population with a real consequence
+        // (see the warning below) and it was previously invisible.
+        if (!Array.isArray(held)) { noScopeList++; continue; }
 
         // The grandfathered words ride inside a wildcard already, so a '*' agent needs none of them.
         const missing: string[] = held.includes('*')
             ? []
             : GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
 
-        // The conditional words do NOT ride inside a wildcard — that is their whole point — so a
-        // '*' agent DOES need them written out, or it silently loses a tool it has today. Coverage
-        // is asked of the 'when' word, which '*' does carry.
+        // A conditional grant asks "did the OWNER already give this agent the word it depends on?",
+        // and the answer has to come from what the owner granted — never from a word this migration
+        // itself wrote on an earlier boot. Read literally, `held` mixes the two, and one pair
+        // overlaps: agent:write is GRANDFATHERED and agent:permissions is conditional on it. That
+        // handed agent:permissions — a word deliberately outside every wildcard, because it lets an
+        // agent rewrite its own permissions — to EVERY agent on the node, on the second boot, in
+        // silence. This runs on every boot, so "it only happens once" was never true of anything
+        // here. Testing coverage against the owner-granted set makes the answer the same on run one
+        // and run fifty. A '*' agent still gets these words written out, which is the whole point of
+        // the list — they sit OUTSIDE every wildcard, so a '*' agent would silently lose a tool it
+        // uses today. The filter does not touch that: '*' is not a grandfathered word, so it survives
+        // and still confers every 'when'.
+        const ownerGranted = held.filter(s => !(GRANDFATHERED_SCOPES as readonly string[]).includes(s));
         for (const c of CONDITIONAL_SCOPES) {
-            if (scopeIsCovered(held, c.when) && !held.includes(c.grant)) missing.push(c.grant);
+            if (scopeIsCovered(ownerGranted, c.when) && !held.includes(c.grant)) missing.push(c.grant);
         }
         if (!missing.length) continue;
 
@@ -127,6 +161,16 @@ export async function migrateAgentScopeVocabulary(storage: Storage): Promise<num
         logger.info('Scope vocabulary migration: existing agents grandfathered onto the new words', {
             agentsUpdated: changed,
             scopes: GRANDFATHERED_SCOPES.join(', '),
+        });
+    }
+    if (noScopeList) {
+        // These agents keep whatever config.defaultAgentScopes says, which names none of the words
+        // above. Every gate that now asks for one of them refuses this agent, and the owner's only
+        // fix is to set its scopes explicitly in the agent editor. Say so out loud rather than
+        // leaving the population to be discovered by a support ticket.
+        logger.warn('Scope vocabulary migration: agents with no recorded scope list were left alone', {
+            agents: noScopeList,
+            effect: 'they fall back to config.defaultAgentScopes, which carries none of these words',
         });
     }
     return changed;

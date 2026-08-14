@@ -17,6 +17,10 @@
  *            call as well. This file keeps the envelope and nothing else. PUT now applies the
  *            moderation gate to a status change, which it never did — publishing a public
  *            capability on a moderated node no longer skips the review the tool door enforced.
+ *   v1.2.0 - 2026-08-14 - August 2026 audit NEW-2: PUT handed the whole request body to the shared
+ *            write, so an owner could award themselves the node operator's review by patching
+ *            `trust`, and could set their own invocation counters by patching `stats`. The body is
+ *            now filtered against SERVER_OWNED_CAPABILITY_FIELDS before it leaves this file.
  */
 import { Router } from 'express';
 import {
@@ -28,6 +32,47 @@ import type { Storage, CapabilityFilter } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
+
+/**
+ * What a capability's owner may NOT put in a PUT body. Each of these is written by the node about
+ * the record, so a client that could patch one would be making the node say something it never
+ * decided. `PUT /v1/capabilities/:id` passes a body straight through to the shared write, which
+ * merges what it is given, and only `id`, `ownerGhii` and `createdAt` were ever taken back out.
+ *
+ *   trust            the operator's review verdict and the vouch count. This is the one that was
+ *                    exploitable: an owner PUT `{"trust":{"operatorReviewed":true,"codeAudited":true}}`
+ *                    on their own capability and the public directory then showed it as reviewed and
+ *                    audited by the node operator. It is written by storage.setCapabilityTrust and
+ *                    the vouch counters, nowhere else.
+ *   stats            invocation counters, written by storage.incrementCapabilityStats after a call
+ *                    that really happened. A patch could claim any usage history it liked.
+ *   operatorOverride the operator's disable switch and notes. It has its own operator-gated door,
+ *                    PUT /v1/admin/capabilities/:id/override, and invoke refuses a capability whose
+ *                    override says disabled — so a self-patch would be an un-disable.
+ *   rejectionReason  the reviewer's words about why this was refused. Same reason as trust: the
+ *                    subject of a review does not get to write the review.
+ *   schemaHash       computed at create from the input and output schemas. The aggregator compares
+ *                    it to decide a source has drifted and needs refreshing.
+ *   scope            always 'local' on this node. Federation, when it arrives, decides this.
+ *   id, ownerGhii    identity. Patching either moves the record to another address or another owner.
+ *   createdAt        the record's birth date.
+ *   updatedAt        stamped by the shared write on every patch.
+ *
+ * The last four are handled again in services/capability-record.ts, which deletes three of them and
+ * stamps updatedAt itself. They are named here anyway, because this list is the door's contract with
+ * its callers and should be readable without opening the service.
+ *
+ * A forbidden field is dropped rather than refused: the response carries the stored record, so a
+ * client sees that its value did not take, and a UI that PUTs a whole record back keeps working.
+ *
+ * The MCP door needs none of this. `aimeat_capabilities_update` declares a fixed parameter list and
+ * copies the eight fields it accepts into a fresh object, so nothing else can arrive. That is the
+ * difference between a tool that publishes its parameters and a route that takes a body.
+ */
+const SERVER_OWNED_CAPABILITY_FIELDS = [
+  'trust', 'stats', 'operatorOverride', 'rejectionReason', 'schemaHash', 'scope',
+  'id', 'ownerGhii', 'createdAt', 'updatedAt',
+] as const;
 
 export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -103,7 +148,11 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
   });
 
   router.put('/v1/capabilities/:id', requireAuth(), requireRole('owner'), async (req, res) => {
-    const updated = await updateCapability({ storage, config }, caller(req), req.params.id as string, req.body);
+    // The body is the caller's, so the fields the node owns come out before it goes any further.
+    const patch: Record<string, unknown> = { ...(req.body as Record<string, unknown> | null ?? {}) };
+    for (const field of SERVER_OWNED_CAPABILITY_FIELDS) delete patch[field];
+
+    const updated = await updateCapability({ storage, config }, caller(req), req.params.id as string, patch);
     if (!updated.ok) return res.status(updated.status).json(error(config.nodeId, updated.code, updated.message));
     res.json(success(config.nodeId, updated.value));
   });

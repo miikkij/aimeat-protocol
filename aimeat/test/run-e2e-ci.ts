@@ -1,11 +1,29 @@
 /**
  * @file run-e2e-ci.ts
  * @description Cross-platform E2E test runner with automatic server lifecycle and backend cleanup.
- * @structure Suite list, server lifecycle helpers, database cleanup, per-suite execution, and summary reporting.
+ * @structure Suite list, argument parsing, per-suite execution, and summary reporting. The node
+ *   under test -- its environment, its lifecycle and its database -- lives in run-e2e-server.ts.
  * @usage
  *   node --import tsx test/run-e2e-ci.ts
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  * @version-history
+ *   v1.15.0 -- 2026-08-14 -- Add e2e-organism-scope-gate.ts (August 2026 audit: organism:write on the
+ *            three organism write doors, plus the boot migration that keeps an existing agent from
+ *            losing the capability).
+ *   v1.14.0 -- 2026-08-14 -- Fix the instrument, in the three ways the August 2026 audit measured.
+ *            (1) The database is emptied before the FIRST suite, not only between suites: the clean
+ *            sat under `if (i > 0 …)`, so a solo run started on whatever the last run left, and
+ *            three audit conclusions came out backwards. (2) Between suites the runner now waits
+ *            for the old server to have EXITED and for its port to be free, bounded and fatal,
+ *            instead of sleeping one second and hoping; when that second was short the file delete
+ *            failed or the next suite talked to a server still up on the old data, which reads as
+ *            hundreds of unrelated 403s. (3) Every variable that changes behaviour is pinned, each
+ *            suite process is handed the same pins as the server, and any key the developer's own
+ *            aimeat/.env still gets to decide is printed by name. Lifecycle, environment and
+ *            cleanup moved to run-e2e-server.ts by pure extraction: this file was at 789 lines
+ *            against a cap of 800, and the fixes needed room.
+ *   v1.13.0 -- 2026-08-14 -- Add e2e-capability-trust-guard.ts (August 2026 audit NEW-2: the fields
+ *            of a capability record that only the node may write).
  *   v1.12.0 -- 2026-08-12 -- Pin AIMEAT_AI_COP_SECTIONS / _SIGNED_ON on the shared server. The server
  *            fills any unset key from ./aimeat/.env, so the developer's own Code of Practice signature
  *            reached the test node while the test process could not see it, and e2e-ai-provenance
@@ -53,8 +71,15 @@
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, unlinkSync } from 'node:fs';
-import { resolve, basename } from 'node:path';
+import { basename } from 'node:path';
+import {
+    cleanDatabase,
+    pinnedEnv,
+    reportEnvLeaks,
+    resolveTarget,
+    startServer,
+    stopServer,
+} from './run-e2e-server.js';
 
 const ALL_SUITES = [
     'test/api-full.ts',
@@ -211,6 +236,11 @@ const ALL_SUITES = [
     'test/e2e-mcp-workspaces.ts',
     'test/e2e-organism-workspace-access.ts',
     'test/e2e-organism-provision.ts',
+    // organism:write on the three organism WRITE doors. They used requireRoleOrScope('agent', …),
+    // whose role path runs before it reads a scope, so the word bound the MCP tool surface and let
+    // the same agent create organisms over HTTP. Includes the boot migration that keeps an existing
+    // agent from losing the capability, run against the real backend.
+    'test/e2e-organism-scope-gate.ts',
     'test/e2e-intake.ts',
     'test/e2e-organism-workspace-engagements.ts',
     'test/e2e-write-guards.ts',
@@ -292,6 +322,9 @@ const ALL_SUITES = [
     'test/e2e-storage-visibility.ts',
     'test/e2e-subdomains.ts',
     'test/e2e-capabilities.ts',
+    // The other side of the capability record: the fields the NODE writes about it. PUT merged the
+    // whole body, so an owner could award themselves the operator's review.
+    'test/e2e-capability-trust-guard.ts',
     'test/e2e-upload.ts',
     'test/cortex-ui-e2e.ts',
     // The cortex CORE suite, as opposed to cortex-ui above. Left out on 2026-07-10 over "2
@@ -355,50 +388,8 @@ const ALL_SUITES = [
     'test/e2e-cortex-upload-ownership.ts',
 ];
 
-const PORT = process.env.AIMEAT_PORT ?? '40251';
-// External mode (test an already-running server instead of auto-starting one) must be
-// opted into explicitly with AIMEAT_E2E_EXTERNAL=1. A bare AIMEAT_BASE_URL is commonly
-// exported to point the CLI/agents at a remote node (e.g. https://aimeat.io) — it must
-// NOT silently hijack a local DB-backed test run into testing that remote server.
-const USE_EXTERNAL_SERVER = process.env.AIMEAT_E2E_EXTERNAL === '1' && !!process.env.AIMEAT_BASE_URL;
-const BASE_URL = (USE_EXTERNAL_SERVER ? (process.env.AIMEAT_BASE_URL as string) : `http://localhost:${PORT}`).replace(/\/+$/, '');
-if (!USE_EXTERNAL_SERVER && process.env.AIMEAT_BASE_URL) {
-    console.warn(`⚠ Ignoring AIMEAT_BASE_URL=${process.env.AIMEAT_BASE_URL} — auto-starting a local server on :${PORT}. Set AIMEAT_E2E_EXTERNAL=1 to test that external server instead.`);
-}
-const DB_TYPE = process.env.AIMEAT_DB ?? 'memory';
-
-interface SyncCommandError {
-    message?: string;
-    status?: number | null;
-    signal?: string | null;
-    stdout?: Buffer | string;
-    stderr?: Buffer | string;
-}
-
-function redactDbCredentials(text: string): string {
-    return text
-        .replace(/(mongodb(?:\+srv)?:\/\/)([^@\s/]+)@/gi, '$1<credentials>@')
-        .replace(/(postgres(?:ql)?:\/\/)([^@\s/]+)@/gi, '$1<credentials>@');
-}
-
-function commandOutputText(value: unknown): string {
-    if (Buffer.isBuffer(value)) return value.toString('utf8');
-    return typeof value === 'string' ? value : '';
-}
-
-function warnPostgresCleanupFailure(error: unknown): void {
-    const commandError = error as SyncCommandError;
-    const message = redactDbCredentials(commandError.message ?? String(error));
-    const stderr = redactDbCredentials(commandOutputText(commandError.stderr).trim());
-    const stdout = redactDbCredentials(commandOutputText(commandError.stdout).trim());
-
-    console.warn('Could not reset PostgreSQL test database. Tests may fail if stale data exists.');
-    console.warn(`PostgreSQL cleanup error: ${message}`);
-    if (commandError.status !== undefined && commandError.status !== null) console.warn(`PostgreSQL cleanup exit status: ${commandError.status}`);
-    if (commandError.signal) console.warn(`PostgreSQL cleanup signal: ${commandError.signal}`);
-    if (stderr) console.warn(`pg stderr:\n${stderr}`);
-    if (stdout) console.warn(`pg stdout:\n${stdout}`);
-}
+const TARGET = resolveTarget();
+const BASE_URL = TARGET.baseUrl;
 
 // ── Parse CLI args ──
 function parseArgs(): string[] {
@@ -433,192 +424,15 @@ function parseArgs(): string[] {
     return tests.length > 0 ? tests : ALL_SUITES;
 }
 
-// ── Server lifecycle ──
-async function startServer(): Promise<ChildProcess> {
-    const env = {
-        ...process.env,
-        AIMEAT_PORT: PORT,
-        // Force the test server's public base URL to the local address. Otherwise a
-        // stray AIMEAT_BASE_URL in the shell (e.g. https://aimeat.io) leaks in via
-        // ...process.env and the server builds presigned upload/download URLs pointing
-        // at that remote node — the local server signs the token but the PUT/GET hits
-        // the remote, which verifies with a different key → 401 "signature verification
-        // failed". --env-file cannot override an already-set shell var, so do it here.
-        AIMEAT_BASE_URL: BASE_URL,
-        AIMEAT_RL_GLOBAL: process.env.AIMEAT_RL_GLOBAL ?? '10000',
-        AIMEAT_RL_AUTH: process.env.AIMEAT_RL_AUTH ?? '1000',
-        AIMEAT_RL_WORK: process.env.AIMEAT_RL_WORK ?? '1000',
-        AIMEAT_RL_MEMORY: process.env.AIMEAT_RL_MEMORY ?? '1000',
-        AIMEAT_RL_BOARDS: process.env.AIMEAT_RL_BOARDS ?? '1000',
-        // Registration is limited to 5 per 60s by default, which several suites already sit right
-        // against — hence their 429-retry loops. Pin it like the other limiters so a suite adding
-        // one more account does not cascade into unrelated failures. No suite asserts this 429.
-        AIMEAT_REGISTRATION_RATE_LIMIT_MAX: process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '1000',
-        AIMEAT_DEFAULT_AGENT_SCOPES: process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*',
-        // Capability publishing is 'disabled' by default in prod, so every capability assertion in
-        // the suites either exercised the disabled policy or returned early having proven nothing.
-        // 'self_only' lets an owner publish their own, which is what the suites are actually about;
-        // e2e-mcp-cross-owner still asserts the disabled branch when a node has it off.
-        AIMEAT_CAPABILITY_PUBLISHING: process.env.AIMEAT_CAPABILITY_PUBLISHING ?? 'self_only',
-        // Connector forward tunnel is opt-in (off by default in prod); enable it
-        // for every e2e run so the tunnel suites work in CI too (the .env.test.*
-        // files are gitignored, so they can't carry this for CI).
-        AIMEAT_CONNECT_TUNNEL_ENABLED: process.env.AIMEAT_CONNECT_TUNNEL_ENABLED ?? 'true',
-        // Outbound connections (TARGET-057) are opt-in and off by default in prod; on for every
-        // e2e run, same reason as the tunnel flag above (the .env.test.* files are gitignored, so
-        // they cannot carry it for CI). The fake provider's port is FIXED because the server reads
-        // this at boot, before the test process has started the provider — they can only meet on a
-        // port agreed in advance.
-        AIMEAT_CONNECTIONS_ENABLED: process.env.AIMEAT_CONNECTIONS_ENABLED ?? 'true',
-        AIMEAT_CONNECT_FAKE_BASE_URL: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:40388',
-        // The fake provider lives on loopback, which safeFetch refuses by default and must.
-        AIMEAT_ALLOW_PRIVATE_EGRESS: process.env.AIMEAT_ALLOW_PRIVATE_EGRESS ?? 'true',
-        AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
-        // Outbound door daily limit kept small so e2e-outbound can actually reach the 429
-        // without sending two hundred messages (default in prod code is 200).
-        AIMEAT_OUTBOUND_DAILY_LIMIT: process.env.AIMEAT_OUTBOUND_DAILY_LIMIT ?? '8',
-        // The server falls back to loading ./aimeat/.env for any key NOT already present in its
-        // env (src/index.ts) — on a dev machine that file holds REAL SMTP credentials, and an e2e
-        // send once reached the real SMTP server through exactly this hole. An empty string counts
-        // as present, so pinning '' here keeps the test server's email service disabled.
-        AIMEAT_SMTP_HOST: process.env.AIMEAT_SMTP_HOST ?? '',
-        // The same hole, and what came through it is a public compliance claim. AIMEAT_AI_COP_SECTIONS
-        // names the EU Code of Practice sections the OPERATOR signed, and /v1/ai-transparency reports
-        // `signatory: true` from it. A developer's own .env holds a real signature, so the test server
-        // inherited it on any backend whose .env.test.* file did not carry the pair, while the test
-        // process, which derives what it expects from its own env, saw nothing. e2e-ai-provenance then
-        // failed on postgres and passed on sqlite off the same code, which reads as a route regression
-        // and is not one. Pinned as a PAIR because a signature date without sections is half a claim,
-        // and an empty string counts as present, so an unset var gives the shipped "not a signatory".
-        AIMEAT_AI_COP_SECTIONS: process.env.AIMEAT_AI_COP_SECTIONS ?? '',
-        AIMEAT_AI_COP_SIGNED_ON: process.env.AIMEAT_AI_COP_SIGNED_ON ?? '',
-        // Finvoice delivery uses the in-process mock operator in every e2e run so the
-        // submit/refresh loop is provable without an operator account.
-        AIMEAT_FINVOICE_OPERATOR: process.env.AIMEAT_FINVOICE_OPERATOR ?? 'mock',
-        // The company origin is opt-in and off by default in prod; on for every e2e run so
-        // the co-family serving half is provable. The host is fixed because the server reads
-        // it at boot — the suite and the server can only meet on a name agreed in advance.
-        AIMEAT_CO_HOST: process.env.AIMEAT_CO_HOST ?? 'co.localhost',
-        AIMEAT_CO_ORIGIN_ENABLED: process.env.AIMEAT_CO_ORIGIN_ENABLED ?? 'true',
-        // A fixed 32-byte (hex) encryption key so features that encrypt at rest work in
-        // e2e (extension secrets, TOTP, and the app copy-protection watermark + decode).
-        AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-        AIMEAT_ANONYMOUS: process.env.AIMEAT_ANONYMOUS ?? 'true',
-        AIMEAT_FEDERATION_AUTH_POLICY: process.env.AIMEAT_FEDERATION_AUTH_POLICY ?? 'all_peers',
-        // Short refresh-token rotation grace so e2e-session-refresh can exercise
-        // reuse-detection (prev-token-after-grace) without a 60s wait.
-        AIMEAT_REFRESH_GRACE_MS: process.env.AIMEAT_REFRESH_GRACE_MS ?? '1500',
-        // Pin the H-2 app origin OFF on the shared server so suites are deterministic even when
-        // the dev .env enables it (the server loads .env; a stray apps.<host> would 301 apex
-        // app URLs and reject localhost grant redirect_uris). e2e-app-origin self-spawns its
-        // own flag-ON server, so it is unaffected.
-        AIMEAT_APP_ORIGIN_ENABLED: 'false',
-        AIMEAT_APP_HOST: '',
-        // Same pinning for the portfolio origin — e2e-portfolio-origin self-spawns
-        // its own flag-ON server.
-        AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false',
-        AIMEAT_PORTFOLIO_HOST: '',
-        // x402 settlement: pin the rail ON and settle against the OFF-CHAIN double. e2e-x402 needs
-        // the handler registered, and its X-PAYMENT proofs carry a FIXED placeholder signature
-        // (`0x` + 'ab' × 65) from an address nobody holds a key for — a real facilitator rejects
-        // that with `invalid_exact_evm_signature`, by design. Without these pins the outcome
-        // depended on the developer's own .env, which the server loads itself (src/index.ts): a
-        // machine whose .env sets AIMEAT_X402_ENABLED=true ran the suite against the LIVE
-        // x402.org facilitator and failed the settling tests, while a machine without it failed
-        // the earlier ones for want of a registered handler. Neither is a regression, and both
-        // read like one. Set either var explicitly to override — e2e-x402-testnet self-skips
-        // unless AIMEAT_X402_TEST_FACILITATOR is turned off, which is how the real-network
-        // acceptance run is opted into.
-        AIMEAT_X402_ENABLED: process.env.AIMEAT_X402_ENABLED ?? 'true',
-        AIMEAT_X402_TEST_FACILITATOR: process.env.AIMEAT_X402_TEST_FACILITATOR ?? 'true',
-    };
-
-    const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];
-    if (DB_TYPE === 'sqlite') {
-        const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
-        serverArgs.push('--db-path', dbPath);
-    } else if (DB_TYPE === 'postgres-kysely') {
-        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-        if (dbUrl) serverArgs.push('--db-url', dbUrl);
-    }
-
-    const child = spawn('node', serverArgs, {
-        env,
-        stdio: ['ignore', 'pipe', 'pipe'],
-        cwd: process.cwd(),
-    });
-
-    child.stdout?.on('data', () => { }); // drain
-    child.stderr?.on('data', () => { }); // drain
-
-    // Wait for server ready
-    const maxWait = 60_000;
-    const start = Date.now();
-    while (Date.now() - start < maxWait) {
-        try {
-            const res = await fetch(`${BASE_URL}/v1/spec`);
-            if (res.ok) return child;
-        } catch { }
-        await new Promise(r => setTimeout(r, 300));
-    }
-    child.kill('SIGTERM');
-    throw new Error(`Server failed to start within ${maxWait}ms`);
-}
-
-function killServer(child: ChildProcess): void {
-    if (!child.killed) {
-        child.kill('SIGTERM');
-        // Force kill after 3s
-        setTimeout(() => { if (!child.killed) child.kill('SIGKILL'); }, 3000);
-    }
-}
-
-// ── Clean database between suites ──
-/** Empty every table for the Postgres+Kysely backend EXCEPT `_kysely_migrations` — so the schema and the
- *  applied-migration ledger survive (the server's runMigrations skips them) while all data is cleared.
- *  Uses the raw `pg` client (no Prisma). A no-op on a fresh DB where no tables exist yet. */
-async function resetKyselyPgTables(dbUrl: string): Promise<void> {
-    const pg = (await import('pg')).default;
-    const client = new pg.Client(dbUrl);
-    await client.connect();
-    try {
-        await client.query(`DO $$
-DECLARE r RECORD;
-BEGIN
-  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_kysely_migrations') LOOP
-    EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
-  END LOOP;
-END $$;`);
-    } finally {
-        await client.end();
-    }
-}
-
-async function cleanDatabase(): Promise<void> {
-    if (DB_TYPE === 'sqlite') {
-        const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
-        const resolved = resolve(process.cwd(), dbPath);
-        for (const suffix of ['', '-shm', '-wal']) {
-            const f = resolved + suffix;
-            if (existsSync(f)) unlinkSync(f);
-        }
-    } else if (DB_TYPE === 'postgres-kysely') {
-        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-        if (dbUrl) {
-            try {
-                await resetKyselyPgTables(dbUrl);
-            } catch (error) {
-                warnPostgresCleanupFailure(error);
-            }
-        }
-    }
-}
-
 // ── Run a single test suite ──
 function runTest(suitePath: string): Promise<{ output: string; exitCode: number }> {
-    return new Promise((resolve) => {
+    return new Promise((settle) => {
+        // The suite gets the SAME pins as the server. A suite derives what it expects from its own
+        // environment, so any pin it cannot see is a place where the two can disagree about what is
+        // being tested: e2e-x402-testnet skips when the off-chain double is in use, could not see
+        // that it was, and so ran its real-network acceptance cases against the double.
         const child = spawn('node', ['--import', 'tsx', suitePath], {
-            env: { ...process.env, AIMEAT_PORT: PORT, AIMEAT_BASE_URL: BASE_URL, E2E_BASE: BASE_URL },
+            env: { ...process.env, ...pinnedEnv(TARGET), E2E_BASE: BASE_URL },
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: process.cwd(),
         });
@@ -636,7 +450,7 @@ function runTest(suitePath: string): Promise<{ output: string; exitCode: number 
         });
 
         child.on('close', (code) => {
-            resolve({ output, exitCode: code ?? 1 });
+            settle({ output, exitCode: code ?? 1 });
         });
     });
 }
@@ -672,41 +486,30 @@ async function main() {
     const suites = parseArgs();
     console.log(`\n${'='.repeat(50)}`);
     console.log(`  AIMEAT E2E Test Runner`);
-    console.log(`  Server: ${USE_EXTERNAL_SERVER ? BASE_URL + ' (external)' : `auto-start on :${PORT}`}`);
-    console.log(`  Storage: ${DB_TYPE}`);
+    console.log(`  Server: ${TARGET.external ? BASE_URL + ' (external)' : `auto-start on :${TARGET.port}`}`);
+    console.log(`  Storage: ${TARGET.dbType}${TARGET.dbType === 'sqlite' ? ` (${TARGET.dbPath})` : ''}`);
     console.log(`  Suites: ${suites.length}`);
     console.log(`${'='.repeat(50)}\n`);
 
     let server: ChildProcess | null = null;
 
-    // Clean up stale data so each run starts fresh
-    if (DB_TYPE === 'sqlite') {
-        const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
-        const resolved = resolve(process.cwd(), dbPath);
-        if (existsSync(resolved)) {
-            unlinkSync(resolved);
-            console.log(`Deleted stale test DB: ${resolved}`);
-        }
-    } else if (DB_TYPE === 'postgres-kysely') {
-        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-        if (dbUrl) {
-            const dbName = new URL(dbUrl).pathname.replace('/', '');
-            console.log(`Resetting Postgres+Kysely test database "${dbName}"...`);
-            try {
-                // No prisma db push — the server's own migration runner builds the schema on boot. This just
-                // empties every table EXCEPT _kysely_migrations (so the recorded migrations aren't re-run).
-                await resetKyselyPgTables(dbUrl);
-                console.log('Postgres+Kysely test database reset.');
-            } catch (error) {
-                warnPostgresCleanupFailure(error);
-            }
-        }
-    }
+    reportEnvLeaks(pinnedEnv(TARGET));
 
-    if (!USE_EXTERNAL_SERVER) {
+    // Empty the database BEFORE the first suite, by the same call the loop makes between suites.
+    // The version that ran only between them left suite one on whatever the previous run wrote,
+    // so a solo run of any suite was a run against stale data.
+    if (!TARGET.external) {
+        try {
+            await cleanDatabase(TARGET);
+            console.log(`Cleaned ${TARGET.dbType} test database before the first suite.`);
+        } catch (e) {
+            console.error(`Could not empty the test database: ${(e as Error).message}`);
+            process.exit(1);
+        }
+
         console.log('Starting server...');
         try {
-            server = await startServer();
+            server = await startServer(TARGET);
             console.log('Server ready.\n');
         } catch (e) {
             console.error(`Failed to start server: ${(e as Error).message}`);
@@ -722,12 +525,14 @@ async function main() {
             const suite = suites[i];
             const name = basename(suite, '.ts');
 
-            // Clean DB and restart server between suites for isolation
-            if (i > 0 && server && !USE_EXTERNAL_SERVER) {
-                killServer(server);
-                await new Promise(r => setTimeout(r, 1000));
-                await cleanDatabase();
-                server = await startServer();
+            // Clean DB and restart server between suites for isolation. stopServer does not return
+            // until the old process is gone and its port is free, so the delete below cannot fail
+            // on a live file handle and the next suite cannot reach the previous server.
+            if (i > 0 && server && !TARGET.external) {
+                await stopServer(server, TARGET);
+                server = null;
+                await cleanDatabase(TARGET);
+                server = await startServer(TARGET);
             }
 
             console.log(`\n${'─'.repeat(40)}`);
@@ -744,9 +549,11 @@ async function main() {
         }
     } finally {
         if (server) {
-            killServer(server);
-            // Allow graceful shutdown
-            await new Promise(r => setTimeout(r, 1000));
+            // Reported, not thrown: a failure to shut down must not replace whatever error brought
+            // us into this block, which is the thing the reader needs.
+            await stopServer(server, TARGET).catch((e: unknown) => {
+                console.error(`Could not stop the test server: ${(e as Error).message}`);
+            });
         }
     }
 

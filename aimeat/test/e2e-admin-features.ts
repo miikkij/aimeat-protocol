@@ -169,11 +169,26 @@ await test('GET /v1/admin/email/status \u2192 200, has enabled field', async () 
     assert(typeof body.data?.confirmation_required === 'boolean', 'has confirmation_required');
 });
 
-await test('POST /v1/admin/email/test \u2192 200, sent', async () => {
+await test('POST /v1/admin/email/test → sends, or says the node has no SMTP', async () => {
+    // This needs a mail server, and the runner deliberately does not configure one: sending real
+    // mail from a test suite is not something a run should do by accident. The status endpoint
+    // above already told us whether email is on, so read THAT rather than demanding a send the node
+    // cannot make. Until 2026-08-14 this asserted 200 unconditionally and was red on every machine
+    // without SMTP, which is one of the failures that made a full sweep unreadable: an assertion
+    // that can never pass here teaches everyone to ignore the colour.
+    const status0 = await json('/v1/admin/email/status', authed());
+    const emailOn = status0.body?.data?.enabled === true;
+
     const { status, body } = await json('/v1/admin/email/test', authed({
         method: 'POST',
         body: JSON.stringify({ to: 'notifications@aimeat.io' }),
     }));
+
+    if (!emailOn) {
+        assert(status === 400 && body?.error?.code === 'EMAIL_DISABLED',
+            `an unconfigured node must refuse the send and SAY so, got ${status}: ${JSON.stringify(body)}`);
+        return;
+    }
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(body.data?.sent === true, 'sent');

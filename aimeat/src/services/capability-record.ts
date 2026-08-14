@@ -37,6 +37,10 @@
  *   v1.1.0 — 2026-08-11 — The whole write moves here (August 2026 audit step 8): create, update,
  *     delete, vouch and the post-invoke record, with the four differences above collapsed onto the
  *     HTTP door's behaviour, apart from the update-time moderation gate where the tool was right.
+ *   v1.2.0 — 2026-08-14 — The webhook policy gate reads the NORMALISED source (audit NEW-1). It read
+ *     the caller's own `source`, so a body with a webhookUrl and no `source` skipped WEBHOOKS_DISABLED
+ *     and the domain allowlist and was stored as the manual webhook capability the gate would have
+ *     refused. Both doors were affected: the gate lives here, and the tools reach the same function.
  */
 import { randomUUID, createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -163,6 +167,10 @@ export function buildCapabilityRecord(
  * on both backends. Defaulting only when source was ABSENT let a partial object — the natural
  * `{type:'manual'}` — reach the insert with ref undefined and crash it into a 500. Normalise per
  * field, and refuse the cases where a placeholder ref would produce an unresolvable record.
+ *
+ * This is also what the webhook policy gate reads, so the defaults here are a security decision as
+ * well as a storage one: whatever type this returns is the type the record is built with, and the
+ * gate must see the same one. Move the call after the gate and the gap it closed reopens.
  */
 function normaliseSource(raw: unknown): CapabilityResult<CapabilityRecord['source']> {
     const obj = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {};
@@ -196,12 +204,20 @@ export async function createCapability(
         }
     }
 
-    // Webhook domain allowlist, checked against the source the caller SENT. Omitting `source`
-    // entirely therefore skips it, even though the record is then built as a manual capability
-    // carrying the webhook. That gap is the HTTP door's and predates this file; it is reported in
-    // the August 2026 audit rather than closed here, because closing it moves a gate.
-    const rawSource = (input.source && typeof input.source === 'object') ? input.source as Record<string, unknown> : {};
-    if (input.webhookUrl && rawSource.type === 'manual') {
+    // Normalise BEFORE the webhook gate, and gate on the normalised value. This ordering is the
+    // fix, not a tidy-up: the gate used to read `input.source.type` while the record was built from
+    // a source that defaults a missing type to 'manual', so a body carrying a webhookUrl and no
+    // `source` at all skipped both WEBHOOKS_DISABLED and the domain allowlist and was then stored
+    // as exactly the manual webhook capability the gate would have refused. The gate and the record
+    // disagreed about what the request was, and on a node running 'disabled' or 'allowlist_only'
+    // the operator's setting was one omitted field away from meaning nothing. Invariant 13 in
+    // docs/coding-guidelines/security-development-dna.md. Nothing may be read from `input.source`
+    // below this line.
+    const source = normaliseSource(input.source);
+    if (!source.ok) return source;
+
+    // Webhook policy, on the source the record will actually carry.
+    if (input.webhookUrl && source.value.type === 'manual') {
         if (config.capabilityWebhooks === 'disabled') {
             return refuse(403, 'WEBHOOKS_DISABLED', 'Webhook capabilities are disabled on this node');
         }
@@ -217,9 +233,6 @@ export async function createCapability(
             }
         }
     }
-
-    const source = normaliseSource(input.source);
-    if (!source.ok) return source;
 
     const schemaHash = createHash('sha256')
         .update(JSON.stringify(input.inputSchema ?? {}) + JSON.stringify(input.outputSchema ?? {}))

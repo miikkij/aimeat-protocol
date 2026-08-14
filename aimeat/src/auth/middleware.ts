@@ -12,6 +12,10 @@
  *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
  *
  * @version-history
+ *   v1.4.0 — 2026-08-14 — requireRoleOrScope() says in its own doc that the role path makes the
+ *     named scope decorative FOR THAT ROLE, which is how organism:write came to be enforced on the
+ *     MCP tool surface and ignored on the three HTTP doors that write. Nothing executable changed
+ *     here; the three organism routes moved to requireScope('organism:write').
  *   v1.3.0 — 2026-08-13 — The session-revocation check moved into optionalAuth(), where the token is
  *     actually verified. It lived in requireAuth() behind an early return that server.ts makes
  *     unconditional: optionalAuth() is mounted globally, so requireAuth() always found req.auth
@@ -512,12 +516,24 @@ export function requireLocalSession() {
  * Agents with explicit scopes are always enforced, even if their owner is an operator.
  */
 /**
- * Pass if the caller satisfies requireRole(role) OR carries one of `scopes`. Generalizes the
- * organism:invite pattern: a role-'app' (H-2) or ecosystem session with an explicit owner-granted
- * scope may do what agents/owners can do by role — without weakening the role path (existing
- * agent/owner/operator callers keep working regardless of their scopes). Used to let a published app
- * provision an organism/workspace on its owner's behalf (organism:write) the same way it can invite
- * (organism:invite).
+ * Pass if the caller satisfies requireRole(role) OR carries one of `scopes`. Lets a role-'app' (H-2)
+ * or ecosystem session with an explicit owner-granted scope do what the named role can do.
+ *
+ * READ THIS BEFORE REACHING FOR IT. The role path runs FIRST and unconditionally, so for the role
+ * named here the scope is DECORATIVE: an agent passed requireRoleOrScope('agent', 'organism:write')
+ * whether or not its owner ticked organism:write. That was measured on a running node — an agent
+ * holding seven explicit scopes without the word could not even SEE aimeat_organism_create on its
+ * MCP surface, because the tool surface filters on that same word at registration, and the same
+ * agent got 201 Created from POST /v1/organisms. Enforced on the surface the owner reads, ignored on
+ * the door that writes: security DNA invariant 15.
+ *
+ * So this helper is right only where the ROLE is the permission and the scope WIDENS it to a
+ * principal class that does not carry that role. requireRoleOrScope('owner', 'agent:delete') is that
+ * shape: the owner may delete their own agent by being the owner, and a fleet-managing agent may do
+ * it on the explicit word. It is the wrong shape whenever the scope is meant to bind the same
+ * principals the role already admits — there, use requireScope(), which keeps the owner-session
+ * bypass and refuses an agent that lacks the word. The three organism write doors moved to
+ * requireScope on 2026-08-14 for exactly that reason; see routes/organisms/crud.ts.
  */
 export function requireRoleOrScope(role: string, ...scopes: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {

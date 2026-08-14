@@ -1,6 +1,18 @@
-// E2E test for AIMEAT Capability Layer
-//
-// Run: pnpm test:e2e (auto-discovered by test runner)
+/**
+ * @file test/e2e-capabilities.ts
+ * @description E2E for the capability layer over the HTTP door: manual CRUD, visibility, invoke,
+ *   stats, the cortex and extension aggregators, vouch, cross-owner list isolation, and the webhook
+ *   policy gate.
+ * @usage
+ *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-capabilities
+ * @version-history
+ *   v1.1.0 — 2026-08-14 — Phase 11: the webhook policy gate. A body carrying a webhookUrl and no
+ *     `source` at all used to skip both WEBHOOKS_DISABLED and the domain allowlist, and was then
+ *     stored as the manual webhook capability the gate would have refused (August 2026 audit,
+ *     NEW-1). The allowlist half runs against a node this suite spawns itself, because
+ *     capabilityWebhooks is read at boot and the shared test server boots with it 'disabled'.
+ *   v1.0.0 — 2026-08-14 — Header added; file pre-dates the header standard.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -24,8 +36,10 @@ function assert(cond: boolean, msg: string) {
     if (!cond) throw new Error(msg);
 }
 
-async function json(path: string, opts: RequestInit = {}) {
-    const res = await fetch(`${BASE}${path}`, {
+// `base` is the node being driven. Everything runs against the shared test server except Phase 11,
+// which spawns a second node because the webhook policy is read at boot and cannot be changed after.
+async function json(path: string, opts: RequestInit = {}, base = BASE) {
+    const res = await fetch(`${base}${path}`, {
         ...opts,
         headers: { 'Content-Type': 'application/json', ...opts.headers },
     });
@@ -36,6 +50,9 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync, unlinkSync } from 'node:fs';
+import { resolve } from 'node:path';
 ed.hashes.sha512 = (m: Uint8Array) =>
     new Uint8Array(createHash('sha512').update(m).digest());
 
@@ -734,6 +751,141 @@ await test('Cleanup B + operator caps', async () => {
     for (const id of [opPrivCap, opPubCap]) {
         await json(`/v1/capabilities/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${ownerToken}` } });
     }
+});
+
+// ─── Phase 11: the webhook gate reads the NORMALISED source (August 2026 audit, NEW-1) ───
+// POST /v1/capabilities checked the webhook policy against the source the CALLER SENT, while the
+// record was built from a source that defaults a missing type to 'manual'. So a body carrying a
+// webhookUrl and no `source` at all walked past WEBHOOKS_DISABLED and the domain allowlist and was
+// then stored as exactly the manual webhook capability the gate would have refused: one omitted
+// field and the operator's setting meant nothing. Invariant 13 in security-development-dna.md.
+// Both shapes must be answered identically, and a refusal must leave nothing behind.
+console.log('\nPhase 11 — Webhook gate reads the normalised source');
+
+const WEBHOOK_SHAPES: [string, Record<string, unknown> | undefined][] = [
+    ['source sent', { type: 'manual', ref: 'manual', version: '1.0.0' }],
+    ['source omitted', undefined],
+];
+
+function webhookBody(id: string, source: Record<string, unknown> | undefined, url: string) {
+    return JSON.stringify({
+        id, name: 'Hook cap', summary: 'carries a webhook', visibility: 'private',
+        webhookUrl: url, ...(source ? { source } : {}),
+    });
+}
+
+await test('Webhooks disabled: refused with AND without `source`, and nothing is stored', async () => {
+    const { body: list } = await json('/v1/capabilities');
+    assert(list.data?.policy?.webhooks === 'disabled',
+        `this node must boot with capabilityWebhooks=disabled, got '${list.data?.policy?.webhooks}'`);
+    for (const [label, source] of WEBHOOK_SHAPES) {
+        const id = 'hook-off-' + Math.random().toString(36).slice(2, 8);
+        const { status, body } = await json('/v1/capabilities', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${ownerToken}` },
+            body: webhookBody(id, source, 'https://elsewhere.test/hook'),
+        });
+        assert(status === 403 && body.error?.code === 'WEBHOOKS_DISABLED',
+            `${label}: expected 403 WEBHOOKS_DISABLED, got ${status} ${body.error?.code ?? JSON.stringify(body.data)}`);
+        const back = await json(`/v1/capabilities/${id}`, { headers: { 'Authorization': `Bearer ${ownerToken}` } });
+        assert(back.status === 404, `${label}: a refused capability must not be stored, got ${back.status}`);
+    }
+});
+
+// The allowlist branch is a boot-time setting, so it needs a node of its own. The port is derived
+// from this suite's own so two suites running side by side cannot land on the same one.
+const ALT_PORT = String(Number(new URL(BASE).port || '80') + 500);
+const ALT_BASE = `http://localhost:${ALT_PORT}`;
+const ALT_DB = resolve(process.cwd(), `test/.caps-allowlist-${ALT_PORT}.db`);
+let altNode: ChildProcess | null = null;
+let altToken = '';
+
+function cleanupAltDb() {
+    for (const f of [ALT_DB, ALT_DB + '-wal', ALT_DB + '-shm']) {
+        try { if (existsSync(f)) unlinkSync(f); } catch { /* a leftover file is not worth failing over */ }
+    }
+}
+
+async function startAllowlistNode(): Promise<ChildProcess> {
+    cleanupAltDb();
+    const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', ALT_DB], {
+        env: {
+            ...process.env,
+            AIMEAT_PORT: ALT_PORT,
+            AIMEAT_BASE_URL: ALT_BASE,
+            // The whole point of this node: webhooks admitted only from one named domain.
+            AIMEAT_CAPABILITY_WEBHOOKS: 'allowlist_only',
+            AIMEAT_CAPABILITY_WEBHOOK_DOMAIN_ALLOWLIST: 'hooks.example.test',
+            AIMEAT_CAPABILITY_PUBLISHING: 'self_only',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        cwd: process.cwd(),
+    });
+    child.stdout?.on('data', () => {});
+    child.stderr?.on('data', () => {});
+    const started = Date.now();
+    while (Date.now() - started < 60_000) {
+        try { if ((await fetch(`${ALT_BASE}/v1/spec`)).ok) return child; } catch { /* not up yet */ }
+        await new Promise(r => setTimeout(r, 300));
+    }
+    child.kill('SIGTERM');
+    throw new Error(`allowlist node did not start on port ${ALT_PORT}`);
+}
+
+await test('Start a node with capabilityWebhooks=allowlist_only', async () => {
+    altNode = await startAllowlistNode();
+    const altOwner = 'capalw-' + Math.random().toString(36).slice(2, 8);
+    const reg = await json('/v1/admin/setup/register', {
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW }, body: JSON.stringify({ name: altOwner }),
+    }, ALT_BASE);
+    assert(reg.body.ok === true, `register on alt node: ${JSON.stringify(reg.body)}`);
+    const tok = await json('/v1/admin/setup/token', {
+        method: 'POST', headers: { 'X-Admin-Password': ADMIN_PW },
+        body: JSON.stringify({ owner: altOwner, private_key: reg.body.private_key }),
+    }, ALT_BASE);
+    assert(tok.body.ok === true, `token on alt node: ${JSON.stringify(tok.body.error)}`);
+    altToken = tok.body.token;
+    const { body } = await json('/v1/capabilities', {}, ALT_BASE);
+    assert(body.data?.policy?.webhooks === 'allowlist_only', `alt node policy: ${body.data?.policy?.webhooks}`);
+});
+
+await test('Allowlist only: an off-list domain is refused with AND without `source`', async () => {
+    for (const [label, source] of WEBHOOK_SHAPES) {
+        const id = 'hook-offlist-' + Math.random().toString(36).slice(2, 8);
+        const { status, body } = await json('/v1/capabilities', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${altToken}` },
+            body: webhookBody(id, source, 'https://elsewhere.test/hook'),
+        }, ALT_BASE);
+        assert(status === 403 && body.error?.code === 'WEBHOOK_DOMAIN_NOT_ALLOWED',
+            `${label}: expected 403 WEBHOOK_DOMAIN_NOT_ALLOWED, got ${status} ${body.error?.code ?? JSON.stringify(body.data)}`);
+        const back = await json(`/v1/capabilities/${id}`, { headers: { 'Authorization': `Bearer ${altToken}` } }, ALT_BASE);
+        assert(back.status === 404, `${label}: a refused capability must not be stored, got ${back.status}`);
+    }
+});
+
+await test('Allowlist only: a listed domain still goes through with `source` omitted', async () => {
+    // The gate reading the normalised source must not turn into a blanket refusal: what the
+    // operator allowed still passes, and the record is the manual capability it was read as.
+    const id = 'hook-onlist-' + Math.random().toString(36).slice(2, 8);
+    const { status, body } = await json('/v1/capabilities', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${altToken}` },
+        body: webhookBody(id, undefined, 'https://hooks.example.test/x'),
+    }, ALT_BASE);
+    assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error ?? body)}`);
+    assert(body.data.source.type === 'manual' && body.data.source.ref === 'manual',
+        `record should carry the normalised manual source: ${JSON.stringify(body.data.source)}`);
+    assert(body.data.webhookUrl === 'https://hooks.example.test/x', `webhook stored: ${body.data.webhookUrl}`);
+});
+
+await test('Stop the allowlist node', async () => {
+    if (!altNode) return;
+    const ended = new Promise<void>(r => altNode!.once('exit', () => r()));
+    altNode.kill('SIGTERM');
+    await Promise.race([ended, new Promise(r => setTimeout(r, 5000))]);
+    if (!altNode.killed) altNode.kill('SIGKILL');
+    cleanupAltDb();
 });
 
 // ─── Cleanup ───

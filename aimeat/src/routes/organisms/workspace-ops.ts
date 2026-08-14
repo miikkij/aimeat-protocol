@@ -12,12 +12,14 @@
  *     ONE cross-owner key-IN query (readWsManifests + canReadWsManifest), not one canReadWs scan per ws.
  *   v1.3.0 — 2026-07-17 — GET /v1/organisms/:id/workspace/public/records — the generic no-auth read for
  *     records spaces a workspace marked public (meta.share), mirroring the public documents path.
+ *   v1.4.0 — 2026-08-14 — SECURITY: POST /v1/organisms/:id/workspaces is gated by
+ *     requireScope('organism:write'); requireRoleOrScope('agent', …) let every agent through on role.
  */
 import { raw, type Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, requireRoleOrScope, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -324,11 +326,13 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
   });
 
   /* ── POST /v1/organisms/:id/workspaces — CREATE a new workspace from a manifest + per-namespace JSON
-     schemas (locked strict). Any active member may create; agents/owners by role, published apps via the
-     organism:write scope (so an app can provision its own structured data space for its owner). The
-     workspace meta + schema locks are owned by the caller's OWNER GHII (resolveIdentity). Mirrors the MCP
-     aimeat_workspace_create — both share services/workspace-provision.ts. ── */
-  router.post('/v1/organisms/:id/workspaces', requireAuth(), requireRoleOrScope('agent', 'organism:write'), async (req, res) => {
+     schemas (locked strict). Any active member may create; the workspace meta + schema locks are owned
+     by the caller's OWNER GHII (resolveIdentity). Mirrors the MCP aimeat_workspace_create — both share
+     services/workspace-provision.ts. The gate is requireScope('organism:write'): requireRoleOrScope
+     ('agent', …) admitted every agent before it read the word, so the permission that hides
+     aimeat_workspace_create from an agent's MCP surface did nothing here. Reasoning and measurement on
+     POST /v1/organisms in crud.ts. Owner/operator sessions bypass scopes; membership is unchanged. ── */
+  router.post('/v1/organisms/:id/workspaces', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }

@@ -4,6 +4,10 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-08-14 — SECURITY: POST /v1/organisms is gated by requireScope('organism:write').
+ *     requireRoleOrScope('agent', …) admitted every agent by role before it read a scope, so the word
+ *     removed aimeat_organism_create from the agent's MCP surface and let the same agent create
+ *     organisms over HTTP. Owner and operator sessions are unaffected (requireScope bypasses them).
  *   v1.6.0 — 2026-08-11 — SECURITY (H-29): leaving an organism also detaches the leaver's agents from
  *     organism.agentGaiis and revokes their workspace-role consents (revokeDepartedMemberAccess) —
  *     the membership row went away while both of those kept working.
@@ -25,7 +29,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, requireRoleOrScope, optionalAuth } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope, optionalAuth } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { canSeeMembers, redactOrganism, rosterCallerFromAuth } from '../../services/organism-privacy.js';
@@ -37,9 +41,26 @@ import type { OrganismHelpers } from './shared.js';
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
 
-  /* ── POST /v1/organisms — Create a new organism (agents/owners by role; published apps via the
-     organism:write scope, so an app can provision its own structured data space for its owner). ── */
-  router.post('/v1/organisms', requireAuth(), requireRoleOrScope('agent', 'organism:write'), async (req, res) => {
+  /* ── POST /v1/organisms — Create a new organism.
+   *
+   * THE GATE, and why it is requireScope rather than requireRoleOrScope('agent', …). The role path
+   * of that helper runs before it looks at any scope, so every agent passed whether or not its owner
+   * had ticked organism:write. Measured on a running node: an agent holding seven explicit scopes
+   * without the word could not see aimeat_organism_create on its MCP surface at all, because the
+   * tool surface filters on the same word, and that agent still got 201 Created from this route. The
+   * permission was real where the owner reads it and decorative where the write happens, which is
+   * security DNA invariant 15. The other two organism write doors carried the same gate and moved
+   * with it: POST /v1/organisms/:id/workspaces and POST /v1/organisms/:id/comments.
+   *
+   * requireScope keeps the owner-session bypass, so a person acting in their own session is
+   * untouched (and an operator session carries the owner role, so it bypasses too). An agent, an
+   * ecosystem app (GEAI) and a published app each need organism:write — the last two already did,
+   * because neither carries the 'agent' role.
+   *
+   * NOBODY LOSES A CAPABILITY. organism:write has been in GRANDFATHERED_SCOPES since 2026-08-10
+   * (services/scope-vocabulary-migration.ts), so every agent with a recorded scope list is handed
+   * the word at boot, and a '*' agent is covered by the wildcard at this door. ── */
+  router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility } = req.body ?? {};
 
