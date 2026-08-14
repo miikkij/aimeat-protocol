@@ -54,6 +54,7 @@ const SCHEMA_MAP: Record<string, Record<string, z.ZodType<unknown>>> = {
     '/v1/storage/upload/init': { POST: ChunkedUploadInitSchema },
     '/v1/admin/config': { PUT: ConfigUpdateSchema },
     '/v1/admin/roles/grant': { POST: RoleGrantSchema },
+    '/v1/admin/roles/revoke': { POST: RoleGrantSchema },
 };
 
 export function validateRouter(config: AimeatConfig): Router {

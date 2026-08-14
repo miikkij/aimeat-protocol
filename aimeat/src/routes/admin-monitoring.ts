@@ -11,6 +11,8 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   Operator revoke — 2026-08-14 — POST /v1/admin/roles/revoke takes the operator role back, refusing
+ *     self-revoke and the last operator so the node keeps at least one administrator.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -416,6 +418,43 @@ export function adminMonitoringRouter(
             owner,
             role: 'operator',
             granted: true,
+        }));
+        emitChange('config');
+    });
+
+    // POST /v1/admin/roles/revoke — take the operator role away (operator only)
+    router.post('/v1/admin/roles/revoke', requireAuth(), requireRole('operator'), validateBody(RoleGrantSchema, config.nodeId), async (req, res) => {
+        const { owner } = req.body ?? {};
+
+        const ownerRecord = await storage.getOwner(owner);
+        if (!ownerRecord) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${owner}`));
+            return;
+        }
+
+        if (!ownerRecord.roles.includes('operator')) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', `Owner "${owner}" does not have operator role`));
+            return;
+        }
+
+        // Two doors that would lock the node out of its own administration.
+        if (req.auth!.owner === owner) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'You cannot revoke your own operator role'));
+            return;
+        }
+
+        const operators = (await storage.listOwners()).filter(o => o.roles.includes('operator'));
+        if (operators.length <= 1) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT', 'The last operator cannot be revoked'));
+            return;
+        }
+
+        await storage.updateOwner(owner, { roles: ownerRecord.roles.filter(r => r !== 'operator') });
+
+        res.json(success(config.nodeId, {
+            owner,
+            role: 'operator',
+            revoked: true,
         }));
         emitChange('config');
     });

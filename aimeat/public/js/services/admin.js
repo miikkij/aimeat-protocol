@@ -5,7 +5,7 @@
  *
  * @structure
  *   - getDashboard/getConfig/saveConfig/deleteConfig: node config + dashboard reads/writes
- *   - getAdminAgents/getAdminOwners/grantRole + security-incident helpers: identity & moderation
+ *   - getAdminAgents/getAdminOwners/grantRole/revokeRole + security-incident helpers: identity & moderation
  *   - boards/actions/work/messages: content and telemetry reads
  *   - maintenance/seedExamples/backup/restore: operational tooling
  *   - federation/peering helpers: cross-node peer management
@@ -39,6 +39,7 @@ export const deleteSecurityIncident  = (id) => apiDelete(`/v1/admin/security/inc
 export const getAgentDetail  = (gaii)   => apiGet(`/v1/agents/${encodeURIComponent(gaii)}`);
 export const getOwnerDetail  = (name)   => apiGet(`/v1/owners/${encodeURIComponent(name)}`);
 export const grantRole       = (owner, role) => apiPost('/v1/admin/roles/grant', { owner, role });
+export const revokeRole      = (owner, role) => apiPost('/v1/admin/roles/revoke', { owner, role });
 
 // ── Actions & Boards ──
 export const getActions      = ()       => apiGet('/v1/actions');

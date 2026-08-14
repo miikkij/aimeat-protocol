@@ -16183,6 +16183,33 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/admin/roles/revoke:
+    post:
+      operationId: revokeRole
+      summary: Revoke operator role
+      description: >-
+        Removes the operator role from an owner. Operator only. Refuses to revoke
+        the caller's own role and refuses to remove the last operator on the node.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [owner, role]
+              properties:
+                owner:
+                  type: string
+                role:
+                  type: string
+                  enum: [operator]
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
   # ── Additional Implemented Endpoints ───────────────────────
 
   /v1/help/prompt:
