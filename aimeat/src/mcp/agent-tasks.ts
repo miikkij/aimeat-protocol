@@ -7,6 +7,9 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-08-14 — aimeat_task_create takes `scope`. The shared service and the HTTP route both took
+ *     it; this tool could not express it, so a caller told to put a dispatch `kind` in the scope —
+ *     which is what a fleet runner reads — built a task nothing would ever pick up, successfully.
  *   v1.8.0 — 2026-08-11 — The WRITES move to services/agent-task-write.ts: create, event, propose and
  *     todo now call the same functions the HTTP routes call, so these tools stop building their own
  *     records. Four differences closed with the move. Telemetry now ACCUMULATES instead of
@@ -91,9 +94,17 @@ export function registerAgentTaskTools(
             status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to target immediately).'),
             files: z.array(z.string()).max(20).optional()
                 .describe('Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" (or a bare key for one of your own files). Upload first via aimeat_storage_upload, or pass the `ref` from a DM attachment. You must be able to read each file yourself; the target agent gets a presigned download_url from aimeat_task_get.'),
+            scope: z.array(z.object({
+                name: z.string().describe('Field name the receiving runner reads, e.g. "kind", "memory_key", "app_id".'),
+                value: z.string(),
+                type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']).optional()
+                    .describe('How to read the value. Defaults to "text".'),
+                description: z.string().optional().describe('What this field is for, for whoever reads the task.'),
+            })).max(20).optional()
+                .describe('Named parameters the receiving runner DISPATCHES on, as opposed to the description, which is prose for a model to read. A fleet runner recognises work by a `kind` entry here and takes its pointers (a memory key, an app id) from the others — putting those in the title instead is the standard way to build a task nothing picks up.'),
         },
         annotationsFor('aimeat_task_create'),
-        async ({ target_agent, title, description, status, files }) => {
+        async ({ target_agent, title, description, status, files, scope }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
@@ -123,6 +134,11 @@ export function registerAgentTaskTools(
                     title,
                     description,
                     status: status ?? 'queued',
+                    // `type` is optional here and required by the record, so it is defaulted at the
+                    // seam rather than demanded of the caller: 'text' is what a dispatch key is, and
+                    // a tool that refuses a task over a missing type field would be refusing the
+                    // common case to satisfy a schema.
+                    ...(scope?.length ? { scope: scope.map(s => ({ ...s, type: s.type ?? 'text' as const })) } : {}),
                     ...(files?.length ? { resources: { files: files.map(ref => ({ ref })) } } : {}),
                 },
                 actor: agentGaii,

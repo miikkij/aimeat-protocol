@@ -2,6 +2,7 @@
  * @file cli/connect/tool-call-defs-agent.ts
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 -- 2026-08-14 -- aimeat_task_create takes `scope` here too.
  *   v1.3.0 -- 2026-08-13 -- Add the aimeat_agent_console_set handler (PATCH
  *     /v1/agents/:name/console-url).
  *   v1.2.0 -- 2026-07-19 -- Add shell handlers for operator_agent_configure + operator_ai_config so an
@@ -278,13 +279,19 @@ export const agentTools: ConnectCliToolDefinition[] = [
             title: { type: 'string', required: true, description: 'Short human-readable title.' },
             description: { type: 'string', required: true, description: 'The actual prompt / instruction.' },
             status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued".' },
+            scope: { type: 'array', description: 'Named parameters the receiving runner dispatches on: [{ name, value, type?, description? }]. A fleet runner recognises work by a `kind` entry here, not by the title.' },
         },
         handler: ({ client }, input) => {
             const target = requiredString(input, 'target_agent');
+            const scope = (optionalArray(input, 'scope') ?? []).map((entry) => {
+                const o = (entry && typeof entry === 'object' && !Array.isArray(entry)) ? entry as JsonObject : {};
+                return { ...o, type: typeof o.type === 'string' ? o.type : 'text' };
+            });
             return client.post(`/v1/agents/${encodeURIComponent(target)}/tasks`, {
                 title: requiredString(input, 'title'),
                 description: requiredString(input, 'description'),
                 status: optionalString(input, 'status') ?? 'queued',
+                ...(scope.length ? { scope } : {}),
                 verification: { user_expects: '', technical_checks: [] },
                 todos: [],
             });

@@ -3,6 +3,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.1.0 — 2026-08-14 — aimeat_task_create gains `scope`: the named parameters a receiving
+ *     runner dispatches on, which the tool had no way to send.
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
 
@@ -144,6 +146,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             description: { type: 'string', required: true, description: 'The actual prompt / instruction for the target agent.' },
             status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued" (visible to target immediately). Use "draft" for owner-review-first.' },
             files: { type: 'array', description: 'Up to 20 file REFERENCES the target agent needs: "<owner@node>/<storage key>" each (a bare key means one of your own files). You must be able to read each file yourself.' },
+            scope: { type: 'array', description: 'Named parameters the receiving runner DISPATCHES on, each { name, value, type?, description? }. A fleet runner recognises work by a `kind` entry here and takes its pointers (a memory key, an app id) from the others; the description is prose for a model, and a pointer put in the title is the standard way to build a task nothing picks up.' },
         },
     },
     {

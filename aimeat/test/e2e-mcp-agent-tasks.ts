@@ -23,6 +23,8 @@
  *   this file proves is the two that a plain session reaches.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-agent-tasks
  * @version-history
+ *   v1.2.0 — 2026-08-14 — The dispatch scope: a sixth difference between this tool and the route
+ *     it mirrors, and the one that made a published skill's central step impossible to follow.
  *   v1.1.0 — 2026-08-11 — Two more differences, from the step that moved the WRITES into
  *     services/agent-task-write.ts: telemetry accumulates instead of overwriting the task totals with
  *     the last event's numbers, and the title/description caps the HTTP route applies now apply here.
@@ -166,6 +168,39 @@ async function run() {
         assert(!got.isError, `get failed: ${got.text.slice(0, 300)}`);
         const task = JSON.parse(got.text).task ?? JSON.parse(got.text);
         assert(task.status === 'active', `expected an active task, got '${task.status}'`);
+    });
+
+    // A fleet runner recognises work by a `kind` entry in the SCOPE and takes its pointers from the
+    // rest. The tool could not express any of that until 2026-08-14 — target_agent, title,
+    // description, status, files and nothing else — while the HTTP door and the shared service both
+    // took it. So a chat following a runner's own instructions built a task the runner would never
+    // pick up, and every step reported success.
+    await test('a dispatch scope survives the tool and comes back on the task', async () => {
+        const created = await callTool(runner.session, 'aimeat_task_create', {
+            target_agent: runner.agentName,
+            title: 'Build the morning news agent',
+            description: 'The person asked for an agent that fetches AI news every morning.',
+            scope: [
+                { name: 'kind', value: 'hatchery.create_agent', description: 'What the runner dispatches on' },
+                { name: 'memory_key', value: 'news.ai.daily', type: 'memory_key' },
+                { name: 'app_id', value: 'someone/news.html' },
+            ],
+        });
+        assert(!created.isError, `create failed: ${created.text.slice(0, 300)}`);
+        const taskId = JSON.parse(created.text).task_id ?? JSON.parse(created.text).id;
+
+        const got = await callTool(runner.session, 'aimeat_task_get', { task_id: taskId });
+        const task = JSON.parse(got.text).task ?? JSON.parse(got.text);
+        const scope = (task.scope ?? []) as Array<{ name: string; value: string; type?: string }>;
+        const byName = Object.fromEntries(scope.map(s => [s.name, s]));
+
+        assert(byName.kind?.value === 'hatchery.create_agent', `kind lost: ${JSON.stringify(scope)}`);
+        assert(byName.memory_key?.value === 'news.ai.daily', `memory_key lost: ${JSON.stringify(scope)}`);
+        assert(byName.app_id?.value === 'someone/news.html', `app_id lost: ${JSON.stringify(scope)}`);
+        // `type` is required by the record and optional on the tool, so the seam defaults it rather
+        // than refusing a task over a field a caller has no reason to think about.
+        assert(byName.kind?.type === 'text', `an omitted type must default to text, got ${byName.kind?.type}`);
+        assert(byName.memory_key?.type === 'memory_key', `an explicit type must survive, got ${byName.memory_key?.type}`);
     });
 
     await test('and it carries the same \'started\' event an owner-approved task would', async () => {

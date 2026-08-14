@@ -5,6 +5,7 @@
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the
  *   registry's primary agent is used.
  * @version-history
+ *   2026-08-14 — aimeat_task_create takes `scope`, parity with the server MCP surface.
  *   v2.4.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_task_complete carries `ai_provenance` /
  *     `ai_provenance_id` and echoes what was recorded.
  *   v1.1.0 -- 2026-05-28 -- Add TODO proposal tool for Hello Integration
@@ -56,9 +57,15 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       description: z.string().describe('The actual prompt / instruction for the target agent. This is what its liaison / runtime will read and act on.'),
       status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to the target agent immediately). Use "draft" if you want the owner to review before it goes live.'),
       files: z.array(z.string()).max(20).optional().describe('Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" each (a bare key means a file the calling agent owns). The caller must be able to read each file itself; the target agent gets a presigned download_url from aimeat_task_get.'),
+      scope: z.array(z.object({
+        name: z.string().describe('Field name the receiving runner reads, e.g. "kind", "memory_key", "app_id".'),
+        value: z.string(),
+        type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']).optional().describe('How to read the value. Defaults to "text".'),
+        description: z.string().optional(),
+      })).max(20).optional().describe('Named parameters the receiving runner DISPATCHES on, as opposed to the description, which is prose for a model. A fleet runner recognises work by a `kind` entry here and takes its pointers from the others.'),
     },
     annotationsFor('aimeat_task_create'),
-    async ({ agent_name, target_agent, title, description, status, files }) => {
+    async ({ agent_name, target_agent, title, description, status, files, scope }) => {
       const { client } = pickAgent(registry, agent_name);
       const body: Record<string, unknown> = {
         title,
@@ -69,6 +76,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
         verification: { user_expects: '', technical_checks: [] },
         todos: [],
       };
+      if (scope?.length) body.scope = scope.map(sc => ({ ...sc, type: sc.type ?? 'text' }));
       if (files?.length) body.resources = { files: files.map(ref => ({ ref })) };
       const resp = await client.post(`/v1/agents/${encodeURIComponent(target_agent)}/tasks`, body);
       return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
