@@ -1,0 +1,27 @@
+#!/bin/sh
+#
+# AIMEAT commit-msg gate — reads the message git is about to commit from, after every quoting
+# layer has had its say, and refuses the shapes that mean something mangled it on the way in.
+#
+# It exists because three commits reached main on 2026-08-13 with `@` as their subject line: a
+# PowerShell here-string (@'…'@) written in Bash, where those are two ordinary characters. Nothing
+# else caught it — git accepted the message, pre-commit passed, the push worked — and the result is
+# permanent, because a pushed subject line can only be corrected by rewriting history.
+#
+# This runs on every commit however it was made: a script, an IDE, an assistant, either shell.
+#
+# $1 is git's path to the message file, and it is RELATIVE to the repo root. The checker runs from
+# aimeat/ (that is where pnpm lives), so the path is made absolute before changing directory —
+# via `git rev-parse`, which on Windows answers `E:/…` rather than a Git-Bash `/e/…` that the
+# Node binary could not open.
+
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+case "$1" in
+  /*|?:/*|?:\\*) MSG="$1" ;;
+  *) MSG="$ROOT/$1" ;;
+esac
+
+cd "$ROOT/aimeat"
+pnpm -s check:commit-msg "$MSG"

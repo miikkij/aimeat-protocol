@@ -82,6 +82,14 @@ Tooling that has bitten before: the dev server does not watch backend `src/` (re
 
 Git: parallel sessions work in a worktree · never `git add -A` (it sweeps another session's files) · the pre-commit hook reads the worktree, not the index, so an uncommitted fix greens it falsely · no scratch files in the repo root · no `Co-Authored-By` trailer.
 
+**A multi-line commit message is never a shell argument.** Two shells sit side by side here and
+their multi-line string syntaxes differ, so the wrong one produces valid characters rather than an
+error: `git commit -m @'…'@` is a PowerShell here-string, and in Bash it prepends a literal `@` to
+the subject. Seven commits in this history carry that damage and three of them show `@ feat(…)` in
+`git log --oneline`; a pushed subject can only be fixed by rewriting history. Write the message to a
+file and run `bash scripts/git-commit.sh <file>`. `-m` is fine for a single line. The `commit-msg`
+hook refuses the wreckage whichever way the commit was made. → `docs/coding-guidelines/shell-and-git.md`
+
 ## Ask the developer first
 
 Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing an organism record or roadmap milestone. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).
@@ -115,7 +123,7 @@ grep -i -C3 "<term>" docs/internal/memory-archive/platform-notes/<file>.md
 - **Never claim you broke nothing from a full-sweep total.** The E2E runner clears the database between suites and not before the first, and kills the server on a fixed one-second wait, so a slipped restart hands the next suite the previous one's data and produces hundreds of unrelated `403`s. One suite failed 78 times in a sweep and passes 95 of 95 alone. A regression claim needs one suite at a time, freshly deleted database, run on a worktree of the commit you started from as well. Your own gitignored `aimeat/.env` is loaded by the test server, so that worktree does not have it and the comparison flatters the new tree. → `docs/pitfalls.md` §18
 - **When a test goes green after your change, say which of three it was**: it asserted the hole you closed, the source was broken, or its setup no longer matched production. Write it in the diff with the finding id. A suite in this repo asserted `agent of owner should inherit owner role` in one line. → `docs/pitfalls.md` §19
 - **Security**, on any change to `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, federation, extensions or an AI path: authorize against `resolveIdentity(req.auth!, …)` and never a client-supplied id; keep server-trusted config and secrets out of principal-writable namespaces; route non-constant outbound HTTP through `safeFetch`; gate every mutation with `requireScope`/`requireRole`; verify federation Ed25519 signatures unconditionally. Anything whose safe value differs between localhost and the public internet goes in `.env.example` with a safe public default and a documented local override. Identity-touching features ship with cross-owner and cross-scope "→403" tests. → `docs/coding-guidelines/security-development-dna.md`
-- **Pre-commit hook** (`.githooks/pre-commit`) runs seventeen checks: lint, typecheck, typecheck:frontend, typecheck:sdk, check:importmap, check:profile-tabs, check:no-max-tokens, check:openapi, check:app-catalog, check:changelog, check:sdk, check:mcp-tools, check:viewport, check:silent-catch, check:ai-disclosure, check:sse-parity, check:copied-logic. It reads the worktree rather than the index, so an uncommitted fix can green it falsely. CI runs the same set plus the vitest suite.
+- **Pre-commit hook** (`.githooks/pre-commit`) runs seventeen checks: lint, typecheck, typecheck:frontend, typecheck:sdk, check:importmap, check:profile-tabs, check:no-max-tokens, check:openapi, check:app-catalog, check:changelog, check:sdk, check:mcp-tools, check:viewport, check:silent-catch, check:ai-disclosure, check:sse-parity, check:copied-logic. It reads the worktree rather than the index, so an uncommitted fix can green it falsely. CI runs the same set plus the vitest suite. A second hook, `.githooks/commit-msg`, checks the message itself.
 - **File headers** (`@file`, `@description`, `@version-history`) on the `.ts`/`.js`/`.css` files you touch. Any existing source file shows the format.
 - **No file over 800 lines** (`aimeat/max-file-lines`, an error, so it blocks the commit). When one grows past it, split by **pure extraction**: move a coherent group out to a sibling and change nothing else, so the diff is a move and the tests still prove it. Do not shave comments or version history to squeeze under the limit; that is how a file loses the part explaining why it is the way it is.
 - **Shared code has one home per kind.** Served browser libs, cortex libs, extensions and library packs each have their own authoring rules and their own build. → skill `aimeat-library-authoring`
@@ -236,6 +244,7 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 
 | Guide | Purpose |
 |-------|---------|
+| [Shell and Git](docs/coding-guidelines/shell-and-git.md) | Two shells, one quoting trap; committing a multi-line message safely |
 | [Testing Requirements](docs/coding-guidelines/testing-requirements.md) | E2E rules, multi-backend testing, writing tests |
 | [Security DNA](docs/coding-guidelines/security-development-dna.md) | Trust model, ten invariants, per-change checklist |
 | [Security](docs/coding-guidelines/security.md) | Auth, validation, XSS, rate limiting, GDPR |
