@@ -86,6 +86,24 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_usage_report',
+        description: 'Answer "what did we actually use, and what did it cost" for the owner behind this session: spend per model, per app, per agent, per day, plus which tools get called and which of them refuse or fail. Reads a precomputed layer, so it is cheap however large the history is, and it says how fresh it is. Scoped to this owner and to nobody else. Use it for a spend or usage question; use aimeat_agent_activity for one agent own counters.',
+        // 'agent' in the catalog's sense (the caller is a session principal), though an owner session
+        // reaches it too — both resolve to the same human account, which is the only account it can
+        // report on.
+        caller: 'agent',
+        // publicMcp + connectorMcp, no cliFallback: there is no `aimeat connect` handler for it, and
+        // claiming one would fail the parity gate rather than quietly not work.
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: false },
+        input: {
+            report: { type: 'string', enum: ['day', 'model', 'app', 'agent', 'tool', 'surface', 'apps-used', 'activity', 'sold'], description: 'Which report to read.' },
+            from: { type: 'string', description: 'Inclusive start day, YYYY-MM-DD. Defaults to 30 days ago.' },
+            to: { type: 'string', description: 'Inclusive end day, YYYY-MM-DD. Defaults to today.' },
+            grain: { type: 'string', enum: ['day', 'hour'], description: 'Bucket size, where the report has one.' },
+            limit: { type: 'number', description: 'Maximum groups to return.' },
+        },
+    },
+    {
         // Connector-CLI-only convenience (no MCP surface): the loopback serve daemon / a no-LLM crew
         // reads its own rollups over `aimeat connect call` instead of a periodic node GET. Excluded
         // from the v2 MCP surfaces (V2_EXCLUDED); cliFallback only.

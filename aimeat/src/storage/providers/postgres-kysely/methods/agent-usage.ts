@@ -59,6 +59,8 @@ function toEvent(r: Selectable<AgentUsageEventRow>): AgentUsageEvent {
     capabilityId: r.capabilityId ?? undefined,
     consumerGhii: r.consumerGhii ?? undefined,
     provenanceId: r.provenanceId ?? undefined,
+    appId: r.appId ?? '',
+    surface: r.surface ?? '',
   };
 }
 
@@ -83,6 +85,8 @@ export const agentUsageMethods = {
       capabilityId: event.capabilityId ?? null,
       consumerGhii: event.consumerGhii ?? null,
       provenanceId: event.provenanceId ?? null,
+      appId: event.appId ?? '',
+      surface: event.surface ?? '',
     }).execute();
   },
 

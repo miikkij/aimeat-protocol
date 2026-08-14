@@ -212,6 +212,121 @@ export interface AgentUsageEvent {
   source: string;
   ts: string;
   workspaceId: string | null;
+  appId: Generated<string>;
+  surface: Generated<string>;
+}
+
+/** Column-identical to AgentUsageEvent plus archivedAt; storage only, never a data source. */
+export interface AgentUsageEventArchive {
+  agentGaii: string;
+  apiKeyScope: Generated<string>;
+  appId: Generated<string>;
+  archivedAt: string;
+  capabilityId: string | null;
+  completionTokens: Generated<number>;
+  consumerGhii: string | null;
+  costUsd: number | null;
+  id: string;
+  model: string;
+  organismId: string | null;
+  ownerGhii: string;
+  priceRef: string | null;
+  provenanceId: string | null;
+  promptTokens: Generated<number>;
+  provider: string;
+  runId: string | null;
+  source: string;
+  surface: Generated<string>;
+  ts: string;
+  workspaceId: string | null;
+}
+
+/** Usage telemetry layer 1: one row per observable call, whichever door it came through. */
+export interface UsageCall {
+  id: string;
+  ts: string;
+  ownerGhii: string;
+  actorGaii: Generated<string>;
+  actorKind: Generated<string>;
+  surface: string;
+  coordinate: Generated<string>;
+  appId: Generated<string>;
+  counterpartyGhii: Generated<string>;
+  outcome: Generated<string>;
+  reason: Generated<string>;
+  durationMs: Generated<number>;
+  chargedUnits: Generated<string | number | bigint>;
+  unit: Generated<string>;
+  currency: Generated<string>;
+  entitlementId: Generated<string>;
+  runId: Generated<string>;
+  meta: Generated<unknown>;
+}
+
+/** Column-identical to UsageCall plus archivedAt. */
+export interface UsageCallArchive {
+  id: string;
+  ts: string;
+  ownerGhii: string;
+  actorGaii: Generated<string>;
+  actorKind: Generated<string>;
+  surface: string;
+  coordinate: Generated<string>;
+  appId: Generated<string>;
+  counterpartyGhii: Generated<string>;
+  outcome: Generated<string>;
+  reason: Generated<string>;
+  durationMs: Generated<number>;
+  chargedUnits: Generated<string | number | bigint>;
+  unit: Generated<string>;
+  currency: Generated<string>;
+  entitlementId: Generated<string>;
+  runId: Generated<string>;
+  meta: Generated<unknown>;
+  archivedAt: string;
+}
+
+/**
+ * Usage telemetry layer 3: the one table every dashboard reads. `cut` names which dimensions this
+ * row is keyed by; a dimension outside the cut holds '' so the unique key stays total.
+ * BIGINT columns arrive from pg as strings, which is why the metrics are typed permissively here
+ * and normalised in the provider's row mapper.
+ */
+export interface UsageRollup {
+  id: string;
+  cut: string;
+  grain: string;
+  bucket: string;
+  ownerGhii: Generated<string>;
+  actorGaii: Generated<string>;
+  appId: Generated<string>;
+  model: Generated<string>;
+  provider: Generated<string>;
+  surface: Generated<string>;
+  outcome: Generated<string>;
+  coordinate: Generated<string>;
+  counterpartyGhii: Generated<string>;
+  calls: Generated<string | number | bigint>;
+  errors: Generated<string | number | bigint>;
+  refusals: Generated<string | number | bigint>;
+  tokensIn: Generated<string | number | bigint>;
+  tokensOut: Generated<string | number | bigint>;
+  costUsd: Generated<number>;
+  unpricedCalls: Generated<string | number | bigint>;
+  chargedUnits: Generated<string | number | bigint>;
+  durationMsSum: Generated<string | number | bigint>;
+  durationMsMax: Generated<string | number | bigint>;
+  actorsSeen: Generated<string | number | bigint>;
+  extra: Generated<unknown>;
+  updatedAt: string;
+}
+
+/** The fold's per-stream watermark. Advanced in the same transaction as the deltas it accounts for. */
+export interface UsageRollupState {
+  stream: string;
+  lastTs: Generated<string>;
+  lastId: Generated<string>;
+  updatedAt: string;
 }
 
 export interface AiProvenance {
@@ -1852,6 +1967,11 @@ export interface DB {
   AgentTaskEvent: AgentTaskEvent;
   AgentUsageDaily: AgentUsageDaily;
   AgentUsageEvent: AgentUsageEvent;
+  AgentUsageEventArchive: AgentUsageEventArchive;
+  UsageCall: UsageCall;
+  UsageCallArchive: UsageCallArchive;
+  UsageRollup: UsageRollup;
+  UsageRollupState: UsageRollupState;
   AiProvenance: AiProvenance;
   App: App;
   AppDownload: AppDownload;

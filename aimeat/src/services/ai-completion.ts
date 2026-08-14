@@ -54,6 +54,7 @@ import { complete, DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js'
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { recordUsageEvent } from './usage-metering.js';
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).
@@ -192,10 +193,22 @@ export function assertWithinBudget(
  * Fold one call into today's usage record and persist it. Text completions and transcriptions share
  * ONE record, so the daily budget covers both and the spend charts show them together — an owner
  * whose budget is being eaten by voice messages sees it in the same place as everything else.
+ *
+ * IT WRITES TWO PLACES, AND THEY ARE NOT REDUNDANT. The per-day memory record is the LIVE budget
+ * counter: it must be readable in one get before every completion, so it stays a single small key
+ * and carries no model dimension. The ledger event is the REPORTING row: append-only, priced,
+ * carrying model, provider and appId. Before this, only the first existed, which is why per-app
+ * model reporting had no data behind it. Both are written here rather than at the two call sites,
+ * so a third caller cannot arrive and write only one of them.
  */
 export async function recordAiUsage(
   storage: Storage, gaii: string, usage: UsageRecord,
-  call: { costUsd: number; tokens: number; audioSeconds?: number; appId?: string },
+  call: {
+    costUsd: number; tokens: number; audioSeconds?: number; appId?: string;
+    /** Ledger dimensions. Omitted only by a caller that genuinely has no model to name. */
+    model?: string; provider?: string; promptTokens?: number; completionTokens?: number;
+    source?: string;
+  },
 ): Promise<UsageRecord> {
   const updated: UsageRecord = {
     date: todayKey(),
@@ -215,6 +228,36 @@ export async function recordAiUsage(
     audio_seconds: (existing.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
   };
   await upsertUsage(storage, gaii, updated);
+
+  // The reporting half. Best-effort on purpose: the owner has already been served and the budget
+  // counter above is already correct, so a ledger failure must not surface as a failed completion.
+  // It is logged rather than swallowed, because an operator seeing this knows spend is happening
+  // that their reports will not show.
+  if (call.model) {
+    try {
+      await recordUsageEvent(storage, {
+        agentGaii: gaii,
+        ownerGhii: gaii,
+        model: call.model,
+        provider: call.provider,
+        promptTokens: call.promptTokens ?? 0,
+        completionTokens: call.completionTokens ?? 0,
+        // The provider's own figure when we have it. `costUsd` here is already either the exact
+        // reported cost or this node's estimate, and priceUsd() prefers what it is given.
+        providerCostUsd: call.costUsd,
+        source: call.source ?? 'ai-complete',
+        // The owner's own key, always: this endpoint decrypts THEIR key and spends THEIR budget.
+        apiKeyScope: 'own',
+        appId: call.appId ?? '',
+        surface: 'app',
+      });
+    } catch (err) {
+      logger.warn('[ai] ledger event failed; the budget counter is still correct', {
+        gaii, model: call.model, error: String(err),
+      });
+    }
+  }
+
   return updated;
 }
 
@@ -440,6 +483,8 @@ export async function completeForOwner(
   // ── Record usage (idempotent within the day) ──
   const updated = await recordAiUsage(storage, gaii, usage, {
     costUsd, tokens: totalTok, appId: opts.appId,
+    model: result.model, provider, promptTokens: promptTok, completionTokens: completionTok,
+    source: 'ai-complete',
   });
 
   logger.info(`[ai] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} tokens=${totalTok} cost=$${costUsd.toFixed(4)} day_total=$${updated.total_cost_usd.toFixed(4)}`);

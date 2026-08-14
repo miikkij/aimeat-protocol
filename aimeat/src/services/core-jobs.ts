@@ -9,6 +9,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.2.0 — 2026-08-14 — Register the usage-rollup fold and the usage-archive sweep
+ *     (docs/internal/telemetria/02-design.md).
  *   v1.1.0 — 2026-07-16 — Register the workspace-version-compaction handler (retention P2; not
  *     seeded as a scheduled job — one-shot via the admin maintenance route, schedulable by operators).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -40,6 +42,18 @@ export function registerCoreHandlers(
   if (config.personalNodesEnabled) {
     scheduler.registerCoreHandler('mailbox-cleanup', () => runMailboxCleanupJob(storage));
   }
+  // Usage telemetry. The fold turns raw calls into the precomputed rows every dashboard reads; the
+  // archive enforces the 90-day hot window. Both are dynamic imports for the same reason the other
+  // heavy handlers are: a node that never schedules them never loads them.
+  scheduler.registerCoreHandler('usage-rollup', async () => {
+    const { runUsageRollup } = await import('./usage/rollup-engine.js');
+    await runUsageRollup(storage);
+  });
+  scheduler.registerCoreHandler('usage-archive', async () => {
+    const { runUsageArchiveJob } = await import('./usage/archive-job.js');
+    await runUsageArchiveJob(storage);
+  });
+
   scheduler.registerCoreHandler('capability-aggregation', async () => {
     const { runCapabilityAggregation } = await import('./capability-aggregator.js');
     await runCapabilityAggregation(config, storage);

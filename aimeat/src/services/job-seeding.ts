@@ -9,6 +9,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   v1.1.0 — 2026-08-14 — Seed core:usage-rollup (every 5 min) and core:usage-archive (nightly).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { AimeatConfig } from '../config.js';
@@ -69,6 +70,13 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
 
   // Living Documents -- unattended pulse of due instances (per-instance charter cadence gates actual work)
   jobs.push({ id: 'core:living-pulse', name: 'Living Document Pulse', coreHandler: 'living-pulse', cron: '*/5 * * * *' });
+
+  // Usage telemetry. The fold every 5 minutes is what makes the serving layer's staleness a number
+  // we can state (`computed_through`) rather than a shrug; the archive sweep runs nightly, off-peak,
+  // because it moves rows in bulk. NOTE: seeding is create-if-absent, so changing a cron here does
+  // nothing to a database that already has the job.
+  jobs.push({ id: 'core:usage-rollup', name: 'Usage Rollup', coreHandler: 'usage-rollup', cron: '*/5 * * * *' });
+  jobs.push({ id: 'core:usage-archive', name: 'Usage Archive Sweep', coreHandler: 'usage-archive', cron: '20 3 * * *' });
 
   const now = new Date().toISOString();
   for (const def of jobs) {

@@ -80,6 +80,7 @@ import { catalogueRouter } from '../routes/catalogue.js';
 import { workRouter } from '../routes/work.js';
 import { walletRouter } from '../routes/wallet.js';
 import { usageRouter } from '../routes/usage.js';
+import { usageReportsRouter } from '../routes/usage-reports.js';
 import { boardsRouter } from '../routes/boards.js';
 import { promptsRouter } from '../routes/prompts.js';
 import { adminRouter } from '../routes/admin.js';
@@ -155,6 +156,7 @@ import { agentIntegrationRouter } from '../routes/agent-integration.js';
 import { agentDirectivesRouter } from '../routes/agent-directives.js';
 import { adminAgentTasksRouter } from '../routes/admin-agent-tasks.js';
 import { adminStorageStatsRouter } from '../routes/admin-storage-stats.js';
+import { adminUsageRouter } from '../routes/admin-usage.js';
 import { adminAgentIntegrationRouter } from '../routes/admin-agent-integration.js';
 import { adminSharingGroupsRouter } from '../routes/admin-sharing-groups.js';
 import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
@@ -207,6 +209,7 @@ import { invalidateTag } from '../services/cache.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
+import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
@@ -259,6 +262,10 @@ export async function mountRoutes(
   // In-memory accumulator for high-frequency agent signals (telemetry + heartbeat),
   // flushed to storage on an interval instead of per request.
   initTelemetryBuffer(storage);
+
+  // The one write door for the usage call stream: every measured call, whichever surface it came
+  // through, buffers here and flushes on an interval so a request never waits on a metrics write.
+  initUsageBuffer(storage);
 
   // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
   initConsentAuditBuffer(storage);
@@ -479,6 +486,9 @@ export async function mountRoutes(
   app.use(workRouter(config, storage, peers, mailboxNotificationService));
   app.use(walletRouter(config, storage));
   app.use(usageRouter(config, storage));
+  // The owner's own usage REPORTS, off the precomputed serving layer. A different meaning of
+  // "usage" from usageRouter above (which is quota), hence a separate router.
+  app.use(usageReportsRouter(config, storage));
   app.use(knowledgeRouter(config, storage));
 
   // Extended features guard — returns 503 when extended features are disabled
@@ -680,6 +690,7 @@ export async function mountRoutes(
   // Agent tasks + sharing groups admin routes (Phase 1 Agent Dashboard)
   app.use(adminAgentTasksRouter(config, storage));
   app.use(adminStorageStatsRouter(config, storage));
+  app.use(adminUsageRouter(config, storage));
   app.use(adminAgentIntegrationRouter(config, storage));
   app.use(adminSharingGroupsRouter(config, storage));
 

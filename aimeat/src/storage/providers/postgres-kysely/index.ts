@@ -46,6 +46,7 @@ import { connectionMethods } from './methods/connections.js';
 import { financeMethods } from './methods/finance.js';
 import { outboundMethods } from './methods/outbound.js';
 import { companyMethods } from './methods/companies.js';
+import { usageMethods } from './methods/usage.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
 import { appMethods } from './methods/apps.js';
@@ -150,6 +151,7 @@ Object.assign(
   financeMethods,
   outboundMethods,
   companyMethods,
+  usageMethods,
   capabilityMethods,
   knowledgeMethods,
   appMethods,

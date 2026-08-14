@@ -47,6 +47,7 @@ import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
+import { recordAppOpen } from '../../services/usage/record-app-open.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
@@ -583,6 +584,8 @@ export function registerReadRoutes(
         res.setHeader('X-Content-Type-Options', 'nosniff');
 
         storage.incrementAppDownloads(app.ownerGaii, filename).catch(err => { logger.warn('body: continuing after a suppressed failure', { error: String(err) }); });
+        // The lifetime counter above answers "how many"; this answers when, and by whom.
+        recordAppOpen({ appOwnerGaii: app.ownerGaii, filename, viewer: req.auth?.sub });
 
         res.send(body);
     });

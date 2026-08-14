@@ -83,6 +83,7 @@ import { applyServeMarks } from '../services/app-serve-marks.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
+import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
 import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
@@ -276,6 +277,8 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(err => { logger.warn('serveApp: continuing after a suppressed failure', { error: String(err) }); });
+  // The lifetime counter above answers "how many"; this answers when, and by whom.
+  recordAppOpen({ appOwnerGaii: app.ownerGaii, filename: app.filename, viewer: protect?.viewer });
 
   if (/text\/html/i.test(app.mimeType)) {
     // Relax the author's CSP meta so the H-2 SSO bridge works (only when apex framing is on),

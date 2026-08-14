@@ -43,6 +43,8 @@ import {
   settleMeteredCharge, burnPacingTollFor,
   type SettlementResult, type BeneficiaryAccrual,
 } from './metered-settlement.js';
+import { recordUsageCall } from './usage/usage-buffer.js';
+import type { UsageActorKind, UsageOutcome, UsageSurface } from '../storage/interface.js';
 
 /** The permission a hosted app needs before it may draw on its owner's contracts. */
 export const SPEND_SCOPE = 'contract:spend';
@@ -95,6 +97,70 @@ export type MeteredOutcome =
       kind: 'settled'; entitlement: MeteredEntitlement; charged: number;
       refund: () => Promise<void>; accrue: BeneficiaryAccrual;
     };
+
+/**
+ * Which usage surface a metered coordinate belongs to. The coordinate already encodes it, so the
+ * door does not get to declare its own and cannot disagree with the next door about the same call.
+ */
+function surfaceOfCoordinate(coordExt: string): UsageSurface {
+  if (coordExt.startsWith('apptool:')) return 'apptool';
+  if (coordExt.startsWith('agentwork:')) return 'exchange';
+  return 'extension';
+}
+
+/** `alice/app.html` out of `apptool:alice/app.html`; '' for anything that is not an app coordinate. */
+function appIdOfCoordinate(coordExt: string): string {
+  return coordExt.startsWith('apptool:') ? coordExt.slice('apptool:'.length) : '';
+}
+
+function actorKindOf(session?: { roles: string[] } | null): UsageActorKind {
+  const roles = session?.roles ?? [];
+  if (roles.includes('app')) return 'app';
+  if (roles.includes('eco')) return 'eco';
+  if (roles.includes('agent')) return 'agent';
+  return 'owner';
+}
+
+/**
+ * Record what this gate decided, for every branch. THE GATE, not the doors: six doors reach this
+ * function, and the whole reason it exists is that a door forgets a step the other doors remember.
+ * Counting is no different from charging in that respect.
+ *
+ * DURATION IS 0 HERE, DELIBERATELY. This records the DECISION, which happens before the work does,
+ * so there is nothing to have timed yet. Recording again after the invoke would count every call
+ * twice, and exactly-once counting is worth more than a duration this stream can get elsewhere:
+ * per-capability latency is already measured by call-timing.ts (p50/p95 per coordinate), and the
+ * surfaces that are NOT behind this gate (MCP, an app open) time themselves.
+ */
+function recordMeteredDecision(args: {
+  caller: string;
+  product: MeteredProduct;
+  session?: { roles: string[] } | null;
+  outcome: UsageOutcome;
+  reason: string;
+  charged?: number;
+  unit?: 'morsels' | 'money' | '';
+  entitlementId?: string;
+  providerGhii?: string;
+}): void {
+  recordUsageCall({
+    // The PAYER's account, which for an app grant is the human behind it — the same resolution the
+    // charge itself uses, so the report and the money agree on whose call this was.
+    ownerGhii: ownerGhiiOf(args.caller),
+    actorGaii: args.caller,
+    actorKind: actorKindOf(args.session),
+    surface: surfaceOfCoordinate(args.product.ext),
+    coordinate: `${args.product.ext}/${args.product.action}`,
+    appId: appIdOfCoordinate(args.product.ext),
+    counterpartyGhii: args.providerGhii ?? '',
+    outcome: args.outcome,
+    reason: args.reason,
+    chargedUnits: args.charged ?? 0,
+    unit: args.unit ?? '',
+    entitlementId: args.entitlementId ?? '',
+    meta: { label: args.product.label },
+  });
+}
 
 /**
  * The owner selling at a coordinate, when the coordinate says so. `apptool:alice/app.html` and
@@ -179,7 +245,7 @@ export async function appSpendRefusal(
  *   4. STATE, RATE, CEILINGS — the contract's own limits, and a grant's separate carried ceiling.
  *   5. SETTLE + ATTRIBUTE — move the value, apply the rake, advance the meter, record WHO called.
  */
-export async function authoriseMeteredCall(args: {
+export interface MeteredCallArgs {
   config: AimeatConfig;
   storage: Storage;
   /** The exact principal making the call — an agent GAII, a GEAI, or an owner GHII. */
@@ -191,7 +257,49 @@ export async function authoriseMeteredCall(args: {
    * missing session is never treated as a permission — it simply skips a check that does not apply.
    */
   session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
-}): Promise<MeteredOutcome> {
+}
+
+/**
+ * Decide, settle, and RECORD. The recording wraps the decision rather than sitting inside it, for
+ * the same reason this file exists at all: `decideMeteredCall` has ten returns, and a per-return
+ * `recordUsageCall(...)` is ten chances to forget one. Wrapped, a new branch is counted the day it
+ * is written, whether or not its author thought about telemetry.
+ */
+export async function authoriseMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome> {
+  const outcome = await decideMeteredCall(args);
+  const ent = 'entitlement' in outcome ? outcome.entitlement : null;
+  const shared = {
+    caller: args.caller, product: args.product, session: args.session,
+    entitlementId: ent?.entitlementId ?? '',
+    providerGhii: ent?.providerGhii ?? args.product.providerOwner ?? '',
+  };
+
+  switch (outcome.kind) {
+    case 'free_owner':
+      // A provider calling their own capability. It happened, it cost nothing, and it belongs in
+      // the count — otherwise a capability's own author is invisible in their own usage.
+      recordMeteredDecision({ ...shared, outcome: 'ok', reason: 'free_owner' });
+      break;
+    case 'settled':
+      recordMeteredDecision({
+        ...shared, outcome: 'ok', reason: '',
+        charged: outcome.charged, unit: outcome.entitlement.unit,
+      });
+      break;
+    case 'settlement_failed':
+      // The system failing, not refusing: the caller was authorised and was not charged.
+      recordMeteredDecision({ ...shared, outcome: 'error', reason: outcome.reason });
+      break;
+    default:
+      // Every refusal kind. This is the half that had no record anywhere before: a refused call is
+      // demand that was not served, and it is the most actionable row in the whole stream.
+      recordMeteredDecision({ ...shared, outcome: 'refused', reason: outcome.kind });
+      break;
+  }
+  return outcome;
+}
+
+async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome> {
   const { config, storage, caller, product, session } = args;
 
   // 1. Own capability → free. Before the lookup: a provider holding a contract against themselves

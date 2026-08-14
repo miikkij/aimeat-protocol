@@ -37,6 +37,8 @@ function deserializeEvent(row: Record<string, unknown>): AgentUsageEvent {
     capabilityId: (row.capabilityId as string | null) ?? undefined,
     consumerGhii: (row.consumerGhii as string | null) ?? undefined,
     provenanceId: (row.provenanceId as string | null) ?? undefined,
+    appId: (row.appId as string) ?? '',
+    surface: (row.surface as string) ?? '',
   };
 }
 
@@ -65,8 +67,8 @@ export function appendUsageEvent(db: Database.Database, e: AgentUsageEvent): voi
     `INSERT INTO agent_usage_event
        (id, ts, agentGaii, ownerGhii, runId, model, provider, promptTokens,
         completionTokens, costUsd, priceRef, source, apiKeyScope,
-        organismId, workspaceId, capabilityId, consumerGhii, provenanceId)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        organismId, workspaceId, capabilityId, consumerGhii, provenanceId, appId, surface)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     e.id,
     e.ts,
@@ -86,6 +88,8 @@ export function appendUsageEvent(db: Database.Database, e: AgentUsageEvent): voi
     e.capabilityId ?? null,
     e.consumerGhii ?? null,
     e.provenanceId ?? null,
+    e.appId ?? '',
+    e.surface ?? '',
   );
 }
 

@@ -36037,6 +36037,259 @@ paths:
   # Admin — Agent Tasks & Sharing Groups
   # ============================================================
 
+  /v1/usage/reports:
+    get:
+      operationId: usageReports
+      summary: Which usage reports this node can answer, for the calling owner
+      description: >-
+        The menu for GET /v1/usage/summary. Cheap and static, so a client (or an agent) never has to
+        guess a report name. Behind the same wallet:read scope as the summary itself.
+      tags: [Usage]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Report names with a one-line description of each
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/usage/summary:
+    get:
+      operationId: usageSummary
+      summary: One usage report over a date window, for the calling owner only
+      description: >-
+        Reads the precomputed serving layer, never a raw table, so the cost of an answer does not
+        grow with the node traffic. Always scoped to the owner behind the session: there is no
+        parameter on this endpoint that can name another owner. The computed_through field in the
+        response states how fresh the precomputed layer is.
+        Requires the wallet:read scope for agent, ecosystem and app-grant sessions (owner sessions
+        bypass scopes): a usage report is the owner's whole spend and activity history, which is the
+        same sensitivity class as their balance.
+      tags: [Usage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: report
+          schema:
+            type: string
+            default: day
+            enum: [day, model, app, agent, tool, surface, apps-used, activity, sold]
+          description: Which report to read. GET /v1/usage/reports lists them with descriptions.
+        - in: query
+          name: from
+          schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+          description: Inclusive start day (UTC). Defaults to 30 days ago.
+        - in: query
+          name: to
+          schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+          description: Inclusive end day (UTC). Defaults to today.
+        - in: query
+          name: grain
+          schema: { type: string, enum: [day, hour], default: day }
+          description: Falls back to the grain the report actually materialises.
+        - in: query
+          name: series
+          schema: { type: string, enum: ['true', 'false'], default: 'true' }
+          description: Include the per-bucket series a chart needs.
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 2000, default: 200 }
+      responses:
+        '200':
+          description: Groups, totals, an optional series, and the freshness of the layer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/admin/usage/summary:
+    get:
+      operationId: adminUsageSummary
+      summary: Cross-owner usage reports, or one named owner slice (operator only)
+      description: >-
+        The same precomputed layer as GET /v1/usage/summary, without the owner scope. Pass owner to
+        read one person numbers; omit it for the node. Operator role required on every shape.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: report
+          schema:
+            type: string
+            default: day
+            enum: [day, model, app, app-model, agent, user, tool, surface, apps-used, activity, provider]
+        - in: query
+          name: owner
+          schema: { type: string }
+          description: Bare owner name or full GHII. Omit for a node-wide report.
+        - in: query
+          name: from
+          schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+        - in: query
+          name: to
+          schema: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+        - in: query
+          name: grain
+          schema: { type: string, enum: [day, hour], default: day }
+      responses:
+        '200':
+          description: Groups, totals and freshness
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/usage/reports:
+    get:
+      operationId: adminUsageReports
+      summary: Which usage reports exist in each scope (operator only)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Node-scope and per-owner report names
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/usage/calls:
+    get:
+      operationId: adminUsageCalls
+      summary: Raw usage-call rows behind the reports (operator only, audited)
+      description: >-
+        The operator carries liability for what happens on this node, so anything that can become a
+        legal matter has to be reachable at the call level. The counterweight is that looking is
+        itself recorded: this endpoint writes a usage call of its own (surface operator, the
+        inspected owner as the counterparty), which then appears in the ordinary reports. Only the
+        hot window is served; older rows live in the archive.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: owner
+          schema: { type: string }
+          description: Bare owner name or full GHII. Omit to read across owners.
+        - in: query
+          name: actor
+          schema: { type: string }
+        - in: query
+          name: surface
+          schema: { type: string, enum: [mcp, apptool, exchange, capability, app, extension, http, operator] }
+        - in: query
+          name: app_id
+          schema: { type: string }
+        - in: query
+          name: outcome
+          schema: { type: string, enum: [ok, refused, error] }
+        - in: query
+          name: from
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 2000, default: 200 }
+      responses:
+        '200':
+          description: Raw calls, newest first, flagged as audited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/usage/status:
+    get:
+      operationId: adminUsageStatus
+      summary: How fresh the precomputed usage layer is, and its retention windows (operator only)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Fold watermarks per stream, plus the hot-window settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/usage/rollup/rebuild:
+    post:
+      operationId: adminUsageRollupRebuild
+      summary: Clear a bucket range and recompute it from raw (operator only)
+      description: >-
+        Needed after a new report cut is declared, whose history would otherwise be empty and read on
+        a chart as never used. Clears the range before re-folding, because the fold adds. Refuses a
+        from older than the raw hot window rather than deleting rollups it could not refill.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [from]
+              properties:
+                from: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+                grain: { type: string, enum: [day, hour] }
+      responses:
+        '200':
+          description: Rows cleared and what was re-folded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/usage/archive/prune:
+    post:
+      operationId: adminUsageArchivePrune
+      summary: Permanently delete archived usage rows before a date (operator only)
+      description: >-
+        Deliberately not a scheduled job. Archived rows are what answers a billing dispute or a legal
+        question months later, so the date is required, is never defaulted, and confirm true is
+        required alongside it.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [before, confirm]
+              properties:
+                before: { type: string, pattern: '^\\d{4}-\\d{2}-\\d{2}$' }
+                confirm: { type: boolean }
+      responses:
+        '200':
+          description: What was deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/admin/storage-stats:
     get:
       operationId: adminStorageStats

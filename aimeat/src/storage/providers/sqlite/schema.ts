@@ -10,6 +10,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   v1.11.0 — 2026-08-14 — Usage telemetry: agent_usage_event.appId/.surface for existing databases,
+ *     plus the fold's (ts, id) cursor index. Tables themselves are in schema-tables-4.
  *   v1.10.0 — 2026-08-13 — agents.registeredBy for existing databases too.
  *   v1.9.0 — 2026-08-13 — agents.consoleUrl, so an existing database gets the column too.
  *   v1.8.0 — 2026-08-13 — Two more index-before-ALTER crashes, both moved here from block 1: the
@@ -443,6 +445,17 @@ export function initializeSchema(db: Database.Database): void {
   // a connection authorises perfectly and then dies on its first refresh with an invalid_grant that
   // names nothing, hours later, looking exactly like a revoked account. NULL = the node's client.
   safeAddColumn('connections', 'providerClientId', 'TEXT');
+
+  // ── Usage telemetry (mirrors Postgres 0036) ──
+  // Two dimensions onto the LLM ledger. Without appId, /v1/ai/complete cannot write into the same
+  // ledger as agent telemetry, which is why app-side model and provider reporting had no data
+  // behind it rather than merely no UI. agent_usage_daily is deliberately NOT widened: it is the
+  // live budget counter, and its composite PRIMARY KEY cannot take a new column by ALTER anyway.
+  safeAddColumn('agent_usage_event', 'appId', "TEXT NOT NULL DEFAULT ''");
+  safeAddColumn('agent_usage_event', 'surface', "TEXT NOT NULL DEFAULT ''");
+  // The fold's cursor. Both columns predate this change, so it could live in block 1 — it sits here
+  // next to the ALTERs it belongs with, which costs nothing and keeps the change readable in one place.
+  db.exec('CREATE INDEX IF NOT EXISTS idx_agent_usage_event_cursor ON agent_usage_event(ts, id);');
 
   // provider_clients was created with `instance TEXT NOT NULL`, which was right when the only rows
   // were per-instance registrations. A principal's own client for a fixed-endpoint provider has no

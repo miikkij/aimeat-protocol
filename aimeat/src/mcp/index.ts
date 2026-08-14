@@ -99,6 +99,7 @@ import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
+import { wrapToolHandler } from './tool-usage-wrap.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 import { instructionsFor } from './instructions.js';
 import { registerManagedPrompts } from './prompts-managed.js';
@@ -182,8 +183,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         };
         const originalTool = patchable.tool.bind(mcp) as ToolFn;
         const originalRegisterTool = patchable.registerTool.bind(mcp) as ToolFn;
-        patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? originalTool(...args) : undefined;
-        patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? originalRegisterTool(...args) : undefined;
+        // Measured INSIDE the gate: a tool this agent's scopes filtered out is never wrapped, so a
+        // tool that was never offered is never counted as one that was not called. The wrap sits at
+        // registration for the same reason the gate does — one place, every tool, nothing for a new
+        // tool's author to remember. See mcp/tool-usage-wrap.ts.
+        const measuredTool = wrapToolHandler(originalTool, () => agentGaii);
+        const measuredRegisterTool = wrapToolHandler(originalRegisterTool, () => agentGaii);
+        patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? measuredTool(...args) : undefined;
+        patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? measuredRegisterTool(...args) : undefined;
 
         registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers);
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

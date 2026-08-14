@@ -49,6 +49,10 @@ export interface UsageEventInput {
   /** The AI provenance record this call produced (TARGET-058), so a spend can be joined to what it
    *  made. Optional — every existing caller keeps working without it. */
   provenanceId?: string;
+  /** Which app spent this, as `owner/filename`. Empty for an agent's own call. */
+  appId?: string;
+  /** Which door the spend came through: 'app', 'mcp', 'schedule', ''. Matches UsageCall.surface. */
+  surface?: string;
   /** Override the record timestamp (defaults to now). */
   ts?: string;
 }
@@ -96,6 +100,8 @@ export async function recordUsageEvent(storage: Storage, input: UsageEventInput)
     capabilityId: input.capabilityId,
     consumerGhii: input.consumerGhii,
     provenanceId: input.provenanceId,
+    appId: input.appId ?? '',
+    surface: input.surface ?? '',
   };
 
   // 1. Source of truth — must persist (billing audit, TARGET-019). Let failures propagate.

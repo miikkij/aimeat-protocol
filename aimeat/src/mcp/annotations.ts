@@ -199,6 +199,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_agent_telemetry_report: { title: 'Report Agent Telemetry', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_capabilities_report: { title: 'Report Agent Capabilities', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_agent_activity: { title: 'List Agent Activity', readOnlyHint: true },
+    aimeat_usage_report: { title: 'Usage Report', readOnlyHint: true },
     aimeat_agent_statistics: { title: 'Get Agent Statistics', readOnlyHint: true },
 
     // ── Owner-managed agent classification ──

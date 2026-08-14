@@ -348,6 +348,15 @@ export interface AgentUsageEvent {
    *  (the consumer). The producer is agentGaii/ownerGhii above. Lets the producer see who
    *  called each capability and what the real compute cost, alongside the morsel escrow. */
   consumerGhii?: string;
+  /**
+   * Which app spent this, as `owner/filename`. Empty for an agent's own call. Added 2026-08-14 so
+   * /v1/ai/complete could write HERE instead of into a parallel per-day memory record that carried
+   * no model and no provider — which is why "which model does this app actually call" had no data
+   * behind it rather than merely no UI. Design: docs/internal/telemetria/02-design.md
+   */
+  appId?: string;
+  /** Which door the spend came through: 'app', 'mcp', 'schedule', ''. Matches UsageCall.surface. */
+  surface?: string;
 }
 
 /**

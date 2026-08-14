@@ -4,6 +4,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.1.0 — 2026-08-14 — Usage telemetry: the hot call stream, the two archive tables, the
+ *     discriminated serving rollup and its watermark. Mirrors Postgres 0036.
  *   v1.0.0 — 2026-08-06 — Finance (invoices/vouchers/VAT/fiscal years/counters) + outbound
  *     (contacts/send log), moved from schema-tables-3.ts.
  */
@@ -231,6 +233,137 @@ export function applySchemaTables4(db: Database.Database): void {
       updatedAt   TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_company_smtp_owner ON company_smtp(ownerGhii);
+
+    -- ── Usage telemetry ───────────────────────────────────────────────────────
+    -- Three layers, mirroring Postgres 0036. Full rationale:
+    -- docs/internal/telemetria/02-design.md
+    --   hot raw   usage_calls (+ the existing agent_usage_event), 90 days
+    --   cold      usage_calls_archive, agent_usage_event_archive — storage, never a data source
+    --   serving   usage_rollup — everything a dashboard reads, precomputed incrementally
+
+    -- One row per observable call, whichever door it came through. The outcome and reason columns are the
+    -- point of the table: a refused call is the record that a capability was wanted and not
+    -- delivered, and nothing recorded that before.
+    CREATE TABLE IF NOT EXISTS usage_calls (
+      id               TEXT PRIMARY KEY,
+      ts               TEXT NOT NULL,
+      ownerGhii        TEXT NOT NULL,
+      actorGaii        TEXT NOT NULL DEFAULT '',
+      actorKind        TEXT NOT NULL DEFAULT 'owner',
+      surface          TEXT NOT NULL,
+      coordinate       TEXT NOT NULL DEFAULT '',
+      appId            TEXT NOT NULL DEFAULT '',
+      counterpartyGhii TEXT NOT NULL DEFAULT '',
+      outcome          TEXT NOT NULL DEFAULT 'ok',
+      reason           TEXT NOT NULL DEFAULT '',
+      durationMs       INTEGER NOT NULL DEFAULT 0,
+      chargedUnits     INTEGER NOT NULL DEFAULT 0,
+      unit             TEXT NOT NULL DEFAULT '',
+      currency         TEXT NOT NULL DEFAULT '',
+      entitlementId    TEXT NOT NULL DEFAULT '',
+      runId            TEXT NOT NULL DEFAULT '',
+      meta             TEXT NOT NULL DEFAULT '{}'
+    );
+    -- (ts, id) is a total order over the stream, so the fold's watermark can resume exactly.
+    CREATE INDEX IF NOT EXISTS idx_usage_calls_cursor ON usage_calls(ts, id);
+    CREATE INDEX IF NOT EXISTS idx_usage_calls_owner ON usage_calls(ownerGhii, ts DESC);
+
+    CREATE TABLE IF NOT EXISTS usage_calls_archive (
+      id               TEXT PRIMARY KEY,
+      ts               TEXT NOT NULL,
+      ownerGhii        TEXT NOT NULL,
+      actorGaii        TEXT NOT NULL DEFAULT '',
+      actorKind        TEXT NOT NULL DEFAULT 'owner',
+      surface          TEXT NOT NULL,
+      coordinate       TEXT NOT NULL DEFAULT '',
+      appId            TEXT NOT NULL DEFAULT '',
+      counterpartyGhii TEXT NOT NULL DEFAULT '',
+      outcome          TEXT NOT NULL DEFAULT 'ok',
+      reason           TEXT NOT NULL DEFAULT '',
+      durationMs       INTEGER NOT NULL DEFAULT 0,
+      chargedUnits     INTEGER NOT NULL DEFAULT 0,
+      unit             TEXT NOT NULL DEFAULT '',
+      currency         TEXT NOT NULL DEFAULT '',
+      entitlementId    TEXT NOT NULL DEFAULT '',
+      runId            TEXT NOT NULL DEFAULT '',
+      meta             TEXT NOT NULL DEFAULT '{}',
+      archivedAt       TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_usage_calls_archive_owner ON usage_calls_archive(ownerGhii, ts);
+
+    CREATE TABLE IF NOT EXISTS agent_usage_event_archive (
+      id               TEXT PRIMARY KEY,
+      ts               TEXT NOT NULL,
+      agentGaii        TEXT NOT NULL,
+      ownerGhii        TEXT NOT NULL,
+      runId            TEXT,
+      model            TEXT NOT NULL,
+      provider         TEXT NOT NULL,
+      promptTokens     INTEGER NOT NULL DEFAULT 0,
+      completionTokens INTEGER NOT NULL DEFAULT 0,
+      costUsd          REAL,
+      priceRef         TEXT,
+      source           TEXT NOT NULL,
+      apiKeyScope      TEXT NOT NULL DEFAULT 'own',
+      organismId       TEXT,
+      workspaceId      TEXT,
+      capabilityId     TEXT,
+      consumerGhii     TEXT,
+      provenanceId     TEXT,
+      appId            TEXT NOT NULL DEFAULT '',
+      surface          TEXT NOT NULL DEFAULT '',
+      archivedAt       TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_usage_event_archive_owner ON agent_usage_event_archive(ownerGhii, ts);
+
+    -- The one table every dashboard reads. The cut column names which dimensions this row is keyed by;
+    -- a dimension outside the cut holds '' (never NULL) so the unique key is total and the
+    -- upsert is a plain ON CONFLICT DO UPDATE SET x = x + excluded.x.
+    CREATE TABLE IF NOT EXISTS usage_rollup (
+      id               TEXT PRIMARY KEY,
+      cut              TEXT NOT NULL,
+      grain            TEXT NOT NULL,
+      bucket           TEXT NOT NULL,
+      ownerGhii        TEXT NOT NULL DEFAULT '',
+      actorGaii        TEXT NOT NULL DEFAULT '',
+      appId            TEXT NOT NULL DEFAULT '',
+      model            TEXT NOT NULL DEFAULT '',
+      provider         TEXT NOT NULL DEFAULT '',
+      surface          TEXT NOT NULL DEFAULT '',
+      outcome          TEXT NOT NULL DEFAULT '',
+      coordinate       TEXT NOT NULL DEFAULT '',
+      counterpartyGhii TEXT NOT NULL DEFAULT '',
+      calls            INTEGER NOT NULL DEFAULT 0,
+      errors           INTEGER NOT NULL DEFAULT 0,
+      refusals         INTEGER NOT NULL DEFAULT 0,
+      tokensIn         INTEGER NOT NULL DEFAULT 0,
+      tokensOut        INTEGER NOT NULL DEFAULT 0,
+      costUsd          REAL NOT NULL DEFAULT 0,
+      unpricedCalls    INTEGER NOT NULL DEFAULT 0,
+      chargedUnits     INTEGER NOT NULL DEFAULT 0,
+      durationMsSum    INTEGER NOT NULL DEFAULT 0,
+      durationMsMax    INTEGER NOT NULL DEFAULT 0,
+      -- Distinct actors within one fold batch, summed across batches: an approximation FROM
+      -- BELOW. Labelled as such wherever it is served, never used for billing.
+      actorsSeen       INTEGER NOT NULL DEFAULT 0,
+      extra            TEXT NOT NULL DEFAULT '{}',
+      updatedAt        TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_usage_rollup_key ON usage_rollup(
+      cut, grain, bucket, ownerGhii, actorGaii, appId, model, provider,
+      surface, outcome, coordinate, counterpartyGhii
+    );
+    CREATE INDEX IF NOT EXISTS idx_usage_rollup_read ON usage_rollup(cut, grain, bucket);
+    CREATE INDEX IF NOT EXISTS idx_usage_rollup_owner ON usage_rollup(cut, ownerGhii, grain, bucket);
+
+    -- One row per raw stream. Advanced in the SAME transaction as the deltas it accounts for,
+    -- which is what makes the fold exactly-once.
+    CREATE TABLE IF NOT EXISTS usage_rollup_state (
+      stream    TEXT PRIMARY KEY,
+      lastTs    TEXT NOT NULL DEFAULT '',
+      lastId    TEXT NOT NULL DEFAULT '',
+      updatedAt TEXT NOT NULL
+    );
 
   `);
 }

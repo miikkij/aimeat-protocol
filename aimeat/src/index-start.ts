@@ -412,6 +412,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     if (statsInstance) await statsInstance.shutdown();
     const { shutdownTelemetryBuffer } = await import('./services/telemetry-buffer.js');
     await shutdownTelemetryBuffer();
+    const { shutdownUsageBuffer } = await import('./services/usage/usage-buffer.js');
+    await shutdownUsageBuffer();
     const { shutdownConsentAuditBuffer } = await import('./services/consent-audit-buffer.js');
     await shutdownConsentAuditBuffer();
     const { shutdownCache } = await import('./services/cache.js');

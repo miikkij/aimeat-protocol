@@ -18,6 +18,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.9.0 -- 2026-08-14 -- aimeat_usage_report -> wallet:read, matching GET /v1/usage/summary. A
+ *     usage report is the owner's whole spend and activity history, which is the same sensitivity
+ *     class as their balance rather than a new one.
  *   v1.8.0 -- 2026-08-13 -- aimeat_schedule_trigger -> task:write (it creates the same work its cron
  *     would) and aimeat_agent_console_set -> agent:write (beside mode_set and tags_set).
  *   v1.7.1 -- 2026-08-11 -- Note beside the onboarding entries in SCOPE_EXEMPT_TOOLS: the four tools
@@ -256,6 +259,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Wallet (GET /v1/wallet, /v1/wallet/transactions → wallet:read)
     aimeat_wallet_balance: 'wallet:read',
     aimeat_wallet_transactions: 'wallet:read',
+    // Usage reports (GET /v1/usage/summary → wallet:read). The same word as the route it calls,
+    // because the tool IS that door: a permission enforced on one surface and not the other is a
+    // permission the owner was told they had.
+    aimeat_usage_report: 'wallet:read',
 
     // Work queue (inbox → work:read; accept/deliver → work:accept; request execution → work:request)
     aimeat_work_inbox: 'work:read',

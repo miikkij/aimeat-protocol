@@ -132,6 +132,11 @@ export async function transcribeForOwner(
 
   const updated = await recordAiUsage(storage, gaii, usage, {
     costUsd, tokens: totalTok, audioSeconds: seconds, appId: opts.appId,
+    // Speech-to-text is priced per second rather than per token, so the token split is whatever the
+    // provider reported and the authoritative number is the cost. Named here anyway so a
+    // transcription is not a hole in the per-model report.
+    model: result.model, provider, promptTokens: 0, completionTokens: totalTok,
+    source: 'ai-transcribe',
   });
 
   logger.info(`[stt] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} seconds=${seconds} chars=${result.text.length} cost=$${costUsd.toFixed(6)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
