@@ -844,17 +844,25 @@ await test('Reset hooks', async () => {
 hookServer.close();
 
 await test('Cascade-delete owners', async () => {
-    const { status } = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${ownerToken}` },
-    });
-    assert(status === 200, `owner1 status: ${status}`);
-
+    // The OTHER owner goes first. Both deletes are made with owner1's credential, which is allowed
+    // because owner1 is the first owner on a fresh database and therefore the operator, and an
+    // operator may delete any account. But deleting owner1 first ends the credential doing the
+    // deleting, and what happens next is not something a test should rely on: the two backends
+    // disagree about it. The Postgres cascade clears the Session table with the owner
+    // (providers/postgres-kysely/methods/owner-cascade.ts) and the SQLite one does not, so the same
+    // sequence answered 200 on one backend and 401 on the other. Order it so the question never
+    // comes up. The divergence itself is real and is recorded separately.
     const { status: status2 } = await json(`/v1/owners/${encodeURIComponent(providerOwnerName)}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     assert(status2 === 200, `owner2 status: ${status2}`);
+
+    const { status } = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `owner1 status: ${status}`);
 });
 
 // ─── Summary ───

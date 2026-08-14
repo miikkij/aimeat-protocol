@@ -1347,7 +1347,14 @@ await test('DELETE /v1/auth/sessions — revoke sessions', async () => {
     assert(body.ok === true, `revoke sessions: ${JSON.stringify(body.error)}`);
 });
 
-// Re-auth after session revocation for cleanup
+// Re-auth after session revocation for cleanup.
+//
+// DELETE /v1/auth/sessions above revokes every session this OWNER holds, which is what the Security
+// tab's "log out everywhere" does, so ownerToken died with agentToken. Only the agent was re-minted
+// here, and the cleanup below still used the dead owner credential. That went unnoticed while
+// DELETE /v1/owners/:name accepted an agent token; it stopped being invisible when that route gained
+// requireOwnerPrincipal() on 2026-08-11, because the cleanup then had to use the owner's own
+// credential and the owner's own credential was the revoked one.
 await test('Re-auth after session revocation', async () => {
     const timestamp = new Date().toISOString();
     const signature = await signMsg(agentPrivKey, agentGaii + timestamp);
@@ -1357,6 +1364,15 @@ await test('Re-auth after session revocation', async () => {
     });
     assert(body.ok === true, `re-auth: ${JSON.stringify(body.error)}`);
     agentToken = body.data.token;
+
+    const ownerTs = new Date().toISOString();
+    const ownerSig = await signMsg(ownerPrivKey, ownerName + NODE_ID + ownerTs);
+    const owner = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: ownerName, timestamp: ownerTs, signature: ownerSig }),
+    });
+    assert(owner.body.ok === true, `owner re-auth: ${JSON.stringify(owner.body.error)}`);
+    ownerToken = owner.body.data.token;
 });
 
 // ══════════════════════════════════════════════════════════════════
