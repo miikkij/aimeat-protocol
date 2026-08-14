@@ -1,0 +1,5 @@
+# Revisions to skip in `git blame` — they changed line endings and nothing else.
+#
+# Enable it once per clone:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+

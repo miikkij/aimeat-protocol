@@ -1,6 +1,49 @@
+# Line endings, decided once.
+#
+# Until 2026-08-14 this repo had both: 584 of 2864 tracked files were CRLF in their committed blobs
+# and the rest LF, because different tools wrote them. Nothing read them worse for it, but every
+# tool that rewrites a file whole — Python's write_text on Windows translates every newline —
+# turned a one-line edit into a whole-file diff. One 71-line change was committed as 2707 changed
+# lines, and a 394-line change as 31,678. A diff like that cannot be reviewed, and a repo where the
+# answer depends on which tool touched the file last has no answer at all.
+#
+# Everything text is LF in the repository. Windows working copies get LF too, which every editor
+# and every tool in this stack reads; the two exceptions that genuinely need CRLF are declared below.
+
+* text=auto eol=lf
+
 # The app-catalog page is built (esbuild) from the modular sources under
-# aimeat/src/static/app-catalog/ into a single artifact. Pin LF on the build output and
-# its sources so `pnpm check:app-catalog` (freshness gate) round-trips byte-identically on
-# every platform, regardless of a contributor's core.autocrlf setting.
+# aimeat/src/static/app-catalog/ into a single artifact. These two lines pre-date the rule above and
+# are kept explicit: `pnpm check:app-catalog` compares the built artifact byte for byte, so its
+# inputs and output must round-trip identically whatever a contributor's core.autocrlf says. The
+# blanket rule now covers them, and naming them again costs nothing and survives a change to it.
 aimeat/src/static/app-catalog.html      text eol=lf
 aimeat/src/static/app-catalog/**        text eol=lf
+
+# Windows shells parse these by line and want CRLF on disk.
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+
+# Binary, declared rather than detected: git's heuristic is good and this is not a place to rely on
+# a heuristic, because a false "text" here corrupts the file on checkout.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.mp3  binary
+*.mp4  binary
+*.wav  binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.eot  binary
+*.pdf  binary
+*.zip  binary
+*.gz   binary
+*.wasm binary
+*.db   binary
+*.sqlite binary
+*.sqlite3 binary

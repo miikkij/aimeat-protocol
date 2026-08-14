@@ -82,7 +82,6 @@
     "check:sse-parity": "cd aimeat && pnpm check:sse-parity",
     "check:copied-logic": "cd aimeat && pnpm check:copied-logic",
     "check:liaison-surface": "cd aimeat && pnpm check:liaison-surface",
-    "check:line-endings": "cd aimeat && pnpm check:line-endings",
     "check:storage-parity": "cd aimeat && pnpm check:storage-parity",
     "check:audit-gates": "cd aimeat && pnpm check:audit-gates"
   }

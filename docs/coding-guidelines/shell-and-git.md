@@ -63,32 +63,25 @@ teaches people to work around it.
 
 # Rewriting a file instead of editing it
 
-Same family, different tool. `pathlib.Path.write_text` on Windows translates every `\n` to `\r\n`,
-so a Python one-liner that reads a file, changes one line and writes it back changes every line.
-On 2026-08-14 a 71-line change was committed as 1388 insertions and 1319 deletions; two earlier
-commits carry the same churn, one of them 31,000 lines of it. The content was right in all three.
-Nobody can review that.
+Same family, different tool. `pathlib.Path.write_text` on Windows translates every newline to a
+carriage return plus newline, so a Python one-liner that reads a file, changes one line and writes
+it back changes every line in it.
+On 2026-08-14 a 71-line change was committed as 1388 insertions and 1319 deletions, and a 394-line
+change as 31,678. The content was right in all of them. Nobody can review that.
 
-**Use the editor tool for edits.** When a script really is the right instrument — the same small
-change across ten files — read and write **bytes**:
+**This can no longer reach the repository.** `.gitattributes` declares `* text=auto eol=lf`, so git
+normalises on `git add` whatever the file looks like on disk: a tool that writes CRLF produces no
+diff at all. The repo was normalised in one commit on 2026-08-14 (599 files, 158,498 lines, zero
+content changes), and that revision is listed in `.git-blame-ignore-revs` so it does not shadow
+`git blame`.
+
+Two exceptions are declared rather than detected: `*.bat` and `*.cmd` stay CRLF because Windows
+shells want them that way, and the binary extensions are named explicitly instead of trusting a
+heuristic, because a false "text" guess corrupts a file on checkout.
+
+**Still prefer the editor tool for edits.** The endings are handled now, but a script that rewrites
+a whole file still risks everything else about it, and `write_bytes(read_bytes()...)` costs nothing:
 
 ```python
-p.write_bytes(p.read_bytes().replace(b'old', b'new'))   # endings survive
-p.write_text(p.read_text())                              # every line now CRLF
+p.write_bytes(p.read_bytes().replace(b'old', b'new'))
 ```
-
-`pnpm check:line-endings` runs in the pre-commit hook. It compares what git says changed against
-what changed with carriage returns at end of line ignored, and refuses a staged file where the gap
-is large. A deliberate normalisation passes with `AIMEAT_ALLOW_EOL_CHURN=1`.
-
-## Why not .gitattributes
-
-The obvious answer is `* text=auto eol=lf`, and it is the wrong one here. **584 of this repo's 2864
-tracked files are CRLF in their committed blobs**, and have been for years; nothing reads them
-worse for it. Declaring `eol=lf` would mark all 584 modified in every working tree at once — every
-parallel session's included — and land a renormalisation diff on top of whatever anyone had open,
-to fix something that was not hurting anyone.
-
-The mixed state is not the problem. A writer that flips a file wholesale is, and that is what the
-gate catches. If the repo is ever normalised, it should be one deliberate commit on a quiet tree,
-with the revision recorded in `.git-blame-ignore-revs`.
