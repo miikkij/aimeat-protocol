@@ -731,7 +731,14 @@ def create_liaison_agent(
     if backstory is None:
         template = SLIM_BACKSTORY_TEMPLATE if resolved_skill_path else FULL_BACKSTORY_TEMPLATE
         fmt_name = agent_name or "<unknown -- pass agent_name=... to create_liaison_agent>"
-        backstory = template.format(agent_name=fmt_name)
+        # replace(), not format(). A backstory template is prose that CONTAINS JSON examples, and
+        # str.format reads every brace in them as a field: the AI-provenance example in the FULL
+        # template raised KeyError: '"level"' for every agent that reaches this line, which is every
+        # agent registered through the device-authorize API rather than the CLI (no skill bundle ->
+        # FULL template). SLIM survived only because it happens to contain no JSON. Escaping the
+        # braces would fix today's example and lose to the next one, so the substitution is now
+        # literal and no brace in any template means anything.
+        backstory = template.replace("{agent_name}", fmt_name)
 
     adapter = MCPServerAdapter(mcp_server_params)
     try:
