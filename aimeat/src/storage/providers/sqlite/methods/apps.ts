@@ -411,6 +411,12 @@ export const appsMethods = {
     return rows.map(r => this.deserializeAppGrant(r));
   },
 
+  async listAppGrants(this: SqliteStorage): Promise<AppGrantRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM app_grants WHERE revoked = 0 ORDER BY createdAt DESC')
+      .all() as Record<string, unknown>[];
+    return rows.map(r => this.deserializeAppGrant(r));
+  },
+
   async updateAppGrant(this: SqliteStorage, 
     grantId: string,
     updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels'>>,

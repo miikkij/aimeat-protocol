@@ -83,6 +83,11 @@ export const GRANDFATHERED_SCOPES = [
     'ext:invoke',
     'organism:write',
     'organism:invite',
+    // Added 2026-08-15 with the door that now demands it (routes/instances/install.ts). Installing a
+    // package asked for nothing before, so every principal that could reach the route could install;
+    // the word describes what was already happening rather than granting anything new, which is the
+    // only condition under which a word belongs on this list.
+    'packages:write',
 ] as const;
 
 /**
@@ -174,4 +179,61 @@ export async function migrateAgentScopeVocabulary(storage: Storage): Promise<num
         });
     }
     return changed;
+}
+
+/**
+ * The same grandfathering, for the OTHER principal family a new permission word can refuse.
+ *
+ * `requireScope` waves an owner session through and deliberately does NOT wave an app grant through
+ * — it is the only middleware that stops one, which is exactly why tightening a route to a new word
+ * is the shape that broke a live app in changelog 1.33.1 and is why H-20 was reverted. Everything
+ * above was written for agents and stopped there, so for five days the node had a mechanism that
+ * made a new word safe for one family and left the family the word actually bites uncovered.
+ *
+ * A grant carries what its owner approved on the consent screen at the time it was made, and an app
+ * gains nothing from being updated. So a word added to the vocabulary today would refuse every grant
+ * approved before it existed — for an act the app was already performing, through a door that asked
+ * nothing. Writing the word onto those grants preserves the reach they have; it does not hand an app
+ * a permission it never had, because the door it names was open to them a moment ago.
+ *
+ * The rule for a NEW grant is unchanged and is where the word does its work: the consent screen
+ * lists it, the owner sees it, and they can uncheck it.
+ *
+ * Conditional words are not applied here. Their `when` is a question about what an owner granted a
+ * particular agent, and an app grant's scope list is a different conversation with a different
+ * screen; the two should not be reasoned about with one table until someone decides they mean the
+ * same thing.
+ */
+export async function migrateAppGrantScopeVocabulary(storage: Storage): Promise<number> {
+    const grants = await storage.listAppGrants();
+    let changed = 0;
+
+    for (const grant of grants) {
+        const held = grant.scopes;
+        if (!Array.isArray(held) || held.includes('*')) continue;
+        const missing = GRANDFATHERED_SCOPES.filter(s => !held.includes(s));
+        if (!missing.length) continue;
+        await storage.updateAppGrant(grant.grantId, { scopes: [...held, ...missing] });
+        changed++;
+    }
+
+    if (changed) {
+        logger.info('Scope vocabulary migration: live app grants grandfathered onto the new words', {
+            grantsUpdated: changed,
+            scopes: GRANDFATHERED_SCOPES.join(', '),
+        });
+    }
+    return changed;
+}
+
+/**
+ * Both families, one call. The boot path takes this rather than either half, so a word added to
+ * GRANDFATHERED_SCOPES cannot reach one principal family and miss the other — which is the failure
+ * this pair exists to prevent, and which it had itself.
+ */
+export async function migrateScopeVocabulary(storage: Storage): Promise<{ agents: number; appGrants: number }> {
+    return {
+        agents: await migrateAgentScopeVocabulary(storage),
+        appGrants: await migrateAppGrantScopeVocabulary(storage),
+    };
 }

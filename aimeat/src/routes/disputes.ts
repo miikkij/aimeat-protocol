@@ -427,6 +427,25 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
 
         const { to_requester = 0, to_provider = 0, burned = 0 } = distribution;
 
+        // SECURITY (C-3, third site). A ruling DISTRIBUTES the escrow — the word the API uses is
+        // `distribution` and openapi.yaml types it as requester_wins | provider_wins | split, all of
+        // which are ways of dividing what is held. It was the only one of the three money doors on
+        // this route with no ceiling: /offer-partial refuses above the escrow (line 268) and
+        // /accept-partial clamps again, and this one credited whatever integer it was handed, so
+        // `{to_requester: 1000000}` on an 11-morsel escrow minted the difference out of nothing.
+        //
+        // An operator can already mint — but through mintMorsels(), which enforces
+        // config.maxOperatorMintPerDay. A door that creates morsels with no cap at all is not the
+        // same authority just because the same person holds it, and nothing here writes the audit
+        // trail that door writes. Refuse before you write: this sits above every credit below.
+        const escrowed = work.cost.inEscrow;
+        if (to_requester + to_provider + burned > escrowed) {
+            res.status(400).json(error(config.nodeId, 'RULING_EXCEEDS_ESCROW',
+                `A ruling distributes the ${escrowed} morsels held in escrow for this work; `
+                + `${to_requester + to_provider + burned} were named. Nothing was written.`));
+            return;
+        }
+
         // Distribute funds
         if (to_requester > 0) {
             await returnEscrow(storage, work, to_requester);

@@ -36,7 +36,7 @@ import { seedKnowledgeTemplates } from '../services/knowledge.js';
 import { seedSystemPrompts } from '../services/prompt-seeder.js';
 import { seedBundledCortexes } from '../services/cortex-seeder.js';
 import { seedExamplePackages } from '../services/package-seeder.js';
-import { migrateAgentScopeVocabulary } from '../services/scope-vocabulary-migration.js';
+import { migrateScopeVocabulary } from '../services/scope-vocabulary-migration.js';
 import { seedBuiltinSkills } from '../services/skill-seeds.js';
 import { DirectoryService } from '../services/directory.js';
 import { RealtimeManager } from '../services/realtime-manager.js';
@@ -147,12 +147,18 @@ export async function initializeServices(
     .then(count => { if (count > 0) logger.info(`Auto-seeded ${count} example package(s)`); })
     .catch(err => logger.error('Failed to seed example packages', { error: String(err) }));
 
-  // Grandfather existing agents onto the scope words added 2026-08-10. An MCP tool with a scope
+  // Grandfather existing principals onto the scope words added 2026-08-10. An MCP tool with a scope
   // entry is REMOVED from an agent that lacks it, and those 73 tools had no entry until now, so
-  // without this every agent connected before today would silently lose them. Idempotent.
-  migrateAgentScopeVocabulary(storage)
-    .then(count => { if (count > 0) logger.info(`Scope vocabulary: grandfathered ${count} agent(s)`); })
-    .catch(err => logger.error('Failed to migrate agent scope vocabulary', { error: String(err) }));
+  // without this every agent connected before today would silently lose them. BOTH families: an app
+  // grant is the principal requireScope actually stops, so a word that reaches only agents leaves
+  // the tightening that bites live apps exactly as dangerous as it was. Idempotent.
+  migrateScopeVocabulary(storage)
+    .then(({ agents, appGrants }) => {
+      if (agents > 0 || appGrants > 0) {
+        logger.info(`Scope vocabulary: grandfathered ${agents} agent(s) and ${appGrants} app grant(s)`);
+      }
+    })
+    .catch(err => logger.error('Failed to migrate scope vocabulary', { error: String(err) }));
 
   // Data hygiene: legacy publish paths stored app ownerName as the full GHII
   // (owner@node). The catalog "my apps" filter and the by-owner-name delete

@@ -194,9 +194,17 @@ export type BoardReactionResult = { ok: true } | BoardWriteRefusal;
 /**
  * React to a post.
  *
- * Neither door loads the board here, so a reaction lands on any post whose ids the caller knows.
- * That is how both copies have always behaved and it is left as it is; the bound on the reaction
- * itself is what differed, and it now holds on both.
+ * The board is loaded and the READ rule applied, which is a change from how both doors behaved until
+ * 2026-08-15. Before that neither door loaded the board, so a reaction landed on any post whose ids
+ * the caller knew — a principal holding social:write could write their own GAII onto a post on a
+ * private board they cannot read, post to or reply on, and could use the 200-versus-404 answer to
+ * probe which post ids exist there. That was recorded as a known state rather than decided, and it is
+ * decided now (E2E test-quality audit finding A30).
+ *
+ * The READ rule and not the POST rule, and the difference is the whole blast radius: boardVisibleTo
+ * leaves public and system boards open to everyone, so reacting on a public board — the normal case,
+ * and the only one any caller in this repo performs — is untouched. What closes is the private and
+ * shared case, where reacting was a write onto somebody else's surface.
  */
 export async function reactToBoardPost(
     deps: BoardWriteDeps,
@@ -208,6 +216,20 @@ export async function reactToBoardPost(
     const reaction = String(input.reaction ?? '');
     if (!reaction || reaction.length > BOARD_LIMITS.reactionMax) {
         return { ok: false, status: 400, code: 'VALIDATION_ERROR', message: `reaction must be 1-${BOARD_LIMITS.reactionMax} characters` };
+    }
+
+    // 404 rather than 403 for a board the caller cannot see: the same answer a post that does not
+    // exist gets, so the refusal does not become the probe it was closing.
+    //
+    // The same-owner clause is not decoration, and the E2E suite is what found it: boardVisibleTo
+    // grants same-owner access only for `shared` boards, so on a PRIVATE board it refuses the
+    // owner's own second agent — which is one person's two agents on one person's board, and
+    // exactly the arrangement this node is built around. isSameOwner is the test the rest of the
+    // codebase makes for that, so it is the test here.
+    const board = await storage.getBoard(input.boardId);
+    const mayReact = !!board && (boardVisibleTo(board, caller.gaii) || isSameOwner(board.ownerGaii, caller.gaii));
+    if (!mayReact) {
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Post not found' };
     }
 
     const stored = await storage.addReaction(input.boardId, input.postId, reaction, caller.gaii);

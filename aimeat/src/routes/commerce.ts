@@ -32,7 +32,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { isEvmAddressShape, toChecksumAddress, checksumIsWrong, settlementAssetMatch, probeIsContract } from '../commerce/evm-address.js';
@@ -369,7 +369,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/commerce/holds — authorize money on the buyer's instrument toward one seller.
-  router.post('/v1/commerce/holds', requireAuth(), async (req, res) => {
+  router.post('/v1/commerce/holds', requireAuth(), requireScope('commerce:sell'), async (req, res) => {
     const parsed = HoldCreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_HOLD', parsed.error.message)); return; }
     try {
@@ -408,7 +408,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/commerce/holds/:id/capture — seller settles up to the held amount (partial allowed).
-  router.post('/v1/commerce/holds/:id/capture', requireAuth(), async (req, res) => {
+  router.post('/v1/commerce/holds/:id/capture', requireAuth(), requireScope('commerce:sell'), async (req, res) => {
     const amount = req.body?.amount;
     if (amount !== undefined && (typeof amount !== 'number' || !Number.isInteger(amount))) {
       res.status(400).json(error(config.nodeId, 'INVALID_HOLD', 'amount must be an integer number of micro-units'));
@@ -421,7 +421,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/commerce/holds/:id/release — buyer or seller cancels an open hold.
-  router.post('/v1/commerce/holds/:id/release', requireAuth(), async (req, res) => {
+  router.post('/v1/commerce/holds/:id/release', requireAuth(), requireScope('commerce:sell'), async (req, res) => {
     try {
       const hold = await releaseHold(storage, config, req.auth!.owner as string, req.params.id as string);
       res.json(success(config.nodeId, { hold }));

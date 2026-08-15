@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, PendingApprovalRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { shouldGate, gatePolicyFromManifest, type Risk } from '../../services/gate-policy.js';
@@ -201,7 +201,14 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
   // member, meta.* needs admin/creator, archived is read-only. The publish REVIEW gate is per-decision,
   // so when it's enabled this batch path is refused (use POST /v1/organisms/:id/publish one at a time).
   // Body: { ws?, namespace, instances: [], expected_versions?: { <instance>: <version> } }.
-  router.post('/v1/organisms/:id/workspace/records/publish', requireAuth(), async (req, res) => {
+  // A17 (E2E test-quality audit). `requireAuth()` alone here meant the batch door asked less than the
+  // single-record door it amortises, and less than the memory door the records land in — so an app
+  // grant carrying any one scope could publish a workspace's records in bulk. organism:write is the
+  // word: it is what the MCP surface already requires for workspace writes, and it is in
+  // GRANDFATHERED_SCOPES, so every agent AND (as of today) every live app grant already carries it.
+  // Owner sessions are unaffected — requireScope waves them through — so the SPA and CADENCE's own
+  // owner-session imports do not change.
+  router.post('/v1/organisms/:id/workspace/records/publish', requireAuth(), requireScope('organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }

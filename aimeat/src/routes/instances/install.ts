@@ -24,7 +24,7 @@ import type {
   ScheduledJobRecord,
   ExtensionRecord,
 } from '../../storage/interface.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import {
@@ -68,8 +68,16 @@ export function registerInstallRoutes(
   storage: Storage,
   scheduler?: Scheduler,
 ): void {
-  // POST /v1/packages/:groupId/install — Install package as instance
-  router.post('/v1/packages/:groupId/install', requireAuth(), async (req, res) => {
+  // POST /v1/packages/:groupId/install — Install package as instance.
+  //
+  // A22 (E2E test-quality audit). Installing REGISTERS things under the caller's identity — an app,
+  // a cortex, an extension, and any @activate cron the manifest declares — so it is a write with a
+  // long tail, and it asked for no permission at all. `packages:write` is that permission: it says
+  // on the consent screen what this actually is, instead of arriving inside whatever single scope an
+  // owner happened to approve. Owner sessions are waved through by requireScope, so the Packages tab
+  // and the gallery installs are untouched; the word is in GRANDFATHERED_SCOPES, so every agent and
+  // every live app grant already carries it and nothing in flight breaks.
+  router.post('/v1/packages/:groupId/install', requireAuth(), requireScope('packages:write'), async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
     const owner = req.auth!.owner;
     const ownerGhii = await resolveGhii(storage, owner, req.auth!.sub);

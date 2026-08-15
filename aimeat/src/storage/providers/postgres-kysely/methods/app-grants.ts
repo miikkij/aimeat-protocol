@@ -59,6 +59,9 @@ export const appGrantMethods = {
   async listAppGrantsByOwner(this: PostgresKyselyStorage, owner: string): Promise<AppGrantRecord[]> {
     return (await this.db.selectFrom('AppGrant').selectAll().where('owner', '=', owner).orderBy('createdAt', 'desc').execute()).map(toGrant);
   },
+  async listAppGrants(this: PostgresKyselyStorage): Promise<AppGrantRecord[]> {
+    return (await this.db.selectFrom('AppGrant').selectAll().where('revoked', '=', false).orderBy('createdAt', 'desc').execute()).map(toGrant);
+  },
   async updateAppGrant(
     this: PostgresKyselyStorage,
     grantId: string,

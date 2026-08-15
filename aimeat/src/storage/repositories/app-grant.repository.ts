@@ -25,6 +25,17 @@ export interface AppGrantRepository {
    */
   getAppGrantByOwnerAndApp(owner: string, app: string): Promise<AppGrantRecord | null>;
   listAppGrantsByOwner(owner: string): Promise<AppGrantRecord[]>;
+  /**
+   * Every LIVE grant on the node, across all owners. One consumer, and it is the reason this exists:
+   * the scope-vocabulary migration (services/scope-vocabulary-migration.ts) has to reach every
+   * principal a new permission word could refuse, and app grants are a principal family — the one
+   * `requireScope` deliberately does NOT wave through. Walking owners and calling
+   * listAppGrantsByOwner would be the same read as N+1 queries at boot.
+   *
+   * Revoked rows are excluded: a revoked grant mints nothing, so widening its scope list would be
+   * writing a permission onto a credential that cannot be used.
+   */
+  listAppGrants(): Promise<AppGrantRecord[]>;
   updateAppGrant(grantId: string, updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels'>>): Promise<AppGrantRecord | null>;
   deleteAppGrant(grantId: string): Promise<boolean>;
 }

@@ -10,7 +10,7 @@ import type { Router } from 'express';
 import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireOwnerPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
@@ -23,8 +23,17 @@ import { emitChange } from '../../services/event-bus.js';
 export function registerRoutingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // ── Cross-Node Query Routing ──
 
-    // POST /v1/federation/route — Forward a request to a peer node (multi-hop relay)
-    router.post('/v1/federation/route', requireAuth(), async (req, res) => {
+    // POST /v1/federation/route — Forward a request to a peer node (multi-hop relay).
+    //
+    // A23 (E2E test-quality audit). This is an OUTBOUND call made in this node's name, charged to
+    // this node's relationship with its peers, and it carried requireAuth() alone — so any principal
+    // that could authenticate at all could drive the relay, including a scope-limited app grant.
+    // requireOwnerPrincipal is the narrow answer and it costs nothing measurable: greps across
+    // public/ (the SPA), src/mcp/ (no tool reaches it), src/static/sdk-libs/ and python/aimeat-crewai
+    // find ZERO callers, and federation-multinode drives it with an owner token. The wider answer —
+    // a `federation:relay` word an agent could hold — is available the day someone wants an agent to
+    // relay; it is not invented here for a caller that does not exist.
+    router.post('/v1/federation/route', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
         const { target_node, method, path, body: reqBody, max_hops } = req.body ?? {};
 
         if (!target_node || !path) {

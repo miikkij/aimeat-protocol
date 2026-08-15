@@ -96,6 +96,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'messages:read': 'Read direct messages addressed to you across the federation',
   'wallet:read': 'See your morsel balance and transactions',
   'knowledge:read': 'Read your knowledge packages',
+  // Installing a package REGISTERS an app, a cortex, an extension and any @activate cron the
+  // manifest declares, under the installer's identity. Until 2026-08-15 that door asked for nothing,
+  // so it arrived inside whatever single scope the owner had approved. Named here so the consent
+  // screen can say what it is and the owner can uncheck it.
+  'packages:write': 'Install packages for you (registers their apps, extensions and scheduled jobs)',
   // task:* and workflow:* let a control-plane app (e.g. AGENCY) orchestrate the owner's OWN
   // agents on their behalf. The task routes enforce an owner-match (an app may only create/read
   // tasks for agents whose owner is the app's own owner) and workflow routes already resolve to

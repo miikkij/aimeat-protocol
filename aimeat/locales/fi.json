@@ -5730,6 +5730,9 @@
           },
           "operator": {
             "organism-repair": "Palauta omistaja organismiin jota tämä tili ei omista. Toimii vain noden operaattorilla: muulla tilillä tämä oikeus ei tee mitään. Tällä pääsee takaisin organismiin jonka omistajatiliin ei enää saa yhteyttä, ja se antaa organismin sille jonka agentti nimeää."
+          },
+          "packages": {
+            "write": "Asenna puolestasi paketteja. Se ottaa käyttöön paketin sovelluksen, laajennukset ja mahdolliset ajastetut työt sinun nimissäsi."
           }
         },
         "domainAi": "Tekoäly",
@@ -5748,7 +5751,8 @@
         "domainCapability": "Myymäsi palvelut",
         "domainAccount": "Tilisi ja kirjautuminen",
         "domainOperator": "Tämän noden ylläpito",
-        "permInvoke": "Aja"
+        "permInvoke": "Aja",
+        "domainPackages": "Paketit"
       },
       "deviceAuth": {
         "title": "Laitehyväksyntä",

@@ -153,6 +153,11 @@ export const SCOPE_DOMAINS = [
   // inert until ext:write activates it). Cortex INSTALL requires cortex:write.
   { key: 'cortex',    permissions: ['write'] },
   { key: 'ext',       permissions: ['write', 'invoke'] },
+  // packages:write — install a package. That REGISTERS its app, its cortex, its extension and any
+  // @activate cron the manifest declares, all under the installer's identity, so it is the widest
+  // single act in this list and it asked for nothing at all until 2026-08-15. A row here is what
+  // lets an owner see it and take it away.
+  { key: 'packages', permissions: ['write'] },
 
   // ── Added 2026-08-10 (August 2026 audit, step 3a) ────────────────────────────────────────────
   // These name things an agent could already do with no permission at all, because the MCP surface

@@ -5730,6 +5730,9 @@
           },
           "operator": {
             "organism-repair": "Put an owner back on an organism this account does not own. Only works for a node operator: on any other account this permission does nothing. It is the way back when an organism's owner account can no longer be reached, and it hands that organism to whoever the agent names."
+          },
+          "packages": {
+            "write": "Install packages for you. That sets up the package's app, its extensions and any scheduled jobs it brings, under your name."
           }
         },
         "domainAi": "AI",
@@ -5748,7 +5751,8 @@
         "domainCapability": "Services you sell",
         "domainAccount": "Your account and how you sign in",
         "domainOperator": "Running this node",
-        "permInvoke": "Run"
+        "permInvoke": "Run",
+        "domainPackages": "Packages"
       },
       "deviceAuth": {
         "title": "Device Authorization",
