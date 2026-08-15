@@ -62,6 +62,9 @@ const EXT = `bsplit${Date.now()}`;
 // The real kumppani figure: 0.50 EUR in 6-decimal micro-units. A share is REVENUE, so the whole
 // suite is priced in money. Morsels appear here only to prove they are NEVER shared.
 const PRICE = 500_000;
+// A DIFFERENT number in the other currency, on purpose: with the same amount, a test that reads the
+// wrong currency's bucket still finds the figure it expected and passes for the wrong reason.
+const USD_PRICE = 700_000;
 const POOL_PCT = 50;
 const MORSEL_PRICE = 10;
 const SCRIPTS = {
@@ -106,6 +109,11 @@ const manifest = (name: string) => JSON.stringify({
     // The consent-gated lookup: same money price, but the destination set comes from a registry the
     // capability owns, so "has this company consented" decides whether anybody is owed anything.
     { id: 'registerChanges', method: 'POST', path: '/registerChanges', script: 'consentRegistry', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
+    // The SAME product priced in the other currency the rail carries. Every money action in this file
+    // was EUR, so nothing here ever asked whether the currency travels: whether the buyer is charged
+    // in what the action is priced in, and whether a share lands in that currency's book rather than
+    // being added to a EUR total that happens to be the one the code reads.
+    { id: 'sharedusd', method: 'POST', path: '/sharedusd', script: 'echo', commercial: { payMoney: { amount: USD_PRICE, currency: 'USD' } } },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 5000, max_api_calls: 1 },
@@ -151,12 +159,20 @@ async function balanceEur(token: string): Promise<number> {
   return balance(token);
 }
 
-/** Everything a beneficiary has been booked, in one number, so a delta is easy to assert. */
-async function accrued(token: string): Promise<number> {
+/**
+ * Everything a beneficiary has been booked in one currency, so a delta is easy to assert.
+ *
+ * The bucket is a PARAMETER, not a constant. totalsOf() keys by currency, so a helper that always
+ * read EUR would report 0 for a USD share and 0 for a wiped book alike — which is exactly how
+ * e2e-mcp-beneficiary came to compare `undefined ?? 0` with `undefined ?? 0`.
+ */
+async function accruedIn(token: string, currency: string): Promise<number> {
   const r = await earnings(token);
   assert(r.status === 200, `earnings ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  return Number(r.body.data.totals?.EUR?.accrued ?? 0);
+  return Number(r.body.data.totals?.[currency]?.accrued ?? 0);
 }
+/** The EUR bucket, which is what most of this file prices in. */
+const accrued = (token: string) => accruedIn(token, 'EUR');
 
 // ── Declaring a split ─────────────────────────────────────────────────────────
 
@@ -201,13 +217,40 @@ await test('Contract accepted at the authoritative price', async () => {
   assert(rakePerCall >= 1, `a positive price must carry a rake, got ${rakePerCall}`);
 });
 
+/**
+ * What this consumer has actually been charged against their contract for `action`, and IN WHAT.
+ *
+ * The currency comes back with the number rather than being assumed by the helper's name. That is
+ * the mistake this file already contained once: `balanceEur` returns morsels, and every assertion
+ * that trusted the name was reading a quantity a money call never touches.
+ */
+async function contractSpend(token: string, ext: string, action: string): Promise<{ spent: number; currency: string }> {
+  const r = await json('/v1/exchange/entitlements', { headers: auth(token) });
+  assert(r.status === 200, `entitlements ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const e = (r.body.data.entitlements as any[]).find(x => x.ext === ext && x.action === action);
+  assert(!!e, `no contract for ${ext}/${action}: ${JSON.stringify((r.body.data.entitlements as any[]).map(x => `${x.ext}/${x.action}`))}`);
+  return { spent: Number(e.budget?.spent_units ?? 0), currency: String(e.currency ?? e.unit ?? '') };
+}
+
 await test('A settled call: the CONSUMER pays exactly the list price — a split costs the buyer nothing', async () => {
-  const before = await balance(consumer.token);
+  // The header's claim is about the PRICE, and the only quantity this test read was the morsel
+  // balance — which a money call never touches under any implementation. The helper that read it was
+  // named balanceEur and its own body is `return balance(token)`. So "the buyer pays exactly the list
+  // price" was asserted by a number that is the same whatever the buyer is charged. The buyer's real
+  // charge is the spend meter on their contract.
+  const morselsBefore = await balance(consumer.token);
+  const before = await contractSpend(consumer.token, EXT, 'shared');
+
   const r = await invoke(consumer.token, 'shared');
   assert(r.status === 200, `call ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  // A money call settles in EUR on the accrual rail; the pacing meter is a different quantity and
-  // must not move because somebody paid money.
-  assert(await balance(consumer.token) === before, 'a money call does not touch the morsel balance');
+
+  const after = await contractSpend(consumer.token, EXT, 'shared');
+  assert(after.spent - before.spent === PRICE,
+    `the buyer was charged the list price ${PRICE} and the meter moved by ${after.spent - before.spent}`);
+  assert(after.currency === 'EUR',
+    `and it was charged in the currency the action is priced in, not an assumed one: ${after.currency}`);
+  // And the pacing meter is a different quantity: it must not move because somebody paid money.
+  assert(await balance(consumer.token) === morselsBefore, 'a money call does not touch the morsel balance');
 });
 
 await test('The PROVIDER received their whole cut — the share is an obligation, not a deduction', async () => {
@@ -225,9 +268,24 @@ await test('The pool divides 3:1 and the ledger conserves: price === rake + prov
   assert(a + b === pool, `shares must sum to the pool exactly: ${a} + ${b} !== ${pool}`);
   assert(a === Math.floor(pool * 3 / 4) || a === Math.floor(pool * 3 / 4) + 1, `alpha's 3/4 share: got ${a} of ${pool}`);
   assert(a > b, `weight 3 must receive more than weight 1: ${a} vs ${b}`);
-  // The conservation invariant, read off what actually happened rather than recomputed from itself.
-  assert(rakePerCall + (providerCut - pool) + a + b === PRICE,
-    `conservation: ${rakePerCall} + ${providerCut - pool} + ${a} + ${b} !== ${PRICE}`);
+  // THE CONSERVATION LINE WAS ALGEBRA, NOT A READING. providerCut and pool are both computed here
+  // from PRICE and rakePerCall, and the line above has already asserted a + b === pool, so
+  // `rakePerCall + (providerCut - pool) + a + b === PRICE` reduces to PRICE === PRICE and holds
+  // whatever the node did. The provider's own receipt was never read anywhere in this file.
+  const receipts = await json('/v1/exchange/earnings', { headers: auth(provider.token) });
+  assert(receipts.status === 200, `provider earnings ${receipts.status}: ${JSON.stringify(receipts.body?.error)}`);
+  const lines = (receipts.body.data.entries ?? []) as any[];
+  const providerEur = lines
+    .filter(l => (l.currency ?? 'EUR') === 'EUR' && l.method !== 'beneficiary-share')
+    .reduce((sum, l) => sum + Number(l.amount ?? 0), 0);
+  assert(providerEur > 0,
+    `the provider has a money receipt to read at all: ${JSON.stringify(lines.slice(0, 3))}`);
+  // What the provider actually holds, plus what the rake took and what the beneficiaries are owed,
+  // is the price the buyer paid. Every term but the last two is now READ rather than derived.
+  assert(providerEur + rakePerCall === PRICE,
+    `the provider's receipt (${providerEur}) plus the rake (${rakePerCall}) is the list price ${PRICE}`);
+  assert(a + b <= providerEur,
+    `the shares (${a} + ${b}) are owed OUT of what the provider holds (${providerEur}), not on top of it`);
 });
 
 await test('A beneficiary sees only their OWN share, with the amount explained', async () => {
@@ -890,6 +948,130 @@ await test('Deleting a split stops future sharing and leaves accrued shares stan
 await test('Deleting a split that does not exist → 404', async () => {
   const r = await json(`/v1/commerce/beneficiary-splits?ext=${EXT}&action=nosuch`, { method: 'DELETE', headers: auth(provider.token) });
   assert(r.status === 404, `expected 404, got ${r.status}`);
+});
+
+// ── The other currency the rail carries ──────────────────────────────────────────────────────────
+//
+// Every money action above is EUR, and every total this file read was the EUR bucket. So nothing
+// asked whether the currency actually travels: a rail that charged in one currency and booked the
+// share in another, or that added a USD share to the EUR total, would have passed all 54 assertions.
+// The buckets being kept apart is not a detail — it is what makes "released" mean an amount somebody
+// can be paid.
+await test('USD: the buyer is charged in the currency the action is PRICED in', async () => {
+  const d = await declare(provider.token, {
+    ext: EXT, action: 'sharedusd', pool_percent: POOL_PCT,
+    beneficiaries: [{ ghii: alpha.ghii, weight: 3 }, { ghii: beta.ghii, weight: 1 }],
+  });
+  assert(d.status === 200, `declare usd ${d.status}: ${JSON.stringify(d.body?.error)}`);
+
+  const a = await accept(consumer.token, 'sharedusd', { cap_units: 10 * USD_PRICE });
+  assert(a.status === 201, `accept usd ${a.status}: ${JSON.stringify(a.body?.error)}`);
+  assert(a.body.data.entitlement.price_per_call === USD_PRICE,
+    `the USD price is authoritative: ${a.body.data.entitlement.price_per_call}`);
+
+  const before = await contractSpend(consumer.token, EXT, 'sharedusd');
+  const r = await invoke(consumer.token, 'sharedusd');
+  assert(r.status === 200, `usd call ${r.status}: ${JSON.stringify(r.body?.error)}`);
+
+  const after = await contractSpend(consumer.token, EXT, 'sharedusd');
+  assert(after.spent - before.spent === USD_PRICE,
+    `charged the USD list price ${USD_PRICE}, meter moved ${after.spent - before.spent}`);
+  assert(after.currency === 'USD', `and in USD, not the file's usual EUR: ${after.currency}`);
+});
+
+await test('USD: the share is booked in the USD book, and the EUR book does not move', async () => {
+  const eurBefore = await accruedIn(alpha.token, 'EUR');
+  const usdBefore = await accruedIn(alpha.token, 'USD');
+
+  const r = await invoke(consumer.token, 'sharedusd');
+  assert(r.status === 200, `second usd call ${r.status}: ${JSON.stringify(r.body?.error)}`);
+
+  const usdAfter = await accruedIn(alpha.token, 'USD');
+  const eurAfter = await accruedIn(alpha.token, 'EUR');
+  assert(usdAfter > usdBefore, `alpha's USD share was booked: ${usdBefore} -> ${usdAfter}`);
+  assert(eurAfter === eurBefore,
+    `a USD call moved the EUR book: ${eurBefore} -> ${eurAfter} — the two currencies are one pot`);
+
+  // And the entry says which currency it is, so a payer reading one line knows what to pay in.
+  const e = await earnings(alpha.token);
+  const usdLine = (e.body.data.entries as any[]).find(x => x.currency === 'USD');
+  assert(!!usdLine, `the USD entry names its currency: ${JSON.stringify((e.body.data.entries as any[]).map(x => x.currency))}`);
+});
+
+// ── The scopes on this router had never been executed ────────────────────────────────────────────
+//
+// Every one of the tests above authenticates with an OWNER JWT from setupOwner(), and an owner
+// session bypasses requireScope entirely (auth/middleware.ts). The only non-happy principal anywhere
+// in this file is a stranger OWNER, who is refused for being the wrong person and not for lacking a
+// permission. So `requireScope('exchange:beneficiary')` on declare, withdraw and release, and
+// `requireScope('wallet:read')` on earnings and obligations, could all be deleted with all 51
+// assertions still green.
+//
+// An AGENT is the principal those words exist for: it carries its owner's name, so every ownership
+// check in the handlers passes, and the scope list is the only thing standing between it and its
+// owner's revenue.
+
+/** An agent of `owner`, holding exactly `scopes`, with a signed session token. */
+async function agentOf(owner: { name: string; token: string }, label: string, scopes: string[]) {
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({ name: `bsagent${label}`, owner: owner.name, capabilities: ['actions'], scopes }),
+  });
+  assert(reg.status === 201, `agent ${label} ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+  const gaii = (reg.body.data.agent?.gaii ?? reg.body.data.gaii) as string;
+  const ts = new Date().toISOString();
+  const t = await json('/v1/auth/token', {
+    method: 'POST',
+    body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(reg.body.data.private_key, gaii + ts) }),
+  });
+  assert(t.body.ok === true, `agent token ${label}: ${JSON.stringify(t.body?.error)}`);
+  return { gaii, token: t.body.data.token as string };
+}
+
+await test('An agent WITHOUT exchange:beneficiary cannot declare, withdraw or release a split', async () => {
+  const narrow = await agentOf(provider, 'narrow', ['memory:read']);
+
+  const declared = await declare(narrow.token, { ext: EXT, action: 'shared', pool_percent: 90, dynamic: true });
+  assert(declared.status === 403 && declared.body?.error?.code === 'SCOPE_DENIED',
+    `an agent with memory:read declared its owner's split: ${declared.status} ${JSON.stringify(declared.body?.error)}`);
+
+  const withdrawn = await json(`/v1/commerce/beneficiary-splits?ext=${EXT}&action=shared`, {
+    method: 'DELETE', headers: auth(narrow.token),
+  });
+  assert(withdrawn.status === 403, `it withdrew one: ${withdrawn.status}`);
+
+  const released = await json('/v1/commerce/beneficiary/release', {
+    method: 'POST', headers: auth(narrow.token),
+    body: JSON.stringify({ tracking_code: 'anything', beneficiary: alpha.ghii }),
+  });
+  assert(released.status === 403, `it released a share: ${released.status}`);
+
+  // And the refusal refused: whatever this action's split was before, it is not the 90 the agent
+  // asked for. A 403 sent after the write would be the same defect one step later.
+  const still = await json(`/v1/commerce/beneficiary-splits?ext=${EXT}&action=shared`, { headers: auth(provider.token) });
+  const pool = Number(still.body?.data?.split?.pool_percent ?? still.body?.data?.pool_percent ?? 0);
+  assert(pool !== 90, `the refused declare was applied anyway: pool_percent ${pool}`);
+});
+
+await test('An agent WITHOUT wallet:read cannot read its owner\'s earnings or obligations', async () => {
+  const narrow = await agentOf(provider, 'narrow2', ['memory:read']);
+  const e = await earnings(narrow.token);
+  assert(e.status === 403, `it read the owner's beneficiary earnings: ${e.status}`);
+  const o = await obligations(narrow.token);
+  assert(o.status === 403, `it read the owner's obligations: ${o.status}`);
+});
+
+await test('An agent WITH the words does the same work (the permission is not a ban)', async () => {
+  // Without this the three refusals above are satisfied by an agent that can do nothing at all.
+  const wide = await agentOf(provider, 'wide', ['memory:read', 'exchange:beneficiary', 'wallet:read']);
+  const o = await obligations(wide.token);
+  assert(o.status === 200, `a ticked agent could not read the obligations: ${o.status} ${JSON.stringify(o.body?.error)}`);
+  const d = await declare(wide.token, { ext: EXT, action: 'agentdeclared', pool_percent: 10, dynamic: true });
+  assert(d.status === 200, `a ticked agent could not declare: ${d.status} ${JSON.stringify(d.body?.error)}`);
+  const gone = await json(`/v1/commerce/beneficiary-splits?ext=${EXT}&action=agentdeclared`, {
+    method: 'DELETE', headers: auth(wide.token),
+  });
+  assert(gone.status === 200, `a ticked agent could not withdraw what it declared: ${gone.status}`);
 });
 
 console.log(`\n=== BENEFICIARY SPLIT E2E: ${passed} passed, ${failed} failed ===\n`);
