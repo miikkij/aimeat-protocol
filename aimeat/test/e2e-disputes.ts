@@ -567,8 +567,22 @@ await test('17. Admin views audit log', async () => {
     assert(events.includes('escalated'), 'has escalated');
 });
 
+/** What a token's owner actually holds, as the node reports it. */
+async function walletOf(token: string): Promise<number> {
+    const { body } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${token}` } });
+    return Number(body.data.balance);
+}
+
 await test('18. Operator rules in favor of requester', async () => {
     const disputeId = disputeIds[4];
+    // A ruling DISTRIBUTES the escrow, and until now that was asserted from
+    // `body.data.ruling.distribution.*` — which is the request echoed back. Delete the whole
+    // fund-distribution block from routes/disputes.ts (returnEscrow, creditBalance, addTransaction)
+    // and keep the status update, and this test passed while an operator ruling moved no money at
+    // all. The wallets are the only witness that matters.
+    const reqBefore = await walletOf(requesterToken);
+    const provBefore = await walletOf(providerToken);
+
     const { status, body } = await json(`/v1/admin/disputes/${disputeId}/rule`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -581,6 +595,13 @@ await test('18. Operator rules in favor of requester', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
     assert(body.data.ruling.distribution.to_requester === 10, `to_requester: ${body.data.ruling.distribution.to_requester}`);
+
+    const reqAfter = await walletOf(requesterToken);
+    const provAfter = await walletOf(providerToken);
+    assert(reqAfter - reqBefore === 10,
+        `the requester was awarded 10 and received ${reqAfter - reqBefore} (${reqBefore} -> ${reqAfter})`);
+    assert(provAfter === provBefore,
+        `the provider was awarded nothing and moved anyway: ${provBefore} -> ${provAfter}`);
 });
 
 // Provider-favorable ruling
@@ -608,6 +629,9 @@ await test('Setup: Open + escalate for provider ruling', async () => {
 
 await test('19. Operator rules in favor of provider', async () => {
     const disputeId = disputeIds[5];
+    const reqBefore = await walletOf(requesterToken);
+    const provBefore = await walletOf(providerToken);
+
     const { status, body } = await json(`/v1/admin/disputes/${disputeId}/rule`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
@@ -620,6 +644,15 @@ await test('19. Operator rules in favor of provider', async () => {
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.status === 'resolved', `status: ${body.data.status}`);
     assert(body.data.ruling.distribution.to_provider === 10, `to_provider: ${body.data.ruling.distribution.to_provider}`);
+
+    // The mirror of 18, and the pair is what makes either one mean something: a distribution that
+    // ignored its own arguments and always paid the requester would pass 18 alone.
+    const reqAfter = await walletOf(requesterToken);
+    const provAfter = await walletOf(providerToken);
+    assert(provAfter - provBefore === 10,
+        `the provider was awarded 10 and received ${provAfter - provBefore} (${provBefore} -> ${provAfter})`);
+    assert(reqAfter === reqBefore,
+        `the requester was awarded nothing and moved anyway: ${reqBefore} -> ${reqAfter}`);
 });
 
 // Phase 8 was Tier 0.5: the same two operations reached by GET with a one-time key in the query
@@ -650,6 +683,47 @@ await test('22. Audit log hash chain is valid', async () => {
             assert(entry.previousHash === entries[i - 1].hash, `entry ${i} previousHash matches previous hash`);
         }
     }
+});
+
+await test('22b. Every hash is RECOMPUTED from its own entry, and one edited field breaks it', async () => {
+    // The loop above only checks that each entry's previousHash equals the previous entry's STORED
+    // hash. It never recomputes anything, so replacing computeAuditHash with randomBytes(32) keeps
+    // the chain linking perfectly — appendAuditEntry copies the previous stored hash forward — and
+    // test 22 passes while the log detects no edit to event, actor, data or timestamp at all. A
+    // tamper-evident log that is never asked to detect tampering is a list with a hex column.
+    const disputeId = disputeIds[4];
+    const { body } = await json(`/v1/admin/disputes/${disputeId}/audit-log`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const entries = body.data.entries as any[];
+    assert(entries.length >= 3, `need 3+ entries: ${entries.length}`);
+
+    // The exact payload routes/disputes.ts hashes: the entry without its hash, serialised with keys
+    // in a fixed order at every depth. Insertion order would not do — Postgres stores `data` as JSONB
+    // and hands the keys back in its own order, so a recomputation that depended on the order the
+    // route happened to write would disagree with itself across the two backends and prove nothing on
+    // either.
+    const canonical = (v: any): string => {
+        if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null';
+        if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
+        const keys = Object.keys(v).filter(k => v[k] !== undefined).sort();
+        return `{${keys.map(k => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
+    };
+    const recompute = (e: any) => createHash('sha256').update(canonical({
+        sequence: e.sequence, event: e.event, actor: e.actor,
+        timestamp: e.timestamp, data: e.data, previousHash: e.previousHash,
+    })).digest('hex');
+
+    for (const e of entries) {
+        assert(recompute(e) === e.hash,
+            `entry ${e.sequence} (${e.event}) does not hash to its stored value — the log records a hash it did not compute`);
+    }
+
+    // And the recomputation has to be sensitive, or agreeing with it proves nothing. Flip one field
+    // of one entry and the same function must disagree.
+    const tampered = { ...entries[entries.length - 1], actor: 'someone-else' };
+    assert(recompute(tampered) !== tampered.hash,
+        'editing the actor left the hash valid — the hash does not cover the fields it is supposed to');
 });
 
 await test('23. Entries ordered chronologically', async () => {

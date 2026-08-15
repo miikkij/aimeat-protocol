@@ -132,10 +132,26 @@ await test('Consumer accepts a contract → price is authoritative (10), budget 
 await test('Metered call #1: caller −10, provider +(10−rake), budget spent=10', async () => {
   const cb = await balance(consumer.token);
   const pb = await balance(provider.token);
+  const ob = await balance(operator.token);
   const r = await invoke(consumer.token, 'validate');
   assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(await balance(consumer.token) === cb - 10, 'consumer debited the 10-morsel price');
   assert(await balance(provider.token) === pb + (10 - rakePerCall), `provider credited its cut (10−${rakePerCall})`);
+
+  // WHERE THE RAKE LANDS. Every assertion above reads the two ENDS of the transfer, and the rake
+  // itself only ever came out of the accept response body — the node's own arithmetic, echoed back.
+  // The operator owner is created at the top of this file and its balance was never read, so a rake
+  // that was computed, subtracted from the provider and then dropped on the floor passed every test
+  // here. Money that leaves one account has to arrive somewhere, and that is the assertion.
+  const oa = await balance(operator.token);
+  assert(oa - ob === rakePerCall,
+    `the rake of ${rakePerCall} was taken from the provider and the operator received ${oa - ob} (${ob} -> ${oa})`);
+
+  // And it is recorded as what it is, not as an unexplained credit.
+  const tx = await json('/v1/wallet/transactions?limit=20', { headers: auth(operator.token) });
+  const fees = (tx.body.data.transactions ?? tx.body.data.items ?? []) as any[];
+  assert(fees.some(t => t.type === 'marketplace_fee' && Number(t.amount) === rakePerCall),
+    `the operator's ledger names the fee: ${JSON.stringify(fees.slice(0, 3).map(t => ({ type: t.type, amount: t.amount })))}`);
 });
 
 await test('Metered call #2: budget spent=20, still under the 25 cap', async () => {

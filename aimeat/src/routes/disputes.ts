@@ -9,6 +9,14 @@
  *   - disputesRouter(config, storage): mounts POST /v1/work/:tc/dispute and related endpoints
  *
  * @version-history
+ *   v2.1.0 — 2026-08-16 — The audit hash is computed over a CANONICAL serialisation, so it can be
+ *     recomputed from the entry as it is read back. It could not be on the production backend:
+ *     `DisputeAudit.data` is JSONB and Postgres returns its keys in its own order, so any entry whose
+ *     data carries two or more keys hashed one string on the way in and serialised to a different one
+ *     on the way out. A log that is tamper-evident only on sqlite is not tamper-evident. Found by the
+ *     E2E test-quality work: the suite's only chain test walked the LINKS and never recomputed a
+ *     hash, so the defect was invisible — a random value per entry passed it too. Nothing consumed
+ *     these hashes before this, so no stored value changes meaning for a reader that exists.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-10 — Security audit C-3: a partial refund is bounded by the escrow, refused at
  *     the offer and clamped again at accept. `refund_morsels` was validated as any positive integer
@@ -48,8 +56,33 @@ function param(p: string | string[]): string {
     return Array.isArray(p) ? p[0] : p;
 }
 
+/**
+ * JSON with object keys in a fixed order, at every depth.
+ *
+ * The hash below has to be computable from the entry as it is READ BACK, or the log is tamper-evident
+ * in name only. Plain JSON.stringify is not, because it serialises keys in insertion order and the
+ * production backend does not preserve that: `DisputeAudit.data` is JSONB (migration 0001), and
+ * Postgres jsonb stores a decomposed form and returns keys in its own normalised order. So an entry
+ * whose `data` has two or more keys hashed one string on the way in and serialises to a different
+ * one on the way out, and anybody recomputing the hash from the API response concludes the record was
+ * edited. Measured 2026-08-15 on the `operator_ruled` entry, which carries three: the recomputation
+ * matched on sqlite (JSON text, exact round trip) and failed on postgres-kysely.
+ *
+ * Sorting the keys makes the two agree, and costs nothing else: nothing consumed these hashes before
+ * — no route verified one, and the only test walked the LINKS without recomputing anything — so there
+ * is no stored value whose meaning this changes for a reader that exists.
+ */
+function canonicalJson(value: unknown): string {
+    if (value === null || typeof value !== 'object') return JSON.stringify(value) ?? 'null';
+    if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+    const entries = Object.entries(value as Record<string, unknown>)
+        .filter(([, v]) => v !== undefined)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`;
+}
+
 function computeAuditHash(entry: Omit<DisputeAuditEntry, 'hash'>, previousHash: string): string {
-    const payload = JSON.stringify({ ...entry, previousHash });
+    const payload = canonicalJson({ ...entry, previousHash });
     return createHash('sha256').update(payload).digest('hex');
 }
 
