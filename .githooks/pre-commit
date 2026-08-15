@@ -25,9 +25,16 @@
 #  18. An agent writes, page hears it — pnpm check:sse-parity
 #  19. No decision written out twice  — pnpm check:copied-logic
 #  20. Published surfaces + release   — pnpm check:liaison-surface
+#  21. The vitest unit suite          — pnpm test
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
+#
+# The unit suite (21) was CI-only until 2026-08-15, and the gap had a cost: a commit that added two
+# MCP tools to the v2 surface allowlists without a connector implementation passed all twenty static
+# checks, because the check that would have caught it — connector-surfaces — is a vitest test rather
+# than a script. It is 18 seconds against the ~40 the rest of this hook takes, and it turns "green
+# before commit" into something that is actually true.
 #
 # Bypass in a genuine emergency with:  git commit --no-verify
 #
@@ -116,5 +123,10 @@ pnpm -s check:copied-logic
 
 echo "[pre-commit] Published surfaces match, and neither needs a release (check:liaison-surface)…"
 pnpm -s check:liaison-surface
+
+# Last, because it is the slowest thing here (~18s) and every check above fails faster. It is also
+# the only one that runs the code rather than reading it.
+echo "[pre-commit] Unit suite (test)…"
+pnpm -s test
 
 echo "[pre-commit] ✓ all checks passed"
