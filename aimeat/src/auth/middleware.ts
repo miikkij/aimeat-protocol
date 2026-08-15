@@ -166,6 +166,45 @@ async function sessionRevoked(verified: VerifiedToken): Promise<boolean> {
 }
 
 /**
+ * An app grant's ACCESS token carries no session id, so the check above cannot see it: revoking the
+ * grant cleared the refresh token and nothing else, and the 15-minute access token kept reading and
+ * writing the owner's memory until it expired on its own. The owner is told otherwise in as many
+ * words — locales/en.json `profile.apps.revokeConfirm`: "It loses access immediately."
+ *
+ * The other two credential families are already answered per request: a PAT is resolved from storage
+ * on every call, and owner/agent sessions go through sessionRevoked(). This is the third family, and
+ * it was the only one where the button and the behaviour disagreed.
+ *
+ * One keyed read per app-token request, uncached for the same reason sessionRevoked() is: the row is
+ * written by whoever pressed Revoke, and "immediately" is the promise being kept. A grant that has
+ * disappeared counts as revoked — an app whose grant row is gone has nothing to act for.
+ */
+async function appGrantRevoked(verified: VerifiedToken): Promise<boolean> {
+  if (!verified.app_grant || !_sessionStorage) return false;
+  const grant = await _sessionStorage.getAppGrant(verified.app_grant);
+  return !grant || grant.revoked === true;
+}
+
+/**
+ * Is this credential dead? Three ways a JWT stops being one, and a door that asks fewer than three
+ * questions is a door the revoked keep opening:
+ *   - the exact token was revoked          (POST /v1/auth/revoke)
+ *   - its session row was revoked          (sign out, sign out everywhere, deleting the agent)
+ *   - its app grant was revoked            (the owner pressed Revoke on the app)
+ *
+ * Exported because verifying a JWT is not only Express's job. The WebSocket upgrade for the connect
+ * tunnel (src/index-start.ts) cannot run middleware on a raw socket, so it verified the token by
+ * hand — and asked none of these. A bearer revoked on every HTTP route still opened a tunnel and
+ * received the on-connect backlog plus live pushes until its own exp. Any future door that verifies
+ * a token itself calls this rather than writing the rule out a fourth time.
+ */
+export async function credentialRevoked(token: string, verified: VerifiedToken): Promise<boolean> {
+  if (await isRevoked(token)) return true;
+  if (await sessionRevoked(verified)) return true;
+  return appGrantRevoked(verified);
+}
+
+/**
  * Optional auth middleware — parses JWT if present, does not reject if absent.
  * Use requireAuth() or requireRole() for endpoints that need auth.
  */
@@ -192,7 +231,7 @@ export function optionalAuth() {
         // Uncached on purpose. The token-hash cache in jwt.ts can afford 60 seconds because the
         // revoking caller writes its own entry; here the revocation happens in storage, and an owner
         // pressing Delete means now. One keyed read per authenticated request that carries a jti.
-        if (verified && !(await sessionRevoked(verified))) {
+        if (verified && !(await credentialRevoked(token, verified))) {
           req.auth = verified;
         }
       }

@@ -334,6 +334,27 @@ async function main() {
         assert(!list.body.data.grants.find((x: any) => x.grant_id === grantId), 'revoked grant no longer listed');
     });
 
+    // A9 (E2E test-quality audit). The test above proves the REFRESH token is dead and the grant is
+    // off the list. The access token it already issued was never asked about, and that is the one the
+    // app is holding: it carries no session id, so the per-request revocation check could not see it,
+    // and revoke cleared only the refresh token. For up to its 15-minute TTL the app kept reading and
+    // writing the owner's memory after the owner pressed Revoke and was told "It loses access
+    // immediately" (locales/en.json profile.apps.revokeConfirm). 401 rather than 403 is the point:
+    // the credential is dead, not merely short of a scope. Against the pre-fix source this fails.
+    await test('after revoke, the access token it already issued stops working', async () => {
+        const r = await json('/v1/memory?limit=1', { headers: { Authorization: `Bearer ${appAccess}` } });
+        assert(r.status === 401, `a revoked grant's access token expected 401, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+        assert(!r.body?.data, `a revoked grant's access token was served data: ${JSON.stringify(r.body?.data ?? null).slice(0, 200)}`);
+
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${appAccess}` },
+            body: JSON.stringify({ key: 'revoked-app-write', value: 'should never land', visibility: 'private' }),
+        });
+        assert(w.status === 401, `a revoked grant's access token expected 401 on write, got ${w.status}`);
+        const check = await json('/v1/memory/revoked-app-write', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(check.status === 404, `the revoked app's write landed in the owner's memory (${check.status})`);
+    });
+
     await test('after revoke, consenting again creates a NEW grant (reuse covers live grants only)', async () => {
         // The one-live-grant rule must not resurrect a revoked grant: the owner said no, so the next
         // approval is a fresh authorization with its own id, and there is still exactly one live row.
