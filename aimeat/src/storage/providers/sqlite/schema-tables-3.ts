@@ -4,6 +4,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   2026-08-15 — agent_tasks.createdBy (fresh installs; schema.ts adds it to existing databases).
  *   v1.1.0 — 2026-08-13 — Both provider_clients indexes move to schema.ts, after the rebuild that
  *     adds `principal`. They named a column an upgraded table did not have yet, so a SQLite node
  *     created before that column crashed on boot with "no such column: principal".
@@ -260,6 +261,7 @@ export function applySchemaTables3(db: Database.Database): void {
       id              TEXT PRIMARY KEY,
       agentGaii       TEXT NOT NULL,
       ownerGaii       TEXT NOT NULL,
+      createdBy       TEXT,
       title           TEXT NOT NULL,
       description     TEXT NOT NULL DEFAULT '',
       scope           TEXT NOT NULL DEFAULT '[]',

@@ -2,6 +2,7 @@
  * @file agent-task.ts
  * @description SQLite implementation for agent task CRUD, events, and stall detection
  * @version-history
+ *   2026-08-15 — createdBy on insert and read (migration 0037).
  *   v1.3.0 -- 2026-07-31 -- Persist dedupeKey + findLiveTaskByDedupeKey (one live commission per agent+fingerprint)
  *   v1.2.0 -- 2026-06-15 -- Persist the `automation` field (ecosystem-app recipe provenance/routing, B5/B6)
  *   v1.1.0 -- 2026-06-05 -- deleteAgentTask now removes any non-active task (was draft/queued only)
@@ -19,6 +20,7 @@ function deserializeTask(row: Record<string, unknown>): AgentTaskRecord {
     id: row.id as string,
     agentGaii: row.agentGaii as string,
     ownerGaii: row.ownerGaii as string,
+    createdBy: (row.createdBy as string) ?? null,
     title: row.title as string,
     description: row.description as string,
     scope: JSON.parse(row.scope as string),
@@ -62,8 +64,8 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     `INSERT INTO agent_tasks
      (id, agentGaii, ownerGaii, title, description, scope, rules, verification,
       resources, todos, status, dedupeKey, parentTaskId, workTrackingCode, telemetry,
-      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage, automation)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage, automation, createdBy)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.agentGaii,
@@ -88,6 +90,7 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     record.rating ? JSON.stringify(record.rating) : null,
     record.triage ?? null,
     record.automation ? JSON.stringify(record.automation) : null,
+    record.createdBy ?? null,
   );
   return record;
 }

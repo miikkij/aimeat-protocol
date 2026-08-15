@@ -8,6 +8,7 @@
  *   groups by agent then folds status/doneToday/lastTaskUpdateAt/lastFailedAt, findStalledTasks compares
  *   lastEventAt to a now-threshold. Delete cascades the event log and refuses an 'active' task.
  * @version-history
+ *   2026-08-15 — createdBy on insert and read (migration 0037).
  *   v1.0.0 — 2026-07-15 — Phase 5: agent-task domain on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -26,6 +27,7 @@ function toTask(r: Selectable<AgentTask>): AgentTaskRecord {
     id: r.id,
     agentGaii: r.agentGaii,
     ownerGaii: r.ownerGaii,
+    createdBy: r.createdBy ?? null,
     title: r.title,
     description: r.description,
     scope: r.scope as unknown as AgentTaskRecord['scope'],
@@ -68,6 +70,7 @@ export const agentTaskMethods = {
       id: record.id,
       agentGaii: record.agentGaii,
       ownerGaii: record.ownerGaii,
+      createdBy: record.createdBy ?? null,
       title: record.title,
       description: record.description,
       scope: jsonb(record.scope),

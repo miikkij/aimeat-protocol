@@ -7,6 +7,10 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-08-15 — aimeat_task_get answers the principal that CREATED the task, not only the one it
+ *     is for. A chat commissioning a build from a fleet concierge could not read back its own
+ *     commission, so a build that produced nothing and said nothing was undiagnosable from the only
+ *     side that was waiting. Read only: every writing tool still asks isOwnTask.
  *   v1.9.0 — 2026-08-14 — aimeat_task_complete calls services/agent-task-fanout.ts:completeTask(),
  *     the last tool surface in this repo that still wrote its own records. Three drifts close with
  *     it. A STALLED task can now be completed here as it always could over HTTP, so an agent that
@@ -85,6 +89,23 @@ export function registerAgentTaskTools(
     /** Check if a task belongs to the current agent. */
     function isOwnTask(task: AgentTaskRecord): boolean {
         return task.agentGaii === agentGaii;
+    }
+
+    /**
+     * May this session READ the task? The agent it is for, or the principal that ordered it.
+     *
+     * Reading and acting are different questions, and only reading widens here: every tool that
+     * changes a task still asks isOwnTask, because the agent doing the work is the only one that
+     * may report on it. What was broken is that ordering a task made it invisible to the orderer —
+     * a chat that commissioned a build from a fleet concierge could not see its own commission, so
+     * a build that produced nothing and said nothing could not be diagnosed by the one party that
+     * was waiting for it.
+     *
+     * An absent `createdBy` (every task written before the field existed) is not a match. Absence
+     * is not evidence of authorship, and treating it as one would open every old task to anybody.
+     */
+    function mayReadTask(task: AgentTaskRecord): boolean {
+        return isOwnTask(task) || (!!task.createdBy && task.createdBy === agentGaii);
     }
 
     // ── Tool 0: aimeat_task_create ──
@@ -233,8 +254,8 @@ export function registerAgentTaskTools(
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
 
-            if (!isOwnTask(task)) {
-                return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
+            if (!mayReadTask(task)) {
+                return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent, and you did not create it' }], isError: true };
             }
 
             // Attachments become presigned handles here, authorized for THIS agent on THIS read — the

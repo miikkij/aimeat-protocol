@@ -168,6 +168,10 @@ export function initializeSchema(db: Database.Database): void {
   // work is commissionable again. Created AFTER the ALTER per the index-ordering rule; no dedupe
   // pass is needed first because every pre-existing row has dedupeKey = NULL (outside the index).
   safeAddColumn('agent_tasks', 'dedupeKey', 'TEXT');
+
+  // Who ORDERED the task, as opposed to agentGaii who receives it. Without it the party that
+  // placed a commission could not read it back. See migration 0037.
+  safeAddColumn('agent_tasks', 'createdBy', 'TEXT');
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_agent_tasks_live_dedupe ON agent_tasks(agentGaii, dedupeKey)
            WHERE dedupeKey IS NOT NULL AND status IN ('draft','queued','revision_requested','active','paused')`);
 

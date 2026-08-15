@@ -2,6 +2,7 @@
  * @file src/storage/types/agents-messaging.ts
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-08-15 — AgentTaskRecord.createdBy: who ORDERED the task, beside agentGaii who receives it.
  *   v1.2.0 — 2026-08-01 — The Capability Layer moved to ./capabilities.ts (max-file-lines) and is
  *     re-exported from here, so nothing that imported it has to change. Pure extraction — a
  *     capability is not a message, and it was the block least tied to this file's name.
@@ -102,6 +103,20 @@ export interface AgentTaskRecord {
   id: string;
   agentGaii: string;
   ownerGaii: string;
+  /**
+   * Who ordered this task: an agent's GAII, or the owner's identity when a person created it.
+   *
+   * The node knew this at write time and threw it away. That mattered the moment one agent started
+   * commissioning another: a chat that ordered a build from a fleet concierge could not read back
+   * the task it had just created — `aimeat_task_get` compares the caller against `agentGaii`, which
+   * is the RECEIVER — so the only record of what happened was invisible to the party waiting on it.
+   * A published guide's "watch the task until it completes" step was unexecutable by anyone, and a
+   * build that silently produced nothing could not be diagnosed at all.
+   *
+   * Null on every task created before this field existed, which is why the read rule below treats
+   * absence as "not mine" rather than as a match.
+   */
+  createdBy?: string | null;
   title: string;
   description: string;
   scope: AgentTaskScope[];

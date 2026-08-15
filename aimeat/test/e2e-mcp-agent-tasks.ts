@@ -168,6 +168,45 @@ async function setup(label: string, mode: string, base: string = BASE) {
     return { base, owner, ownerToken, agentToken, agentGaii, agentName: `ag${label}`, session };
 }
 
+/**
+ * A SECOND agent under an existing owner, with its own MCP session.
+ *
+ * The concierge shape needs three parties under one owner — one that orders, one that receives, and
+ * one that is merely nearby — and setup() makes a fresh owner every time, which is the wrong axis
+ * for a read rule that turns on who ordered rather than on who owns.
+ */
+async function siblingSession(base: Awaited<ReturnType<typeof setup>>, name: string): Promise<Session> {
+    const ag = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${base.ownerToken}` },
+        body: JSON.stringify({ name, owner: base.owner, capabilities: [], mode: 'interactive', scopes: ['*'] }),
+    }, base.base);
+    assert(ag.status === 201, `sibling ${name}: ${ag.status} ${JSON.stringify(ag.body?.error)}`);
+    const gaii = ag.body.data.agent.gaii as string;
+    const key = ag.body.data.private_key as string;
+
+    const client = await json('/v1/mcp/register', {
+        method: 'POST', body: JSON.stringify({ client_name: `mcp sibling ${name}`, redirect_uris: [] }),
+    }, base.base);
+    const ts = new Date().toISOString();
+    const params = new URLSearchParams({
+        response_type: 'code', client_id: client.body.client_id, gaii,
+        signature: await sign(key, gaii + NODE_ID + ts), timestamp: ts,
+    });
+    const auth = await json(`/v1/mcp/authorize?${params}`, {}, base.base);
+    const token = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({
+            grant_type: 'authorization_code', code: auth.body.code,
+            client_id: client.body.client_id, client_secret: client.body.client_secret,
+        }),
+    }, base.base);
+    assert(token.status === 200, `sibling token ${token.status}: ${JSON.stringify(token.body)}`);
+
+    const session: Session = { base: base.base, token: token.body.access_token, sessionId: '', nextId: 1 };
+    await rpc(session, 'initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'mcp sibling e2e', version: '1.0.0' } });
+    return session;
+}
+
 // ── The stalled case, and why it costs a second node ────────────────────────────────────────────
 //
 // A task reaches 'stalled' exactly one way: the detector's clock. The threshold is
@@ -340,6 +379,39 @@ async function run() {
         // than refusing a task over a field a caller has no reason to think about.
         assert(byName.kind?.type === 'text', `an omitted type must default to text, got ${byName.kind?.type}`);
         assert(byName.memory_key?.type === 'memory_key', `an explicit type must survive, got ${byName.memory_key?.type}`);
+    });
+
+    // The commission a chat places on a fleet concierge. Until 2026-08-15 the orderer could not read
+    // it back — the gate compared the caller against the task's RECEIVER — so a build that produced
+    // nothing and said nothing was invisible to the only party waiting on it, and a published
+    // guide's "watch the task until it completes" step was unexecutable by anybody.
+    await test('the agent that ORDERED a task can read it back', async () => {
+        // A second agent under the runner's owner: the concierge shape — one agent commissions
+        // another, then has to watch what it commissioned.
+        const orderer = await siblingSession(runner, `orderer${Date.now() % 100000}`);
+        const created = await callTool(orderer, 'aimeat_task_create', {
+            target_agent: runner.agentName,
+            title: 'Build the morning agent',
+            description: 'The person asked for AI news every morning.',
+            scope: [{ name: 'kind', value: 'hatchery.create_agent' }, { name: 'memory_key', value: 'news.ai.daily' }],
+        });
+        assert(!created.isError, `create failed: ${created.text.slice(0, 300)}`);
+        const taskId = JSON.parse(created.text).task_id ?? JSON.parse(created.text).id;
+
+        const asOrderer = await callTool(orderer, 'aimeat_task_get', { task_id: taskId });
+        assert(!asOrderer.isError, `the orderer must be able to read its own commission: ${asOrderer.text.slice(0, 200)}`);
+        const task = JSON.parse(asOrderer.text).task ?? JSON.parse(asOrderer.text);
+        assert(task.id === taskId, 'the orderer reads the same task');
+
+        // The receiver still reads it, which is the case that always worked.
+        const asReceiver = await callTool(runner.session, 'aimeat_task_get', { task_id: taskId });
+        assert(!asReceiver.isError, 'the agent the task is FOR still reads it');
+
+        // And a third same-owner agent that neither ordered nor received it does not.
+        const bystander = await siblingSession(runner, `bystander${Date.now() % 100000}`);
+        const asBystander = await callTool(bystander, 'aimeat_task_get', { task_id: taskId });
+        assert(asBystander.isError, 'an uninvolved sibling must not read it');
+        assert(asBystander.text.includes('did not create it'), `the refusal says why: ${asBystander.text.slice(0, 160)}`);
     });
 
     await test('and it carries the same \'started\' event an owner-approved task would', async () => {

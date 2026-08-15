@@ -40,6 +40,8 @@
  *   const r = await createTask({ storage, config, webhook }, { agent, agentGaii, agentName, creator, body, actor });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-08-15 — The record carries `createdBy`. Both doors already knew the actor and neither
+ *     stored it.
  *   v1.0.0 — 2026-08-11 — Extracted from routes/agent-tasks/{create-read,completion,lifecycle}.ts and
  *     mcp/agent-tasks.ts (August 2026 audit, step 8: the write). Two ordering changes came with the
  *     move and neither is observable from outside: `emitChange` and the offer-ordered workflow
@@ -170,6 +172,10 @@ export async function createTask(deps: TaskWriteDeps, args: CreateTaskArgs): Pro
         id,
         agentGaii: args.agentGaii,
         ownerGaii: `${args.agent.owner}@${config.nodeId}`,
+        // Who ordered it. Known here on every door and stored nowhere until now, which is what made
+        // a commission invisible to the party that placed it. `actor` is the principal whose live
+        // view this write belongs to — the owner on the HTTP door, the calling agent over MCP.
+        createdBy: args.actor,
         title: body.title.trim(),
         description: body.description.trim(),
         scope: body.scope,
