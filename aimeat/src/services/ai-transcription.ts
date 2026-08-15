@@ -11,6 +11,11 @@
  *   import { transcribeForOwner } from '../services/ai-transcription.js';
  *   const r = await transcribeForOwner(storage, config, gaii, { audio, appId: 'inbox' });
  * @version-history
+ *   v1.x — 2026-08-16 — The speech model and the language hint fall back to the node's defaults
+ *     before refusing. NO_STT_MODEL stays as the last answer rather than becoming a chat model:
+ *     handing audio to a text model turns a clear local refusal into an opaque provider error.
+ *     What changes is that a brand-new account on a configured node can use the microphone at all,
+ *     where before it had to find a settings page first.
  *   v1.0.0 — 2026-08-01 — Initial version. Multipart transport (services/openrouter.ts transcribe),
  *     shared gate from ai-completion.ts, cost taken from the provider's reported usage.cost because
  *     for audio models it is the only trustworthy price signal.
@@ -23,6 +28,7 @@ import {
   assertWithinBudget, recordAiUsage, todayKey, type UsageRecord,
 } from './ai-completion.js';
 import { logger } from '../utils/logger.js';
+import { resolveModelFor, resolveSttLanguage } from './ai-model-defaults.js';
 
 /** Shown when the owner has no `sttModel`. Kept here so the route, the message route and the UI copy
  *  all point at the same instruction. */
@@ -97,7 +103,9 @@ export async function transcribeForOwner(
   assertProviderAllowed(config, baseUrl);
   assertAppAllowed(prefs, opts.appId);
 
-  const model = opts.model || (typeof prefs.sttModel === 'string' ? prefs.sttModel : '');
+  // Owner setting, then the node's default, then a refusal by name. The refusal stays: handing
+  // audio to a chat model turns a clear local error into an opaque provider one.
+  const model = opts.model || resolveModelFor(config, prefs, 'stt');
   if (!model) throw new AiCompletionError('NO_STT_MODEL', 400, STT_UNSET_MESSAGE);
 
   const decryptedKey = decryptOwnerKey(config, apiKeyRecord?.value, provider);
@@ -105,7 +113,7 @@ export async function transcribeForOwner(
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
   const dailyBudget = assertWithinBudget(usage, prefs, opts.appId);
 
-  const language = opts.language || (typeof prefs.sttLanguage === 'string' ? prefs.sttLanguage : undefined) || undefined;
+  const language = opts.language || resolveSttLanguage(config, prefs);
 
   let result;
   try {

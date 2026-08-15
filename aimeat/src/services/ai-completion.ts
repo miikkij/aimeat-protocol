@@ -19,6 +19,10 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v1.x — 2026-08-16 — Model selection asks the node as well as the owner, per role, through
+ *     services/ai-model-defaults.ts. A node that pays for its own inference can now name a model
+ *     for a person who has chosen none. Inert until an operator sets one: with the environment
+ *     untouched every branch resolves exactly as it did before.
  *   v1.8.0 — 2026-08-01 — Speech-to-text groundwork: the preflight (provider allowlist, app
  *     allowlist, key decrypt, budget) and the usage write are now exported helpers, so
  *     ai-transcription.ts runs the IDENTICAL gate instead of a second copy that could drift — this
@@ -54,6 +58,7 @@ import { complete, DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js'
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
 import { recordUsageEvent } from './usage-metering.js';
 
 /**
@@ -437,21 +442,24 @@ export async function completeForOwner(
 
   // ── Model selection ──
   const hasImages = Array.isArray(opts.images) && opts.images.length > 0;
+  // Each role asks the owner first and the node second (services/ai-model-defaults.ts). With no
+  // instance defaults configured every branch resolves exactly as it did before that existed.
+  const roleModel = (role: ModelRole) => resolveModelFor(config, prefs, role);
   let selectedModel: string;
   if (typeof opts.model === 'string' && opts.model) {
     selectedModel = opts.model;
-  } else if (hasImages && typeof prefs.visionModel === 'string' && prefs.visionModel) {
+  } else if (hasImages && roleModel('vision')) {
     // Image inputs need a vision-capable model — the owner's default may be text-only. Use the
     // configured visionModel (e.g. qwen-2.5-VL) for any request carrying images.
-    selectedModel = prefs.visionModel as string;
-  } else if (opts.modelRole === 'reasoning' && prefs.reasoningModel) {
-    selectedModel = prefs.reasoningModel as string;
-  } else if (opts.modelRole === 'execution' && prefs.executionModel) {
-    selectedModel = prefs.executionModel as string;
+    selectedModel = roleModel('vision') as string;
+  } else if (opts.modelRole === 'reasoning' && roleModel('reasoning')) {
+    selectedModel = roleModel('reasoning') as string;
+  } else if (opts.modelRole === 'execution' && roleModel('execution')) {
+    selectedModel = roleModel('execution') as string;
   } else {
-    selectedModel = (prefs.model as string)
-      || (prefs.executionModel as string)
-      || (prefs.reasoningModel as string)
+    selectedModel = roleModel('chat')
+      || roleModel('execution')
+      || roleModel('reasoning')
       // Vendor-neutral default: OpenRouter's free-models router (no specific vendor hardcoded).
       || 'openrouter/free';
   }

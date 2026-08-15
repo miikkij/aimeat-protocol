@@ -323,6 +323,25 @@ export interface AimeatConfig {
   /** Hard cap on a browser voice-message recording, in seconds. Served to the UI so the recorder
    *  stops at the node's own number instead of a hardcoded one. */
   voiceMsgMaxSeconds: number;
+  /**
+   * Instance-level model defaults, one per role. Read only when the OWNER has not chosen a model of
+   * their own: owner setting, then this, then a refusal that names what to set. Empty (the default)
+   * means the node states no preference and behaves exactly as it did before these existed.
+   *
+   * They belong with the instance API key rather than beside it. A key alone does not let a new
+   * person speak, read an image or make one, because every model role is an owner-level setting and
+   * an unset one is an error rather than a fallback — speech-to-text is the sharpest case, where a
+   * brand-new account cannot use the microphone at all until it visits a settings page it has no
+   * reason to know about. That is the wrong order.
+   */
+  modelDefaultChat: string;
+  modelDefaultReasoning: string;
+  modelDefaultExecution: string;
+  modelDefaultVision: string;
+  modelDefaultStt: string;
+  modelDefaultImage: string;
+  /** ISO-639-1 hint for speech-to-text when the owner has set none. Empty = let the model detect. */
+  sttLanguageDefault: string;
   microMemoryQuotaKb: number;
   microMemoryMaxSetsPerAgent: number;
   microMemoryMaxKeysPerSet: number;
