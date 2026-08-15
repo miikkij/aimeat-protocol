@@ -39,6 +39,9 @@
  *   v2.11.0 — 2026-07-03 — Files preview + search: .mem-file-search (name/type filter box),
  *     .pf-clickable (click-to-preview thumbnails/icons), and the in-browser preview lightbox
  *     (.pf-file-preview-modal/-body/-img/-frame/-media/-text/-status/-actions).
+ *   v2.19.0 — 2026-08-15 — Usage reports tab uses the canonical .stat-grid/.stat-card and
+ *     .seg/.seg-btn; its own classes are pf-ureport-* because pf-usage-* is the Home quota
+ *     card, and reusing it rendered the selected report white on white.
  *   v2.10.0 — 2026-07-03 — Contract-engagement chips: .pj-eng + .pj-retire-btn for the People panel.
  *   v2.9.0 — 2026-07-02 — Workspace Apps strip: .pj-apps-strip/-head/-title/-hint/-grid, launch
  *     cards .pj-app-card/-name/-desc/-meta/-missing, and the pin/unpin picker .pj-apps-picker(-row/
@@ -3682,35 +3685,40 @@
 .pf-adk-prompt-card { position: relative; }
 .pf-adk-prompt-head { padding-right: 2.4rem; }
 
-/* ── Usage tab ─────────────────────────────────────────────────────────────
-   The report chips wrap on a phone rather than scrolling sideways: there are
-   eight of them, and a horizontal scroller hides the ones a person has not
-   thought to look for, which is exactly what this page is for. */
-.pf-usage-controls {
+/* ── Usage reports tab (pf-ureport-*) ──────────────────────────────────────
+   NOT pf-usage-*, which is the Home quota card. Reusing that prefix made
+   .pf-usage-chip's surface background win over the selected button's white
+   text, so the chosen report rendered white on white.
+
+   Stats use the canonical .stat-grid/.stat-card and the time window uses the
+   canonical .seg/.seg-btn, so nothing is defined here twice. What is left is
+   the one shape the house set has no member for: a WRAPPING button bar. Eight
+   report labels do not fit a joined segmented control on a phone, and a
+   horizontal scroller would hide the questions this page exists to offer. */
+.pf-ureport-controls {
   display: flex; flex-wrap: wrap; justify-content: space-between;
-  gap: var(--space-3, 0.75rem); margin-bottom: var(--space-4, 1rem);
+  align-items: flex-start; gap: var(--space-3, 0.75rem);
+  margin-bottom: var(--space-4, 1rem);
 }
-.pf-usage-chips, .pf-usage-periods { display: flex; flex-wrap: wrap; gap: var(--space-2, 0.5rem); }
-.pf-usage-chip { font-size: 0.85rem; padding: 0.35rem 0.75rem; }
+.pf-ureport-bar { display: flex; flex-wrap: wrap; gap: 4px; }
+/* Same tokens and the same accent-fill-when-active as the agents range bar, so
+   the two read as one control language rather than two. */
+.pf-ureport-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: none;
+  color: var(--text-dim);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.pf-ureport-btn:hover:not(.active) { border-color: var(--accent); color: var(--text); }
+.pf-ureport-btn.active { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
 
-/* auto-fit rather than a fixed count: four stats sit in a row on a desktop and
-   two per row on a phone, without a breakpoint that guesses where that happens. */
-.pf-usage-stats {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: var(--space-3, 0.75rem); margin-bottom: var(--space-4, 1rem);
-}
-.pf-usage-stat {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: var(--space-3, 0.75rem);
-  background: var(--card-bg-alt); border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
-}
-.pf-usage-stat-value { font-size: 1.35rem; font-weight: 600; line-height: 1.1; }
-.pf-usage-stat-label { font-size: 0.78rem; color: var(--text-dim); }
-
-/* A fixed height so the canvas has something to be 100% of, and so switching
+/* A fixed height so the canvas has something to be 100 % of, and so switching
    report does not make the table below it jump. */
-.pf-usage-chart { height: 200px; margin-bottom: var(--space-4, 1rem); }
+.pf-ureport-chart { height: 200px; margin-bottom: var(--space-4, 1rem); }
 
-.pf-usage-empty { color: var(--text-dim); font-size: 0.9rem; padding: var(--space-4, 1rem) 0; }
-.pf-usage-error { color: var(--danger, #b3372c); font-size: 0.9rem; }
+.pf-ureport-empty { color: var(--text-dim); font-size: 0.9rem; padding: var(--space-4, 1rem) 0; }
+.pf-ureport-error { color: var(--danger, #b3372c); font-size: 0.9rem; }

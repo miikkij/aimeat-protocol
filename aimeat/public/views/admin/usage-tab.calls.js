@@ -15,6 +15,8 @@
  *   - CallsSection({ data }) — three tables over GET /v1/admin/usage/summary reports
  * @usage  Imported by views/admin/usage-tab.js and rendered under the shared time range.
  * @version-history
+ *   v1.1.0 — 2026-08-15 — Drop the local per-surface collapsing: the read service no longer groups
+ *     by outcome, so one surface is one row before it gets here.
  *   v1.0.0 — 2026-08-14 — Initial: the call stream reaches the operator dashboard.
  */
 import { h } from 'preact';
@@ -58,29 +60,17 @@ export function CallsSection({ data }) {
     { label: t('dashboard.callsSlowest'), value: ms(totals.duration_ms_max), tone: 'cyan' },
   ];
 
-  // Surface rows are keyed by (surface, outcome), so the same surface appears up to three times.
-  // Collapsing them here rather than adding a cut: an operator asks "is MCP carrying the work",
-  // which is one row per surface with its outcomes as columns.
-  const bySurface = new Map();
-  for (const g of surface.groups || []) {
-    const key = g.dims?.surface || g.key;
-    const row = bySurface.get(key) || { key, calls: 0, refusals: 0, errors: 0, ms: 0 };
-    row.calls += g.calls || 0;
-    row.refusals += g.refusals || 0;
-    row.errors += g.errors || 0;
-    if ((g.duration_ms_max || 0) > row.ms) row.ms = g.duration_ms_max || 0;
-    bySurface.set(key, row);
-  }
-  const surfaceRows = [...bySurface.values()]
-    .sort((a, b) => b.calls - a.calls)
-    .map(r => [
-      r.key,
-      { text: num(r.calls), mono: true },
-      { text: num(r.refusals), mono: true },
-      { text: num(r.errors), mono: true },
-      { text: rate(r.errors + r.refusals, r.calls), mono: true },
-      { text: ms(r.ms), mono: true },
-    ]);
+  // One row per surface already: the read service treats `outcome` as a qualifier rather than a
+  // grouping key, because `refusals` and `errors` are metrics on every row. Before that it split one
+  // surface into an ok row and an error row that both read "mcp".
+  const surfaceRows = (surface.groups || []).map(g => [
+    g.key,
+    { text: num(g.calls || 0), mono: true },
+    { text: num(g.refusals || 0), mono: true },
+    { text: num(g.errors || 0), mono: true },
+    { text: rate((g.errors || 0) + (g.refusals || 0), g.calls), mono: true },
+    { text: ms(g.duration_ms_max), mono: true },
+  ]);
 
   const toolRows = (tool?.groups || []).slice(0, 50).map(g => [
     { text: g.key, mono: true },

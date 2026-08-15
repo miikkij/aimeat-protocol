@@ -12,12 +12,20 @@
  *   MONEY AND ACTIVITY ARE NEVER SUMMED. The stat row changes with the report: a spend report leads
  *   with cost, an activity report leads with calls and shows how many were refused. A single grand
  *   total across both would be a number with no meaning.
+ *   IT BORROWS NOTHING AND INVENTS NOTHING. Stats are the canonical `.stat-grid`/`.stat-card`, the
+ *   time window is the canonical `.seg`/`.seg-btn`, and only the wrapping report bar has classes of
+ *   its own — eight long labels do not fit a joined segmented control on a phone. Its own classes
+ *   are `pf-ureport-*` rather than `pf-usage-*`, which already belongs to the Home quota card: the
+ *   first version reused that name, inherited its `background: var(--bg-surface)` over the selected
+ *   button's white text, and rendered the chosen report invisible.
  * @structure
- *   - REPORTS         — chip definitions: id, label key, and which stats it leads with
+ *   - REPORTS         — button definitions: id, label key, and which stats it leads with
  *   - getRange(period) — preset key → { from, to }
  *   - UsageTab (default) — fetch + render
  * @usage Registered in views/profile.js as the `usage` tab; menu entry in landing-page.cards.js.
  * @version-history
+ *   v1.1.0 — 2026-08-15 — House styles: .stat-grid/.stat-card and .seg/.seg-btn instead of a local
+ *     clone; own classes renamed off the colliding pf-usage-* prefix.
  *   v1.0.0 — 2026-08-14 — Initial: the owner-facing usage reports.
  */
 import { h } from 'preact';
@@ -112,7 +120,7 @@ export default function UsageTab() {
   const series = data?.series ?? [];
 
   const chart = series.length > 1 ? html`
-    <div class="pf-usage-chart">
+    <div class="pf-ureport-chart">
       <${UsageChart}
         type="bar"
         labels=${series.map(s => s.bucket)}
@@ -151,36 +159,36 @@ export default function UsageTab() {
     : [g.key, compact(g.calls), compact(g.refusals), compact(g.errors), ms(g.duration_ms_avg)]));
 
   return html`
-    <div class="pf-usage">
+    <div class="pf-ureport">
       <h2 class="section-title">${t('profile.usage.title')}</h2>
       <p class="section-desc">${t('profile.usage.intro')}</p>
 
-      <div class="pf-usage-controls">
-        <div class="pf-usage-chips" role="group" aria-label=${t('profile.usage.reportGroupLabel')}>
+      <div class="pf-ureport-controls">
+        <div class="pf-ureport-bar" role="group" aria-label=${t('profile.usage.reportGroupLabel')}>
           ${REPORTS.map(r => html`
             <button type="button"
-              class=${r.id === report ? 'btn-primary pf-usage-chip' : 'btn-outline pf-usage-chip'}
+              class=${`pf-ureport-btn${r.id === report ? ' active' : ''}`}
               aria-pressed=${r.id === report}
               onClick=${() => setReport(r.id)}>${t(r.label)}</button>`)}
         </div>
-        <div class="pf-usage-periods" role="group" aria-label=${t('profile.usage.periodGroupLabel')}>
+        <div class="seg" role="group" aria-label=${t('profile.usage.periodGroupLabel')}>
           ${PERIODS.map(p => html`
             <button type="button"
-              class=${p === period ? 'btn-primary pf-usage-chip' : 'btn-ghost pf-usage-chip'}
+              class=${`seg-btn${p === period ? ' active' : ''}`}
               aria-pressed=${p === period}
               onClick=${() => setPeriod(p)}>${t(`profile.usage.period${p}`)}</button>`)}
         </div>
       </div>
 
-      ${error ? html`<p class="pf-usage-error">${error}</p>` : null}
+      ${error ? html`<p class="pf-ureport-error">${error}</p>` : null}
       ${loading && !data ? html`<${Spinner} text=${t('profile.usage.loading')} />` : null}
 
       ${data ? html`
-        <div class="pf-usage-stats">
+        <div class="stat-grid">
           ${statCards.map(c => html`
-            <div class="pf-usage-stat">
-              <span class="pf-usage-stat-value">${c.value}</span>
-              <span class="pf-usage-stat-label">${c.label}</span>
+            <div class="stat-card">
+              <div class="stat-card-value">${c.value}</div>
+              <div class="stat-card-label">${c.label}</div>
             </div>`)}
         </div>
         ${chart}
@@ -188,7 +196,7 @@ export default function UsageTab() {
           ? html`<${DataTable} headers=${headers} rows=${rows} scroll=${true} />`
           // An empty report is a fact about this account, not a broken page — so it says which
           // question was asked and over what window, rather than showing a bare dash.
-          : html`<p class="pf-usage-empty">${t('profile.usage.emptyFor')
+          : html`<p class="pf-ureport-empty">${t('profile.usage.emptyFor')
               .replace('{report}', t(current.label))
               .replace('{days}', t(`profile.usage.period${period}`))}</p>`}
       ` : null}

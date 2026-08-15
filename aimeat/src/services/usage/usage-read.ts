@@ -264,25 +264,34 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
   const totalDuration = { n: 0, sum: 0 };
   const series = new Map<string, { bucket: string; calls: number; cost_usd: number; total_tokens: number }>();
 
-  // The dimensions still FREE to vary after the scope pinned what it pinned. An owner-scoped read of
-  // `llm.owner` pins the only dimension that cut has, so what is left to distinguish one row from
-  // another is time — which is why "spend per day" must group by bucket rather than showing one row
-  // labelled with the reader's own identity. Checked rather than declared per report, so a new cut
-  // gets the right shape without anyone remembering this.
-  const freeDims = cut.dims.filter(d => !(d === 'ownerGhii' && args.scope === 'owner'));
-  const isTimeSeries = freeDims.length === 0;
+  // The dimensions a row is actually GROUPED by, after two removals.
+  //
+  //   ownerGhii, when the scope already pinned it. An owner-scoped read of `llm.owner` pins the only
+  //   dimension that cut has, so what is left to distinguish one row from another is time — which is
+  //   why "spend per day" groups by bucket instead of showing one row labelled with the reader's own
+  //   identity.
+  //
+  //   outcome, always. It QUALIFIES a call, it does not identify one, and `refusals` and `errors`
+  //   are already metrics on every row. Grouping by it too split one surface into an ok row and an
+  //   error row that both read "mcp", which is a table that answers no question anyone asked.
+  //
+  // Derived rather than declared per report, so a new cut gets the right shape with nothing for its
+  // author to remember.
+  const groupDims = cut.dims.filter(d =>
+    d !== 'outcome' && !(d === 'ownerGhii' && args.scope === 'owner'));
+  const isTimeSeries = groupDims.length === 0;
 
   for (const r of rows) {
     const dims: Partial<Record<UsageDim, string>> = {};
-    for (const d of cut.dims) {
+    for (const d of groupDims) {
       const value = r[d];
       if (value) dims[d] = value;
     }
     const key = isTimeSeries
       // Nothing but time distinguishes these rows, so the bucket IS the row's identity.
       ? r.bucket
-      : (LABEL_ORDER.map(d => (freeDims.includes(d) ? dims[d] : '')).find(v => !!v) ?? '(unattributed)');
-    const groupKey = isTimeSeries ? r.bucket : cut.dims.map(d => r[d]).join(DIM_SEPARATOR);
+      : (LABEL_ORDER.map(d => dims[d]).find(v => !!v) ?? '(unattributed)');
+    const groupKey = isTimeSeries ? r.bucket : groupDims.map(d => r[d]).join(DIM_SEPARATOR);
 
     let entry = groups.get(groupKey);
     if (!entry) {
