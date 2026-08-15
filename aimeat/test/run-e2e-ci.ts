@@ -7,7 +7,15 @@
  * @usage
  *   node --import tsx test/run-e2e-ci.ts
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
+ *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.17.0 -- 2026-08-15 -- GUARD_SUITES and --guards: the tier CI blocks on. Both E2E steps in
+ *            .github/workflows/ci.yml were `continue-on-error: true`, so no red suite has ever
+ *            stopped a merge and every improvement to this directory was optional. The full sweep
+ *            stays advisory -- two hours, and §18's cleanup race makes it occasionally wrong -- and
+ *            twelve suites that assert a refusal or an isolation boundary block instead. 323
+ *            assertions, both backends, measured before it was wired up. Two more were measured and
+ *            left out; the reason is on GUARD_SUITES and it is about those suites, not the gate.
  *   v1.16.0 -- 2026-08-14 -- Add e2e-capability-webhook-update.ts, and stop the list drifting from
  *            the directory it describes. The list cannot notice its own gaps, so the runner now
  *            reads test/ and compares: a suite file on no list is fatal on a full run and a warning
@@ -412,6 +420,51 @@ const ALL_SUITES = [
     'test/e2e-cortex-upload-ownership.ts',
 ];
 
+/**
+ * THE GUARD TIER — the suites CI refuses to merge without.
+ *
+ * Both E2E steps in .github/workflows/ci.yml carried `continue-on-error: true` from the day they were
+ * added, so a red sweep has never blocked anything: the whole suite was advisory, and improving it
+ * was volunteer work. Removing that flag from the full sweep is not the fix — it takes about two
+ * hours, the runner's own database-cleanup race can hand one suite the previous one's data
+ * (docs/pitfalls.md §18), and a gate that is slow and occasionally wrong gets switched off again
+ * within a week.
+ *
+ * So a small tier blocks instead. Membership is one question: does a failure here mean a principal
+ * can reach money, an identity, or another account's data that they must not? Everything below either
+ * asserts a refusal or asserts an isolation boundary. Measured 2026-08-15 on both backends: 323
+ * assertions, under 20 seconds — cheap enough that nobody has a reason to skip it.
+ *
+ * A suite named here that is not in ALL_SUITES exits 1 rather than running fewer tests quietly, which
+ * is what a rename would otherwise do. Adding to this list is welcome; removing from it is a decision
+ * to stop guarding something, and the reason belongs in the commit that does it.
+ *
+ * TWO SUITES THAT BELONG HERE AND ARE NOT IN IT YET. e2e-money-audit (60 assertions on who gets
+ * billed) and e2e-zip-security (7 on archive extraction) both need an operator, and both get one the
+ * same way: registering the first owner on the node, which routes/ghii/register-login.ts promotes
+ * when no operator exists yet. That makes them depend on what ran before them. Measured 2026-08-15:
+ * e2e-money-audit is 60/60 on postgres-kysely, 42/60 on sqlite alone, and 60/60 on sqlite when it
+ * runs thirteenth; e2e-zip-security is 7/7 on both alone and failed 0/7 once on postgres inside a
+ * fourteen-suite run. The sqlite-alone failure is the decisive reading and was taken with this
+ * commit's source change STASHED, so it is main's behaviour and not this change's. A blocking gate cannot contain a suite whose result depends on its neighbours,
+ * so they stay in the advisory sweep until the operator they need is arranged rather than inherited.
+ * That is Part B work on the suites themselves, not a reason to weaken the gate.
+ */
+const GUARD_SUITES = [
+    'test/e2e-account-security-gate.ts',    // the doors back INTO the account: password, recovery, 2FA, deletion
+    'test/e2e-organism-scope-gate.ts',      // organism:write means the same thing on the HTTP door and the tool surface
+    'test/e2e-write-guards.ts',             // which principal may write into which namespace
+    'test/e2e-security.ts',                 // the cross-cutting refusals: auth, injection, traversal, rate limits
+    'test/e2e-mcp-cross-owner.ts',          // one owner's agent reaching another owner's data through MCP
+    'test/e2e-app-grants.ts',               // the scope fence around an app grant, the one principal requireScope stops
+    'test/e2e-agent-token-revocation.ts',   // revoking a credential actually ends it
+    'test/e2e-memory-namespaces.ts',        // owner, ext: and eco: namespaces stay apart
+    'test/e2e-anonymous-identity-leaks.ts', // what an unauthenticated caller can learn about who exists here
+    'test/e2e-mcp-scopes.ts',               // the tool surface is filtered by the words the owner ticked
+    'test/e2e-board-access.ts',             // reading, posting and replying on a board you were not let into
+    'test/e2e-storage-visibility.ts',       // private, shared and public files, and who may fetch which
+];
+
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone
 // reading this a year from now needs to tell a file that was judged and left out from one nobody
 // ever noticed, and the list above cannot make that distinction on its own.
@@ -480,9 +533,28 @@ function reconcileSuiteList(filtered: boolean): void {
 const TARGET = resolveTarget();
 const BASE_URL = TARGET.baseUrl;
 
+/**
+ * GUARD_SUITES, held against ALL_SUITES first. A guard suite that has been renamed or deleted must
+ * be re-pointed here; without this it would reach parseArgs as an unknown name, and the gate would
+ * quietly guard one thing less than the list says it does.
+ */
+function guardSuites(): string[] {
+    const known = new Set(ALL_SUITES);
+    const missing = GUARD_SUITES.filter(s => !known.has(s));
+    if (missing.length > 0) {
+        console.error(`\nGUARD_SUITES names ${missing.length} suite(s) that ALL_SUITES does not:`);
+        for (const s of missing) console.error(`  ${s}`);
+        console.error('Re-point the entry, or take it out deliberately and say why in the commit.\n');
+        process.exit(1);
+    }
+    console.log(`\nGuard tier: ${GUARD_SUITES.length} suites that block a merge. A failure here is a hole, not a flake.`);
+    return [...GUARD_SUITES];
+}
+
 // ── Parse CLI args ──
 function parseArgs(): string[] {
     const args = process.argv.slice(2);
+    if (args.includes('--guards')) return guardSuites();
     const tests: string[] = [];
     for (const arg of args) {
         if (arg.startsWith('--test=')) {

@@ -12,6 +12,13 @@
  *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
  *
  * @version-history
+ *   v1.6.0 — 2026-08-15 — The three scope gates ask utils/scope-coverage.ts instead of each writing
+ *     the wildcard rule out again. All three read `scopes.includes('*')` and passed, so the nine
+ *     words in SCOPES_OUTSIDE_WILDCARD — which exist BECAUSE no wildcard may carry them — were
+ *     honoured on the MCP surface, which asks that module, and waved through here. Behaviour is
+ *     unchanged at every call site today (only share:manage is gated this way, and services/
+ *     group-shares.ts already refused a `*` session behind the door); what changes is that the next
+ *     route to name one of those words gets the answer the vocabulary says it should.
  *   v1.5.0 — 2026-08-15 — requireOperatorPrincipal(), the gate for the break-glass doors that reach
  *     across accounts. requireRole('operator') reads the TOKEN's roles, so it admits the operator's
  *     browser and refuses the operator's agents; this asks whether the ACCOUNT behind the principal
@@ -37,7 +44,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
-import { ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
+import { ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, scopeIsCovered } from '../utils/scope-coverage.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
@@ -645,9 +652,10 @@ export function requireRoleOrScope(role: string, ...scopes: string[]) {
     if (roles.includes(role) ||
         (role === 'agent' && (roles.includes('owner') || roles.includes('operator'))) ||
         (role === 'owner' && roles.includes('operator'))) { next(); return; }
-    // Scope path — any authenticated principal carrying the grant (wildcard-aware, mirrors requireScope).
+    // Scope path — any authenticated principal carrying the grant. The wildcard rule is
+    // scopeIsCovered()'s, not this function's; see requireScope below for why that matters.
     const have = req.auth.scopes ?? [];
-    if (have.includes('*') || scopes.some(s => have.includes(s) || have.includes(`${s.split(':')[0]}:*`))) { next(); return; }
+    if (scopes.some(s => scopeIsCovered(have, s))) { next(); return; }
     res.status(403).json(errorEnvelope('ACCESS_DENIED', `Requires role '${role}' or one of scopes: [${scopes.join(', ')}]`));
   };
 }
@@ -670,18 +678,17 @@ export function requireScope(...requiredScopes: string[]) {
 
     const agentScopes = req.auth.scopes;
 
-    // Global wildcard
-    if (agentScopes.includes('*')) {
-      next();
-      return;
-    }
-
+    // The rule for "does this principal hold that word" lives in utils/scope-coverage.ts and is asked
+    // here rather than restated: the exact string, `{domain}:*`, `*` — and, for the words in
+    // SCOPES_OUTSIDE_WILDCARD, the exact string ALONE. Restated here it read `includes('*')` first and
+    // returned, so a `*` agent was admitted to words that exist precisely because no wildcard may
+    // carry them (the password door, the reserved memory keys, the operator break-glass, the six
+    // own-tick words), while the MCP surface — which does ask that module — refused the same agent for
+    // the same word. Enforced on one surface and not the other is invariant 15, and a copied rule is
+    // how it happens: three copies of this test lived in this file, and none of them knew about the
+    // exception the module was written to hold.
     for (const required of requiredScopes) {
-      const [domain] = required.split(':');
-      const hasExact = agentScopes.includes(required);
-      const hasDomainWild = agentScopes.includes(`${domain}:*`);
-
-      if (!hasExact && !hasDomainWild) {
+      if (!scopeIsCovered(agentScopes, required)) {
         logger.warn(`[scope-denied] ${req.auth.sub} needs "${required}", has [${agentScopes.join(', ')}] on ${req.method} ${req.path}`);
         res.status(403).json(errorEnvelope('SCOPE_DENIED', `Scope "${required}" required. Agent scopes: [${agentScopes.join(', ')}]`));
         return;
@@ -716,15 +723,7 @@ export function requireAnyScope(...acceptableScopes: string[]) {
       return;
     }
     const held = req.auth.scopes;
-    if (held.includes('*')) {
-      next();
-      return;
-    }
-    const ok = acceptableScopes.some((required) => {
-      const [domain] = required.split(':');
-      return held.includes(required) || held.includes(`${domain}:*`);
-    });
-    if (ok) {
+    if (acceptableScopes.some((required) => scopeIsCovered(held, required))) {
       next();
       return;
     }

@@ -38,6 +38,24 @@ When a feature, bugfix, or structural change is completed:
 
 4. **Full test runs are required at the end of any multi-step plan execution.**
 
+### Rule 1b: The guard tier is the part CI refuses to merge without
+
+Both E2E steps in `.github/workflows/ci.yml` carried `continue-on-error: true` from the day they were added, so until 2026-08-15 a red suite had never stopped a merge. The full sweep still cannot be that gate: two hours, and the cleanup race in `docs/pitfalls.md` §18 makes it occasionally wrong about suites nobody touched.
+
+So a named tier blocks instead. `GUARD_SUITES` in `test/run-e2e-ci.ts`, run with `--guards`:
+
+```bash
+pnpm test:e2e:guards:sqlite
+pnpm test:e2e:guards:postgres-kysely
+```
+
+Twelve suites, 323 assertions, under half a minute per backend. Membership is one question: **does a failure here mean a principal can reach money, an identity, or another account's data that they must not?** Everything in it asserts a refusal or an isolation boundary.
+
+- **Run it before you push** anything touching `src/routes/`, `src/auth/`, `src/services/` or `src/storage/`. It is cheap enough that there is no argument for skipping it, and it is what CI will run.
+- **A suite you fixed can be promoted into the tier.** That is the intended direction of travel, and it is how the advisory sweep shrinks.
+- **A suite cannot be in the tier if its result depends on what ran before it.** `e2e-money-audit` and `e2e-zip-security` are out for that reason: both need an operator and both get one by registering the first owner on the node, so they pass or fail according to their neighbours. Arranging the operator explicitly is what would let them in.
+- Removing an entry is a decision to stop guarding something. Say why in the commit.
+
 ### Rule 2: New Features Must Have Tests
 
 Every new feature or significant change should include E2E tests that verify it works correctly and won't break silently later. Quality over quantity — test the critical paths and edge cases.

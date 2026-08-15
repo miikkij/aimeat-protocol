@@ -1,7 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { requireAuth, requireRole, requireScope, requireAuthOrAnonymous } from '../../src/auth/middleware.js';
+import {
+    requireAuth, requireRole, requireScope, requireAuthOrAnonymous,
+    requireAnyScope, requireRoleOrScope,
+} from '../../src/auth/middleware.js';
+import { SCOPES_OUTSIDE_WILDCARD } from '../../src/utils/scope-coverage.js';
 import type { VerifiedToken } from '../../src/auth/jwt.js';
-import type { Request, Response, NextFunction } from 'express';
+import type { Request, Response } from 'express';
 
 // ── Mock helpers ──────────────────────────────────────────────────────
 
@@ -257,6 +261,90 @@ describe('requireScope', () => {
             expect(res._status).toBe(401);
             expect((res._json as any).error.code).toBe('AUTH_REQUIRED');
         });
+    });
+});
+
+// =====================================================================
+// The words no wildcard carries — on every scope gate, not just the MCP surface
+//
+// SCOPES_OUTSIDE_WILDCARD (utils/scope-coverage.ts) names the permissions that only an exact grant
+// can confer: the password door, the server-trusted memory keys, the operator break-glass, and the
+// six own-tick words. The MCP tool surface asks that module and refuses a `*` agent. These three
+// middlewares each wrote the wildcard test out themselves, starting with `scopes.includes('*')`, so
+// the same agent was admitted here — the same word enforced on one surface and ignored on the other.
+//
+// Driven from the exported list rather than a copy of it, so a word added to the vocabulary is
+// covered on the day it is added instead of on the day someone remembers this file.
+// =====================================================================
+
+describe('scope gates honour SCOPES_OUTSIDE_WILDCARD', () => {
+    const call = (mw: (q: any, s: any, n: any) => void, scopes: string[], roles = ['agent']) => {
+        const req = mockReq({ auth: token({ roles, scopes }) });
+        const res = mockRes();
+        const next = vi.fn();
+        mw(req, res, next);
+        return { res, next };
+    };
+
+    it('the list is not empty, or the cases below prove nothing', () => {
+        expect(SCOPES_OUTSIDE_WILDCARD.length).toBeGreaterThan(0);
+    });
+
+    for (const word of SCOPES_OUTSIDE_WILDCARD) {
+        const domain = word.split(':')[0];
+
+        it(`requireScope('${word}') refuses a '*' agent`, () => {
+            const { res, next } = call(requireScope(word), ['*']);
+            expect(next).not.toHaveBeenCalled();
+            expect(res._status).toBe(403);
+            expect((res._json as any).error.code).toBe('SCOPE_DENIED');
+        });
+
+        it(`requireScope('${word}') refuses a '${domain}:*' agent`, () => {
+            const { res, next } = call(requireScope(word), [`${domain}:*`]);
+            expect(next).not.toHaveBeenCalled();
+            expect(res._status).toBe(403);
+        });
+
+        it(`requireScope('${word}') admits the exact word`, () => {
+            const { res, next } = call(requireScope(word), [word]);
+            expect(next).toHaveBeenCalled();
+            expect(res._status).toBeNull();
+        });
+
+        it(`requireAnyScope('${word}') refuses a '*' agent`, () => {
+            const { res, next } = call(requireAnyScope(word), ['*']);
+            expect(next).not.toHaveBeenCalled();
+            expect(res._status).toBe(403);
+        });
+
+        it(`requireRoleOrScope('owner', '${word}') refuses a '*' agent`, () => {
+            const { res, next } = call(requireRoleOrScope('owner', word), ['*']);
+            expect(next).not.toHaveBeenCalled();
+            expect(res._status).toBe(403);
+            expect((res._json as any).error.code).toBe('ACCESS_DENIED');
+        });
+    }
+
+    // The exception must stay an exception: delegating the rule must not narrow an ordinary word.
+    it("an ordinary word is still carried by '*' on all three gates", () => {
+        expect(call(requireScope('memory:write'), ['*']).next).toHaveBeenCalled();
+        expect(call(requireAnyScope('memory:write'), ['*']).next).toHaveBeenCalled();
+        expect(call(requireRoleOrScope('owner', 'memory:write'), ['*']).next).toHaveBeenCalled();
+    });
+
+    it("an ordinary word is still carried by its domain wildcard on all three gates", () => {
+        expect(call(requireScope('memory:write'), ['memory:*']).next).toHaveBeenCalled();
+        expect(call(requireAnyScope('memory:write'), ['memory:*']).next).toHaveBeenCalled();
+        expect(call(requireRoleOrScope('owner', 'memory:write'), ['memory:*']).next).toHaveBeenCalled();
+    });
+
+    it('an owner session is still waved past a word no wildcard carries', () => {
+        // The human at their own keyboard is not a scoped principal — the exception is about what an
+        // AGENT may be handed in one click, and removing the owner bypass here would lock the person
+        // out of their own account settings.
+        const { next } = call(requireScope(SCOPES_OUTSIDE_WILDCARD[0]!), [], ['owner']);
+        expect(next).toHaveBeenCalled();
     });
 });
 

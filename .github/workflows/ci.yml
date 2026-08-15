@@ -139,12 +139,30 @@ jobs:
           cp .env.test.sqlite.example .env.test.sqlite
           cp .env.test.postgres-kysely.example .env.test.postgres-kysely
 
-      - name: E2E tests (SQLite)
+      # THE GUARD TIER BLOCKS. Twelve suites, chosen on one question: does a failure here mean a
+      # principal can reach money, an identity, or another account's data that they must not? The
+      # list and the reason for each entry are in test/run-e2e-ci.ts (GUARD_SUITES). 323 assertions,
+      # under half a minute per backend, no continue-on-error — a red run here is a hole, and merging
+      # on top of it is the thing this repo spent August discovering it had been doing.
+      - name: E2E guard tier (SQLite) — blocking
+        working-directory: aimeat
+        run: pnpm test:e2e:guards:sqlite
+
+      - name: E2E guard tier (PostgreSQL + Kysely — primary backend) — blocking
+        working-directory: aimeat
+        run: pnpm test:e2e:guards:postgres-kysely
+
+      # The full sweep stays advisory, deliberately and not by neglect: it takes about two hours, and
+      # the runner's database cleanup can hand one suite the previous one's data when a server
+      # shutdown slips past its fixed wait (docs/pitfalls.md §18), which produces hundreds of
+      # unrelated 403s. A gate that is slow and occasionally wrong gets switched off within a week, so
+      # it reports instead — and the way OUT of advisory is to move a suite up into the guard tier.
+      - name: E2E tests (SQLite) — full sweep, advisory
         continue-on-error: true
         working-directory: aimeat
         run: pnpm test:e2e:sqlite
 
-      - name: E2E tests (PostgreSQL + Kysely — primary backend)
+      - name: E2E tests (PostgreSQL + Kysely — primary backend) — full sweep, advisory
         continue-on-error: true
         working-directory: aimeat
         run: pnpm test:e2e:postgres-kysely
