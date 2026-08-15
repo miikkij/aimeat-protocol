@@ -7,126 +7,14 @@
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  */
 import type {
-  StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, PersonalNodeRecord, MailboxItemRecord,
+  PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, PersonalNodeRecord, MailboxItemRecord,
   MaintenanceState, EmailVerificationRecord, ChatInstanceRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
-import { sumStorageBytesForOwners as sumStorageBytesForOwnersRepo } from '../repos/storage-file.js';
 
 export const identityNodesMethods = {
-  // ── Storage (Binary Files) ──
-  // ══════════════════════════════════════════════════════════
-
-  async createStorageFile(this: SqliteStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
-    this.db.prepare(
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, accessCode, tags, createdAt, federate)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      file.ownerGaii, file.key, file.visibility, file.groupId ?? null, file.workspaceRef ?? null,
-      file.mimeType, file.size, file.data,
-      file.accessCode ?? null, JSON.stringify(file.tags || []), file.createdAt,
-      file.federate ? 1 : 0,
-    );
-    return file;
-  },
-
-  async getStorageFile(this: SqliteStorage, ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
-    const row = this.db.prepare('SELECT * FROM storage_files WHERE ownerGaii = ? AND key = ?').get(ownerGaii, key) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    const record: StorageFileRecord = {
-      key: row.key as string,
-      ownerGaii: row.ownerGaii as string,
-      visibility: row.visibility as StorageFileRecord['visibility'],
-      mimeType: row.mimeType as string,
-      size: row.size as number,
-      data: row.data as Buffer,
-      tags: row.tags ? JSON.parse(row.tags as string) : [],
-      createdAt: row.createdAt as string,
-    };
-    if (row.accessCode) record.accessCode = row.accessCode as string;
-    if (row.groupId) record.groupId = row.groupId as string;
-    if (row.workspaceRef) record.workspaceRef = row.workspaceRef as string;
-    record.federate = row.federate === 1;
-    return record;
-  },
-
-  async sumStorageBytesForOwners(this: SqliteStorage, ownerGaiis: string[]): Promise<{ bytes: number; count: number }> {
-    return sumStorageBytesForOwnersRepo(this.db, ownerGaiis);
-  },
-
-  async listStorageFiles(this: SqliteStorage, ownerGaii: string): Promise<StorageFileRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM storage_files WHERE ownerGaii = ?').all(ownerGaii) as Record<string, unknown>[];
-    return rows.map(r => {
-      const record: StorageFileRecord = {
-        key: r.key as string,
-        ownerGaii: r.ownerGaii as string,
-        visibility: r.visibility as StorageFileRecord['visibility'],
-        mimeType: r.mimeType as string,
-        size: r.size as number,
-        data: r.data as Buffer,
-        tags: r.tags ? JSON.parse(r.tags as string) : [],
-        createdAt: r.createdAt as string,
-      };
-      if (r.accessCode) record.accessCode = r.accessCode as string;
-      if (r.groupId) record.groupId = r.groupId as string;
-      if (r.workspaceRef) record.workspaceRef = r.workspaceRef as string;
-      record.federate = r.federate === 1;
-      return record;
-    });
-  },
-
-  async listStorageFilesForOwners(this: SqliteStorage, ownerGaiis: string[]): Promise<Record<string, StorageFileRecord[]>> {
-    const out: Record<string, StorageFileRecord[]> = {};
-    for (const g of ownerGaiis) out[g] = [];
-    if (ownerGaiis.length === 0) return out;
-    const placeholders = ownerGaiis.map(() => '?').join(',');
-    // Metadata only (no `data` bytes) — mirrors the PG/Prisma batch variant.
-    const rows = this.db.prepare(
-      `SELECT key, ownerGaii, visibility, mimeType, size, tags, accessCode, groupId, workspaceRef, federate, createdAt
-       FROM storage_files WHERE ownerGaii IN (${placeholders})`,
-    ).all(...ownerGaiis) as Record<string, unknown>[];
-    for (const r of rows) {
-      const record: StorageFileRecord = {
-        key: r.key as string,
-        ownerGaii: r.ownerGaii as string,
-        visibility: r.visibility as StorageFileRecord['visibility'],
-        mimeType: r.mimeType as string,
-        size: r.size as number,
-        data: Buffer.alloc(0),
-        tags: r.tags ? JSON.parse(r.tags as string) : [],
-        createdAt: r.createdAt as string,
-      };
-      if (r.accessCode) record.accessCode = r.accessCode as string;
-      if (r.groupId) record.groupId = r.groupId as string;
-      if (r.workspaceRef) record.workspaceRef = r.workspaceRef as string;
-      record.federate = r.federate === 1;
-      (out[record.ownerGaii] ??= []).push(record);
-    }
-    return out;
-  },
-
-  async deleteStorageFile(this: SqliteStorage, ownerGaii: string, key: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM storage_files WHERE ownerGaii = ? AND key = ?').run(ownerGaii, key);
-    return result.changes > 0;
-  },
-
-  async updateFileTagsByKey(this: SqliteStorage, ownerGaii: string, key: string, tags: string[]): Promise<StorageFileRecord | null> {
-    const result = this.db.prepare(
-      'UPDATE storage_files SET tags = ? WHERE ownerGaii = ? AND key = ?'
-    ).run(JSON.stringify(tags), ownerGaii, key);
-    if (result.changes === 0) return null;
-    return this.getStorageFile(ownerGaii, key);
-  },
-
-  async updateFileVisibility(this: SqliteStorage, ownerGaii: string, key: string, visibility: StorageFileRecord['visibility'], workspaceRef?: string): Promise<StorageFileRecord | null> {
-    // workspaceRef undefined → change visibility only (keep any existing ref); provided → set both
-    // (pass '' to clear). Lets a caller flip a file to 'workspace' AND bind it to its org/ws in one call.
-    const result = workspaceRef === undefined
-      ? this.db.prepare('UPDATE storage_files SET visibility = ? WHERE ownerGaii = ? AND key = ?').run(visibility, ownerGaii, key)
-      : this.db.prepare('UPDATE storage_files SET visibility = ?, workspaceRef = ? WHERE ownerGaii = ? AND key = ?').run(visibility, workspaceRef || null, ownerGaii, key);
-    if (result.changes === 0) return null;
-    return this.getStorageFile(ownerGaii, key);
-  },
+  // Stored files moved to methods/storage-files.ts when this file passed 800 lines. A pure
+  // extraction: same bodies, merged onto the same prototype, one import away in index.ts.
 
   // ══════════════════════════════════════════════════════════
   // ── Peering Requests ──

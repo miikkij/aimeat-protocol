@@ -42,7 +42,7 @@
  *     had seven download responses each setting the uploader's Content-Type and nothing else.
  */
 import type { Response } from 'express';
-import { sniffedContentType } from './app-content-type.js';
+import { sniffedContentType, verifiedContentType } from './app-content-type.js';
 
 /**
  * Everything a stored file may be rendered as when someone navigates to it. Read the reasoning in
@@ -114,16 +114,29 @@ function dispositionValue(disposition: 'inline' | 'attachment', filename: string
  * The caller still sets `Content-Length` (or `Content-Range`), caching and any CORS headers: those
  * depend on which door the file came through, and these four do not.
  *
- * Pass the WHOLE file as `data`, even when replying with a range. The content type is sniffed from
- * it, and a multi-byte character straddling a range boundary would fail a decode of the slice while
- * the file itself is good UTF-8.
+ * Pass `utf8Verified` when the record carries it — a metadata read has it and a range reply cannot
+ * sniff. Otherwise pass the WHOLE file as `data`, even when replying with a range: the content type
+ * is sniffed from it, and a multi-byte character straddling a range boundary would fail a decode of
+ * the slice while the file itself is good UTF-8.
  */
 export function setStoredFileHeaders(
     res: Response,
-    file: { key: string; mimeType: string; data?: Buffer | Uint8Array | null },
+    file: { key: string; mimeType: string; data?: Buffer | Uint8Array | null; utf8Verified?: boolean },
 ): void {
     const inline = isInlineSafeFileType(file.mimeType);
-    res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
+    // A stored verdict WINS over the bytes in hand, and that ordering is the point: a range response
+    // holds a slice, and sniffing a slice can disagree with the full GET when a multi-byte character
+    // straddles the boundary. The verdict is a property of the file, so both responses name the same
+    // type. Only a file written before the verdict existed falls through to reading the bytes.
+    //
+    // An EMPTY `data` is treated as "no bytes were supplied" rather than as an empty file, and that
+    // is not pedantry: a metadata-only record carries a zero-length buffer, zero bytes decode as
+    // valid UTF-8, and the sniffer would cheerfully stamp `charset=utf-8` on a file it has never
+    // seen. A genuinely empty file loses nothing by not being told which encoding its no bytes are in.
+    const supplied = file.data && file.data.length > 0 ? file.data : null;
+    res.setHeader('Content-Type', file.utf8Verified === undefined
+        ? sniffedContentType(file.mimeType, supplied)
+        : verifiedContentType(file.mimeType, file.utf8Verified));
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Security-Policy', inline ? CSP_INLINE : CSP_ATTACHMENT);
     // The key is an address, so its last segment is the closest thing to a filename we have; a key

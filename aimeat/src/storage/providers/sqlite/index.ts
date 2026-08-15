@@ -45,6 +45,7 @@ import { ownerMemoryBulkMethods } from './methods/owner-memory-bulk.js';
 import { ownerMemoryScopeMethods } from './methods/owner-memory-scope.js';
 import { workMethods } from './methods/work.js';
 import { identityNodesMethods } from './methods/identity-nodes.js';
+import { storageFileMethods } from './methods/storage-files.js';
 import { governanceMethods } from './methods/governance.js';
 import { communityMethods } from './methods/community.js';
 import { extensionsNotifyMethods } from './methods/extensions-notify.js';
@@ -184,6 +185,7 @@ Object.assign(
   ownerMemoryScopeMethods,
   workMethods,
   identityNodesMethods,
+  storageFileMethods,
   governanceMethods,
   communityMethods,
   extensionsNotifyMethods,

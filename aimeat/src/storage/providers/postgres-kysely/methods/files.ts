@@ -7,21 +7,25 @@
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: storage files on Postgres+Kysely.
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
+ *   v1.2.0 — 2026-08-15 — TARGET-063: getStorageFileMeta and readStorageFileRange (database-side
+ *     substring), and the UTF-8 verdict settled on write.
  */
 import { sql } from 'kysely';
 import type { ChunkedUploadRecord, StorageFileRecord } from '../../../interface.js';
 import type { PostgresKyselyStorage } from '../index.js';
+import { utf8VerdictFor } from '../../../../utils/app-content-type.js';
 
 export const fileMethods = {
   async createStorageFile(this: PostgresKyselyStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
+    const utf8Verified = utf8VerdictFor(file);
     const shared = {
       visibility: file.visibility, mimeType: file.mimeType, size: file.size, data: file.data,
       tags: file.tags || [], federate: file.federate ?? false, groupId: file.groupId ?? null,
-      workspaceRef: file.workspaceRef ?? null, createdAt: new Date(file.createdAt),
+      workspaceRef: file.workspaceRef ?? null, createdAt: new Date(file.createdAt), utf8Verified,
     };
     await this.db.insertInto('StorageFile').values({ key: file.key, ownerGaii: file.ownerGaii, ...shared })
       .onConflict(oc => oc.columns(['ownerGaii', 'key']).doUpdateSet(shared)).execute();
-    return file;
+    return { ...file, utf8Verified: utf8Verified ?? undefined };
   },
 
   async getStorageFile(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
@@ -31,8 +35,35 @@ export const fileMethods = {
       key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
       groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
       size: r.size, data: Buffer.from(r.data), tags: r.tags || [], federate: r.federate ?? false,
+      utf8Verified: r.utf8Verified ?? undefined,
       createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
     };
+  },
+
+  async getStorageFileMeta(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
+    const r = await this.db.selectFrom('StorageFile')
+      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'createdAt'])
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
+    if (!r) return null;
+    return {
+      key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
+      groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
+      size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
+      utf8Verified: r.utf8Verified ?? undefined,
+      createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
+    };
+  },
+
+  async readStorageFileRange(this: PostgresKyselyStorage, ownerGaii: string, key: string, start: number, length: number): Promise<Buffer | null> {
+    if (length <= 0) return Buffer.alloc(0);
+    // `substring(bytea from N for L)` counts from 1. The caller's `start` is a byte offset, which
+    // counts from 0, and that difference is worth exactly one +1 in one place rather than in every
+    // route that ever serves a range.
+    const r = await this.db.selectFrom('StorageFile')
+      .select(sql<Buffer>`substring("data" from ${start + 1} for ${length})`.as('chunk'))
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
+    if (!r) return null;
+    return Buffer.from(r.chunk);
   },
 
   async listStorageFiles(this: PostgresKyselyStorage, ownerGaii: string): Promise<StorageFileRecord[]> {

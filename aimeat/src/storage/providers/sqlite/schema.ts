@@ -293,6 +293,10 @@ export function initializeSchema(db: Database.Database): void {
   // Workspace-scoped visibility tier (files reach parity with memory): "<org>/<ws>" whose members may read.
   safeAddColumn('memory', 'workspaceRef', 'TEXT');
   safeAddColumn('storage_files', 'workspaceRef', 'TEXT');
+  // TARGET-063: does the whole file decode as UTF-8? Settled on write, so a byte-range or HEAD
+  // response can name the charset without loading the file. No DEFAULT: NULL means "not
+  // established", which is a different thing from "not UTF-8" and is read as such.
+  safeAddColumn('storage_files', 'utf8Verified', 'INTEGER');
   safeAddColumn('agents', 'technicalCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'domainCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'activityStats', "TEXT DEFAULT '{}'");

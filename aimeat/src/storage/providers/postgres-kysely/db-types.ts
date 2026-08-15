@@ -1785,6 +1785,7 @@ export interface StorageFile {
   ownerGaii: string;
   size: number;
   tags: Generated<string[] | null>;
+  utf8Verified: boolean | null;
   visibility: string;
   workspaceRef: string | null;
 }

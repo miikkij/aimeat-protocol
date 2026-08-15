@@ -206,6 +206,12 @@ export interface StorageFileRecord {
   mimeType: string;
   size: number;
   data: Buffer;
+  /** Do the WHOLE bytes decode as UTF-8? Settled once by the provider on write (see
+   *  utils/app-content-type.ts), so a byte-range or HEAD response can name the charset without
+   *  loading the file to find out. `undefined` means a file stored before the verdict existed, and
+   *  those paths read the bytes as they always did. Only recorded for types where it changes the
+   *  served Content-Type; a PNG carries no verdict because a charset on a PNG means nothing. */
+  utf8Verified?: boolean;
   accessCode?: string;
   tags?: string[];
   createdAt: string;
