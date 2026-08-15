@@ -22,6 +22,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { dt, Empty, DataTable } from './shared.js';
+import { KeyValueRow } from '/components/KeyValueRow.js';
 import { apiGet, apiPost } from '/js/api.js';
 
 export default function OrganismOwnershipTab() {
@@ -83,7 +84,7 @@ export default function OrganismOwnershipTab() {
           || 'Put an owner back on an organism whose own owners can no longer be reached. Adding is additive: nobody inside loses anything.'}
       </p>
 
-      <div class="form-row">
+      <div class="adm-oo-row">
         <input class="input-field" type="text" value=${orgId} placeholder=${t('admin.orgOwnership.idPlaceholder') || 'Organism id'}
           onInput=${(e) => setOrgId(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') load(); }} />
         <button class="btn-outline" disabled=${busy || !orgId.trim()} onClick=${() => load()}>
@@ -94,20 +95,14 @@ export default function OrganismOwnershipTab() {
       ${msg ? html`<p class=${msg.bad ? 'form-error' : 'form-note'}>${msg.text}</p>` : null}
 
       ${state ? html`
-        <div class="detail-card">
-          <div class="detail-row"><span class="detail-label">${t('admin.orgOwnership.name') || 'Organism'}</span><span>${state.name}</span></div>
-          <div class="detail-row">
-            <span class="detail-label">${t('admin.orgOwnership.owners') || 'Owners'}</span>
-            <span>${(state.owners || []).join(', ')}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">${t('admin.orgOwnership.createdBy') || 'Created by'}</span>
-            <span>${state.created_by || '—'}</span>
-          </div>
-          <div class="detail-row"><span class="detail-label">${t('admin.orgOwnership.created') || 'Created'}</span><span>${dt(state.created_at)}</span></div>
+        <div class="adm-oo-card">
+          <${KeyValueRow} label=${t('admin.orgOwnership.name') || 'Organism'} value=${state.name} />
+          <${KeyValueRow} label=${t('admin.orgOwnership.owners') || 'Owners'} value=${(state.owners || []).join(', ')} />
+          <${KeyValueRow} label=${t('admin.orgOwnership.createdBy') || 'Created by'} value=${state.created_by || '—'} />
+          <${KeyValueRow} label=${t('admin.orgOwnership.created') || 'Created'} value=${dt(state.created_at)} />
         </div>
 
-        <div class="form-row">
+        <div class="adm-oo-row">
           <input class="input-field" type="text" value=${candidate}
             placeholder=${t('admin.orgOwnership.addPlaceholder') || 'Owner name to add'}
             onInput=${(e) => setCandidate(e.target.value)} onKeyDown=${(e) => { if (e.key === 'Enter') addOwner(); }} />

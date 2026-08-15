@@ -268,7 +268,12 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
                 <div class="pj-org-main pj-org-main-static">
                   <div class="pj-org-titlerow">
                     <span class="pj-org-name">${(m.ghii)} <${PresenceDot} ghii=${toGhii(m.ghii)} /></span>
-                    <span class="badge ${m.role === 'creator' ? 'badge-success' : 'badge-info'}">${(m.role || 'member')}</span>
+                    <!-- The stored role is still 'creator', and several members can hold it now, so
+                         the badge says what it means: owner. Two rows both reading "creator" asks
+                         the viewer which one really made the organism. -->
+                    <span class="badge ${isOwnerRow ? 'badge-success' : 'badge-info'}">
+                      ${isOwnerRow ? (t('organisms.roleOwner') || 'owner') : (m.role || 'member')}
+                    </span>
                   </div>
                   ${(acc || m.joinedAt) ? html`
                     <div class="pj-org-desc">
