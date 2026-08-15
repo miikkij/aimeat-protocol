@@ -7,7 +7,7 @@
   },
   "pypi": {
     "package": "aimeat-crewai",
-    "version": "0.19.0",
+    "version": "0.19.1",
     "fingerprint": "d3448ba5685107ca",
     "toolCount": 24
   }
