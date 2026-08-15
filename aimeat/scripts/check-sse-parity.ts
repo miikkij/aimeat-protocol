@@ -110,6 +110,10 @@ const DELEGATES: Record<string, string> = {
         + "services/memory-write.ts and emits 'memory' there. No REST twin exists for this one: the "
         + 'proof is attached from the appdev tool surface only.',
     'src/mcp/apps.ts': "services/app-publish.ts and services/app-lifecycle.ts, both emitting 'apps'",
+    'src/mcp/apps-screenshot.ts': "services/screenshot-capture.ts, which emits 'apps' after the "
+        + 'render — the catalogue card is what changes, and it changes for everyone who can see the '
+        + 'app rather than only for the caller. Verified by reading the domain out of the service '
+        + 'rather than trusting the delegation.',
     'src/mcp/boards.ts': "services/board-write.ts and services/board-post.ts, both emitting 'boards'",
     'src/mcp/chat-instances.ts': "services/chat-instance-write.ts, which emits 'chat'",
     'src/mcp/commerce.ts': "services/memory-write.ts ('memory') and services/agent-offers-write.ts ('agents')",

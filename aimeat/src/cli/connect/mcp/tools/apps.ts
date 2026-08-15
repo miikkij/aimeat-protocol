@@ -155,6 +155,13 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/seed`, body));
   });
 
+  // → POST /v1/apps/:owner/:filename/screenshot/capture — render the live app and store the picture.
+  mcp.tool('aimeat_app_screenshot', descriptionFor('aimeat_app_screenshot'), {
+    filename: z.string().describe('The published app to photograph (e.g. "pong.html").'),
+  }, annotationsFor('aimeat_app_screenshot'), async ({ filename }) => {
+    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/screenshot/capture`, {}));
+  });
+
   // → POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a new live version.
   mcp.tool('aimeat_app_draft_publish', descriptionFor('aimeat_app_draft_publish'), {
     filename: z.string().describe('App filename whose draft to publish.'),

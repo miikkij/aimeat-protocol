@@ -35,8 +35,9 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth, optionalAuth } from '../../auth/middleware.js';
+import { requireAuth, optionalAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { captureAppScreenshot } from '../../services/screenshot-capture.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
 import { generateAppAccessToken } from '../../services/app-access-token.js';
@@ -224,6 +225,46 @@ export function registerReadRoutes(
     // re-publishing it. The app's owner can set their own; a node operator can set any app's,
     // so the screenshot worker can backfill defaults for apps that have none. createStorageFile
     // upserts, so this overwrites an existing screenshot.
+    // POST /v1/apps/:owner/:filename/screenshot/capture — render the app NOW and store the result.
+    // The sibling POST above takes a picture the caller already has; this one takes it. The node has
+    // never had a request path that renders, deliberately, because rendering is the most expensive
+    // thing it does and an open one is a denial-of-service shape. It exists now because an agent has
+    // no other way to see what it published: it has no browser and, hosted, no shell either, so
+    // without this it ships blind and reports success on the strength of a 200.
+    // Throttled per owner in services/screenshot-capture.ts.
+    router.post('/v1/apps/:owner/:filename/screenshot/capture', requireAuth(), requireScope('app:write'), async (req, res) => {
+        const ownerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const owner = ownerParam.includes('@') ? ownerParam.split('@')[0] : ownerParam;
+
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${filename}" not found for owner "${owner}"`));
+            return;
+        }
+
+        const isOperator = req.auth!.roles?.includes('operator') ?? false;
+        const { owner: callerOwner } = await canonicalOwner(req);
+        if (!isOperator && callerOwner !== app.ownerName) {
+            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'You can only capture screenshots of your own apps'));
+            return;
+        }
+
+        const out = await captureAppScreenshot(config, storage, { ownerName: app.ownerName, filename });
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message, out.status));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            filename,
+            captured: true,
+            size: out.sizeBytes,
+            screenshot_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/screenshot`,
+        }, [
+            { description: 'View the screenshot', method: 'GET', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/screenshot` },
+        ]));
+    });
+
     router.post('/v1/apps/:owner/:filename/screenshot', requireAuth(), async (req, res) => {
         const ownerParam = req.params.owner as string;
         const filename = req.params.filename as string;

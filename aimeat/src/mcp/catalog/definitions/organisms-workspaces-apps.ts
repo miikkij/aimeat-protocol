@@ -606,6 +606,15 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_app_screenshot',
+        description: 'Render a published app in a real browser and store the picture, then return its URL so you can LOOK at what you built. Use it right after publishing: the publish response tells you the bytes arrived, not that the page works, and a blank screen, a broken layout or a script that never ran all return 200. The URL needs no authentication, so you can hand it straight to a vision model. It also replaces the thumbnail the catalogue shows. Only published apps can be photographed; a draft has no public page, so publish first. Throttled per owner, because rendering is expensive.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            filename: { type: 'string', required: true, description: 'The published app to photograph (e.g. "pong.html").' },
+        },
+    },
+    {
         name: 'aimeat_extension_list',
         description: 'List the node\'s ACTIVE server-side extensions with their version, description, author, available actions (id/method/path), and federation flags. Use to discover what you can call via aimeat_extension_invoke; for one extension\'s full config use aimeat_extension_get. Inactive/installed-but-not-activated extensions are not shown here.',
         caller: 'agent',

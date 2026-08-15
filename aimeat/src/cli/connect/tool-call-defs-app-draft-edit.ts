@@ -97,4 +97,16 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             return client.post(`/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(filename)}/draft/seed`, body);
         },
     },
+    {
+        // → POST /v1/apps/:owner/:filename/screenshot/capture
+        name: 'aimeat_app_screenshot',
+        description: 'Render a published app in a real browser, store the picture, and return its URL so you can look at what you built.',
+        input: {
+            filename: { type: 'string', required: true, description: 'The published app to photograph (e.g. "pong.html").' },
+        },
+        handler: ({ client, config }, input) => {
+            const filename = requiredString(input, 'filename');
+            return client.post(`/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(filename)}/screenshot/capture`, {});
+        },
+    },
 ];

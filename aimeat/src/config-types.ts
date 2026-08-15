@@ -342,6 +342,10 @@ export interface AimeatConfig {
   modelDefaultImage: string;
   /** ISO-639-1 hint for speech-to-text when the owner has set none. Empty = let the model detect. */
   sttLanguageDefault: string;
+  /** How many on-demand app screenshots one owner may ask for per hour. Rendering is the most
+   *  expensive thing this node does per request, and an unthrottled render is a denial-of-service
+   *  shape, which is why the batch job never had a request path at all until this existed. */
+  screenshotOnDemandPerHour: number;
   microMemoryQuotaKb: number;
   microMemoryMaxSetsPerAgent: number;
   microMemoryMaxKeysPerSet: number;

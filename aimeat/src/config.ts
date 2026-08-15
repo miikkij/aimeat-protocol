@@ -284,6 +284,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     modelDefaultStt: process.env.AIMEAT_MODEL_DEFAULT_STT ?? '',
     modelDefaultImage: process.env.AIMEAT_MODEL_DEFAULT_IMAGE ?? '',
     sttLanguageDefault: process.env.AIMEAT_STT_LANGUAGE_DEFAULT ?? '',
+    screenshotOnDemandPerHour: parseInt(process.env.AIMEAT_SCREENSHOT_ONDEMAND_PER_HOUR ?? '20', 10),
     microMemoryQuotaKb: parseInt(process.env.AIMEAT_MICRO_MEMORY_QUOTA_KB ?? '500', 10),
     microMemoryMaxSetsPerAgent: parseInt(process.env.AIMEAT_MICRO_MEMORY_MAX_SETS ?? '50', 10),
     microMemoryMaxKeysPerSet: parseInt(process.env.AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET ?? '100', 10),
