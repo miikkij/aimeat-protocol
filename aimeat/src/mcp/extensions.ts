@@ -54,7 +54,8 @@ import { enforcePaywall } from '../routes/extensions/paywall.js';
 import { createRefusalRecorder, refusalText } from '../routes/extensions/metered-response.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
-import { parseGAII } from '../utils/gaii.js';
+import { parseGAII, ownerGhiiOf } from '../utils/gaii.js';
+import { makeExtensionDataPackage } from '../services/datapackage/ext-capability.js';
 import { canManageExtensionAs } from '../routes/extensions/permissions.js';
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
@@ -279,6 +280,15 @@ export function registerExtensionsTools(
                     callerGaii: agentGaii,
                     callerOwner: parseGAII(agentGaii)?.owner,
                     extName: ext.name,
+                }),
+                // Same capability as the REST road, and deliberately the same TARGET: a data package
+                // an agent produces lands in its OWNER's namespace, not the agent's, so the address
+                // does not change with the producer. ctx.files stays agent-scoped — an arbitrary
+                // file belongs to whoever asked for it; a published package belongs to the account.
+                datapackage: makeExtensionDataPackage({
+                    config, storage,
+                    ownerGhii: ownerGhiiOf(agentGaii),
+                    producedBy: { gaii: agentGaii, kind: 'agent', ref: `${ext.name}/${action_id}` },
                 }),
                 // The shared wallet, so this door has the per-call debit ceiling too. Its own copy
                 // refused a negative amount but had no ceiling, which is the guard that bounds how

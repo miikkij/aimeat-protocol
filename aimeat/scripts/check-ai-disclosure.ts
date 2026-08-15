@@ -186,6 +186,10 @@ const AI_PROVENANCE_REQUIRED = [
   'aimeat_app_publish',
   'aimeat_board_post',
   'aimeat_board_reply',
+  // A published data package is world-readable at a permanent address and is read by people as
+  // well as programs. When an AGENT publishes one, the rows and the change description are
+  // model-touched output, and the descriptor carries the resulting record id in aimeat.
+  'aimeat_datapackage_publish',
   'aimeat_dm_ask',
   'aimeat_dm_send',
   'aimeat_dm_send_as_owner',

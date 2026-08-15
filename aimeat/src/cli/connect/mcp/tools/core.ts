@@ -323,6 +323,56 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     return jsonContent(resp.data ?? resp);
   });
 
+  mcp.tool('aimeat_datapackage_publish', descriptionFor('aimeat_datapackage_publish'), {
+    agent_name: agentNameSchema,
+    name: z.string().describe('Package name: lowercase letters, digits and dashes. It becomes part of the permanent URL.'),
+    changes: z.string().describe('REQUIRED. What changed against the previous version and why.'),
+    resources: z.array(z.record(z.string(), z.unknown())).describe('One or more { name, rows, schema?, title?, description? }.'),
+    title: z.string().optional(),
+    description: z.string().optional(),
+    license: z.string().optional(),
+    sources: z.array(z.record(z.string(), z.unknown())).optional(),
+    legal_basis: z.string().optional(),
+    // Crews publish through the connector, so the declaration has to exist HERE too — the node
+    // surface being right does not help a caller that never touches it.
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_datapackage_publish'), async ({ agent_name, ...body }) => {
+    const { client } = pickAgent(registry, agent_name);
+    // Straight through: the quality gate, the content hash and the address all live on the node, and
+    // a refusal comes back with the row and the column rather than a verdict.
+    const resp = await client.post('/v1/datapackages', body as Record<string, unknown>);
+    return jsonContent(resp.data ?? resp);
+  });
+
+  mcp.tool('aimeat_datapackage_export', descriptionFor('aimeat_datapackage_export'), {
+    agent_name: agentNameSchema,
+    ref: z.string().describe('pkg:owner/name, optionally @sha256:... to pin a version.'),
+    resource: z.string().describe('Which resource of the package.'),
+    format: z.enum(['url', 'csv', 'json']).optional().describe('url (default) = the permanent CSV address. csv/json = a window of rows inline.'),
+    limit: z.number().optional(),
+    offset: z.number().optional(),
+    select: z.array(z.string()).optional(),
+  }, annotationsFor('aimeat_datapackage_export'), async ({ agent_name, ref, resource, format, limit, offset, select }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const m = /^pkg:([^/@]+)\/([^@]+)(?:@(sha256:[a-f0-9]{64}))?$/.exec(ref);
+    if (!m) return jsonContent({ error: 'ref must look like "pkg:owner/name" or "pkg:owner/name@sha256:..."' });
+    const [, owner, name, version] = m;
+    const base = `/v1/datapackages/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+    const qs: string[] = [];
+    if (version) qs.push(`version=${encodeURIComponent(version)}`);
+    // 'url' is the default because handing over the permanent address costs one small response,
+    // while pulling the table through the model context is slow, billed and usually unnecessary.
+    if ((format ?? 'url') === 'url') {
+      const resp = await client.get(base + (qs.length ? `?${qs.join('&')}` : ''));
+      return jsonContent(resp.data ?? resp);
+    }
+    if (limit !== undefined) qs.push(`limit=${encodeURIComponent(limit)}`);
+    if (offset !== undefined) qs.push(`offset=${encodeURIComponent(offset)}`);
+    if (select?.length) qs.push(`select=${encodeURIComponent(select.join(','))}`);
+    const resp = await client.get(`${base}/rows/${encodeURIComponent(resource)}${qs.length ? `?${qs.join('&')}` : ''}`);
+    return jsonContent(resp.data ?? resp);
+  });
+
   mcp.tool('aimeat_storage_delete', descriptionFor('aimeat_storage_delete'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Storage key in the agent\'s own namespace. Only the agent\'s own files can be deleted.'),

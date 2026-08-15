@@ -76,6 +76,25 @@ export interface ExtensionCtx {
             Promise<{ key: string; gaii: string; owner: string; url: string; size: number }>;
     };
     /**
+     * AIMEAT Data Packages, as a HOST capability — the answer to "a sandboxed extension cannot load
+     * a shared library, and the deterministic producers live in extensions". The work (schema
+     * inference, validation, the content hash, canonical CSV, the storage writes) happens on the
+     * host; the browser binding and the MCP tools reach the same functions, so a package built here
+     * is byte-identical to one built there.
+     *
+     * `publish` THROWS when the quality gate refuses. The scheduler and the workflow engine record a
+     * normal return as a successful run, so a returned refusal would be a green run that published
+     * nothing; `validate` is the non-throwing call for looking first.
+     */
+    datapackage?: {
+        publish(input: unknown): Promise<unknown>;
+        validate(resources: unknown): Promise<unknown>;
+        inferSchema(rows: unknown): Promise<unknown>;
+        open(ref: string): Promise<unknown>;
+        rows(ref: string, resource: string, opts?: unknown): Promise<unknown>;
+        fail(name: string, message: string): Promise<void>;
+    };
+    /**
      * Who invoked this action. `member` is their standing in the app this extension gates, resolved
      * by the NODE before the sandbox starts and handed in: a gate needs the role, the roster is
      * private, and reading it here means no lookup has to be opened to the sandbox. It is null when
@@ -269,6 +288,16 @@ ${userFnDecl}
         files: __files_read ? {
             read:  async (ref)              => __call(__files_read, [ref]),
             write: async (key, b64, opts)   => __call(__files_write, [key, b64, opts ? JSON.stringify(opts) : '{}']),
+        } : undefined,
+        // AIMEAT Data Packages. publish() REJECTS when the quality gate refuses, so an await on it
+        // throws, and an unattended run is a failed run. A returned verdict would read as success.
+        datapackage: __dp_publish ? {
+            publish:     async (input)                => __call(__dp_publish,  [JSON.stringify(input ?? {})]),
+            validate:    async (resources)            => __call(__dp_validate, [JSON.stringify(resources ?? [])]),
+            inferSchema: async (rows)                 => __call(__dp_infer,    [JSON.stringify(rows ?? [])]),
+            open:        async (ref)                  => __call(__dp_open,     [String(ref)]),
+            rows:        async (ref, resource, opts)  => __call(__dp_rows,     [String(ref), String(resource), opts ? JSON.stringify(opts) : '{}']),
+            fail:        async (name, message)        => __call(__dp_fail,     [String(name), String(message)]),
         } : undefined,
         wallet: {
             consume:    __wallet_consume    ? (async (amount, reason) => __call(__wallet_consume, [String(amount), reason]))  : undefined,
@@ -499,6 +528,31 @@ export async function executeExtensionAction(
             ctx.files
                 ? async (key, b64, optsJson) => ctx.files!.write(key, b64, JSON.parse(optsJson || '{}') as { mime?: string; visibility?: string })
                 : null,
+            counter, limits.maxApiCalls, inflight);
+
+        // ── Data Package API ──────────────────────────────────
+        // The library's work, done on the host, because there is no module loader in here and the
+        // deterministic producers live in extensions. Everything crosses as JSON, and the factory
+        // refuses an oversized payload at the boundary rather than letting the VM run out of memory.
+        // `__dp_publish` REJECTS on a refused quality gate; the guest's await therefore throws, which
+        // is what makes a failed producer a failed RUN on the roads where nobody is watching.
+        registerAsyncHostFn(vm, '__dp_publish',
+            ctx.datapackage ? async (json) => ctx.datapackage!.publish(JSON.parse(json || '{}')) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__dp_validate',
+            ctx.datapackage ? async (json) => ctx.datapackage!.validate(JSON.parse(json || '[]')) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__dp_infer',
+            ctx.datapackage ? async (json) => ctx.datapackage!.inferSchema(JSON.parse(json || '[]')) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__dp_open',
+            ctx.datapackage ? async (ref) => ctx.datapackage!.open(ref) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__dp_rows',
+            ctx.datapackage ? async (ref, resource, optsJson) => ctx.datapackage!.rows(ref, resource, JSON.parse(optsJson || '{}')) : null,
+            counter, limits.maxApiCalls, inflight);
+        registerAsyncHostFn(vm, '__dp_fail',
+            ctx.datapackage ? async (name, message) => { await ctx.datapackage!.fail(name, message); return { recorded: true }; } : null,
             counter, limits.maxApiCalls, inflight);
 
         // ── Wallet API ────────────────────────────────────────

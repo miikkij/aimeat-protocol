@@ -40,6 +40,7 @@ import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.j
 import type { ExtensionCtx } from './extension-runtime.js';
 import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail, sandboxLimits } from './extension-ctx.js';
 import { makeExtensionFiles } from './extension-files.js';
+import { makeExtensionDataPackage } from './datapackage/ext-capability.js';
 import { getEncryptionKey } from './encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
 import type { EmailService } from './email.js';
@@ -73,6 +74,15 @@ export interface SystemRunArgs {
     storageOwnerGhii: string;
     /** Distinguishes this road in the sandbox's log lines, e.g. 'scheduler' or 'wf:daily-scan'. */
     logLabel: string;
+    /** What a data package produced on this road records as its producer. A clock and a workflow are
+     *  different things to a consumer deciding whether to trust a cadence. */
+    producerKind: 'extension' | 'workflow';
+    /** The producer's own address — the schedule id or the workflow's `id/step` — so a consumer
+     *  looking at a package can find the thing that makes it. */
+    producerRef?: string;
+    /** The cron the producer runs on, when it has one. This is what `updateFrequency` in the ODPS
+     *  SLA block is projected from, so it is recorded rather than described. */
+    producerSchedule?: string;
     /** Wrap the context in memory-access tracking and return the reads/writes (the scheduler logs them). */
     trackMemory?: boolean;
 }
@@ -135,6 +145,20 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
             config, storage, extName: ext.name,
             callerGaii: storageOwnerGhii,
             callerOwner: ownerName,
+        }),
+        // The deterministic producers live here, so this is the road ctx.datapackage exists for.
+        // Owner namespace on both roads, and the producer block records WHICH unattended road it
+        // was: a package a clock refreshes weekly and one a workflow rebuilds after a human approval
+        // are different products, and a buyer choosing between them needs to see which is which.
+        datapackage: makeExtensionDataPackage({
+            config, storage,
+            ownerGhii: storageOwnerGhii,
+            producedBy: {
+                gaii: callerGaii,
+                kind: args.producerKind,
+                ref: args.producerRef ?? `${ext.name}/${actionId}`,
+                ...(args.producerSchedule ? { schedule: args.producerSchedule } : {}),
+            },
         }),
         notify: buildExtensionNotify({
             storage, config, extName: ext.name,

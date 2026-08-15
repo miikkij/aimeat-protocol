@@ -182,6 +182,9 @@ export function dispatchExtensionStep(
         ownerName,
         storageOwnerGhii: ownerGhii,
         logLabel: `wf:${workflowId}:${stepId}`,
+        producerKind: 'workflow',
+        producerRef: `${workflowId}/${stepId}`,
+        ...(run.defSnapshot.trigger?.kind === 'schedule' ? { producerSchedule: run.defSnapshot.trigger.cron } : {}),
       },
     );
     // THE BRIDGE BETWEEN TWO NAMESPACES. An extension's own memory lives under `ext:{name}`, and a

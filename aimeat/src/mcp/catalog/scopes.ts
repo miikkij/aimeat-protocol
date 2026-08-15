@@ -216,6 +216,12 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_storage_upload:                    'storage:write',
     aimeat_storage_delete:                    'storage:write',
 
+    // Publishing a data package writes BYTES and a catalogue entry. storage:write is the one that
+    // matters — the catalogue is a projection of what was stored, and a package with bytes and no
+    // listing is a package; a listing with no bytes is not.
+    aimeat_datapackage_publish:               'storage:write',
+    aimeat_datapackage_export:                'storage:read',
+
     // Creates work that will run.
     aimeat_schedule_create:                   'task:write',
     // Running a schedule now creates the same work its cron would, only sooner.

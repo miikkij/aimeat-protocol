@@ -84,6 +84,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },
     aimeat_storage_upload: { title: 'Upload Storage File', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // idempotent because the version IS the content hash: publishing the same rows twice lands on
+    // the same address and creates no second version.
+    aimeat_datapackage_publish: { title: 'Publish Data Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_datapackage_export: { title: 'Export Data Package', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_storage_delete: { title: 'Delete Storage File', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Wallet & morsels ──

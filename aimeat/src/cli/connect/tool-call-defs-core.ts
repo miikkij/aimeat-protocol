@@ -191,6 +191,29 @@ export const coreTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_datapackage_publish',
+        // One door and no twin: publishing goes through /v1/datapackages, which owns the quality
+        // gate, the content hash and the address. A connector that assembled a package itself would
+        // be the second implementation the whole format exists to prevent.
+        handler: ({ client }, input) => client.post('/v1/datapackages', input as JsonObject),
+    },
+    {
+        name: 'aimeat_datapackage_export',
+        // Default 'url' answers with the permanent address rather than the rows, so the common case
+        // costs one small response instead of a table pulled through a model context.
+        handler: ({ client }, input) => {
+            const ref = requiredString(input, 'ref');
+            const m = /^pkg:([^/@]+)\/([^@]+)(?:@(sha256:[a-f0-9]{64}))?$/.exec(ref);
+            if (!m) throw new Error('ref must look like "pkg:owner/name" or "pkg:owner/name@sha256:..."');
+            const [, owner, name, version] = m;
+            const format = optionalString(input, 'format') ?? 'url';
+            const base = `/v1/datapackages/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+            const qs = version ? `?version=${encodeURIComponent(version)}` : '';
+            if (format === 'url') return client.get(base + qs);
+            return client.get(`${base}/rows/${encodeURIComponent(requiredString(input, 'resource'))}${qs}`);
+        },
+    },
+    {
         // Own namespace only, so there is no /v1/pub twin here the way aimeat_storage_download has one.
         name: 'aimeat_storage_delete',
         handler: ({ client }, input) => client.delete(

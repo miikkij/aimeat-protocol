@@ -166,7 +166,7 @@ import { buildLibsCatalogue } from '../data/library-packs.js';
 const SDK_LIB_NAMES = [
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
-  'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect',
+  'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

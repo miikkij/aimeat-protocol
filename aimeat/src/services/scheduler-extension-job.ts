@@ -66,6 +66,9 @@ export async function runExtensionJob(
     ownerName,
     storageOwnerGhii: ownerGhii,
     logLabel: 'scheduler',
+    producerKind: 'extension',
+    producerRef: job.id,
+    producerSchedule: job.cron,
     trackMemory: true,
   });
   return { reads: out.reads, writes: out.writes };

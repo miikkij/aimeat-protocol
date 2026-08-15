@@ -32,9 +32,18 @@ import type { ExtensionCtx } from '../../services/extension-runtime.js';
 const aimeatHashRef: (s: string) => string =
   new Function(`${EXT_HASH_REFERENCE_JS}; return aimeatHash;`)() as (s: string) => string;
 import { makeExtensionFiles } from '../../services/extension-files.js';
+import { makeExtensionDataPackage } from '../../services/datapackage/ext-capability.js';
 import { logger } from '../../utils/logger.js';
 import { getMember, accountOf } from '../../services/app-members.js';
-import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
+import { resolveIdentity, callerPrincipal, ownerGhiiOf } from '../../utils/gaii.js';
+
+/** Which producer a descriptor records for this session. The roles say what kind of principal it is;
+ *  'manual' is the honest word for a person doing it themselves. */
+function producerKindOf(roles: string[]): 'app' | 'agent' | 'manual' {
+  if (roles.includes('app') || roles.includes('eco')) return 'app';
+  if (roles.includes('agent')) return 'agent';
+  return 'manual';
+}
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import { resolveGatedApp } from './permissions.js';
@@ -158,6 +167,15 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         logPrefix: `[ext:${ext.name}:${instanceId}]`,
         wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name, trackingScope: instanceId }),
         files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
+        // Data packages land in the OWNER's namespace whichever principal called: the same package
+        // produced from the app, by an agent, on a clock or by a workflow step has to sit at ONE
+        // permanent address. `producedBy` still records the exact principal, because who owns it and
+        // who made it are different questions.
+        datapackage: makeExtensionDataPackage({
+          config, storage,
+          ownerGhii: ownerGhiiOf(callerGaii),
+          producedBy: { gaii: callerGaii, kind: producerKindOf(req.auth!.roles), ref: `${ext.name}/${action.id}` },
+        }),
         buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
           const { buyForExtension } = await import('../../services/extension-purchase.js');
           return buyForExtension({
@@ -299,6 +317,15 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         logPrefix: `[ext:${ext.name}]`,
         wallet: buildExtensionWallet({ config, storage, callerGaii, extName: ext.name }),
         files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
+        // Data packages land in the OWNER's namespace whichever principal called: the same package
+        // produced from the app, by an agent, on a clock or by a workflow step has to sit at ONE
+        // permanent address. `producedBy` still records the exact principal, because who owns it and
+        // who made it are different questions.
+        datapackage: makeExtensionDataPackage({
+          config, storage,
+          ownerGhii: ownerGhiiOf(callerGaii),
+          producedBy: { gaii: callerGaii, kind: producerKindOf(req.auth!.roles), ref: `${ext.name}/${action.id}` },
+        }),
         buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
           const { buyForExtension } = await import('../../services/extension-purchase.js');
           return buyForExtension({

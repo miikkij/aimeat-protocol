@@ -94,6 +94,7 @@ import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
 import { microMemoryRouter } from '../routes/micro-memory.js';
 import { storageFilesRouter } from '../routes/storage-files.js';
+import { dataPackagesRouter } from '../routes/datapackages.js';
 import { validateRouter } from '../routes/validate.js';
 import { unfurlRouter } from '../routes/unfurl.js';
 import { mcpRouter } from '../mcp/index.js';
@@ -539,6 +540,10 @@ export async function mountRoutes(
   app.use(matchesRouter(config, storage));
   app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
+  // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
+  // address of a package is the /v1/pub storage URL these routes hand back; this is where a
+  // producer writes one and where "the newest version" gets resolved.
+  app.use(dataPackagesRouter(config, storage));
   app.use(validateRouter(config));
   app.use(unfurlRouter(config));                        // GET /v1/unfurl(/image) — link previews
   app.use(mcpRouter(config, storage, peers));

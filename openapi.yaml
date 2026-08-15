@@ -177,6 +177,8 @@ tags:
     description: Web push subscriptions and personal-node notification delivery
   - name: Schedules
     description: Scheduled jobs and recurring automation triggers
+  - name: Data Packages
+    description: Frictionless Data Packages with AIMEAT provenance — publish, validate, read
   - name: Workflows
     description: Multi-step agent workflows — save, run, answer human-input steps, and inspect pending inputs
   - name: Public
@@ -12591,6 +12593,229 @@ paths:
           description: File not found
         '410':
           description: Token expired
+
+  # ── Data Packages ──────────────────────────────────────────
+  # A package's CANONICAL address is the /v1/pub storage URL these routes hand back:
+  # /v1/pub/{owner}/datapkg/{name}/{contentHash}/datapackage.json, with resources[].path a sibling
+  # relative path, so frictionless-py, R, DuckDB and pandas read it with no AIMEAT knowledge and no
+  # session. The routes below are where a version is PRODUCED and where "the newest version" gets
+  # resolved; they do not replace the address.
+  /v1/datapackages:
+    post:
+      operationId: publishDataPackage
+      summary: Publish a data package version
+      description: |
+        Build, check and store one immutable version. The quality gate runs FIRST: if any row fails
+        its resource's Table Schema the response is 422 with the row and column of every problem and
+        NOTHING is written, so the package stays on its previous version rather than acquiring a
+        half-finished one at a permanent address.
+
+        The version is the content hash of the descriptor, so re-publishing identical data answers
+        200 with `unchanged: true` instead of creating a second version — a deterministic producer
+        proving it is deterministic is not an update.
+
+        `schema` per resource is either a Table Schema (declared) or omitted/`infer` (proposed from
+        the rows). The descriptor records which, as `aimeat.schemaSource`, so a consumer can see
+        whether anybody confirmed the types.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, changes, resources]
+              properties:
+                name:
+                  type: string
+                  description: 'Lowercase letters, digits and dashes, 2-64 chars. It is an address segment.'
+                changes:
+                  type: string
+                  description: >-
+                    REQUIRED. What moved against the previous version and why. A version nobody
+                    explained is a version a consumer cannot decide about, so this is not optional.
+                title: { type: string }
+                description: { type: string }
+                resources:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [name, rows]
+                    properties:
+                      name: { type: string, description: 'Becomes data/{name}.csv in the package.' }
+                      rows:
+                        type: array
+                        items: { type: object, additionalProperties: true }
+                      schema:
+                        description: 'A Table Schema object, or "infer" (the default) to propose one from the rows.'
+                        oneOf:
+                          - type: string
+                            enum: [infer]
+                          - type: object
+                            required: [fields]
+                            properties:
+                              fields:
+                                type: array
+                                items:
+                                  type: object
+                                  required: [name, type]
+                                  properties:
+                                    name: { type: string }
+                                    type: { type: string, enum: [string, integer, number, boolean, date, datetime, any] }
+                                    description: { type: string }
+                              primaryKey:
+                                type: array
+                                items: { type: string }
+                                description: 'Fields that must be present, non-empty and unique across rows.'
+                      title: { type: string }
+                      description: { type: string }
+                parameters:
+                  type: object
+                  additionalProperties: true
+                  description: 'What the producer was asked for — the window, the keywords. Travels in the descriptor.'
+                provenance:
+                  type: object
+                  description: 'Origin, legal basis and licence. The owner is responsible for the data; this is where they say so.'
+                  properties:
+                    sources:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          url: { type: string }
+                          title: { type: string }
+                          retrievedAt: { type: string }
+                          role: { type: string }
+                    lineage: { type: array, items: { type: string }, description: 'packageIds this was derived from.' }
+                    transformations:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          by: { type: string }
+                          what: { type: string }
+                    legalBasis: { type: string }
+                    consentStatus: { type: string }
+                    retention: { type: string }
+                    license: { type: string }
+                    supersedes: { type: string }
+                retentionPolicy:
+                  type: object
+                  properties:
+                    keep: { type: integer }
+                    unit: { type: string, enum: [versions, months] }
+      responses:
+        '201':
+          description: A new version was written
+        '200':
+          description: Identical content was already published — no new version (unchanged is true)
+        '400':
+          description: The request is malformed (no name, no changes, no resources, a bad resource name)
+        '422':
+          description: The quality gate refused — issues[] carries the row and column of each problem
+        '401':
+          description: Authentication required
+        '403':
+          description: Missing storage:write or memory:write
+
+    get:
+      operationId: listDataPackages
+      summary: The caller's own packages
+      description: |
+        One entry per package, pointing at its NEWEST version, plus `lastError` when the most recent
+        production run failed. That pairing is the point: a package that has not changed and a
+        package whose producer is broken look identical without it.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: The caller's packages, newest first
+        '401':
+          description: Authentication required
+
+  /v1/datapackages/validate:
+    post:
+      operationId: validateDataPackage
+      summary: Run the quality gate without writing
+      description: |
+        The same check `POST /v1/datapackages` runs, with no side effect: infer or apply each
+        resource's Table Schema, validate every row against it, and answer with the coordinates of
+        anything wrong plus the schemas that were used. This is what puts a row-and-column error in
+        front of a publisher in the browser, before anything is stored.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [resources]
+              properties:
+                resources:
+                  type: array
+                  items:
+                    type: object
+                    required: [name, rows]
+                    properties:
+                      name: { type: string }
+                      rows: { type: array, items: { type: object, additionalProperties: true } }
+                      schema: { description: 'A Table Schema, or "infer" (default).' }
+      responses:
+        '200':
+          description: 'ok:false with issues[] is a normal answer here — the gate ran and refused.'
+        '401':
+          description: Authentication required
+
+  /v1/datapackages/{owner}/{name}:
+    get:
+      operationId: getDataPackage
+      summary: A package descriptor
+      description: |
+        The Frictionless descriptor for one version. Without `version` the newest is resolved through
+        the package's mutable pointer, and the pointer travels back so a consumer can see whether the
+        latest production run failed. With `version` the answer is pinned and can never change.
+
+        No authentication: a published package is public, and a program reading one should not need
+        an AIMEAT session. For the raw bytes use the descriptor_url this returns, which is a
+        permanent, range-readable /v1/pub address.
+      tags: [Data Packages]
+      security: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: version, in: query, required: false, schema: { type: string }, description: 'sha256:… to pin one version.' }
+      responses:
+        '200':
+          description: The descriptor, its permanent URL, and the latest pointer when unpinned
+        '404':
+          description: No such package or version
+
+  /v1/datapackages/{owner}/{name}/rows/{resource}:
+    get:
+      operationId: readDataPackageRows
+      summary: A window of rows
+      description: |
+        A paginated read for a UI or an agent that wants to look rather than download. For anything
+        larger, read the resource's CSV from its permanent address — that is what it is for, and it
+        answers byte ranges.
+      tags: [Data Packages]
+      security: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: resource, in: path, required: true, schema: { type: string } }
+        - { name: version, in: query, required: false, schema: { type: string } }
+        - { name: offset, in: query, required: false, schema: { type: integer, default: 0 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 500, maximum: 5000 } }
+        - { name: select, in: query, required: false, schema: { type: string }, description: 'Comma-separated field names.' }
+      responses:
+        '200':
+          description: rows, total, and the Table Schema of what was returned
+        '404':
+          description: No such package, version or resource
 
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:

@@ -62,6 +62,7 @@ export interface ExtensionCtxDeps {
     // ── Optional capabilities: present only on the roads that can honestly offer them ──
     wallet?: ExtensionCtx['wallet'];
     files?: ExtensionCtx['files'];
+    datapackage?: ExtensionCtx['datapackage'];
     buy?: ExtensionCtx['buy'];
     notify?: ExtensionCtx['notify'];
     email?: ExtensionCtx['email'];
@@ -79,11 +80,26 @@ function looksLikeUtf8(buf: ArrayBuffer): boolean {
     return false;
 }
 
-/** Read a response body as text, honouring the charset from the header or the document prolog.
- *  Extracted because each hand-built context carried its own copy and they had drifted: three had
- *  the mislabelled-encoding guard below and the MCP one did not, so the same feed that reads
- *  correctly over REST came back as mojibake through a tool call. */
-async function decodeBody(resp: { arrayBuffer(): Promise<ArrayBuffer>; headers: Headers }): Promise<string> {
+/**
+ * Read a response body as text, honouring the charset from the header or the document prolog.
+ * Extracted because each hand-built context carried its own copy and they had drifted: three had
+ * the mislabelled-encoding guard below and the MCP one did not, so the same feed that reads
+ * correctly over REST came back as mojibake through a tool call.
+ *
+ * TWO MODES, AND THE DEFAULT DOES NOT CHANGE. An extension reading a source feed wants the bytes it
+ * can get: a document declaring an encoding nobody has heard of is that document's problem, not a
+ * reason to fail the call, so the default falls back to UTF-8 with a warning. That is the right
+ * choice for a reader and the WRONG one for a PRODUCER — a data package built from a body that was
+ * decoded with a guessed codec is a version with mojibake in it, published at a permanent address,
+ * hashed, and indistinguishable from a good one until somebody reads the rows. So `strictCharset`
+ * makes an undecodable charset a thrown error, which on the unattended roads is a failed run that
+ * leaves the previous version standing. An extension that produces packages opts in with
+ * `config: { strictCharset: true }` in its manifest.
+ */
+async function decodeBody(
+    resp: { arrayBuffer(): Promise<ArrayBuffer>; headers: Headers },
+    strictCharset = false,
+): Promise<string> {
     const buf = await resp.arrayBuffer();
     const ct = resp.headers.get('content-type') || '';
     let charset = (/charset=([^\s;]+)/i.exec(ct)?.[1] ?? '').toLowerCase();
@@ -98,6 +114,16 @@ async function decodeBody(resp: { arrayBuffer(): Promise<ArrayBuffer>; headers: 
     try {
         return new TextDecoder(charset === 'utf8' ? 'utf-8' : charset).decode(buf);
     } catch {
+        if (strictCharset) {
+            // A producer's road. Decoding with a codec we had to guess would publish a version whose
+            // text is wrong, at a permanent address, with a content hash that makes it look
+            // deliberate. Better a failed run: the package stays on its last good version and the
+            // owner is told which charset nobody could read.
+            throw new Error(
+                `CHARSET_UNDECODABLE: the response declares charset "${charset}", which this node cannot decode. `
+                + 'Refusing rather than guessing, because a guessed decode becomes a published version nobody can tell '
+                + 'apart from a good one. Ask the source for UTF-8, or drop strictCharset if this feed is not a package source.');
+        }
         // An unknown label is the document's problem, not a reason to fail the call: fall back to
         // utf-8 and let the extension see the bytes it can.
         logger.warn('extension ctx: unknown charset, decoding as utf-8', { charset });
@@ -355,7 +381,9 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 body: opts?.body,
                 signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
             });
-            const text = await decodeBody(resp);
+            // Opted in per extension, in its manifest config — so a feed reader keeps the forgiving
+            // default and a package producer gets a failed run instead of a mojibake version.
+            const text = await decodeBody(resp, deps.extConfig?.strictCharset === true);
             const headers: Record<string, string> = {};
             resp.headers.forEach((v, k) => { headers[k] = v; });
             return { status: resp.status, ok: resp.ok, text, headers };
@@ -399,6 +427,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     // sees `undefined` rather than a function that fails at the far end.
     if (deps.instance) ctx.instance = deps.instance;
     if (deps.files) ctx.files = deps.files;
+    if (deps.datapackage) ctx.datapackage = deps.datapackage;
     if (deps.buy) ctx.buy = deps.buy;
     if (deps.notify) ctx.notify = deps.notify;
     if (deps.email) ctx.email = deps.email;

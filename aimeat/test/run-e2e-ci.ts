@@ -144,6 +144,9 @@ const ALL_SUITES = [
     // The same capability on the road that did not have it: an extension on a clock, writing bytes
     // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
     'test/e2e-scheduled-ext-files.ts',
+    // TARGET-063 slice 1 end to end: a package produced by a run with nobody present, read by a
+    // program with no session, and read back by an agent that is never told the columns.
+    'test/e2e-datapackage-slice1.ts',
     // The gates the August 2026 audit added around extensions: what a manifest may declare,
     // and who may read an action's source. Each test names the thing that used to be possible.
     'test/e2e-ext-hardening.ts',

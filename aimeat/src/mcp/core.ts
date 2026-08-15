@@ -103,6 +103,7 @@ import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.
 import { writeProvenanceEcho, readProvenance, readProvenanceMany } from './ai-provenance-result.js';
 import { registerCoreAdminTools } from './core-admin.js';
 import { registerCoreStorageTools } from './core-storage.js';
+import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
 import { flexibleBoolean } from './schema-flags.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
@@ -761,6 +762,9 @@ export function registerCoreTools(
 
     // ── Storage Tools (upload/download) — extracted to ./core-storage.ts ──
     registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+
+    // ── Data Package Tools (publish/export) — extracted to ./core-datapackage.ts ──
+    registerCoreDataPackageTools(mcp, storage, config, getAgentGaii);
 
     // ── Admin Tools (operator-only) — extracted to ./core-admin.ts ──
     registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
