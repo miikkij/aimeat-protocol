@@ -276,6 +276,10 @@
     "test/e2e-public-totals.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "c7185060f37715d3"
+    },
+    "test/e2e-datapackage-odata.ts": {
+      "reason": "REVIEWED 2026-08-15: this surface has no refusal to test, and that is the design rather than an omission. An OData feed serves the rows of a PUBLISHED data package, whose CSV already sits at a permanent, world-readable /v1/pub address; putting a token in front of the feed while the file stays open would be theatre, not a control. There is therefore no second principal that gets a different answer. What the suite DOES prove instead is the fence that exists here: test 13b shows the feed is a door onto packages and cannot be steered at the owner's other storage, and tests 7-11 prove every unimplemented query construct is REFUSED (501/400) rather than ignored — which on this surface is the failure with real consequences, because an ignored $filter returns the wrong rows into somebody's report with no symptom. If the metered feed is ever built it will be a separate authenticated door, and that one owes a 401/403 case.",
+      "sha": "6618969bc19e53c6"
     }
   }
 }

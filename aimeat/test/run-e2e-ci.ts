@@ -155,6 +155,9 @@ const ALL_SUITES = [
     // TARGET-063 slice 1 end to end: a package produced by a run with nobody present, read by a
     // program with no session, and read back by an agent that is never told the columns.
     'test/e2e-datapackage-slice1.ts',
+    // The OData v4 feed: the three documents a native connector fetches, the query subset, and
+    // above all the refusals — an ignored query option returns the wrong rows and looks like data.
+    'test/e2e-datapackage-odata.ts',
     // The gates the August 2026 audit added around extensions: what a manifest may declare,
     // and who may read an action's source. Each test names the thing that used to be possible.
     'test/e2e-ext-hardening.ts',

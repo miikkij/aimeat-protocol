@@ -193,6 +193,13 @@ export const SDK_PACKS: LibraryPack[] = [
       '',
       'exportAs(ref, resource, "csv") returns that permanent URL; "json" derives a blob in the browser.',
       'There is no XLSX: this node vendors no spreadsheet writer, and a CSV named .xlsx would be a lie.',
+      '',
+      'FOR EXCEL AND POWER BI, hand over the OData feed instead of a file — they connect natively and',
+      'then refresh themselves, which a downloaded CSV never does:',
+      '  /v1/odata/{owner}/{package}          service document (paste THIS into the connector)',
+      '  /v1/odata/{owner}/{package}/$metadata   CSDL, projected from the same Table Schema',
+      '  /v1/odata/{owner}/{package}/{resource}  $select $top $skip $filter $orderby $count',
+      'Add ?version=sha256:… to pin a feed that can never change under the reader.',
     ].join('\n'),
     changelog: [
       { version: '1.0.0', date: '2026-08-15', summary: 'Initial: create/addResource/validate/publish plus open/rows/urlFor/exportAs, over /v1/datapackages.' },

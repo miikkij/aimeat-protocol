@@ -12817,6 +12817,119 @@ paths:
         '404':
           description: No such package, version or resource
 
+  # ── OData v4 feed ──────────────────────────────────────────
+  # The surface Excel, Power BI and Tableau connect to natively and then refresh by themselves. A
+  # CORE route because an extension cannot serve one: the extension HTTP surface is two POST routes
+  # behind auth, the sandbox never sees the query string, and its answer is envelope-wrapped, while
+  # OData needs GET, query options, XML metadata and a bare JSON body.
+  #
+  # THREE THINGS THAT DIFFER FROM EVERY OTHER ROUTE HERE, all deliberate:
+  #  - the responses are NOT the node envelope. A connector reads `error.code` / `error.message` and
+  #    an OData-shaped body; the envelope would surface in Excel as "something went wrong".
+  #  - there is no authentication. The package's CSV is world-readable at a permanent address, so a
+  #    feed over the same rows is world-readable too; a token here would be theatre.
+  #  - there is no meter. Metering needs an authenticated caller and an entitlement coordinate, which
+  #    is a different door. A half-built meter counting anonymous reads as free would misreport.
+  /v1/odata/{owner}/{name}:
+    get:
+      operationId: odataServiceDocument
+      summary: OData service document
+      description: |
+        The first thing a native connector fetches: which entity sets this feed offers. One entity
+        set per tabular resource in the package.
+
+        Paste this URL into Excel's "From OData Feed" or Power BI's OData connector and the rest is
+        automatic — and the workbook refreshes itself afterwards, which is the whole reason this
+        exists next to the CSV address.
+      tags: [Data Packages]
+      security: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - name: version
+          in: query
+          required: false
+          schema: { type: string }
+          description: 'sha256:… to pin the feed to one version, which can then never change under the consumer.'
+      responses:
+        '200':
+          description: '{ "@odata.context": …, "value": [ { name, kind, url } ] }'
+        '404':
+          description: No such package (OData error shape, not the node envelope)
+
+  /v1/odata/{owner}/{name}/$metadata:
+    get:
+      operationId: odataMetadata
+      summary: CSDL metadata (XML)
+      description: |
+        The CSDL v4 document, projected from the package's Table Schema — which is the ONE place
+        columns and types are declared, so the metadata cannot drift from the data.
+
+        XML, not JSON: that is what a v4 metadata document is and what every native connector parses.
+        Types map Frictionless to EDM (string→Edm.String, integer→Edm.Int64, number→Edm.Double,
+        boolean→Edm.Boolean, date→Edm.Date, datetime→Edm.DateTimeOffset).
+
+        Every entity gets a synthetic `RowId` key, because OData requires an entity key and a CSV row
+        has no identity of its own. It is the row's ordinal within the version, which is stable
+        precisely because the version is immutable. Every other property is nullable: a Table Schema's
+        `primaryKey` is the only statement anybody made about required-ness.
+      tags: [Data Packages]
+      security: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: version, in: query, required: false, schema: { type: string } }
+      responses:
+        '200':
+          description: CSDL v4 XML
+          content:
+            application/xml:
+              schema: { type: string }
+        '404':
+          description: No such package
+
+  /v1/odata/{owner}/{name}/{resource}:
+    get:
+      operationId: odataEntitySet
+      summary: An entity set — the rows
+      description: |
+        The rows of one resource, with the readable subset of the OData query language applied.
+
+        SUPPORTED: `$select`, `$top`, `$skip`, `$filter`, `$orderby`, `$count`, `$format`.
+        `$filter` reads `field eq|ne|gt|ge|lt|le value` clauses joined by `and`, plus
+        `contains()`, `startswith()` and `endswith()`.
+
+        ANYTHING ELSE IS REFUSED, NEVER IGNORED — 501 for a construct this feed does not implement
+        (`$expand`, `$apply`, `$search`, `or`, `not`), 400 for a property that does not exist. That
+        is the design decision worth knowing: a server that ignores a query option returns MORE ROWS
+        THAN THE CLIENT ASKED FOR, and the client puts them in a report as the answer. There is no
+        symptom — the numbers are simply wrong. A visibly missing feature is cheap by comparison.
+
+        `$count=true` reports what the FILTER matched, before `$top`/`$skip`, which is what the option
+        means and what a paging client needs.
+      tags: [Data Packages]
+      security: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: resource, in: path, required: true, schema: { type: string }, description: 'The entity set name from the service document.' }
+        - { name: version, in: query, required: false, schema: { type: string } }
+        - { name: $select, in: query, required: false, schema: { type: string } }
+        - { name: $top, in: query, required: false, schema: { type: integer } }
+        - { name: $skip, in: query, required: false, schema: { type: integer } }
+        - { name: $filter, in: query, required: false, schema: { type: string } }
+        - { name: $orderby, in: query, required: false, schema: { type: string } }
+        - { name: $count, in: query, required: false, schema: { type: boolean } }
+      responses:
+        '200':
+          description: '{ "@odata.context": …, "@odata.count": …, "value": [ … ] }'
+        '400':
+          description: A named property does not exist, or an option is malformed
+        '404':
+          description: No such package, version or entity set
+        '501':
+          description: A query construct this feed does not implement — refused rather than ignored
+
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:
     post:
