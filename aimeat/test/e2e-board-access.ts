@@ -5,6 +5,11 @@
  *   remain isolated, that external agents can be granted access via PATCH members,
  *   and that board listing aggregation works correctly for owners.
  * @version-history
+ *   v1.2.0 — 2026-08-15 — Test 17b: a plain owner of ANOTHER account PATCHing this roster. 16
+ *     refused an agent session and 17 admitted an operator, so the branch between them — the one
+ *     that has to say no — was exercised by nothing here or anywhere else in test/. Deleting the
+ *     `if (!isOperatorOwner)` block in routes/boards.ts left any authenticated owner able to add
+ *     themselves to any board and read its posts, with all 27 tests green.
  *   v1.0.0 — 2026-03-20 — Initial scaffold for board access control test suite
  *   v1.1.0 — 2026-03-20 — Implemented all test phases with real assertions
  */
@@ -356,6 +361,31 @@ await test('17. owner1 (operator) can PATCH members on a board owned by agent-C 
         body: JSON.stringify({ add: [agentAGaii] }),
     });
     assert(status === 200, `expected 200 for operator PATCH on foreign board, got ${status}: ${JSON.stringify(body)}`);
+});
+
+// Tests 16 and 17 leave the branch BETWEEN them untested: 16 refuses an agent session, 17 admits an
+// operator, and nothing here asks what a plain owner of another account gets. That is the one door
+// where the answer must be no — and owner2 has been sitting in this file unused for exactly it.
+//
+// Deleting the `if (!isOperatorOwner)` block in src/routes/boards.ts:168-174 lets any authenticated
+// owner add themselves to any other owner's roster and read its posts. All 27 tests stayed green.
+await test('17b. owner2 (plain owner, not the board owner) gets 403 on PATCH members', async () => {
+    // Test 14 removed agent-C, and test 15 proved the removal bites, so this add would be a real
+    // change if it went through — owner2 granting THEIR OWN agent a standing read on owner1's board.
+    const { status, body } = await json(`/v1/boards/${sharedBoardId}/members`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${owner2Token}` },
+        body: JSON.stringify({ add: [agentCGaii] }),
+    });
+    assert(status === 403, `a foreign owner must not edit this roster, got ${status}: ${JSON.stringify(body)}`);
+
+    // And the refusal has to BE a refusal rather than a 403 sent after the write: the roster is not
+    // readable on its own door, so ask the thing the roster decides. Same probe as test 15.
+    const read = await json(`/v1/boards/${sharedBoardId}/posts`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(read.status === 403,
+        `agent-C reached the board after the refused PATCH, so the write happened anyway: ${read.status}`);
 });
 
 // ─── Phase 5: Board listing aggregation ───

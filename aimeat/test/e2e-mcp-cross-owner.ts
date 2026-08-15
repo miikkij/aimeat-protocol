@@ -27,6 +27,12 @@
  *   rather than only that it passes.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-cross-owner
  * @version-history
+ *   v1.1.0 — 2026-08-15 — The cortex line above was a claim, not a test: the body contained zero
+ *     aimeat_cortex_* calls, and only e2e-cortex-upload-ownership.ts touched those tools at all —
+ *     for install and namespace squatting, never for the lifecycle. Removing the three
+ *     `installedBy !== caller.ownerName` guards in services/cortex-lifecycle.ts let owner B activate,
+ *     deactivate and delete owner A's cortex while that suite stayed 5/5 green. Now mirrored on the
+ *     extension trio, positive control included.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 3: the MCP/REST gate parity work).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -230,6 +236,72 @@ async function run() {
         assert(theirs.isError, `owner B put owner A's extension on a clock: ${theirs.text.slice(0, 200)}`);
         assert(/not found/i.test(theirs.text),
             `refused, but not as "not found" — which is the wording that keeps the id unconfirmed: ${theirs.text.slice(0, 200)}`);
+    });
+
+    // ── Owner A's CORTEX, and the same three verbs ──────────────────────────────────────────
+    //
+    // This file's header claimed the cortex trio was covered here. It was not: the body contained
+    // zero aimeat_cortex_* calls, and across the whole test tree only e2e-cortex-upload-ownership.ts
+    // touches those tools — for install and namespace squatting, never for the lifecycle. Removing
+    // the callerOwner comparison from src/mcp/cortex.ts left owner B able to delete owner A's cortex
+    // and its lib files, which are served as JavaScript from the apex origin to everyone who has that
+    // cortex active, with every suite green.
+    const cortexName = `crosscortex${Date.now()}`;
+    const cortexEnc = encodeURIComponent(cortexName);
+    const cortexManifest = `apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: ${cortexName}
+  namespace: ${A.name}
+  description: cross-owner cortex lifecycle e2e
+spec:
+  version: "1.0.0"
+  components:
+    - type: lib
+      name: prober
+      filename: probe.js
+      exports: [probe]
+      api_surface: probe()
+`;
+    const cortexInstalled = await callTool(A.session, 'aimeat_cortex_install', {
+        manifest: cortexManifest,
+        libs: { 'probe.js': 'export function probe() { return "owner A"; }' },
+    });
+    assert(!cortexInstalled.isError, `owner A could not install a cortex: ${cortexInstalled.text.slice(0, 300)}`);
+
+    /** What owner A sees when they look at their own cortex. The read is always as A. */
+    const cortexStatus = async (): Promise<string> => {
+        const r = await json(`/v1/cortex/${cortexEnc}`, { headers: { Authorization: `Bearer ${A.ownerToken}` } });
+        assert(r.status === 200, `owner A can no longer read their own cortex: ${r.status}`);
+        return r.body?.data?.cortex?.status ?? r.body?.data?.status ?? 'unknown';
+    };
+
+    await test('owner B cannot ACTIVATE owner A\'s cortex over MCP', async () => {
+        const r = await callTool(B.session, 'aimeat_cortex_activate', { name: cortexName });
+        assert(r.isError, `expected a refusal, got: ${r.text.slice(0, 200)}`);
+        assert(await cortexStatus() !== 'active', 'owner B activated owner A\'s cortex');
+    });
+
+    await test('owner A CAN activate their own cortex over MCP', async () => {
+        // The positive control, and it is what makes B's refusal mean "not yours" rather than
+        // "not your tool" or "no such manifest".
+        const r = await callTool(A.session, 'aimeat_cortex_activate', { name: cortexName });
+        assert(!r.isError, `the installer's own agent was refused: ${r.text.slice(0, 200)}`);
+        assert(await cortexStatus() === 'active', 'owner A activated it and it did not go active');
+    });
+
+    await test('owner B cannot DEACTIVATE owner A\'s cortex over MCP', async () => {
+        const r = await callTool(B.session, 'aimeat_cortex_deactivate', { name: cortexName });
+        assert(r.isError, `expected a refusal, got: ${r.text.slice(0, 200)}`);
+        assert(await cortexStatus() === 'active', 'owner B took owner A\'s cortex offline');
+    });
+
+    await test('owner B cannot DELETE owner A\'s cortex over MCP', async () => {
+        // The worst of the three: it takes the lib files with it.
+        const r = await callTool(B.session, 'aimeat_cortex_delete', { name: cortexName });
+        assert(r.isError, `expected a refusal, got: ${r.text.slice(0, 200)}`);
+        const after = await json(`/v1/cortex/${cortexEnc}`, { headers: { Authorization: `Bearer ${A.ownerToken}` } });
+        assert(after.status === 200, `owner B deleted owner A's cortex: read-back ${after.status}`);
     });
 
     // ── A private capability ────────────────────────────────────────────────────────────────

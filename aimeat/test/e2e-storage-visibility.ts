@@ -6,6 +6,11 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   v1.4.0 — 2026-08-15 — Tests 40a-40d: the `members` visibility tier, which no suite in the corpus
+ *     had ever uploaded. access-guard.ts allows it unconditionally and trusts the CALLER to reject
+ *     the shared anonymous identity, so the tier rested on one branch in GET /v1/pub that nothing
+ *     tested: deleting it made members-only files world-readable at the apex origin with every suite
+ *     green, e2e-memory-full included — that covers the analogous rule on a different route.
  *   v1.3.0 — 2026-08-15 — Phase 12: DELETE /v1/storage, which had no coverage at all. The one that
  *     had to fail first is 54: reading a foreign file through /v1/pub must not make it deletable.
  *     Same removeStorageFile() the new aimeat_storage_delete tool calls.
@@ -787,6 +792,51 @@ await test('40. Non-member (agent-D) downloads the group file → 403, denial is
     assert(aStatus === 200, `audit status ${aStatus}: ${JSON.stringify(aBody)}`);
     const found = (aBody.data?.entries as any[]).some(e => e.memory_key === `storage:${groupFileKey}` && e.allowed === false);
     assert(found, `no denial audit entry for storage:${groupFileKey}`);
+});
+
+// ── The fourth tier, which nothing in the corpus had ever uploaded ──
+//
+// StorageFileRecord supports `members`: readable by anyone with an account here, hidden from the
+// shared anonymous identity. access-guard.ts returns {allowed:true, reason:'members_data'} for it
+// unconditionally and TRUSTS THE CALLER to reject anonymous, so the whole tier rests on one branch in
+// GET /v1/pub. No suite uploaded a members file (grep: only memory records used the word), so
+// deleting that branch made members-only files world-readable at the apex origin with every suite
+// green. e2e-memory-full covers the analogous rule on /v1/memory, which is a different route with its
+// own guard, and stays green through the same mutation.
+const membersFileKey = `members-file-${Date.now()}`;
+
+await test('40a. Agent-A uploads a members-visibility file', async () => {
+    const { status, body } = await json('/v1/storage', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({
+            key: membersFileKey, data: testContentB64, mime_type: 'text/plain', visibility: 'members',
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.visibility === 'members', `visibility: ${body.data.visibility}`);
+});
+
+await test('40b. Anonymous reader gets 404 on the members file', async () => {
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(membersFileKey)}`);
+    assert(res.status === 404, `an anonymous reader must not see a members file, got ${res.status}`);
+});
+
+await test('40c. A cross-owner authenticated agent DOES get the members file → 200', async () => {
+    // The positive control, and it is the point of the tier: "members" means everyone with an
+    // account, not "the owner". Without this, a 404 for everybody would pass the test above.
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(membersFileKey)}`, {
+        headers: { Authorization: `Bearer ${agentCToken}` },
+    });
+    assert(res.status === 200, `expected 200 for an authenticated member, got ${res.status}`);
+    assert(await res.text() === testContent, 'data mismatch on the members file');
+});
+
+await test('40d. The owner\'s own agent gets the members file → 200', async () => {
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(membersFileKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(res.status === 200, `the uploader was refused their own members file, got ${res.status}`);
 });
 
 await test('41. Presigned download (allowed read) is NOT audited', async () => {

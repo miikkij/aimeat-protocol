@@ -1,6 +1,19 @@
-// MCP audit Phase 3 (F1): scope enforcement on the /v1/mcp tool surface.
-// Verifies a narrow-scoped agent only sees/can-call the tools its scopes allow, while a
-// broad ('*') agent sees the full surface. Run: cd aimeat && pnpm exec tsx test/e2e-mcp-scopes.ts
+/**
+ * @file test/e2e-mcp-scopes.ts
+ * @description MCP audit Phase 3 (F1): scope enforcement on the /v1/mcp tool surface. A narrow agent
+ *   sees and can call only what its scopes allow; a broad ('*') agent sees the full surface — MINUS
+ *   the words no wildcard carries, which is the half this file used to leave out.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-scopes
+ * @version-history
+ *   v1.1.0 — 2026-08-15 — The '*' agent is now asserted NEGATIVELY as well. The suite checked only
+ *     that four ordinary tools ARE present, so reintroducing a local wildcard rule inside
+ *     scopeAllowsTool — the exact regression mcp/catalog/scopes.ts v1.7.0 records — kept it green
+ *     while a Full-access agent gained twelve reserved tools, among them the URL a decrypted AI key
+ *     is sent to and the seller's payment credentials. Both new cases derive their tool list from
+ *     TOOL_SCOPES x SCOPES_OUTSIDE_WILDCARD, because a hand-written list is how the rule was lost the
+ *     first time.
+ *   v1.0.0 — 2026-07 — Initial (MCP audit phase 3, F1).
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -32,6 +45,8 @@ async function json(path: string, opts: RequestInit = {}) {
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { TOOL_SCOPES } from '../src/mcp/catalog/scopes.js';
+import { SCOPES_OUTSIDE_WILDCARD } from '../src/utils/scope-coverage.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 async function signMsg(privateKeyB64: string, message: string): Promise<string> {
@@ -182,6 +197,61 @@ await test('Broad agent (*) sees the full tool surface', async () => {
     assert(tools.includes('aimeat_wallet_balance'), 'has wallet_balance');
     assert(tools.includes('aimeat_board_post'), 'has board_post');
     assert(tools.includes('aimeat_consent_grant'), 'has consent_grant');
+});
+
+// "Full access" is one click, and a handful of permissions are deliberately not in it:
+// SCOPES_OUTSIDE_WILDCARD (src/utils/scope-coverage.ts) names the words only an exact grant confers —
+// the URL a decrypted AI key is sent to, the spend cap, the seller's payment credentials, who is in a
+// sharing group, who may read a board, and an agent's own permission list.
+//
+// The test above asserts only that four ordinary tools ARE present, which is the hole: reintroduce a
+// local wildcard rule inside scopeAllowsTool that answers yes to '*' for everything — the exact
+// regression src/mcp/catalog/scopes.ts v1.7.0 records — and this suite stays green while a Full-access
+// agent gains every one of those tools.
+//
+// Derived from TOOL_SCOPES and SCOPES_OUTSIDE_WILDCARD rather than a copied list of tool names, so a
+// word added to the vocabulary is covered on the day it is added rather than the day someone
+// remembers this file. A hand-written list is how the rule got lost the first time.
+await test("Broad agent (*) does NOT see the tools riding a word no wildcard carries", async () => {
+    const reserved = Object.entries(TOOL_SCOPES)
+        .filter(([, scope]) => SCOPES_OUTSIDE_WILDCARD.includes(scope))
+        .map(([tool]) => tool);
+    assert(reserved.length > 0, 'the vocabulary names at least one such tool, or this test proves nothing');
+
+    const client = await connectMcp(broad.gaii, broad.key);
+    const tools = await client.list();
+    const leaked = reserved.filter(t => tools.includes(t));
+    assert(leaked.length === 0,
+        `a '*' agent must not be handed ${leaked.join(', ')} — those need the exact word, ticked per agent`);
+
+    // Absence from tools/list is the REGISTRATION filter. A client that already knows the name does
+    // not read the list, so the call itself has to be refused as well — the two are different gates
+    // and only one of them was ever asked about here.
+    const { ok, body } = await client.call(reserved[0]!, {});
+    assert(!ok, `a '*' agent CALLED ${reserved[0]}: ${JSON.stringify(body).slice(0, 200)}`);
+});
+
+// The other half of the same rule: the word is not withheld from an agent that WAS given it. Without
+// this, deleting every one of those tools from the surface would also pass the test above.
+await test('An agent granted the exact word DOES see the tool it names', async () => {
+    const [probeTool, probeScope] = Object.entries(TOOL_SCOPES)
+        .find(([, scope]) => SCOPES_OUTSIDE_WILDCARD.includes(scope)) ?? [];
+    assert(!!probeTool && !!probeScope, 'no reserved tool to probe with');
+
+    const ticked = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: 'tickedagent', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o',
+            scopes: ['memory:read', probeScope],
+        }),
+    });
+    assert(ticked.status === 201, `register tickedagent ${ticked.status}: ${JSON.stringify(ticked.body)}`);
+
+    const client = await connectMcp(ticked.body.data.agent.gaii as string, ticked.body.data.private_key as string);
+    const tools = await client.list();
+    assert(tools.includes(probeTool!),
+        `an agent holding ${probeScope} must see ${probeTool} — the exception withholds it from wildcards, not from a grant`);
 });
 
 console.log(`\n────────────────────────────────────────`);

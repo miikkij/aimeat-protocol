@@ -23,6 +23,14 @@
  *   cd aimeat && pnpm check:denial-coverage --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:denial-coverage --seed     # rewrite the file from today's state
  * @version-history
+ *   v1.1.0 — 2026-08-15 — The detector reads an MCP refusal too, not only an HTTP status. A refused
+ *     tools/call comes back as a JSON-RPC error, which every suite here reads as `isError`, so a
+ *     status-only test reported twenty MCP suites as having no denial case while refusal was the only
+ *     thing several of them did. It said so about test/e2e-mcp-cross-owner.ts — seventeen assertions,
+ *     every one of them owner B being refused — the first time that file was edited after the seed.
+ *     A gate that is wrong about its best example teaches people to route around it. The negation is
+ *     read as well: `assert(!r.isError, …)` is the positive control and must not count. Backlog 89 →
+ *     69, and those twenty were never uncovered — the instrument was.
  *   v1.0.0 — 2026-08-15 — Initial (E2E test-quality audit, the missing-denial class).
  *   v1.0.1 — 2026-08-15 — Hash with line endings normalised. The shas were seeded from an LF tree
  *     and a Windows checkout hands readFileSync CRLF, so every seeded sha mismatched there and the
@@ -64,15 +72,42 @@ export function registeredSuites(runnerSource: string): string[] {
 }
 
 /**
+ * Is this occurrence of `isError` negated — `!r.isError` rather than `r.isError`?
+ *
+ * The difference is the whole meaning. `assert(r.isError, …)` says the call had to be refused;
+ * `assert(!r.isError, …)` is the positive control saying the same call had to WORK. Counting the
+ * second as a denial case would let a suite that only ever succeeds look fenced.
+ *
+ * Walk back over the identifier chain (`r.`, `theirs.`, `res.body.`) and any whitespace; the token
+ * before it decides.
+ */
+function isNegatedAt(condition: string, at: number): boolean {
+    let i = at - 1;
+    while (i >= 0 && /[\w.$[\]]/.test(condition[i]!)) i--;
+    while (i >= 0 && /\s/.test(condition[i]!)) i--;
+    return i >= 0 && condition[i] === '!';
+}
+
+/**
  * Does this suite assert a refusal?
  *
- * The CONDITION of the assert has to mention the status, not the message. `assert(ok, 'expected 403
+ * The CONDITION of the assert has to mention the refusal, not the message. `assert(ok, 'expected 403
  * eventually')` is a sentence about a wish; `assert(r.status === 403, …)` is the test. Everything up
  * to the first top-level comma is the condition, so a message that happens to name a status cannot
  * make an unrelated assertion look like a denial case.
  *
- * 401 and 403 both count: which one a door answers is a design choice (a 404 that refuses to confirm
- * existence is a third), and this gate asks whether the suite ever asks about refusal at all.
+ * TWO SHAPES COUNT, because this node has two surfaces and they refuse differently.
+ *
+ * HTTP answers with a status. 401 and 403 both count: which one a door sends is a design choice (a
+ * 404 that refuses to confirm existence is a third), and this gate asks whether the suite ever asks
+ * about refusal at all.
+ *
+ * MCP does not send a status. A tools/call that is refused comes back as a JSON-RPC error, which
+ * every suite here reads as `isError`, so a status-only detector reported the MCP suites as having no
+ * denial case while they were doing nothing else. It said so about test/e2e-mcp-cross-owner.ts — a
+ * file that exists solely to prove owner B is refused seventeen ways — the first time that file was
+ * edited after the seed. A gate that is wrong about its best example teaches people to route around
+ * it, so it now measures the refusal rather than the transport that carries it.
  */
 export function hasDenialAssertion(source: string): boolean {
     const re = /\bassert\s*\(/g;
@@ -89,6 +124,9 @@ export function hasDenialAssertion(source: string): boolean {
         }
         const condition = source.slice(start, i);
         if (/\b40[13]\b/.test(condition)) return true;
+        for (const hit of condition.matchAll(/\bisError\b/g)) {
+            if (!isNegatedAt(condition, hit.index)) return true;
+        }
     }
     return false;
 }
