@@ -19,6 +19,16 @@ import { logger } from '../../../../utils/logger.js';
 
 // ── Organism Helpers ──
 
+/** The organism `owners` JSON array, or the single owner the row had before the column existed.
+ *  Absent, empty and malformed all mean the same thing: whatever creatorGhii said. */
+function parseOwners(raw: unknown, creatorGhii: string): string[] {
+  if (typeof raw !== 'string' || !raw) return [creatorGhii];
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return [creatorGhii]; }
+  if (Array.isArray(parsed) && parsed.length) return parsed.filter((x): x is string => typeof x === 'string');
+  return [creatorGhii];
+}
+
 function deserializeOrganism(row: Record<string, unknown>): OrganismRecord {
   const record: OrganismRecord = {
     id: row.id as string,
@@ -27,6 +37,10 @@ function deserializeOrganism(row: Record<string, unknown>): OrganismRecord {
     type: row.type as OrganismRecord['type'],
     interests: JSON.parse(row.interests as string) as string[],
     creatorGhii: row.creatorGhii as string,
+    // Same fallback as methods/governance.ts: a row from before the ownership split had exactly one
+    // owner, and creatorGhii is who it was.
+    createdBy: (row.createdBy as string | null) ?? (row.creatorGhii as string),
+    owners: parseOwners(row.owners, row.creatorGhii as string),
     admins: JSON.parse(row.admins as string) as string[],
     members: JSON.parse(row.members as string) as string[],
     agentGaiis: JSON.parse(row.agentGaiis as string) as string[],

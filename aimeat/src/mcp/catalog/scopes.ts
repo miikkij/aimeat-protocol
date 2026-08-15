@@ -180,6 +180,8 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_organism_invite:                   'organism:invite',
     aimeat_organism_invite_email:             'organism:invite',
     aimeat_organism_member_add:               'organism:invite',
+    aimeat_organism_owner_add:                'organism:invite',
+    aimeat_organism_owner_remove:             'organism:invite',
     aimeat_workspace_access:                  'organism:invite',
     aimeat_workspace_member_grant:            'organism:invite',
     aimeat_workspace_member_revoke:           'organism:invite',
@@ -200,7 +202,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     // here as well because a tool is REGISTERED according to this table, and no wildcard carries this
     // one (SCOPES_OUTSIDE_WILDCARD), so an operator's agent holds it only by an explicit tick.
     aimeat_admin_organism_ownership:          'operator:organism-repair',
-    aimeat_admin_organism_owner_set:          'operator:organism-repair',
+    aimeat_admin_organism_owner_add:          'operator:organism-repair',
 
     // Writes something other people see under the owner's name.
     aimeat_flag_report:                       'social:write',

@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-07-03 — Initial (privacy fix: rosters were world-readable via detail/list/members).
  */
 import type { Storage, OrganismRecord } from '../storage/interface.js';
+import { isOrganismOwner } from './organism-ownership.js';
 
 export type MemberVisibility = NonNullable<OrganismRecord['memberVisibility']>;
 
@@ -53,7 +54,7 @@ export function rosterCallerFromAuth(auth?: { owner?: string; roles?: string[]; 
 export async function canSeeMembers(storage: Storage, organism: OrganismRecord, caller: RosterCaller): Promise<boolean> {
   if (caller.isOperator) return true;
   const owner = caller.isAnonymous ? undefined : caller.ownerName;
-  if (owner && (organism.creatorGhii === owner || organism.admins.includes(owner))) return true;
+  if (owner && (isOrganismOwner(organism, owner) || organism.admins.includes(owner))) return true;
   switch (memberVisibilityOf(organism)) {
     case 'public': return true;
     case 'authenticated': return !!owner;

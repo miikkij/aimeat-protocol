@@ -178,6 +178,17 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
     () => run(() => orgService.transferOwnership(orgId, toWhom), (t('organisms.ownershipTransferred') || 'Ownership transferred'), 'organisms.transferFailed'),
     { danger: true });
 
+  // Additive, and that is the whole point: bringing in a second owner used to cost the first one
+  // everything, and an organism whose single owner went unreachable could not be recovered at all.
+  const addOwner = (toWhom) => confirm(
+    (t('organisms.confirmAddOwner') || 'Make {member} an owner too? They get everything you can do, and you keep it.').replace('{member}', toWhom),
+    () => run(() => orgService.addOwner(orgId, toWhom), (t('organisms.ownerAdded') || 'Owner added'), 'organisms.transferFailed'));
+
+  const removeOwner = (fromWhom) => confirm(
+    (t('organisms.confirmRemoveOwner') || 'Take {member} off the owners? They stay as an admin.').replace('{member}', fromWhom),
+    () => run(() => orgService.removeOwner(orgId, fromWhom), (t('organisms.ownerRemoved') || 'Owner removed'), 'organisms.transferFailed'),
+    { danger: true });
+
   const makeAdmin = (memberGhii) => run(() => orgService.addAdmin(orgId, memberGhii), (t('organisms.adminGranted') || 'Admin role granted'), 'organisms.adminChangeFailed');
   const demoteAdmin = (memberGhii) => run(() => orgService.removeAdmin(orgId, memberGhii), (t('organisms.adminRemoved') || 'Admin role removed'), 'organisms.adminChangeFailed');
 
@@ -233,14 +244,23 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
         ${(members || []).map(m => {
           const acc = accessLine(m);
           const bare = String(m.ghii || '').split('@')[0];
-          const menuItems = (canManage && m.role !== 'creator' && m.ghii !== ghii) ? [
+          // An owner row used to carry no menu at all, so an organism could be handed away and never
+          // handed back: the only person who could undo it was the one who no longer had the button.
+          // Another owner can now take a co-owner off, and nobody can take off the last one.
+          const isOwnerRow = m.role === 'creator';
+          const ownerCount = (members || []).filter(x => x.role === 'creator').length;
+          const menuItems = !canManage ? [] : (isOwnerRow ? [
+            (isCreator && m.ghii !== ghii && ownerCount > 1)
+              && { label: t('organisms.removeOwner') || 'Remove owner', danger: true, onClick: () => removeOwner(m.ghii) },
+          ].filter(Boolean) : (m.ghii !== ghii ? [
             m.role === 'member' && { label: t('organisms.makeAdmin') || 'Make admin', icon: '⭐', onClick: () => makeAdmin(m.ghii) },
             (isCreator && m.role === 'admin') && { label: t('organisms.removeAdmin') || 'Remove admin', onClick: () => demoteAdmin(m.ghii) },
             wsOptions.length > 0 && { label: t('organisms.editAccess') || 'Edit access', icon: '🔑', onClick: () => setAccessEditFor(f => f === bare ? null : bare) },
-            isCreator && { label: t('organisms.makeCreator') || 'Make creator', icon: '👑', onClick: () => transfer(m.ghii) },
+            isCreator && { label: t('organisms.addOwner') || 'Make owner too', icon: '👑', onClick: () => addOwner(m.ghii) },
+            isCreator && { label: t('organisms.makeCreator') || 'Hand over and step back', onClick: () => transfer(m.ghii) },
             { label: t('organisms.remove') || 'Remove', danger: true, onClick: () => remove(m.ghii, false) },
             { label: t('organisms.block') || 'Block', danger: true, onClick: () => remove(m.ghii, true) },
-          ].filter(Boolean) : [];
+          ].filter(Boolean) : []));
           return html`
             <div key=${m.ghii}>
               <div class="pj-org-row">

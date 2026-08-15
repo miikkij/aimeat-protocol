@@ -1429,6 +1429,7 @@ export interface Organism {
   archivedBy: string | null;
   boardId: string;
   createdAt: Generated<Timestamp>;
+  createdBy: string | null;
   creatorGhii: string;
   description: string;
   id: Generated<string>;
@@ -1437,6 +1438,7 @@ export interface Organism {
   location: Json | null;
   maxMembers: Generated<number>;
   members: string[] | null;
+  owners: string[] | null;
   memberVisibility: string | null;
   memoryNamespace: string;
   moderationConfig: Json;

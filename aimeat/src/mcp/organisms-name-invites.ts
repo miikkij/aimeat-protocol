@@ -20,6 +20,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, OrganismRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { isOrganismOwner, addOrganismOwner, removeOrganismOwner } from '../services/organism-ownership.js';
 import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
     acceptNameInvitation, declineNameInvitation, addOrganismMember,
@@ -39,7 +40,7 @@ export function registerOrganismNameInviteTools(
         const organism = await storage.getOrganism(organism_id);
         if (!organism) return { err: 'Organism not found' };
         const ownerName = getOwnerName();
-        if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
+        if (!isOrganismOwner(organism, ownerName) && !organism.admins.includes(ownerName)) {
             return { err: 'Only the creator or an admin can manage members and invitations' };
         }
         return { organism, ownerName };
@@ -103,6 +104,54 @@ export function registerOrganismNameInviteTools(
             } catch (e) {
                 return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
             }
+        },
+    );
+
+    // ── Tool: aimeat_organism_owner_add ──
+    // Mirrors POST /v1/organisms/:id/owners, and calls the same service, so the membership rules and
+    // the notifications cannot differ between the two doors.
+    mcp.tool(
+        'aimeat_organism_owner_add',
+        descriptionFor('aimeat_organism_owner_add'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            ghii: z.string().describe('Bare owner name of an active member to make a co-owner'),
+        },
+        annotationsFor('aimeat_organism_owner_add'),
+        async ({ organism_id, ghii }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
+            const ownerName = getOwnerName();
+            if (!isOrganismOwner(organism, ownerName)) {
+                return { content: [{ type: 'text' as const, text: 'Only an owner can add an owner' }], isError: true };
+            }
+            const out = await addOrganismOwner(storage, config, organism, ghii, { performedBy: ownerName });
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, added: out.added, owners: out.owners }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_organism_owner_remove ──
+    // Mirrors DELETE /v1/organisms/:id/owners/:ghii. The last owner cannot be removed: an organism
+    // with no owner is the one state nobody inside it can repair.
+    mcp.tool(
+        'aimeat_organism_owner_remove',
+        descriptionFor('aimeat_organism_owner_remove'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            ghii: z.string().describe('Bare owner name to take off the owners; they stay as an admin'),
+        },
+        annotationsFor('aimeat_organism_owner_remove'),
+        async ({ organism_id, ghii }) => {
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
+            const ownerName = getOwnerName();
+            if (!isOrganismOwner(organism, ownerName)) {
+                return { content: [{ type: 'text' as const, text: 'Only an owner can remove an owner' }], isError: true };
+            }
+            const out = await removeOrganismOwner(storage, config, organism, ghii, { performedBy: ownerName });
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ organism_id, removed: out.removed, owners: out.owners }, null, 2) }] };
         },
     );
 

@@ -21,6 +21,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { createEmailInvitation, cancelEmailInvitation, invitePublic, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError } from '../services/invitations.js';
 import { emitChange } from '../services/event-bus.js';
+import { isOrganismOwner } from '../services/organism-ownership.js';
 
 export function registerOrganismEmailInviteTools(
     mcp: McpServer,
@@ -33,7 +34,7 @@ export function registerOrganismEmailInviteTools(
         const organism = await storage.getOrganism(organism_id);
         if (!organism) return { error: 'Organism not found' };
         const ownerName = getOwnerName();
-        if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
+        if (!isOrganismOwner(organism, ownerName) && !organism.admins.includes(ownerName)) {
             return { error: 'Only the creator or an admin can manage invitations' };
         }
         return { organism };

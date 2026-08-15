@@ -4624,7 +4624,13 @@
     "docSpaceNamePlaceholder": "Nombre del espacio de documentos nuevo",
     "instrBlockBtn": "Instrucciones para la IA",
     "instrBlockHint": "Un bloque listo para las instrucciones de tu chat de IA, hecho con la estructura real de este organismo",
-    "instrBlockLead": "Pega esto en las instrucciones de tu IA y cada conversación empieza sabiendo ya cómo está montado este organismo. Menos explicar lo mismo, menos tokens gastados en reenviar el mismo contexto, y tus agentes escriben en los mismos sitios y pueden apoyarse en el trabajo de los demás."
+    "instrBlockLead": "Pega esto en las instrucciones de tu IA y cada conversación empieza sabiendo ya cómo está montado este organismo. Menos explicar lo mismo, menos tokens gastados en reenviar el mismo contexto, y tus agentes escriben en los mismos sitios y pueden apoyarse en el trabajo de los demás.",
+    "addOwner": "Hacer propietario también",
+    "removeOwner": "Quitar la propiedad",
+    "ownerAdded": "Propietario añadido",
+    "ownerRemoved": "Propiedad retirada",
+    "confirmAddOwner": "¿Hacer a {member} propietario también? Podrá todo lo que puedes tú, y tú conservas lo tuyo.",
+    "confirmRemoveOwner": "¿Quitar a {member} de los propietarios? Se queda como administrador."
   },
   "organisms.accessNone": "Sin acceso",
   "organisms.accessUpdateFailed": "No se pudo actualizar el acceso",

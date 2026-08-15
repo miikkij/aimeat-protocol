@@ -27,7 +27,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperatorPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { handOverOwnership } from '../services/organism-ownership.js';
+import { addOrganismOwner, organismOwners } from '../services/organism-ownership.js';
 import { logger } from '../utils/logger.js';
 
 export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -47,13 +47,14 @@ export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Ro
         res.json(success(config.nodeId, {
             id: organism.id,
             name: organism.name,
-            creator: organism.creatorGhii,
+            owners: organismOwners(organism),
+            created_by: organism.createdBy,
             admins: organism.admins,
             created_at: organism.createdAt,
             updated_at: organism.updatedAt,
             members: members.map(m => ({ ghii: m.ghii, role: m.role, status: m.status, joined_at: m.joinedAt })),
         }, [{
-            description: 'Install an owner on this organism',
+            description: 'Add an owner to this organism',
             method: 'POST',
             url: `/v1/admin/organisms/${id}/ownership`,
         }]));
@@ -78,7 +79,7 @@ export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Ro
         }
 
         const performedBy = req.auth!.sub;
-        const outcome = await handOverOwnership(storage, config, organism, ghii, {
+        const outcome = await addOrganismOwner(storage, config, organism, ghii, {
             seatNonMember: true,
             performedBy: `operator repair by ${performedBy}`,
         });
@@ -89,15 +90,15 @@ export function adminOrganismsRouter(config: AimeatConfig, storage: Storage): Ro
 
         // A cross-account write leaves a line in the log whatever else it leaves: this is the one
         // door on the node where the caller is not the affected account and never was.
-        logger.warn('[operator-organism-repair] ownership installed', {
-            organism: id, from: outcome.previousCreator, to: outcome.creator,
+        logger.warn('[operator-organism-repair] owner installed', {
+            organism: id, added: outcome.added, owners: outcome.owners,
             seated: outcome.membershipCreated, by: performedBy,
         });
 
         res.json(success(config.nodeId, {
             organism: id,
-            creator: outcome.creator,
-            previous_creator: outcome.previousCreator,
+            added: outcome.added,
+            owners: outcome.owners,
             membership_created: outcome.membershipCreated,
         }));
         emitChange('organisms');

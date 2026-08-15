@@ -37,7 +37,28 @@ export interface OrganismRecord {
     geo?: [number, number];
   };
   interests: string[];
+  /**
+   * @deprecated since 2026-08-15, removed in v5.0 — read `owners` through
+   * services/organism-ownership.ts:organismOwners() and test membership with isOrganismOwner().
+   *
+   * It carried two different facts in one column: WHO MADE THIS, which is history and cannot change,
+   * and WHO HOLDS IT, which is a role and should never have been singular. A handover wrote both, so
+   * transferring authority also rewrote the past — this node's own development organism spent a month
+   * claiming it was created by an account that joined five weeks after it existed.
+   *
+   * It stays as a MIRROR of `owners[0]`, maintained only by services/organism-ownership.ts, so
+   * federation payloads, exports and clients built against v4 keep reading a field that is still
+   * true. Nothing should compare against it.
+   */
   creatorGhii: string;
+  /** Who made this organism. Immutable: a handover never rewrites it. */
+  createdBy: string;
+  /**
+   * Who holds this organism, in the order they were added. Never empty — the last owner cannot be
+   * removed, only replaced. Every owner has the same authority; `owners[0]` is merely the one
+   * `creatorGhii` mirrors for older readers.
+   */
+  owners: string[];
   admins: string[];
   members: string[];
   agentGaiis: string[];

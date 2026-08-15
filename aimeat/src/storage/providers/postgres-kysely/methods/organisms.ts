@@ -28,7 +28,14 @@ const isoOpt = (t: Date | string | null | undefined): string | undefined => (t =
 function toOrg(r: Selectable<Organism>): OrganismRecord {
   return {
     id: r.id, name: r.name, description: r.description, type: r.type as OrganismRecord['type'], location: (r.location ?? undefined) as OrganismRecord['location'],
-    interests: r.interests ?? [], creatorGhii: r.creatorGhii, admins: r.admins ?? [], members: r.members ?? [], agentGaiis: r.agentGaiis ?? [],
+    interests: r.interests ?? [], creatorGhii: r.creatorGhii,
+    // Rows written before migration 0038 carry neither column. `creatorGhii` was the only answer the
+    // node had then, so it is the honest fallback for both — and for `createdBy` it is the honest
+    // answer only where no handover ever happened, which is why the migration backfills rather than
+    // leaving the read to guess forever.
+    createdBy: r.createdBy ?? r.creatorGhii,
+    owners: (r.owners?.length ? r.owners : [r.creatorGhii]),
+    admins: r.admins ?? [], members: r.members ?? [], agentGaiis: r.agentGaiis ?? [],
     boardId: r.boardId, joinPolicy: r.joinPolicy as OrganismRecord['joinPolicy'], maxMembers: r.maxMembers,
     visibility: r.visibility as OrganismRecord['visibility'], memberVisibility: (r.memberVisibility ?? undefined) as OrganismRecord['memberVisibility'],
     moderationConfig: r.moderationConfig as OrganismRecord['moderationConfig'], memoryNamespace: r.memoryNamespace,
@@ -59,7 +66,9 @@ export const organismMethods = {
   async createOrganism(this: PostgresKyselyStorage, r: OrganismRecord): Promise<OrganismRecord> {
     await this.db.insertInto('Organism').values({
       id: r.id, name: r.name, description: r.description, type: r.type, location: jsonb(r.location ?? null), interests: r.interests,
-      creatorGhii: r.creatorGhii, admins: r.admins, members: r.members, agentGaiis: r.agentGaiis, boardId: r.boardId,
+      creatorGhii: r.creatorGhii, createdBy: r.createdBy ?? r.creatorGhii,
+      owners: r.owners?.length ? r.owners : [r.creatorGhii],
+      admins: r.admins, members: r.members, agentGaiis: r.agentGaiis, boardId: r.boardId,
       joinPolicy: r.joinPolicy, maxMembers: r.maxMembers, visibility: r.visibility, memberVisibility: r.memberVisibility ?? null,
       moderationConfig: jsonb(r.moderationConfig), memoryNamespace: r.memoryNamespace, semantic: jsonb(r.semantic ?? null),
       archived: r.archived ?? false, archivedAt: r.archivedAt ? new Date(r.archivedAt) : null, archivedBy: r.archivedBy ?? null,

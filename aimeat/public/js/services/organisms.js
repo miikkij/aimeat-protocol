@@ -184,21 +184,11 @@ export async function searchOrganism(id, q, ws) {
   return apiGet(`/v1/organisms/${encodeURIComponent(id)}/search?${params.toString()}`);
 }
 
-/** Remove (revoke) a member's organism access. Creator/admin only. Pass ban=true to block re-join. */
-export async function removeMember(id, memberGhii, ban = false) {
-  const suffix = ban ? '?ban=1' : '';
-  return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/members/${encodeURIComponent(memberGhii)}${suffix}`);
-}
-
-/** Lift a ban on a previously-blocked owner. Creator/admin only. */
-export async function unbanMember(id, memberGhii) {
-  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/members/${encodeURIComponent(memberGhii)}/unban`, {});
-}
-
-/** Transfer ownership to an existing active member. Creator only. */
-export async function transferOwnership(id, toGhii) {
-  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/transfer`, { to: toGhii });
-}
+// Who holds this organism and who may act in it: owners, admins, removal and bans. Pure
+// extraction to a sibling (max-file-lines); re-exported so every caller keeps its import.
+export {
+  removeMember, unbanMember, transferOwnership, addOwner, removeOwner, addAdmin, removeAdmin,
+} from '/js/services/organism-roles.js';
 
 /** Invite an owner by bare name, optionally with an org role + invite-time workspace grants
  *  ({ role: 'member'|'admin', workspaces: [{ws, role: 'viewer'|'contributor'}] }). Creator/admin only. */
@@ -278,16 +268,6 @@ export async function attachAgent(id, agentGaii) {
 /** Detach an agent from an organism. Agent owner or organism admin. */
 export async function detachAgent(id, agentGaii) {
   return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/agents/${encodeURIComponent(agentGaii)}`);
-}
-
-/** Add admin. */
-export async function addAdmin(id, targetGhii) {
-  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/admins`, { target_ghii: targetGhii });
-}
-
-/** Remove admin. */
-export async function removeAdmin(id, ghii) {
-  return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/admins/${encodeURIComponent(ghii)}`);
 }
 
 /** Archive / unarchive organism content (creator/admin). `target` = { level, ws?, namespace?, key? }.

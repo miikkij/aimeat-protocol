@@ -2,7 +2,7 @@
  * @file src/mcp/core-admin.ts
  * @description Operator-only core MCP admin tools (aimeat_admin_stats, aimeat_admin_agents,
  *   aimeat_admin_config, aimeat_admin_mint, aimeat_admin_organism_ownership,
- *   aimeat_admin_organism_owner_set). Registered for all sessions but each checks the operator role
+ *   aimeat_admin_organism_owner_add). Registered for all sessions but each checks the operator role
  *   at runtime. Extracted from src/mcp/core.ts to satisfy max-file-lines.
  * @structure
  *   - registerCoreAdminTools() — registers the six operator-only admin tools on an McpServer
@@ -28,7 +28,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { mintMorsels } from '../services/morsel.js';
-import { handOverOwnership } from '../services/organism-ownership.js';
+import { addOrganismOwner, organismOwners } from '../services/organism-ownership.js';
 import { logger } from '../utils/logger.js';
 
 export function registerCoreAdminTools(
@@ -183,7 +183,7 @@ export function registerCoreAdminTools(
                     type: 'text' as const,
                     text: JSON.stringify({
                         id: organism.id, name: organism.name,
-                        creator: organism.creatorGhii, admins: organism.admins,
+                        owners: organismOwners(organism), created_by: organism.createdBy, admins: organism.admins,
                         created_at: organism.createdAt, updated_at: organism.updatedAt,
                         members: members.map(m => ({ ghii: m.ghii, role: m.role, status: m.status, joined_at: m.joinedAt })),
                     }, null, 2),
@@ -192,36 +192,35 @@ export function registerCoreAdminTools(
         },
     );
 
-    // ── Tool 20: aimeat_admin_organism_owner_set ──
+    // ── Tool 20: aimeat_admin_organism_owner_add ──
     // The break-glass. ONE implementation (services/organism-ownership.ts handOverOwnership), the
     // same function POST /v1/admin/organisms/:id/ownership calls, so the membership rules, the
     // notifications and the three-writes-together transaction cannot differ between the surfaces.
     mcp.tool(
-        'aimeat_admin_organism_owner_set',
-        descriptionFor('aimeat_admin_organism_owner_set'),
+        'aimeat_admin_organism_owner_add',
+        descriptionFor('aimeat_admin_organism_owner_add'),
         { organism_id: z.string(), ghii: z.string() },
-        annotationsFor('aimeat_admin_organism_owner_set'),
+        annotationsFor('aimeat_admin_organism_owner_add'),
         async ({ organism_id, ghii }) => {
             if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
-            const outcome = await handOverOwnership(storage, config, organism, ghii, {
+            const outcome = await addOrganismOwner(storage, config, organism, ghii, {
                 seatNonMember: true,
                 performedBy: `operator repair by ${agentGaii}`,
             });
             if (!outcome.ok) {
                 return { content: [{ type: 'text' as const, text: `${outcome.code}: ${outcome.message}` }], isError: true };
             }
-            logger.warn('[operator-organism-repair] ownership installed', {
-                organism: organism_id, from: outcome.previousCreator, to: outcome.creator,
+            logger.warn('[operator-organism-repair] owner installed', {
+                organism: organism_id, added: outcome.added, owners: outcome.owners,
                 seated: outcome.membershipCreated, by: agentGaii,
             });
             return {
                 content: [{
                     type: 'text' as const,
                     text: JSON.stringify({
-                        organism: organism_id, creator: outcome.creator,
-                        previous_creator: outcome.previousCreator,
+                        organism: organism_id, added: outcome.added, owners: outcome.owners,
                         membership_created: outcome.membershipCreated,
                     }, null, 2),
                 }],

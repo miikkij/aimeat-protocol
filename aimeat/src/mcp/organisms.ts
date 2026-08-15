@@ -55,6 +55,7 @@ import { canSeeMembers } from '../services/organism-privacy.js';
 import { emitChange } from '../services/event-bus.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
+import { isOrganismOwner, organismOwners } from '../services/organism-ownership.js';
 
 export function registerOrganismsTools(
     mcp: McpServer,
@@ -120,6 +121,8 @@ export function registerOrganismsTools(
                         join_policy: organism.joinPolicy,
                         max_members: organism.maxMembers,
                         board_id: organism.boardId,
+                        owners: organismOwners(organism),
+                        created_by: organism.createdBy,
                         creator_ghii: organism.creatorGhii,
                         admins: organism.admins,
                         interests: organism.interests,
@@ -213,6 +216,8 @@ export function registerOrganismsTools(
                         join_policy: organism.joinPolicy,
                         max_members: organism.maxMembers,
                         board_id: organism.boardId,
+                        owners: organismOwners(organism),
+                        created_by: organism.createdBy,
                         creator_ghii: organism.creatorGhii,
                         admins: organism.admins,
                         interests: organism.interests,
@@ -565,7 +570,7 @@ export function registerOrganismsTools(
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
             const ownerName = getOwnerName();
-            if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
+            if (!isOrganismOwner(organism, ownerName) && !organism.admins.includes(ownerName)) {
                 return { content: [{ type: 'text' as const, text: 'Only the creator or an admin can update this organism' }], isError: true };
             }
             // Shared with PUT /v1/organisms/:id (services/organism-lifecycle.ts): the field

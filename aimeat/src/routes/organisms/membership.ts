@@ -29,7 +29,7 @@ import { parseGaiiLoose } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
-import { handOverOwnership } from '../../services/organism-ownership.js';
+import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism-ownership.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
   acceptNameInvitation, declineNameInvitation, addOrganismMember, revokeDepartedMemberAccess,
@@ -59,7 +59,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const canSeeRoster = await canSeeMembers(storage, organism, rosterCaller);
     if (!canSeeRoster) {
       const visible = members.filter(m => m.role === 'creator' || m.role === 'admin'
-        || m.ghii === organism.creatorGhii || organism.admins.includes(m.ghii)
+        || isOrganismOwner(organism, m.ghii) || organism.admins.includes(m.ghii)
         || (rosterCaller.ownerName && m.ghii === rosterCaller.ownerName));
       res.json(success(config.nodeId, { members: visible, total: members.length, members_hidden: true }));
       return;
@@ -99,7 +99,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
 
-    if (organism.creatorGhii !== ghii && !organism.admins.includes(ghii)) {
+    if (!isOrganismOwner(organism, ghii) && !organism.admins.includes(ghii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only admins can view join requests'));
       return;
     }
@@ -126,7 +126,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
 
-    if (organism.creatorGhii !== ghii && !organism.admins.includes(ghii)) {
+    if (!isOrganismOwner(organism, ghii) && !organism.admins.includes(ghii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only admins can review join requests'));
       return;
     }
@@ -200,7 +200,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
 
-    if (organism.creatorGhii !== ghii && !organism.admins.includes(ghii)) {
+    if (!isOrganismOwner(organism, ghii) && !organism.admins.includes(ghii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only admins can promote members'));
       return;
     }
@@ -238,12 +238,12 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
 
-    if (organism.creatorGhii !== callerGhii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator can demote admins'));
+    if (!isOrganismOwner(organism, callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can demote admins'));
       return;
     }
 
-    if (targetGhii === organism.creatorGhii) {
+    if (isOrganismOwner(organism, targetGhii)) {
       res.status(400).json(error(config.nodeId, 'CANNOT_DEMOTE_CREATOR', 'Cannot remove admin from creator'));
       return;
     }
@@ -280,14 +280,14 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
 
-    const callerIsCreator = organism.creatorGhii === callerGhii;
+    const callerIsCreator = isOrganismOwner(organism, callerGhii);
     const callerIsAdmin = callerIsCreator || organism.admins.includes(callerGhii);
     if (!callerIsAdmin) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can remove members'));
       return;
     }
 
-    if (targetGhii === organism.creatorGhii) {
+    if (isOrganismOwner(organism, targetGhii)) {
       res.status(400).json(error(config.nodeId, 'CANNOT_REMOVE_CREATOR', 'The creator cannot be removed. Delete the organism instead.'));
       return;
     }
@@ -352,7 +352,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
       return;
     }
-    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+    if (!isOrganismOwner(organism, callerGhii) && !organism.admins.includes(callerGhii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can lift a block'));
       return;
     }
@@ -384,8 +384,8 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
       return;
     }
-    if (organism.creatorGhii !== callerGhii) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the current creator can transfer ownership'));
+    if (!isOrganismOwner(organism, callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can transfer ownership'));
       return;
     }
     if (to === callerGhii) {
@@ -396,14 +396,80 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     // the operator's break-glass repair (POST /v1/admin/organisms/:id/ownership) performs the same
     // transition and a second copy of it would drift. `seatNonMember` stays off here: a creator hands
     // the organism to somebody already in it.
-    const outcome = await handOverOwnership(storage, config, organism, to);
+    const outcome = await handOverOwnership(storage, config, organism, to, callerGhii);
     if (!outcome.ok) {
       res.status(outcome.status).json(error(config.nodeId, outcome.code, outcome.message));
       return;
     }
     emitChange('notifications');
 
-    res.json(success(config.nodeId, { creator: outcome.creator, previousCreator: outcome.previousCreator }));
+    // `creator`/`previousCreator` are the v4 words for what is now one add and one remove. Kept for
+    // clients built against them; `owners` is the field to read.
+    res.json(success(config.nodeId, {
+      creator: outcome.added, previousCreator: outcome.removed, owners: outcome.owners,
+    }));
+    emitChange('organisms');
+  });
+
+  /* Reading who owns an organism has no route of its own: GET /v1/organisms/:id already returns the
+   * record, and `owners` + `createdBy` are fields on it. A wrapper would be a second answer to the
+   * same question, subject to a second set of visibility rules. */
+
+  /* ── POST /v1/organisms/:id/owners — { ghii } — ADD an owner ──
+   * Additive on purpose. Ownership used to move in one irreversible step, so bringing in a second
+   * pair of hands cost the first pair everything, and an organism whose single owner went unreachable
+   * could not be recovered by anyone. Adding costs the adder nothing; the handover is this plus the
+   * DELETE below, with a look in between. The target must already be an active member. ── */
+  router.post('/v1/organisms/:id/owners', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const callerGhii = req.auth!.owner as string;
+    const { ghii } = req.body ?? {};
+    if (!ghii || typeof ghii !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "ghii" (an active member) is required'));
+      return;
+    }
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (!isOrganismOwner(organism, callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can add an owner'));
+      return;
+    }
+    const outcome = await addOrganismOwner(storage, config, organism, ghii, { performedBy: callerGhii });
+    if (!outcome.ok) {
+      res.status(outcome.status).json(error(config.nodeId, outcome.code, outcome.message));
+      return;
+    }
+    emitChange('notifications');
+    res.json(success(config.nodeId, { owners: outcome.owners, added: outcome.added }));
+    emitChange('organisms');
+  });
+
+  /* ── DELETE /v1/organisms/:id/owners/:ghii — step down, or remove a co-owner ──
+   * The departing owner stays as an admin. The LAST owner cannot be removed: an organism with no
+   * owner is the one state nobody inside it can repair. ── */
+  router.delete('/v1/organisms/:id/owners/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const callerGhii = req.auth!.owner as string;
+    const targetGhii = req.params.ghii as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+      return;
+    }
+    if (!isOrganismOwner(organism, callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an owner can remove an owner'));
+      return;
+    }
+    const outcome = await removeOrganismOwner(storage, config, organism, targetGhii, { performedBy: callerGhii });
+    if (!outcome.ok) {
+      res.status(outcome.status).json(error(config.nodeId, outcome.code, outcome.message));
+      return;
+    }
+    emitChange('notifications');
+    res.json(success(config.nodeId, { owners: outcome.owners, removed: outcome.removed }));
     emitChange('organisms');
   });
 
@@ -417,7 +483,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
-    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+    if (!isOrganismOwner(organism, callerGhii) && !organism.admins.includes(callerGhii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage members and invitations'));
       return null;
     }
@@ -513,7 +579,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
       return;
     }
-    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+    if (!isOrganismOwner(organism, callerGhii) && !organism.admins.includes(callerGhii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can view invitations'));
       return;
     }
@@ -592,7 +658,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     }
     const membership = await storage.getMembership(id, callerGhii);
     const isMember = !!membership && membership.status === 'active';
-    if (!isMember && organism.creatorGhii !== callerGhii) {
+    if (!isMember && !isOrganismOwner(organism, callerGhii)) {
       res.status(403).json(error(config.nodeId, 'NOT_MEMBER', 'You must be a member to attach an agent'));
       return;
     }
@@ -618,7 +684,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     }
     const parsed = parseGaiiLoose(agentGaii);
     const ownsAgent = parsed.owner === callerGhii;
-    const isAdmin = organism.creatorGhii === callerGhii || organism.admins.includes(callerGhii);
+    const isAdmin = isOrganismOwner(organism, callerGhii) || organism.admins.includes(callerGhii);
     if (!ownsAgent && !isAdmin) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the agent owner or an organism admin can detach it'));
       return;

@@ -42,6 +42,7 @@ import { updateOrganismStructure } from './structure-snapshot.js';
 import { getOrganismReadme, setOrganismReadme } from './organism-readme.js';
 import { MEMBER_VISIBILITY_VALUES } from './organism-privacy.js';
 import { logger } from '../utils/logger.js';
+import { isOrganismOwner } from './organism-ownership.js';
 
 export interface OrganismDeps {
   storage: Storage;
@@ -132,7 +133,10 @@ export async function createOrganismRecord(
     type,
     location: (input.location && typeof input.location === 'object' ? input.location : {}) as OrganismRecord['location'],
     interests: Array.isArray(input.interests) ? (input.interests as string[]) : [],
+    // creatorGhii is the deprecated mirror of owners[0]; createdBy is the fact that never moves.
     creatorGhii: creatorOwner,
+    createdBy: creatorOwner,
+    owners: [creatorOwner],
     admins: [creatorOwner],
     members: [creatorOwner],
     agentGaiis: [],
@@ -381,7 +385,7 @@ export async function leaveOrganism(
   const { storage } = deps;
   const id = organism.id;
 
-  if (organism.creatorGhii === leaverOwner) {
+  if (isOrganismOwner(organism, leaverOwner)) {
     return refuse(400, 'CREATOR_CANNOT_LEAVE', 'Creator cannot leave. Delete the organism instead.');
   }
 

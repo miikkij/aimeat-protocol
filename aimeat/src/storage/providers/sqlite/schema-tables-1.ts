@@ -487,6 +487,8 @@ export function applySchemaTables1(db: Database.Database): void {
       location         TEXT,
       interests        TEXT NOT NULL DEFAULT '[]',
       creatorGhii      TEXT NOT NULL,
+      createdBy        TEXT,
+      owners           TEXT NOT NULL DEFAULT '[]',
       admins           TEXT NOT NULL DEFAULT '[]',
       members          TEXT NOT NULL DEFAULT '[]',
       agentGaiis       TEXT NOT NULL DEFAULT '[]',

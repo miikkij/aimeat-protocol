@@ -16,6 +16,15 @@ import { getCachedSchemaLocks, setCachedSchemaLocks, invalidateSchemaLockCache }
 import { matchesRecipient } from '../../../../services/consent.js';
 import { parseGaiiLoose } from '../../../../utils/gaii.js';
 
+/** The organism `owners` JSON array, or the single owner the row had before the column existed. */
+function parseOwners(raw: unknown, creatorGhii: string): string[] {
+  if (typeof raw !== 'string' || !raw) return [creatorGhii];
+  let parsed: unknown;
+  try { parsed = JSON.parse(raw); } catch { return [creatorGhii]; }
+  if (Array.isArray(parsed) && parsed.length) return parsed.filter((x): x is string => typeof x === 'string');
+  return [creatorGhii];
+}
+
 export const governanceMethods = {
   // ── Consent Layer ──
   // ══════════════════════════════════════════════════════════
@@ -628,14 +637,16 @@ export const governanceMethods = {
 
   async createOrganism(this: SqliteStorage, record: OrganismRecord): Promise<OrganismRecord> {
     this.db.prepare(
-      `INSERT INTO organisms (id, name, description, type, location, interests, creatorGhii, admins,
+      `INSERT INTO organisms (id, name, description, type, location, interests, creatorGhii, createdBy, owners, admins,
        members, agentGaiis, boardId, joinPolicy, maxMembers, visibility, memberVisibility, moderationConfig,
        memoryNamespace, semantic, createdAt, updatedAt, archived, archivedAt, archivedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.name, record.description, record.type,
       record.location ? JSON.stringify(record.location) : null,
       JSON.stringify(record.interests), record.creatorGhii,
+      record.createdBy ?? record.creatorGhii,
+      JSON.stringify(record.owners?.length ? record.owners : [record.creatorGhii]),
       JSON.stringify(record.admins), JSON.stringify(record.members),
       JSON.stringify(record.agentGaiis), record.boardId,
       record.joinPolicy, record.maxMembers, record.visibility,
@@ -683,7 +694,7 @@ export const governanceMethods = {
     const updated = { ...existing, ...updates, id: existing.id };
     this.db.prepare(
       `UPDATE organisms SET name = ?, description = ?, type = ?, location = ?, interests = ?,
-       creatorGhii = ?, admins = ?, members = ?, agentGaiis = ?, boardId = ?,
+       creatorGhii = ?, createdBy = ?, owners = ?, admins = ?, members = ?, agentGaiis = ?, boardId = ?,
        joinPolicy = ?, maxMembers = ?, visibility = ?, memberVisibility = ?, moderationConfig = ?,
        memoryNamespace = ?, semantic = ?, createdAt = ?, updatedAt = ?,
        archived = ?, archivedAt = ?, archivedBy = ? WHERE id = ?`
@@ -691,6 +702,8 @@ export const governanceMethods = {
       updated.name, updated.description, updated.type,
       updated.location ? JSON.stringify(updated.location) : null,
       JSON.stringify(updated.interests), updated.creatorGhii,
+      updated.createdBy ?? updated.creatorGhii,
+      JSON.stringify(updated.owners?.length ? updated.owners : [updated.creatorGhii]),
       JSON.stringify(updated.admins), JSON.stringify(updated.members),
       JSON.stringify(updated.agentGaiis), updated.boardId,
       updated.joinPolicy, updated.maxMembers, updated.visibility,
@@ -739,6 +752,8 @@ export const governanceMethods = {
     return txn();
   },
 
+  /** owners is a JSON array column added after the fact: absent, empty or malformed all mean
+   *  "whatever creatorGhii said", which is the only owner such a row ever had. */
   deserializeOrganism(this: SqliteStorage, row: Record<string, unknown>): OrganismRecord {
     const record: OrganismRecord = {
       id: row.id as string,
@@ -747,6 +762,10 @@ export const governanceMethods = {
       type: row.type as OrganismRecord['type'],
       interests: JSON.parse(row.interests as string) as string[],
       creatorGhii: row.creatorGhii as string,
+      // Rows written before the ownership split carry neither column; creatorGhii was the only answer
+      // the node had, so it is the fallback for both (schema.ts backfills the same way on boot).
+      createdBy: (row.createdBy as string | null) ?? (row.creatorGhii as string),
+      owners: parseOwners(row.owners, row.creatorGhii as string),
       admins: JSON.parse(row.admins as string) as string[],
       members: JSON.parse(row.members as string) as string[],
       agentGaiis: JSON.parse(row.agentGaiis as string) as string[],

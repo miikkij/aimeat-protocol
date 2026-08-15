@@ -27942,11 +27942,68 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/owners:
+    post:
+      operationId: addOrganismOwner
+      summary: Add an owner
+      description: >-
+        Make an existing active member a co-owner. Additive: the caller keeps everything, which is
+        the point — ownership used to move in one irreversible step, so an organism whose single
+        owner became unreachable could not be recovered by anyone, and bringing in a second pair of
+        hands cost the first pair everything. Owner only. A blocked target is refused (MEMBER_BANNED);
+        a target who already owns it is ALREADY_OWNER.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ghii]
+              properties:
+                ghii: { type: string, description: Bare owner name of the active member to make an owner }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/owners/{ghii}:
+    delete:
+      operationId: removeOrganismOwner
+      summary: Remove an owner
+      description: >-
+        Take an owner off the organism; they stay on as an admin. Owner only, and any owner may
+        remove any other. The LAST owner cannot be removed (LAST_OWNER) — an organism with no owner
+        is the one state nobody inside it can repair. To leave entirely, remove yourself as an owner
+        first and then use the leave route.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: ghii, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/organisms/{id}/transfer:
     post:
       operationId: transferOrganismOwnership
       summary: Transfer organism ownership
-      description: The current creator hands the organism to an existing active member; the target becomes creator and the previous creator is demoted to admin. Creator only.
+      description: >-
+        Hand the organism to an existing active member in one call: the target is added as an owner
+        and the caller stops being one, staying on as an admin. Owner only. This is POST
+        /v1/organisms/{id}/owners followed by DELETE /v1/organisms/{id}/owners/{caller}, and doing it
+        in those two steps is preferable — the state in between is legal, so it can be looked at
+        before the second step. Kept because clients depend on it; the response carries `owners`
+        alongside the older `creator`/`previousCreator` fields.
       tags: [Organisms]
       security:
         - BearerAuth: []

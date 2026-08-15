@@ -233,46 +233,66 @@ async function main() {
         const token = await mintAgentToken(repairbot);
         const r = await json(`/v1/admin/organisms/${orgId}/ownership`, { headers: auth(token) });
         assert(r.body.ok === true, `read as operator agent: ${r.status} ${JSON.stringify(r.body)}`);
-        assert(r.body.data!.creator === TAKER, `creator reads as ${r.body.data!.creator}`);
+        assert((r.body.data!.owners as string[]).includes(TAKER), `owners read as ${JSON.stringify(r.body.data!.owners)}`);
 
         const w = await json(`/v1/admin/organisms/${orgId}/ownership`, {
             method: 'POST', headers: auth(token), body: JSON.stringify({ ghii: FOUNDER }),
         });
         assert(w.body.ok === true, `repair as operator agent: ${w.status} ${JSON.stringify(w.body)}`);
-        assert(w.body.data!.creator === FOUNDER, `creator is ${w.body.data!.creator}`);
-        // Put it back where phase 3 expects to find it, so the next test starts from the trap.
-        const undo = await json(`/v1/admin/organisms/${orgId}/ownership`, {
-            method: 'POST', headers: auth(opToken), body: JSON.stringify({ ghii: TAKER }),
-        });
+        assert(w.body.data!.added === FOUNDER, `added is ${w.body.data!.added}`);
+        // Put it back where the next test expects to find it: the founder is out again, the taker holds it.
+        const undo = await json(`/v1/organisms/${orgId}/owners/${FOUNDER}`, { method: 'DELETE', headers: auth(takerToken) });
         assert(undo.body.ok === true, `restore: ${undo.status} ${JSON.stringify(undo.body)}`);
     });
 
     await test('the operator reads the ownership state first', async () => {
         const r = await json(`/v1/admin/organisms/${orgId}/ownership`, { headers: auth(opToken) });
         assert(r.body.ok === true, `read: ${r.status} ${JSON.stringify(r.body)}`);
-        assert(r.body.data!.creator === TAKER, `creator reads as ${r.body.data!.creator}`);
-        assert((r.body.data!.members as any[]).length === 2, 'the roster is not what the repair will re-point');
+        assert(JSON.stringify(r.body.data!.owners) === JSON.stringify([TAKER]), `owners read as ${JSON.stringify(r.body.data!.owners)}`);
+        // The fact that never moves: the founder made this, whoever holds it now.
+        assert(r.body.data!.created_by === FOUNDER, `created_by reads as ${r.body.data!.created_by}`);
+        assert((r.body.data!.members as any[]).length === 2, 'the roster is not what the repair will change');
     });
 
-    await test('the operator puts the founder back, and the taker keeps a seat as admin', async () => {
+    await test('the operator ADDS the founder back — nobody has to lose anything', async () => {
         const r = await json(`/v1/admin/organisms/${orgId}/ownership`, {
             method: 'POST', headers: auth(opToken), body: JSON.stringify({ ghii: FOUNDER }),
         });
         assert(r.body.ok === true, `repair: ${r.status} ${JSON.stringify(r.body)}`);
-        assert(r.body.data!.creator === FOUNDER, `creator is ${r.body.data!.creator}`);
-        assert(r.body.data!.previous_creator === TAKER, `previous is ${r.body.data!.previous_creator}`);
+        assert(r.body.data!.added === FOUNDER, `added is ${r.body.data!.added}`);
+        assert(JSON.stringify(r.body.data!.owners) === JSON.stringify([TAKER, FOUNDER]),
+            `owners are ${JSON.stringify(r.body.data!.owners)} — the repair must be additive, not a handover`);
 
         const rec = await orgRecord(orgId, founderToken);
-        assert(rec.creatorGhii === FOUNDER, `the organism record still names ${rec.creatorGhii}`);
-        assert((rec.admins as string[]).includes(TAKER), 'the previous creator lost their seat');
+        assert(rec.createdBy === FOUNDER, `createdBy was rewritten to ${rec.createdBy}`);
+        assert(rec.creatorGhii === TAKER, `the deprecated mirror should still be owners[0], reads ${rec.creatorGhii}`);
         const members = await roster(orgId, founderToken);
-        assert(members.find(m => m.ghii === FOUNDER)?.role === 'creator', 'the membership row still says admin');
-        assert(members.find(m => m.ghii === TAKER)?.role === 'admin', 'the taker was not demoted to admin');
+        assert(members.find(m => m.ghii === FOUNDER)?.role === 'creator', 'the founder is not seated as an owner');
+        assert(members.find(m => m.ghii === TAKER)?.role === 'creator', 'the taker stopped being an owner');
     });
 
-    await test('the founder can now do what only a creator can — remove the other one', async () => {
+    await test('an owner is not removable as a MEMBER while they still own it', async () => {
         const r = await json(`/v1/organisms/${orgId}/members/${TAKER}`, { method: 'DELETE', headers: auth(founderToken) });
-        assert(r.body.ok === true, `remove: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.status === 400, `expected 400, got ${r.status}`);
+        assert(r.body.error?.code === 'CANNOT_REMOVE_CREATOR', `expected CANNOT_REMOVE_CREATOR, got ${r.body.error?.code}`);
+    });
+
+    await test('the founder takes the taker off the owners, then out of the organism', async () => {
+        const off = await json(`/v1/organisms/${orgId}/owners/${TAKER}`, { method: 'DELETE', headers: auth(founderToken) });
+        assert(off.body.ok === true, `remove owner: ${off.status} ${JSON.stringify(off.body)}`);
+        assert(JSON.stringify(off.body.data!.owners) === JSON.stringify([FOUNDER]), `owners are ${JSON.stringify(off.body.data!.owners)}`);
+        const rec = await orgRecord(orgId, founderToken);
+        assert(rec.creatorGhii === FOUNDER, `the mirror did not follow owners[0]: ${rec.creatorGhii}`);
+        assert((rec.admins as string[]).includes(TAKER), 'the departing owner lost their seat entirely');
+
+        const gone = await json(`/v1/organisms/${orgId}/members/${TAKER}`, { method: 'DELETE', headers: auth(founderToken) });
+        assert(gone.body.ok === true, `remove member: ${gone.status} ${JSON.stringify(gone.body)}`);
+    });
+
+    await test('the last owner cannot step down — an ownerless organism is the unrepairable state', async () => {
+        const r = await json(`/v1/organisms/${orgId}/owners/${FOUNDER}`, { method: 'DELETE', headers: auth(founderToken) });
+        assert(r.status === 400, `expected 400, got ${r.status}`);
+        assert(r.body.error?.code === 'LAST_OWNER', `expected LAST_OWNER, got ${r.body.error?.code}`);
     });
 
     console.log('\nPhase 4: The repair case that has nobody left inside');
@@ -283,10 +303,10 @@ async function main() {
         });
         assert(r.body.ok === true, `seat: ${r.status} ${JSON.stringify(r.body)}`);
         assert(r.body.data!.membership_created === true, 'the outsider should have been seated');
-        const rec = await orgRecord(orgId, outsiderToken);
-        assert(rec.creatorGhii === OUTSIDER, `the outsider did not become the creator (${rec.creatorGhii})`);
         const members = await roster(orgId, outsiderToken);
         assert(members.find(m => m.ghii === OUTSIDER)?.role === 'creator', 'the seated row does not say creator');
+        const rec = await orgRecord(orgId, outsiderToken);
+        assert((rec.owners as string[]).includes(OUTSIDER), `owners are ${JSON.stringify(rec.owners)}`);
     });
 
     await test('a blocked owner is refused — lifting a block is its own act', async () => {

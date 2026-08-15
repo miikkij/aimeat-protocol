@@ -4631,7 +4631,13 @@
     "docSpaceNamePlaceholder": "New document space name",
     "instrBlockBtn": "AI instructions",
     "instrBlockHint": "A ready block for your AI chat instructions, generated from this organism’s real structure",
-    "instrBlockLead": "Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure. Less re-explaining, fewer tokens spent re-sending the same context, and your agents write into the same places so they can build on each other’s work."
+    "instrBlockLead": "Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure. Less re-explaining, fewer tokens spent re-sending the same context, and your agents write into the same places so they can build on each other’s work.",
+    "addOwner": "Make owner too",
+    "removeOwner": "Remove owner",
+    "ownerAdded": "Owner added",
+    "ownerRemoved": "Owner removed",
+    "confirmAddOwner": "Make {member} an owner too? They get everything you can do, and you keep it.",
+    "confirmRemoveOwner": "Take {member} off the owners? They stay as an admin."
   },
   "organisms.accessNone": "No access",
   "organisms.accessUpdateFailed": "Access update failed",

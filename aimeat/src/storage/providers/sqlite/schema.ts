@@ -77,6 +77,14 @@ export function initializeSchema(db: Database.Database): void {
 
   // Organism member-roster visibility (privacy fix 2026-07-03: rosters were world-readable).
   safeAddColumn('organisms', 'memberVisibility', 'TEXT');
+  // Ownership split in two (mirrors Postgres migration 0038): `createdBy` is history and never moves,
+  // `owners` is the authority and is plural. `creatorGhii` used to be both, so a handover rewrote who
+  // made the organism, and a single owner had no way back once that account went unreachable. Both
+  // backfill from creatorGhii below — the only answer the node ever recorded.
+  safeAddColumn('organisms', 'createdBy', 'TEXT');
+  safeAddColumn('organisms', 'owners', 'TEXT');
+  db.exec(`UPDATE organisms SET createdBy = creatorGhii WHERE createdBy IS NULL`);
+  db.exec(`UPDATE organisms SET owners = json_array(creatorGhii) WHERE owners IS NULL OR owners = '' OR owners = '[]'`);
   // Who made the call, beside whose balance moved — see WalletTransaction.initiatorGaii.
   safeAddColumn('wallet_transactions', 'initiatorGaii', 'TEXT');
   // What a granted app may spend of its owner's money, and what it has spent so far.

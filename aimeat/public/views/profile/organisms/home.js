@@ -58,7 +58,9 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [pendingJoin, setPendingJoin] = useState(0);   // Members tab pill — visible without opening the tab
   useEffect(() => { try { sessionStorage.setItem('aimeat.org.tab', tab); } catch { /* noop */ } }, [tab]);   // eslint-disable-line aimeat/no-silent-catch -- noop
 
-  const isCreator = org.creatorGhii === ghii;
+  // Ownership is plural. `owners` is the truth; `creatorGhii` is the deprecated mirror of owners[0]
+  // and is only read for an organism served by a node that predates the split.
+  const isCreator = (org.owners?.length ? org.owners : [org.creatorGhii]).includes(ghii);
   const isAdmin = org.admins?.includes(ghii);
   // members[] can be roster-redacted (memberVisibility) — your_membership from GET /:id is the
   // caller-scoped truth, with the array as fallback for orgs whose roster this caller CAN see.

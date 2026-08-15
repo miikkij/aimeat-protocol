@@ -39,6 +39,7 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { loadServedProvenanceMany } from '../../services/ai-provenance-marks.js';
 import { fresherRec } from './shared.js';
 import { logger } from '../../utils/logger.js';
+import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 export function registerOrganismWorkspaceReadRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
@@ -598,7 +599,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const rec = scan.items.find(r => r.key === key);
     if (!rec) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Comment not found')); return; }
     const isAuthor = rec.ownerGaii === callerGaii;
-    const isAdmin = organism.creatorGhii === callerOwner || organism.admins.includes(callerOwner);
+    const isAdmin = isOrganismOwner(organism, callerOwner) || organism.admins.includes(callerOwner);
     if (!isAuthor && !isAdmin) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the comment author or an organism admin can delete it')); return;
     }

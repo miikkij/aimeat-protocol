@@ -64,6 +64,7 @@ export async function readOrganismConfig(
 // import of these from ./shared.js keeps resolving, including src/mcp/workspaces.ts.
 export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo } from './record-helpers.js';
 import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule } from './record-helpers.js';
+import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 export type ShareAccess = 'open' | 'password' | 'account';
 export type ShareMeta = {
@@ -693,7 +694,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const callerGhii = req.auth!.owner as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
-    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+    if (!isOrganismOwner(organism, callerGhii) && !organism.admins.includes(callerGhii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage invitations'));
       return null;
     }

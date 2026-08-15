@@ -37,6 +37,7 @@ import { getOrganismReadme } from '../../services/organism-readme.js';
 import { createOrganismRecord, updateOrganismRecord, joinOrganism, leaveOrganism } from '../../services/organism-lifecycle.js';
 import { revokeDepartedMemberAccess } from '../../services/invitations.js';
 import type { OrganismHelpers } from './shared.js';
+import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -188,7 +189,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       }
     }
     // Join requests only for orgs the caller manages (creator/admin) — kept per-org (typically few managed).
-    const managed = orgs.filter(org => org.creatorGhii === owner || (org.admins ?? []).includes(owner));
+    const managed = orgs.filter(org => isOrganismOwner(org, owner) || (org.admins ?? []).includes(owner));
     await Promise.all(managed.map(async (org) => {
       const jr = await storage.listJoinRequests(org.id, { status: 'pending' });
       if (jr.length) joinRequests.push({ kind: 'join', n: jr.length, orgId: org.id, orgName: org.name });
@@ -258,7 +259,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     }
 
     // Only creator or admin can update
-    if (organism.creatorGhii !== ghii && !organism.admins.includes(ghii)) {
+    if (!isOrganismOwner(organism, ghii) && !organism.admins.includes(ghii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only creator or admin can update'));
       return;
     }
@@ -289,7 +290,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       return;
     }
 
-    if (organism.creatorGhii !== ghii) {
+    if (!isOrganismOwner(organism, ghii)) {
       res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator can delete'));
       return;
     }

@@ -4631,7 +4631,13 @@
     "docSpaceNamePlaceholder": "Uuden dokumenttitilan nimi",
     "instrBlockBtn": "AI-ohjeet",
     "instrBlockHint": "Valmis blokki AI-chattisi ohjeisiin, generoituna tämän organismin oikeasta rakenteesta",
-    "instrBlockLead": "Liitä tämä tekoälysi ohjeisiin, niin jokainen keskustelu alkaa tietäen tämän organismin rakenteen. Vähemmän uudelleenselittämistä, vähemmän tokeneita saman kontekstin lähettämiseen, ja agenttisi kirjoittavat samoihin paikkoihin joten ne voivat jatkaa toistensa työstä."
+    "instrBlockLead": "Liitä tämä tekoälysi ohjeisiin, niin jokainen keskustelu alkaa tietäen tämän organismin rakenteen. Vähemmän uudelleenselittämistä, vähemmän tokeneita saman kontekstin lähettämiseen, ja agenttisi kirjoittavat samoihin paikkoihin joten ne voivat jatkaa toistensa työstä.",
+    "addOwner": "Tee myös omistajaksi",
+    "removeOwner": "Poista omistajuus",
+    "ownerAdded": "Omistaja lisätty",
+    "ownerRemoved": "Omistajuus poistettu",
+    "confirmAddOwner": "Tehdäänkö {member} myös omistajaksi? Hän saa kaiken minkä sinäkin, ja sinä pidät omasi.",
+    "confirmRemoveOwner": "Poistetaanko {member} omistajista? Hän jää adminiksi."
   },
   "organisms.accessNone": "Ei pääsyä",
   "organisms.accessUpdateFailed": "Oikeuksien päivitys epäonnistui",

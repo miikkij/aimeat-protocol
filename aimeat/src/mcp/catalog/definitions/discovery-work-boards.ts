@@ -180,7 +180,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         },
     },
     {
-        name: 'aimeat_admin_organism_owner_set',
+        name: 'aimeat_admin_organism_owner_add',
         description: 'Operator-only break-glass. Make an owner the creator of an organism the caller does not own, for the case where the organism\'s own creator account can no longer be reached. The previous creator stays on as an admin, and a target who is not yet a member is seated as one; a blocked target is refused. Needs the exact permission operator:organism-repair, which no wildcard carries. The ordinary handover, by the current creator to an existing member, is aimeat_organism_update\'s sibling route POST /v1/organisms/{id}/transfer.',
         caller: 'operator',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },

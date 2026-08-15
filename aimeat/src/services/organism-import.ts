@@ -79,7 +79,10 @@ export async function restoreOrganismFromFiles(
   await storage.createOrganism({
     id, name, description: o.description || '', type: type as 'community' | 'team' | 'club' | 'cooperative' | 'project',
     location: {}, interests: Array.isArray(o.interests) ? o.interests as string[] : [],
-    creatorGhii: importerOwner, admins: [importerOwner], members: [importerOwner], agentGaiis: [],
+    // An import makes a NEW organism here, so the importer both made it and holds it. The exporting
+    // node's creator is not carried over: they have no account on this node to be an owner of.
+    creatorGhii: importerOwner, createdBy: importerOwner, owners: [importerOwner],
+    admins: [importerOwner], members: [importerOwner], agentGaiis: [],
     boardId, joinPolicy: joinPolicy as 'open' | 'approval_required' | 'invite_only', maxMembers: 500,
     visibility: visibility as 'public' | 'listed' | 'private',
     moderationConfig: { flagsEnabled: true, autoHideThreshold: 3, appealsEnabled: true },
