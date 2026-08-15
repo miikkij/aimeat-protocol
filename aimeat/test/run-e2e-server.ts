@@ -97,6 +97,15 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         AIMEAT_NODE_TYPE: process.env.AIMEAT_NODE_TYPE ?? 'full',
         // The --db flag already decides this; pinning it removes the question of which one wins.
         AIMEAT_STORAGE: target.dbType,
+        // Thirteen suites boot a node of their OWN with loadConfig({}), and config.ts defaults
+        // sqlitePath to './data/aimeat.db' — the developer's working node. Nothing pinned this, so
+        // those nodes wrote their accounts, extensions and morsels into it and left them: 242 owners
+        // measured in that file on 2026-08-15, 241 of them from past runs of e2e-money-audit. It also
+        // produced a failure that looks exactly like flakiness, because the first run against that
+        // file takes the operator role permanently (routes/ghii/register-login.ts promotes only while
+        // no operator exists) and every run after it is refused every operator-only assertion.
+        // Pinned here so a suite has to opt OUT of the test database rather than opt in.
+        AIMEAT_SQLITE_PATH: target.dbType === 'sqlite' ? target.dbPath : '',
         // The runner empties the database the RUNNER resolved. Pinning the same string on the
         // server is what guarantees the two are the same database: a developer's .env carrying a
         // DATABASE_URL would otherwise point the server at a database nothing here ever cleans.

@@ -49,11 +49,12 @@ pnpm test:e2e:guards:sqlite
 pnpm test:e2e:guards:postgres-kysely
 ```
 
-Twelve suites, 323 assertions, under half a minute per backend. Membership is one question: **does a failure here mean a principal can reach money, an identity, or another account's data that they must not?** Everything in it asserts a refusal or an isolation boundary.
+Fourteen suites, 407 assertions, under a minute per backend. Membership is one question: **does a failure here mean a principal can reach money, an identity, or another account's data that they must not?** Everything in it asserts a refusal or an isolation boundary.
 
 - **Run it before you push** anything touching `src/routes/`, `src/auth/`, `src/services/` or `src/storage/`. It is cheap enough that there is no argument for skipping it, and it is what CI will run.
 - **A suite you fixed can be promoted into the tier.** That is the intended direction of travel, and it is how the advisory sweep shrinks.
-- **A suite cannot be in the tier if its result depends on what ran before it.** `e2e-money-audit` and `e2e-zip-security` are out for that reason: both need an operator and both get one by registering the first owner on the node, so they pass or fail according to their neighbours. Arranging the operator explicitly is what would let them in.
+- **A suite cannot be in the tier if its result depends on what ran before it.** `e2e-money-audit` and `e2e-zip-security` were held out for a day on that basis and are in now: the dependency turned out to be a defect, not a property. See the rule below.
+- **A suite that boots its own node must say where that node's data goes.** Thirteen suites call `createServer()` themselves, and `config.ts` defaults `sqlitePath` to `./data/aimeat.db` — the developer's working node. `e2e-money-audit` had been registering its accounts there for months (242 owners measured on 2026-08-15, 241 of them its own), and because the first owner on a node is promoted to operator and nobody else ever is, its first run took that role permanently and every run after it failed the same 18 assertions. The runner pins `AIMEAT_SQLITE_PATH` now, so a suite has to opt OUT of the test database rather than opt in; a suite running a SECOND node beside the runner's should still name a file of its own, because two nodes must not share one SQLite file.
 - Removing an entry is a decision to stop guarding something. Say why in the commit.
 
 ### Rule 2: New Features Must Have Tests

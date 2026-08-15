@@ -13,9 +13,8 @@
  *            .github/workflows/ci.yml were `continue-on-error: true`, so no red suite has ever
  *            stopped a merge and every improvement to this directory was optional. The full sweep
  *            stays advisory -- two hours, and §18's cleanup race makes it occasionally wrong -- and
- *            twelve suites that assert a refusal or an isolation boundary block instead. 323
- *            assertions, both backends, measured before it was wired up. Two more were measured and
- *            left out; the reason is on GUARD_SUITES and it is about those suites, not the gate.
+ *            fourteen suites that assert a refusal or an isolation boundary block instead. 407
+ *            assertions, both backends, measured before it was wired up.
  *   v1.16.0 -- 2026-08-14 -- Add e2e-capability-webhook-update.ts, and stop the list drifting from
  *            the directory it describes. The list cannot notice its own gaps, so the runner now
  *            reads test/ and compares: a suite file on no list is fatal on a full run and a warning
@@ -435,23 +434,25 @@ const ALL_SUITES = [
  *
  * So a small tier blocks instead. Membership is one question: does a failure here mean a principal
  * can reach money, an identity, or another account's data that they must not? Everything below either
- * asserts a refusal or asserts an isolation boundary. Measured 2026-08-15 on both backends: 323
- * assertions, under 20 seconds — cheap enough that nobody has a reason to skip it.
+ * asserts a refusal or asserts an isolation boundary. Measured 2026-08-15 on both backends: 407
+ * assertions, under a minute — cheap enough that nobody has a reason to skip it.
  *
  * A suite named here that is not in ALL_SUITES exits 1 rather than running fewer tests quietly, which
  * is what a rename would otherwise do. Adding to this list is welcome; removing from it is a decision
  * to stop guarding something, and the reason belongs in the commit that does it.
  *
- * TWO SUITES THAT BELONG HERE AND ARE NOT IN IT YET. e2e-money-audit (60 assertions on who gets
- * billed) and e2e-zip-security (7 on archive extraction) both need an operator, and both get one the
- * same way: registering the first owner on the node, which routes/ghii/register-login.ts promotes
- * when no operator exists yet. That makes them depend on what ran before them. Measured 2026-08-15:
- * e2e-money-audit is 60/60 on postgres-kysely, 42/60 on sqlite alone, and 60/60 on sqlite when it
- * runs thirteenth; e2e-zip-security is 7/7 on both alone and failed 0/7 once on postgres inside a
- * fourteen-suite run. The sqlite-alone failure is the decisive reading and was taken with this
- * commit's source change STASHED, so it is main's behaviour and not this change's. A blocking gate cannot contain a suite whose result depends on its neighbours,
- * so they stay in the advisory sweep until the operator they need is arranged rather than inherited.
- * That is Part B work on the suites themselves, not a reason to weaken the gate.
+ * THE TWO THAT WERE HELD BACK ARE IN. e2e-money-audit and e2e-zip-security were kept out on
+ * 2026-08-15 because their result depended on what had run before them: both need an operator, and
+ * both get one by registering the first owner on the node, which routes/ghii/register-login.ts
+ * promotes only while no operator exists yet.
+ *
+ * That was not the flake it looked like. e2e-money-audit boots a node of its OWN, and nothing pinned
+ * AIMEAT_SQLITE_PATH, whose default in config.ts is `./data/aimeat.db` — so on the sqlite backend
+ * that node never touched the test database at all. It ran against the DEVELOPER'S working node:
+ * 242 owners measured in that file, 241 of them from past runs of this one suite, and the seed
+ * account of its first ever run still holding the operator role, which is why every run after that
+ * one failed the same 18 assertions. run-e2e-server.ts pins the path now and the suite takes a
+ * private file of its own; both suites are green repeatedly on both backends.
  */
 const GUARD_SUITES = [
     'test/e2e-account-security-gate.ts',    // the doors back INTO the account: password, recovery, 2FA, deletion
@@ -466,6 +467,8 @@ const GUARD_SUITES = [
     'test/e2e-mcp-scopes.ts',               // the tool surface is filtered by the words the owner ticked
     'test/e2e-board-access.ts',             // reading, posting and replying on a board you were not let into
     'test/e2e-storage-visibility.ts',       // private, shared and public files, and who may fetch which
+    'test/e2e-money-audit.ts',              // no path mints, double-spends or bills the wrong account
+    'test/e2e-zip-security.ts',             // an uploaded archive cannot write outside where it was unpacked
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

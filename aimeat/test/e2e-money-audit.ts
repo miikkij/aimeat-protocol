@@ -41,6 +41,38 @@ process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX = '200';
 // this file ("right unit?", "does a ceiling hold?") are only answerable if money can actually settle.
 process.env.AIMEAT_TEST_MONEY_HANDLER = 'true';
 if (!process.env.AIMEAT_ADMIN_PASSWORD) process.env.AIMEAT_ADMIN_PASSWORD = randomBytes(16).toString('base64url');
+// THIS SUITE BRINGS ITS OWN NODE, SO IT HAS TO SAY WHERE THAT NODE'S DATA GOES.
+//
+// It did not, and the default in config.ts is `./data/aimeat.db` — the DEVELOPER'S OWN local node.
+// So on the sqlite backend this suite never touched the test database at all: it registered its
+// accounts, installed its extensions and moved its morsels inside the working node, and left them
+// there. Measured 2026-08-15 on this machine: 242 owners in data/aimeat.db, 241 of them `ma*`
+// accounts from past runs of this file.
+//
+// That is also the whole of the "flakiness". `setupOwner('seed')` is promoted to operator only while
+// NO operator exists yet (routes/ghii/register-login.ts), so the first run against that file made its
+// seed the operator permanently — maseed1786820376379, still there — and every run afterwards found
+// an operator already present, was not promoted, and failed the same 18 of 60 assertions. First run
+// green, everything after red, which reads as a flake and is not one.
+//
+// The runner now pins AIMEAT_SQLITE_PATH for every suite (test/run-e2e-server.ts), so no
+// self-spawning node can reach the developer's database by default. This suite goes one further and
+// takes a file of its own, because it runs a SECOND node beside the runner's and two nodes must not
+// share one SQLite file. On postgres-kysely it still shares the runner's database — that one cannot
+// be fixed here (the role deliberately may not create a database) and has been stable, because
+// TRUNCATE between suites does not disturb an idle pool.
+//
+// Deleted on the way IN rather than on the way out, which is the runner's own pattern: on Windows the
+// node still holds the handle for a moment after close(), so a delete at exit fails, is caught, and
+// leaves a file behind that the next run would then inherit — the very thing this block exists to
+// prevent. Nothing holds it before boot.
+process.env.AIMEAT_SQLITE_PATH = 'test/.test-money-audit.db';
+if ((process.env.AIMEAT_STORAGE ?? '') === 'sqlite') {
+    const { rmSync } = await import('node:fs');
+    for (const suffix of ['', '-shm', '-wal']) {
+        rmSync(process.env.AIMEAT_SQLITE_PATH + suffix, { force: true });
+    }
+}
 const { config } = loadConfig({});
 config.port = PORT;
 const NODE_ID = config.nodeId;
@@ -1202,6 +1234,38 @@ await test('APP CAP · a ceiling on what an app may spend of your money holds, a
     const reset = await json(`/v1/app-grants/${grantId}/spend-cap`, { method: 'PATCH', headers: auth(consumer.token), body: JSON.stringify({ reset: true }) });
     assert(reset.status === 200 && reset.body.data.spent_morsels === 0, `counter cleared: ${JSON.stringify(reset.body?.data)}`);
     assert((await call()).status === 200, 'and the app may spend again');
+
+    // WHO MAY MOVE THE DIAL. Every PATCH above is the human's own token, so the door that sets the
+    // ceiling was never asked about the credential the ceiling exists to bound. Delete
+    // requireRole('owner') from PATCH /v1/app-grants/:grantId/spend-cap and the app raises its own
+    // cap — or POSTs {reset:true} after every APP_SPEND_CAP refusal — because it already holds
+    // contract:spend and `grant.owner === req.auth.owner` is TRUE for an app grant: that field
+    // carries the human's account name on every principal, which is invariant 11.
+    await json(`/v1/app-grants/${grantId}/spend-cap`, { method: 'PATCH', headers: auth(consumer.token), body: JSON.stringify({ cap_morsels: 8, reset: true }) });
+    await call();                                    // spend the one call the ceiling allows
+    assert((await call()).body?.error?.code === 'APP_SPEND_CAP', 'the ceiling is biting again');
+
+    const selfRaise = await json(`/v1/app-grants/${grantId}/spend-cap`, {
+        method: 'PATCH', headers: auth(appToken), body: JSON.stringify({ cap_morsels: 100000 }),
+    });
+    assert(selfRaise.status === 403,
+        `the app raised its own ceiling: ${selfRaise.status} ${JSON.stringify(selfRaise.body?.data ?? selfRaise.body?.error)}`);
+    const selfReset = await json(`/v1/app-grants/${grantId}/spend-cap`, {
+        method: 'PATCH', headers: auth(appToken), body: JSON.stringify({ reset: true }),
+    });
+    assert(selfReset.status === 403, `the app cleared its own counter: ${selfReset.status}`);
+
+    // A second human is not the owner of this grant and must not find it at all.
+    const stranger = await setupOwner('capx');
+    const theirs = await json(`/v1/app-grants/${grantId}/spend-cap`, {
+        method: 'PATCH', headers: auth(stranger.token), body: JSON.stringify({ cap_morsels: 100000 }),
+    });
+    assert(theirs.status === 404, `another owner reached this grant: ${theirs.status}`);
+
+    // And after all of that the ceiling is still where the human left it.
+    const still = await call();
+    assert(still.status === 402 && still.body?.error?.code === 'APP_SPEND_CAP',
+        `the ceiling survived the attempts to move it: ${still.status} ${JSON.stringify(still.body?.error)}`);
 });
 
 await test('LOCKED INPUT · a tool can fix a parameter the caller cannot talk their way past', async () => {
@@ -1471,6 +1535,80 @@ await test('APP GRANT · an app can be given the right to hand out its owner\'s 
     const defaults = (cat.body.data.scopes as any[]).filter(s2 => s2.default).map(s2 => s2.scope);
     assert(!defaults.includes('exchange:grant') && !defaults.includes('contract:spend'),
         `neither is granted by default: ${JSON.stringify(defaults)}`);
+});
+
+/** An app grant of the provider's, carrying exactly the scopes asked for. */
+async function appGrantFor(person: { name: string; token: string }, scopes: string, file: string) {
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(person.token),
+        body: JSON.stringify({
+            filename: file, content: Buffer.from('<!DOCTYPE html><html><body>grantprobe</body></html>').toString('base64'),
+            name: 'Grant Probe', description: 'money audit probe', category: 'utility',
+        }),
+    });
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const REDIRECT = 'http://localhost:9/cb';
+    const q = new URLSearchParams({
+        app: `${person.name}/${file}`, response_type: 'code', scope: scopes,
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(person.token), body: JSON.stringify({ request_id: rid }) });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }) });
+    assert(!!tok.body.data?.access_token, `app grant for [${scopes}]: ${JSON.stringify(tok.body?.error)}`);
+    return tok.body.data.access_token as string;
+}
+
+await test('APP GRANT · exchange:grant is ENFORCED on the door, not only offered in the catalogue', async () => {
+    // The test above proves the word is askable. Nothing proved it is required: every grant in this
+    // file is issued and revoked with the provider's OWNER session, and an owner session bypasses
+    // requireScope. So `requireScope('exchange:grant')` could be deleted from POST
+    // /v1/exchange/grants and /grants/revoke and all sixty assertions here would still pass, while an
+    // app or agent holding nothing but memory:read hands out — or withdraws — its owner's 8-morsel
+    // product for free. Giving away revenue is the one act this word exists for.
+    const beneficiary = await setupOwner('gben');
+
+    const withoutTheWord = await appGrantFor(provider, 'memory:read', `grant-probe-a-${Date.now()}.html`);
+    const refused = await json('/v1/exchange/grants', {
+        method: 'POST', headers: auth(withoutTheWord),
+        body: JSON.stringify({ consumer: beneficiary.name, offering_id: offeringSolo, cap_carried_units: 50 }),
+    });
+    assert(refused.status === 403 && refused.body?.error?.code === 'SCOPE_DENIED',
+        `an app without the word gave away its owner's product: ${refused.status} ${JSON.stringify(refused.body?.error ?? refused.body?.data)}`);
+    const revokeRefused = await json('/v1/exchange/grants/revoke', {
+        method: 'POST', headers: auth(withoutTheWord),
+        body: JSON.stringify({ consumer: beneficiary.name, offering_id: offeringSolo }),
+    });
+    assert(revokeRefused.status === 403, `and it withdrew one: ${revokeRefused.status}`);
+
+    // The positive control: with the word ticked, the same app does the same thing. A refusal that
+    // refuses everybody is not a permission, it is an outage.
+    const withTheWord = await appGrantFor(provider, 'memory:read exchange:grant', `grant-probe-b-${Date.now()}.html`);
+    const issued = await json('/v1/exchange/grants', {
+        method: 'POST', headers: auth(withTheWord),
+        body: JSON.stringify({ consumer: beneficiary.name, offering_id: offeringSolo, cap_carried_units: 50 }),
+    });
+    assert(issued.status === 201, `the app that WAS given the word could not use it: ${issued.status} ${JSON.stringify(issued.body?.error)}`);
+
+    // And the grant is real: the beneficiary calls the provider's product without paying for it.
+    const before = await balance(beneficiary.token);
+    const call = await json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(beneficiary.token), body: JSON.stringify({ q: 'hi' }) });
+    assert(call.status === 200, `the granted call is served: ${call.status} ${JSON.stringify(call.body?.error)}`);
+    assert(await balance(beneficiary.token) === before, 'and a granted call costs the beneficiary nothing');
+});
+
+await test('LINEAGE · the consumer list of a listing is the PROVIDER\'s, and nobody else\'s', async () => {
+    // Read only with provider.token anywhere in this file, though six owners are in hand. Delete
+    // `|| o.providerOwner !== req.auth!.owner` from routes/exchange-market.ts and any signed-in owner
+    // reads who holds a contract against any listing: their GAIIs, their agent breakdown, settled and
+    // carried units.
+    const mine = await json(`/v1/exchange/offerings/${offeringSolo}/consumers`, { headers: auth(provider.token) });
+    assert(mine.status === 200, `the provider reads their own lineage: ${mine.status}`);
+    const theirs = await json(`/v1/exchange/offerings/${offeringSolo}/consumers`, { headers: auth(consumer.token) });
+    assert(theirs.status === 404, `another owner read the provider's consumer list: ${theirs.status}`);
 });
 
 console.log(`\n═══ MONEY AUDIT: ${passed} passed, ${failed} failed (${passed + failed} total) ═══\n`);
