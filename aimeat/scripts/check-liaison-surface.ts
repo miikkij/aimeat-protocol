@@ -26,6 +26,9 @@
  *   cd aimeat && pnpm check:liaison-surface --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:liaison-surface --record   # after publishing, write the new baseline
  * @version-history
+ *   v1.1.0 — 2026-08-15 — Say when a release is STAGED but not out. A bumped version with a moved
+ *     fingerprint satisfied neither failure condition, so the reminder vanished the moment somebody
+ *     edited package.json and nothing mentioned it again. Reported every run, never fatal.
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit: the surfaces the drift map could not see).
  */
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -177,10 +180,30 @@ function main(): void {
     } else {
         console.log('  baseline  none yet — run --record once to establish it');
     }
-    console.log('');
+    // A version bumped but not yet published is invisible to the checks above: the fingerprint moved
+    // AND the version moved, so neither condition fires, and the reminder disappears the moment
+    // somebody edits package.json. That is the state this repo is in between deciding to release and
+    // actually releasing, and it can last indefinitely with nothing saying so. It is NOT a failure —
+    // blocking every commit until a publish happens would be worse than the drift — but it is said
+    // out loud, every run, until the baseline catches up.
+    const pending: string[] = [];
+    if (base) {
+        if (base.npm.fingerprint !== now.npm.fingerprint && base.npm.version !== now.npm.version) {
+            pending.push(`npm aimeat@${now.npm.version} is staged (baseline records ${base.npm.version}, `
+                + `${base.npm.toolCount} → ${now.npm.toolCount} tools)`);
+        }
+        if (base.pypi.fingerprint !== now.pypi.fingerprint && base.pypi.version !== now.pypi.version) {
+            pending.push(`pypi aimeat-crewai@${now.pypi.version} is staged (baseline records ${base.pypi.version}, `
+                + `${base.pypi.toolCount} → ${now.pypi.toolCount} tools)`);
+        }
+    }
+    for (const p of pending) console.log(`  ⏳ ${p} — publish it, then \`pnpm check:liaison-surface --record\``);
+    if (pending.length) console.log('');
 
     if (!problems.length) {
-        console.log('  ✓ both published surfaces match what this node registers, and neither needs a release');
+        console.log(pending.length
+            ? '  ✓ no surface is out of step with an unbumped version — one release is still waiting to go out'
+            : '  ✓ both published surfaces match what this node registers, and neither needs a release');
         return;
     }
     for (const p of problems) console.log('  ✖ ' + p + '\n');
