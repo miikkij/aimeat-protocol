@@ -17,6 +17,7 @@
 #  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
 #  11b. Language files agree with en.json  — pnpm check:locales
 #  12. Route authorization gates        — pnpm check:route-scopes
+#  12b. E2E suites test a refusal       — pnpm check:denial-coverage
 #  13. Outbound fetch through safeFetch — pnpm check:outbound-fetch
 #  14. Server-trusted memory keys       — pnpm check:trusted-keys
 #  15. Owner-scoped tables vs cascades  — pnpm check:storage-parity
@@ -98,6 +99,9 @@ pnpm -s check:locales
 # seeds live in aimeat/security/*.json with a reason per entry.
 echo "[pre-commit] Route authorization gates (check:route-scopes)…"
 pnpm -s check:route-scopes
+
+echo "[pre-commit] Every suite asks what a second principal gets (check:denial-coverage)…"
+pnpm -s check:denial-coverage
 
 echo "[pre-commit] Outbound fetch goes through safeFetch (check:outbound-fetch)…"
 pnpm -s check:outbound-fetch

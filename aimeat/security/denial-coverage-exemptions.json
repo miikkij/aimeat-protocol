@@ -1,0 +1,361 @@
+{
+  "note": "Registered E2E suites with no assertion about a 401 or 403. Seeded from the state on 2026-08-15 so the gate can only ratchet down. The `sha` pins the reason to the file it was written about: EDIT THE SUITE AND ITS EXEMPTION EXPIRES, because the person editing it is the one person who has the context to add the missing case. Re-stamping the sha without adding a denial is available and is a decision someone has to write down.",
+  "exempt": {
+    "test/e2e-agent-capabilities.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "0db93e273c4c88a8"
+    },
+    "test/e2e-oauth-login.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "0b3718a6714b3ae4"
+    },
+    "test/e2e-app-publish-gate.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "ca773c65a478d990"
+    },
+    "test/e2e-app-descriptions.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "265bfbbae4e81d36"
+    },
+    "test/e2e-portfolio-origin.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "8121169cd1184d2d"
+    },
+    "test/e2e-sse.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "f9f019b119567492"
+    },
+    "test/e2e-calibrator.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "162fe1bb785a62c0"
+    },
+    "test/e2e-ext-paywall.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "087351267457eb0c"
+    },
+    "test/e2e-ext-files.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "7ac09408557ee264"
+    },
+    "test/e2e-mcp-cross-owner.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "e7654c91596a3542"
+    },
+    "test/e2e-mcp-agent-tasks.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "fa1a7236275a712a"
+    },
+    "test/e2e-mcp-schedule-trigger.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "d9c2c1b98fb047e5"
+    },
+    "test/e2e-mcp-sse-parity.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "52885311c2194490"
+    },
+    "test/e2e-pacing.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "d227f8a82210602f"
+    },
+    "test/e2e-exchange-projection.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "fec3a0c5c834fe14"
+    },
+    "test/e2e-exchange-mcp.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "24594cc6df6f6d57"
+    },
+    "test/e2e-mcp-beneficiary.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "ba7d6f7242e9e588"
+    },
+    "test/e2e-extension-secrets.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "d2b0d7c7c65afbfd"
+    },
+    "test/e2e-iam-extension.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "4d37d4f8f13b0d78"
+    },
+    "test/e2e-federation-nodeinfo.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "ca4b8b47b52bbca3"
+    },
+    "test/e2e-hello-mcp.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "d032e6848a678b33"
+    },
+    "test/e2e-device-token-grace.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "616bae1e919225ae"
+    },
+    "test/e2e-agent-reapproval.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "f3130c42b0cdd0aa"
+    },
+    "test/e2e-agent-health.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "1882209589a5f2d5"
+    },
+    "test/e2e-registration-invites.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "9bfa527729132d7e"
+    },
+    "test/e2e-ai-provenance-surfaces.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "c5e93def548ac8ea"
+    },
+    "test/e2e-ai-provenance-connector.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "1a79705e4d2dea3d"
+    },
+    "test/e2e-app-publish-provenance-doors.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "62f29c3fd26c7779"
+    },
+    "test/e2e-libs.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "1fbf0b7998c86338"
+    },
+    "test/e2e-library-packs.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "0e7291d69a964e2e"
+    },
+    "test/e2e-appdev-pitfalls.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "3fd5b45ba2427af2"
+    },
+    "test/e2e-appdev-flow.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "9dd582c6b6603ea1"
+    },
+    "test/e2e-mcp-scopes.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "9d12d0ab831556ae"
+    },
+    "test/e2e-mcp-v2.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "e05b4682d29bba74"
+    },
+    "test/e2e-mcp-orientation.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "473b75bdf85ad5c4"
+    },
+    "test/e2e-mcp-boards.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "9989439708aacb04"
+    },
+    "test/e2e-mcp-extensions.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "85dddc823e75f290"
+    },
+    "test/e2e-mcp-knowledge.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "7f98ea1ed663605c"
+    },
+    "test/e2e-mcp-appdev-pitfalls.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "fcb021f09985905d"
+    },
+    "test/e2e-app-template-proposals.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "d0b0e446f8088a79"
+    },
+    "test/e2e-appdev-proofs.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "2f46a195b344bd30"
+    },
+    "test/e2e-mcp-organisms.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "6532030bdc857681"
+    },
+    "test/e2e-write-guards.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "053ebaf21a68efb1"
+    },
+    "test/e2e-x402.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "29c33da073b11f15"
+    },
+    "test/e2e-x402-testnet.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "63a20107e5207f5e"
+    },
+    "test/e2e-organism-member-visibility.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "3949d2576b76ac2e"
+    },
+    "test/e2e-agent-readiness.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "cdd937f63335b84d"
+    },
+    "test/e2e-transparency-page.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "768ed6a78d9a41d4"
+    },
+    "test/e2e-organism-decision-cap.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "6bb6ee5195ac41dc"
+    },
+    "test/e2e-organism-delete-cascade.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "1cbaf75ecf0590a8"
+    },
+    "test/e2e-organism-bulk-app-origin.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "067ec45de559b6d2"
+    },
+    "test/e2e-zip-security.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "cebd0648cbad8ce9"
+    },
+    "test/e2e-workspace-kpi.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "226e541693b9b3b8"
+    },
+    "test/e2e-workspace-publish-guard.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "c9d466047db413a4"
+    },
+    "test/e2e-workspace-backing-gate.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "ed17bc087ec2228e"
+    },
+    "test/e2e-mcp-memory-extended.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "42acc0e26f8a29de"
+    },
+    "test/e2e-mcp-wallet-extended.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "11c7e79a45e4ac5d"
+    },
+    "test/e2e-mcp-companies.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "3f9ac5a878728202"
+    },
+    "test/e2e-mcp-consent.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "708be57d74d9485d"
+    },
+    "test/e2e-mcp-chat-instances.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "3f37439ab72dd6c2"
+    },
+    "test/e2e-mcp-flags.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "72a1da744d0cdff9"
+    },
+    "test/e2e-mcp-commerce.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "2d055dd50ce213f4"
+    },
+    "test/e2e-mcp-prompts.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "cf48299a7e44de50"
+    },
+    "test/e2e-connect-tunnel-delivery.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "374ff3925654ca54"
+    },
+    "test/e2e-connect-tunnel-records.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "cbfc438922d7864c"
+    },
+    "test/e2e-connect-serve-loopback.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "9ba4093f7834bf64"
+    },
+    "test/e2e-portal.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "7834c004b9ccc67a"
+    },
+    "test/e2e-memory-file-presigned.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "6ee449518f5be4ee"
+    },
+    "test/e2e-capability-trust-guard.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "a0094d954e9bf230"
+    },
+    "test/cortex-ui-e2e.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "9d1b81b8c99d44fc"
+    },
+    "test/e2e-audio-speech.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "f7c0ce1ae8df2766"
+    },
+    "test/e2e-message-transcript.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "cc93f9090d00affd"
+    },
+    "test/e2e-dm-send-as-owner.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "1d652db8246ba7b5"
+    },
+    "test/e2e-interactive-messages.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "2329b525c19e5057"
+    },
+    "test/e2e-members.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "f3bc7fae3449b261"
+    },
+    "test/e2e-tracked-response.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "417da2e8b410d254"
+    },
+    "test/e2e-attachment-sweep.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "3026905962578080"
+    },
+    "test/e2e-agent-services.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "20cde23a6d19248f"
+    },
+    "test/e2e-integration-kit.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "6eea5bfd2185da86"
+    },
+    "test/e2e-inbox-cursor.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "3d71cf560b1be0cc"
+    },
+    "test/e2e-agent-telemetry.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "ad2e21d075f17afc"
+    },
+    "test/e2e-agent-onboarding.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "dcd563791ff04235"
+    },
+    "test/e2e-agent-connect-email.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "6d1fb46364ba68c7"
+    },
+    "test/e2e-ecosystem-automation-recipe.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "e269aaf73e8577b7"
+    },
+    "test/e2e-ecosystem-validation.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "9703d83a96f392c2"
+    },
+    "test/e2e-workflows.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "b2fb95e403566c5c"
+    },
+    "test/e2e-workflows-human.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "6af766619d4ae496"
+    },
+    "test/e2e-public-activity.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "067aba73c3ec539c"
+    },
+    "test/e2e-public-totals.ts": {
+      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
+      "sha": "c7185060f37715d3"
+    }
+  }
+}

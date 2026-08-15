@@ -18,6 +18,7 @@ import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import reactHooks from 'eslint-plugin-react-hooks';
 import aimeatPlugin from './eslint-rules/index.js';
+import vitestPlugin from '@vitest/eslint-plugin';
 
 export default tseslint.config(
   eslint.configs.recommended,
@@ -179,10 +180,27 @@ export default tseslint.config(
     //                        under the cap moves assertions away from the setup that explains them.
     // What IS enforced is the part that decides whether a test can fail at all.
     files: ['test/**/*.ts'],
+    plugins: { vitest: vitestPlugin },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       'aimeat/file-header': 'off',
       'aimeat/max-file-lines': 'off',
+
+      // A test whose body contains no assertion cannot fail. The plugin normally recognises a test
+      // block by resolving `test`/`it` to a vitest import, and the E2E harness declares its own
+      // `async function test(name, fn)` locally — so the rule stays silent here unless it is told
+      // the name. `additionalTestBlockFunctions` is that instruction, and it is the whole reason
+      // this works on a hand-rolled harness at all.
+      //
+      // Do NOT pass `assertFunctionNames`. The plugin's default is ["expect", "assert"] — already
+      // this repo's E2E assertion name — and the option REPLACES the default rather than extending
+      // it, so naming `expect` alone silently stops counting every `assert()` in the E2E tree.
+      //
+      // Warn, not error: measured at 94 hits, of which ~54 are setup-shaped blocks (register, login,
+      // seed). Those are true positives by the rule's definition and not defects; the honest fix is
+      // to assert the setup's own result — `assert(token, 'login returned a token')` — because a
+      // silently-undefined token today surfaces as a cascade of confusing failures later.
+      'vitest/expect-expect': ['warn', { additionalTestBlockFunctions: ['test'] }],
 
       // A test whose assertion accepts two different statuses cannot tell the two apart, so the
       // one it was written for is no longer proven. 373 sites measured on 2026-08-15; warn while
