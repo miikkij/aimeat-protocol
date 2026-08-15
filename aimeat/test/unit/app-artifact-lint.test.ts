@@ -16,7 +16,12 @@
  *   belongs in the E2E suite, where there is a node listening. What is tested here is everything
  *   the check can decide from the bytes alone, plus the classification the probe depends on.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
- * @version-history v1.0.0 — 2026-08-11 — initial.
+ * @version-history
+ *   v1.1.0 — 2026-08-15 — The declared-but-unused trio. Two bugs of my own are recorded in these
+ *     cases: the first version reused an existing pitfall id for a new defect (which broke three
+ *     passing tests, correctly), and it detected the pill by an API name I guessed instead of the
+ *     real `mountLoginButton` — so it flagged the suite's own CLEAN app.
+ *   v1.0.0 — 2026-08-11 — initial.
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
@@ -50,7 +55,8 @@ const CLEAN = `<!DOCTYPE html><html lang="en"><head>
 
 const findings = async (html: string) => {
   const r = await lintAppArtifact(html, config);
-  return { ids: [...r.blocking, ...r.warnings].map(f => f.pitfall), ...r };
+  const all = [...r.blocking, ...r.warnings];
+  return { ids: all.map(f => f.pitfall), messages: all.map(f => f.message), ...r };
 };
 
 describe('lintAppArtifact — silence on a correct app', () => {
@@ -172,5 +178,61 @@ describe('lintAppArtifact — reading data the agents wrote', () => {
       </script></body></html>`;
     const { ids } = await findings(html);
     expect(ids).not.toContain('namespace-rule');
+  });
+
+  // ── Declared and never used (2026-08-15) ─────────────────────────────────────────────────────
+  //
+  // One run published an app carrying all three at once: aimeat-auth.js with no pill, a locales
+  // meta with nothing to switch, and daisyUI with no daisyUI class. None of them was reported,
+  // because none was checked — and the two findings that WERE returned got fixed on the spot,
+  // which is the whole argument for checking these.
+
+  it('flags an auth library that is loaded and never mounted', async () => {
+    const html = `<!DOCTYPE html><html><head>
+      <meta name="aimeat-app" content="x.html"><meta name="aimeat-scopes" content="memory:read">
+      <link rel="stylesheet" href="/lib/aimeat-theme.css">
+      <script src="/v1/libs/aimeat-auth.js"></script></head><body><h1>Archive</h1></body></html>`;
+    const { ids, messages } = await findings(html);
+    expect(ids).toContain('app-declared-unused');
+    expect(messages.join(' ')).toContain('never mounts the login pill');
+  });
+
+  it('stays quiet when the pill is actually mounted', async () => {
+    const html = `<!DOCTYPE html><html><head>
+      <meta name="aimeat-app" content="x.html"><meta name="aimeat-scopes" content="memory:read">
+      <meta name="aimeat-locales" content="en fi">
+      <link rel="stylesheet" href="/lib/aimeat-theme.css">
+      <script src="/v1/libs/aimeat-auth.js"></script></head><body>
+      <script>AIMEAT.auth.mountLoginButton('#pill', { onLogin: start });</script></body></html>`;
+    const { messages } = await findings(html);
+    expect(messages.join(' ')).not.toContain('never mounts the login pill');
+    expect(messages.join(' ')).not.toContain('no way to change language');
+  });
+
+  it('flags languages declared with nothing that switches them', async () => {
+    const html = `<!DOCTYPE html><html><head>
+      <meta name="aimeat-app" content="x.html"><meta name="aimeat-scopes" content="memory:read">
+      <meta name="aimeat-locales" content="en fi">
+      <link rel="stylesheet" href="/lib/aimeat-theme.css"></head><body><h1>Arkisto</h1></body></html>`;
+    const { messages } = await findings(html);
+    expect(messages.join(' ')).toContain('no way to change language');
+  });
+
+  it('flags daisyUI linked and never used, and stays quiet when it is used', async () => {
+    const head = `<meta name="aimeat-app" content="x.html"><meta name="aimeat-scopes" content="memory:read">
+      <meta name="aimeat-locales" content="en"><link rel="stylesheet" href="/lib/aimeat-theme.css">
+      <link rel="stylesheet" href="/lib/daisyui@5.css">`;
+    // Asserted on the MESSAGE, not the id: all three checks share one pitfall id, and this fixture
+    // also declares locales without a switcher, so the id is present either way.
+    const unused = await findings(`<!DOCTYPE html><html><head>${head}</head><body><div>plain</div></body></html>`);
+    expect(unused.messages.join(' ')).toContain('uses none of its classes');
+
+    const used = await findings(`<!DOCTYPE html><html><head>${head}</head><body><button class="btn btn-primary">Go</button></body></html>`);
+    expect(used.messages.join(' ')).not.toContain('uses none of its classes');
+  });
+
+  it('says nothing about any of the three for the clean app', async () => {
+    const { ids } = await findings(CLEAN);
+    expect(ids).not.toContain('app-declared-unused');
   });
 });

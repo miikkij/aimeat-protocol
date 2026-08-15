@@ -10,6 +10,7 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   v1.3.0 — 2026-08-15 — +app-declared-unused, the id the three new artifact-lint findings carry.
  *   v1.2.0 — 2026-08-11 — +inline-js-does-not-parse, +app-meta-declarations, +namespace-rule. All
  *     three are what the publish-time artifact check (services/app-artifact-lint.ts) reports by id,
  *     so a finding in a publish response resolves to a full entry at GET /v1/appdev/pitfalls/{id}.
@@ -86,6 +87,16 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     updatedAt: '2026-08-11',
+  }),
+  E({
+    id: 'app-declared-unused',
+    title: 'Loaded, declared, and never used',
+    symptom: 'The published app opens with no sign-in and no way to change language or theme, or it downloads daisyUI and renders unstyled. Every stylesheet is linked and none of it shows. The person finds this in five seconds by opening the app; no tool said anything.',
+    fix: 'Fetch `GET /v1/app-templates` and build on a shell. It already carries the login pill (which IS the sign-in, the language switch and the theme control), the design system, and the head declarations in their correct form. Writing the page from nothing means reproducing all of that from memory, and what actually happens is that it is left out — the app looks finished to whoever built it, because the only way to see the gap is to open it. If you keep a stylesheet or `aimeat-auth.js` in the head, use what it provides; a library that is loaded and unused is a page that looks connected and is not.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-08-15',
   }),
   E({
     id: 'namespace-rule',

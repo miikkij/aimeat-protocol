@@ -30,6 +30,10 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.1.0 — 2026-08-15 — checkDeclaredButUnused: an auth library loaded with no pill mounted, a
+ *     locales meta with nothing that switches language, daisyUI linked with no daisyUI class. One
+ *     run shipped all three at once, and the two findings the publish DID return were fixed on the
+ *     spot — which is the argument for checking these, not a comment on whoever built it.
  *   v1.0.0 — 2026-08-11 — initial: inline-JS parse + dead node asset URL (blocking); theme tokens,
  *     the head declarations and unscoped reads of agent-written data (warnings).
  */
@@ -86,8 +90,65 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   warnings.push(...checkTheme(html));
   warnings.push(...checkMetas(html));
   warnings.push(...checkAgentDataReads(html));
+  warnings.push(...checkDeclaredButUnused(html));
 
   return { blocking, warnings };
+}
+
+/**
+ * Three ways an app can LOAD the platform and never use it.
+ *
+ * All three came out of one run on 2026-08-15, and all three were invisible to every check that
+ * existed: the two hints the publish did return were fixed on the spot because they were in front of
+ * the builder, and these were not returned, so they shipped. Each is the same shape — a declaration
+ * in the head with nothing behind it — and each costs the person something they can see: no way to
+ * sign in, no way to change language, a design system that never renders.
+ *
+ * Warnings rather than blocks, deliberately. Live apps published before this check exists carry all
+ * three, and refusing their next update would take a working app off the air to make a point about
+ * its login pill. The repo has done that once already (changelog 1.33.1) and the lesson stuck.
+ */
+function checkDeclaredButUnused(html: string): AppArtifactFinding[] {
+  const out: AppArtifactFinding[] = [];
+  const head = html.slice(0, SCAN_BYTES);
+
+  // 1. The auth library is loaded and the pill is never mounted. The pill IS the login, the language
+  // switch and the theme control; without the mount the page has a script and no way in.
+  const loadsAuth = /aimeat-auth\.js/i.test(html);
+  // The real API is AIMEAT.auth.mountLoginButton (it delegates to mountPill internally). Matched on
+  // the verb rather than the full path, so a destructured or aliased call still counts — a check
+  // that only knows one spelling of a correct call is a check that flags correct apps.
+  const mountsPill = /mountLoginButton\s*\(|mountPill\s*\(|data-aimeat-pill|aimeat-login-pill/i.test(html);
+  if (loadsAuth && !mountsPill) {
+    out.push(finding('app-declared-unused', 'warn',
+      'The page loads `aimeat-auth.js` and never mounts the login pill, so there is no sign-in, no '
+      + 'language switch and no theme control — the three things the pill draws. Mount it, or drop the '
+      + 'script: a library that is loaded and unused is a page that looks connected and is not.'));
+  }
+
+  // 2. Languages declared, nothing that switches them. The declaration is what draws the switcher in
+  // the pill, so this is usually case 1 wearing a different hat — but an app can also roll its own.
+  const declaresLocales = /<meta\b[^>]*name\s*=\s*["']aimeat-locales["']/i.test(head);
+  const hasSwitcher = mountsPill || /setLocale|changeLanguage|data-locale|i18n\.(set|use)|lang-switch/i.test(html);
+  if (declaresLocales && !hasSwitcher) {
+    out.push(finding('app-declared-unused', 'warn',
+      'The head declares `aimeat-locales` but the page offers no way to change language. The '
+      + 'declaration draws the switch in the login pill, so either mount the pill or provide your own '
+      + 'control — a declared language nobody can select is a promise the page does not keep.'));
+  }
+
+  // 3. A stylesheet linked and never used. daisyUI classes are distinctive enough to detect, and the
+  // failure is visible: the page renders unstyled while carrying the weight of the framework.
+  const linksDaisy = /daisyui[^"']*\.css/i.test(head);
+  const usesDaisy = /class\s*=\s*["'][^"']*\b(btn|card|navbar|modal|drawer|badge|alert|menu|tabs|table|input|select|toggle|stat)\b/i.test(html);
+  if (linksDaisy && !usesDaisy) {
+    out.push(finding('app-declared-unused', 'warn',
+      'The page links daisyUI and uses none of its classes, so it downloads a design system and '
+      + 'renders without one. Build on the shell from `GET /v1/app-templates`, which already uses it, '
+      + 'or remove the stylesheet.'));
+  }
+
+  return out;
 }
 
 // ── Blocking check 1: does the app's own JavaScript compile? ────────────────────────────────────
