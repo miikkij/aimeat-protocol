@@ -26,6 +26,14 @@
  *            capabilityWebhooks 'disabled' or 'allowlist_only' was defeated in two requests - create
  *            without a webhook, then PUT one on. The gate now fires on a CHANGE of the webhook the
  *            node would end up calling, with the same three refusal codes createCapability gives.
+ *   v1.4.0 - 2026-08-15 - The telemetry ping stops taking three things on the caller's word. It is
+ *            self-reported by design (a client-side call is one the node never saw, and a
+ *            third-party caller is the normal case), but any authenticated principal could ping ANY
+ *            id — including one that does not exist, which wrote stats for a row nobody owns — with
+ *            an unbounded duration that moves the published average by any amount, and with free
+ *            `lastError` text rendered on somebody else's public capability record. The capability
+ *            must now exist, the duration is clamped, and the error TEXT is taken from the owner
+ *            only; a third party still counts their failure. E2E test-quality audit finding A12.
  */
 import { Router } from 'express';
 import {
@@ -78,6 +86,10 @@ const SERVER_OWNED_CAPABILITY_FIELDS = [
   'trust', 'stats', 'operatorOverride', 'rejectionReason', 'schemaHash', 'scope',
   'id', 'ownerGhii', 'createdAt', 'updatedAt',
 ] as const;
+
+/** A self-reported client-side call cannot legitimately claim to have taken longer than this, and
+ *  an unbounded number moves the published average by any amount the reporter chooses. One hour. */
+const MAX_TELEMETRY_DURATION_MS = 3_600_000;
 
 /** A refusal this file renders itself, in the shape the envelope wants. */
 interface WebhookRefusal { status: number; code: string; message: string }
@@ -307,13 +319,32 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
 
   // ── Telemetry (client-side stats ping) ──
 
+  // A client-side invocation is one the node never saw, so this counter is self-reported by
+  // whoever called it — that is the feature, and third-party callers are the normal case. Three
+  // things are still not the caller's to decide, and all three were: that the capability EXISTS
+  // (a ping to any id wrote stats for a row nobody owns), how long it took (an unbounded number
+  // moves the published average by any amount), and `lastError` — free text that is rendered on
+  // somebody else's public capability record, which is a stranger writing on the owner's page.
+  // The error TEXT is accepted from the owner only; a third party still counts their failure.
   router.post('/v1/capabilities/:id/telemetry', requireAuth(), async (req, res) => {
-    const { duration_ms, status: telStatus } = req.body;
     const capId = req.params.id as string;
+    const cap = await storage.getCapability(capId);
+    if (!cap) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
+      return;
+    }
+    const { duration_ms, status: telStatus } = req.body ?? {};
+    const raw = typeof duration_ms === 'number' && Number.isFinite(duration_ms) ? duration_ms : 0;
+    const totalMs = Math.min(Math.max(raw, 0), MAX_TELEMETRY_DURATION_MS);
     if (telStatus === 'success') {
-      await storage.incrementCapabilityStats(capId, { success: 1, error: 0, totalMs: duration_ms || 0 });
+      await storage.incrementCapabilityStats(capId, { success: 1, error: 0, totalMs });
     } else {
-      await storage.incrementCapabilityStats(capId, { success: 0, error: 1, totalMs: duration_ms || 0, lastError: req.body.error });
+      const isOwner = cap.ownerGhii === resolve(req);
+      const reported = typeof req.body?.error === 'string' ? req.body.error.slice(0, 500) : undefined;
+      await storage.incrementCapabilityStats(capId, {
+        success: 0, error: 1, totalMs,
+        lastError: isOwner ? reported : 'Reported by a caller (details withheld)',
+      });
     }
     res.status(204).end();
   });

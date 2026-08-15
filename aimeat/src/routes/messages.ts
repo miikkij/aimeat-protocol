@@ -19,6 +19,12 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.3.0 -- 2026-08-15 -- The `conversation` block on GET conversations/:id is served to a
+ *     PARTICIPANT only. The message rows were always fenced by the reading identity, so an outsider
+ *     saw an empty page — but the block rode along unconditionally, handing anyone who holds the id
+ *     the subject, the creator and every participant. In a support thread that list is every
+ *     operator GHII on the node, and every former participant keeps the id. E2E test-quality audit
+ *     finding A5.
  *   v1.0.0 -- 2026-06-16 -- Initial creation: local (same-node) direct messaging + first-contact gate.
  *   v1.1.0 -- 2026-06-21 -- Extract the send/deliver core into services/message-send.ts (shared with
  *     Tracked Response replies); the route is now a thin caller. Behaviour unchanged.
@@ -55,7 +61,7 @@ import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schema
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { resolveGroupTarget } from '../services/message-alias.js';
-import { sendGroupMessage } from '../services/conversation-group.js';
+import { sendGroupMessage, isParticipant } from '../services/conversation-group.js';
 import { withMessageProvenance } from '../services/message-provenance.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { resolveAudience, sendBroadcast, broadcastToFederation } from '../services/message-broadcast.js';
@@ -357,8 +363,14 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     const result = await storage.listConversation(readAs, conversationId, { page, perPage });
     // A group thread carries its membership: who else is reading this is part of reading it, and in
-    // a support thread it is the answer to "am I talking to one operator or to all of them".
-    const conversation = await storage.getConversation(conversationId);
+    // a support thread it is the answer to "am I talking to one operator or to all of them". That
+    // is true FOR A PARTICIPANT and for nobody else. The message rows are already fenced by
+    // `readAs`, so an outsider's page is empty — but this block was attached unconditionally, so
+    // anyone holding the id (every former participant, and every operator GHII named in a support
+    // thread is exactly what it discloses) got the subject, the creator and the full participant
+    // list back with HTTP 200.
+    const found = await storage.getConversation(conversationId);
+    const conversation = found && isParticipant(found, readAs) ? found : null;
     res.json(success(config.nodeId, {
       messages: await withMessageProvenance(storage, result.messages),
       total: result.total, page, per_page: perPage,

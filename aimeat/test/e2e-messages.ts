@@ -444,5 +444,33 @@ await test('S6. An outsider cannot post into a support thread they are not in (f
     assert(body.error?.code === 'NOT_A_PARTICIPANT', `expected NOT_A_PARTICIPANT, got ${body.error?.code}`);
 });
 
+// A5 (E2E test-quality audit). S6 proves the outsider cannot POST into the thread, and its own
+// wording is "let me read your support tickets" — but nothing ever tried the READ. The message rows
+// are fenced by the reading identity, so Mallory's page is empty and the door looks shut; the
+// `conversation` block beside them was attached unconditionally. Against the pre-fix source this
+// test fails: 200 carrying the subject, the creator and every operator GHII in the thread.
+await test('S7. An outsider reading a support thread learns nothing about it', async () => {
+    const { status, body } = await json(`/v1/messages/conversations/${supportConvId}`, {
+        headers: { Authorization: `Bearer ${mal.token}` },
+    });
+    // The read itself may answer 200 with an empty page — what must not happen is disclosure.
+    assert((body.data?.messages ?? []).length === 0, `an outsider must see no messages, got ${(body.data?.messages ?? []).length}`);
+    assert(!body.data?.conversation, `an outsider was served the thread's metadata: ${JSON.stringify(body.data?.conversation)}`);
+    const serialized = JSON.stringify(body);
+    assert(!serialized.includes(op.ghii), `the operator's identity leaked to an outsider: ${serialized.slice(0, 220)}`);
+    assert(!serialized.includes(alice.ghii), `the reporter's identity leaked to an outsider: ${serialized.slice(0, 220)}`);
+    assert(!serialized.includes('Cannot finish onboarding'), `the thread's subject leaked to an outsider: ${serialized.slice(0, 220)}`);
+    assert(status === 200 || status === 403 || status === 404, `unexpected status ${status}`);
+
+    // The participants still get theirs — the fix must not blind the people in the thread.
+    const mine = await json(`/v1/messages/conversations/${supportConvId}`, { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(mine.status === 200, `the reporter's own read expected 200, got ${mine.status}`);
+    assert(mine.body.data?.conversation?.participants?.includes(op.ghii),
+        `the reporter must still see who they are talking to, got ${JSON.stringify(mine.body.data?.conversation)}`);
+    const theirs = await json(`/v1/messages/conversations/${supportConvId}`, { headers: { Authorization: `Bearer ${op.token}` } });
+    assert(theirs.body.data?.conversation?.participants?.includes(alice.ghii),
+        `the operator must still see the reporter, got ${JSON.stringify(theirs.body.data?.conversation)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

@@ -626,6 +626,57 @@ await test('10d. Idempotency key: Replayed UUID returns cached response', async 
     assert(b2.data?.version === b1.data?.version, 'replayed request returns cached version');
 });
 
+// A2 (E2E test-quality audit). 10d replays within ONE agent, so it proves the cache works and never
+// asks who the cache belongs to. The middleware is mounted app-wide and keyed on the UUID alone, so
+// a UUID was a global address: agent B presenting a key agent A had used was served A's response
+// body — record id, version, the whole envelope — while B's own write never reached the handler.
+// The same key ignoring method and path meant one client reusing a request-id across two routes got
+// the wrong route's answer and the second call silently did nothing. Against the pre-fix source this
+// test fails on the first assertion: B's write comes back carrying A's version.
+await test('10e. A second principal replaying another\'s idempotency key is not served their response', async () => {
+    const sharedUuid = '770e8400-e29b-41d4-a716-446655440002';
+
+    const { status: sA, body: bA } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}`, 'Idempotency-Key': sharedUuid },
+        body: JSON.stringify({ key: 'idem-cross', value: 'owner A wrote this', visibility: 'private' }),
+    });
+    assert(sA === 200 || sA === 201, `A's write expected 2xx, got ${sA}`);
+
+    // B is a DIFFERENT owner's agent presenting the same key.
+    const { body: bB } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentBToken}`, 'Idempotency-Key': sharedUuid },
+        body: JSON.stringify({ key: 'idem-cross', value: 'owner B wrote this', visibility: 'private' }),
+    });
+    // A's cached envelope carries A's record identity. Being handed it byte-for-byte is the leak;
+    // this route's body happens not to echo the value, so identity is what the comparison must use.
+    assert(JSON.stringify(bB.data) !== JSON.stringify(bA.data),
+        `B was served A's cached response verbatim: ${JSON.stringify(bB.data).slice(0, 220)}`);
+    assert(!JSON.stringify(bB).includes('owner A wrote this'),
+        `B was served A's content: ${JSON.stringify(bB).slice(0, 220)}`);
+
+    // B's own write has to have landed — the silent drop is the other half of the same defect.
+    const readB = await json('/v1/memory/idem-cross', { headers: { Authorization: `Bearer ${agentBToken}` } });
+    assert(readB.status === 200, `B's own record expected 200, got ${readB.status}`);
+    assert(readB.body.data?.value === 'owner B wrote this',
+        `B's write was dropped: their record reads ${JSON.stringify(readB.body.data?.value)}`);
+
+    // A's record is untouched by B's call.
+    const readA = await json('/v1/memory/idem-cross', { headers: { Authorization: `Bearer ${agentAToken}` } });
+    assert(readA.body.data?.value === 'owner A wrote this',
+        `A's record changed: ${JSON.stringify(readA.body.data?.value)}`);
+
+    // And A replaying their OWN key still gets the cached answer — the fix must not break idempotency.
+    const { body: bA2 } = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}`, 'Idempotency-Key': sharedUuid },
+        body: JSON.stringify({ key: 'idem-cross', value: 'A tries again', visibility: 'private' }),
+    });
+    assert(bA2.data?.version === bA.data?.version,
+        `A's own replay must still be cached: got version ${bA2.data?.version}, first was ${bA.data?.version}`);
+});
+
 await test('11. GET /v1/security/overview folds GHII CORS + per-agent CORS + sessions', async () => {
     // Set a GHII-level CORS origin so the ghii partition (and agents inheriting it) has a custom value.
     const put = await json('/v1/ghii/cors', {

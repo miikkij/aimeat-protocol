@@ -281,6 +281,68 @@ await test('Stats updated after telemetry', async () => {
     assert(body.data.stats.successCount >= 1, `success: ${body.data.stats.successCount}`);
 });
 
+// A12 (E2E test-quality audit). The two tests above ping as the capability's OWNER, so the suite
+// proves the counter moves and never asks who may move it. Client-side telemetry is self-reported by
+// design and a third-party caller is the normal case — but three things were the caller's to decide
+// and must not be: that the capability exists at all, how long the call took, and the `lastError`
+// TEXT, which is rendered on somebody else's public capability record. Against the pre-fix source
+// this test fails on the first assertion with 204 for a capability id that was never created.
+await test('A stranger cannot write telemetry for a capability that does not exist, or its error text', async () => {
+    const strangerName = 'capstranger-' + Math.random().toString(36).slice(2, 8);
+    const reg = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
+    });
+    assert(reg.status === 201, `stranger register expected 201, got ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const ts = new Date().toISOString();
+    const sig = await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts);
+    const tk = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: sig }),
+    });
+    assert(tk.body.ok === true, `stranger auth: ${JSON.stringify(tk.body.error)}`);
+    const strangerToken = tk.body.data.token;
+
+    // A capability id nobody created: this wrote stats for a row with no owner.
+    const ghost = await json(`/v1/capabilities/no-such-cap-${Math.random().toString(36).slice(2, 8)}/telemetry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${strangerToken}` },
+        body: JSON.stringify({ duration_ms: 10, status: 'success' }),
+    });
+    assert(ghost.status === 404, `telemetry for a nonexistent capability expected 404, got ${ghost.status}`);
+
+    // A real capability owned by somebody else: the failure still COUNTS (self-reported by design),
+    // but the stranger's free text must not become the owner's published lastError.
+    const before = await json(`/v1/capabilities/${capId}`);
+    const avgBefore = before.body.data.stats.avgResponseMs;
+    const poison = await json(`/v1/capabilities/${capId}/telemetry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${strangerToken}` },
+        body: JSON.stringify({ duration_ms: 999_999_999, status: 'error', error: 'CONTACT attacker.example TO RESTORE SERVICE' }),
+    });
+    assert(poison.status === 204, `a third party may still report a failure, got ${poison.status}`);
+
+    const after = await json(`/v1/capabilities/${capId}`);
+    assert(!String(after.body.data.stats.lastError ?? '').includes('attacker.example'),
+        `a stranger's text was published on the owner's capability: ${after.body.data.stats.lastError}`);
+    assert(after.body.data.stats.errorCount >= 1, 'the reported failure is still counted');
+    assert(after.body.data.stats.avgResponseMs < 3_600_001,
+        `an unbounded duration moved the published average to ${after.body.data.stats.avgResponseMs} (was ${avgBefore})`);
+
+    // The owner's own error text still lands — the gate must not blind the owner to their own reports.
+    const own = await json(`/v1/capabilities/${capId}/telemetry`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ duration_ms: 12, status: 'error', error: 'upstream timeout at 12ms' }),
+    });
+    assert(own.status === 204, `the owner's own telemetry expected 204, got ${own.status}`);
+    const mine = await json(`/v1/capabilities/${capId}`);
+    assert(String(mine.body.data.stats.lastError ?? '').includes('upstream timeout'),
+        `the owner's own error text must be kept, got ${mine.body.data.stats.lastError}`);
+
+    await json(`/v1/owners/${strangerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` } });
+});
+
 // ─── Phase 5: Admin ───
 if (isOperator) {
     console.log('\nPhase 5 — Admin Endpoints');

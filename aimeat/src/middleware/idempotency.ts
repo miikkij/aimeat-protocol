@@ -9,6 +9,12 @@
  *   - cache / TTL_MS / MAX_CACHE_SIZE: in-memory store with periodic expiry sweep
  *
  * @version-history
+ *   v1.1.0 — 2026-08-15 — The cache key is principal + method + path + UUID, not the UUID alone.
+ *     This middleware is mounted app-wide, so the key was a global address: a second principal
+ *     replaying another's key was served that principal's response body while its own write was
+ *     silently dropped, and one client reusing a request-id across two routes got the wrong route's
+ *     answer with the second call never executed. Tightening a key can only turn a HIT into a MISS,
+ *     which is the request actually running. E2E test-quality audit finding A2.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -31,6 +37,27 @@ setInterval(() => {
         if (now - entry.storedAt > TTL_MS) cache.delete(key);
     }
 }, 300_000);
+
+/**
+ * What a replay has to match before it is answered from the cache. A client's key says "this is the
+ * same request I already sent"; it does not say whose request it was, or which one.
+ *
+ * The key alone was the whole cache key, and this middleware is mounted app-wide (src/server.ts), so
+ * a UUID is a global address. Two consequences, and the first is the serious one. A second principal
+ * presenting a key another principal has used was SERVED THAT PRINCIPAL'S RESPONSE BODY — the
+ * record id, the version, the whole envelope — while its own POST never reached the handler. And
+ * because method and path were ignored too, one client reusing a single request-id across
+ * POST /v1/memory and POST /v1/tasks got the memory response back for the task call, and the task
+ * was silently never created.
+ *
+ * `req.auth` is populated by the globally mounted optionalAuth(), so it is available here. An
+ * unauthenticated caller keys on 'anon', which is correct: the routes that accept one are the ones
+ * where a replay carries no cross-principal meaning.
+ */
+function cacheKeyFor(req: Request, idempotencyKey: string): string {
+    const principal = req.auth?.sub ?? 'anon';
+    return `${principal}|${req.method}|${req.path}|${idempotencyKey}`;
+}
 
 export function idempotency() {
     return (req: Request, res: Response, next: NextFunction) => {
@@ -55,7 +82,8 @@ export function idempotency() {
         }
 
         // Check cache
-        const cached = cache.get(idempotencyKey);
+        const cacheKey = cacheKeyFor(req, idempotencyKey);
+        const cached = cache.get(cacheKey);
         if (cached) {
             res.status(cached.status).json(cached.body);
             return;
@@ -77,7 +105,7 @@ export function idempotency() {
         // Intercept response to cache it
         const originalJson = res.json.bind(res);
         res.json = function (body: unknown) {
-            cache.set(idempotencyKey, {
+            cache.set(cacheKey, {
                 status: res.statusCode,
                 body,
                 storedAt: Date.now(),
