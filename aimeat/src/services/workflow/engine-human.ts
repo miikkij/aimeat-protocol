@@ -6,6 +6,13 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   v1.2.0 — 2026-08-15 — The upgrade requires a PERSON, which the paragraph guarding it always
+ *     said and the code never asked. An agent could call aimeat_workflow_answer on the step holding
+ *     its own draft and the node stamped that content 'editorial-control' with the note "reviewed
+ *     by <the agent>", turning the public disclosure label from "no human editorial review" into
+ *     the reviewed wording with nobody having read the bytes. `byIsHuman` is set by the door that
+ *     knows the principal class and absent everywhere else, so agents keep answering and stop
+ *     upgrading. E2E test-quality audit finding A18.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: a human-input step that names `reviews_key` re-stamps
  *     the reviewed content with humanInvolvement 'editorial-control'. This is the ONLY place in
  *     the engine that may upgrade that field, and a watchdog timeout default never does — nobody
@@ -23,6 +30,14 @@ export interface HumanAnswerValue {
   pick: string;
   other?: string;
   by: string;
+  /**
+   * Was the answerer a PERSON? Absent means no, deliberately: the upgrade below is the one thing in
+   * the engine that can turn "no human editorial review" into "reviewed by a person", so a caller
+   * has to say so on purpose. `by` alone cannot answer it — an agent's GAII and a human's GHII are
+   * both just strings here, and inferring humanness from their shape would break the moment a new
+   * principal class arrives.
+   */
+  byIsHuman?: boolean;
 }
 
 /**
@@ -76,7 +91,16 @@ export async function applyHumanAnswer(
   // A TIMEOUT DEFAULT IS NOT REVIEW. When the watchdog synthesises an answer (`by: 'timeout-default'`)
   // nobody read anything, and upgrading on that path would manufacture editorial control out of
   // silence — which is the precise failure this whole design exists to prevent.
-  if (action?.reviews_key && ans.by && ans.by !== 'timeout-default') {
+  //
+  // AND NEITHER IS AN AGENT ANSWERING ITS OWN STEP. The paragraph above says "a person reads the
+  // substance", and until 2026-08-15 nothing enforced the person: the very agent whose draft was
+  // parked for review called aimeat_workflow_answer on it and the node stamped that content
+  // `humanInvolvement: 'editorial-control'` with the note "reviewed by <the agent>", flipping the
+  // public disclosure label from "no human editorial review" to the reviewed wording with nobody
+  // having seen the bytes. That is a false statement about provenance, which is the one thing this
+  // record exists to make true. `byIsHuman` is set by the door that knows the principal class; the
+  // agent surface and the watchdog leave it unset, so both keep answering and neither upgrades.
+  if (action?.reviews_key && ans.by && ans.by !== 'timeout-default' && ans.byIsHuman === true) {
     const reviewedKey = (run.keyPrefix ?? '') + template(action.reviews_key, run.vars);
     const reviewed = await storage.getMemory(ownerGhii, reviewedKey);
     if (reviewed) {

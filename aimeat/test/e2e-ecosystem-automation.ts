@@ -335,6 +335,31 @@ await test('DELETE /v1/ecosystem-apps/:app → 200 { deleted: true }', async () 
   assert(body.data.geai === geai, `geai mismatch: ${body.data.geai}`);
 });
 
+// A6 (E2E test-quality audit). The suite proves the card, the recipe and the schedule are gone, and
+// line 308 says out loud that the GEAI credential "is exercised elsewhere" — it is held in a variable
+// and pointed at nothing. That is the hole: DELETE removed the principal ROW and revoked no
+// credential, and the approve path never wrote the session row its own sessionId refers to, so
+// isSessionRevoked() read the absence as permission. The app's ninety-day bearer therefore kept
+// writing the owner's memory after the owner deleted it, with the card gone and DELETE answering
+// 404 — no surface left to stop it. Against the pre-fix source this fails with 200 and a stored
+// record.
+await test('after delete, the app\'s own credential stops working', async () => {
+  const read = await json('/v1/memory?limit=1', { headers: { Authorization: `Bearer ${geaiToken}` } });
+  assert(read.status === 401, `the deleted app's token expected 401, got ${read.status}: ${JSON.stringify(read.body).slice(0, 200)}`);
+
+  const key = `eco-after-delete-${Date.now()}`;
+  const write = await json('/v1/memory', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${geaiToken}` },
+    body: JSON.stringify({ key, value: 'written after the owner deleted me', visibility: 'private' }),
+  });
+  assert(write.status === 401, `the deleted app's token expected 401 on write, got ${write.status}`);
+
+  // And nothing landed: a 401 that still wrote would be the worse half of the same defect.
+  const check = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(check.status === 404, `the deleted app's write landed anyway (${check.status})`);
+});
+
 await test('GET /v1/ecosystem-apps no longer lists the app (gone, not status:revoked)', async () => {
   const { status, body } = await json('/v1/ecosystem-apps', {
     headers: { Authorization: `Bearer ${ownerToken}` },

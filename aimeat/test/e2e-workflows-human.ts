@@ -285,6 +285,56 @@ async function run() {
     await json(`/v1/workflows/gated/runs/${runId}/cancel`, { method: 'POST', headers: auth });
   });
 
+  // A18 (E2E test-quality audit). The test above proves the upgrade HAPPENS. It answers as the
+  // owner, so it never asks who is allowed to cause it — and the guard's own comment says "a person
+  // reads the substance". Nothing enforced the person: the agent whose draft is parked can call
+  // aimeat_workflow_answer on its own step, and the node stamped that content 'editorial-control'
+  // with the note "reviewed by hwf-reviewer#…", flipping the public disclosure label from "no human
+  // editorial review" to the reviewed wording with nobody having read the bytes. The agent must
+  // still be able to ANSWER — that is the agent-first design — it just must not become editorial
+  // control. Against the pre-fix source this fails: humanInvolvement comes back editorial-control.
+  await test('an agent may answer a review step, but does not become editorial control', async () => {
+    const reviewerName = 'hwf-reviewer';
+    const reg = await json('/v1/agents', {
+      method: 'POST', headers: auth,
+      body: JSON.stringify({ name: reviewerName, owner: ownerName, capabilities: ['memory'], scopes: ['workflow:write', 'memory:read'] }),
+    });
+    assert(reg.status === 201, `reviewer agent ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(gaii + ts), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+    assert(tok.body.ok === true, `reviewer token: ${JSON.stringify(tok.body.error)}`);
+    const agentAuth = { Authorization: `Bearer ${tok.body.data.token}` };
+
+    // A fresh run parked at the same gate. writeMem rewrites plan.draft, so its provenance starts
+    // over — whatever this assertion sees was set by THIS run.
+    const runId = await startAndReachGate('full');
+    const ans = await json(`/v1/workflows/gated/runs/${runId}/steps/gate/answer`, {
+      method: 'POST', headers: agentAuth, body: JSON.stringify({ picks: ['approve'] }),
+    });
+    assert(ans.status === 200, `an agent must still be able to answer, got ${ans.status}: ${JSON.stringify(ans.body).slice(0, 200)}`);
+    await sleep(700);
+
+    const mem = await json('/v1/memory/plan.draft', { headers: auth });
+    assert(mem.status === 200, `plan.draft read ${mem.status}`);
+    const rec = mem.body.meta?.provenance?.record;
+    assert(rec?.humanInvolvement !== 'editorial-control',
+      `an agent's answer claimed human editorial control: ${JSON.stringify({ humanInvolvement: rec?.humanInvolvement, notes: rec?.notes })}`);
+    assert(!String(rec?.notes ?? '').includes(reviewerName),
+      `the agent was recorded as the reviewer: ${rec?.notes}`);
+    // The label a reader sees must still say a person has not reviewed this.
+    if (rec) {
+      assert(rec.disclosure?.required !== false || rec.humanInvolvement !== 'editorial-control',
+        'an unreviewed item must not be excused from its disclosure label');
+    }
+
+    // The step itself resolved and the run advanced — the gate costs the agent nothing.
+    const { body: after } = await json(`/v1/workflows/gated/runs/${runId}`, { headers: auth });
+    assert(after.data.steps.gate.state === 'green',
+      `the agent's answer must green the step, got ${after.data.steps.gate.state}`);
+  });
+
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed > 0) process.exit(1);
 }

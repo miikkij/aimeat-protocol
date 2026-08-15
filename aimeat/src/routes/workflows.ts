@@ -222,7 +222,15 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       return;
     }
     const by = resolveIdentity(req.auth!, config.nodeId);
-    const result = await engine.onHumanAnswer(ownerGhiiOf(req), id, runId, stepId, { ...parsed.data, by });
+    // Only a signed-in PERSON may upgrade the reviewed content's provenance to "a human read this".
+    // An agent, an ecosystem app or a hosted app answering through this same door still answers —
+    // the step goes green and the run advances — it just does not become editorial control. Every
+    // other principal class arrives here with roles that say what it is, so this is read rather
+    // than inferred from the identity string. See engine-human.ts for what it gates.
+    const roles = req.auth!.roles;
+    const byIsHuman = roles.includes('owner')
+      && !roles.includes('agent') && !roles.includes('ecosystem') && !roles.includes('app');
+    const result = await engine.onHumanAnswer(ownerGhiiOf(req), id, runId, stepId, { ...parsed.data, by, byIsHuman });
     if (!result.ok) {
       const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'BAD_ANSWER' ? 400 : 409;
       const code = result.code === 'NOT_WAITING' ? 'WORKFLOW_STEP_NOT_WAITING' : result.code;

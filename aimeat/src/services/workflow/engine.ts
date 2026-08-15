@@ -749,7 +749,7 @@ export class WorkflowEngine {
    */
   async onHumanAnswer(
     ownerGhii: string, workflowId: string, runId: string, stepId: string,
-    answer: { picks: string[]; other?: string; by: string },
+    answer: { picks: string[]; other?: string; by: string; byIsHuman?: boolean },
   ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'NOT_WAITING' | 'BAD_ANSWER'; error: string }> {
     return this.withLock(runId, async () => {
       const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
@@ -762,7 +762,8 @@ export class WorkflowEngine {
       const bad = validateHumanAnswer(rs.human.question, answer);
       if (bad) return { ok: false as const, code: 'BAD_ANSWER' as const, error: bad };
       await applyHumanAnswer(this.storage, this.config, ownerGhii, run, stepId, {
-        picks: answer.picks, pick: answer.picks[0] ?? '', other: answer.other, by: answer.by,
+        picks: answer.picks, pick: answer.picks[0] ?? '', other: answer.other,
+        by: answer.by, byIsHuman: answer.byIsHuman,
       });
       await this.tick(ownerGhii, run);
       logger.info(`workflow ${workflowId} run ${runId}: step "${stepId}" answered by ${answer.by}`);

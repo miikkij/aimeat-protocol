@@ -20,6 +20,12 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.3.0 — 2026-08-15 — Delete ends the app's credentials, and approve writes the row that makes
+ *     that possible. The approve path generated a sessionId, stamped it into the ninety-day JWT and
+ *     never created the session, so there was nothing to revoke and isSessionRevoked() read the
+ *     absence as permission: after the owner deleted an app its bearer kept writing memory for the
+ *     rest of its TTL, with the card gone and DELETE answering 404. E2E test-quality audit finding
+ *     A6.
  *   v1.2.0 — 2026-07-16 — Add GET /:app/automation composite (schedules + recipe + organisms + advisories)
  *     folding the automation card mount; the agent list stays a separate GET /v1/agents.
  *   v1.0.0 — 2026-06-14 — Created for ecosystem-apps foundation (chunk 1).
@@ -58,10 +64,8 @@ import { validateEcoManifest } from '../models/ecosystem-manifest.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitEcosystemBindingRevoked } from '../services/ecosystem-events.js';
 import { logger } from '../utils/logger.js';
-import {
-  deliverAdvisory, pendingKey, pendingPrefix, PENDING_TYPE,
-  type PendingAdvisoryRecord,
-} from '../services/ecosystem-automation-advisories.js';
+import { pendingPrefix, PENDING_TYPE, type PendingAdvisoryRecord } from '../services/ecosystem-automation-advisories.js';
+import { registerEcosystemAdvisoryRoutes } from './ecosystem-apps-advisories.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -398,6 +402,19 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     }, config.ecoJwtTtlSeconds, sessionId);
     const expiresAt = new Date(Date.now() + config.ecoJwtTtlSeconds * 1000).toISOString();
 
+    // The session row the token's sessionId refers to. Without it there is nothing to revoke, and
+    // isSessionRevoked() answers "not revoked" for a session it has never heard of — so the missing
+    // row read as permission (docs/pitfalls.md §21). That is why deleting an ecosystem app left its
+    // ninety-day credential authenticating on every route: the card went, the token did not.
+    // device-auth.ts:197 writes the same row for the same reason, and this was the path without it.
+    await storage.createSession({
+      sessionId,
+      gaii: geai,
+      owner: request.ownerName,
+      issuedAt: new Date().toISOString(),
+      expiresAt,
+    });
+
     await storage.updateEcoAuth(request.deviceCode, {
       status: 'approved',
       scopes: finalScopes,
@@ -638,113 +655,9 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     res.json(success(config.nodeId, { deleted: true, app }));
     emitChange('ecosystem-apps');
   });
+  // Advisory approval gate + delivery — moved to ecosystem-apps-advisories.ts (max-file-lines).
+  registerEcosystemAdvisoryRoutes(router, config, storage);
 
-  // ── Advisory approval gate (B7) + delivery (B8) ──
-  // When a recipe has requireApproval:true, the advisory-drain (processAutomationAdvisories) parks each
-  // wisdom-agent advisory at the owner-namespace key eco.<app>.advisory.pending.<id> instead of
-  // delivering it. These three routes are the owner's surface to that pending list and the approve/
-  // reject decision. Approving invokes the app's `deliver-advisory` capability over the connector
-  // tunnel (the exact path the schedule executor uses); rejecting drops the advisory. Both resolve the
-  // pending memory record (mark decided + clean up). This reuses the existing ecosystem-apps owner
-  // surface + owner-namespace memory — it is NOT a separate approval inbox.
-
-  /** Load a pending advisory-delivery record for (owner, app, id), or null. */
-  async function getPendingAdvisory(ownerGhii: string, app: string, id: string): Promise<PendingAdvisoryRecord | null> {
-    const rec = await storage.getMemory(ownerGhii, pendingKey(app, id));
-    if (!rec) return null;
-    const v = rec.value as PendingAdvisoryRecord | undefined;
-    if (!v || v.type !== PENDING_TYPE) return null;
-    return v;
-  }
-
-  // ── GET /v1/ecosystem-apps/:app/advisories/pending — owner lists awaiting-approval advisories ──
-  router.get('/v1/ecosystem-apps/:app/advisories/pending', requireAuth(), requireRole('owner'), async (req, res) => {
-    const app = req.params.app as string;
-    const owner = req.auth!.owner;
-    const ownerGhii = `${owner}@${config.nodeId}`;
-
-    const record = await storage.getEcosystemAppByOwnerAndApp(owner, app);
-    if (!record) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Ecosystem app "${app}" not found under owner "${owner}"`));
-      return;
-    }
-
-    const items = await storage.listMemory(ownerGhii, { prefix: pendingPrefix(app) });
-    const pending = items
-      .map((r) => r.value as PendingAdvisoryRecord)
-      .filter((v) => v && v.type === PENDING_TYPE && v.status === 'pending')
-      .map((v) => ({ id: v.id, app: v.app, recipe_id: v.recipeId ?? null, advisory: v.advisory, status: v.status, created_at: v.createdAt }));
-    res.json(success(config.nodeId, { pending, total: pending.length }));
-  });
-
-  // ── POST /v1/ecosystem-apps/:app/advisories/:id/approve — approve → deliver over the tunnel ──
-  router.post('/v1/ecosystem-apps/:app/advisories/:id/approve', requireAuth(), requireRole('owner'), async (req, res) => {
-    const app = req.params.app as string;
-    const id = req.params.id as string;
-    const owner = req.auth!.owner;
-    const ownerGhii = `${owner}@${config.nodeId}`;
-
-    const pending = await getPendingAdvisory(ownerGhii, app, id);
-    if (!pending) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No pending advisory "${id}" for app "${app}"`));
-      return;
-    }
-    if (pending.status !== 'pending') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_RESOLVED', `Advisory already ${pending.status}`));
-      return;
-    }
-
-    // B8 — deliver the approved advisory into the app's guidance sink over the connector tunnel.
-    const outcome = await deliverAdvisory(config, app, owner, pending.advisory);
-    const now = new Date().toISOString();
-
-    if (outcome.state === 'delivered') {
-      // Delivered — mark the record approved/delivered then clean it up (the app now holds it).
-      const resolved: PendingAdvisoryRecord = {
-        ...pending, status: 'approved', decidedAt: now, decidedBy: owner,
-        delivery: 'delivered', deliveredId: outcome.deliveredId,
-      };
-      await storage.setMemory({
-        key: pendingKey(app, id), ownerGaii: ownerGhii, value: resolved, visibility: 'owner',
-        tags: ['advisory-resolved', app], ttlHours: null, version: 2, createdAt: pending.createdAt, updatedAt: now,
-      });
-      // Remove the resolved pending key so it leaves the pending list.
-      await storage.deleteMemory(ownerGhii, pendingKey(app, id));
-      res.json(success(config.nodeId, { id, app, status: 'approved', delivery: 'delivered', delivered_id: outcome.deliveredId }));
-      emitChange('ecosystem-apps');
-      return;
-    }
-
-    // Not delivered (offline/timeout or refusal/error): the owner DID approve, but delivery couldn't
-    // complete. Keep the record pending (so a later approve retries) and surface the outcome so the
-    // owner knows to retry once the app reconnects. We do NOT delete the payload here.
-    const delivery = outcome.state === 'offline-retry' ? 'offline-retry' : 'failed';
-    res.status(202).json(success(config.nodeId, { id, app, status: 'pending', delivery, reason: outcome.reason }, [
-      { description: 'Retry approval once the app is connected', method: 'POST', url: `/v1/ecosystem-apps/${app}/advisories/${id}/approve` },
-    ]));
-  });
-
-  // ── POST /v1/ecosystem-apps/:app/advisories/:id/reject — reject → drop the advisory ──
-  router.post('/v1/ecosystem-apps/:app/advisories/:id/reject', requireAuth(), requireRole('owner'), async (req, res) => {
-    const app = req.params.app as string;
-    const id = req.params.id as string;
-    const owner = req.auth!.owner;
-    const ownerGhii = `${owner}@${config.nodeId}`;
-
-    const pending = await getPendingAdvisory(ownerGhii, app, id);
-    if (!pending) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No pending advisory "${id}" for app "${app}"`));
-      return;
-    }
-    if (pending.status !== 'pending') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_RESOLVED', `Advisory already ${pending.status}`));
-      return;
-    }
-    // Reject → no delivery. Drop the pending record entirely.
-    await storage.deleteMemory(ownerGhii, pendingKey(app, id));
-    res.json(success(config.nodeId, { id, app, status: 'rejected' }));
-    emitChange('ecosystem-apps');
-  });
 
   // ── DELETE /v1/ecosystem-apps/:app — owner HARD-DELETES a GEAI binding ──
   // "When I delete, it deletes — I never see it again; reconnecting starts over from scratch."
@@ -766,7 +679,15 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     //    live grant re-check passes; the connected app/desk reacts to binding.revoked and drops its side.
     await emitEcosystemBindingRevoked(storage, config, ownerGhii, record.geai, 'owner_revoked').catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
 
-    // 2) Hard-delete the GEAI principal row → the app disappears from GET /v1/ecosystem-apps entirely.
+    // 2) End every credential this app holds, THEN delete the principal row. Deleting the row alone
+    //    left the app's ninety-day bearer authenticating for the rest of its life — the card was
+    //    gone, DELETE answered 404, and the owner had no surface left to stop it. Every session
+    //    rather than one, because each re-approval mints another. Order matters: the row has to go
+    //    after, or a token minted between the two calls survives.
+    for (const s of await storage.listActiveSessions(owner)) {
+      if (s.gaii === record.geai) await storage.revokeSession(s.sessionId);
+    }
+
     await storage.deleteEcosystemApp(record.geai);
 
     // 3a) Remove the app's automation recipe (the "data published → run agents" rule), if any.
