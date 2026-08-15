@@ -178,11 +178,28 @@ await test('1. Alice (A) sends to Bob (B) across federation', async () => {
     convId = body.data.message.conversationId;
 });
 
-await test('2. Bob (B) sees a pending request from Alice', async () => {
+// A19 (E2E test-quality audit). This asserted only that a row appeared in Bob's requests list, which
+// is true whether or not the gate does anything. The first-contact gate does not REFUSE a stranger —
+// it HOLDS them: the message is stored and acknowledged, and stays out of everything the owner reads
+// until they accept. So the contract has two halves and only the visible one was checked. Asserting
+// the other half is what makes this a gate test: delete the `isRequest` filter in routes/messages.ts
+// and the inbox assertion below goes red, while the requests-list assertion stays green.
+await test('2. Bob (B) sees a pending request from Alice, and nothing else yet', async () => {
     const reqs = await B!.json('/v1/messages/requests', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
     assert(reqs.status === 200, `requests status ${reqs.status}`);
     const r = reqs.body.data.requests.find((x: any) => x.contactId === A!.ownerGhii);
     assert(r !== undefined, 'Alice appears in Bob requests');
+
+    // Held, not delivered: the message is not in the inbox and opens no thread before acceptance.
+    const inbox = await B!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    assert(inbox.status === 200, `inbox status ${inbox.status}`);
+    assert(!(inbox.body.data.messages ?? []).some((m: any) => m.id === msgId),
+        'a first-contact message must NOT be in the inbox before it is accepted');
+
+    const convos = await B!.json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    assert(convos.status === 200, `conversations status ${convos.status}`);
+    assert(!(convos.body.data.conversations ?? []).some((c: any) => c.conversationId === convId || c.contactId === A!.ownerGhii),
+        'a first-contact message must open no thread before it is accepted');
 });
 
 console.log('\nPhase 2 -- Accept, reply, read receipt');

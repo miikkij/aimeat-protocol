@@ -276,7 +276,12 @@ await test('5. aimeat_catalogue_agents with no match returns empty array', async
 console.log('\nPhase 3 — Public Boards');
 
 await test('6. Create a public board for testing', async () => {
-    // First owner is operator, so can create public boards
+    // A7 (E2E test-quality audit). This used to read "First owner is operator, so can create public
+    // boards", which states an escalation as if it were the feature. It is neither: the first owner
+    // registered on an empty node is promoted to operator on purpose (routes/ghii/register-login.ts),
+    // and creating a public board is operator-only (services/board-write.ts:130). This suite's owner
+    // happens to be that first owner, which is why the call below succeeds — it is a property of the
+    // fixture, not a permission any agent has. Test 6b pins the gate the comment used to hide.
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_board_create',
         arguments: { name: 'catalogue-public-board', visibility: 'public', description: 'Public board for catalogue test' },
@@ -285,6 +290,53 @@ await test('6. Create a public board for testing', async () => {
     const result = JSON.parse(body.result.content[0].text);
     assert(typeof result.id === 'string', 'has id');
     publicBoardId = result.id;
+});
+
+// A7 (E2E test-quality audit). The gate test 6 passes only by being the bootstrap owner. Asserted
+// here through the HTTP door, which calls the SAME createBoard in services/board-write.ts that the
+// MCP tool calls — one implementation, so proving it on either door proves the rule. A second owner
+// registered on a node that already has one is an ordinary account with no operator role.
+await test('6b. A later owner\'s agent cannot create a public board (the operator gate)', async () => {
+    const otherOwner = `cat2${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherOwner, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `second owner ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
+    const ts = new Date().toISOString();
+    const otherTok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: otherOwner, timestamp: ts, signature: await signMsg(reg.body.data.private_key, otherOwner + NODE_ID + ts) }),
+    });
+    assert(otherTok.body.ok === true, `second owner token: ${JSON.stringify(otherTok.body.error)}`);
+
+    const ag = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${otherTok.body.data.token}` },
+        body: JSON.stringify({ name: 'cat2-bot', owner: otherOwner, capabilities: ['catalogue'], scopes: ['social:write', 'social:read'] }),
+    });
+    assert(ag.status === 201, `second agent ${ag.status}: ${JSON.stringify(ag.body).slice(0, 200)}`);
+    const ats = new Date().toISOString();
+    const agGaii = ag.body.data.agent.gaii as string;
+    const agTok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: agGaii, timestamp: ats, signature: await signMsg(ag.body.data.private_key, agGaii + ats) }),
+    });
+    assert(agTok.body.ok === true, `second agent token: ${JSON.stringify(agTok.body.error)}`);
+    const agentAuth = { Authorization: `Bearer ${agTok.body.data.token}` };
+
+    const pub = await json('/v1/boards', {
+        method: 'POST', headers: agentAuth,
+        body: JSON.stringify({ name: 'not-allowed-public', visibility: 'public', description: 'should be refused' }),
+    });
+    assert(pub.status === 403, `a non-operator agent creating a public board expected 403, got ${pub.status}: ${JSON.stringify(pub.body).slice(0, 200)}`);
+    assert(pub.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${pub.body.error?.code}`);
+
+    // The refusal is about `public`, not about creating boards at all — otherwise this test would
+    // pass just as well against an agent that may create nothing.
+    const priv = await json('/v1/boards', {
+        method: 'POST', headers: agentAuth,
+        body: JSON.stringify({ name: 'allowed-private', visibility: 'private', description: 'ordinary board' }),
+    });
+    assert(priv.status === 201, `the same agent must still create a private board, got ${priv.status}: ${JSON.stringify(priv.body).slice(0, 200)}`);
+
+    await json(`/v1/owners/${otherOwner}`, { method: 'DELETE', headers: { Authorization: `Bearer ${otherTok.body.data.token}` } });
 });
 
 await test('7. aimeat_catalogue_boards returns array including public board', async () => {

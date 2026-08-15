@@ -2552,6 +2552,50 @@ await test('Owner delete (cascade)', async () => {
     assert(gBody.ok === false || gBody.data === null, 'owner gone');
 });
 
+// A25 (E2E test-quality audit). Everything below used to run on `ownerToken` — the credential of the
+// account the test above just erased. It worked, which is the point: the JWT is valid until its own
+// exp, and whether the erasure also kills it depends on the BACKEND. The postgres cascade clears the
+// Session table with the owner and the SQLite one does not, so the identical sequence answers 200 on
+// one and 401 on the other; that divergence is on record in commit 8003a58a, which reversed the
+// order in three other suites for exactly this reason. This is the fourth. Rather than assert a
+// backend-dependent status, the suite stops using a dead credential: a fresh owner, freshly minted.
+let configOwnerName = '';
+await test('Re-register an owner for the config tests (the previous one was just erased)', async () => {
+    configOwnerName = `cfgowner${Date.now()}`;
+    let privKey = '';
+    if (ADMIN_PW && isOperator) {
+        const { status, body } = await json('/v1/admin/setup/register', {
+            method: 'POST',
+            headers: { 'X-Admin-Password': ADMIN_PW },
+            body: JSON.stringify({ name: configOwnerName }),
+        });
+        assert(status === 200, `admin re-register ${status}: ${JSON.stringify(body)}`);
+        privKey = body.private_key;
+        const tk = await json('/v1/admin/setup/token', {
+            method: 'POST',
+            headers: { 'X-Admin-Password': ADMIN_PW },
+            body: JSON.stringify({ owner: configOwnerName, private_key: privKey }),
+        });
+        assert(tk.body.ok === true, `admin re-token: ${JSON.stringify(tk.body.error)}`);
+        ownerToken = tk.body.token;
+    } else {
+        const { status, body } = await json('/v1/owners', {
+            method: 'POST',
+            body: JSON.stringify({ name: configOwnerName, public_key: 'placeholder' }),
+        });
+        assert(status === 201, `re-register ${status}: ${JSON.stringify(body)}`);
+        privKey = body.data.private_key;
+        const timestamp = new Date().toISOString();
+        const tk = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ owner: configOwnerName, timestamp, signature: await signMsg(privKey, configOwnerName + NODE_ID + timestamp) }),
+        });
+        assert(tk.body.ok === true, `re-token: ${JSON.stringify(tk.body.error)}`);
+        ownerToken = tk.body.data?.token;
+    }
+    assert(typeof ownerToken === 'string' && ownerToken.length > 0, 'got a live owner token');
+});
+
 // ─── Config System ───
 console.log('\nConfig System');
 

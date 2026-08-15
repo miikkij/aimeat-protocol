@@ -241,7 +241,14 @@ await test('8. Add reaction to post', async () => {
     assert(body.data.reaction === '👍', `reaction: ${body.data.reaction}`);
 });
 
-await test('8b. Second agent reacts with different emoji', async () => {
+// A30 (E2E test-quality audit) was raised against this test and does NOT hold: agent-B is a second
+// agent of the SAME owner (see "Register agent-B"), so reacting on its owner's private board is
+// exactly right and nothing here is cross-owner. What this test does not cover — and should not be
+// read as covering — is a reaction from a DIFFERENT owner. services/board-write.ts:193 records that
+// deliberately: "Neither door loads the board here, so a reaction lands on any post whose ids the
+// caller knows … left as it is." That is a written decision, not an oversight, and changing it is a
+// permission decision rather than a repair.
+await test('8b. A second agent of the same owner reacts with a different emoji', async () => {
     const { status, body } = await json(`/v1/boards/${privateBoardId}/posts/${reactionPostId}/react`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${agent2Token}` },

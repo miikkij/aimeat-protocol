@@ -128,8 +128,18 @@ await test('Register second owner (non-operator)', async () => {
     owner2Token = await getToken(owner2Name, owner2PrivKey, false);
 });
 
-// ─── Phase 1: Budget Controls ───
-console.log('\nPhase 1 -- Budget Controls');
+// ─── Phase 1: Budget directives (an instruction to the agent, not a node-enforced cap) ───
+//
+// A14 (E2E test-quality audit). This phase was titled "Budget Controls", which reads as a claim
+// that the node refuses spending past the limit. It does not, and that is by design: an external
+// agent's tokens are bought from its own vendor with its own key, so the node never sees them and
+// has nothing to meter. `budget_limits` is an instruction the owner writes into the agent's
+// directives for the agent to honour, plus a number the Activity tab shows beside self-reported
+// telemetry. An exhaustive grep for budgetLimits across src/ finds the schema, the two directives
+// routes and the read below — no enforcement site anywhere. The tests therefore assert what this
+// actually is: a document the owner writes and the AGENT can read back, which is the whole
+// mechanism. Anyone adding real metering later should rename the phase and add a refusal test.
+console.log('\nPhase 1 -- Budget directives (instruction to the agent, not enforced by the node)');
 
 await test('PUT directives with budgetLimits succeeds', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/directives`, {
@@ -159,6 +169,22 @@ await test('GET directives returns budgetLimits', async () => {
     assert(body.data.budget_limits.max_tokens_per_day === 50000, 'max_tokens_per_day correct');
     assert(body.data.budget_limits.max_tasks_per_day === 5, 'max_tasks_per_day correct');
     assert(body.data.budget_limits.alert_threshold === 80, 'alert_threshold correct');
+});
+
+// The half that makes the feature a feature: the AGENT can read the budget it is asked to honour.
+// The test above reads with the owner's token, which proves storage round-trips and nothing about
+// whether the instruction reaches the party expected to follow it. Delete the budgetLimits block
+// from the directives read (routes/agent-directives.ts) and this goes red while the owner-side
+// assertions above stay green.
+await test('the AGENT can read the budget it is asked to honour', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/directives`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `agent directives read ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(body.data.budget_limits !== undefined,
+        'the agent cannot see the budget it is expected to respect — the instruction reaches nobody');
+    assert(body.data.budget_limits.max_tokens_per_day === 50000,
+        `agent sees max_tokens_per_day ${body.data.budget_limits.max_tokens_per_day}`);
 });
 
 // ─── Phase 2: Owner-Only Task Start ───
