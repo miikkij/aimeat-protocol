@@ -62,12 +62,18 @@ export interface ExtensionCtx {
         getScore?(gaii: string): Promise<number>;
     };
     fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
-    /** Stored FILES, by reference. Optional the way notify/email are: a context that cannot offer
-     *  it (a scheduled run with no caller) simply does not, and the guest sees undefined. */
+    /** Stored FILES, by reference. Optional the way notify/email are: a road that cannot offer it
+     *  simply does not, and the guest sees undefined.
+     *
+     *  A SCHEDULED RUN NOW OFFERS IT. It used to be the road that could not — which is why "produce
+     *  a file on a clock" did not exist on this node — and the reason was that the scheduler passed
+     *  no `files`, not that a clock cannot own bytes. It writes into the INSTALLER's namespace, so
+     *  `write()` returns `owner` alongside `gaii`: the caller the sandbox sees is not necessarily
+     *  the namespace its bytes landed in, and a script handing the address on must not have to guess. */
     files?: {
         read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string } | null>;
         write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
-            Promise<{ key: string; gaii: string; url: string; size: number }>;
+            Promise<{ key: string; gaii: string; owner: string; url: string; size: number }>;
     };
     /**
      * Who invoked this action. `member` is their standing in the app this extension gates, resolved

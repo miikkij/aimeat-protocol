@@ -1,27 +1,41 @@
 /**
  * @file src/services/scheduler-extension-job.ts
- * @description Scheduled `extension` job executor: resolves the extension and action, gets its
- *   sandbox context from services/extension-ctx.ts, and runs the action with memory-access tracking.
- *   Extracted from scheduler.ts to satisfy max-file-lines.
+ * @description Scheduled `extension` job executor: turns a ScheduledJobRecord into one unattended
+ *   extension run. The run itself — resolving the extension and action, the owner fence, secrets,
+ *   the instance, the sandbox context — is services/extension-system-run.ts, shared with the
+ *   workflow engine's `extension` step.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from scheduler.ts (max-file-lines)
  *   v1.1.0 — 2026-08-10 — Context comes from buildExtensionCtx instead of 174 hand-written lines.
  *                         Fixes what the copy had been missing: memory writes now go through the
  *                         size and key-count limits, and outbound calls through safeFetch.
+ *   v1.2.0 — 2026-08-15 — TARGET-063 A2: the scheduled road gets `ctx.files`, writing into the
+ *                         INSTALLER's namespace. It was the only road without it, so an extension on
+ *                         a clock could hold memory records and reach the internet and could not put
+ *                         one byte into storage — "produce a file on a schedule" did not exist, and
+ *                         the reason was a missing argument rather than anything about clocks. The
+ *                         namespace is the installer's GHII on purpose: `scheduler@<node>` owns no
+ *                         storage, and a package written under it would sit at a different permanent
+ *                         URL than the same package written from the app or by an agent.
+ *   v1.3.0 — 2026-08-15 — TARGET-063 A3: the body moved to services/extension-system-run.ts so the
+ *                         workflow engine's new `extension` step runs the identical sequence rather
+ *                         than growing a second copy of it. Two things this road gains on the way:
+ *                         the owner fence is now re-checked at RUN time (it was create-time only, and
+ *                         a delete-and-reinstall by another owner outlives a create-time gate), and
+ *                         the sandbox limits go through sandboxLimits() like every other road — the
+ *                         ceiling was already applied at install (routes/extensions/manifest.ts), so
+ *                         this only adds the small floors that keep a sandbox large enough to start.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
-import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.js';
-import type { ExtensionCtx } from './extension-runtime.js';
-import { buildExtensionCtx, buildExtensionNotify, buildExtensionEmail } from './extension-ctx.js';
-import { getEncryptionKey } from './encryption.js';
-import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
+import { runExtensionActionAsSystem } from './extension-system-run.js';
 import type { EmailService } from './email.js';
 
 /**
- * Execute a scheduled `extension` job: resolve the extension + action, build the sandbox context
- * (scheduler runs as a system caller), decrypt secret config (incl. an instance-scoped job's
- * bring-your-own-key config), run the action, and return the tracked memory reads/writes.
+ * Execute a scheduled `extension` job and return the tracked memory reads/writes for the run log.
+ *
+ * Every refusal throws: the scheduler records a thrown error as `lastRunResult: 'error'`, leaves the
+ * run count alone and notifies the owner, while any normal return is recorded as a successful run.
  */
 export async function runExtensionJob(
   storage: Storage,
@@ -33,80 +47,26 @@ export async function runExtensionJob(
     throw new Error(`Extension job "${job.id}" missing extensionName or actionId`);
   }
 
-  const ext = await storage.getExtension(job.extensionName);
-  if (!ext) {
-    throw new Error(`Extension "${job.extensionName}" not found`);
-  }
-  if (ext.status !== 'active') {
-    throw new Error(`Extension "${job.extensionName}" is not active`);
-  }
+  // A schedule's `ownerScope` is the owner GHII; an extension record carries the BARE installer name
+  // (routes/extensions/crud.ts writes `req.auth!.owner` into it). Both forms are needed: the owner
+  // fence compares bare names, storage is addressed by GHII. Falling back to the extension record's
+  // own installer would make the fence compare a value against itself, so it is not done.
+  const ownerScope = job.ownerScope ?? '';
+  const ownerName = ownerScope.split('@')[0];
+  if (!ownerName) throw new Error(`Extension job "${job.id}" has no owner scope`);
+  const ownerGhii = ownerScope.includes('@') ? ownerScope : `${ownerName}@${config.nodeId}`;
 
-  const action = ext.actions.find(a => a.id === job.actionId);
-  if (!action) {
-    throw new Error(`Action "${job.actionId}" not found in extension "${job.extensionName}"`);
-  }
-
-  // Build the extension context — scheduler runs as a system caller
-  const extMemoryOwner = job.instanceId
-    ? `ext:${ext.name}.${job.instanceId}`
-    : `ext:${ext.name}`;
-
-  // For an instance-scoped job, load the instance and decrypt its secret config so a scheduled
-  // sync gets the same bring-your-own-key config a live instance action would. `type: 'secret'`
-  // fields are decrypted just before the VM (see services/extension-secrets.ts).
-  const encKey = getEncryptionKey(config);
-  let instanceCtx: { id: string; config: Record<string, unknown> } | undefined;
-  if (job.instanceId) {
-    const inst = await storage.getExtensionInstance(ext.name, job.instanceId);
-    instanceCtx = {
-      id: job.instanceId,
-      config: inst
-        ? decryptSecretFields(inst.config, getInstanceSecretKeys(ext), encKey)
-        : (job.input ?? {}),
-    };
-  }
-
-  // One builder, so this road cannot be the one that forgets a guard again. It was: until
-  // 2026-08-10 the scheduled path wrote memory without the size and key-count limits, and fetched
-  // with a bare fetch rather than safeFetch, so an extension running on a clock had neither the
-  // storage ceiling nor the SSRF check that the same extension had when a person invoked it.
-  const baseCtx: ExtensionCtx = buildExtensionCtx({
-    config,
-    storage,
-    extMemoryOwner,
-    // Scheduled runs have no human present. The installer is the responsible party, and the
-    // 'operator' role is what the sandbox reads to decide it is a system run.
-    caller: {
-      gaii: `scheduler@${config.nodeId}`,
-      owner: ext.installedBy,
-      roles: ['operator'],
-    },
-    extConfig: decryptSecretFields(ext.config, getExtSecretKeys(ext), encKey),
-    instance: instanceCtx,
-    logPrefix: `[ext:${ext.name}:scheduler]`,
-    // No wallet: nobody's balance is available to spend on a schedule.
-    notify: buildExtensionNotify({
-      storage, config, extName: ext.name,
-      recipientGaii: ext.installedBy, recipientOwner: ext.installedBy,
-    }),
-    email: buildExtensionEmail({
-      storage, config, extName: ext.name, extConfig: ext.config,
-      ownerName: ext.installedBy, emailService,
-    }),
+  const out = await runExtensionActionAsSystem({ storage, config, emailService }, {
+    extensionName: job.extensionName,
+    actionId: job.actionId,
+    instanceId: job.instanceId,
+    input: job.input,
+    // Nobody is present, and the scheduler says so rather than borrowing the owner's name for it.
+    callerGaii: `scheduler@${config.nodeId}`,
+    ownerName,
+    storageOwnerGhii: ownerGhii,
+    logLabel: 'scheduler',
+    trackMemory: true,
   });
-
-  // Wrap with memory access tracking
-  const { ctx, accessLog } = trackMemoryAccess(baseCtx);
-
-  // Validate input is a plain object — reject non-serializable values
-  const rawInput = job.input ?? {};
-  let input: Record<string, unknown>;
-  try {
-    input = JSON.parse(JSON.stringify(rawInput)) as Record<string, unknown>;
-  } catch {
-    throw new Error(`Scheduled job "${job.id}" has non-serializable input`);
-  }
-  await executeExtensionAction(action.scriptContent, ctx, input, ext.limits);
-
-  return { reads: accessLog.reads, writes: accessLog.writes };
+  return { reads: out.reads, writes: out.writes };
 }

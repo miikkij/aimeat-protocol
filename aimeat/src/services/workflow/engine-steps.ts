@@ -7,6 +7,11 @@
  *   v1.0.0 — 2026-07-13 — Extracted from engine.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — askHumanInput: deliver a human-input step's question to the owner (in-app
  *     inbox + push, best-effort) and return the templated question snapshot to pin into the run.
+ *   v1.2.0 — 2026-08-15 — TARGET-063 A3: dispatchExtensionStep — run one of the owner's own
+ *     extension actions on this node, in the sandbox, with no agent and no model. It completes
+ *     through the SAME onPushTerminal as an ecosystem step, so its success_signal decides green or
+ *     red and a script that returns without delivering is red rather than quietly green. The run
+ *     itself is services/extension-system-run.ts, shared with the scheduled road.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -21,6 +26,7 @@ import { globToRegExp } from './signal-eval.js';
 import { collectSignalKeys, runKey, type ResolvedStep } from './store.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
+import { runExtensionActionAsSystem } from '../extension-system-run.js';
 import { loc, template } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -46,6 +52,13 @@ const FAILED_STEP = new Set<WorkflowRunStep['state']>(['input-red', 'output-red'
 export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, resolved: ResolvedStep | undefined, onPushTerminal: OnPushTerminal): Promise<string[]> {
   // human-input steps are parked by tick() BEFORE dispatch (askHumanInput) — they never reach here.
   if (step.action?.kind === 'human-input') return [];
+  // An extension step runs HERE, on this node, in the QuickJS sandbox — no agent to reach, no
+  // tunnel to cross, no model. Completion arrives through the same onPushTerminal path as an
+  // ecosystem step, so its success_signal decides green or red the same way.
+  if (step.action?.kind === 'extension') {
+    dispatchExtensionStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
+    return [];
+  }
   // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
   // async onPushTerminal path, never an agent task. They record no task ids.
   if (step.action && step.action.kind !== 'agent') {
@@ -91,7 +104,7 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
  * under the lock by tick(), so onPushTerminal (which also locks) advances it safely on the reply.
  * The workflow owner is the caller GHII (the human pays / is the AIMEAT-side principal).
  */
-export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Exclude<WorkflowStep['action'], undefined | { kind: 'agent' } | { kind: 'human-input' }>, onPushTerminal: OnPushTerminal): void {
+export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Extract<NonNullable<WorkflowStep['action']>, { kind: 'export-out' } | { kind: 'trigger-geai' }>, onPushTerminal: OnPushTerminal): void {
   const { workflowId, runId } = run;
   const stepId = step.id;
   const fire = async (): Promise<boolean> => {
@@ -114,6 +127,93 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
   fire()
     .then(ok => onPushTerminal(ownerGhii, workflowId, runId, stepId, ok))
     .catch(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, false));
+}
+
+/**
+ * Substitute `{var}` into the STRING leaves of a step's input, one level deep plus arrays of
+ * strings. Numbers, booleans and nested objects pass through untouched: templating is for keys and
+ * labels, and silently stringifying a number would make `{ window: 7 }` arrive as `"7"`.
+ */
+function templateInput(input: Record<string, unknown> | undefined, vars: Record<string, string>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(input ?? {})) {
+    if (typeof v === 'string') out[k] = template(v, vars);
+    else if (Array.isArray(v)) out[k] = v.map(item => (typeof item === 'string' ? template(item, vars) : item));
+    else out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * Run an `extension` step: one of the OWNER'S OWN extension actions, here on this node, in the
+ * QuickJS sandbox. No agent has to be online, no tunnel has to be up, and no model is called.
+ *
+ * WHY THIS EXISTS. An extension action was already callable over HTTP, over MCP and on a clock, and
+ * was the one capability a workflow could not reach — so a pipeline whose deterministic half lives
+ * in an extension had to route it through an agent that did nothing but relay, which needs the agent
+ * to be online and puts a model in the path of work that has no judgement in it.
+ *
+ * IDENTITY. The caller is the RUN'S OWNER GHII (an ecosystem step already names them for the same
+ * reason: the human is the AIMEAT-side principal), with the role 'operator' because nobody is
+ * sitting at a screen. Files land in the owner's namespace, so a package produced by a workflow step
+ * sits at the same permanent address as one produced on a clock, by an agent, or from the app.
+ *
+ * Fire-and-forget, exactly like the ecosystem path: tick() has already marked the step 'dispatched'
+ * and persisted it under the run lock, and onPushTerminal takes the lock again to advance the run.
+ * A throw becomes `ok: false`, which is `output-red` (or a retry) — never a quiet green.
+ */
+export function dispatchExtensionStep(
+  deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep,
+  action: Extract<NonNullable<WorkflowStep['action']>, { kind: 'extension' }>,
+  onPushTerminal: OnPushTerminal,
+): void {
+  const { workflowId, runId } = run;
+  const stepId = step.id;
+  const ownerName = ownerGhii.split('@')[0];
+  const fire = async (): Promise<boolean> => {
+    const out = await runExtensionActionAsSystem(
+      { storage: deps.storage, config: deps.config, emailService: deps.emailService },
+      {
+        extensionName: action.extension,
+        actionId: action.action,
+        instanceId: action.instance_id,
+        input: templateInput(action.input, run.vars),
+        callerGaii: ownerGhii,
+        ownerName,
+        storageOwnerGhii: ownerGhii,
+        logLabel: `wf:${workflowId}:${stepId}`,
+      },
+    );
+    // THE BRIDGE BETWEEN TWO NAMESPACES. An extension's own memory lives under `ext:{name}`, and a
+    // workflow's signals read OWNER SCOPE (services/owner-memory.ts: the owner GHII plus their
+    // agents and ecosystem apps). Those never intersect, so without this the step's result would be
+    // invisible to its own gate and every extension step would be permanently red. The engine
+    // therefore lands the return value in the owner's namespace — the same move `answer_to_key`
+    // makes for a human-input step — before the signal is asked anything.
+    if (action.result_to_key) {
+      const key = (run.keyPrefix ?? '') + template(action.result_to_key, run.vars);
+      const existing = await deps.storage.getMemory(ownerGhii, key);
+      const now = new Date().toISOString();
+      await deps.storage.setMemory({
+        key, ownerGaii: ownerGhii, value: out.result ?? null,
+        visibility: 'private', tags: ['workflow-extension-result'], ttlHours: null,
+        version: existing ? existing.version + 1 : 1,
+        createdAt: existing?.createdAt ?? now, updatedAt: now,
+      });
+    }
+    // Reaching here means the sandbox returned rather than threw. Whether the step actually
+    // DELIVERED is the success_signal's question, and onPushTerminal asks it — a script that returns
+    // without producing what the signal names is a red step.
+    return true;
+  };
+  fire()
+    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true))
+    .catch(err => {
+      // The reason has to survive: a red step with no message sends the owner to the run log for a
+      // sentence that was thrown away here.
+      logger.warn(`workflow ${workflowId} run ${runId}: extension step "${stepId}" failed`, { error: String(err) });
+      return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);
+    });
 }
 
 /**

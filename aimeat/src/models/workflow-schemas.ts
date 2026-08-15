@@ -31,6 +31,11 @@
  *     the owner, AskUserQuestion-shaped), StepState 'waiting-human', WorkflowRunStep.human (pinned
  *     question + answer), WorkflowHumanAnswerSchema (the answer POST body). The answer is written to
  *     `answer_to_key` so downstream steps gate on it with plain deterministic signals (json_field).
+ *   v1.8.0 — 2026-08-15 — TARGET-063 A3: step action kind 'extension' — run one of the owner's own
+ *     extension actions on the server, no agent session and no model call. A workflow could reach an
+ *     agent, a human and another node's app, and could not reach the deterministic capability sitting
+ *     on the same node, even though an HTTP caller could. Completion goes through onPushTerminal, so
+ *     the success_signal decides green or red exactly as it does for an ecosystem step.
  */
 import { z } from 'zod';
 
@@ -145,7 +150,32 @@ export type WorkflowStepAction =
   // humanInvolvement to 'editorial-control', because it is the only place where a named person reads
   // the substance and can reject it. A step that merely asks "publish now?" must not set it —
   // clicking publish is not review, and a false editorial-control claim is worse than none.
-  | { kind: 'human-input'; question: WorkflowHumanQuestion; answer_to_key?: string; reviews_key?: string; on_timeout?: 'fail' | 'skip' | 'default'; default_option?: string };
+  | { kind: 'human-input'; question: WorkflowHumanQuestion; answer_to_key?: string; reviews_key?: string; on_timeout?: 'fail' | 'skip' | 'default'; default_option?: string }
+  // extension: run one of the OWNER'S OWN extension actions on the server, in the QuickJS sandbox,
+  // with no agent session and no model call. It is the deterministic half of a pipeline — fetch,
+  // normalise, hash, write a file — next to the agent steps that do the interpreting.
+  //
+  // Same input as the schedule kind, because it is the same run: services/extension-system-run.ts
+  // executes both. `input` is {var}-templated at dispatch, so a step can be parameterised by the
+  // run's vars the way a key template is. The step completes through onPushTerminal, which means
+  // its success_signal decides green or red exactly as it does for an ecosystem step — a script
+  // that returns without producing what the signal names is a RED step, not a quiet pass.
+  //
+  // OWN EXTENSION ONLY, checked at save AND at run. An unattended call has no paywall, no contract
+  // and no meter, so pointing a workflow at somebody else's extension would be an unlimited standing
+  // call on their capability, their API keys and their quota — the same reason POST /v1/schedules
+  // has refused it since it was written.
+  //
+  // `result_to_key` IS HOW THE STEP IS GATED, and it is not optional decoration. An extension's own
+  // memory lives in the `ext:{name}` namespace, and a workflow's signals read OWNER SCOPE (the owner
+  // GHII plus their agents and ecosystem apps — see services/owner-memory.ts). Those two never
+  // intersect, so a signal pointed at what the extension wrote for itself can only ever read
+  // nothing. The engine therefore writes the action's RETURN VALUE to this key, in the owner's
+  // namespace, templated and keyPrefix-honouring — exactly what `answer_to_key` does for a
+  // human-input step — and the signal gates on that. A step must declare either this or its own
+  // success_signal; with neither, the only thing left to green on is "the script returned", which is
+  // the covering fallback this design exists to remove.
+  | { kind: 'extension'; extension: string; action: string; instance_id?: string; input?: Record<string, unknown>; result_to_key?: string };
 
 export interface WorkflowStep {
   id: string;                         // stable; marks "what happened where" per run
@@ -356,6 +386,18 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     reviews_key: z.string().min(1).max(400).optional(),
     on_timeout: z.enum(['fail', 'skip', 'default']).optional(),
     default_option: z.string().min(1).max(64).optional(),
+  }),
+  z.object({
+    kind: z.literal('extension'),
+    extension: z.string().min(1).max(120),            // must be installed by THIS workflow's owner
+    action: z.string().min(1).max(120),               // an action id on that extension
+    instance_id: z.string().min(1).max(120).optional(),
+    // Handed to the sandbox as the action's input, {var}-templated at dispatch. Values are opaque to
+    // the engine; only string leaves are templated, so numbers and booleans survive as themselves.
+    input: z.record(z.string().max(120), z.unknown()).optional(),
+    /** Owner-namespace key the action's return value is written to, so a signal can gate on it.
+     *  See the type above for why an extension step needs this and an agent step does not. */
+    result_to_key: z.string().min(1).max(400).optional(),
   }),
 ]);
 

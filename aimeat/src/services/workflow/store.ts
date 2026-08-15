@@ -200,6 +200,40 @@ export async function validateWorkflow(
     if (step.action && step.action.kind !== 'agent') {
       const a = step.action;
       let deliverableKey: string | undefined;
+      if (a.kind === 'extension') {
+        // OWN EXTENSION ONLY. A workflow step runs unattended, with no paywall, no contract and no
+        // meter — there is no door where a price could be asked — so pointing one at somebody else's
+        // extension is an unlimited standing call on their capability, their API keys and their
+        // quota. POST /v1/schedules has refused exactly this since it was written
+        // (services/schedule-write.ts); the same rule, at the same moment, for the same reason.
+        //
+        // Refused at SAVE so the author is told while they are writing it rather than at 06:00 in a
+        // run log. It is checked again at run time (services/extension-system-run.ts): `installedBy`
+        // is decided at install, and a delete-and-reinstall by a different owner outlives this gate.
+        const ext = await storage.getExtension(a.extension);
+        if (!ext || ext.installedBy !== ownerName) {
+          // Same wording either way: which extensions exist is not a stranger's business.
+          errors.push(`step "${step.id}": extension "${a.extension}" not found`);
+        } else if (!ext.actions.some(act => act.id === a.action)) {
+          errors.push(`step "${step.id}": extension "${a.extension}" has no action "${a.action}"`);
+        }
+        // A step with neither a signal nor a result key would go green on the sandbox merely
+        // RETURNING, which is the covering fallback this whole target exists to remove: a producer
+        // whose source was empty returns cleanly and the run reports success having produced nothing.
+        if (!step.success_signal && !a.result_to_key) {
+          errors.push(`step "${step.id}": an extension step needs result_to_key or an explicit success_signal — with neither, the step greens whenever the script returns, whatever it produced`);
+        }
+        // The result key is the step's deliverable, exactly as answer_to_key is for a human-input
+        // step: `fresh` clears it, `skip_done` greens on an existing one, and the synthesized signal
+        // below reads it.
+        deliverableKey = a.result_to_key;
+        for (const v of collectVarRefs([
+          ...Object.values(a.input ?? {}).filter((x): x is string => typeof x === 'string'),
+          ...(a.result_to_key ? [a.result_to_key] : []),
+        ])) {
+          if (!declaredVars.has(v)) errors.push(`step "${step.id}": input or result_to_key references undeclared var "{${v}}"`);
+        }
+      }
       if (a.kind === 'human-input') {
         // The answer key is the step's deliverable: fresh clears it, skip_done greens on an existing
         // answer without re-asking, signals-only checks it — all via the synthesized success_signal.
@@ -215,12 +249,16 @@ export async function validateWorkflow(
           }
         }
       }
-      const humanDefaultSignal: Signal | undefined = a.kind === 'human-input' && a.answer_to_key
-        ? { kind: 'deterministic', key: a.answer_to_key, op: 'nonempty' }
-        : undefined;
+      // Both kinds that name a key where their output lands get the same default gate: the key is
+      // non-empty. An explicit success_signal on the step still wins — a producer that wants to
+      // assert the SHAPE of what it wrote (json_field, json_schema, count_nonempty) says so.
+      const keyDefaultSignal: Signal | undefined =
+        a.kind === 'human-input' && a.answer_to_key ? { kind: 'deterministic', key: a.answer_to_key, op: 'nonempty' }
+          : a.kind === 'extension' && a.result_to_key ? { kind: 'deterministic', key: a.result_to_key, op: 'nonempty' }
+            : undefined;
       resolved.push({
         stepId: step.id, agents: [], offerId: '',
-        success_signal: step.success_signal ?? humanDefaultSignal,
+        success_signal: step.success_signal ?? keyDefaultSignal,
         required_to_function: step.required_to_function ?? 'none',
         deliverableKey,
       });

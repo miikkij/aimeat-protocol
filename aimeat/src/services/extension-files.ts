@@ -14,6 +14,13 @@
  *             can overwrite something they wrote themselves.
  *   Both are size-capped before any base64 crosses the QuickJS bridge, and a write goes through the
  *   ordinary per-file limit and storage quota.
+ *
+ *   THE PREFIX IS A PARAMETER, NOT A CONSTANT — and it defaults to the fence. A road may name a
+ *   different key root ONLY when the road, not the guest, derives the key: that is what
+ *   `ctx.datapackage` does, where the host builds `datapkg/{name}/{contentHash}/…` and the sandbox
+ *   never gets to say where its bytes land. Handing an extension a free choice of root would undo
+ *   the one rule that keeps an installed extension off the owner's own files, so `keyPrefix` is set
+ *   by the factory's caller and is never read from anything the guest supplies.
  * @structure MAX_FILE_BYTES · parseRef · makeExtensionFiles (the ctx.files factory)
  * @usage const files = makeExtensionFiles({ config, storage, callerGaii, extName });
  *   const ctx: ExtensionCtx = { …, files };
@@ -22,6 +29,11 @@
  *     instead of its bytes (image pipelines, MCP-safe handoff).
  *   v1.1.0 — 2026-07-26 — parseRef delegates to services/file-refs.ts: the same reference form now
  *     serves MCP tools, DM attachments and task attachments, and there is one implementation of it.
+ *   v1.2.0 — 2026-08-15 — TARGET-063 A2/A4: `keyPrefix` is a dependency (default unchanged), so a
+ *     host-derived key path can live outside `ext/{name}/` without the guest gaining that choice.
+ *     `write()` also returns the file's OWNER, which the scheduled road needs: it writes into the
+ *     installer's namespace rather than its own, so "the URL of what I just wrote" is no longer
+ *     derivable from the caller the sandbox can see.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -47,15 +59,23 @@ export const parseRef = parseFileRef;
 export function makeExtensionFiles(deps: {
     config: AimeatConfig;
     storage: Storage;
+    /** Whose storage is read and written, and whose access rights a read is judged against. */
     callerGaii: string;
     callerOwner?: string;
     extName: string;
+    /**
+     * The key root every write is forced under. Defaults to `ext/{extName}/`, which is the fence
+     * that keeps an extension off files the owner wrote by hand. Pass something else ONLY from a
+     * road that derives the whole key itself — see the file header.
+     */
+    keyPrefix?: string;
 }): {
     read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string } | null>;
     write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
-        Promise<{ key: string; gaii: string; url: string; size: number }>;
+        Promise<{ key: string; gaii: string; owner: string; url: string; size: number }>;
 } {
     const { config, storage, callerGaii, callerOwner, extName } = deps;
+    const keyPrefix = deps.keyPrefix ?? `ext/${extName}/`;
 
     return {
         async read(ref) {
@@ -95,8 +115,10 @@ export function makeExtensionFiles(deps: {
             const clean = String(key || '').replace(/^\/+/, '').trim();
             if (!clean) throw new Error('write() needs a key');
             // Reserved prefix: the result is attributable to the extension that made it, and no
-            // extension can land on top of a file the owner wrote by hand.
-            const full = clean.startsWith(`ext/${extName}/`) ? clean : `ext/${extName}/${clean}`;
+            // extension can land on top of a file the owner wrote by hand. A storage key is an
+            // opaque string rather than a filesystem path, so `..` inside one is inert — it names a
+            // silly key, not a directory to climb out of.
+            const full = clean.startsWith(keyPrefix) ? clean : `${keyPrefix}${clean}`;
 
             const data = Buffer.from(String(base64 || '').replace(/^data:[^;]+;base64,/, ''), 'base64');
             if (!data.length) throw new Error('write() got no bytes');
@@ -123,6 +145,10 @@ export function makeExtensionFiles(deps: {
             return {
                 key: full,
                 gaii: callerGaii,
+                // The namespace the file landed in, spelled out. On the scheduled road that is the
+                // INSTALLER, not the principal the sandbox sees as its caller, and a script that
+                // wants to hand the address on cannot work it out from anything else it holds.
+                owner: callerGaii,
                 // Only meaningful for a public file; a private one is fetched with the owner's token.
                 url: `${config.baseUrl}/v1/pub/${encodeURIComponent(callerGaii)}/${full.split('/').map(encodeURIComponent).join('/')}`,
                 size: data.length,

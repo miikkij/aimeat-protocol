@@ -60,10 +60,21 @@
  *     is now the same one the upload runs. And the response emitted only `emitChange('files')` while
  *     the upload emits `files` and `memory` -- a delete frees bytes in the budget the memory view
  *     renders exactly as an upload spends them, and the two views disagreed about it.
+ *   v1.13.0 -- 2026-08-15 -- TARGET-063 A1: byte ranges are one implementation (utils/http-range.ts)
+ *     and GET /v1/pub has them for the first time. Three things were wrong at once. The regex
+ *     `/bytes=(\d+)-(\d*)/` does not match `bytes=-8`, the suffix range a Parquet reader opens with,
+ *     so that request fell through to a 200 carrying the whole file -- a silent fallback that makes a
+ *     streaming reader download everything while believing it succeeded. `Accept-Ranges` was sent by
+ *     no path at all, so a client could not discover range support and correctly concluded there was
+ *     none. And /v1/pub, the door a program reads a published dataset through, never looked at
+ *     `Range`. Now: suffix ranges parse, an unsatisfiable byte range answers 416 with a
+ *     `Content-Range: bytes STAR/size` instead of 200, and every byte-serving response (including
+ *     HEAD and both /v1/pub branches) advertises `Accept-Ranges: bytes`.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { setStoredFileHeaders } from '../utils/file-download-headers.js';
+import { parseRangeHeader, sendPartialContent, setAcceptRanges, rangeNotSatisfiable } from '../utils/http-range.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireRole, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -136,23 +147,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // The presigned token IS the capability (already owner-authorized). Allowed reads
         // are no longer audited (only denials + consent mutations — see consent-audit-buffer).
 
-        const rangeHeader = req.headers.range;
-        if (rangeHeader) {
-            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-            if (match) {
-                const start = parseInt(match[1], 10);
-                const end = match[2] ? parseInt(match[2], 10) : file.size - 1;
-                const chunk = file.data.subarray(start, end + 1);
-                res.status(206);
-                setStoredFileHeaders(res, file);
-                res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
-                res.setHeader('Content-Length', chunk.length);
-                res.end(chunk);
-                return;
-            }
-        }
+        const verdict = parseRangeHeader(req.headers.range, file.size);
+        if (verdict.kind === 'unsatisfiable') { rangeNotSatisfiable(res, file.size, verdict.reason); return; }
+        if (verdict.kind === 'partial') { sendPartialContent(res, file, verdict); return; }
 
         setStoredFileHeaders(res, file);
+        setAcceptRanges(res);
         res.setHeader('Content-Length', file.size);
         res.setHeader('Cache-Control', 'private, max-age=300');
         res.end(file.data);
@@ -566,22 +566,34 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 action: 'read',
             });
             if (handleMode) { await sendHandle(req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : gaii); return; }
-            res.setHeader('Cache-Control', 'public, max-age=300');
-            // A public file is world-readable by definition, and until now only by <img>: a script
-            // that fetched the same bytes got no Access-Control-Allow-Origin and was blocked. The
-            // global CORS middleware resolves allowed origins from the CALLER's identity, and a
+            // A public file is world-readable by definition, and for a long time only by <img>: a
+            // script that fetched the same bytes got no Access-Control-Allow-Origin and was blocked.
+            // The global CORS middleware resolves allowed origins from the CALLER's identity, and a
             // public read carries none, so it fell back to the node default and app origins missed.
             // '*' is the honest answer for content that needs no credentials to read — the same
             // header the app-template, library-pack and font routes already send — and it is set
             // ONLY on this branch: the consent-gated paths below keep the credentialed policy.
+            // `Cross-Origin-Resource-Policy` lets the bytes be drawn into a canvas and read back.
+            //
+            // All three are set BEFORE the range branches so a 206 and a 416 carry them too: a
+            // cross-origin reader that gets its bytes but not its error is worse off than one that
+            // gets neither. `Access-Control-Expose-Headers` is what makes `Content-Range` readable
+            // from a browser at all — without it a fetch() sees the 206 and none of its geometry.
             res.setHeader('Access-Control-Allow-Origin', '*');
-            // Lets the bytes be drawn into a canvas and read back, which is what any app doing
-            // something WITH a public image (resize, re-encode, hand to a tool) has to do.
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-            // The door this hardening exists for. Anyone on the internet reaches this branch, the
-            // bytes come back from the apex origin, and their type is whatever the uploader said it
-            // was, so an uploaded page would run as the portal. Images, media, PDFs and plain text
-            // still render; everything else is saved rather than shown.
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Accept-Ranges, Content-Length');
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            // THE DOOR A DATA PACKAGE IS READ THROUGH, and until now the only one with no range
+            // support at all: every partial request came back 200 with the whole file, so a reader
+            // asking for eight bytes downloaded everything and was told it had succeeded.
+            const pubVerdict = parseRangeHeader(req.headers.range, file.size);
+            if (pubVerdict.kind === 'unsatisfiable') { rangeNotSatisfiable(res, file.size, pubVerdict.reason); return; }
+            if (pubVerdict.kind === 'partial') { sendPartialContent(res, file, pubVerdict); return; }
+            setAcceptRanges(res);
+            // The hardening this branch exists for. Anyone on the internet reaches it, the bytes come
+            // back from the apex origin, and their type is whatever the uploader said it was, so an
+            // uploaded page would run as the portal. Images, media, PDFs and plain text still render;
+            // everything else is saved rather than shown.
             setStoredFileHeaders(res, file);
             res.setHeader('Content-Length', file.size);
             res.end(file.data);
@@ -634,7 +646,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         if (handleMode) { await sendHandle(accessorGaii); return; }
+        // Same range contract as the public branch. A consented reader is reading the same kind of
+        // artefact through a narrower door, and a door that answers ranges only when the file is
+        // public would make "share this dataset with one buyer" a strictly worse product than
+        // "publish it to everyone".
+        const gatedVerdict = parseRangeHeader(req.headers.range, file.size);
+        if (gatedVerdict.kind === 'unsatisfiable') { rangeNotSatisfiable(res, file.size, gatedVerdict.reason); return; }
+        if (gatedVerdict.kind === 'partial') { sendPartialContent(res, file, gatedVerdict); return; }
         setStoredFileHeaders(res, file);
+        setAcceptRanges(res);
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
     });
@@ -665,8 +685,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         // Same headers as the GET below, so a client cannot learn one answer from HEAD and meet a
-        // different one when it fetches the bytes.
+        // different one when it fetches the bytes. `Accept-Ranges` above all: a range reader probes
+        // with HEAD first and decides from this header alone whether to stream or to download.
         setStoredFileHeaders(res, file);
+        setAcceptRanges(res);
         res.setHeader('Content-Length', file.size);
         res.setHeader('X-AIMEAT-Visibility', file.visibility);
         res.setHeader('X-AIMEAT-Created', file.createdAt);
@@ -714,24 +736,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        // Range header support
-        const rangeHeader = req.headers.range;
-        if (rangeHeader) {
-            const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
-            if (match) {
-                const start = parseInt(match[1], 10);
-                const end = match[2] ? parseInt(match[2], 10) : file.size - 1;
-                const chunk = file.data.subarray(start, end + 1);
-                res.status(206);
-                setStoredFileHeaders(res, file);
-                res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
-                res.setHeader('Content-Length', chunk.length);
-                res.end(chunk);
-                return;
-            }
-        }
+        const verdict = parseRangeHeader(req.headers.range, file.size);
+        if (verdict.kind === 'unsatisfiable') { rangeNotSatisfiable(res, file.size, verdict.reason); return; }
+        if (verdict.kind === 'partial') { sendPartialContent(res, file, verdict); return; }
 
         setStoredFileHeaders(res, file);
+        setAcceptRanges(res);
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
     });

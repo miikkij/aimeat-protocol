@@ -24,6 +24,10 @@
  *   cd aimeat && pnpm check:denial-coverage --seed     # rewrite the file from today's state
  * @version-history
  *   v1.0.0 — 2026-08-15 — Initial (E2E test-quality audit, the missing-denial class).
+ *   v1.0.1 — 2026-08-15 — Hash with line endings normalised. The shas were seeded from an LF tree
+ *     and a Windows checkout hands readFileSync CRLF, so every seeded sha mismatched there and the
+ *     gate reported two suites as EXPIRED — "you edited this" — with nobody having touched them.
+ *     A gate that cannot go green on one of the platforms it runs on is a gate people route around.
  */
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -89,7 +93,22 @@ export function hasDenialAssertion(source: string): boolean {
     return false;
 }
 
-const sha = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 16);
+/**
+ * The suite's content, hashed with LINE ENDINGS NORMALISED.
+ *
+ * Without the replace this gate cannot go green on Windows. The exemptions were seeded on a tree
+ * with LF endings, `.gitattributes` normalises on `git add` so the committed bytes are LF, and a
+ * Windows checkout puts CRLF in the worktree — which is what readFileSync hands us. Every seeded
+ * sha therefore mismatched on that platform and two suites reported EXPIRED ("the file was edited")
+ * with nobody having touched them since the seed, on a gate whose whole message is that you edited
+ * something. Measured: test/e2e-portal.ts hashes 7834c004b9ccc67a as LF, which IS its stored sha,
+ * and b6823b21d23de6d1 as it sits on disk.
+ *
+ * The line ending is not part of what an exemption is about — the reason is pinned to what the
+ * suite ASSERTS — so normalising here is the fix rather than re-seeding the file per platform.
+ */
+const sha = (text: string): string =>
+    createHash('sha256').update(text.replace(/\r\n/g, '\n')).digest('hex').slice(0, 16);
 
 function loadExemptions(): ExemptionFile {
     if (!existsSync(EXEMPTIONS)) return { note: '', exempt: {} };

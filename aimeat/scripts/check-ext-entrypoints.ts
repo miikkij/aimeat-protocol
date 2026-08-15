@@ -22,6 +22,11 @@
  *   v1.1.0 — 2026-08-10 — Step 4 landed: the invariant is now "get the context from the builder"
  *                         rather than "import the guards here", since the guards moved inside it.
  *                         Gating from this version — every entry point complies.
+ *   v1.2.0 — 2026-08-15 — The paywall exemption follows the road: the two unattended paths now share
+ *                         services/extension-system-run.ts, and scheduler-extension-job.ts no longer
+ *                         runs the engine at all. The reason now also names what stands in for the
+ *                         paywall there (the owner fence), because "no payer" excuses a charge and
+ *                         never a check.
  */
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -32,10 +37,17 @@ const SRC = join(ROOT, 'src');
 /** The builder every entry point must take its sandbox context from. */
 const BUILDER = 'buildExtensionCtx';
 
-/** Roads that genuinely have nobody to charge, each with the reason. */
+/**
+ * Roads that genuinely have nobody to charge, each with the reason — and with what stands in for the
+ * paywall there, because "no payer" is a reason to skip a CHARGE, never a reason to skip a check.
+ */
 const PAYWALL_EXEMPT: Record<string, string> = {
-    'src/services/scheduler-extension-job.ts':
-        'a scheduled run has no caller and no payer; the installing owner is not charged for their own clock',
+    'src/services/extension-system-run.ts':
+        'the two unattended roads (a schedule firing, a workflow step reaching its turn) have no caller '
+        + 'and no payer, and the owner is not charged for their own clock. What replaces the paywall is '
+        + 'the owner fence enforced in this file: an unattended run may only call an extension the '
+        + 'requesting owner installed, so there is no cross-owner call for a price to be asked about. '
+        + 'Formerly keyed to scheduler-extension-job.ts, which no longer runs the engine itself.',
 };
 
 /** Files that mention the engine but do not run it. */

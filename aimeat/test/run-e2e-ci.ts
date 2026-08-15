@@ -141,6 +141,9 @@ const ALL_SUITES = [
     'test/e2e-extensions.ts',
     'test/e2e-ext-paywall.ts',
     'test/e2e-ext-files.ts',
+    // The same capability on the road that did not have it: an extension on a clock, writing bytes
+    // into the INSTALLER's namespace so a scheduled producer and a hand-run one land at one address.
+    'test/e2e-scheduled-ext-files.ts',
     // The gates the August 2026 audit added around extensions: what a manifest may declare,
     // and who may read an action's source. Each test names the thing that used to be possible.
     'test/e2e-ext-hardening.ts',
@@ -398,6 +401,9 @@ const ALL_SUITES = [
     'test/e2e-agent-governance.ts',
     'test/e2e-workflows.ts',
     'test/e2e-workflows-human.ts',
+    // The step kind a workflow was missing: an extension action, run on this node with no agent
+    // online and no model in the path, gated by the same success_signal as every other step.
+    'test/e2e-workflow-extension-step.ts',
     'test/e2e-public-activity.ts',
     'test/e2e-public-totals.ts',
     'test/e2e-cortex-upload-ownership.ts',

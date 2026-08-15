@@ -349,17 +349,117 @@ await test('15. Range: bytes=5- → 206 from byte 5 to end', async () => {
     assert(contentRange === `bytes 5-${testContent.length - 1}/${testContent.length}`, `Content-Range: ${contentRange}`);
 });
 
-await test('16. Non-matching Range header falls through to full download', async () => {
-    // The server regex only matches bytes=(\d+)-(\d*), so a malformed range skips range handling
+await test('16. An unknown range UNIT is ignored and the full representation is sent', async () => {
+    // RFC 9110 §14.2 says MUST on this, and it is not a covering fallback: the same response
+    // carries `Accept-Ranges: bytes`, so the client has been told which unit works. Distinct from
+    // a malformed `bytes=` header, which is a 416 (test 16d) — there the client is speaking the
+    // right unit and got the syntax wrong, and a 200 would hide that.
     const res = await rawFetch(`/v1/storage/${encodeURIComponent(publicKey)}`, {
         headers: {
             Authorization: `Bearer ${agentAToken}`,
             Range: 'characters=0-5',
         },
     });
-    assert(res.status === 200, `expected 200 (fallthrough), got ${res.status}`);
+    assert(res.status === 200, `expected 200 (unknown unit ignored), got ${res.status}`);
+    assert(res.headers.get('accept-ranges') === 'bytes', `Accept-Ranges: ${res.headers.get('accept-ranges')}`);
     const data = await res.text();
-    assert(data === testContent, 'full content returned on malformed range');
+    assert(data === testContent, 'full content returned on an unknown range unit');
+});
+
+// ── TARGET-063 A1: the five answers the old parser got wrong ──
+// Proof that these are new: the previous implementation was `/bytes=(\d+)-(\d*)/`, which needs a
+// digit before the dash. `bytes=-8` never matched it and fell through to 200 + the whole file; the
+// three out-of-bounds cases DID match and produced a 206 whose Content-Range described bytes that
+// were never sent.
+
+await test('16a. Accept-Ranges: bytes is advertised on the full download', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(publicKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assert(res.headers.get('accept-ranges') === 'bytes', 'a range reader decides from this header alone');
+});
+
+await test('16b. Range: bytes=-8 → 206 with the LAST eight bytes (the Parquet footer probe)', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(publicKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}`, Range: 'bytes=-8' },
+    });
+    assert(res.status === 206, `expected 206, got ${res.status} — a 200 here IS the silent fallback`);
+    const text = await res.text();
+    assert(text === testContent.slice(-8), `suffix data mismatch: "${text}"`);
+    const cr = res.headers.get('content-range');
+    assert(cr === `bytes ${testContent.length - 8}-${testContent.length - 1}/${testContent.length}`, `Content-Range: ${cr}`);
+});
+
+await test('16c. Range: bytes=-5000 (longer than the file) → 206 with the whole file', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(publicKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}`, Range: 'bytes=-5000' },
+    });
+    assert(res.status === 206, `expected 206, got ${res.status}`);
+    const text = await res.text();
+    assert(text === testContent, 'a suffix larger than the representation means all of it');
+    const cr = res.headers.get('content-range');
+    assert(cr === `bytes 0-${testContent.length - 1}/${testContent.length}`, `Content-Range: ${cr}`);
+});
+
+await test('16d. An unsatisfiable byte range → 416 + Content-Range, never a quiet 200', async () => {
+    for (const bad of ['bytes=9999-10000', 'bytes=50-10', 'bytes=abc', 'bytes=-0']) {
+        const res = await rawFetch(`/v1/storage/${encodeURIComponent(publicKey)}`, {
+            headers: { Authorization: `Bearer ${agentAToken}`, Range: bad },
+        });
+        assert(res.status === 416, `${bad}: expected 416, got ${res.status}`);
+        const cr = res.headers.get('content-range');
+        assert(cr === `bytes */${testContent.length}`, `${bad}: Content-Range: ${cr}`);
+        assert(res.headers.get('accept-ranges') === 'bytes', `${bad}: 416 must still say which unit works`);
+    }
+});
+
+await test('16e. A multi-range request is refused, not partly served', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(publicKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}`, Range: 'bytes=0-9, 20-29' },
+    });
+    assert(res.status === 416, `expected 416, got ${res.status} — the old path answered 206 with only the first range`);
+});
+
+// ── The door a data package is actually read through: anonymous GET /v1/pub ──
+
+await test('16f. GET /v1/pub advertises Accept-Ranges to an anonymous reader', async () => {
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(publicKey)}`);
+    assert(res.status === 200, `status ${res.status}`);
+    assert(res.headers.get('accept-ranges') === 'bytes', 'no header = DuckDB concludes there are no ranges');
+    // A browser fetch() cannot see Content-Range without this, so a 206 would arrive with no geometry.
+    const expose = res.headers.get('access-control-expose-headers') ?? '';
+    assert(/content-range/i.test(expose), `Access-Control-Expose-Headers: ${expose}`);
+});
+
+await test('16g. GET /v1/pub serves a byte range to an anonymous reader (206, not 200)', async () => {
+    const res = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(publicKey)}`, {
+        headers: { Range: 'bytes=0-9' },
+    });
+    assert(res.status === 206, `expected 206, got ${res.status} — this door had NO range handling at all`);
+    const text = await res.text();
+    assert(text === testContent.slice(0, 10), `range data mismatch: "${text}"`);
+    assert(res.headers.get('access-control-allow-origin') === '*', 'a 206 must carry the CORS headers too');
+});
+
+await test('16h. GET /v1/pub serves a suffix range and refuses an unsatisfiable one', async () => {
+    const url = `/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(publicKey)}`;
+    const suffix = await rawFetch(url, { headers: { Range: 'bytes=-8' } });
+    assert(suffix.status === 206, `suffix: expected 206, got ${suffix.status}`);
+    assert(await suffix.text() === testContent.slice(-8), 'suffix data mismatch on /v1/pub');
+
+    const bad = await rawFetch(url, { headers: { Range: 'bytes=9999-' } });
+    assert(bad.status === 416, `unsatisfiable: expected 416, got ${bad.status}`);
+    assert(bad.headers.get('content-range') === `bytes */${testContent.length}`, `Content-Range: ${bad.headers.get('content-range')}`);
+});
+
+await test('16i. HEAD carries Accept-Ranges, which is what a reader probes with first', async () => {
+    const res = await rawFetch(`/v1/storage/${encodeURIComponent(publicKey)}`, {
+        method: 'HEAD', headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(res.status === 200, `status ${res.status}`);
+    assert(res.headers.get('accept-ranges') === 'bytes', 'HEAD must answer the same as GET');
+    assert(res.headers.get('content-length') === String(testContent.length), `Content-Length: ${res.headers.get('content-length')}`);
 });
 
 // ─── Phase 5: HEAD Metadata ───

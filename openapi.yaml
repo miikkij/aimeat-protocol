@@ -4053,13 +4053,40 @@ components:
             sandbox-prefix-honoring) so downstream steps branch on it with deterministic json_field
             gates — e.g. required_to_function {op: json_field, key: <answer_to_key>, path: pick,
             equals: approve}.
+            `extension` runs one of the OWNER'S OWN extension actions on this node, in the sandbox,
+            with no agent session and no model call — the deterministic half of a pipeline (fetch,
+            normalise, hash, write a file) next to the agent steps that interpret. It completes
+            through the same path as an ecosystem step, so its `success_signal` decides green or red;
+            a `success_signal` is REQUIRED on an extension step, because without one the step would
+            go green whenever the script merely returned, whatever it produced. Naming an extension
+            installed by anyone else is refused at save AND at run: an unattended call has no
+            paywall, no contract and no meter, so it would be an unlimited standing call on someone
+            else's capability, API keys and quota.
           required: [kind]
           properties:
-            kind: { type: string, enum: [agent, export-out, trigger-geai, human-input] }
+            kind: { type: string, enum: [agent, export-out, trigger-geai, human-input, extension] }
             geai: { type: string, description: 'export-out / trigger-geai: the target GEAI.' }
             capability: { type: string, description: 'trigger-geai (required) / export-out (default __deposit__).' }
             from: { type: string, description: 'export-out: owner memory key whose value is pushed.' }
-            input: { type: object, additionalProperties: true, description: 'trigger-geai: capability input.' }
+            input:
+              type: object
+              additionalProperties: true
+              description: >-
+                trigger-geai: capability input. extension: the action's input, with `{var}` substituted
+                into its string leaves at dispatch (numbers and booleans pass through unchanged).
+            extension: { type: string, maxLength: 120, description: 'extension: the extension name — must be installed by this workflow''s owner.' }
+            action: { type: string, maxLength: 120, description: 'extension: the action id on that extension.' }
+            instance_id: { type: string, maxLength: 120, description: 'extension: run against this named instance (its config, secrets decrypted, arrives as ctx.instance).' }
+            result_to_key:
+              type: string
+              maxLength: 400
+              description: >-
+                extension: owner-namespace key (templated, sandbox-prefix-honoring) the action's RETURN
+                VALUE is written to, so a signal can gate on it — the analogue of `answer_to_key`. It is
+                needed because an extension's own memory lives in the `ext:{name}` namespace while a
+                workflow's signals read owner scope, and those never intersect: a signal pointed at what
+                the extension wrote for itself can only read nothing. Absent `success_signal`, the
+                default gate is that this key is non-empty. A step must declare one or the other.
             question:
               type: object
               description: 'human-input: the structured question (AskUserQuestion-shaped).'
