@@ -3,8 +3,9 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
- *   v1.2.0 — 2026-08-16 — the four incremental app-draft tools (write/replace/read/seed). Server MCP only for now: the connector
- *     surfaces call REST routes, and these have none yet.
+ *   v1.2.0 — 2026-08-16 — the four incremental app-draft tools (write/replace/read/seed), reachable
+ *     from all three doors. `content` is plain text here where aimeat_app_draft_save takes base64:
+ *     a caller composing HTML is not moving a file, and base64 would inflate every chunk by a third.
  *   v1.1.0 — 2026-07-31 — aimeat_workspace_write documents its `items` batch (space/value become
  *     optional; one call carries a whole migration).
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
@@ -560,7 +561,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         name: 'aimeat_app_draft_write',
         description: 'Write into an app\'s draft slot a PIECE AT A TIME, so you can build an app larger than one model response. This is the way to author a real app: no model emits 400 kB in one go, and there is no filesystem here to assemble it on. Call repeatedly with mode "append" until the file is complete, then aimeat_app_draft_publish. Use mode "replace" for the first call, or to start over. Content is plain UTF-8 text, NOT base64. To continue an app that is already live, copy it into the slot first with aimeat_app_draft_seed. To change something you already wrote, prefer aimeat_app_draft_replace over rewriting the whole file. Pass expected_size_bytes when you are appending across many calls and want to be told if the draft moved underneath you.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         input: {
             filename: { type: 'string', required: true, description: 'App filename this draft stages (e.g. "pong.html").' },
             content: { type: 'string', required: true, description: 'The text to write. Plain UTF-8, not base64.' },
@@ -574,7 +575,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         name: 'aimeat_app_draft_replace',
         description: 'Replace an exact piece of text inside an app\'s draft, the way an editor does. Use this to iterate: read the part you want to change with aimeat_app_draft_read, then replace it, instead of rewriting the whole app through your context. old_string must match EXACTLY, including indentation and line breaks, and must appear exactly once unless you set replace_all. When it is not unique the refusal tells you how many times it appeared, so widen the surrounding text until the match is unambiguous rather than guessing.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         input: {
             filename: { type: 'string', required: true, description: 'App filename whose draft to edit.' },
             old_string: { type: 'string', required: true, description: 'The exact text to replace, including indentation.' },
@@ -586,7 +587,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         name: 'aimeat_app_draft_read',
         description: 'Read a line range of an app\'s draft. Returns the slice plus the total line count and byte size, so you can page through a large app without pulling all of it into context. Ask for the part you are about to change, not the whole file: a read with no range returns the first page and tells you that more remains. Line numbers are 1-based.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         input: {
             filename: { type: 'string', required: true, description: 'App filename whose draft to read.' },
             offset: { type: 'number', description: 'First line to return, 1-based. Default 1.' },
@@ -597,7 +598,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         name: 'aimeat_app_draft_seed',
         description: 'Copy a published app\'s source into its draft slot, server-side, so you can continue an app you already shipped. This is the missing first step when someone asks you to change a live app: aimeat_app_get returns the manifest and NOT the source, so without this there is nothing to edit. The bytes never pass through your context. Seed, then read and replace the parts you need, then aimeat_app_draft_publish. Seeding under a different filename copies the app, manifest and all.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: agentEverywhere,
         input: {
             filename: { type: 'string', required: true, description: 'The draft slot to write into.' },
             from_filename: { type: 'string', description: 'The published app to copy from. Defaults to filename.' },

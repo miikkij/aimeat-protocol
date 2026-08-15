@@ -100,6 +100,61 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.put(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft`, body));
   });
 
+  // → POST /v1/apps/:owner/:filename/draft/write — append a piece of the draft, or replace it.
+  //   Plain text rather than base64: the caller is composing HTML, not moving a file.
+  mcp.tool('aimeat_app_draft_write', descriptionFor('aimeat_app_draft_write'), {
+    filename: z.string().describe('App filename this draft stages (e.g. "pong.html").'),
+    content: z.string().describe('The text to write. Plain UTF-8, not base64.'),
+    mode: z.enum(['append', 'replace']).optional().describe('append (default) adds to the end; replace overwrites the whole draft.'),
+    expected_size_bytes: z.number().int().nonnegative().optional().describe('Refuse unless the draft is currently this many bytes.'),
+    name: z.string().optional().describe('Display name (defaults to the live app\'s, or the draft\'s once set).'),
+    description: z.string().optional().describe('Description (defaults to the live app\'s, or the draft\'s once set).'),
+  }, annotationsFor('aimeat_app_draft_write'), async ({ filename, content, mode, expected_size_bytes, name, description }) => {
+    const body: Record<string, unknown> = { content };
+    if (mode) body.mode = mode;
+    if (expected_size_bytes !== undefined) body.expected_size_bytes = expected_size_bytes;
+    if (name) body.name = name;
+    if (description !== undefined) body.description = description;
+    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/write`, body));
+  });
+
+  // → POST /v1/apps/:owner/:filename/draft/replace — exact old → new inside the draft.
+  mcp.tool('aimeat_app_draft_replace', descriptionFor('aimeat_app_draft_replace'), {
+    filename: z.string().describe('App filename whose draft to edit.'),
+    old_string: z.string().describe('The exact text to replace, including indentation.'),
+    new_string: z.string().describe('What to put there instead.'),
+    replace_all: z.boolean().optional().describe('Replace every occurrence instead of requiring exactly one. Default false.'),
+  }, annotationsFor('aimeat_app_draft_replace'), async ({ filename, old_string, new_string, replace_all }) => {
+    const body: Record<string, unknown> = { old_string, new_string };
+    if (replace_all) body.replace_all = true;
+    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/replace`, body));
+  });
+
+  // → GET /v1/apps/:owner/:filename/draft/lines — a line range, not the whole slot.
+  mcp.tool('aimeat_app_draft_read', descriptionFor('aimeat_app_draft_read'), {
+    filename: z.string().describe('App filename whose draft to read.'),
+    offset: z.number().int().min(1).optional().describe('First line to return, 1-based. Default 1.'),
+    limit: z.number().int().min(1).optional().describe('How many lines to return. Default 400, maximum 2000.'),
+  }, annotationsFor('aimeat_app_draft_read'), async ({ filename, offset, limit }) => {
+    const qs = new URLSearchParams();
+    if (offset !== undefined) qs.set('offset', String(offset));
+    if (limit !== undefined) qs.set('limit', String(limit));
+    const query = qs.toString() ? `?${qs.toString()}` : '';
+    return out(await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/lines${query}`));
+  });
+
+  // → POST /v1/apps/:owner/:filename/draft/seed — copy a published version into the slot.
+  mcp.tool('aimeat_app_draft_seed', descriptionFor('aimeat_app_draft_seed'), {
+    filename: z.string().describe('The draft slot to write into.'),
+    from_filename: z.string().optional().describe('The published app to copy from. Defaults to filename.'),
+    version: z.number().int().min(1).optional().describe('Which published version. Defaults to the newest.'),
+  }, annotationsFor('aimeat_app_draft_seed'), async ({ filename, from_filename, version }) => {
+    const body: Record<string, unknown> = {};
+    if (from_filename) body.from_filename = from_filename;
+    if (version !== undefined) body.version = version;
+    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/seed`, body));
+  });
+
   // → POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a new live version.
   mcp.tool('aimeat_app_draft_publish', descriptionFor('aimeat_app_draft_publish'), {
     filename: z.string().describe('App filename whose draft to publish.'),

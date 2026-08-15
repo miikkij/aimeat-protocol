@@ -18905,6 +18905,244 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft to discard }
 
+  /v1/apps/{owner}/{filename}/draft/write:
+    post:
+      operationId: writeAppDraft
+      summary: Append to, or replace, the app's draft
+      description: |
+        Writes a PIECE of the draft. `PUT .../draft` takes the whole app base64-encoded in one
+        request, which suits a client that already has the file and is impossible for a caller
+        composing one: no model emits 400 kB in a single response. Call this repeatedly with
+        `mode: append` until the file is complete, then publish the draft.
+
+        Content is plain UTF-8 text, not base64. The caller is composing HTML rather than moving a
+        file, and base64 would inflate the body by a third for nothing.
+
+        The size ceiling is checked before anything is written, so a chunk that would push the draft
+        past the node's app size limit leaves the previous content intact instead of truncating it.
+        Pass `expected_size_bytes` while building across many calls to be refused, rather than
+        silently duplicating a chunk, if the draft moved underneath you.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  description: The text to write. Plain UTF-8, not base64.
+                mode:
+                  type: string
+                  enum: [append, replace]
+                  default: append
+                expected_size_bytes:
+                  type: integer
+                  description: Refuse unless the draft currently has exactly this many bytes.
+                name:
+                  type: string
+                  description: Display name; defaults from the live app, or from the draft once set.
+                description:
+                  type: string
+      responses:
+        '200':
+          description: The piece was written
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          mode: { type: string }
+                          size: { type: integer }
+                          updated_at: { type: string, format: date-time }
+                          has_live_version: { type: boolean }
+                          live_version_number: { type: integer }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: DRAFT_CHANGED - the draft is not the size the caller expected; nothing was written
+        '413':
+          description: TOO_LARGE - the write would exceed the node's app size ceiling; nothing was written
+  /v1/apps/{owner}/{filename}/draft/replace:
+    post:
+      operationId: replaceInAppDraft
+      summary: Replace an exact passage inside the app's draft
+      description: |
+        The editing counterpart to `.../draft/write`: change part of a draft without sending the
+        whole file. `old_string` must match exactly, including indentation and line breaks.
+
+        Without `replace_all` the match must be unique. Both refusals carry the actual number of
+        occurrences, because the caller's next move differs between none and several: none means the
+        text is not there at all, and several means the surrounding context has to be widened until
+        the target is unambiguous.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_string, new_string]
+              properties:
+                old_string:
+                  type: string
+                  description: The exact text to replace, including indentation.
+                new_string:
+                  type: string
+                replace_all:
+                  type: boolean
+                  default: false
+      responses:
+        '200':
+          description: The replacement was made
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          replacements: { type: integer }
+                          size: { type: integer }
+                          updated_at: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: NO_DRAFT, or NOT_FOUND when old_string does not appear in the draft
+        '409':
+          description: NOT_UNIQUE - old_string appears more than once and replace_all was not set
+  /v1/apps/{owner}/{filename}/draft/lines:
+    get:
+      operationId: readAppDraftLines
+      summary: Read a line range of the app's draft
+      description: |
+        Returns a slice of the draft as text, plus the total line count and byte size. `GET
+        .../draft` returns the WHOLE slot base64-encoded, which is right for a client restoring its
+        working copy and wrong for a caller that wants the twenty lines it is about to change.
+
+        Bounded twice: a request with no range returns the first page with `has_more` set rather than
+        the whole app, and a slice that would exceed the character ceiling is cut at a line boundary
+        with the same flag. A caller therefore never aims a replacement at text it only half received.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+        - in: query
+          name: offset
+          schema: { type: integer, minimum: 1, default: 1 }
+          description: First line to return, 1-based.
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, default: 400, maximum: 2000 }
+      responses:
+        '200':
+          description: The requested range
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          size: { type: integer }
+                          total_lines: { type: integer }
+                          from_line: { type: integer }
+                          to_line: { type: integer }
+                          has_more: { type: boolean }
+                          mime_type: { type: string }
+                          updated_at: { type: string, format: date-time }
+                          content: { type: string }
+        '400':
+          description: INVALID_RANGE - offset is 1-based and limit is at least 1
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: NO_DRAFT - nothing is staged for this app
+  /v1/apps/{owner}/{filename}/draft/seed:
+    post:
+      operationId: seedAppDraft
+      summary: Copy a published version into the app's draft slot
+      description: |
+        Loads a published version's source into the draft, server-side, so an app that is already
+        live can be continued. Without it there is nothing to edit: the app read routes serve the
+        bytes for download, and every draft write path has always taken its bytes from the caller.
+
+        Seeding under a different `{filename}` copies the app, manifest and all. The source manifest
+        is the base, so the copy keeps the original name and category rather than inheriting from
+        whatever happens to live at the destination name.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - in: path
+          name: filename
+          required: true
+          schema: { type: string }
+          description: The draft slot to write into.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                from_filename:
+                  type: string
+                  description: The published app to copy from. Defaults to filename.
+                version:
+                  type: integer
+                  description: Which published version. Defaults to the newest.
+      responses:
+        '200':
+          description: The published source is now in the draft slot
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          seeded_from: { type: string }
+                          seeded_version: { type: integer }
+                          size: { type: integer }
+                          updated_at: { type: string, format: date-time }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: NOT_FOUND - no published app, or no such version, to copy from
+        '413':
+          description: TOO_LARGE - the published app exceeds the node's current app size ceiling
   /v1/apps/{owner}/{filename}/draft/preview-token:
     post:
       operationId: mintAppDraftPreviewToken

@@ -111,6 +111,7 @@ const ALL_SUITES = [
     'test/e2e-apps.ts',
     'test/e2e-app-agent-deploy.ts',
     'test/e2e-app-draft.ts',
+    'test/e2e-app-draft-edit.ts',
     'test/e2e-app-publish-gate.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-protect.ts',

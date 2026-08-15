@@ -4,6 +4,12 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.4.0 — 2026-08-16 — Four routes for incremental editing: .../draft/write appends a piece,
+ *     .../draft/replace does an exact old to new, .../draft/lines returns a bounded range, and
+ *     .../draft/seed copies a published version back into the slot. PUT .../draft takes the WHOLE
+ *     app base64-encoded in one request, which suits a client holding the file and is impossible
+ *     for a caller composing one, since no model emits 400 kB in a single response. These take
+ *     plain text, and each asks for `app:write` rather than requireAuth alone.
  *   v2.3.0 — 2026-08-11 — August 2026 audit step 8: the draft save, the discard and the promotion go
  *     through services/app-lifecycle.ts, shared with aimeat_app_draft_save / _discard / _publish.
  *     The two manifest builders disagreed on the default category for a NEW app ('utility' here and
@@ -35,13 +41,16 @@
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { generateDraftToken, generateFrameToken } from '../../services/draft-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { stageAppDraft, discardAppDraft, publishAppDraft } from '../../services/app-lifecycle.js';
+import {
+    writeAppDraft, replaceInAppDraft, readAppDraft, seedAppDraft,
+} from '../../services/app-draft-edit.js';
 import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 
@@ -112,6 +121,153 @@ export function registerDraftRoutes(
         }, [
             { description: 'Get a preview URL', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/preview-token` },
             { description: 'Publish the draft', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft` },
+        ]));
+    });
+
+    // ── Incremental draft editing ─────────────────────────────────────────────────
+    // The four routes below exist because PUT .../draft is all-or-nothing: it takes the WHOLE app,
+    // base64-encoded, in one request. That is fine for a client with the file on disk and impossible
+    // for an agent authoring one, since no model emits 400 kB in a single response. These take PLAIN
+    // TEXT rather than base64 — the caller is composing HTML, not moving a file, and base64 would
+    // inflate the body by a third for nothing. Their MCP twins call the same service functions.
+
+    // POST /v1/apps/:owner/:filename/draft/write — append a piece, or replace the whole draft.
+    router.post('/v1/apps/:owner/:filename/draft/write', requireAuth(), requireScope('app:write'), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { owner, ownerGhii } = await canonicalOwner(req);
+        const { content, mode, expected_size_bytes, name, description } = req.body ?? {};
+
+        if (typeof content !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'content is required (plain UTF-8 text, not base64)'));
+            return;
+        }
+        if (mode !== undefined && mode !== 'append' && mode !== 'replace') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'mode must be "append" or "replace"'));
+            return;
+        }
+        if (expected_size_bytes !== undefined && typeof expected_size_bytes !== 'number') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'expected_size_bytes must be a number'));
+            return;
+        }
+
+        const out = await writeAppDraft(storage, config, {
+            ownerName: owner, ownerGhii, filename, content, mode,
+            expectedSizeBytes: expected_size_bytes,
+            requested: {
+                name: typeof name === 'string' ? name : undefined,
+                description: typeof description === 'string' ? description : undefined,
+            },
+        });
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            filename,
+            mode: mode ?? 'append',
+            size: out.size,
+            updated_at: out.updatedAt,
+            has_live_version: out.hasLiveVersion,
+            live_version_number: out.liveVersionNumber,
+        }, [
+            { description: 'Publish the draft', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft` },
+        ]));
+    });
+
+    // POST /v1/apps/:owner/:filename/draft/replace — exact old → new inside the draft.
+    router.post('/v1/apps/:owner/:filename/draft/replace', requireAuth(), requireScope('app:write'), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { owner, ownerGhii } = await canonicalOwner(req);
+        const { old_string, new_string, replace_all } = req.body ?? {};
+
+        if (typeof old_string !== 'string' || typeof new_string !== 'string') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'old_string and new_string are both required strings'));
+            return;
+        }
+
+        const out = await replaceInAppDraft(storage, config, {
+            ownerName: owner, ownerGhii, filename,
+            oldString: old_string, newString: new_string,
+            replaceAll: replace_all === true,
+        });
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            filename,
+            replacements: out.replacements,
+            size: out.size,
+            updated_at: out.updatedAt,
+        }, [
+            { description: 'Publish the draft', method: 'POST', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft` },
+        ]));
+    });
+
+    // GET /v1/apps/:owner/:filename/draft/lines — a line range of the draft, as text.
+    // Distinct from GET .../draft, which returns the WHOLE slot base64-encoded: that is the right
+    // answer for a client restoring its working copy and the wrong one for a caller that wants the
+    // twenty lines it is about to change.
+    router.get('/v1/apps/:owner/:filename/draft/lines', requireAuth(), requireScope('app:write'), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { ownerGhii, owner } = await canonicalOwner(req);
+        const rawOffset = req.query.offset;
+        const rawLimit = req.query.limit;
+
+        const out = await readAppDraft(storage, {
+            ownerName: owner, ownerGhii, filename,
+            offset: typeof rawOffset === 'string' ? Number(rawOffset) : undefined,
+            limit: typeof rawLimit === 'string' ? Number(rawLimit) : undefined,
+        });
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            filename: out.filename,
+            size: out.sizeBytes,
+            total_lines: out.totalLines,
+            from_line: out.fromLine,
+            to_line: out.toLine,
+            has_more: out.hasMore,
+            mime_type: out.mimeType,
+            updated_at: out.updatedAt,
+            content: out.content,
+        }));
+    });
+
+    // POST /v1/apps/:owner/:filename/draft/seed — copy a published version into the slot.
+    router.post('/v1/apps/:owner/:filename/draft/seed', requireAuth(), requireScope('app:write'), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { owner, ownerGhii } = await canonicalOwner(req);
+        const { from_filename, version } = req.body ?? {};
+
+        if (version !== undefined && typeof version !== 'number') {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'version must be a number'));
+            return;
+        }
+
+        const out = await seedAppDraft(storage, config, {
+            ownerName: owner, ownerGhii, filename,
+            fromFilename: typeof from_filename === 'string' ? from_filename : undefined,
+            version,
+        });
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(
+                config.nodeId, out.refusal.code, out.refusal.message, out.refusal.status, out.refusal.details));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            filename,
+            seeded_from: out.seededFrom,
+            seeded_version: out.seededVersion,
+            size: out.size,
+            updated_at: out.updatedAt,
+        }, [
+            { description: 'Read a range to edit', method: 'GET', url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/lines` },
         ]));
     });
 

@@ -19,10 +19,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
- *   2026-08-16 — The four incremental app-draft tools (write/replace/read/seed) go in V2_EXCLUDED,
- *     not on `appdev` where they belong. A v2 allowlist doubles as the connector's tool list and
- *     the connector works over HTTP, so a tool with no REST twin cannot sit on one. They are on
- *     /v1/mcp meanwhile; moving them onto `appdev` is the first thing their REST routes buy.
+ *   2026-08-16 — Place the four incremental app-draft tools (write/replace/read/seed) on `appdev`,
+ *     beside aimeat_app_draft_save. They are how an agent authors an app larger than one model
+ *     response, so they belong wherever publishing does.
  *   2026-08-15 — Place aimeat_storage_delete beside upload and download on all four surfaces that
  *     already serve storage. An agent that may store a file may take it back; splitting those across
  *     surfaces would leave uploads a client cannot clean up.
@@ -58,10 +57,6 @@ export const V2_EXCLUDED: readonly string[] = [
     'aimeat_task_request_changes',
     // Connector-CLI-only convenience (no v2 MCP surface) — see definitions.ts.
     'aimeat_agent_statistics',
-    // Server MCP only until they have REST twins. A v2 surface is also the connector's tool list,
-    // and the connector reaches everything over HTTP, so a tool with no route cannot be on one.
-    // They are on /v1/mcp, which is what a hosted chat session and Claude Desktop both use.
-    'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
 ];
 
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */
@@ -71,6 +66,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
         'aimeat_discover',
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
+        'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
         'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete', 'aimeat_iam_define',
         'aimeat_cortex_install', 'aimeat_cortex_activate', 'aimeat_cortex_deactivate', 'aimeat_cortex_list', 'aimeat_cortex_delete',
