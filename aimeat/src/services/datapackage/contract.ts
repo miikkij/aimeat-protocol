@@ -209,6 +209,12 @@ export const packageId = (ownerName: string, name: string): string => `pkg:${own
  *   producer recorded at an address is whoever produced it FIRST, and one address can never hold
  *   two different byte sequences.
  *
+ * - `supersedes`, for exactly the same reason one step further on. It names the version this one
+ *   REPLACED, which is a fact about where this version sits in a history rather than about what it
+ *   contains. With it inside the identity, republishing the same rows a second time would hash
+ *   differently purely because a previous version now existed, and the same table would land at two
+ *   addresses — the defect the producer block already taught us, wearing a different hat.
+ *
  * What IS inside: the data, every Table Schema, the change description (a version is partly its
  * explanation), the provenance block, and `schemaSource` — because "declared" and "inferred" are a
  * real difference to whoever reads the types.
@@ -237,7 +243,6 @@ export function contentHashOf(descriptor: Omit<Descriptor, 'aimeat'> & { aimeat:
             consentStatus: a.consentStatus,
             retention: a.retention,
             license: a.license,
-            supersedes: a.supersedes,
             retentionPolicy: a.retentionPolicy,
         },
     };

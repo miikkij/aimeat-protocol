@@ -225,6 +225,17 @@ describe('contentHashOf — the version', () => {
         expect(contentHashOf(b)).toBe(contentHashOf(a));
     });
 
+    it('does NOT move with WHAT IT REPLACED — history is where a version sits, not what it is', () => {
+        // Same argument as the producer, one step further on. `supersedes` is derived at publish
+        // time from the pointer that was standing there, so with it inside the identity the FIRST
+        // publish of a table and a REPUBLISH of the identical table would hash differently — purely
+        // because something came before the second one. The same rows would land at two addresses.
+        const a = base();
+        const b = base();
+        b.aimeat.supersedes = 'pkg:alice/shortages@sha256:' + 'e'.repeat(64);
+        expect(contentHashOf(b)).toBe(contentHashOf(a));
+    });
+
     it('DOES move when the inference status changes — declared and inferred are not the same claim', () => {
         const a = base();
         const b = base();

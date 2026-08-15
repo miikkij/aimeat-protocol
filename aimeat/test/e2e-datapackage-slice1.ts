@@ -315,6 +315,42 @@ await test('10. ACCEPTANCE: a pinned version can never change under a consumer',
   assert(oldCsv.status === 200 && (await oldCsv.text()).split('\n').length === 5, 'the first version\'s CSV is untouched');
 });
 
+await test('10a. ACCEPTANCE: each version says what it replaced, and saying so moves no address', async () => {
+  // A chain that only exists when a producer remembers to fill a field is not a chain, so the node
+  // derives it from the pointer that was standing there. The second half is the part that is easy
+  // to get wrong: `supersedes` must stay OUT of the content hash, or the same rows would hash one
+  // way as a first version and another way as a replacement, and land at two addresses.
+  const latest = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  const a = latest.body.data.descriptor.aimeat;
+  assert(a.supersedes === `${a.packageId}@${firstHash}`,
+    `the second version should name the first as superseded, got ${JSON.stringify(a.supersedes)}`);
+
+  const pinned = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}?version=${encodeURIComponent(firstHash)}`);
+  assert(!pinned.body.data.descriptor.aimeat.supersedes,
+    'the first version replaced nothing and must not claim to');
+
+  // The other half, on a package of its own so it disturbs nothing: publish A, publish B, then
+  // publish A's EXACT content again — same rows, same change description, since the explanation is
+  // part of what a version is and belongs in the hash. A now has a predecessor where it had none,
+  // and the address must not care.
+  const CHAIN = `${PKG}-chain`;
+  const a1 = await json(`/v1/ext/${EXT}/produce`, {
+    method: 'POST', headers: auth(owner.token), body: JSON.stringify({ name: CHAIN, rows: 3 }),
+  });
+  assert(a1.status === 200, `chain A ${a1.status}: ${JSON.stringify(a1.body?.error)}`);
+  const b1 = await json(`/v1/ext/${EXT}/produce`, {
+    method: 'POST', headers: auth(owner.token), body: JSON.stringify({ name: CHAIN, rows: 5 }),
+  });
+  assert(b1.status === 200 && b1.body.data.contentHash !== a1.body.data.contentHash, 'chain B is a new version');
+  const a2 = await json(`/v1/ext/${EXT}/produce`, {
+    method: 'POST', headers: auth(owner.token), body: JSON.stringify({ name: CHAIN, rows: 3 }),
+  });
+  assert(a2.body.data.contentHash === a1.body.data.contentHash,
+    `identical rows must reach the identical address whatever came before: ${a2.body.data.contentHash} vs ${a1.body.data.contentHash}`);
+  assert(a2.body.data.unchanged === true,
+    'and be reported as unchanged rather than announced as a version that was written');
+});
+
 await test('10b. ACCEPTANCE: the package is sellable — odps.yaml rides with every version', async () => {
   // The product sheet is generated from the descriptor and stored beside it, so a pinned version
   // carries the sheet that describes THAT version. Schema conformance is asserted against the

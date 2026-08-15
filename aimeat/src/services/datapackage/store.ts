@@ -143,6 +143,18 @@ export async function publishPackage(
         ...(b.description ? { description: b.description } : {}),
     }));
 
+    // What this version replaces, read from the pointer BEFORE it moves. The caller may state a
+    // lineage of its own — a package rebuilt from somebody else's, say — and an explicit claim wins;
+    // otherwise it is simply the version that stood here a moment ago. Deriving it is the point: a
+    // history that only exists when a producer remembers to fill a field is not a history.
+    //
+    // It is deliberately NOT in the content hash (see contentHashOf): "what I replaced" is where a
+    // version sits, not what it contains, and hashing it would give the same rows two addresses
+    // depending on whether anything came before.
+    const previous = await readLatestPointer(deps, ownerGhii, input.name);
+    const supersedes = input.provenance?.supersedes
+        ?? (previous?.contentHash ? `${previous.packageId}@${previous.contentHash}` : undefined);
+
     const now = new Date().toISOString();
     const withoutHash = {
         name: input.name,
@@ -164,6 +176,7 @@ export async function publishPackage(
             schemaSource,
             ...(input.parameters ? { parameters: input.parameters } : {}),
             ...(input.provenance ?? {}),
+            ...(supersedes ? { supersedes } : {}),
             ...(input.retentionPolicy ? { retentionPolicy: input.retentionPolicy } : {}),
         },
     };
@@ -334,6 +347,24 @@ async function pruneOldVersions(
         });
     }
     return removed;
+}
+
+/** The pointer as it stands now, or null when this package has never published a version. A pointer
+ *  that carries only a recorded failure counts as "nothing published yet", because there is no
+ *  version at it to supersede. */
+async function readLatestPointer(deps: StoreDeps, ownerGhii: string, name: string): Promise<LatestPointer | null> {
+    const file = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
+    if (!file) return null;
+    try {
+        const pointer = JSON.parse(file.data.toString('utf8')) as LatestPointer;
+        return pointer.contentHash ? pointer : null;
+    } catch (err) {
+        // A pointer we cannot read is a broken pointer, and it must not silently become "no previous
+        // version" — that would publish a version claiming to supersede nothing and quietly break
+        // the chain. Refusing the publish is louder and correct.
+        throw new Error(`latest.json for "${name}" is not readable JSON, so the version chain cannot be `
+            + 'continued honestly', { cause: err });
+    }
 }
 
 /** The mutable pointer for a consumer following the newest version. Clears any recorded failure:
