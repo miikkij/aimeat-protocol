@@ -17941,6 +17941,15 @@ paths:
         session, so that grant is the whole check it makes; a gated app requested there without one
         answers the same `404` an unmapped subdomain does. Ungated apps keep the plain `301`.
 
+        Since 2026-08-15 that `404` has a door in it for people, because the app origin is the
+        address they hold: a **browser** (`Accept: text/html`) meeting a **code**-gated app there
+        with no usable grant is sent back here with `302 …?mode=inline&unlock=1`, which is the code
+        form below. Following it and typing the code produces the grant redirect again, this time
+        carrying `unlock=1` alongside `access`, and the origin refuses a second bounce, so a grant
+        that will not verify there stops at one round trip instead of ping-ponging. Price-gated apps
+        and every non-browser caller keep the uniform `404`: no form can supply the `Bearer` a paid
+        app needs.
+
         **Agent Face (markdown for agents):** a request that prefers `text/markdown` (`Accept`
         negotiation, or an explicit `?format=md`) receives the app's markdown read-surface instead
         of HTML: the app's **public** `apps.{filename}.agentface` memory record (a markdown string,
@@ -17970,6 +17979,14 @@ paths:
             code field rather than JSON; an API caller gets `403 ACCESS_DENIED`. The app's own owner
             and node operators never need it. With the app origin enabled, a correct code produces a
             302 to the app origin carrying a grant, and the code itself is not forwarded.
+        - in: query
+          name: unlock
+          required: false
+          schema: { type: string, enum: ['1'] }
+          description: >
+            Set by the app origin when it sends a browser here for the code form, and stamped back
+            onto the grant redirect so the origin can tell a first bounce from a second. A caller
+            never needs to set it; passing it by hand only costs the retry.
         - in: query
           name: preview
           required: false

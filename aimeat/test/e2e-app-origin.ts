@@ -10,6 +10,11 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   v1.5.0 — 2026-08-15 — Phase 7 gains the way BACK to the code field: a browser meeting the
+ *     code-gated app on its own origin with no usable grant is bounced to the apex unlock page and
+ *     the round trip completes, while ?unlock=1 without a grant, and any non-browser Accept, keep
+ *     the uniform 404. The app origin is the address people actually hold, and until now it
+ *     answered them with NOT_FOUND JSON and no field to type into.
  *   v1.4.0 — 2026-08-11 — Phase 7 (audit H-19): a code-gated app is redirected like every other app,
  *     the apex hands out a one-app grant only once the code matches, and the app origin serves
  *     against that grant and nothing else — cross-app and cross-owner grants refused, and the app's
@@ -537,6 +542,55 @@ async function main() {
                 const res = await onAppOrigin(`/${q}`, GATED_SUB);
                 assert(res.status === 404, `"${q}" should look like an unknown subdomain, got ${res.status}`);
             }
+        });
+
+        // ── The way back to the code field ────────────────────────────────────────────────
+        // The app origin IS the address people hold: the catalog opens it, aimeat_app_list hands
+        // it out, a shared link carries it. The code form lives on the apex, so without this a
+        // stranger following that link — and the owner reloading after the hour-long grant died —
+        // met NOT_FOUND JSON with nothing to type into.
+        const asBrowser = { Accept: 'text/html,application/xhtml+xml' };
+
+        await test('a BROWSER with no grant is sent to the apex code form, not the 404', async () => {
+            const res = await onAppOrigin('/', GATED_SUB, 'header', asBrowser);
+            assert(res.status === 302, `expected a bounce to the unlock page, got ${res.status}`);
+            const loc = res.header('location') ?? '';
+            assert(loc === `${BASE}/v1/apps/${owner}/${gatedFile}?mode=inline&unlock=1`, `unexpected Location: ${loc}`);
+            assert((res.header('cache-control') ?? '').includes('no-store'), 'an unlock hop must not be cached');
+            assert(!res.body.includes('gated secret body'), 'and it carries none of the app');
+        });
+
+        await test('an EXPIRED-looking grant bounces the same way — the reload case', async () => {
+            const res = await onAppOrigin('/?access=not-a-token', GATED_SUB, 'header', asBrowser);
+            assert(res.status === 302, `a dead grant must lead back to the field, got ${res.status}`);
+        });
+
+        await test('the whole round trip: origin → code form → grant → the app', async () => {
+            const bounce = await onAppOrigin('/', GATED_SUB, 'header', asBrowser);
+            const unlockUrl = bounce.header('location') ?? '';
+            // What the form does with the code typed into it: the same GET, code added.
+            const submitted = await fetch(`${unlockUrl}&code=${CODE}`, {
+                headers: asBrowser, redirect: 'manual',
+            });
+            assert(submitted.status === 302, `the right code must mint a grant, got ${submitted.status}`);
+            const back = submitted.headers.get('location') ?? '';
+            assert(back.includes('access='), `no grant on the way back: ${back}`);
+            assert(back.includes('unlock=1'), `the bounce mark must survive the hop: ${back}`);
+            const served = await onAppOrigin(`/${back.slice(back.indexOf('?'))}`, GATED_SUB, 'header', asBrowser);
+            assert(served.status === 200, `the unlocked app must serve, got ${served.status}`);
+            assert(served.body.includes('gated secret body'), 'and it must be the app');
+        });
+
+        await test('the bounce is single: ?unlock=1 without a usable grant is the 404 again', async () => {
+            for (const q of ['?unlock=1', '?access=not-a-token&unlock=1']) {
+                const res = await onAppOrigin(`/${q}`, GATED_SUB, 'header', asBrowser);
+                assert(res.status === 404, `"${q}" must stop here rather than ping-pong, got ${res.status}`);
+            }
+        });
+
+        await test('an API caller keeps the uniform 404 — the door is for humans only', async () => {
+            const res = await onAppOrigin('/', GATED_SUB, 'header', { Accept: 'application/json' });
+            assert(res.status === 404, `an agent must still see an unknown subdomain, got ${res.status}`);
         });
 
         await test('a grant for ANOTHER app does not open this one', async () => {

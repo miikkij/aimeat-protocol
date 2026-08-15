@@ -8,6 +8,10 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   v1.6.0 — 2026-08-15 — The gated-app redirect carries ?unlock=1 back to the app origin when the
+ *     request arrived with it. The app origin now bounces a browser here for the code form, and the
+ *     mark is what keeps that bounce single: a grant this node minted and the origin still refuses
+ *     stops at the origin's 404 rather than ping-ponging between the two.
  *   v1.5.0 — 2026-08-11 — Audit H-19: an inline request for a GATED app is redirected to the app
  *     origin like any other, carrying a short-lived app-access grant, rather than being served on
  *     the apex. The gate moves from the app HTML to the unlock.
@@ -508,11 +512,16 @@ export function registerReadRoutes(
             }
             const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename });
             const sep = target.includes('?') ? '&' : '?';
+            // The app origin sends a browser here when it holds no usable grant, marking the hop
+            // with ?unlock=1 (subdomains.ts unlockRedirect). Carrying the mark back onto the grant
+            // is what makes that a single bounce: a grant this node just minted and the origin
+            // still rejects — a rotated key, a clock apart — stops there instead of ping-ponging.
+            const unlockMark = req.query.unlock === '1' ? '&unlock=1' : '';
             // 302 and no-store, never the 301 an open app gets: a permanent redirect to an address
             // carrying an expiring grant is one the browser keeps reusing after the grant is dead,
             // and the user then meets a 404 with no way back to the code field.
             res.setHeader('Cache-Control', 'no-store');
-            res.redirect(302, `${target}${sep}access=${encodeURIComponent(grant)}`);
+            res.redirect(302, `${target}${sep}access=${encodeURIComponent(grant)}${unlockMark}`);
             return;
         }
 

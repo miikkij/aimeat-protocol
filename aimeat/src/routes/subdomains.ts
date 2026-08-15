@@ -7,10 +7,18 @@
  *              ("owner/filename.html") or an absolute redirect URL — never raw
  *              HTML, so content stays in one place (app versions).
  * @structure subdomainServeRouter — root catch (GET /) for subdomain requests;
- *            RESERVED_SUBDOMAINS, SUBDOMAIN_RE — validation primitives.
+ *            RESERVED_SUBDOMAINS, SUBDOMAIN_RE — validation primitives;
+ *            unlockRedirect — a browser at a code-gated app is sent to the apex code form.
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.15.0 — 2026-08-15 — A browser that meets a CODE-gated app here with no usable grant is sent
+ *     to the apex unlock page (302, ?unlock=1) instead of the uniform 404. The app origin is the
+ *     address people actually hold — the catalog opens it, aimeat_app_list hands it out, a link
+ *     carries it — and the code form only ever existed on the apex, so a stranger following that
+ *     link and an owner reloading after the hour-long grant expired both dead-ended in JSON with
+ *     no field to type into. No code is checked here and the gate has not moved; price-gated apps,
+ *     API callers and every other path keep the uniform 404.
  *   v1.14.0 — 2026-08-11 — Audit H-19: a gated app (access code, or a price) is served here when
  *     the request carries a valid app-access grant minted by the apex, and answers the uniform 404
  *     without one. Before this the app origin refused gated apps outright, which is why the apex
@@ -159,6 +167,43 @@ export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
   if (app.accessCode) return true;
   if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) return true;
   return false;
+}
+
+/**
+ * A CODE-gated app met by a browser that holds no usable grant: send it to the apex, where the
+ * code form already lives, instead of the uniform 404. Returns true when the redirect was sent.
+ *
+ * Why here. The public address of every app is its own origin — it is what the catalog opens, what
+ * `aimeat_app_list` hands out and what a person shares — but the code form only ever existed on the
+ * apex, so a stranger following that link, and an owner reloading after the hour-long grant died,
+ * both got `{"error":{"code":"NOT_FOUND"}}` with no way back to the field. The gate is not moved and
+ * no code is checked here: this origin has no session and still verifies nothing but a signed grant.
+ * It only points a human at the door.
+ *
+ * Three conditions, each load-bearing:
+ *   - An ACCESS CODE, never a price. A paid app refuses anything without a Bearer, which is the one
+ *     credential a browser navigation cannot carry, so a form would only dead-end more slowly.
+ *   - A browser NAVIGATION (`Accept: text/html`), the same test the apex unlock page uses. An API
+ *     caller, an agent and a script's own request keep the uniform 404 they contract for.
+ *   - `unlock` absent. The apex stamps it back onto the grant it mints, so a grant that fails to
+ *     verify HERE (clock skew, a rotated node key) bounces exactly once and then 404s.
+ *
+ * The disclosure this trades away, deliberately: a code-gated app's origin stops being
+ * indistinguishable from an unmapped subdomain for a browser. The apex has always said as much to
+ * the same visitor — it answers the code form rather than 404 — so this aligns the two doors
+ * instead of opening a new one. Everything else on this origin keeps the uniform 404.
+ */
+function unlockRedirect(req: Request, res: Response, config: AimeatConfig, app: AppRecord): boolean {
+  if (!app.accessCode) return false;
+  if (!(req.headers.accept ?? '').includes('text/html')) return false;
+  if (req.query.unlock === '1') return false;
+  const target = `${config.baseUrl}/v1/apps/${encodeURIComponent(app.ownerName)}`
+    + `/${encodeURIComponent(app.filename)}?mode=inline&unlock=1`;
+  // no-store for the same reason the apex grant redirect carries it: this address is a step in an
+  // unlock, and a cached copy of it would send the next visit somewhere it no longer belongs.
+  res.setHeader('Cache-Control', 'no-store');
+  res.redirect(302, target);
+  return true;
 }
 
 /**
@@ -556,6 +601,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // grant is the whole authorization. Without one the answer stays the uniform 404 an unmapped
     // subdomain gets, so the origin still tells a stranger nothing about which apps exist.
     if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {
+      if (unlockRedirect(req, res, config, app)) return;
       return notFound();
     }
 
@@ -718,6 +764,7 @@ Sitemap: ${origin}/sitemap.xml
     const app = await resolveAppTarget(storage, `${bareOwner}/${filename}`);
     if (!app) return next();
     if (appIsRestricted(config, app) && !(await appAccessGranted(req.query.access, app.ownerName, app.filename))) {
+      if (unlockRedirect(req, res, config, app)) return;
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown app'));
       return;
     }
