@@ -264,6 +264,45 @@ await test('Owner lists ecosystem apps → record is active with the right grant
 // ─── Phase 4: failure modes ───
 console.log('\nPhase 4 — Failure modes');
 
+// A20 (E2E test-quality audit). The scope test below proves the fence holds on the way in. Nothing
+// asked whether the GEAI could change what it IS. POST /v1/auth/refresh kept an agent at ['agent']
+// across a refresh for exactly this reason, and its `else` handed the OWNER's roles to every other
+// principal — so one call with the GEAI's own bearer returned a token for the same sub carrying
+// ['owner'] and no scopes at all, after which requireScope waves it through (owner sessions bypass
+// scopes), requireRole('owner') passes, and so does requireOwnerPrincipal — the gate on the
+// account's password. Against the pre-fix source this fails: the refreshed token's roles are
+// ['owner'] and the delete below succeeds with it.
+await test('A GEAI refresh cannot turn it into the owner', async () => {
+  const r = await json('/v1/auth/refresh', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${geaiToken}` },
+    body: JSON.stringify({}),
+  });
+  // Refusing the refresh outright is also a correct answer; what must not happen is an upgrade.
+  if (r.status === 200) {
+    const refreshed = r.body.data?.token;
+    assert(typeof refreshed === 'string' && refreshed.length > 0, 'a 200 must carry a token');
+    const claims = JSON.parse(Buffer.from(refreshed.split('.')[1], 'base64url').toString());
+    assert(!(claims.roles ?? []).includes('owner'),
+      `the refreshed GEAI token carries owner: ${JSON.stringify(claims.roles)}`);
+    assert(!(claims.roles ?? []).includes('operator'),
+      `the refreshed GEAI token carries operator: ${JSON.stringify(claims.roles)}`);
+    assert((claims.roles ?? []).includes('ecosystem'),
+      `the refreshed token must stay an ecosystem principal, got ${JSON.stringify(claims.roles)}`);
+    assert(Array.isArray(claims.scopes) && !claims.scopes.includes('memory:delete'),
+      `the refreshed token must keep the approved scopes, got ${JSON.stringify(claims.scopes)}`);
+
+    // The measurable consequence: the scope it was never granted must still be refused.
+    const del = await json(`/v1/memory/${encodeURIComponent(MEM_KEY)}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${refreshed}` },
+    });
+    assert(del.status === 403, `the refreshed GEAI deleted a record it has no scope for (${del.status})`);
+  } else {
+    assert(r.status === 401 || r.status === 403, `unexpected refresh status ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+  }
+});
+
 await test('GEAI denied a scope it was not granted (memory:delete) → 403', async () => {
   // The GEAI has memory:read + memory:write but NOT memory:delete. It reaches the route (role OK
   // via requireExternalPrincipal) but requireScope denies — proving scopes are enforced, not bypassed.

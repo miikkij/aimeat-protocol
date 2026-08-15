@@ -7,14 +7,27 @@
  *   ai-provenance-marks.ts that names the forbidden vocabulary in order to forbid it.
  * @usage pnpm test -- check-ai-disclosure
  * @version-history
+ *   v1.1.0 — 2026-08-15 — Timeout raised to match what the file does. Each test spawns the real
+ *     script through tsx, which takes ~7s under the full suite's load against vitest's 5s default,
+ *     so this file passed alone and failed in `pnpm test` — blocking unrelated commits at the
+ *     pre-commit hook. Nothing about what is asserted changed.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8.
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { stripComments } from '../../scripts/check-ai-disclosure.js';
+
+// Every test here spawns `node --import tsx scripts/check-ai-disclosure.ts`. That costs about two
+// seconds on its own and about seven with the other 147 test files running beside it, so vitest's
+// default five-second timeout made this file pass alone and fail in `pnpm test` — which is the
+// pre-commit hook and CI, so it blocked commits that had nothing to do with it. Measured on an
+// unchanged tree: 12/12 alone, 5 to 6 failures in the full run, each at ~6000ms and none of them
+// an assertion. A flake teaches everyone to re-run until green, which is how a real regression gets
+// waved through (docs/pitfalls.md §19). The timeout now describes what the test actually does.
+vi.setConfig({ testTimeout: 120_000 });
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const SCRIPT = join(ROOT, 'scripts', 'check-ai-disclosure.ts');

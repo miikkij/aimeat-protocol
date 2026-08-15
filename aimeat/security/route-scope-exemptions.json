@@ -114,8 +114,6 @@
     "src/routes/auth.ts:GET:/v1/auth/sessions": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/auth.ts:DELETE:/v1/auth/sessions/:id": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/auth.ts:DELETE:/v1/auth/sessions": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
-    "src/routes/auth.ts:POST:/v1/auth/otk": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
-    "src/routes/auth.ts:POST:/v1/auth/initial-otk": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/boards.ts:PATCH:/v1/boards/:boardId/members": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/capabilities.ts:POST:/v1/capabilities/:id/invoke": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/capabilities.ts:POST:/v1/capabilities/:id/telemetry": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
@@ -340,6 +338,7 @@
     "src/routes/verification.ts:GET:/v1/trusted-issuers": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/wallet.ts:GET:/v1/wallet/history": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
     "src/routes/wallet.ts:POST:/v1/wallet/request": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
-    "src/routes/webmcp.ts:POST:/v1/apps/:owner/:filename/webmcp/tools/:tool": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs."
+    "src/routes/webmcp.ts:POST:/v1/apps/:owner/:filename/webmcp/tools/:tool": "Seeded 2026-08-10 from the August audit. Not yet reviewed: this route changes state (or reads authenticated) without saying which scope it needs.",
+    "src/routes/auth-otk.ts:POST:/v1/auth/initial-otk": "Seeded 2026-08-10 from the August audit, carried over on 2026-08-15 when the Tier 0.5 routes moved to auth-otk.ts by pure extraction. Same route, same unreviewed status: it mints the key a brand-new agent redeems, so the caller has no scopes yet by construction. POST /v1/auth/otk left this file the same day — it now requires memory:write."
   }
 }

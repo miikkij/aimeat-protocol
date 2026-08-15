@@ -9,6 +9,23 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.5.0 -- 2026-08-15 -- The Tier 0.5 OTK write path stops being a fourth implementation and a
+ *     way around the reserved-key rule. GET /v1/otk/:key executes UNAUTHENTICATED by design, so
+ *     every question about who may do this belongs at the mint — and the mint carried requireAuth()
+ *     alone, so an app grant holding only memory:read minted a write of `openrouter.settings` and
+ *     executed it with no credential, reopening C-2. The mint now needs memory:write and applies
+ *     appMayWriteKey() to the parameters; the execution goes through writeMemoryRecord() like every
+ *     other door, so schema locks, quota, provenance and the SSE change domain apply to it too.
+ *     E2E test-quality audit finding A8. Tier 0.5 is deprecated in RFC v4.0 and three of its write
+ *     paths were deleted in 9723f018; removing this one is a separate decision.
+ *   v1.4.0 -- 2026-08-15 -- POST /v1/auth/refresh branches on the PRINCIPAL CLASS, not on "is this
+ *     an agent". The guard that keeps an agent at ['agent'] across a refresh was written for agents
+ *     and the `else` handed the OWNER's roles to everything else — so an ecosystem app or an
+ *     app-grant token made one call with its own bearer and got back a token for the same sub
+ *     carrying ['owner'] (plus 'operator' where the human is one) and no scopes, clearing
+ *     requireScope, requireRole and requireOwnerPrincipal alike. Ecosystem apps now refresh as
+ *     ['ecosystem'] with their stored scopes; an app grant is sent to its own exchange. E2E
+ *     test-quality audit finding A20.
  *   v1.3.0 -- 2026-08-13 -- Session revocation started being ENFORCED (auth/middleware.ts), so the
  *     two session surfaces here were scoped to the human's own sign-ins: the device list hides agent
  *     rows, and "sign out everywhere" no longer disconnects the owner's fleet.
@@ -28,14 +45,15 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, MemoryRecord } from '../storage/interface.js';
+import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
+import { registerOtkRoutes } from './auth-otk.js';
 import { success, error } from '../middleware/envelope.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
-import { parseGAII, validateAgentName, buildGAII, isExternalPrincipal } from '../utils/gaii.js';
+import { parseGAII, isExternalPrincipal } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
 import { randomBytes } from 'node:crypto';
 import { generateOtk } from '../utils/otk.js';
@@ -475,6 +493,28 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // not scope) — an intra-owner privilege escalation / scope collapse.
       freshRoles = ['agent'];
       freshScopes = agent.defaultScopes;
+    } else if (req.auth!.roles.includes('ecosystem')) {
+      // The same rule as the agent branch, for the principal class it forgot. `else` handed the
+      // OWNER's roles to anything that was not an agent, and an ecosystem app is not an agent: one
+      // POST /v1/auth/refresh with its own bearer returned a token for the same sub carrying
+      // ['owner'] (plus 'operator' where the human is one) and NO scopes — after which it passed
+      // requireScope, requireRole('owner'), requireRole('operator') and requireOwnerPrincipal. A
+      // memory:read ecosystem app could change the account's password.
+      const ecoApp = await storage.getEcosystemApp(req.auth!.sub);
+      if (!ecoApp || ecoApp.status === 'revoked') {
+        res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Ecosystem app no longer active'));
+        return;
+      }
+      freshRoles = ['ecosystem'];
+      freshScopes = ecoApp.scopes;
+    } else if (req.auth!.app_grant) {
+      // An app grant has its own exchange (POST /v1/app-grants/token, refresh_token grant) which
+      // re-reads the grant and its approved scopes. Coming through THIS door was the escalation in
+      // its purest form: a token minted from a consent screen the owner ticked, handed back with the
+      // human's roles and no scopes at all.
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+        'An app grant refreshes at POST /v1/app-grants/token, not here'));
+      return;
     } else {
       freshRoles = ownerRecord.roles ?? ['owner'];
     }
@@ -597,179 +637,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Get a new token', method: 'POST', url: '/v1/auth/token' },
     ]));
   });
+  // Tier 0.5 one-time keys — moved to auth-otk.ts by pure extraction (max-file-lines).
+  registerOtkRoutes(router, config, storage, sessions, SESSION_INACTIVITY_MS);
 
-  // POST /v1/auth/otk — generate a one-time key for Tier 0.5 actions (agent auth)
-  router.post('/v1/auth/otk', requireAuth(), async (req, res) => {
-    const { action, params } = req.body ?? {};
-    if (!action) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'action is required (e.g. write_memory, post_board)'));
-      return;
-    }
-
-    const allowedActions = ['write_memory', 'post_board'];
-    if (!allowedActions.includes(action)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `action must be one of: ${allowedActions.join(', ')}`));
-      return;
-    }
-
-    const key = generateOtk();
-    const expiresAt = new Date(Date.now() + 600_000).toISOString(); // 10 minutes
-
-    await storage.createOtk({
-      key,
-      ownerGaii: req.auth!.sub,
-      action,
-      params: params ?? {},
-      expiresAt,
-      initial: false,
-      used: false,
-      usedAt: null,
-      sessionId: null,
-      createdAt: new Date().toISOString(),
-    });
-
-    res.status(201).json(success(config.nodeId, {
-      otk: key,
-      action,
-      expires_at: expiresAt,
-      usage_url: `/v1/otk/${key}`,
-      note: 'This key can be used once via GET request. Share with a Tier 0 agent to allow a single write operation.',
-    }, [
-      { description: 'Use this one-time key', method: 'GET', url: `/v1/otk/${key}` },
-    ]));
-  });
-
-  // POST /v1/auth/initial-otk — generate an Initial OTK (timer starts on first use)
-  // The OTK remains dormant until the AI first uses it. Once used, the grace period starts.
-  // Ideal for embedding in prompts — the consumer can use it hours/days later.
-  router.post('/v1/auth/initial-otk', requireAuth(), async (req, res) => {
-    const key = generateOtk();
-    // Far-future expiry — effectively no expiry until first use activates the timer
-    const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
-
-    await storage.createOtk({
-      key,
-      ownerGaii: req.auth!.sub,
-      action: 'initial',
-      params: {},
-      expiresAt: farFuture,
-      initial: true,
-      used: false,
-      usedAt: null,
-      sessionId: null,
-      createdAt: new Date().toISOString(),
-    });
-
-    res.status(201).json(success(config.nodeId, {
-      otk: key,
-      initial: true,
-      grace_ms: config.otkGraceMs,
-      note: `This is an Initial OTK. It has no expiry until first use. Once used, it remains valid for ${config.otkGraceMs / 1000} seconds. Embed it in prompts for AI agents.`,
-      owner: req.auth!.sub,
-    }, [
-      { description: 'Use for micro-memory operations', method: 'GET', url: `/v1/mm?otk=${key}&op=list` },
-      { description: 'Generate AI prompt with this OTK', method: 'GET', url: `/v1/prompts/tier0?otk=${key}` },
-    ]));
-  });
-
-  // POST /v1/auth/connectivity-key — generate a connectivity key for AI agent registration
-  router.post('/v1/auth/connectivity-key', requireAuth(), requireRole('owner'), async (req, res) => {
-    const { agent_name, description } = req.body ?? {};
-    const owner = req.auth!.owner;
-
-    if (agent_name) {
-      const nameError = validateAgentName(agent_name);
-      if (nameError) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameError));
-        return;
-      }
-
-      const gaii = buildGAII(agent_name, owner, config.nodeId);
-      const existing = await storage.getAgent(gaii);
-      if (existing) {
-        res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Agent "${agent_name}" already exists under your identity`));
-        return;
-      }
-    }
-
-    const key = generateOtk();
-    const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
-
-    await storage.createOtk({
-      key,
-      ownerGaii: req.auth!.sub,
-      action: 'register_agent',
-      params: {
-        owner,
-        agent_name: agent_name ?? null,
-        description: description ?? null,
-      },
-      expiresAt: farFuture,
-      initial: true,
-      used: false,
-      usedAt: null,
-      sessionId: null,
-      createdAt: new Date().toISOString(),
-    });
-
-    res.set('Cache-Control', 'no-store');
-    res.set('Pragma', 'no-cache');
-    res.status(201).json(success(config.nodeId, {
-      connectivity_key: key,
-      owner,
-      agent_name: agent_name ?? null,
-    }));
-  });
-
-  // GET /v1/otk/:key — execute a one-time key action (no auth required — Tier 0.5)
-  router.get('/v1/otk/:key', async (req, res) => {
-    const key = req.params.key as string;
-    const otk = await storage.consumeOtk(key, config.otkGraceMs);
-    if (!otk) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'One-time key not found, expired, or already used'));
-      return;
-    }
-
-    // Check session inactivity timeout
-    if (otk.sessionId) {
-      const session = sessions.get(otk.sessionId);
-      if (session && Date.now() - session.lastActivity > SESSION_INACTIVITY_MS) {
-        await storage.expireSessionOtks(otk.sessionId);
-        sessions.delete(otk.sessionId);
-        res.status(401).json(error(config.nodeId, 'SESSION_EXPIRED', 'Session expired due to inactivity'));
-        return;
-      }
-      if (session) session.lastActivity = Date.now();
-    }
-
-    if (otk.action === 'write_memory') {
-      const { key: memKey, value, visibility } = otk.params as {
-        key?: string;
-        value?: unknown;
-        visibility?: MemoryRecord['visibility'];
-      };
-      if (!memKey || value === undefined) {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'OTK params must include key and value'));
-        return;
-      }
-      const existing = await storage.getMemory(otk.ownerGaii, memKey);
-      await storage.setMemory({
-        key: memKey,
-        ownerGaii: otk.ownerGaii,
-        value,
-        visibility: visibility ?? 'private',
-        tags: [],
-        ttlHours: null,
-        version: existing ? existing.version + 1 : 1,
-        createdAt: existing?.createdAt ?? new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-      res.json(success(config.nodeId, { action: 'write_memory', key: memKey, written: true }));
-      return;
-    }
-
-    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Unsupported OTK action: ${otk.action}`));
-  });
 
   // Cleanup expired challenges and inactive sessions periodically
   setInterval(() => {

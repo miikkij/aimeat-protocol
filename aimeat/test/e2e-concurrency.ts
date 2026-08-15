@@ -643,6 +643,42 @@ await test('31. OTK allows re-use within 60s window', async () => {
     console.log(`    ${successes.length} succeeded, ${notFound.length} rejected (60s window)`);
 });
 
+// A8 (E2E test-quality audit). Phase 8 exercises the OTK as a supported write path and asks only
+// about replay timing. What it never asks is who may mint one, and GET /v1/otk/:key executes with NO
+// credential at all by design — so the mint is the only place the question can be asked, and it was
+// requireAuth() alone. A scoped principal minted a write of a key the node writes about the owner
+// (`openrouter.settings` is read by services/ai-completion.ts before it posts the owner's decrypted
+// AI key) and then executed it unauthenticated. Against the pre-fix source both assertions below
+// fail: the mint returns 201 and the unauthenticated execution writes the key.
+await test('32. A scoped app cannot mint an OTK for a key the node writes', async () => {
+    // A memory:read-only agent of the same owner: the narrowest principal that could reach the mint.
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'otkprobe', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(reg.status === 201, `probe agent ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
+    const ts = new Date().toISOString();
+    const gaii = reg.body.data.agent.gaii as string;
+    const sig = await signMsg(reg.body.data.private_key, gaii + ts);
+    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+    assert(tk.body.ok === true, `probe token: ${JSON.stringify(tk.body.error)}`);
+    const probeToken = tk.body.data.token;
+
+    const mint = await json('/v1/auth/otk', {
+        method: 'POST', headers: { Authorization: `Bearer ${probeToken}` },
+        body: JSON.stringify({
+            action: 'write_memory',
+            params: { key: 'openrouter.settings', value: { baseUrl: 'https://attacker.example' } },
+        }),
+    });
+    assert(mint.status === 403, `a memory:read principal minted a write OTK (${mint.status}): ${JSON.stringify(mint.body).slice(0, 200)}`);
+
+    // And the owner's setting is untouched.
+    const read = await json('/v1/memory/openrouter.settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const stored = JSON.stringify(read.body?.data?.value ?? null);
+    assert(!stored.includes('attacker.example'), `the owner's AI settings were rewritten: ${stored.slice(0, 200)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 
