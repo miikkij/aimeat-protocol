@@ -17,6 +17,12 @@
  * @usage Called from validateMemoryWrite (every write surface funnels through it) and from the
  *   external delete routes. The publish path passes { viaPublish, expectedVersion }.
  * @version-history
+ *   v1.1.0 — 2026-08-15 — getNamespacePolicy folds the guard flags across EVERY copy of the manifest
+ *     instead of taking the first row a scan returns. The key is unique per owner, not per node, so
+ *     a member's own copy without `create_only` could resolve here and turn an append-only namespace
+ *     off with the creator's manifest untouched. No copy may withdraw a guard now; the same fork can
+ *     happen by accident between a member GHII and a legacy agent GAII, with no attacker at all.
+ *     E2E test-quality audit finding A24.
  *   v1.0.0 — 2026-07-07 — Initial: create_only + requires_expected_version manifest policies
  *     (doc-pyxoy49 S1/S3, doc-write-guards; the TARGET-005 overwrite incident is the reason).
  */
@@ -67,19 +73,46 @@ export interface NamespaceGuardPolicy {
   requiresExpectedVersion: boolean;
 }
 
-/** Read the guard flags for a namespace from the workspace manifest (objectTypes entry). */
+/**
+ * Read the guard flags for a namespace from the workspace manifest (objectTypes entry).
+ *
+ * ONE KEY, POSSIBLY SEVERAL ROWS. A memory key is unique per OWNER, not per node, so
+ * `organism.<id>.w.<ws>.meta.manifest` can exist under more than one identity in the same
+ * workspace — deliberately, when a member's GHII and a legacy agent GAII both wrote one, and
+ * deliberately-hostile when an ordinary active member posts their own copy. This read used to take
+ * `items.find(...)`, the FIRST row the scan happened to return, so a second copy without
+ * `create_only` could resolve here and switch an append-only namespace off while the creator's
+ * manifest sat untouched and nothing looked wrong.
+ *
+ * The flags are folded with OR rather than resolved to one copy. A guard is a claim that a record
+ * may not be rewritten, and no copy of the manifest should be able to WITHDRAW that claim — which is
+ * exactly what "pick one row" allows, whichever row it picks. The freshest-wins rule readLatest uses
+ * below is right for content and wrong here: a planted copy is by definition the fresher one.
+ *
+ * The residual is that a copy can turn a guard ON for a namespace that had none, which is a member
+ * making a workspace stricter than its creator meant. That is a nuisance rather than a hole, it is
+ * visible in the workspace's own records, and the same member could already write the junk this
+ * would block.
+ */
 export async function getNamespacePolicy(
   storage: Storage, organismId: string, ws: string, namespace: string,
 ): Promise<NamespaceGuardPolicy | null> {
   const mkey = `organism.${organismId}.w.${ws}.meta.manifest`;
-  const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
-  const man = items.find(r => r.key === mkey)?.value as
-    { objectTypes?: Array<{ namespace?: string; create_only?: boolean; requires_expected_version?: boolean }> } | undefined;
-  const ot = (man?.objectTypes ?? []).find(o => o?.namespace === namespace);
-  if (!ot) return null;
-  const createOnly = ot.create_only === true;
-  const requiresExpectedVersion = ot.requires_expected_version === true;
-  if (!createOnly && !requiresExpectedVersion) return null;
+  const { items } = await storage.listAllMemory({ prefix: mkey, limit: 50 });
+  let createOnly = false;
+  let requiresExpectedVersion = false;
+  let found = false;
+  for (const rec of items) {
+    if (rec.key !== mkey) continue;
+    const man = rec.value as
+      { objectTypes?: Array<{ namespace?: string; create_only?: boolean; requires_expected_version?: boolean }> } | undefined;
+    const ot = (man?.objectTypes ?? []).find(o => o?.namespace === namespace);
+    if (!ot) continue;
+    found = true;
+    if (ot.create_only === true) createOnly = true;
+    if (ot.requires_expected_version === true) requiresExpectedVersion = true;
+  }
+  if (!found || (!createOnly && !requiresExpectedVersion)) return null;
   return { createOnly, requiresExpectedVersion };
 }
 

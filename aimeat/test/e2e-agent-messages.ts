@@ -271,6 +271,58 @@ await test('6. Update message status to delivered', async () => {
     assert(typeof body.data.message.processedAt === 'string', 'has processedAt');
 });
 
+// A11 (E2E test-quality audit). Tests 5 and 6 update this agent's own message and prove the status
+// moves. The access check they pass, canAccessAgent(), asks "may you act as the agent named in the
+// PATH" and builds that name against the CALLER's own owner — a real check, and not this one. The
+// message id was a second coordinate nobody checked, so any agent on the node could flip the status
+// of any message by id, and the handler returns the whole updated row, which made the write a read
+// of another owner's message as well. Against the pre-fix source this fails with 200 and B's
+// message content in the response.
+await test('6b. An agent cannot touch another owner\'s message by id', async () => {
+    const strangerName = `agmsgstranger${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `stranger owner ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
+    const strangerToken = await getToken(strangerName, reg.body.data.private_key, false);
+
+    const strangerAgent = 'stranger-bot';
+    const ar = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${strangerToken}` },
+        body: JSON.stringify({ name: strangerAgent, owner: strangerName, capabilities: ['memory'] }),
+    });
+    assert(ar.status === 201, `stranger agent ${ar.status}: ${JSON.stringify(ar.body).slice(0, 200)}`);
+    const strangerAgentToken = await getToken(ar.body.data.agent.gaii, ar.body.data.private_key, true);
+
+    // A message that belongs to the STRANGER's agent, with content only they should ever see.
+    const secret = 'the stranger\'s private instruction';
+    const sent = await json(`/v1/agents/${strangerAgent}/messages`, {
+        method: 'POST', headers: { Authorization: `Bearer ${strangerToken}` },
+        body: JSON.stringify({ direction: 'inbound', content: secret }),
+    });
+    assert(sent.status === 201, `stranger message ${sent.status}: ${JSON.stringify(sent.body).slice(0, 200)}`);
+    const strangerMsgId = sent.body.data.message.id;
+
+    // Our agent, addressing its OWN name in the path so canAccessAgent passes, but naming the
+    // stranger's message id.
+    const attack = await json(`/v1/agents/${agentName}/messages/${strangerMsgId}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ status: 'error' }),
+    });
+    assert(attack.status === 404, `expected 404, got ${attack.status}: ${JSON.stringify(attack.body).slice(0, 200)}`);
+    assert(!JSON.stringify(attack.body).includes(secret),
+        `another owner's message content was served: ${JSON.stringify(attack.body).slice(0, 220)}`);
+
+    // The stranger's message is untouched, and they can still work with it themselves.
+    const theirs = await json(`/v1/agents/${strangerAgent}/messages/${strangerMsgId}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${strangerAgentToken}` },
+        body: JSON.stringify({ status: 'processing' }),
+    });
+    assert(theirs.status === 200, `the rightful agent must still update its own message, got ${theirs.status}`);
+    assert(theirs.body.data.message.status === 'processing',
+        `expected processing (not the attacker's 'error'), got ${theirs.body.data.message.status}`);
+
+    await json(`/v1/owners/${strangerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${strangerToken}` } });
+});
+
 // ─── Phase 3: Filtering ───
 console.log('\nPhase 3 -- List & Filter');
 

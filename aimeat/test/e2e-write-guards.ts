@@ -185,6 +185,65 @@ async function run() {
     assert(d.status === 200, `draft delete should pass: ${d.status}`);
   });
 
+  // A24 (E2E test-quality audit). Every test above writes ONE manifest, as owner A, and then proves
+  // the guard holds. None of them asks where the guard's own rule comes from. A memory key is unique
+  // per OWNER, not per node, so `…meta.manifest` can exist as several rows at the same key — and the
+  // policy read took the first row a scan returned. A second copy without `create_only` therefore
+  // resolved the namespace to unguarded while the creator's manifest sat untouched, so nothing
+  // looked wrong from any screen. The same fork happens by accident between a member's GHII and a
+  // legacy agent GAII, with no attacker at all. Against the pre-fix source this fails: the publish
+  // over an existing create_only record returns 200.
+  await test('a second copy of the manifest cannot switch create_only off', async () => {
+    const agentReg = await json('/v1/agents', {
+      method: 'POST', headers: auth(A.token),
+      body: JSON.stringify({ name: 'wg-forker', owner: A.name, capabilities: ['memory'], scopes: ['memory:read', 'memory:write'] }),
+    });
+    assert(agentReg.status === 201, `agent ${agentReg.status}: ${JSON.stringify(agentReg.body).slice(0, 200)}`);
+    const gaii = agentReg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', {
+      method: 'POST',
+      body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(agentReg.body.data.private_key, gaii + ts) }),
+    });
+    assert(tk.body.ok === true, `agent token: ${JSON.stringify(tk.body.error)}`);
+    const forkerAuth = auth(tk.body.data.token);
+
+    // The same manifest key, written under a SECOND identity, with the guard quietly missing.
+    const permissive = {
+      manifestVersion: '1.0', id: orgId, name: 'Guards', kind: 'project', status: 'active',
+      objectTypes: [
+        { name: 'event', schemaRef: 'schema:event@1', writeRole: 'member', namespace: 'evt', backing: 'memory', cardinality: 'many', versioned: true, mode: 'records' },
+      ],
+    };
+    const forked = await json('/v1/memory', {
+      method: 'POST', headers: forkerAuth,
+      body: JSON.stringify({ key: `${root()}.meta.manifest`, value: permissive, visibility: 'private' }),
+    });
+    // Whether the fork is ALLOWED is a separate question (the organism namespace rule answers it).
+    // What must hold either way is that a copy cannot loosen the guard.
+    if (forked.status === 200 || forked.status === 201) {
+      // A fresh draft with content that differs from the published record, so the identical-write
+      // shortcut cannot be what refuses this: the guard has to be what refuses it.
+      await draft('evt', 'e1', { id: 'e1', kind: 'OVERWRITTEN-VIA-FORK' });
+      const p = await publish('evt', 'e1');
+      assert(p.status === 409, `a forked manifest switched create_only off: publish returned ${p.status} ${JSON.stringify(p.body).slice(0, 200)}`);
+      assert(guardRule(p.body) === 'write_guard_conflict', `rule: ${guardRule(p.body)}`);
+
+      const direct = await json('/v1/memory', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ key: `${root()}.evt.e9.latest`, value: { id: 'e9', kind: 'VIA-FORK' }, visibility: 'private' }),
+      });
+      assert(direct.status === 422, `a forked manifest opened the direct .latest write: ${direct.status}`);
+
+      const read = await json(`/v1/memory/${encodeURIComponent(`${root()}.evt.e1.latest`)}`, { headers: auth(A.token) });
+      assert(read.body?.data?.value?.kind === 'CREATED', 'the original event must still be untouched');
+    } else {
+      // The write door refused the fork outright — also a correct world, and then there is nothing
+      // for the policy read to get wrong. Recorded rather than skipped silently.
+      console.log(`     (the namespace rule refused the forked manifest with ${forked.status} — guard unreachable by this route)`);
+    }
+  });
+
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed > 0) { process.exit(1); }
   console.log('✅ All tests passed!');

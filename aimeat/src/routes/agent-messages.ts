@@ -8,6 +8,12 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.6.0 -- 2026-08-15 -- PATCH /:name/messages/:id authorizes against the MESSAGE, not just the
+ *     agent name in the path. canAccessAgent() answers "may you act as this agent", built against
+ *     the caller's own owner, and the message id was a second, unchecked coordinate — so any agent
+ *     could flip the status of any message on the node by id, and the response returns the whole
+ *     updated row, which made the write a read of somebody else's message too. E2E test-quality
+ *     audit finding A11.
  *   v1.5.0 -- 2026-08-11 -- The send is one implementation again: validation, the record build, the
  *     provenance stamp, the message.inbound webhook, the MCP resource notification and the live-update
  *     emit moved to services/agent-message-send.ts, which aimeat_message_send now calls as well. The
@@ -32,7 +38,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentMessageRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity, buildGAII } from '../utils/gaii.js';
+import { resolveIdentity, buildGAII, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
@@ -249,6 +255,23 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     const processedAt = status === 'delivered' || status === 'error'
       ? new Date().toISOString()
       : undefined;
+
+    // canAccessAgent() above answers "may you act as the agent NAMED IN THE PATH", and it builds
+    // that name against the caller's OWN owner — so it is a real check and it is not this one. The
+    // message id is a separate, client-supplied coordinate, and updateMessageStatus took it on its
+    // own: any agent could flip the status of any message on the node by id, and the response hands
+    // back the whole updated row, so the write doubled as a read of somebody else's message. The
+    // record decides now, which is the rule the identity model states — authorize against the
+    // resolved identity, never against a name in the request.
+    const existing = await storage.getMessage(id);
+    if (!existing || !isSameOwner(existing.agentGaii, resolve(req))) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Message not found'));
+      return;
+    }
+    if (req.auth!.roles.includes('agent') && existing.agentGaii !== req.auth!.sub) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Message not found'));
+      return;
+    }
 
     const updated = await storage.updateMessageStatus(id, status, processedAt);
     if (!updated) {
