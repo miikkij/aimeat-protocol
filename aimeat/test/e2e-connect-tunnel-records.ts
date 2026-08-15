@@ -61,7 +61,12 @@ async function setupAgent(ownerName: string, ownerTok: string, agentName: string
     body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'], scopes: ['*'] }),
   });
   assert(reg.status === 201, `register agent ${reg.status}: ${JSON.stringify(reg.body)}`);
-  return { gaii: reg.body.data.agent.gaii as string, token: await agentToken(reg.body.data.agent.gaii, reg.body.data.private_key) };
+  // The private key is kept so a suite that REVOKES this agent's token can mint a fresh one instead
+  // of carrying on with the dead credential (A28: everything after Phase 3 used to reconnect with
+  // the token test 7 had just revoked, which is why nothing noticed the tunnel accepting it).
+  const priv = reg.body.data.private_key as string;
+  const gaii = reg.body.data.agent.gaii as string;
+  return { gaii, priv, token: await agentToken(gaii, priv) };
 }
 
 // ─── State ───
@@ -194,6 +199,30 @@ await test("7. Revoking an agent's token pushes auth_revoked + closes its tunnel
   assert(rev !== null, 'received an auth_revoked frame');
   assert(rev!.type === 'auth_revoked', `frame type ${rev!.type}`);
   await t.close();
+});
+
+// A28 (E2E test-quality audit). Test 7 proves the OPEN socket is told and closed. Nothing asked the
+// obvious next question, and the suite itself answered it by accident: every test after this point
+// used to reconnect with this very token and succeed. The upgrade handler verified the JWT
+// signature by hand — a raw socket cannot run middleware — and asked nothing about revocation, so a
+// bearer refused on every HTTP route still opened a tunnel and received the on-connect backlog
+// (queued and active tasks, pending messages) plus live pushes until its own exp. Against the
+// pre-fix source this test fails: the connect resolves and a welcome frame arrives.
+await test('7b. The revoked token cannot open a NEW tunnel', async () => {
+  let opened = false;
+  try {
+    const dead = await TunnelClient.connect(BASE, aAgent.token);
+    opened = true;
+    await dead.close();
+  } catch { /* refused at the upgrade, which is the point */ }
+  assert(!opened, 'a revoked token opened a new tunnel and received its backlog');
+
+  // The rest of this suite needs a live credential. Minting one here is the repair for the lifecycle
+  // mistake the finding named: a suite must not keep using a credential it deliberately killed.
+  aAgent.token = await agentToken(aAgent.gaii, aAgent.priv);
+  const live = await TunnelClient.connect(BASE, aAgent.token);
+  await live.waitForBacklog(1000);
+  await live.close();
 });
 
 // ─── P3: task-cancellation push ───

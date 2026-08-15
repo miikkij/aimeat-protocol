@@ -175,7 +175,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   if (tunnelManager || realtimeManager || connectTunnelManager) {
     const { WebSocketServer } = await import('ws');
     const { verifyJWT } = await import('./auth/jwt.js');
-    const { isAnonymousMode } = await import('./auth/middleware.js');
+    const { isAnonymousMode, credentialRevoked } = await import('./auth/middleware.js');
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
     const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
     const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
@@ -225,6 +225,12 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
             return;
           }
 
+          if (await credentialRevoked(token, payload)) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
           const ownerName = (payload.owner as string) ?? '';
           const personalNode = await storage.getPersonalNodeByOwner(ownerName);
           if (!personalNode) {
@@ -264,6 +270,11 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
         try {
           const payload = await verifyJWT(token);
           if (!payload || !payload.sub) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+          if (await credentialRevoked(token, payload)) {
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
             socket.destroy();
             return;
@@ -371,6 +382,12 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
         try {
           const payload = await verifyJWT(token);
           if (!payload || !payload.sub) {
+            socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+            socket.destroy();
+            return;
+          }
+
+          if (await credentialRevoked(token, payload)) {
             socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
             socket.destroy();
             return;
