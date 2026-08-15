@@ -151,6 +151,10 @@ export function registerCoreDataPackageTools(
                 unchanged: out.unchanged,
                 schema_source: out.descriptor.aimeat.schemaSource,
                 resources: out.resources,
+                ...(out.pruned.length ? {
+                    pruned_versions: out.pruned,
+                    pruned_note: 'The retention policy removed these older versions. Anyone pinned to one now gets a 404.',
+                } : {}),
                 note: out.unchanged
                     ? 'Identical content was already published — this is NOT a new version. Say "no change", not "updated".'
                     : 'Published. descriptor_url is permanent, needs no authentication and answers byte ranges: give it to '

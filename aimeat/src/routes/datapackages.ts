@@ -118,6 +118,10 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             unchanged: out.unchanged,
             schema_source: out.descriptor.aimeat.schemaSource,
             resources: out.resources,
+            // Named, not counted. If the owner's retention policy removed a version, whoever
+            // published has to be able to see WHICH — a pinned consumer of one of these now
+            // gets a 404, and that is a thing to know at the moment it happens.
+            ...(out.pruned.length ? { pruned_versions: out.pruned } : {}),
         }, [
             { description: 'Read the descriptor (permanent, no auth)', method: 'GET', url: out.descriptorUrl },
         ]));

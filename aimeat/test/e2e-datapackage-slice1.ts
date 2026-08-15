@@ -12,6 +12,9 @@
  *     8  — an agent reads the columns out of the Table Schema, never having been told them
  *     9  — the SAME package from a DIFFERENT producer lands on the same hash and the same URL
  *    10  — a pinned version can never change under a consumer
+ *   10b  — the package is sellable: odps.yaml rides with every version, cadence from the cron
+ *   10c-e— retention is configurable, names what it removed, never eats the current version, and
+ *          does nothing at all unless the owner asked for it
  *
  *   WHAT IS PROVEN HERE AND WHAT IS PROVEN OUTSIDE. Test 7 asserts everything DuckDB and pandas
  *   need from the transport: the exact bytes, `text/csv`, `Accept-Ranges`, a correct 206 and a
@@ -310,6 +313,93 @@ await test('10. ACCEPTANCE: a pinned version can never change under a consumer',
   // The old bytes are still at their old address, byte for byte.
   const oldCsv = await fetch(csvUrl);
   assert(oldCsv.status === 200 && (await oldCsv.text()).split('\n').length === 5, 'the first version\'s CSV is untouched');
+});
+
+await test('10b. ACCEPTANCE: the package is sellable — odps.yaml rides with every version', async () => {
+  // The product sheet is generated from the descriptor and stored beside it, so a pinned version
+  // carries the sheet that describes THAT version. Schema conformance is asserted against the
+  // vendored ODPS v4.1 schema in test/unit/datapackage-odps.test.ts; what matters here is that the
+  // file exists at a permanent address and says the true things about this package.
+  const yamlUrl = descriptorUrl.replace(/datapackage\.json$/, 'odps.yaml');
+  const res = await fetch(yamlUrl);
+  assert(res.status === 200, `anonymous odps.yaml read ${res.status}`);
+  const text = await res.text();
+  assert(/^schema: https:\/\/opendataproducts\.org\/v4\.1\/schema\/odps\.yaml/m.test(text), `schema pointer: ${text.slice(0, 80)}`);
+  // The YAML writer quotes it, because a bare 4.1 would parse as a number and the field is a string.
+  assert(/^version: ["']?4\.1["']?$/m.test(text), `ODPS v4.1, got: ${/^version:.*$/m.exec(text)?.[0]}`);
+  // The cadence is the producer's cron, recorded rather than described. The schedule is weekly.
+  assert(/dimension: updateFrequency/.test(text), 'the SLA carries the update frequency');
+  assert(/unit: weeks/.test(text), `and it came from the cron, got: ${/unit: \w+/.exec(text)?.[0]}`);
+  // The change description is the version's own explanation and ODPS has a field that means that.
+  assert(/versionNotes:/.test(text), 'the required change description reaches the product sheet');
+});
+
+await test('10c. ACCEPTANCE: retention is configurable, and what it removed is named', async () => {
+  // keep: 2 versions. Publishing a third must remove the oldest and SAY which — a deletion nobody
+  // can see is how a history disappears unnoticed.
+  const pub = async (rows: number, changes: string) => json('/v1/datapackages', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({
+      name: 'retained', changes,
+      resources: [{ name: 'rows', rows: Array.from({ length: rows }, (_, i) => ({ n: i })) }],
+      retentionPolicy: { keep: 2, unit: 'versions' },
+    }),
+  });
+  const v1 = await pub(1, 'first');
+  const v2 = await pub(2, 'second');
+  assert(v1.status === 201 && v2.status === 201, `two versions: ${v1.status}/${v2.status}`);
+  assert(!v1.body.data.pruned_versions && !v2.body.data.pruned_versions, 'nothing pruned yet — two are kept');
+
+  const v3 = await pub(3, 'third');
+  assert(v3.status === 201, `third ${v3.status}`);
+  assert(Array.isArray(v3.body.data.pruned_versions) && v3.body.data.pruned_versions.length === 1,
+    `exactly one version pruned, got ${JSON.stringify(v3.body.data.pruned_versions)}`);
+  assert(v3.body.data.pruned_versions[0] === v1.body.data.content_hash,
+    `and it is the OLDEST: ${v3.body.data.pruned_versions[0]} vs ${v1.body.data.content_hash}`);
+
+  // Gone means gone: a consumer pinned to the pruned version gets a 404, not different bytes.
+  const pinnedGone = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/retained?version=${encodeURIComponent(v1.body.data.content_hash)}`);
+  assert(pinnedGone.status === 404, `the pruned version is gone, got ${pinnedGone.status}`);
+  // …and the two kept versions are both still readable, the newest one included.
+  for (const keep of [v2, v3]) {
+    const r = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/retained?version=${encodeURIComponent(keep.body.data.content_hash)}`);
+    assert(r.status === 200, `a kept version is still there: ${r.status}`);
+  }
+});
+
+await test('10d. Retention never removes the version the pointer names', async () => {
+  // keep: 0 is "keep only the current one", not "delete everything" — a package with no readable
+  // version is a deletion, not a retention policy.
+  const r = await json('/v1/datapackages', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({
+      name: 'retained', changes: 'fourth, keeping nothing older',
+      resources: [{ name: 'rows', rows: [{ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 }] }],
+      retentionPolicy: { keep: 0, unit: 'versions' },
+    }),
+  });
+  assert(r.status === 201, `fourth ${r.status}`);
+  const latest = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/retained`);
+  assert(latest.status === 200, `the current version survives keep:0, got ${latest.status}`);
+  assert(latest.body.data.descriptor.aimeat.contentHash === r.body.data.content_hash, 'and it is the one just published');
+});
+
+await test('10e. With NO retention policy, nothing is ever removed', async () => {
+  // The default, and the only safe one: a policy that deleted somebody's history by default would
+  // be the worst possible default here.
+  const a = await json('/v1/datapackages', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({ name: 'kept-forever', changes: 'one', resources: [{ name: 'rows', rows: [{ n: 1 }] }] }),
+  });
+  for (const n of [2, 3, 4]) {
+    const r = await json('/v1/datapackages', {
+      method: 'POST', headers: auth(owner.token),
+      body: JSON.stringify({ name: 'kept-forever', changes: `v${n}`, resources: [{ name: 'rows', rows: Array.from({ length: n }, (_, i) => ({ n: i })) }] }),
+    });
+    assert(!r.body.data.pruned_versions, `no policy, no pruning (v${n})`);
+  }
+  const first = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/kept-forever?version=${encodeURIComponent(a.body.data.content_hash)}`);
+  assert(first.status === 200, `the very first version is still readable, got ${first.status}`);
 });
 
 // ── What a SECOND principal gets ──

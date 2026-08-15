@@ -41,6 +41,7 @@ import {
     publicUrl, resourceKey, resourcePath, validateName, RESOURCE_NAME_RE,
 } from './contract.js';
 import { inferSchema, toCsv, fromCsv, validateRows, type ValidationIssue } from './table.js';
+import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
 
@@ -56,7 +57,11 @@ export interface ProducedBy {
 
 export type PublishResult =
     | { ok: true; descriptor: Descriptor; contentHash: string; descriptorUrl: string; unchanged: boolean;
-        resources: Array<{ name: string; url: string; rowCount: number; bytes: number }> }
+        resources: Array<{ name: string; url: string; rowCount: number; bytes: number }>;
+        /** Versions the owner's retention policy removed on this publish. Empty when no policy is
+         *  set, which is the default: keep everything. Returned so the answer can SAY what was
+         *  deleted — a deletion nobody can see is how a history disappears unnoticed. */
+        pruned: string[] }
     | { ok: false; code: 'INVALID_INPUT' | 'QUALITY_GATE'; message: string; issues: ValidationIssue[] };
 
 /**
@@ -199,7 +204,9 @@ export async function publishPackage(
     }));
     if (existing) {
         await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now);
-        return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: true, resources: resourceUrls };
+        // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
+        // out, and a re-publish of existing content pushed nothing out.
+        return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: true, resources: resourceUrls, pruned: [] };
     }
 
     // ── 4. Write. Bytes first, descriptor last: a descriptor is a promise about resources, and a
@@ -227,7 +234,28 @@ export async function publishPackage(
         return { ok: false, code: 'INVALID_INPUT', message: `storing the descriptor failed: ${wroteDescriptor.message}`, issues: [] };
     }
 
+    // The product sheet, projected from the descriptor and stored beside it. Generated rather than
+    // authored: every field traces to something the descriptor already holds, so it cannot drift from
+    // the package and needs no mapping layer to maintain. It rides with the version, so a buyer
+    // reading a pinned version reads the sheet that describes THAT one.
+    const odpsDoc = descriptorToOdps({
+        descriptor, ownerGhii, baseUrl: config.baseUrl, descriptorUrl,
+        resourceUrls: Object.fromEntries(resourceUrls.map(r => [r.name, r.url])),
+    });
+    await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
+        key: odpsYamlKey(input.name, contentHash),
+        data: Buffer.from(odpsToYamlDocument(odpsDoc), 'utf8'),
+        mimeType: 'text/yaml; charset=utf-8',
+        visibility: 'public',
+    });
+
     await writeLatest(deps, ownerGhii, input.name, contentHash, descriptorUrl, now);
+    // Retention, if the owner asked for any. AFTER the new version is live and the pointer moves,
+    // never before: pruning first would leave a window where the newest version is gone and the new
+    // one is not yet published.
+    const pruned = input.retentionPolicy
+        ? await pruneOldVersions(deps, ownerGhii, input.name, input.retentionPolicy, contentHash)
+        : [];
     await upsertCatalogueEntry(deps, ownerGhii, descriptor, descriptorUrl).catch(err => {
         // The bytes ARE the package; the catalogue is where a person finds it. A catalogue failure
         // must not un-publish a version that is already at its permanent address, and it must not be
@@ -237,7 +265,75 @@ export async function publishPackage(
         });
     });
 
-    return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: false, resources: resourceUrls };
+    return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: false, resources: resourceUrls, pruned };
+}
+
+/**
+ * Apply the owner's retention policy: keep the newest N versions, or everything published within the
+ * last N months, and remove the rest.
+ *
+ * FOUR RULES, because this deletes published data at a permanent address:
+ *
+ * 1. IT ONLY RUNS WHEN THE OWNER ASKED. No policy means keep everything, for ever. A default that
+ *    quietly deleted somebody's history would be the worst possible default here.
+ * 2. THE CURRENT VERSION IS NEVER PRUNED, whatever the arithmetic says. `keep: 0` removes every old
+ *    version and leaves the one the pointer names, because a package with no readable version is not
+ *    a retention policy, it is a deletion.
+ * 3. A PRUNED VERSION IS GONE, and a consumer pinned to it gets a 404 rather than different bytes.
+ *    That is the honest failure: the owner chose a retention window, and the descriptor carries the
+ *    policy so a consumer can see how long a pin is good for before they rely on one.
+ * 4. WHAT WAS REMOVED IS RETURNED AND LOGGED. A deletion nobody can see is how a history disappears
+ *    without anyone noticing which run did it.
+ */
+async function pruneOldVersions(
+    deps: StoreDeps, ownerGhii: string, name: string,
+    policy: NonNullable<PublishInput['retentionPolicy']>, currentHash: string,
+): Promise<string[]> {
+    const keep = Number(policy.keep);
+    if (!Number.isFinite(keep) || keep < 0) return [];
+
+    // Every stored file of this package, grouped into versions by the hash segment of its key.
+    const root = `${packageKeyRoot(name)}/`;
+    const files = (await deps.storage.listStorageFiles(ownerGhii))
+        .filter(f => f.key.startsWith(root) && !f.key.endsWith('/latest.json'));
+    const versions = new Map<string, { keys: string[]; at: number }>();
+    for (const f of files) {
+        const hash = f.key.slice(root.length).split('/')[0];
+        if (!/^[a-f0-9]{64}$/.test(hash)) continue;
+        const at = Date.parse(f.createdAt);
+        const entry = versions.get(hash) ?? { keys: [], at: 0 };
+        entry.keys.push(f.key);
+        entry.at = Math.max(entry.at, Number.isFinite(at) ? at : 0);
+        versions.set(hash, entry);
+    }
+
+    const current = bare(currentHash);
+    const ordered = [...versions.entries()]
+        .filter(([hash]) => hash !== current)   // rule 2
+        .sort((a, b) => b[1].at - a[1].at);     // newest first
+
+    let doomed: Array<[string, { keys: string[]; at: number }]>;
+    if (policy.unit === 'months') {
+        const cutoff = Date.now() - keep * 30 * 24 * 3600_000;
+        doomed = ordered.filter(([, v]) => v.at < cutoff);
+    } else {
+        // `keep` counts versions INCLUDING the current one, which is what an owner means by "keep the
+        // last 30" — so the others list is trimmed to keep-1.
+        doomed = ordered.slice(Math.max(0, keep - 1));
+    }
+
+    const removed: string[] = [];
+    for (const [hash, v] of doomed) {
+        for (const key of v.keys) await deps.storage.deleteStorageFile(ownerGhii, key);
+        removed.push(`sha256:${hash}`);
+    }
+    if (removed.length) {
+        logger.info('datapackage: retention removed old versions', {
+            package: `${ownerGhii}/${name}`, policy: `${policy.keep} ${policy.unit}`,
+            removed: removed.length, versions: removed,
+        });
+    }
+    return removed;
 }
 
 /** The mutable pointer for a consumer following the newest version. Clears any recorded failure:
