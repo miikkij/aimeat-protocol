@@ -122,6 +122,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { authorizeRead } from '../services/access-guard.js';
+import { canReadWorkspace } from '../services/workspace-access.js';
 import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, isMemoryBackedSpace, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
 import { emitChange } from '../services/event-bus.js';
@@ -584,6 +585,14 @@ export function registerWorkspaceTools(
             const revertRole = await memberRoleOf(organism_id);
             if (!revertRole || !canWriteNamespaceRule(revertRole, namespace)) {
                 return fail('Admin/creator role required to reopen a meta.* record');
+            }
+            // Organism membership is not workspace access, and reverting COPIES the published
+            // record's full value into a draft the caller then owns. Without this, an agent whose
+            // owner holds no grant on this workspace reads its records one revert at a time, while
+            // aimeat_workspace_read answers them "no access". Same gate as the REST door.
+            const revertOrg = await storage.getOrganism(organism_id);
+            if (!revertOrg || !(await canReadWorkspace(storage, config, revertOrg, agentGaii, ownerName, ownerGhii, ws))) {
+                return fail(`No access to workspace ${ws} — request access with aimeat_workspace_access.`);
             }
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
             // The same revertToDraft POST /v1/organisms/:id/revert calls: copy `.latest` (or the bare

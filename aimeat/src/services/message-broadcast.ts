@@ -11,10 +11,16 @@
  * @structure resolveAudience(ctx, senderGhii, sel) → string[] · sendBroadcast(ctx, input) → BroadcastResult
  * @usage import { resolveAudience, sendBroadcast } from '../services/message-broadcast.js';
  * @version-history
+ *   v1.1.0 — 2026-08-15 — A Share Group audience is resolved only for a sender who is that group's
+ *     owner or one of its members, the same test its read door makes. Holding the id was enough
+ *     before, and a removed member keeps the id: they could broadcast into the group and read every
+ *     current member's identity off the broadcast's own receipt, on a group whose GET answers them
+ *     403. E2E test-quality audit finding A29.
  *   v1.0.0 — 2026-06-23 — Initial: explicit-list + Share-Group audiences, announcement/broadcast modes.
  */
 import { randomUUID } from 'node:crypto';
-import type { DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
+import type { DirectMessageAttachment, InteractivePayload, SharingGroupRecord } from '../storage/interface.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 import type { DeliveryCtx } from './message-delivery.js';
 import { sendDirectMessage } from './message-send.js';
 import { sign } from '../auth/keypair.js';
@@ -48,6 +54,18 @@ export interface BroadcastResult {
   failed: { recipient: string; code: string }[];
 }
 
+/**
+ * May this sender address that group? Owner or member, the same test the group's own read door
+ * makes. An agent broadcasts for its human, so `bot#alice@node` counts wherever `alice@node` does:
+ * both the group's owner field and a member entry may hold either form.
+ */
+function isGroupAudienceAllowed(group: SharingGroupRecord, senderGhii: string): boolean {
+  const senderOwner = ownerGhiiOf(senderGhii);
+  const matches = (identifier: string): boolean =>
+    identifier === senderGhii || identifier === senderOwner || ownerGhiiOf(identifier) === senderOwner;
+  return matches(group.ownerGaii) || group.members.some(m => matches(m.identifier));
+}
+
 /** Resolve an audience selector to a de-duplicated recipient list (minus the sender). */
 export async function resolveAudience(ctx: DeliveryCtx, senderGhii: string, sel: AudienceSelector): Promise<string[]> {
   const set = new Set<string>();
@@ -57,7 +75,19 @@ export async function resolveAudience(ctx: DeliveryCtx, senderGhii: string, sel:
   }
   if (sel.groupId) {
     const group = await ctx.storage.getSharingGroup(sel.groupId);
-    if (group) for (const m of group.members) set.add(m.identifier);
+    // Same question GET /v1/groups/:id asks (routes/sharing-groups.ts:120): owner or member. A
+    // group id is a v4 UUID, so it is not guessable — but every removed member still knows it, and
+    // resolving the audience unchecked both delivered to the group and, through the broadcast's own
+    // receipt, handed the sender the identity of every current member of a group they are refused a
+    // 403 on. Silent skip rather than a throw: the route already answers INVALID_INPUT when the
+    // audience resolves to nobody, and an outsider must not learn whether the id exists.
+    if (group && isGroupAudienceAllowed(group, senderGhii)) {
+      for (const m of group.members) set.add(m.identifier);
+    } else if (group) {
+      logger.warn('broadcast: group audience refused, sender is neither owner nor member', {
+        groupId: sel.groupId, sender: senderGhii,
+      });
+    }
   }
   if (sel.audience === 'node-users' || sel.audience === 'federation-users') {
     const ghiis = await ctx.storage.listGHIIs();   // local owners; peers are reached via broadcastToFederation

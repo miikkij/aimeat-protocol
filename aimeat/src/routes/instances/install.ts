@@ -4,6 +4,10 @@
  *   real component registration via native storage APIs, @activate-cron firing, rollback on failure).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-15 — A PRIVATE package is refused here the way it already was on every read
+ *     door. Install asked only "is it published", so any registered owner could install another
+ *     owner's private package and have its components registered under their own identity, while
+ *     GET, versions and export answered them 404. E2E test-quality audit finding A21.
  *   v1.1.0 — 2026-08-10 — Passes node config to registerComponent (the extension builder needs it).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/instances.ts (max-file-lines)
  */
@@ -91,6 +95,18 @@ export function registerInstallRoutes(
     if (pkg.status !== 'published') {
       res.status(400).json(error(config.nodeId, 'NOT_PUBLISHED',
         'Only published packages can be installed'));
+      return;
+    }
+
+    // Private packages only visible to author — the same refusal the three read doors make
+    // (routes/packages.ts:537, :580, :607), in the same 404 shape so this door does not confirm
+    // that a package exists. Published is not public: a groupId is "{name}::{author}", so anyone
+    // who can guess or has seen an author's package name could install their private one and get
+    // its app, cortex and extension source registered under their own identity, while GET, versions
+    // and export all answered them 404.
+    if (pkg.visibility === 'private' && req.auth?.owner !== pkg.author) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        `Package not found: ${groupId}`));
       return;
     }
 

@@ -10,6 +10,10 @@
  *   - requestStorageGrant(ctx, message, attachment) — recipient→origin signed grant + download
  * @usage import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
  * @version-history
+ *   v1.1.0 -- 2026-08-15 -- The bytes are read from the SENDER's storage or from nobody's. A
+ *     descriptor naming a third party is refused before the same-node read, which is what an
+ *     inbound federated message could use to have this node open a local owner's private file.
+ *     E2E test-quality audit finding A27.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 4: attachments).
  */
 
@@ -42,6 +46,17 @@ function localKeyFor(message: DirectMessageRecord, att: DirectMessageAttachment)
  * Cross-node: request a signed download grant from the origin node, then fetch the bytes.
  */
 async function fetchAttachmentBytes(ctx: AttachmentCtx, message: DirectMessageRecord, att: DirectMessageAttachment): Promise<Buffer | null> {
+  // The only storage an attachment may be read from is the SENDER's. The descriptor names an owner
+  // and a key, and on an inbound federated message that name came off the wire, so reading it
+  // unchecked turns "here is my photo" into "open this local owner's private file for me". The
+  // intake normalizes both fields (routes/federation-sync/messaging.ts); this is the same rule at
+  // the door that does the reading, so a second intake path cannot reopen it.
+  if (att.ownerGhii !== message.senderGhii) {
+    logger.warn('attachment duplication: descriptor names a third party, refused', {
+      messageId: message.id, attachmentId: att.id, claimedOwner: att.ownerGhii, sender: message.senderGhii,
+    });
+    return null;
+  }
   if (att.originNodeId === ctx.config.nodeId) {
     const file = await ctx.storage.getStorageFile(att.ownerGhii, att.storageKey);
     return file ? file.data : null;

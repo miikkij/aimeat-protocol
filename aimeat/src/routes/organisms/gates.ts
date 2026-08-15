@@ -18,6 +18,7 @@ import { shouldGate, gatePolicyFromManifest, type Risk } from '../../services/ga
 import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { canReadWorkspace } from '../../services/workspace-access.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
@@ -293,6 +294,15 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     }
 
     const reverter = resolveIdentity(req.auth!, config.nodeId);
+    // Organism membership is not workspace access. Revert READS the published record and writes its
+    // full value back as a `.draft` under the caller's own identity, so without this the record list
+    // for a workspace answers a non-granted member 404 while revert hands them the same record's
+    // contents, one call at a time. canReadWorkspace is the gate the read doors use; 404 rather than
+    // 403 for the same reason they do, so the refusal does not confirm the record exists.
+    if (wsId && !(await canReadWorkspace(storage, config, organism, req.auth!.sub, req.auth!.owner, reverter, wsId))) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No published record at ${namespace}.${instance} to reopen`));
+      return;
+    }
     const result = await revertToDraft(id, wsId, namespace, instance, reverter);
     if (!result.ok) {
       if (result.code === 'NO_LATEST') {

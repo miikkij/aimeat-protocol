@@ -117,6 +117,44 @@ await test('4. Delivery telemetry: append → stats → list (no content/identit
   assert(!('body' in r) && !('senderGhii' in r) && !('recipientGhii' in r), 'telemetry carries NO content or participant identities');
 });
 
+// A27 (E2E test-quality audit). Every descriptor above names the SENDER's own file, so the suite
+// proved the duplicator works and never asked whose file it will open. The descriptor is data: on an
+// inbound federated message it arrives from the peer, and `ownerGhii` + `originNodeId` are what send
+// the duplicator down its same-node branch. A peer naming THIS node and a local victim therefore had
+// this node read that victim's private file and write the bytes into the recipient's own storage,
+// where they can be downloaded. Against the pre-fix source this test fails: the attachment becomes
+// `duplicate` and the recipient holds a copy of victim/passport.png.
+await test('5. An attachment naming a THIRD owner\'s file is refused, not duplicated', async () => {
+  const victim = `victim@${NODE}`;
+  await storage.createStorageFile({
+    key: 'private/passport.png', ownerGaii: victim, visibility: 'private',
+    mimeType: 'image/png', size: 6, data: Buffer.from('secret'), tags: [], createdAt: new Date().toISOString(),
+  });
+
+  const id = 'msg-thirdparty';
+  await storage.createDirectMessage(inbound(id, new Date().toISOString(), {
+    // What a hostile peer sends: the sender is `sndr`, the file is somebody else's.
+    id: 'a1', inline: false, storageKey: 'private/passport.png', ownerGhii: victim, originNodeId: NODE,
+    mode: 'reference', mime: 'image/png', size: 6, kind: 'image',
+  }));
+
+  await sweepReferenceAttachments(ctx);
+
+  const m = await storage.getDirectMessage(id, recipient);
+  const a = m?.attachments?.[0];
+  assert(a?.mode !== 'duplicate', `a third party's file was duplicated: mode=${a?.mode} localKey=${a?.localKey}`);
+  assert(!a?.localKey, `a third party's file landed in the recipient's storage at ${a?.localKey}`);
+
+  // And nothing of the victim's reached the recipient's storage under any name.
+  const files = await storage.listStorageFiles(recipient);
+  const leaked = files.find(f => f.size === 6 && f.mimeType === 'image/png');
+  assert(!leaked, `victim bytes found in recipient storage as ${leaked?.key}`);
+
+  // The victim's own file is untouched.
+  const orig = await storage.getStorageFile(victim, 'private/passport.png');
+  assert(!!orig && orig.size === 6, 'the victim\'s original file must be unaffected');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);
 process.exit(0);

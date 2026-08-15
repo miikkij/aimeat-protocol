@@ -1003,6 +1003,61 @@ await test('Second owner cannot archive first owner versions', async () => {
   assert(status === 403, `Expected 403, got ${status}`);
 });
 
+// A21 (E2E test-quality audit). Every other door in this phase has its cross-owner denial; install
+// had none, and install is the one that WRITES. The suite's own package is public, so the question
+// was never asked of a private one: `published` is not `public`, and a groupId is "{name}::{author}",
+// so owner B who knows or guesses the name could install owner A's private package and get its app,
+// cortex and extension source registered under B's identity — while GET, versions and export all
+// answered B 404. Against the pre-fix source this test fails with 201.
+await test('Second owner cannot install first owner PRIVATE package', async () => {
+  const privName = 'private-pack-a21';
+  const { status: created, body: privPkg } = await json('/v1/packages', {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({
+      name: privName,
+      description: 'Owner A private package',
+      category: 'utility',
+      visibility: 'private',
+      components: [{ id: 'csm-main', type: 'csm', label: 'Main', content: '{"fields":[]}', dependencies: [] }],
+    }),
+  });
+  assert(created === 201, `private package create expected 201, got ${created}: ${JSON.stringify(privPkg).slice(0, 200)}`);
+  const privGroupEnc = encodeURIComponent(privPkg.data.packageGroupId);
+
+  const { status: published } = await json(`/v1/packages/${privGroupEnc}/versions/${privPkg.data.version}`, {
+    method: 'PATCH',
+    headers: authed(ownerToken),
+    body: JSON.stringify({ status: 'published' }),
+  });
+  assert(published === 200, `publishing the private package expected 200, got ${published}`);
+
+  // The read doors already refuse B. Pinned here so the install assertion below is measured against
+  // a door that is known to be closed rather than against an assumption.
+  const { status: read } = await json(`/v1/packages/${privGroupEnc}`, { headers: authed(owner2Token) });
+  assert(read === 404, `owner B reading A's private package expected 404, got ${read}`);
+
+  const { status: installed, body: instBody } = await json(`/v1/packages/${privGroupEnc}/install`, {
+    method: 'POST',
+    headers: authed(owner2Token),
+    body: JSON.stringify({}),
+  });
+  assert(installed === 404, `owner B installing A's private package expected 404, got ${installed}: ${JSON.stringify(instBody).slice(0, 200)}`);
+
+  // And nothing landed under B: the refusal has to happen before any component is registered.
+  const { body: bInstances } = await json('/v1/instances', { headers: authed(owner2Token) });
+  const leaked = (bInstances.data?.instances ?? []).find((i: any) => String(i.packageGroupId ?? '').startsWith(privName));
+  assert(!leaked, `A's private package was installed as an instance under owner B: ${JSON.stringify(leaked ?? null).slice(0, 200)}`);
+
+  // A can still install their own private package — the gate must not cost the author anything.
+  const { status: ownInstall } = await json(`/v1/packages/${privGroupEnc}/install`, {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({ dry_run: true }),
+  });
+  assert(ownInstall === 200, `the author's own install expected 200, got ${ownInstall}`);
+});
+
 await test('Second owner cannot view first owner instances', async () => {
   const { status } = await json(`/v1/instances/${instanceId}`, {
     headers: authed(owner2Token),

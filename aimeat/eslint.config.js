@@ -26,7 +26,14 @@ export default tseslint.config(
     ignores: [
       'dist/**',
       'node_modules/**',
-      'test/**',
+      // test/** was ignored until 2026-08-15, so "zero warnings, every rule an error" described
+      // src/ and public/ and nothing else — the 241 E2E suites and 142 unit files were linted by
+      // nothing at all. The E2E test-quality audit measured 591 findings behind that line. It is
+      // lifted; the override block at the bottom of this file says which rules apply there and
+      // which are deliberately off.
+      'test/docker/**',
+      'test/playwright/**',
+      'test/fixtures/**',
       // src/static is not our source EXCEPT the SDK-libs migration sources (real, JSDoc-typed
       // ESM under src/static/sdk-libs/, which we DO lint — 800-line + header rules apply). Keep
       // everything else under src/static ignored, and ignore the generated dist bundles.
@@ -155,6 +162,45 @@ export default tseslint.config(
       // These libs are ported browser code that uses the classic `var self = this` closure idiom
       // in prototype methods / event callbacks (e.g. aimeat-tunnel's WebSocket client). Allow it.
       '@typescript-eslint/no-this-alias': 'off',
+    },
+  },
+  {
+    // ── The test tree ────────────────────────────────────────────────────────────────────────
+    // Linted from 2026-08-15. Three rules are OFF here rather than fixed, and each is a decision
+    // rather than an oversight:
+    //   no-explicit-any    — 2317 occurrences, almost all `catch (err: any)` and response-body
+    //                        casts in suites that talk HTTP to a live server and have no generated
+    //                        types for the envelope. Fixing them is a separate, mechanical change;
+    //                        leaving them ON would bury the rules below under noise, which is the
+    //                        reason this whole tree stayed unlinted.
+    //   file-header        — 101 occurrences. The newer suites do carry headers and should keep
+    //                        doing so, but making it an error today blocks every edit to an old one.
+    //   max-file-lines     — 27 occurrences. An E2E suite is a linear script; splitting one to sit
+    //                        under the cap moves assertions away from the setup that explains them.
+    // What IS enforced is the part that decides whether a test can fail at all.
+    files: ['test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+      'aimeat/file-header': 'off',
+      'aimeat/max-file-lines': 'off',
+
+      // A test whose assertion accepts two different statuses cannot tell the two apart, so the
+      // one it was written for is no longer proven. 373 sites measured on 2026-08-15; warn while
+      // they are worked down, then error.
+      'no-restricted-syntax': ['warn',
+        {
+          selector: "CallExpression[callee.name='assert'] > LogicalExpression[operator='||']",
+          message: 'This assertion passes on either branch, so neither is proven. Assert the one status this test is about; if two are genuinely valid, say which and why in a comment and split the test.',
+        },
+        {
+          selector: "IfStatement CallExpression[callee.name='assert']",
+          message: 'An assertion inside an if can silently not run — the test then passes by not testing. Assert the condition itself, or assert unconditionally.',
+        },
+        {
+          selector: "CallExpression[callee.name='assert'][arguments.0.type='Identifier']",
+          message: 'A bare truthiness check proves the value exists, not that it is right. Assert the value.',
+        },
+      ],
     },
   },
 );
