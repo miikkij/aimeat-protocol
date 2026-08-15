@@ -292,6 +292,8 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Admin (operator-only) ──
     aimeat_admin_stats: { title: 'Admin: Node Stats', readOnlyHint: true },
     aimeat_admin_agents: { title: 'Admin: List Agents', readOnlyHint: true },
+    aimeat_admin_organism_ownership: { title: 'Admin: Organism Ownership', readOnlyHint: true },
+    aimeat_admin_organism_owner_set: { title: 'Admin: Install Organism Owner', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     aimeat_admin_config: { title: 'Admin: Read Config', readOnlyHint: true },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },

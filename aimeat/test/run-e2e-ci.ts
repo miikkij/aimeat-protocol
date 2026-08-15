@@ -250,6 +250,9 @@ const ALL_SUITES = [
     // the same agent create organisms over HTTP. Includes the boot migration that keeps an existing
     // agent from losing the capability, run against the real backend.
     'test/e2e-organism-scope-gate.ts',
+    // The trap an admin is left in when ownership moves, and the operator break-glass that is the
+    // only way out of it. Four refusals guard the door, including an operator's own '*' agent.
+    'test/e2e-organism-owner-repair.ts',
     'test/e2e-intake.ts',
     'test/e2e-organism-workspace-engagements.ts',
     'test/e2e-write-guards.ts',

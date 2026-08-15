@@ -12,6 +12,11 @@
  *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
  *
  * @version-history
+ *   v1.5.0 — 2026-08-15 — requireOperatorPrincipal(), the gate for the break-glass doors that reach
+ *     across accounts. requireRole('operator') reads the TOKEN's roles, so it admits the operator's
+ *     browser and refuses the operator's agents; this asks whether the ACCOUNT behind the principal
+ *     is an operator, the way the aimeat_admin_* MCP tools already did, and then requires an exact
+ *     scope word on top so the role alone does not arm every agent the operator owns.
  *   v1.4.0 — 2026-08-14 — requireRoleOrScope() says in its own doc that the role path makes the
  *     named scope decorative FOR THAT ROLE, which is how organism:write came to be enforced on the
  *     MCP tool surface and ignored on the three HTTP doors that write. Nothing executable changed
@@ -32,7 +37,7 @@
  */
 import type { Request, Response, NextFunction } from 'express';
 import { verifyJWT, isRevoked, type VerifiedToken } from './jwt.js';
-import { ACCOUNT_SECURITY_SCOPE } from '../utils/scope-coverage.js';
+import { ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE } from '../utils/scope-coverage.js';
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
@@ -410,6 +415,64 @@ export function requireOwnerPrincipal() {
     res.status(403).json(errorEnvelope('ACCESS_DENIED',
       'This changes how the account is signed into, so it is reserved to the account holder. ' +
       `An agent needs the "${ACCOUNT_SECURITY_SCOPE}" permission, which the owner grants per agent.`));
+  };
+}
+
+/**
+ * Require the NODE OPERATOR, or something the operator explicitly sent. For the break-glass doors
+ * that reach across accounts: repairing an organism whose owner is unreachable is the first of them.
+ *
+ * WHY NOT requireRole('operator'). That tests the token's own role list, so it admits the operator's
+ * browser session and refuses the operator's AGENTS — and an agent should be able to do what a
+ * person can. This gate asks the question one level up: is the ACCOUNT behind this principal an
+ * operator account? The four `aimeat_admin_*` MCP tools already resolve the operator that way
+ * (mcp/core-admin.ts), so the two surfaces now agree instead of disagreeing by accident.
+ *
+ * WHY A SCOPE ON TOP. The role alone would hand every one of the operator's agents a node-wide
+ * capability the moment it exists, and that is the shape of the incident this door was built for: an
+ * agent with no scope limit called the ownership transfer during a test run and gave away the node's
+ * own development organism. The word is tested as the EXACT string — no wildcard carries it
+ * (SCOPES_OUTSIDE_WILDCARD), nobody was grandfathered onto it, and `app` principals are refused
+ * outright, because an app grant is consent to use the account and never consent to act as the node.
+ *
+ * Federated sessions are refused for the same reason requireRole('operator') refuses them: operator
+ * power stops at this node's own front door.
+ */
+export function requireOperatorPrincipal(storage: Storage) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      deny401(req, res, 'Authentication required');
+      return;
+    }
+    if (req.auth.federated) {
+      res.status(403).json(errorEnvelope('FORBIDDEN', 'Federated sessions cannot access operator functions'));
+      return;
+    }
+    const roles = req.auth.roles;
+    // The operator in person: an operator session that is not something acting on its behalf.
+    if (roles.includes('operator') && !roles.includes('app') &&
+        !roles.includes('agent') && !roles.includes('ecosystem')) {
+      next();
+      return;
+    }
+    if (roles.includes('app')) {
+      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'An app grant cannot carry operator functions'));
+      return;
+    }
+    // Anything else: the ACCOUNT must be an operator, and the principal must carry the exact word.
+    const owner = await storage.getOwner(req.auth.owner as string);
+    if (!owner?.roles.includes('operator')) {
+      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'Node operator required'));
+      return;
+    }
+    if (!(req.auth.scopes ?? []).includes(OPERATOR_ORGANISM_REPAIR_SCOPE)) {
+      logger.warn(`[operator-scope-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
+      res.status(403).json(errorEnvelope('SCOPE_DENIED',
+        `Scope "${OPERATOR_ORGANISM_REPAIR_SCOPE}" required. The node operator grants it per agent, ` +
+        'and no wildcard carries it.'));
+      return;
+    }
+    next();
   };
 }
 

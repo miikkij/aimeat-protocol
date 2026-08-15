@@ -5700,6 +5700,9 @@
           },
           "share": {
             "manage": "Avaa osia tiedostasi perustamallesi jakoryhmälle ja sulkea ne taas. Ei koskaan kenellekään jota et ole itse ryhmään laittanut."
+          },
+          "operator": {
+            "organism-repair": "Palauta omistaja organismiin jota tämä tili ei omista. Toimii vain noden operaattorilla: muulla tilillä tämä oikeus ei tee mitään. Tällä pääsee takaisin organismiin jonka omistajatiliin ei enää saa yhteyttä, ja se antaa organismin sille jonka agentti nimeää."
           }
         },
         "domainAi": "Tekoäly",
@@ -5717,6 +5720,7 @@
         "domainApp": "Sovellukset",
         "domainCapability": "Myymäsi palvelut",
         "domainAccount": "Tilisi ja kirjautuminen",
+        "domainOperator": "Tämän noden ylläpito",
         "permInvoke": "Aja"
       },
       "deviceAuth": {

@@ -195,6 +195,13 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_workspace_transfer:                'organism:write',
     aimeat_workspace_update:                  'organism:write',
 
+    // The node operator's break-glass over an organism this account does not own. The handler also
+    // resolves the caller's OWNER and refuses a non-operator, so the word alone gets nobody in; it is
+    // here as well because a tool is REGISTERED according to this table, and no wildcard carries this
+    // one (SCOPES_OUTSIDE_WILDCARD), so an operator's agent holds it only by an explicit tick.
+    aimeat_admin_organism_ownership:          'operator:organism-repair',
+    aimeat_admin_organism_owner_set:          'operator:organism-repair',
+
     // Writes something other people see under the owner's name.
     aimeat_flag_report:                       'social:write',
     aimeat_organism_join:                     'social:write',

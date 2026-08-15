@@ -159,6 +159,7 @@ import { adminStorageStatsRouter } from '../routes/admin-storage-stats.js';
 import { adminUsageRouter } from '../routes/admin-usage.js';
 import { adminAgentIntegrationRouter } from '../routes/admin-agent-integration.js';
 import { adminSharingGroupsRouter } from '../routes/admin-sharing-groups.js';
+import { adminOrganismsRouter } from '../routes/admin-organisms.js';
 import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
 import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
@@ -693,6 +694,7 @@ export async function mountRoutes(
   app.use(adminUsageRouter(config, storage));
   app.use(adminAgentIntegrationRouter(config, storage));
   app.use(adminSharingGroupsRouter(config, storage));
+  app.use(adminOrganismsRouter(config, storage));
 
   // Seed core scheduled jobs (idempotent — only creates if not already present)
   seedCoreScheduledJobs(config, storage).catch(err =>

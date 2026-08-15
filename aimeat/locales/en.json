@@ -5700,6 +5700,9 @@
           },
           "share": {
             "manage": "Open parts of your knowledge to a sharing group you have set up, and close them again. Never to anyone you have not put in a group yourself."
+          },
+          "operator": {
+            "organism-repair": "Put an owner back on an organism this account does not own. Only works for a node operator: on any other account this permission does nothing. It is the way back when an organism's owner account can no longer be reached, and it hands that organism to whoever the agent names."
           }
         },
         "domainAi": "AI",
@@ -5717,6 +5720,7 @@
         "domainApp": "Apps",
         "domainCapability": "Services you sell",
         "domainAccount": "Your account and how you sign in",
+        "domainOperator": "Running this node",
         "permInvoke": "Run"
       },
       "deviceAuth": {

@@ -171,6 +171,25 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {},
     },
     {
+        name: 'aimeat_admin_organism_ownership',
+        description: 'Operator-only. Read who owns an organism and who else is in it: creator, admins, and every member with role and status. Read this before aimeat_admin_organism_owner_set — installing an owner is a cross-account act and the roster it re-points should be seen first. For an organism you belong to yourself, use aimeat_organism_get.',
+        caller: 'operator',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'The organism ID.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_organism_owner_set',
+        description: 'Operator-only break-glass. Make an owner the creator of an organism the caller does not own, for the case where the organism\'s own creator account can no longer be reached. The previous creator stays on as an admin, and a target who is not yet a member is seated as one; a blocked target is refused. Needs the exact permission operator:organism-repair, which no wildcard carries. The ordinary handover, by the current creator to an existing member, is aimeat_organism_update\'s sibling route POST /v1/organisms/{id}/transfer.',
+        caller: 'operator',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            organism_id: { type: 'string', required: true, description: 'The organism ID to repair.' },
+            ghii: { type: 'string', required: true, description: 'Bare owner name to install as the organism\'s creator.' },
+        },
+    },
+    {
         name: 'aimeat_board_list',
         description: 'List every board visible to this agent — public and system boards plus shared/private ones you own or are allowed on — with id, name, visibility, and owner. Use to find board IDs for aimeat_board_read / _post. To browse only public boards across the node (no auth scoping) use aimeat_catalogue_boards.',
         caller: 'agent',

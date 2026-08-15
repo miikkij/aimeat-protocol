@@ -16,6 +16,11 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.5.0 — 2026-08-15 — operator:organism-repair, in its own domain and outside every wildcard.
+ *     The only word here whose effect depends on who the owner is: the node operator can put an
+ *     owner back on an organism whose creator account is unreachable, and on any other account the
+ *     box grants nothing, which its sentence says. Without a row an operator could not grant it from
+ *     this page at all.
  *   v1.4.0 — 2026-08-13 — agent:delete, the word a fleet runtime needs to clear away the agents it
  *     created. Inside the wildcard on purpose: the route's second condition (only agents this
  *     caller registered) is the real fence, and a box nobody can find protects nothing.
@@ -69,6 +74,11 @@ export const NOT_IN_WILDCARD = [
   // and deleting or exporting everything. An agent that can set the password can become the person,
   // so this one is never granted by a preset, a bulk header or Full access — only by this box.
   'account:security',
+  // ── Added 2026-08-15 ─────────────────────────────────────────────────────────────────────────
+  // The node operator's break-glass over an organism's ownership, on organisms the caller does not
+  // own. It answers an incident an unscoped agent caused, so carrying it inside "Full access" would
+  // rebuild the same hole one level up. Only an operator's own agent can be given it at all.
+  'operator:organism-repair',
 ];
 
 /**
@@ -175,6 +185,15 @@ export const SCOPE_DOMAINS = [
   //   account. Enforced by requireOwnerPrincipal() in src/auth/middleware.ts. Nobody was
   //   grandfathered onto it, so an agent has it only if the owner ticked this box.
   { key: 'account',    permissions: ['security'] },
+
+  // ── Added 2026-08-15 ─────────────────────────────────────────────────────────────────────────
+  // operator:organism-repair — install an owner on an organism this account does not own. The node
+  //   operator's break-glass, and the ONLY scope here whose effect depends on who the owner is: the
+  //   gate (requireOperatorPrincipal, src/auth/middleware.ts) reads the OWNER's roles first, so on a
+  //   normal account this box grants nothing and the sentence says so. It exists because an
+  //   organism whose creator became unreachable had no repair path on any surface, and a capability
+  //   an operator cannot grant from this page is a capability with no door.
+  { key: 'operator',   permissions: ['organism-repair'] },
 ];
 
 export const SCOPE_TEMPLATES = {

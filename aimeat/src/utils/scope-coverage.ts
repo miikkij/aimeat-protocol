@@ -28,6 +28,10 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.2.0 — 2026-08-15 — OPERATOR_ORGANISM_REPAIR_SCOPE, the operator's break-glass over an
+ *     organism's ownership. Outside the wildcard from the day it exists: the incident it answers was
+ *     an unscoped agent handing away an organism, so a repair word that "Full access" carries would
+ *     rebuild the same hole with a wider blast radius.
  *   v1.1.0 — 2026-08-11 — ACCOUNT_SECURITY_SCOPE. Out of the wildcard from the day it exists,
  *     because the narrow-only check on the agent-configure surface asks THIS file whether a scope
  *     is already covered: a '*' agent would have been told yes and could have written the word
@@ -57,6 +61,24 @@ export const WRITE_RESERVED_SCOPE = 'memory:write-reserved';
  * (services/scope-vocabulary-migration.ts), so an agent holding it was ticked by hand.
  */
 export const ACCOUNT_SECURITY_SCOPE = 'account:security';
+
+/**
+ * The node operator's break-glass over an organism nobody else can reach: install an owner on an
+ * organism the caller does not own. It exists because ownership had no repair path at all — an admin
+ * cannot remove, demote or replace a creator, and the operator running the node could not either, so
+ * a handover to an account that later went unreachable was permanent.
+ *
+ * Enforced by requireOperatorPrincipal() in auth/middleware.ts, which admits an operator session
+ * outright and any other principal only when its OWNER holds the operator role AND the token carries
+ * this exact word. Out of every wildcard, and for the sharpest reason on this list: the incident that
+ * produced this scope was an unscoped agent calling POST /v1/organisms/:id/transfer in a test run and
+ * handing away the node's own development organism. A break-glass that "Full access" carries by
+ * default is the same hole one level up.
+ *
+ * Nobody is grandfathered onto it (services/scope-vocabulary-migration.ts has no entry): this names
+ * a capability that did not exist before, so no agent can lose one it had.
+ */
+export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
 
 /**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
@@ -90,7 +112,7 @@ const OWN_TICK_SCOPES = [
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] =
-    [WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, ...OWN_TICK_SCOPES];
+    [WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, ...OWN_TICK_SCOPES];
 
 /** True when `scope` is one of the scopes only an exact grant can confer. */
 export function isOutsideWildcard(scope: string): boolean {

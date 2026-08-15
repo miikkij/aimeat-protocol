@@ -155,6 +155,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
     ],
     admin: [
         'aimeat_admin_stats', 'aimeat_admin_agents', 'aimeat_admin_config', 'aimeat_admin_mint',
+        // The operator's break-glass over an organism whose creator account is unreachable, plus the
+        // read that shows the roster before it is re-pointed.
+        'aimeat_admin_organism_ownership', 'aimeat_admin_organism_owner_set',
         'aimeat_flag_report',
         'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
         'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',

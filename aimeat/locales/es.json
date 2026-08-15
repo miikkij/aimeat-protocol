@@ -5693,6 +5693,9 @@
           },
           "share": {
             "manage": "Abrirle partes de lo que sabes a un grupo que tú hayas montado, y volver a cerrarlas. Nunca a nadie que no hayas metido tú en un grupo."
+          },
+          "operator": {
+            "organism-repair": "Devuelve un propietario a un organismo que esta cuenta no posee. Solo funciona para el operador del nodo: en cualquier otra cuenta este permiso no hace nada. Es la vuelta atrás cuando ya no se alcanza la cuenta propietaria de un organismo, y entrega ese organismo a quien el agente nombre."
           }
         },
         "domainAi": "IA",
@@ -5710,6 +5713,7 @@
         "domainApp": "Aplicaciones",
         "domainCapability": "Servicios que vendes",
         "domainAccount": "Tu cuenta y cómo entras",
+        "domainOperator": "Administración de este nodo",
         "permInvoke": "Ejecutar"
       },
       "deviceAuth": {

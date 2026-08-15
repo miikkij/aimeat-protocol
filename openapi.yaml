@@ -16422,6 +16422,75 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/admin/organisms/{id}/ownership:
+    get:
+      operationId: adminGetOrganismOwnership
+      summary: Read an organism's ownership state (operator)
+      description: |
+        Who holds this organism and who else is in it. Read this before writing: installing an owner
+        is a cross-account act, so the roster it re-points should be seen first.
+
+        Reserved to the node operator. An operator's agent also needs the exact scope
+        `operator:organism-repair`, which no wildcard carries.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+    post:
+      operationId: adminInstallOrganismOwner
+      summary: Install an owner on an organism (operator break-glass)
+      description: |
+        Makes `ghii` the organism's creator. The previous creator stays on as an admin, and a target
+        who is not yet a member is seated as one, because the repair case is the organism whose
+        reachable people are outside it. A blocked target is refused: lifting a block is its own act.
+
+        This exists because ownership had no repair path. An admin cannot remove, demote or replace a
+        creator, and only the creator can hand the organism on or delete it, so a handover to an
+        account that later became unreachable was permanent.
+
+        Reserved to the node operator. An operator's agent also needs the exact scope
+        `operator:organism-repair`, which no wildcard carries and nobody was grandfathered onto.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ghii]
+              properties:
+                ghii:
+                  type: string
+                  description: Bare owner name to install as the organism's creator.
+                  example: alice
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/admin/ghii/{ghii}/cors:
     put:
       operationId: adminSetGhiiCors

@@ -1,14 +1,18 @@
 /**
  * @file src/mcp/core-admin.ts
  * @description Operator-only core MCP admin tools (aimeat_admin_stats, aimeat_admin_agents,
- *   aimeat_admin_config, aimeat_admin_mint). Registered for all sessions but each checks the
- *   operator role at runtime. Extracted from src/mcp/core.ts to satisfy max-file-lines.
+ *   aimeat_admin_config, aimeat_admin_mint, aimeat_admin_organism_ownership,
+ *   aimeat_admin_organism_owner_set). Registered for all sessions but each checks the operator role
+ *   at runtime. Extracted from src/mcp/core.ts to satisfy max-file-lines.
  * @structure
- *   - registerCoreAdminTools() — registers the four operator-only admin tools on an McpServer
+ *   - registerCoreAdminTools() — registers the six operator-only admin tools on an McpServer
  * @usage
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.2.0 — 2026-08-15 — Two organism-ownership tools: the operator's read of who holds an
+ *     organism, and the break-glass that installs an owner on one whose creator account is
+ *     unreachable. Both call services/organism-ownership.ts, the same function the HTTP door calls.
  *   v1.1.0 — 2026-08-11 — aimeat_admin_mint calls services/morsel.ts mintMorsels, the same function
  *     POST /v1/admin/mint calls. The two copies computed the daily cap, credited the balance and
  *     wrote the ledger row separately, and had already drifted apart on what they told the live
@@ -24,6 +28,8 @@ import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { mintMorsels } from '../services/morsel.js';
+import { handOverOwnership } from '../services/organism-ownership.js';
+import { logger } from '../utils/logger.js';
 
 export function registerCoreAdminTools(
     mcp: McpServer,
@@ -158,6 +164,68 @@ export function registerCoreAdminTools(
             }
             emitResourceUpdated(gaii, `aimeat://wallet/${encodeURIComponent(gaii)}`);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ gaii, minted: minted.minted, new_balance: minted.newBalance }, null, 2) }] };
+        },
+    );
+
+    // ── Tool 19: aimeat_admin_organism_ownership ──
+    mcp.tool(
+        'aimeat_admin_organism_ownership',
+        descriptionFor('aimeat_admin_organism_ownership'),
+        { organism_id: z.string() },
+        annotationsFor('aimeat_admin_organism_ownership'),
+        async ({ organism_id }) => {
+            if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
+            const members = await storage.listMembers(organism_id);
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        id: organism.id, name: organism.name,
+                        creator: organism.creatorGhii, admins: organism.admins,
+                        created_at: organism.createdAt, updated_at: organism.updatedAt,
+                        members: members.map(m => ({ ghii: m.ghii, role: m.role, status: m.status, joined_at: m.joinedAt })),
+                    }, null, 2),
+                }],
+            };
+        },
+    );
+
+    // ── Tool 20: aimeat_admin_organism_owner_set ──
+    // The break-glass. ONE implementation (services/organism-ownership.ts handOverOwnership), the
+    // same function POST /v1/admin/organisms/:id/ownership calls, so the membership rules, the
+    // notifications and the three-writes-together transaction cannot differ between the surfaces.
+    mcp.tool(
+        'aimeat_admin_organism_owner_set',
+        descriptionFor('aimeat_admin_organism_owner_set'),
+        { organism_id: z.string(), ghii: z.string() },
+        annotationsFor('aimeat_admin_organism_owner_set'),
+        async ({ organism_id, ghii }) => {
+            if (!(await isOperator())) return { content: [{ type: 'text' as const, text: 'Operator role required' }], isError: true };
+            const organism = await storage.getOrganism(organism_id);
+            if (!organism) return { content: [{ type: 'text' as const, text: `Organism not found: ${organism_id}` }], isError: true };
+            const outcome = await handOverOwnership(storage, config, organism, ghii, {
+                seatNonMember: true,
+                performedBy: `operator repair by ${agentGaii}`,
+            });
+            if (!outcome.ok) {
+                return { content: [{ type: 'text' as const, text: `${outcome.code}: ${outcome.message}` }], isError: true };
+            }
+            logger.warn('[operator-organism-repair] ownership installed', {
+                organism: organism_id, from: outcome.previousCreator, to: outcome.creator,
+                seated: outcome.membershipCreated, by: agentGaii,
+            });
+            return {
+                content: [{
+                    type: 'text' as const,
+                    text: JSON.stringify({
+                        organism: organism_id, creator: outcome.creator,
+                        previous_creator: outcome.previousCreator,
+                        membership_created: outcome.membershipCreated,
+                    }, null, 2),
+                }],
+            };
         },
     );
 }

@@ -5,6 +5,10 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-15 — The transfer route's three writes moved into
+ *     services/organism-ownership.ts, which the operator's break-glass repair also calls. It had one
+ *     caller until an organism arrived whose creator account was unreachable and nothing on any
+ *     surface could put it back; a second copy of the sequence is how the two would drift.
  *   v1.3.0 — 2026-08-11 — SECURITY (H-29): removing or banning a member also detaches their agents
  *     from organism.agentGaiis and revokes their workspace-role consents
  *     (revokeDepartedMemberAccess) — an ejected person kept full access through their own agent token.
@@ -25,6 +29,7 @@ import { parseGaiiLoose } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
+import { handOverOwnership } from '../../services/organism-ownership.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
   acceptNameInvitation, declineNameInvitation, addOrganismMember, revokeDepartedMemberAccess,
@@ -387,31 +392,18 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'You are already the creator'));
       return;
     }
-    const targetMembership = await storage.getMembership(id, to);
-    if (!targetMembership || targetMembership.status !== 'active') {
-      res.status(404).json(error(config.nodeId, 'NOT_MEMBER', 'Target must be an active member of this organism'));
+    // The three writes, the membership checks and both notifications live in the service, because
+    // the operator's break-glass repair (POST /v1/admin/organisms/:id/ownership) performs the same
+    // transition and a second copy of it would drift. `seatNonMember` stays off here: a creator hands
+    // the organism to somebody already in it.
+    const outcome = await handOverOwnership(storage, config, organism, to);
+    if (!outcome.ok) {
+      res.status(outcome.status).json(error(config.nodeId, outcome.code, outcome.message));
       return;
     }
-
-    const callerMembership = await storage.getMembership(id, callerGhii);
-    const now = new Date().toISOString();
-    // Promote the new creator, demote the old one to admin. All three writes together: half of this
-    // leaves an organism with two creators or none, and nobody able to fix it.
-    const admins = [...new Set([...organism.admins.filter(a => a !== to), callerGhii])];
-    await storage.transaction(async () => {
-      await storage.updateMembership(targetMembership.id, { role: 'creator' });
-      if (callerMembership) await storage.updateMembership(callerMembership.id, { role: 'admin' });
-      await storage.updateOrganism(id, { creatorGhii: to, admins, updatedAt: now });
-    });
-
-    await notify(storage, `${to}@${config.nodeId}`, {
-      type: 'organism_ownership_transferred',
-      title: `You are now the creator of "${organism.name}"`,
-      link: '/v1/profile#organisms',
-    });
     emitChange('notifications');
 
-    res.json(success(config.nodeId, { creator: to, previousCreator: callerGhii }));
+    res.json(success(config.nodeId, { creator: outcome.creator, previousCreator: outcome.previousCreator }));
     emitChange('organisms');
   });
 
