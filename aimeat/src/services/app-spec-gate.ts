@@ -26,6 +26,10 @@
  *   import { evaluateSpecCheck } from './app-spec-gate.js';
  *   const specCheck = evaluateSpecCheck(config, { specToken, specAck });
  * @version-history
+ *   v1.1.0 — 2026-08-15 — The 'ok' message says what the token proves (the spec was FETCHED at
+ *     this version) instead of what it does not (that it was read). One publish carried the token
+ *     after four regex searches over about a tenth of the document, and the unread parts are what
+ *     the shipped app was missing.
  *   v1.0.0 — 2026-08-11 — initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -68,7 +72,22 @@ export function evaluateSpecCheck(config: AimeatConfig, input: SpecCheckInput): 
   const specUrl = `${config.baseUrl.replace(/\/+$/, '')}/v1/prompts/build-app`;
 
   if (given && given === expected) {
-    return { status: 'ok', message: 'Built against the current build spec.' };
+    return {
+      status: 'ok',
+      // What this actually proves, said in the response rather than implied by the word "ok".
+      //
+      // The token is a digest of the spec DOCUMENT. Carrying it proves the document was fetched at
+      // its current version, and nothing whatever about how much of it was read. On 2026-08-15 a
+      // publish answered "Built against the current build spec" for an app assembled after four
+      // regex searches over roughly a tenth of the text, and the parts never read — the shell
+      // template, the login pill, the design system — are exactly what the published app was
+      // missing. A stamp that overstates itself is worse than no stamp, because the next reader
+      // believes it.
+      message: 'You carried the current build spec token, so the spec was fetched at this version. '
+        + 'That is what this attests — not that it was read. If you searched it rather than read it, '
+        + 'the parts you skipped are the parts that bite: the shell template, the login pill, the '
+        + 'namespace rule.',
+    };
   }
 
   if (input.specAck === SPEC_ACK_SKIPPED) {
