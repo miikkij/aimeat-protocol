@@ -20,6 +20,10 @@
  *   cd aimeat && pnpm check:outbound-fetch --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:outbound-fetch --seed     # rewrite the exemption file
  * @version-history
+ *   v1.1.0 — 2026-08-15 — Comments are stripped before the match. The gate blocked every commit
+ *     in the repo over a sentence explaining a CORS header — prose containing "a fetch()" — and a
+ *     check that reads documentation as code taxes exactly the person it should leave alone. The
+ *     count drops 87 -> 73: fourteen of the seeded findings were never calls.
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, systemic pattern 6).
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'node:fs';
@@ -64,12 +68,21 @@ export function collectFetches(files: string[]): Finding[] {
         const lines = source.split(/\r?\n/);
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            // A COMMENT is not a call. This gate blocked every commit in the repo on 2026-08-15 over
+            // the sentence "without it a fetch() sees the 206 and none of its geometry" — prose
+            // explaining a CORS header, in a file whose author was mid-change. A check that reads
+            // documentation as code costs whoever is writing documentation, which is exactly the
+            // person it should leave alone. Line comments and single-line block comments are
+            // dropped; a `fetch(` inside a multi-line block comment is rare enough to accept, and
+            // errs toward reporting rather than missing.
+            const code = line.replace(/\/\*.*?\*\//g, '').replace(/^\s*\*.*$/, '').split('//')[0];
+            if (!code.trim()) continue;
             // `await fetch(` / `= fetch(` / `return fetch(` — but not safeFetch(, and not a method
             // call like `res.fetch(` or `session.fetch(` (those are the browser SDK's own helper).
-            const m = /(^|[^.\w])fetch\s*\(/.exec(line);
+            const m = /(^|[^.\w])fetch\s*\(/.exec(code);
             if (!m) continue;
             if (/safeFetch\s*\(/.test(line)) continue;
-            const after = line.slice(m.index + m[0].length);
+            const after = code.slice(m.index + m[0].length);
             if (isConstantUrl(after.split(',')[0])) continue;
             findings.push({ file: rel, line: i + 1, snippet: line.trim().slice(0, 96) });
         }
