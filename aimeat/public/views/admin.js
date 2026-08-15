@@ -39,6 +39,7 @@ import UsageTab        from './admin/usage-tab.js';
 import OwnersTab       from './admin/owners-tab.js';
 import AgentsTab       from './admin/agents-tab.js';
 import GhiiTab         from './admin/ghii-tab.js';
+import OrganismOwnershipTab from './admin/organism-ownership-tab.js';
 import ActionsTab      from './admin/actions-tab.js';
 import BoardsTab       from './admin/boards-tab.js';
 import ChatInstancesTab from './admin/chat-instances-tab.js';
@@ -92,6 +93,7 @@ const NAV_GROUPS = [
     { id: 'agents',  key: 'dashboard.agents',  component: AgentsTab,  count: 'agents' },
     { id: 'ghii',    key: 'dashboard.ghii',    component: GhiiTab,    count: 'ghii' },
     { id: 'agent-integration', key: 'admin.tabs.agentIntegration', component: AgentIntegrationAdminTab },
+    { id: 'org-ownership', key: 'admin.tabs.orgOwnership', component: OrganismOwnershipTab },
   ]},
   { key: 'dashboard.navData', items: [
     { id: 'actions',       key: 'dashboard.actions',       component: ActionsTab,        count: 'actions' },

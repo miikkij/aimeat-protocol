@@ -97,7 +97,8 @@
       "evidence": "Payload"
     },
     "tabs": {
-      "agentIntegration": "Agent Integration"
+      "agentIntegration": "Agent Integration",
+      "orgOwnership": "Organism ownership"
     },
     "agentIntegration": {
       "platformRegistry": "Platform Registry",
@@ -147,6 +148,25 @@
         "skillBundle": "Skill bundle not installed or outdated version detected",
         "default": "No progress for over 24 hours -- consider contacting the agent owner"
       }
+    },
+    "orgOwnership": {
+      "desc": "Put an owner back on an organism whose own owners can no longer be reached. Adding is additive: nobody inside loses anything.",
+      "idPlaceholder": "Organism id",
+      "look": "Look up",
+      "name": "Organism",
+      "owners": "Owners",
+      "createdBy": "Created by",
+      "created": "Created",
+      "addPlaceholder": "Owner name to add",
+      "add": "Add owner",
+      "added": "Added {name} as an owner",
+      "owner": "owner",
+      "member": "Member",
+      "role": "Role",
+      "status": "Status",
+      "joined": "Joined",
+      "noMembers": "This organism has no members.",
+      "notFound": "Organism not found"
     }
   },
   "admin.messages.desc": "Delivery telemetry for user-to-user messages. No message content or participant identities are shown.",

@@ -97,7 +97,8 @@
       "evidence": "Contenido"
     },
     "tabs": {
-      "agentIntegration": "Integración de agentes"
+      "agentIntegration": "Integración de agentes",
+      "orgOwnership": "Propiedad de organismos"
     },
     "agentIntegration": {
       "platformRegistry": "Registro de plataformas",
@@ -147,6 +148,25 @@
         "skillBundle": "El paquete de habilidades no está instalado, o su versión está desactualizada",
         "default": "Sin avances desde hace más de 24 horas: quizá convenga hablar con quien lleva el agente"
       }
+    },
+    "orgOwnership": {
+      "desc": "Devuelve un propietario a un organismo cuyos propios propietarios ya no se alcanzan. Añadir es aditivo: nadie de dentro pierde nada.",
+      "idPlaceholder": "Id del organismo",
+      "look": "Buscar",
+      "name": "Organismo",
+      "owners": "Propietarios",
+      "createdBy": "Creado por",
+      "created": "Creado",
+      "addPlaceholder": "Nombre del propietario a añadir",
+      "add": "Añadir propietario",
+      "added": "{name} ya es propietario",
+      "owner": "propietario",
+      "member": "Miembro",
+      "role": "Rol",
+      "status": "Estado",
+      "joined": "Se unió",
+      "noMembers": "Este organismo no tiene miembros.",
+      "notFound": "Organismo no encontrado"
     }
   },
   "admin.messages.desc": "Telemetría de entrega de los mensajes entre personas. No se enseña el contenido de ningún mensaje ni quién participa.",

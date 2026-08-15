@@ -97,7 +97,8 @@
       "evidence": "Tiedosto"
     },
     "tabs": {
-      "agentIntegration": "Agentti-integraatio"
+      "agentIntegration": "Agentti-integraatio",
+      "orgOwnership": "Organismin omistajuus"
     },
     "agentIntegration": {
       "platformRegistry": "Alustarekisteri",
@@ -147,6 +148,25 @@
         "skillBundle": "Taitopakettia ei ole asennettu tai havaittu vanhentunut versio",
         "default": "Ei edistymistä yli 24 tuntiin -- harkitse yhteydenottoa agentin omistajaan"
       }
+    },
+    "orgOwnership": {
+      "desc": "Palauta omistaja organismiin jonka omiin omistajiin ei enää saa yhteyttä. Lisäys on lisäävä: kukaan sisällä ei menetä mitään.",
+      "idPlaceholder": "Organismin tunnus",
+      "look": "Hae",
+      "name": "Organismi",
+      "owners": "Omistajat",
+      "createdBy": "Tekijä",
+      "created": "Luotu",
+      "addPlaceholder": "Lisättävän omistajan nimi",
+      "add": "Lisää omistaja",
+      "added": "{name} on nyt omistaja",
+      "owner": "omistaja",
+      "member": "Jäsen",
+      "role": "Rooli",
+      "status": "Tila",
+      "joined": "Liittyi",
+      "noMembers": "Tässä organismissa ei ole jäseniä.",
+      "notFound": "Organismia ei löytynyt"
     }
   },
   "admin.messages.desc": "Toimitustelemetria käyttäjien välisille viesteille. Viestien sisältöä tai osapuolten henkilöllisyyttä ei näytetä.",
