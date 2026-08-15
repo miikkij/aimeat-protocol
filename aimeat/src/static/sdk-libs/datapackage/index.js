@@ -31,27 +31,37 @@
  *   const out = await pkg.publish();                  // { packageId, contentHash, descriptorUrl }
  * @version-history
  *   v1.0.0 — 2026-08-15 — Initial (TARGET-063 vaihe 1, B1).
+ *   v1.1.0 — 2026-08-15 — Three session.fetch contract errors fixed against a real browser (see call()),
+ *                         and parseTable() added so an app does not rebuild paste handling.
  */
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-datapackage.js');
 import { attach } from '../_core/namespace.js';
 
-/** Unwrap the node envelope and turn a refusal into a thrown Error carrying `.code` and `.issues`. */
+/**
+ * Unwrap the node envelope and turn a refusal into a thrown Error carrying `.code` and `.issues`.
+ *
+ * THREE THINGS ABOUT `session.fetch` THAT THIS FUNCTION GOT WRONG ON THE FIRST PASS, all of them
+ * invisible to a server-side test and all three caught the moment a real browser loaded the page:
+ *   - it returns the PARSED envelope, not a `Response`. Calling `.json()` on it throws, and a
+ *     swallowed throw here made every call answer `null`.
+ *   - it does NOT throw on an error status — it hands back the envelope so a caller can look. So
+ *     the refusal has to be read here, from `ok`/`error`, or a 422 reads as success.
+ *   - it sets `Content-Type: application/json` itself. Passing our own duplicates the header and
+ *     the body arrives empty at the route.
+ */
 async function call(path, opts) {
-  const res = await authFetch(path, opts);
-  let body = null;
-  try { body = await res.json(); } catch { /* a non-JSON body is handled by the status check below */ }
-  if (!res.ok || (body && body.success === false)) {
-    const err = body && body.error ? body.error : { code: 'HTTP_' + res.status, message: 'Request failed' };
-    /** @type {Error & { code?: string, status?: number, issues?: any[] }} */
+  const body = await authFetch(path, opts);
+  if (!body || body.ok === false || body.error) {
+    const err = (body && body.error) || { code: 'REQUEST_FAILED', message: 'The request did not answer.' };
+    /** @type {Error & { code?: string, issues?: any[] }} */
     const e = new Error(err.message || 'Request failed');
     e.code = err.code;
-    e.status = res.status;
     // The quality gate's coordinates, so a page can point at the cell rather than say "invalid".
     e.issues = (err.details && err.details.issues) || [];
     throw e;
   }
-  return body && body.data !== undefined ? body.data : body;
+  return body.data !== undefined ? body.data : body;
 }
 
 /**
@@ -104,7 +114,6 @@ class DataPackageBuilder {
   validate() {
     return call('/v1/datapackages/validate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resources: this._resources }),
     });
   }
@@ -119,7 +128,6 @@ class DataPackageBuilder {
   publish() {
     return call('/v1/datapackages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(Object.assign({}, this._meta, {
         changes: this._changes,
         resources: this._resources,
@@ -131,15 +139,93 @@ class DataPackageBuilder {
   }
 }
 
+/** Drop a leading byte-order mark. A spreadsheet export usually carries one, and left in place it
+ *  becomes part of the FIRST COLUMN'S NAME — so the header a person sees and the key the rows carry
+ *  quietly stop matching. Written as a code point: a raw BOM in source is invisible. */
+const stripBom = (s) => (s.charCodeAt(0) === 0xFEFF ? s.slice(1) : s);
+
+/**
+ * Turn a pasted table into rows: CSV, TSV, semicolon-separated, or a JSON array of objects.
+ *
+ * THIS IS INPUT HANDLING, NOT THE CANONICAL READER, and the distinction is the whole reason it can
+ * live in the browser. It is deliberately lenient — it sniffs the delimiter, tolerates a BOM, CRLF
+ * and a ragged last line — because it is reading whatever a person pasted out of a spreadsheet. The
+ * canonical CSV reader is on the server and is deliberately exact, because it reads bytes this node
+ * itself wrote and hashed. Two parsers with two jobs; only one of them decides what a package IS.
+ *
+ * It lives here rather than in each app because otherwise every app rebuilds it, which is the exact
+ * duplication this library exists to prevent.
+ */
+function parseTable(text) {
+  const raw = stripBom(String(text || '')).trim();
+  if (!raw) return [];
+  if (raw[0] === '[' || raw[0] === '{') {
+    const parsed = JSON.parse(raw);
+    const rows = Array.isArray(parsed) ? parsed : [parsed];
+    if (!rows.every(r => r && typeof r === 'object' && !Array.isArray(r))) {
+      throw new Error('A JSON table must be an array of objects, one per row.');
+    }
+    return rows;
+  }
+  // Sniff the delimiter from the HEADER line only: a comma inside a quoted value further down
+  // must not outvote the separator the file actually uses.
+  const head = raw.split(/\r?\n/)[0];
+  /** @type {Array<{ ch: string, n: number }>} */
+  const counts = [{ ch: ',', n: 0 }, { ch: ';', n: 0 }, { ch: '\t', n: 0 }];
+  let q = false;
+  for (const ch of head) {
+    if (ch === '"') q = !q;
+    else if (!q) for (const c of counts) if (ch === c.ch) c.n++;
+  }
+  counts.sort((a, b) => b.n - a.n);
+  const delim = counts[0].n > 0 ? counts[0].ch : ',';
+
+  const records = [];
+  let field = '';
+  let record = [];
+  let inQuotes = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inQuotes) {
+      if (ch === '"') { if (raw[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+      else field += ch;
+      continue;
+    }
+    if (ch === '"') { inQuotes = true; continue; }
+    if (ch === delim) { record.push(field); field = ''; continue; }
+    if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && raw[i + 1] === '\n') i++;
+      record.push(field); field = ''; records.push(record); record = [];
+      continue;
+    }
+    field += ch;
+  }
+  if (field !== '' || record.length) { record.push(field); records.push(record); }
+  if (!records.length) return [];
+
+  const header = records[0].map((h, i) => (h.trim() || `column_${i + 1}`));
+  return records.slice(1)
+    .filter(r => r.length > 1 || (r[0] ?? '') !== '')
+    .map(r => {
+      const row = {};
+      // Values stay STRINGS here. Typing them is the server's job — a browser that eagerly turned
+      // "001000" into a number would destroy exactly the identifier the type inference protects.
+      for (let c = 0; c < header.length; c++) row[header[c]] = (r[c] ?? '') === '' ? null : r[c];
+      return row;
+    });
+}
+
 const datapackage = {
   /** Start a package. `meta` is `{ name, title?, description? }`; the name is an address segment. */
   create(meta) { return new DataPackageBuilder(meta); },
+
+  /** CSV / TSV / semicolon / JSON text → rows. See parseTable above for why it is lenient. */
+  parseTable(text) { return parseTable(text); },
 
   /** The type proposal for a set of rows, without publishing anything. Show it to the publisher. */
   inferSchema(rows) {
     return call('/v1/datapackages/validate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ resources: [{ name: 'preview', rows: rows || [] }] }),
     }).then(d => d.schemas.preview);
   },
@@ -147,7 +233,7 @@ const datapackage = {
   /** One-shot publish for a caller that has everything already. Same refusal behaviour as the builder. */
   publish(input) {
     return call('/v1/datapackages', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input || {}),
+      method: 'POST', body: JSON.stringify(input || {}),
     });
   },
 

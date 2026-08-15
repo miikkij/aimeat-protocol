@@ -36,21 +36,15 @@
   // src/static/sdk-libs/datapackage/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-datapackage.js");
   async function call(path, opts) {
-    const res = await authFetch2(path, opts);
-    let body = null;
-    try {
-      body = await res.json();
-    } catch {
-    }
-    if (!res.ok || body && body.success === false) {
-      const err = body && body.error ? body.error : { code: "HTTP_" + res.status, message: "Request failed" };
+    const body = await authFetch2(path, opts);
+    if (!body || body.ok === false || body.error) {
+      const err = body && body.error || { code: "REQUEST_FAILED", message: "The request did not answer." };
       const e = new Error(err.message || "Request failed");
       e.code = err.code;
-      e.status = res.status;
       e.issues = err.details && err.details.issues || [];
       throw e;
     }
-    return body && body.data !== void 0 ? body.data : body;
+    return body.data !== void 0 ? body.data : body;
   }
   var DataPackageBuilder = class {
     constructor(meta) {
@@ -104,7 +98,6 @@
     validate() {
       return call("/v1/datapackages/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resources: this._resources })
       });
     }
@@ -118,7 +111,6 @@
     publish() {
       return call("/v1/datapackages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(Object.assign({}, this._meta, {
           changes: this._changes,
           resources: this._resources,
@@ -129,16 +121,88 @@
       });
     }
   };
+  var stripBom = (s) => s.charCodeAt(0) === 65279 ? s.slice(1) : s;
+  function parseTable(text) {
+    const raw = stripBom(String(text || "")).trim();
+    if (!raw) return [];
+    if (raw[0] === "[" || raw[0] === "{") {
+      const parsed = JSON.parse(raw);
+      const rows = Array.isArray(parsed) ? parsed : [parsed];
+      if (!rows.every((r) => r && typeof r === "object" && !Array.isArray(r))) {
+        throw new Error("A JSON table must be an array of objects, one per row.");
+      }
+      return rows;
+    }
+    const head = raw.split(/\r?\n/)[0];
+    const counts = [{ ch: ",", n: 0 }, { ch: ";", n: 0 }, { ch: "	", n: 0 }];
+    let q = false;
+    for (const ch of head) {
+      if (ch === '"') q = !q;
+      else if (!q) {
+        for (const c of counts) if (ch === c.ch) c.n++;
+      }
+    }
+    counts.sort((a, b) => b.n - a.n);
+    const delim = counts[0].n > 0 ? counts[0].ch : ",";
+    const records = [];
+    let field = "";
+    let record = [];
+    let inQuotes = false;
+    for (let i = 0; i < raw.length; i++) {
+      const ch = raw[i];
+      if (inQuotes) {
+        if (ch === '"') {
+          if (raw[i + 1] === '"') {
+            field += '"';
+            i++;
+          } else inQuotes = false;
+        } else field += ch;
+        continue;
+      }
+      if (ch === '"') {
+        inQuotes = true;
+        continue;
+      }
+      if (ch === delim) {
+        record.push(field);
+        field = "";
+        continue;
+      }
+      if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && raw[i + 1] === "\n") i++;
+        record.push(field);
+        field = "";
+        records.push(record);
+        record = [];
+        continue;
+      }
+      field += ch;
+    }
+    if (field !== "" || record.length) {
+      record.push(field);
+      records.push(record);
+    }
+    if (!records.length) return [];
+    const header = records[0].map((h, i) => h.trim() || `column_${i + 1}`);
+    return records.slice(1).filter((r) => r.length > 1 || (r[0] ?? "") !== "").map((r) => {
+      const row = {};
+      for (let c = 0; c < header.length; c++) row[header[c]] = (r[c] ?? "") === "" ? null : r[c];
+      return row;
+    });
+  }
   var datapackage = {
     /** Start a package. `meta` is `{ name, title?, description? }`; the name is an address segment. */
     create(meta) {
       return new DataPackageBuilder(meta);
     },
+    /** CSV / TSV / semicolon / JSON text → rows. See parseTable above for why it is lenient. */
+    parseTable(text) {
+      return parseTable(text);
+    },
     /** The type proposal for a set of rows, without publishing anything. Show it to the publisher. */
     inferSchema(rows) {
       return call("/v1/datapackages/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resources: [{ name: "preview", rows: rows || [] }] })
       }).then((d) => d.schemas.preview);
     },
@@ -146,7 +210,6 @@
     publish(input) {
       return call("/v1/datapackages", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input || {})
       });
     },
