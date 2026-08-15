@@ -111,6 +111,47 @@ await test('device-authorize returns device_code + user_code', async () => {
     assert(!!deviceCode && !!userCode, 'device_code and user_code must be present');
 });
 
+// ANOTHER OWNER MUST NOT APPROVE THIS. device-authorize is unauthenticated and names its target owner
+// in the request body, so the only thing standing between a pending request and a stranger is the
+// `ownerPayload.owner !== request.ownerName` check in POST /v1/agents/verify. Delete that line and any
+// owner holding a valid token approves an agent credential — with scopes of their choosing — against
+// somebody else's account, and the device_code holder then polls the private key out. Nothing in
+// test/ asserted the refusal: every approve() in this suite and in e2e-agent-reapproval signs with
+// the right owner's token.
+//
+// It runs BEFORE the real approval, so the request it is refused on is genuinely pending.
+await test('A DIFFERENT owner cannot approve this device request', async () => {
+    const stranger = `dtgx${Date.now() % 100000}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: stranger, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `stranger register ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: stranger, timestamp: ts, signature: await signMsg(reg.body.data.private_key, stranger + NODE_ID + ts) }),
+    });
+    const strangerToken = tok.body.data.token as string;
+
+    const r = await json('/v1/agents/verify', {
+        method: 'POST',
+        body: JSON.stringify({ user_code: userCode, action: 'approve', scopes: ['*'], owner_token: strangerToken }),
+    });
+    assert(r.status === 403, `a stranger approved an agent against another account: ${r.status} ${JSON.stringify(r.body)}`);
+    // The read-back is the poll two tests below: it must hand out the scopes the OWNER chose
+    // (memory:*), never the `*` this stranger asked for. Polling here would spend the RFC 8628 rate
+    // limit the grace tests are measuring.
+});
+
+await test('An approval with NO owner token is refused', async () => {
+    // Refused as a missing required field rather than as a 401, which is the same outcome for the
+    // holder of the device_code: no credential is issued. Asserted because "the owner approves" has
+    // to be false for a caller who names no owner at all.
+    const r = await json('/v1/agents/verify', {
+        method: 'POST',
+        body: JSON.stringify({ user_code: userCode, action: 'approve', scopes: ['*'] }),
+    });
+    assert(r.status >= 400 && r.status < 500, `approval with no owner token: ${r.status} ${JSON.stringify(r.body)}`);
+});
+
 await test('Owner approves via /v1/agents/verify', async () => {
     const r = await json('/v1/agents/verify', {
         method: 'POST',
@@ -127,6 +168,14 @@ await test('First poll returns flat OAuth-style credentials', async () => {
         && typeof r.body.privateKey === 'string', `flat fields missing: ${Object.keys(r.body).join(',')}`);
     assert(!('ok' in r.body) && !('data' in r.body), 'device-token must stay flat OAuth-style, not enveloped');
     firstCreds = r.body;
+
+    // WHOSE CHOICE THE SCOPES WERE. The stranger above asked for `*` and the owner approved
+    // `memory:*`, so the credential that comes out names which approval the node acted on. Without
+    // this the 403 is the only witness, and a 403 sent after the write would look identical.
+    const claims = JSON.parse(Buffer.from(String(r.body.access_token).split('.')[1], 'base64url').toString('utf8'));
+    const scopes: string[] = claims.scopes ?? claims.scope?.split(' ') ?? [];
+    assert(scopes.includes('memory:*'), `the credential carries the OWNER's scopes: ${JSON.stringify(scopes)}`);
+    assert(!scopes.includes('*'), `the stranger's requested scopes reached the credential: ${JSON.stringify(scopes)}`);
 });
 
 // ── Phase 2: the grace window ──

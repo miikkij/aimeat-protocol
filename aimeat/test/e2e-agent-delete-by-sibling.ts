@@ -141,6 +141,36 @@ async function run() {
         assert((list.body.data.agents ?? []).some((a: any) => a.name === 'plain'), 'plain still exists');
     });
 
+    await test('nor one a SIBLING created — which is the case the header is about', async () => {
+        // The test above points the concierge at `plain`, whom the OWNER registered, so
+        // registered_by is the bare owner name. Change the guard in routes/agents/management.ts from
+        // `agent.registeredBy !== req.auth!.sub` to `agent.registeredBy === ownerName` — protect only
+        // what the human registered directly — and every case in this file still passes: plain is
+        // owner-registered, the self-delete is still refused, the concierge still deletes its own,
+        // the cross-owner case is still 404. Nine green, while any agent holding agent:delete
+        // destroys every agent any sibling ever created under that owner, live sessions included.
+        //
+        // So: an agent registered by a DIFFERENT agent, offered to the concierge.
+        const theirs = await siblingRegisters(plain.token, o.owner, 'plainsward', ['memory:read']);
+        const listed = await json('/v1/agents', { headers: auth });
+        const rec = (listed.body.data.agents ?? []).find((a: any) => a.name === 'plainsward');
+        assert(rec?.registered_by === plain.gaii,
+            `the fixture has to be sibling-registered, got ${rec?.registered_by}`);
+
+        const r = await del(theirs.name, concierge.token);
+        assert(r.status === 403, `the concierge deleted a sibling's agent: ${r.status} ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${r.body.error?.code}`);
+
+        const after = await json('/v1/agents', { headers: auth });
+        assert((after.body.data.agents ?? []).some((a: any) => a.name === 'plainsward'),
+            'the refused delete removed it anyway');
+
+        // Cleanup through the owner, so the rest of the suite starts clean. `plain` is not offered
+        // the delete here: it lacks agent:delete, which the test two above already proves, and a
+        // refusal for the wrong reason would say nothing about ownership.
+        await del(theirs.name, o.ownerToken);
+    });
+
     await test('the concierge cannot delete itself', async () => {
         const r = await del(concierge.name, concierge.token);
         assert(r.status === 403, `expected 403, got ${r.status}`);

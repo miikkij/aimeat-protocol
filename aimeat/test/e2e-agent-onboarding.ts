@@ -174,14 +174,63 @@ await test('2. POST start returns in_progress with 16 steps', async () => {
     testTaskId = taskStep.details.testTaskId;
 });
 
-await test('3. POST start works with agent token (agents inherit owner roles)', async () => {
-    // In AIMEAT, agent tokens authenticated via Ed25519 inherit their owner's roles,
-    // so the same-owner agent CAN hit owner-only endpoints.
+await test('3. POST start works with an agent token that holds agent:write, on ITSELF', async () => {
+    // THE NAME AND THE COMMENT USED TO SAY "agents inherit owner roles". That inheritance was the
+    // August 2026 audit's H-2 defect: POST /v1/auth/token copied the owner's owner/operator roles
+    // onto the agent's JWT, and two calls turned a scope-limited agent into an unscoped operator
+    // credential. routes/agent-onboarding.ts v1.6.0 replaced it with requireScope('agent:write') plus
+    // canAccessAgent, and routes/auth.ts stopped copying the roles.
+    //
+    // Leaving the old sentence in a passing test is worse than a missing test: it writes the
+    // vulnerability down as the contract, so restoring `const roles = [...ownerRecord.roles]` would
+    // have this suite endorsing it by name. The assertion is unchanged; what it MEANS is now stated
+    // correctly, and the case below distinguishes the two reasons it could pass.
     const { status } = await json(`/v1/agents/${agentName}/onboarding/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${agentToken}` },
     });
     assert(status === 200, `expected 200, got ${status}`);
+});
+
+await test('3a. An agent WITHOUT agent:write cannot start onboarding, its own or anyone\'s', async () => {
+    // The distinguishing case. Every agent in this suite carries the node's default scopes, which
+    // include agent:write, so `requireScope('agent:write')` could be deleted from the route and
+    // nothing here would fail. A narrow agent of the same owner is refused for the word — not for
+    // being the wrong person, which is a different gate with a different answer.
+    const reg = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: `${agentName}narrow`, owner: ownerName,
+            capabilities: ['memory'], model: 'gpt-4o', scopes: ['memory:read'],
+        }),
+    });
+    assert(reg.status === 201, `narrow agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+    });
+    const narrowToken = tok.body.data.token as string;
+
+    // Its own onboarding.
+    const own = await json(`/v1/agents/${agentName}narrow/onboarding/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${narrowToken}` },
+    });
+    assert(own.status === 403, `a memory:read agent started its own onboarding: ${own.status} ${JSON.stringify(own.body?.error)}`);
+
+    // And a sibling's, which is the canAccessAgent half.
+    const sibling = await json(`/v1/agents/${agentName}/onboarding/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${narrowToken}` },
+    });
+    assert(sibling.status === 403, `it reached a sibling's onboarding: ${sibling.status}`);
+
+    // The token must not carry the owner's roles — the H-2 defect itself, read off the credential.
+    const claims = JSON.parse(Buffer.from(narrowToken.split('.')[1], 'base64url').toString('utf8'));
+    const roles: string[] = claims.roles ?? [];
+    assert(!roles.includes('owner') && !roles.includes('operator'),
+        `an agent token carries its owner's roles: ${JSON.stringify(roles)}`);
 });
 
 await test('3b. GET enriches steps with descriptionText + howTo and returns step_guide + summary', async () => {
@@ -420,14 +469,17 @@ await test('11. DELETE onboarding returns 200', async () => {
     assert(body.data.deleted === true, 'deleted should be true');
 });
 
-await test('12. DELETE works with agent token (agents inherit owner roles)', async () => {
+await test('12. DELETE works with an agent token that holds agent:write, on ITSELF', async () => {
     // Re-start first so there is something to delete
     await json(`/v1/agents/${agentName}/onboarding/start`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
 
-    // In AIMEAT, agent tokens inherit their owner's roles, so this succeeds
+    // Same correction as test 3: this passes because the agent holds agent:write and canAccessAgent
+    // resolves it to itself, NOT because an agent token carries its owner's roles. It stopped doing
+    // that when the August 2026 audit removed the copy in routes/auth.ts, and test 3a reads the
+    // credential to prove it.
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${agentToken}` },

@@ -148,6 +148,28 @@ await test('The key really is under the AGENT GAII, not the owner GHII', async (
     assert(body.data?.value?.tool === 'e2e agent', `expected the agent's value, got ${JSON.stringify(body.data?.value)}`);
 });
 
+await test('?agent= is authorized: another owner cannot read this agent\'s private key', async () => {
+    // This is the only suite in test/ that uses `?agent=<gaii>`, and every use of it is the agent's
+    // OWN owner. The parameter is a client-supplied identifier, so the whole of what makes it safe is
+    // the `targetAgent.owner !== req.auth!.owner -> 403` check in routes/memory/key.ts. Delete that
+    // line and any owner reads any private memory key of any agent on the node by naming its GAII —
+    // and this file already holds tokenB and agentGaii, so it was one call from catching it.
+    const { status, body } = await json(
+        `/v1/memory/${encodeURIComponent(HELLO_KEY)}?agent=${encodeURIComponent(agentGaii)}`, auth(tokenB));
+    assert(status === 403 || status === 404,
+        `another owner read the agent's private key: ${status} ${JSON.stringify(body?.data ?? body?.error)}`);
+    assert(body?.data?.value === undefined, `and the value came back with it: ${JSON.stringify(body?.data?.value)}`);
+});
+
+await test('?agent= naming an agent that does not exist is refused, not resolved to the caller', async () => {
+    // A missing target must not fall back to "read it under my own identity" — that is the shape the
+    // gate above is protecting, one step earlier.
+    const { status, body } = await json(
+        `/v1/memory/${encodeURIComponent(HELLO_KEY)}?agent=${encodeURIComponent('nosuch#nobody@' + NODE_ID)}`, auth(tokenA));
+    assert(status === 403 || status === 404, `an unknown agent id resolved to something: ${status}`);
+    assert(body?.data?.value === undefined, `and returned a value: ${JSON.stringify(body?.data?.value)}`);
+});
+
 await test('Owner check passes on the agent-written key — ONE lookup, no agent param', async () => {
     const d = await checkHelloMcp(tokenA);
     assert(d.exists === true, `owner-scope read must find the agent's key; got ${JSON.stringify(d)}`);
