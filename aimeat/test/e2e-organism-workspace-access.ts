@@ -127,6 +127,17 @@ await test('8. A denies (revokes) → B loses read access', async () => {
     assert(read.body.data.manifest === null, 'manifest hidden again after deny');
 });
 
+await test('8b. the denial is written down — the request does not read as pending again', async () => {
+    // The status used to be computed from the grant table, which has two values while the flow has
+    // four: no grant is what "never asked" looks like, so a denied request returned to this panel as
+    // pending for good. Denying it a second time changed nothing, because there was nothing to change.
+    const r = await json(`/v1/organisms/${orgId}/workspace-access?ws=${WS}`, { headers: auth(A.token) });
+    assert(r.status === 200, `list-requests ${r.status}`);
+    const req = (r.body.data.requests || []).find((x: any) => x.requester === B.name);
+    assert(!!req, 'the request record disappeared entirely');
+    assert(req.status === 'denied', `expected denied, got "${req.status}"`);
+});
+
 await test('9. notifications: A got the request, B got the approval', async () => {
     const an = await json('/v1/notifications', { headers: auth(A.token) });
     assert(an.status === 200, `notif ${an.status}`);
@@ -240,6 +251,31 @@ await test('17. A file bound to MULTIPLE workspaces is readable via ANY one the 
         const cres = await fetch(`${BASE}/v1/pub/${encodeURIComponent(A_GHII)}/${encodeURIComponent(multiKey)}`, { headers: auth(C.token) });
         assert(cres.status === 403, `non-member expected 403 on multi-bound file, got ${cres.status}`);
     }
+});
+
+await test('18. removing a member closes the question they left open', async () => {
+    // B asks again, so there is a genuinely pending request at the moment the membership ends. An open
+    // request outlives the roster: it is a record in B's own namespace, and the reviewer's panel read
+    // "no grant" as "waiting for you", so an ejected member kept asking from outside the organism.
+    const revoke = await json(`/v1/organisms/${orgId}/workspace-access/decision`, {
+        method: 'POST', headers: auth(A.token), body: JSON.stringify({ ws: WS, requester: B.name, decision: 'deny' }),
+    });
+    assert(revoke.body.ok === true, `revoke before re-request: ${revoke.status}`);
+    const again = await json(`/v1/organisms/${orgId}/workspace-access`, {
+        method: 'POST', headers: auth(B.token), body: JSON.stringify({ ws: WS, message: 'let me back in' }),
+    });
+    assert(again.status === 201, `re-request ${again.status}: ${JSON.stringify(again.body.error)}`);
+    const before = await json(`/v1/organisms/${orgId}/workspace-access?ws=${WS}`, { headers: auth(A.token) });
+    assert((before.body.data.requests || []).find((x: any) => x.requester === B.name)?.status === 'pending',
+        're-request should read as pending before the removal');
+
+    const rm = await json(`/v1/organisms/${orgId}/members/${B.name}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(rm.body.ok === true, `remove B: ${rm.status} ${JSON.stringify(rm.body.error)}`);
+
+    const after = await json(`/v1/organisms/${orgId}/workspace-access?ws=${WS}`, { headers: auth(A.token) });
+    const req = (after.body.data.requests || []).find((x: any) => x.requester === B.name);
+    assert(!!req, 'the request record vanished instead of being resolved');
+    assert(req.status === 'withdrawn', `expected withdrawn, got "${req.status}"`);
 });
 
 await test('Cleanup A + B + C + D', async () => {

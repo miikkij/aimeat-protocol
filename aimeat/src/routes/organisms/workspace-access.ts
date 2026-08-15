@@ -24,6 +24,11 @@
  *   v1.6.0 — 2026-08-11 — the email-invite cancel route calls cancelEmailInvitation() instead of
  *     flipping the record itself, so it and aimeat_organism_invitation_email_cancel share one write
  *     (August 2026 MCP audit step 8).
+ *   v1.8.0 — 2026-08-15 — An access request's status is WRITTEN when it is decided, not computed from
+ *     the grant table. The old expression had two values (`roles.has(requester) ? 'approved' :
+ *     'pending'`) while the flow has four, so "denied" was indistinguishable from "never asked": a
+ *     denied request returned to the reviewer's panel as pending for good, and denying it again did
+ *     nothing. Found on a request denied 2026-07-11 and still pending a month later.
  *   v1.7.0 — 2026-08-11 — SECURITY (H-28): the code-invite mint authorizes what it hands out. An org
  *     role of 'admin' needs the organism's creator/admin; every per-workspace grant goes through the
  *     same requireWsManager check the email twin has always made, now in one shared
@@ -231,6 +236,44 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     res.status(201).json(success(config.nodeId, { status: 'requested', ws, workspace_creator: createdBy }));
   });
 
+  /**
+   * What a request record says about itself, with the pre-2026-08-15 fallback.
+   *
+   * The status used to be COMPUTED — `roles.has(requester) ? 'approved' : 'pending'` — and that
+   * expression has two values while the flow has four. A denied request produces no grant, so it read
+   * back as `pending` and returned to the reviewer's panel every time, for good: a request denied on
+   * 2026-07-11 was still sitting there a month later, and denying it again changed nothing. Same for a
+   * request whose author was removed from the organism. The decision is written down now; a record
+   * without one is old, and falls back to the grant it either has or does not.
+   */
+  function requestStatus(v: { status?: string }, requester: string, roles: Map<string, { role: string }>): string {
+    if (v.status === 'approved' || v.status === 'denied' || v.status === 'withdrawn') return v.status;
+    return roles.has(requester) ? 'approved' : 'pending';
+  }
+
+  /**
+   * Write the outcome onto the request record. The record is OWNED by the requester (their namespace,
+   * their key), and the person deciding is somebody else, so this is a server-side write that keeps
+   * the owner: the status is the node's answer about organism plumbing, not a claim the requester made
+   * about themselves. Returns false when there is no request to decide, which a direct grant produces.
+   */
+  async function recordRequestDecision(
+    id: string, ws: string, requester: string,
+    status: 'approved' | 'denied' | 'withdrawn', decidedBy: string,
+  ): Promise<boolean> {
+    const key = `organism.${id}.w.${ws}.access.request.${requester}`;
+    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+    const rec = items.find(r => r.key === key);
+    if (!rec) return false;
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      ...rec,
+      value: { ...(rec.value as Record<string, unknown>), status, decidedBy, decidedAt: now },
+      updatedAt: now,
+    });
+    return true;
+  }
+
   /* ── GET /v1/organisms/:id/workspace-access?ws= — the workspace creator (or org admin) lists the
    * pending/decided access requests for a workspace they own. ── */
   router.get('/v1/organisms/:id/workspace-access', requireAuth(), async (req, res) => {
@@ -265,9 +308,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         const roles = await memberRolesForWs(`${w.createdBy}@${config.nodeId}`, id, w.id);
         const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${w.id}.access.request.`, limit: 1000 });
         const requests = items.map(r => {
-          const v = r.value as { requester?: string; message?: string; createdAt?: string };
+          const v = r.value as { requester?: string; message?: string; createdAt?: string; status?: string };
           const requester = v.requester ?? bareOwner(r.ownerGaii);
-          return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester)?.role ?? null };
+          return { requester, message: v.message ?? '', created_at: v.createdAt, status: requestStatus(v, requester, roles), role: roles.get(requester)?.role ?? null };
         });
         return { ws: w.id, name: w.name, created_by: w.createdBy, requests, members: [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null })) };
       }));
@@ -287,9 +330,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const roles = await memberRolesForWs(creatorGhii, id, ws);   // owner → 'viewer' | 'contributor'
     const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${ws}.access.request.`, limit: 1000 });
     const requests = items.map(r => {
-      const v = r.value as { requester?: string; message?: string; createdAt?: string };
+      const v = r.value as { requester?: string; message?: string; createdAt?: string; status?: string };
       const requester = v.requester ?? bareOwner(r.ownerGaii);
-      return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester)?.role ?? null };
+      return { requester, message: v.message ?? '', created_at: v.createdAt, status: requestStatus(v, requester, roles), role: roles.get(requester)?.role ?? null };
     });
     const members = [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null, granted_at: m.grantedAt ?? null }));
     res.json(success(config.nodeId, { ws, requests, members }));
@@ -322,6 +365,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     if (decision === 'approve') {
       const role = (req.body?.role === 'viewer' ? 'viewer' : 'contributor') as 'viewer' | 'contributor';
       await setWorkspaceRole(wsCreatorGhii, id, ws, requester, role, 'request', req.auth!.owner as string);
+      await recordRequestDecision(id, ws, requester, 'approved', ownerName);
       await notify(storage, `${requester}@${config.nodeId}`, {
         type: 'workspace_access_approved',
         title: `Your access to "${entry.name ?? ws}" was approved (${role})`,
@@ -331,6 +375,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       res.json(success(config.nodeId, { status: 'approved', ws, requester, role }));
     } else {
       await revokeWorkspaceRole(wsCreatorGhii, id, ws, requester);
+      // Without this the denial had nowhere to live: no grant is exactly what "never asked" looks
+      // like, so the request came straight back to this panel as pending.
+      await recordRequestDecision(id, ws, requester, 'denied', ownerName);
       await notify(storage, `${requester}@${config.nodeId}`, {
         type: 'workspace_access_denied',
         title: `Your access request to "${entry.name ?? ws}" was declined`,

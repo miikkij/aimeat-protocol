@@ -19,6 +19,10 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   v1.7.0 — 2026-08-15 — revokeDepartedMemberAccess() also withdraws the departing member's OPEN
+ *     workspace access requests. A request outlives the membership it was made under, and the
+ *     reviewer's panel read a request with no grant as pending, so an ejected member went on asking
+ *     from outside the organism.
  *   v1.6.0 — 2026-08-11 — SECURITY (H-29): revokeDepartedMemberAccess(), the inverse of
  *     applyInvitationWorkspaceGrants — a removed, banned or departed member's agents are detached from
  *     the organism and their workspace-role consents revoked, neither of which the membership row's
@@ -488,6 +492,27 @@ export async function applyInvitationWorkspaceGrants(
  * data. Call it after the membership write, from every door that ends a membership. Returns what it
  * removed, so a caller can log or report it.
  */
+/**
+ * Mark a departing member's OPEN access request on one workspace as withdrawn. The record lives in
+ * the requester's own namespace, so this is a server-side write that keeps the owner: the status is
+ * the node's answer about organism plumbing, not something the requester said about themselves. No
+ * request is the ordinary case, and it is a no-op.
+ */
+async function withdrawAccessRequest(storage: Storage, orgId: string, ws: string, departing: string): Promise<void> {
+  const key = `organism.${orgId}.w.${ws}.access.request.${departing}`;
+  const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
+  const rec = items.find(r => r.key === key);
+  if (!rec) return;
+  const status = (rec.value as { status?: string } | null)?.status;
+  if (status === 'denied' || status === 'withdrawn') return;
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    ...rec,
+    value: { ...(rec.value as Record<string, unknown>), status: 'withdrawn', decidedAt: now },
+    updatedAt: now,
+  });
+}
+
 export async function revokeDepartedMemberAccess(
   storage: Storage,
   config: AimeatConfig,
@@ -524,6 +549,10 @@ export async function revokeDepartedMemberAccess(
         creatorGhii: `${createdBy}@${config.nodeId}`, orgId: organism.id, ws: w.id, grantee: departing,
       });
       if (revoked > 0) revokedWorkspaces.push(w.id);
+      // An OPEN request outlives the membership it was made under, and the reviewer's panel reads a
+      // request with no grant as pending — so an ejected member kept asking from beyond the roster.
+      // Closing the membership closes the question.
+      await withdrawAccessRequest(storage, organism.id, w.id, departing);
     }
   }
 
