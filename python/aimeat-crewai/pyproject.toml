@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "aimeat-crewai"
-version = "0.19.1"
+version = "0.20.0"
 description = "AIMEAT Liaison Agent for CrewAI -- drop-in crew member that handles all communication with an AIMEAT node (Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task lifecycle, offers + workflow-compatibility) so the rest of the crew can focus on domain work."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,6 +35,20 @@ dependencies = [
 aimeat-offers = "aimeat_crewai.cli:main"
 
 [project.optional-dependencies]
+# Parquet is an EXTRA rather than a dependency: pyarrow is tens of megabytes, most crews never
+# write a Parquet file, and to_parquet() raises a named ImportError when it is missing rather than
+# quietly writing a CSV under a function whose name says otherwise.
+# to_dataframe() is the headline of the data-package module and needs pandas; to_parquet() needs
+# pyarrow on top. Both are extras rather than dependencies because a liaison crew that never touches
+# a table should not carry either, and both functions raise a named ImportError naming the extra
+# rather than degrading into something the caller did not ask for.
+data = [
+    "pandas>=2.0",
+]
+parquet = [
+    "pandas>=2.0",
+    "pyarrow>=17",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",

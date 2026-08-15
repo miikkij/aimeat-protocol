@@ -330,6 +330,59 @@ Task attachments (`resources.files`) are re-authorized on every read: each entry
 `access` and, when granted, a fresh presigned `download_url`. Revoking access stops the URLs from the
 next read onward; the task keeps the reference.
 
+## Data packages: read one correctly, publish one (0.20.0+)
+
+A published data package has a permanent address whose path contains the hash of its own contents,
+so the bytes there can never change. Beside them sits a Frictionless descriptor carrying a Table
+Schema — the name and the **type** of every column — which is why an agent handed a package needs
+no column documentation.
+
+```python
+from aimeat_crewai import serve_client, read_package, to_dataframe, publish_package
+
+pkg = read_package("https://aimeat.io/v1/pub/alice@node/datapkg/laake-saatavuus/<hash>/datapackage.json")
+pkg.changes        # what moved in this version, and why
+pkg.license        # what you may do with it
+pkg.supersedes     # the version it replaced
+
+df = to_dataframe(pkg)                       # typed FROM THE SCHEMA
+df[df.inForce].groupby("company").size()
+```
+
+**`to_dataframe` is the reason this module exists.** `pandas.read_csv` on the same URL guesses the
+types, and the guess is wrong in the way that costs most. Measured on a real 718-row package:
+
+| column | declared | `to_dataframe` | plain `read_csv` |
+|---|---|---|---|
+| `vnr` | string | `string` | `int64` — a zero-padded identifier becomes a number |
+| `startDate` | date | `datetime64` | `str` |
+| `elapsedDays` | integer | `Int64` | `int64` |
+| `inForce` | boolean | `boolean` | `bool` |
+
+Publishing goes through the node's own contract, so a crew's package is the same kind of object as
+one a browser or a scheduled extension produced:
+
+```python
+api = serve_client("research-crew")
+out = publish_package(api, "weekly-summary", rows,
+                      changes="First version: 41 rows from Monday's run.")
+out["unchanged"]   # True = these exact bytes were already published; say "no change", not "updated"
+```
+
+`changes` is required by the node: a version nobody explained is a version a consumer cannot decide
+about. When the rows do not validate against their own schema the call raises `QualityGateRefused`
+with the resource, row and field of every problem — and **nothing was written**, so the package
+still stands on its previous version.
+
+Parquet is an optional extra, because pyarrow is tens of megabytes and most crews never write one:
+
+```bash
+pip install "aimeat-crewai[parquet]"
+```
+
+`to_parquet()` raises a named `ImportError` when it is missing rather than quietly writing a CSV
+under a function whose name says otherwise.
+
 ## Compatibility
 
 | `aimeat-crewai` | AIMEAT node | CrewAI |
@@ -340,6 +393,7 @@ next read onward; the task keeps the reference.
 | 0.4.x | 1.21.0+ with `AIMEAT_CONNECT_TUNNEL_ENABLED=true` for the tunnel (degrades to direct HTTP on older nodes) | 0.80+ |
 | 0.16.x | 1.38.0+ for the usage ledger (older nodes accept the telemetry but record no ledger row) | 0.80+ |
 | 0.17.x | 2.2.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks). Against an older node, reading a file the owner shared still works over plain `GET /v1/pub/{owner}/{key}` — only the handle + task-attachment helpers need 2.2.0. | 0.80+ |
+| 0.20.x | 3.3.0+ for data packages (`/v1/datapackages`). `read_package` and `to_dataframe` need only the package's public address, so they read a package from ANY node that publishes one; `publish_package` and `package_versions` need the routes. | 0.80+ |
 
 ## License
 

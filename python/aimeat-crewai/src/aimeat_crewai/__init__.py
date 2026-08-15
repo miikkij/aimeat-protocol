@@ -86,6 +86,17 @@ from .files import (
     task_files,
     delegate_file,
 )
+from .datapackage import (
+    AimeatPackageError,
+    QualityGateRefused,
+    DataPackage,
+    read_package,
+    package_versions,
+    to_dataframe,
+    rows_of,
+    publish_package,
+    to_parquet,
+)
 from .usage_telemetry import (
     install_usage_telemetry,
     usage_run,
@@ -145,6 +156,16 @@ __all__ = [
     "inbox_files",
     "task_files",
     "delegate_file",
+    # Data packages (0.20.0): read one correctly, publish one from a crew
+    "AimeatPackageError",
+    "QualityGateRefused",
+    "DataPackage",
+    "read_package",
+    "package_versions",
+    "to_dataframe",
+    "rows_of",
+    "publish_package",
+    "to_parquet",
     # Deterministic Hello Integration driver (0.12.0)
     "run_hello_integration",
     "OnboardingError",
