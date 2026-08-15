@@ -347,6 +347,71 @@ await test('community pack: PRIVATE user cortex does NOT leak into the public in
   await json(`/v1/cortex/${extName}`, { method: 'DELETE', headers: auth });
 });
 
+// A32 (E2E test-quality audit). `libpack.proofs.*` is an ordinary public memory prefix, so the
+// question is not whether the pack OWNER can attach a proof — e2e-appdev-proofs already covers that
+// door — but whether a STRANGER's public record with the same key is served as if it were the
+// owner's ledger. It was: the read keyed the map on value.packId, so B's record landed on A's pack
+// and, scanned last, replaced A's real ledger. Against the pre-fix source this test fails on the
+// first assertion with proven_models ['forged-model-x'].
+await test('community pack: a stranger cannot publish proofs onto another owner\'s pack', async () => {
+  const aName = 'packown' + Date.now().toString().slice(-6);
+  const bName = 'packimp' + Date.now().toString().slice(-6);
+  const mk = async (u: string, pw: string) => {
+    await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: u, password: pw, display_name: u }) });
+    const { body: l } = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: u, password: pw }) });
+    const t = l.data?.token || l.data?.jwt;
+    assert(!!t, `${u} login failed`);
+    return { Authorization: `Bearer ${t}` };
+  };
+  const aAuth = await mk(aName, 'PackOwn1!');
+  const bAuth = await mk(bName, 'PackImp1!');
+
+  const extName = aName + '-lib';
+  const manifest = [
+    'apiVersion: cortex.aimeat.org/v1', 'kind: Extension', 'metadata:', `  name: ${extName}`,
+    `  namespace: ${aName}`, '  description: "owner A community lib"', '  author: e2e',
+    '  visibility: public', '  tags: [ui]', 'spec:', '  version: "1.0.0"', '  license: MIT',
+    '  components:',
+    '    - type: prompt', '      name: doc', '      content: |', '        API: AIMEAT.a.x()',
+    '    - type: lib', `      name: ${extName}`, `      filename: ${extName}.js`,
+    '      exports: [x]', '      api_surface: |', '        AIMEAT.a.x()',
+  ].join('\n');
+  const { status: inst } = await json('/v1/cortex', {
+    method: 'POST', headers: aAuth,
+    body: JSON.stringify({ manifest, libs: { [extName + '.js']: '(function(){})();' } }),
+  });
+  assert(inst === 201, `A install expected 201, got ${inst}`);
+  await json(`/v1/cortex/${extName}/activate`, { method: 'POST', headers: aAuth });
+
+  // B writes the pack's own proof key as a PUBLIC record of their own. The write itself is
+  // legitimate — any owner may write their own public memory — which is exactly why the READ has
+  // to decide whose ledger it is.
+  const { status: wrote } = await json('/v1/memory', {
+    method: 'POST', headers: bAuth,
+    body: JSON.stringify({
+      key: `libpack.proofs.${extName}`,
+      value: { packId: extName, proofs: [{ model: 'forged-model-x', verdict: 'pass', evidence: 'none', date: '2026-08-15', selfReported: true }] },
+      visibility: 'public',
+    }),
+  });
+  assert(wrote === 200 || wrote === 201, `B memory write expected 2xx, got ${wrote}`);
+
+  const { body: idx } = await json('/v1/library-packs?scope=community');
+  const entry = (idx.data?.packs || []).find((p: any) => p.id === extName);
+  assert(!!entry, 'A pack missing from the community index');
+  assert(!(entry.proven_models || []).includes('forged-model-x'),
+    `a stranger's proof was served on A's pack: proven_models=${JSON.stringify(entry.proven_models)}`);
+  assert(!(entry.proofs || []).some((p: any) => p.model === 'forged-model-x'),
+    'a stranger\'s proof was served in the pack proofs array');
+
+  const { body: det } = await json(`/v1/library-packs/${extName}`);
+  assert(!((det.data?.pack?.proven_models) || []).includes('forged-model-x'),
+    'the detail endpoint served the stranger\'s proof');
+
+  await json(`/v1/memory/libpack.proofs.${extName}`, { method: 'DELETE', headers: bAuth });
+  await json(`/v1/cortex/${extName}`, { method: 'DELETE', headers: aAuth });
+});
+
 console.log('\n' + '─'.repeat(40));
 console.log(`Library packs E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);

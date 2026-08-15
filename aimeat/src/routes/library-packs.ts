@@ -16,6 +16,13 @@
  *   communityPackDetail() · libraryPackIds()
  * @usage app.use(libraryPacksRouter(config, storage)) from routes-loader.
  * @version-history
+ *   v1.2.0 — 2026-08-15 — A community pack's proof ledger is read by KEY and by WRITER, not by the
+ *     packId inside the value. `libpack.proofs.*` is an ordinary public memory prefix, so any owner
+ *     could publish a record naming somebody else's pack and see their forged `proven_models`
+ *     served on the landing page, the Libraries tab and llms.txt — and replace the real ledger
+ *     outright when their record was scanned last. The write side had the owner gate from the
+ *     start (contribution-proofs.ts:137); only the read trusted the value. E2E test-quality audit
+ *     finding A32.
  *   2026-07-19 — Self-reported acceleration proofs (AppDev KB Phase 8): community-pack + template proofs; self_reported labeling
  *   v1.1.0 — 2026-07-17 — community packs: active+public user cortexes with a lib component
  *     appear in the index (scope 'community') and serve their type:prompt doc as ai_doc.
@@ -27,7 +34,12 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { getLibraryPacks, getLibraryPackIndex, getLibraryPack, renderPackText } from '../data/library-packs.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+
+/** The public memory prefix the proof ledger lives under — packProofsKey() in
+ *  services/contribution-proofs.ts builds the same string on the write side. */
+const PACK_PROOFS_PREFIX = 'libpack.proofs.';
 
 /** Known index categories a community pack may declare via labels.domain / tags. */
 const KNOWN_CATEGORIES = new Set(['core', 'ai', 'ui', 'visualization', 'diagrams', 'canvas', 'game', '3d', 'realtime', 'economy', 'media']);
@@ -92,14 +104,25 @@ function communityPackDetail(ext: CortexExtensionRecord, baseUrl: string) {
 }
 
 /** Self-reported per-model proofs for community packs, keyed by pack id — one prefix read
- *  over the public `libpack.proofs.{packId}` records (attached via aimeat_appdev_proof_attach). */
-async function loadCommunityProofs(storage: Storage): Promise<Map<string, unknown[]>> {
+ *  over the public `libpack.proofs.{packId}` records (attached via aimeat_appdev_proof_attach).
+ *
+ *  The ledger belongs to the pack's owner: attachContributionProof writes it under that owner's
+ *  GHII and refuses anybody else (services/contribution-proofs.ts:137). This read has to ask the
+ *  same question, because `libpack.proofs.*` is an ordinary public memory prefix any owner may
+ *  write. Two things decide a record here, and neither is the value: the KEY names the pack, and
+ *  the WRITER must be that pack's owner. Keying off `value.packId` let a stranger's record claim
+ *  another pack and — depending on scan order — replace the genuine ledger in this map. */
+async function loadCommunityProofs(storage: Storage, exts: CortexExtensionRecord[]): Promise<Map<string, unknown[]>> {
   const out = new Map<string, unknown[]>();
+  const ownerByPack = new Map(exts.map(e => [e.name, e.installedBy]));
   try {
-    const { items } = await storage.listAllMemory({ prefix: 'libpack.proofs.', visibility: 'public', limit: 500 });
+    const { items } = await storage.listAllMemory({ prefix: PACK_PROOFS_PREFIX, visibility: 'public', limit: 500 });
     for (const rec of items) {
-      const v = rec.value as { packId?: string; proofs?: unknown[] } | null;
-      if (v?.packId && Array.isArray(v.proofs)) out.set(v.packId, v.proofs);
+      const packId = rec.key.slice(PACK_PROOFS_PREFIX.length);
+      const packOwner = ownerByPack.get(packId);
+      if (!packOwner || parseGaiiLoose(rec.ownerGaii).owner !== packOwner) continue;
+      const v = rec.value as { proofs?: unknown[] } | null;
+      if (Array.isArray(v?.proofs)) out.set(packId, v.proofs);
     }
   } catch (err) { logger.warn('loadCommunityProofs: best-effort — packs serve without proofs', { error: String(err) }); }
   return out;
@@ -136,7 +159,7 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
     let community: Array<Record<string, unknown>> = [];
     try {
       const exts = await communityExtensions(storage);
-      const proofsByPack = await loadCommunityProofs(storage);
+      const proofsByPack = await loadCommunityProofs(storage, exts);
       community = exts.map(e => withCommunityProofs(communityIndexEntry(e, config.baseUrl), proofsByPack));
     } catch (err) { logger.warn('GET /v1/library-packs: community listing is best-effort — the curated index always serves', { error: String(err) }); }
 
@@ -158,9 +181,10 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
     if (!pack) {
       // Community fallback: an active+public user cortex with a lib component.
       try {
-        const ext = (await communityExtensions(storage)).find(e => e.name === id);
+        const exts = await communityExtensions(storage);
+        const ext = exts.find(e => e.name === id);
         if (ext) {
-          const proofsByPack = await loadCommunityProofs(storage);
+          const proofsByPack = await loadCommunityProofs(storage, exts);
           res.json(success(config.nodeId, {
             pack: withCommunityProofs(communityPackDetail(ext, config.baseUrl), proofsByPack),
           }));

@@ -102,6 +102,48 @@ await test('6. a non-member cannot revert (403)', async () => {
     await json(`/v1/owners/${other}`, { method: 'DELETE', headers: auth(tk2.body.data.token) });
 });
 
+// A10 (E2E test-quality audit). Test 6 proves an OUTSIDER is refused, which reads as "revert's
+// access rule is covered" and is not the same question: organism membership is not workspace access.
+// Revert READS the published record and writes its whole value back as a `.draft` the caller then
+// owns, so a member with no grant on this workspace could pull its contents out one call at a time
+// while the record list for the same workspace answered them 404. This organism's join_policy is
+// `open`, so the member below is exactly what an ordinary joiner gets: membership, no workspace role.
+// Against the pre-fix source this test fails with 200 and the reopened draft in the member's hands.
+await test('7. an organism member with no workspace grant cannot revert', async () => {
+    const joiner = ownerName + 'j';
+    const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: joiner, display_name: 'J', password: 'Rev12345' }) });
+    assert(reg.status === 201, `joiner register: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: joiner, timestamp: ts, signature: await sign(reg.body.data.private_key, joiner + NODE_ID + ts) }) });
+    const jToken = tk.body.data.token;
+    assert(typeof jToken === 'string' && jToken.length > 0, 'joiner token');
+
+    const joined = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(jToken), body: JSON.stringify({}) });
+    assert(joined.status === 200 || joined.status === 201, `join expected 2xx, got ${joined.status} ${JSON.stringify(joined.body)}`);
+
+    // Pin the door that is known to be closed, so the revert assertion is measured against what this
+    // member may actually see rather than against an assumption.
+    const listed = await json(`/v1/organisms/${orgId}/workspace/records?ws=${WS}&namespace=${NS}`, { headers: auth(jToken) });
+    assert(listed.status === 404 || listed.status === 403,
+        `a member with no workspace grant should not read the records, got ${listed.status} ${JSON.stringify(listed.body).slice(0, 200)}`);
+
+    const r = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: auth(jToken), body: JSON.stringify({ ws: WS, namespace: NS, id: 't1' }) });
+    assert(r.status === 404, `member without a workspace grant reverting expected 404, got ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+
+    // No draft was created, and none of the record's content reached the joiner.
+    const roles = await rolesOf('t1');
+    assert(!roles.has('draft'), `a refused revert must not create a draft (got ${[...roles]})`);
+    const own = await json(`/v1/memory?prefix=${encodeURIComponent(root() + '.' + NS + '.')}&limit=50`, { headers: auth(jToken) });
+    const leaked = ((own.body?.data?.items ?? []) as Array<{ key: string }>).length;
+    assert(leaked === 0, `the joiner holds ${leaked} record(s) of a workspace they cannot read`);
+
+    // The creator still reverts their own workspace — the gate must cost the legitimate path nothing.
+    const ok = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: auth(token), body: JSON.stringify({ ws: WS, namespace: NS, id: 't1' }) });
+    assert(ok.status === 200, `the creator's own revert expected 200, got ${ok.status} ${JSON.stringify(ok.body).slice(0, 200)}`);
+
+    await json(`/v1/owners/${joiner}`, { method: 'DELETE', headers: auth(jToken) });
+});
+
 await test('Cleanup', async () => { await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(token) }); });
 
 console.log(`\n=== Workspace Revert: ${passed} passed, ${failed} failed ===\n`);

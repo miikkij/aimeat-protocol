@@ -212,5 +212,48 @@ await test('8. The "all node users" audience is operator-only (a non-operator ge
     assert(body.error?.code === 'FORBIDDEN', `code, got ${body.error?.code}`);
 });
 
+// A29 (E2E test-quality audit). Test 5 broadcasts to a group Alice owns, so the audience gate was
+// never asked a question it could answer no to. Holding the id was the whole check: a group id is a
+// v4 UUID and therefore not guessable, but every REMOVED member still knows it, and resolving the
+// audience both delivered into the group and returned every current member's identity in the
+// broadcast's own receipt — on a group whose GET answers that same person 403. Bob is the outsider
+// here; against the pre-fix source this test fails with 201 and Carol's identity in the response.
+await test('7. A non-member cannot broadcast to a group (and cannot read its members)', async () => {
+    const grp = await json('/v1/groups', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ name: `private-team-${stamp}`, members: [{ identifier: carol.ghii, identifier_type: 'ghii', permissions: { read: true, write: false } }] }),
+    });
+    assert(grp.status === 201, `group create ${grp.status}: ${JSON.stringify(grp.body)}`);
+    const groupId = grp.body.data.group?.id ?? grp.body.data.id;
+
+    // Pin the door that is known to be closed, so the broadcast assertion is measured against it
+    // rather than against an assumption about what Bob may see.
+    const read = await json(`/v1/groups/${groupId}`, { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(read.status === 403, `Bob reading Alice's group expected 403, got ${read.status}`);
+
+    const send = await json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${bob.token}` },
+        body: JSON.stringify({ group_id: groupId, mode: 'broadcast', body: 'I am not in this group' }),
+    });
+    assert(send.status === 400, `Bob broadcasting to Alice's group expected 400 (audience resolves to nobody), got ${send.status}: ${JSON.stringify(send.body).slice(0, 200)}`);
+    const serialized = JSON.stringify(send.body);
+    assert(!serialized.includes(carol.ghii), `the refusal leaked a member identity: ${serialized.slice(0, 200)}`);
+
+    // Nothing reached Carol.
+    await sleep(200);
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${carol.token}` } });
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${carol.token}` } });
+    const gotIt = (reqs.body?.data?.requests ?? []).some((r: any) => r.contactId === bob.ghii)
+        || (inbox.body?.data?.messages ?? []).some((m: any) => /not in this group/.test(m.body));
+    assert(!gotIt, 'a non-member\'s broadcast reached a member of the group');
+
+    // Alice, the owner, still reaches her own group — the gate must cost the legitimate path nothing.
+    const ok = await json('/v1/messages/broadcast', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ group_id: groupId, mode: 'broadcast', body: 'owner still reaches the group' }),
+    });
+    assert(ok.status === 201, `the owner's own group broadcast expected 201, got ${ok.status}: ${JSON.stringify(ok.body).slice(0, 200)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

@@ -3,13 +3,19 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-15 — An inbound message's attachment descriptors are normalized instead of
+ *     stored as the peer sent them. `ownerGhii` and `originNodeId` decide WHOSE storage the
+ *     duplicator reads, so a peer that named this node and a local owner had this node open that
+ *     owner's private file and copy it to the recipient. The send side has always stamped both
+ *     fields itself (services/message-send.ts:88-89); only the receiving side took the sender's
+ *     word. E2E test-quality audit finding A27.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-sync.ts (max-file-lines)
  */
 
 import type { Router } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, DirectMessageAttachment } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
@@ -21,6 +27,25 @@ import { parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
 import { messagePreview, conversationIdFor } from '../../utils/messaging.js';
 import { generateDownloadToken } from '../../services/download-token.js';
 import { duplicateMessageAttachments } from '../../services/attachment-duplication.js';
+
+/**
+ * An inbound attachment descriptor says which storage the bytes come from, so those two fields are
+ * the peer's claim about somebody else's disk and are re-stamped rather than believed: the bytes
+ * can only be the SENDER's, on the node that sent them. mapMessageAttachments() does the identical
+ * thing to a client's claim on the way out, for the same reason.
+ *
+ * Believing them let a peer set originNodeId to THIS node and ownerGhii to a local owner, which
+ * sends the duplicator down its same-node branch (services/attachment-duplication.ts:45) to read
+ * that owner's private file and write the bytes into the recipient's own storage.
+ */
+function normalizeInboundAttachments(
+    attachments: DirectMessageAttachment[] | undefined | null,
+    senderGhii: string,
+    sourceNode: string,
+): DirectMessageAttachment[] | undefined {
+    if (!attachments?.length) return undefined;
+    return attachments.map(a => ({ ...a, ownerGhii: senderGhii, originNodeId: sourceNode }));
+}
 
 export function registerMessagingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // POST /v1/federation/replicate — Receive replicated memory from a peer node
@@ -203,7 +228,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 senderGhii: message.senderGhii,
                 recipientGhii,
                 body: message.body ?? '',
-                attachments: message.attachments ?? undefined,
+                attachments: normalizeInboundAttachments(message.attachments, message.senderGhii, source_node),
                 interactive: message.interactive ?? undefined,
                 broadcastId: message.broadcastId ?? undefined,
                 respondable: message.respondable ?? undefined,
