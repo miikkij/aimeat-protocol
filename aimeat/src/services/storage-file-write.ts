@@ -1,6 +1,6 @@
 /**
  * @file src/services/storage-file-write.ts
- * @description Storing one binary file, once, for every surface that can store one.
+ * @description Storing and removing one binary file, once, for every surface that can do either.
  *
  *   WHY THIS FILE EXISTS. `POST /v1/storage` and `aimeat_storage_upload` are the same capability, and
  *   the two copies had drifted in the way that costs money and access rather than tidiness:
@@ -28,12 +28,19 @@
  *   - StorageWriteDeps / StorageFileInput / StorageFileWriteResult — the contract
  *   - writeStorageFile() — the inline write, in order, with the fence first
  *   - mintStorageUploadUrl() — the presigned representation of the same write
+ *   - removeStorageFile() — the delete, sharing the same key fence and change events
  * @usage
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8, unit storage-files). Collapses
  *     POST /v1/storage and aimeat_storage_upload onto one write.
+ *   v1.1.0 — 2026-08-15 — removeStorageFile(): the delete, which had one door (DELETE /v1/storage)
+ *     and no tool, so an agent could store a file over MCP and never take it back. Written here
+ *     rather than in the new tool because the anonymous key fence was already a hand-copied second
+ *     copy on that route, and because the route emitted only `files` while the upload emits `files`
+ *     and `memory` — a delete moves the byte budget the memory view renders exactly as an upload
+ *     does, and the two views disagreed about it.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
@@ -85,17 +92,30 @@ export type StorageFileWriteResult =
     | StorageWriteRefusal;
 
 /**
- * May this principal write this key at all. Both representations of the upload run it, which is the
- * point: the fence is on the write, not on the shape the caller happens to ask for.
+ * The two refusals the key fence itself can produce. Narrower than either result type on purpose, so
+ * it is assignable to both the write's and the delete's, and neither door can be handed a refusal
+ * code it does not answer for.
  */
-function checkKey(ownerGaii: string, key: string): StorageWriteRefusal | null {
+interface KeyRefusal {
+    ok: false;
+    status: number;
+    code: 'INVALID_INPUT' | 'FORBIDDEN';
+    message: string;
+}
+
+/**
+ * May this principal touch this key at all. Every representation of the upload runs it, and so does
+ * the delete, which is the point: the fence is on the act, not on the shape the caller happens to
+ * ask for. The DELETE route carried its own copy of this until v1.1.0.
+ */
+function checkKey(ownerGaii: string, key: string): KeyRefusal | null {
     if (!key) {
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'key is required' };
     }
     if (isAnonymousGaii(ownerGaii) && !key.startsWith('anonymous/')) {
         return {
             ok: false, status: 403, code: 'FORBIDDEN',
-            message: 'Anonymous agents can only upload to keys prefixed with "anonymous/"',
+            message: 'Anonymous agents can only use keys prefixed with "anonymous/"',
         };
     }
     return null;
@@ -165,6 +185,72 @@ export async function writeStorageFile(
     emitChange('memory');
 
     return { ok: true, file, overageMorsels: quota.overageMorsels };
+}
+
+export interface StorageDeleteRefusal {
+    ok: false;
+    status: number;
+    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'NOT_FOUND' | 'ACCESS_DENIED';
+    message: string;
+}
+
+export type StorageFileDeleteResult =
+    | { ok: true; key: string; size: number; mimeType: string; visibility: StorageFileRecord['visibility'] }
+    | StorageDeleteRefusal;
+
+/**
+ * Remove one file from `ownerGaii`'s namespace. Irreversible: there is no version history behind a
+ * stored file the way there is behind a memory record, so what this deletes is gone.
+ *
+ * THE ORDER IS THE POINT. Fence, then read, then compare, then delete — a refusal must happen before
+ * anything is removed, which is the same rule the write follows for the quota. It also lets the
+ * caller be told WHAT it deleted (size, type), because those are read before the row goes.
+ *
+ * WHY NO CROSS-OWNER FORM. Reading has one, and it is the reason aimeat_storage_download takes a
+ * reference: a file is keyed by (owner, key) and an agent legitimately reads its owner's uploads.
+ * Deleting does not get the same door. `getStorageFile(ownerGaii, key)` is namespaced to the caller,
+ * so a file belonging to anyone else is simply absent here, and the ownership comparison below is a
+ * second lock on a door that is already shut rather than the lock that shuts it.
+ */
+export async function removeStorageFile(
+    deps: StorageWriteDeps,
+    ownerGaii: string,
+    key: string,
+): Promise<StorageFileDeleteResult> {
+    const { storage } = deps;
+
+    const fenced = checkKey(ownerGaii, key);
+    if (fenced) return fenced;
+
+    const existing = await storage.getStorageFile(ownerGaii, key);
+    if (!existing) {
+        return {
+            ok: false, status: 404, code: 'NOT_FOUND',
+            message: `File not found in your namespace: ${key}. This deletes only your own files — a file someone else owns is not reachable here, whatever you may be allowed to read.`,
+        };
+    }
+    if (existing.ownerGaii !== ownerGaii) {
+        return { ok: false, status: 403, code: 'ACCESS_DENIED', message: 'You can only delete your own files' };
+    }
+
+    const deleted = await storage.deleteStorageFile(ownerGaii, key);
+    if (!deleted) {
+        // The row was there a moment ago and is not now. Another door removed it in between, which
+        // is the caller's desired end state, but saying "deleted" would claim work we did not do.
+        return { ok: false, status: 404, code: 'NOT_FOUND', message: `File not found: ${key}` };
+    }
+
+    deps.emitResourceUpdated?.(ownerGaii, `aimeat://storage/${encodeURIComponent(key)}`);
+    deps.emitResourceListChanged?.(ownerGaii);
+
+    // Both views, for the same reason the write emits both: the file leaves the files list AND frees
+    // bytes in the budget the memory view renders. The route emitted only 'files'.
+    emitChange('files');
+    emitChange('memory');
+
+    return {
+        ok: true, key, size: existing.size, mimeType: existing.mimeType, visibility: existing.visibility,
+    };
 }
 
 export interface StorageUploadUrlInput {

@@ -6,6 +6,7 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.9.0 -- 2026-08-15 -- aimeat_storage_delete, so the connector surface does not lag the node.
  *   v1.0.0 -- 2026-05-28 -- Initial connector MCP core tools
  *   v1.1.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -319,6 +320,17 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
       ? `/v1/pub/${encodeURIComponent(refOwner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`
       : `/v1/storage/${encodeURIComponent(refKey)}?mode=${mode}`;
     const resp = await client.get(path);
+    return jsonContent(resp.data ?? resp);
+  });
+
+  mcp.tool('aimeat_storage_delete', descriptionFor('aimeat_storage_delete'), {
+    agent_name: agentNameSchema,
+    key: z.string().describe('Storage key in the agent\'s own namespace. Only the agent\'s own files can be deleted.'),
+  }, annotationsFor('aimeat_storage_delete'), async ({ agent_name, key }) => {
+    const { client } = pickAgent(registry, agent_name);
+    // One door, unlike the download above: /v1/storage is namespaced to the caller, and there is no
+    // /v1/pub form for a delete because reading someone else's file is allowed and removing it is not.
+    const resp = await client.delete(`/v1/storage/${key.split('/').map(encodeURIComponent).join('/')}`);
     return jsonContent(resp.data ?? resp);
   });
 

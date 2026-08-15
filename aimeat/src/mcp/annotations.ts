@@ -21,6 +21,8 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   v1.x — 2026-08-15 — Annotation for aimeat_storage_delete: destructive, and idempotent only
+ *     in the sense that the second call changes nothing (it answers 404).
  *   v1.x — 2026-08-13 — Annotations for aimeat_schedule_trigger and aimeat_agent_console_set.
  *   v1.x — 2026-08-08 — Annotations for the five aimeat_company_* tools.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
@@ -82,6 +84,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Storage ──
     aimeat_storage_download: { title: 'Download Storage File', readOnlyHint: true },
     aimeat_storage_upload: { title: 'Upload Storage File', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_storage_delete: { title: 'Delete Storage File', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Wallet & morsels ──
     aimeat_wallet_balance: { title: 'Read Wallet Balance', readOnlyHint: true },

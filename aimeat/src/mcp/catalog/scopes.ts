@@ -18,6 +18,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.10.0 -- 2026-08-15 -- aimeat_storage_delete -> storage:write, the same permission as the
+ *     upload. Storing a file and taking it back are one authority over one namespace; a separate
+ *     scope would let an owner grant an agent uploads it could never clean up.
  *   v1.9.0 -- 2026-08-14 -- aimeat_usage_report -> wallet:read, matching GET /v1/usage/summary. A
  *     usage report is the owner's whole spend and activity history, which is the same sensitivity
  *     class as their balance rather than a new one.
@@ -208,9 +211,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_flag_report:                       'social:write',
     aimeat_organism_join:                     'social:write',
 
-    // Stores a file.
+    // Stores a file, or takes one back — the same permission over the same namespace.
     aimeat_portfolio_publish:                 'storage:write',
     aimeat_storage_upload:                    'storage:write',
+    aimeat_storage_delete:                    'storage:write',
 
     // Creates work that will run.
     aimeat_schedule_create:                   'task:write',

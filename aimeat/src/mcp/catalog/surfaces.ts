@@ -19,6 +19,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-08-15 — Place aimeat_storage_delete beside upload and download on all four surfaces that
+ *     already serve storage. An agent that may store a file may take it back; splitting those across
+ *     surfaces would leave uploads a client cannot clean up.
  *   2026-08-13 — Place aimeat_schedule_trigger and aimeat_agent_console_set on `agent`, beside the
  *     tools they belong with (the other schedule tools, and mode_set/tags_set).
  *   2026-08-10 — Place aimeat_portfolio_publish on `agent`. It shipped into the catalog with no
@@ -56,7 +59,7 @@ export const V2_EXCLUDED: readonly string[] = [
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */
 export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
     appdev: [
-        'aimeat_storage_upload', 'aimeat_storage_download',
+        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_discover',
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
@@ -72,7 +75,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
     ],
     agent: [
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
-        'aimeat_storage_upload', 'aimeat_storage_download',
+        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the
         // server /v1/mcp), so it cannot appear on a server v2 surface — intentionally omitted here.
         'aimeat_task_create', 'aimeat_task_list', 'aimeat_task_get', 'aimeat_task_propose_todos',
@@ -118,7 +121,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_discover',
         'aimeat_catalogue_search', 'aimeat_catalogue_agents', 'aimeat_catalogue_boards',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
-        'aimeat_storage_upload', 'aimeat_storage_download',
+        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink',
         'aimeat_board_list', 'aimeat_board_read', 'aimeat_board_create', 'aimeat_board_post', 'aimeat_board_reply',
@@ -178,7 +181,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_commerce_beneficiary_release', 'aimeat_commerce_beneficiary_payout',
         'aimeat_commerce_beneficiary_earnings', 'aimeat_commerce_beneficiary_approve',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
-        'aimeat_storage_upload', 'aimeat_storage_download',
+        'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_wallet_balance', 'aimeat_wallet_transactions',
         'aimeat_discover',
         'aimeat_handbook_get',

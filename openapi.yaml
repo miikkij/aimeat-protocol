@@ -12772,6 +12772,14 @@ paths:
     delete:
       operationId: deleteFile
       summary: Delete file
+      description: >
+        Removes one file from the CALLER's own namespace. Irreversible: a stored file has no
+        version history behind it the way a memory record does.
+
+
+        Scope: own namespace only. Files are keyed by (owner, key), so a file someone else owns
+        answers 404 here even when the caller is allowed to READ it through
+        `GET /v1/pub/{gaii}/{key}`. There is deliberately no cross-owner delete.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -12784,6 +12792,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: Anonymous agent outside the `anonymous/` key prefix
+        '404':
+          description: No such file in the caller's own namespace
 
   # ── Actions ────────────────────────────────────────────────
   /v1/actions:

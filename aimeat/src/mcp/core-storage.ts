@@ -1,15 +1,15 @@
 /**
  * @file src/mcp/core-storage.ts
- * @description The two core MCP storage tools: aimeat_storage_upload (inline or presigned) and
+ * @description The core MCP storage tools: aimeat_storage_upload (inline or presigned),
  *   aimeat_storage_download (by key in the caller's own namespace, or by REFERENCE for a file someone
- *   else owns). Extracted from src/mcp/core.ts to satisfy max-file-lines; no behavior change.
+ *   else owns), and aimeat_storage_delete. Extracted from src/mcp/core.ts to satisfy max-file-lines.
  *
  *   The reference form is the point of the download tool: storage is keyed by (owner, key), and a
  *   key-only lookup made every file the CALLER did not upload unreachable — an owner's PDF answered
  *   "not found" to that owner's own agent. Foreign reads go through services/file-refs.ts, i.e. the
  *   same authorizeRead() guard as GET /v1/pub and ctx.files.read, and answer with a presigned handle
  *   so binary never enters a model context.
- * @structure registerCoreStorageTools() — registers both tools on an McpServer
+ * @structure registerCoreStorageTools() — registers the three tools on an McpServer
  * @usage
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
@@ -21,6 +21,10 @@
  *     ceiling through the tool and be billed for none of it, while the identical upload from the
  *     browser was gated and charged. It also took Node's permissive base64 reader, which turns
  *     mis-sent HTML or JSON into a few bytes of garbage stored as a successful file.
+ *   v1.2.0 — 2026-08-15 — aimeat_storage_delete. An agent could store a file over MCP and had no way
+ *     to take it back: the capability existed as DELETE /v1/storage/{key} and on no tool, so the
+ *     cleanup after any agent-side experiment needed a human with a REST client. It deletes through
+ *     services/storage-file-write.ts, the same removeStorageFile() the route now calls.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -28,7 +32,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { writeStorageFile, mintStorageUploadUrl } from '../services/storage-file-write.js';
+import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
@@ -197,6 +201,34 @@ export function registerCoreStorageTools(
                     },
                 ],
             };
+        },
+    );
+
+    // ── Tool 15: aimeat_storage_delete ──
+    // Own namespace only, unlike the download above. The read tool takes a reference because an agent
+    // legitimately reads its owner's uploads; nothing makes the same argument for deleting them, and
+    // a delete that could reach across owners on a permission meant for reading is the shape of an
+    // accident nobody can undo. The gates live in removeStorageFile().
+    mcp.tool(
+        'aimeat_storage_delete',
+        descriptionFor('aimeat_storage_delete'),
+        {
+            key: z.string().describe('Storage key in your own namespace. You can only delete files you uploaded.'),
+        },
+        annotationsFor('aimeat_storage_delete'),
+        async ({ key }) => {
+            const removed = await removeStorageFile(
+                { storage, config, emitResourceUpdated, emitResourceListChanged }, agentGaii, key,
+            );
+            if (!removed.ok) {
+                return { content: [{ type: 'text' as const, text: removed.message }], isError: true };
+            }
+            // Say what was destroyed, not just that something was. A caller that deleted the wrong
+            // key finds out here rather than the next time it looks for the file.
+            return jsonContent({
+                deleted: true, key: removed.key, size: removed.size,
+                mime_type: removed.mimeType, visibility: removed.visibility,
+            });
         },
     );
 }

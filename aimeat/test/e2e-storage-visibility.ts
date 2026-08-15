@@ -6,6 +6,9 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   v1.3.0 — 2026-08-15 — Phase 12: DELETE /v1/storage, which had no coverage at all. The one that
+ *     had to fail first is 54: reading a foreign file through /v1/pub must not make it deletable.
+ *     Same removeStorageFile() the new aimeat_storage_delete tool calls.
  *   v1.2.0 — 2026-08-11 — Phase 11: the headers every download path sends (August 2026 audit H-26).
  *     An uploaded text/html file comes back as an attachment, an uploaded image does not, and both
  *     carry nosniff and a file-only CSP, on /v1/pub, /v1/storage, HEAD, ranges and presigned URLs.
@@ -828,6 +831,91 @@ await test('51. Presigned /v1/download carries them as well', async () => {
     const res = await fetch(body.data.download_url as string);
     assert(res.status === 200, `download status ${res.status}`);
     assertFileHeaders(res, 'attachment', 'presigned html');
+});
+
+// ─── Phase 12: Delete ───
+// The capability had one door and no tool, and no test at all: nothing here asserted that DELETE
+// removes the bytes, that it refuses a key in someone else's namespace, or that a caller cannot
+// reach a foreign file through the permission that lets it READ one. `aimeat_storage_delete` and
+// the route now run the same removeStorageFile(), so these assertions cover both.
+console.log('\nPhase 12 — Delete');
+
+const deletableKey = `delete-me-${Date.now()}`;
+
+await test('52. Agent-A uploads a file to delete', async () => {
+    const { status, body } = await json('/v1/storage', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+        body: JSON.stringify({ key: deletableKey, data: testContentB64, mime_type: 'text/plain', visibility: 'public' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('53. Another owner\'s agent cannot delete it, and the file survives', async () => {
+    const { status } = await json(`/v1/storage/${encodeURIComponent(deletableKey)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${agentDToken}` },
+    });
+    // 404, not 403: the lookup is namespaced to the caller, so the file is not there to refuse.
+    assert(status === 404, `expected 404 for a foreign key, got ${status}`);
+    const still = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(deletableKey)}`);
+    assert(still.status === 200, `the file must still be readable, got ${still.status}`);
+});
+
+await test('54. Reading a foreign file does not imply deleting it (agent-D reads, then cannot remove)', async () => {
+    // Agent-D may read this public file through /v1/pub. That permission must not carry a delete.
+    const read = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(deletableKey)}`, {
+        headers: { Authorization: `Bearer ${agentDToken}` },
+    });
+    assert(read.status === 200, `agent-D can read it: ${read.status}`);
+    const { status } = await json(`/v1/storage/${encodeURIComponent(deletableKey)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${agentDToken}` },
+    });
+    assert(status === 404, `reading it must not make it deletable, got ${status}`);
+});
+
+await test('55. Delete without auth → 401', async () => {
+    const { status } = await json(`/v1/storage/${encodeURIComponent(deletableKey)}`, { method: 'DELETE' });
+    assert(status === 401, `expected 401, got ${status}`);
+});
+
+await test('56. The owner\'s own agent deletes it → 200, and says what it removed', async () => {
+    const { status, body } = await json(`/v1/storage/${encodeURIComponent(deletableKey)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.deleted === true && body.data.key === deletableKey, `envelope: ${JSON.stringify(body.data)}`);
+    // The size and type are read BEFORE the row goes, which is the only reason they can be reported.
+    assert(body.data.size === testContent.length, `size ${body.data.size}, expected ${testContent.length}`);
+    assert(String(body.data.mime_type).startsWith('text/plain'), `mime ${body.data.mime_type}`);
+});
+
+await test('57. The bytes are gone from both doors', async () => {
+    const own = await json(`/v1/storage/${encodeURIComponent(deletableKey)}`, {
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(own.status === 404, `own namespace after delete: ${own.status}`);
+    const pub = await rawFetch(`/v1/pub/${encodeURIComponent(agentAGaii)}/${encodeURIComponent(deletableKey)}`);
+    assert(pub.status === 404, `public URL after delete: ${pub.status}`);
+});
+
+await test('58. Deleting the same key again → 404 (the second call claims nothing)', async () => {
+    const { status } = await json(`/v1/storage/${encodeURIComponent(deletableKey)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
+await test('59. Deleting a key that never existed → 404, and the message names the reason', async () => {
+    const { status, body } = await json(`/v1/storage/${encodeURIComponent('no-such-file-' + Date.now())}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${agentAToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+    assert(String(body.error?.message).includes('your namespace'), `message should name the namespace: ${body.error?.message}`);
 });
 
 // ─── Cleanup ───

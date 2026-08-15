@@ -53,6 +53,13 @@
  *     comes from whoever uploaded it, and GET /v1/pub serves a public file to anyone from the apex
  *     origin, so uploaded text/html or image/svg+xml was a page running next to the portal's
  *     session. Images, media, PDFs and plain text still render inline; everything else downloads.
+ *   v1.12.0 -- 2026-08-15 -- DELETE goes through services/storage-file-write.ts removeStorageFile(),
+ *     which aimeat_storage_delete calls too: the capability had lived on this route alone, so an
+ *     agent could store a file over MCP and needed a human with a REST client to take it back. Two
+ *     things travelled with the move. The anonymous key fence was a hand-copied second copy here and
+ *     is now the same one the upload runs. And the response emitted only `emitChange('files')` while
+ *     the upload emits `files` and `memory` -- a delete frees bytes in the budget the memory view
+ *     renders exactly as an upload spends them, and the two views disagreed about it.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -69,7 +76,7 @@ import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
-import { writeStorageFile, mintStorageUploadUrl } from '../services/storage-file-write.js';
+import { writeStorageFile, mintStorageUploadUrl, removeStorageFile } from '../services/storage-file-write.js';
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
@@ -730,38 +737,22 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     });
 
     // DELETE /v1/storage/{*key} — delete file (agent auth)
+    // The key fence, the existence and ownership checks and the change events are the shared delete
+    // (services/storage-file-write.ts), which aimeat_storage_delete calls too. This handler parses
+    // the request and renders the answer.
     router.delete('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
         const gaii = resolve(req);
         const key = extractKey(req.params);
 
-        // Anonymous namespace enforcement
-        if (isAnonymousGaii(gaii) && !key.startsWith('anonymous/')) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only delete keys prefixed with "anonymous/"'));
+        const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key);
+        if (!removed.ok) {
+            res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
             return;
         }
 
-        // Defense-in-depth: verify ownership before deletion
-        const existing = await storage.getStorageFile(gaii, key);
-        if (!existing) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
-            return;
-        }
-        if (existing.ownerGaii !== resolve(req)) {
-            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only delete your own files'));
-            return;
-        }
-
-        const deleted = await storage.deleteStorageFile(gaii, key);
-        if (!deleted) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
-            return;
-        }
-
-        emitResourceUpdated(gaii, `aimeat://storage/${encodeURIComponent(key)}`);
-        emitResourceListChanged(gaii);
-
-        res.json(success(config.nodeId, { deleted: true, key }));
-        emitChange('files');
+        res.json(success(config.nodeId, {
+            deleted: true, key: removed.key, size: removed.size, mime_type: removed.mimeType,
+        }));
     });
 
     return router;

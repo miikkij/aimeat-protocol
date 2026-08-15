@@ -8,6 +8,7 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   v1.3.0 -- 2026-08-15 -- aimeat_storage_delete: DELETE /v1/storage/<key>, own namespace only.
  *   v1.2.0 -- 2026-08-11 -- aimeat_knowledge_contribute stops posting {entry_key, content} to
  *     POST /v1/knowledge/:id/contribute. That route shares a package with an organism and answered
  *     400 MISSING_FIELDS for every one of these calls, so the tool has never worked. It now says
@@ -188,6 +189,13 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const refKey = optionalString(input, 'owner') ? key : key.slice(slash + 1);
             return client.get(`/v1/pub/${encodeURIComponent(owner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`);
         },
+    },
+    {
+        // Own namespace only, so there is no /v1/pub twin here the way aimeat_storage_download has one.
+        name: 'aimeat_storage_delete',
+        handler: ({ client }, input) => client.delete(
+            `/v1/storage/${requiredString(input, 'key').split('/').map(encodeURIComponent).join('/')}`,
+        ),
     },
     {
         name: 'aimeat_admin_stats',

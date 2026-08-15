@@ -3,6 +3,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.1.0 — 2026-08-15 — aimeat_storage_delete, beside the upload and download it completes.
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
 
@@ -145,6 +146,15 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
             key: { type: 'string', required: true, description: 'Storage key in your own namespace, or a full "owner@node/path/file.pdf" reference.' },
             owner: { type: 'string', description: 'GHII/GAII that owns the file. Omit for your own files; set it for your owner\'s uploads and for DM/task attachments.' },
             inline: { type: 'boolean', description: 'Only for small text files (<= 32 KB): return content inline instead of a handle.' },
+        },
+    },
+    {
+        name: 'aimeat_storage_delete',
+        description: 'Delete one of your own stored files by key. Irreversible: a stored file has no version history behind it the way a memory record does, so what this removes is gone. Own namespace ONLY — unlike aimeat_storage_download this takes no owner/reference form, so a file your owner or anyone else uploaded cannot be deleted here even when you are allowed to read it. Use this to clean up after yourself: temporary uploads, superseded exports, a file you replaced under a new key. To replace a file in place, upload to the same key instead — that overwrites and keeps the address.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            key: { type: 'string', required: true, description: 'Storage key in your own namespace.' },
         },
     },
     {
