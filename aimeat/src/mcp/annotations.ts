@@ -21,6 +21,9 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   v1.x — 2026-08-16 — Annotations for the four incremental app-draft tools (write/replace/read/seed). draft_read is the only read-only one,
+ *     which is what a host's smart-approve mode reads to decide what runs without asking; the two
+ *     writing tools are NOT idempotent, because appending twice is the point.
  *   v1.x — 2026-08-15 — Annotation for aimeat_storage_delete: destructive, and idempotent only
  *     in the sense that the second call changes nothing (it answers 404).
  *   v1.x — 2026-08-13 — Annotations for aimeat_schedule_trigger and aimeat_agent_console_set.
@@ -235,6 +238,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_app_versions: { title: 'List App Versions', readOnlyHint: true },
     aimeat_app_publish: { title: 'Publish App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_draft_save: { title: 'Save App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    // append is not idempotent: calling it twice writes the chunk twice, which is the whole point of
+    // building a file across many calls. A client that retries on timeout must use expected_size_bytes.
+    aimeat_app_draft_write: { title: 'Write App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_app_draft_replace: { title: 'Replace In App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_app_draft_read: { title: 'Read App Draft', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_app_draft_seed: { title: 'Seed App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_app_draft_publish: { title: 'Publish App Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_app_draft_discard: { title: 'Discard App Draft', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_app_fork: { title: 'Fork App', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },

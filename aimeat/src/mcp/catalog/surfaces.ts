@@ -19,6 +19,10 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-08-16 — The four incremental app-draft tools (write/replace/read/seed) go in V2_EXCLUDED,
+ *     not on `appdev` where they belong. A v2 allowlist doubles as the connector's tool list and
+ *     the connector works over HTTP, so a tool with no REST twin cannot sit on one. They are on
+ *     /v1/mcp meanwhile; moving them onto `appdev` is the first thing their REST routes buy.
  *   2026-08-15 — Place aimeat_storage_delete beside upload and download on all four surfaces that
  *     already serve storage. An agent that may store a file may take it back; splitting those across
  *     surfaces would leave uploads a client cannot clean up.
@@ -54,6 +58,10 @@ export const V2_EXCLUDED: readonly string[] = [
     'aimeat_task_request_changes',
     // Connector-CLI-only convenience (no v2 MCP surface) — see definitions.ts.
     'aimeat_agent_statistics',
+    // Server MCP only until they have REST twins. A v2 surface is also the connector's tool list,
+    // and the connector reaches everything over HTTP, so a tool with no route cannot be on one.
+    // They are on /v1/mcp, which is what a hosted chat session and Claude Desktop both use.
+    'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
 ];
 
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */

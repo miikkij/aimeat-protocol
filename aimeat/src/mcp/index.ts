@@ -9,6 +9,8 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.14.0 -- 2026-08-16 -- registerAppDraftEditTools: the four incremental app-draft tools (write/replace/read/seed). They live in their own module
+ *     because apps.ts is already near the 800-line ceiling.
  *   v1.13.0 -- 2026-08-11 -- August audit step 8: registerAppdevProofTools receives the session
  *     scopes, the way the pitfall, knowledge and commerce registrations already do. The proof
  *     attach now writes through services/memory-write.ts, whose scope gate needs them.
@@ -85,6 +87,7 @@ import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
 import { registerAppsTools } from './apps.js';
+import { registerAppDraftEditTools } from './apps-draft-edit.js';
 import { registerSharingGroupTools } from './sharing-groups.js';
 import { registerAgentTaskTools } from './agent-tasks.js';
 import { registerAgentScheduleTools } from './agent-schedules.js';
@@ -217,6 +220,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerCapabilitiesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, getToken);
         registerCortexTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
         registerSharingGroupTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);

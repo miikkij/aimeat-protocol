@@ -69,6 +69,13 @@ const EXEMPT: Record<string, string> = {
         'The session and transport layer. It touches the chat instance on EVERY request to keep '
         + 'lastSeen current, so emitting here would be a frame per tool call rather than a change '
         + 'anyone asked about. The chat-instance tools emit for the acts a person cares about.',
+    'src/mcp/apps-draft-edit.ts':
+        'Every one of the four tools writes the DRAFT slot and nothing else, through stageAppDraft(). '
+        + 'That write is silent on both doors: PUT /v1/apps/:owner/:filename/draft emits nothing '
+        + 'either, because a draft is on no live surface — it is one owner\'s staging copy, and the '
+        + '\'apps\' frame belongs to the promotion (publishAppDraft) where the catalogue actually '
+        + 'changes. Emitting per chunk would also mean a frame per append while a 400 kB app is being '
+        + 'built. Silence here is parity with the REST twin, not a gap.',
     'src/mcp/capabilities.ts':
         'routes/capabilities.ts emits nothing either — a published capability is read through the '
         + 'catalogue, which is not SSE-backed. Silence here is parity, not a gap.',

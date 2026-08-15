@@ -221,6 +221,13 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // have to be re-minted at publish regardless, because the published bytes are the ones a reader
   // gets. One act, one record, at the moment the content reaches a person.
   'aimeat_app_draft_save',
+  // DECIDED, 2026-08-16. Same act, same reason, one call at a time: aimeat_app_draft_write appends a
+  // PIECE of a draft, and a record minted per chunk would describe a fragment that was never a
+  // readable page and that the next chunk changes. The published bytes are what a reader gets, and
+  // aimeat_app_draft_publish stamps those. Its siblings (replace, read, seed) move no authored prose
+  // of the caller's at all: replace names an exact passage, read returns what is already there, and
+  // seed copies bytes the publish path already stamped.
+  'aimeat_app_draft_write',
   'aimeat_app_template_propose',
   'aimeat_appdev_pitfall_report',
   'aimeat_board_create',

@@ -18,6 +18,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.11.0 -- 2026-08-16 -- the four incremental app-draft tools (write/replace/read/seed) all take app:write, including the read.
+ *     Reading your own unpublished draft is part of editing it, not a separate authority, and a
+ *     narrower scope would let an owner grant edits whose result the agent could not check.
  *   v1.10.0 -- 2026-08-15 -- aimeat_storage_delete -> storage:write, the same permission as the
  *     upload. Storing a file and taking it back are one authority over one namespace; a separate
  *     scope would let an owner grant an agent uploads it could never clean up.
@@ -128,6 +131,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_draft_discard:                 'app:write',
     aimeat_app_draft_publish:                 'app:write',
     aimeat_app_draft_save:                    'app:write',
+    aimeat_app_draft_write:                   'app:write',
+    aimeat_app_draft_replace:                 'app:write',
+    aimeat_app_draft_read:                    'app:write',
+    aimeat_app_draft_seed:                    'app:write',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
 
