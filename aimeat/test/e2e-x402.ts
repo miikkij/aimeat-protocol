@@ -195,6 +195,58 @@ await test('5. Replay the SAME proof on a fresh session → 402 (single-use nonc
     assert(ok.status === 200 && ok.body.data.session.status === 'completed', `fresh nonce settles: ${ok.status}`);
 });
 
+await test('5b. The SAME session cannot be completed twice, however fresh the proof', async () => {
+    // Test 5 proves the NONCE is single-use, on a fresh session each time. It says nothing about the
+    // session: no session in this suite is ever completed twice. Delete requireOpen(session) from
+    // completeSession (commerce/session-service.ts) and one settled session can be paid again and
+    // again with a fresh nonce, charging the buyer every time, with all of this file green.
+    const before = await json(`/v1/commerce/checkout-sessions/${sessionId}`, { headers: auth(buyer.token) });
+    assert(before.body.data.session.status === 'completed', `test 4 left it completed: ${before.body.data.session.status}`);
+    const receiptBefore = JSON.stringify(before.body.data.session.receipt ?? null);
+
+    const again = await json(`/v1/commerce/checkout-sessions/${sessionId}/complete`, {
+        method: 'POST',
+        headers: { ...auth(buyer.token), 'X-PAYMENT': buildXPayment(requirements, BUYER_WALLET, freshNonce()) },
+        body: JSON.stringify({}),
+    });
+    assert(again.status === 409 && again.body.error?.code === 'SESSION_NOT_OPEN',
+        `a completed session settled a second time: ${again.status} ${JSON.stringify(again.body.error)}`);
+
+    const after = await json(`/v1/commerce/checkout-sessions/${sessionId}`, { headers: auth(buyer.token) });
+    assert(JSON.stringify(after.body.data.session.receipt ?? null) === receiptBefore,
+        'the second settlement rewrote the receipt of the first');
+});
+
+await test('5c. A checkout session belongs to its buyer, and the seller is not the buyer', async () => {
+    // Every call in this file uses the buyer's own token. The seller owner exists and is never
+    // pointed at the buyer's session, so making getSession fall back to a node-wide lookup when the
+    // buyer-scoped read misses — the natural-looking fix for "the buyer's agent cannot find the
+    // session" — leaves any authenticated owner able to read, cancel or COMPLETE a stranger's
+    // session and receive the fulfilled resource.
+    const open = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ currency: 'USD', items: [{ agent: seller.vendorGaii, offer_id: 'usd-service' }] }),
+    });
+    assert(open.status === 201, `create ${open.status}: ${JSON.stringify(open.body.error)}`);
+    const theirs = open.body.data.session.id as string;
+
+    const read = await json(`/v1/commerce/checkout-sessions/${theirs}`, { headers: auth(seller.token) });
+    assert(read.status === 404 || read.status === 403, `the seller read the buyer's session: ${read.status}`);
+
+    const settle = await json(`/v1/commerce/checkout-sessions/${theirs}/complete`, {
+        method: 'POST',
+        headers: { ...auth(seller.token), 'X-PAYMENT': buildXPayment(requirements, BUYER_WALLET, freshNonce()) },
+        body: JSON.stringify({}),
+    });
+    assert(settle.status === 404 || settle.status === 403,
+        `the seller completed the buyer's session: ${settle.status} ${JSON.stringify(settle.body.error)}`);
+
+    // And the session is untouched: still the buyer's to pay.
+    const mine = await json(`/v1/commerce/checkout-sessions/${theirs}`, { headers: auth(buyer.token) });
+    assert(mine.status === 200 && mine.body.data.session.status === 'open',
+        `the stranger's attempt moved it: ${mine.status} ${mine.body.data?.session?.status}`);
+});
+
 await test('6. A seller with no USDC address → 422 SELLER_NO_X402_ADDRESS (payTo gate)', async () => {
     const stripeSeller = await sellerWithUsdOffer('n', 'usd-service', PRICE_MICROS, { provider: 'stripe', secretKey: 'sk_test_x' });
     const create = await json('/v1/commerce/checkout-sessions', {

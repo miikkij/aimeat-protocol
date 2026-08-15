@@ -350,12 +350,31 @@ await test('The same share cannot be released twice over MCP', async () => {
 });
 
 await test('Withdrawing a split over MCP leaves accrued shares standing', async () => {
+    // This read the MORSELS bucket, and everything in this file is EUR — the test three above asserts
+    // that no morsels move on a money release. totalsOf buckets by currency
+    // (commerce/beneficiary-book.ts), so both sides were `undefined ?? 0` and the assertion was
+    // 0 === 0: making the removal delete or zero the beneficiary's ledger entries kept it green while
+    // the money book was wiped. The EUR bucket is where this suite's money is.
     const before = await benefAgent.session.call('aimeat_commerce_beneficiary_earnings', {});
-    const releasedBefore = before.data.totals?.morsels?.released ?? 0;
+    const eurBefore = before.data.totals?.EUR;
+    assert(eurBefore && Number(eurBefore.released) > 0,
+        `there is EUR to protect before the withdrawal: ${JSON.stringify(before.data.totals)}`);
+
     const r = await provAgent.session.call('aimeat_commerce_beneficiary_splits', { remove_ext: EXT, remove_action: 'lookup' });
     assert(!r.isError && r.data.removed === true, `remove errored: ${r.text}`);
+
     const after = await benefAgent.session.call('aimeat_commerce_beneficiary_earnings', {});
-    assert((after.data.totals?.morsels?.released ?? 0) === releasedBefore, 'what was earned survives the withdrawal');
+    const eurAfter = after.data.totals?.EUR;
+    assert(Number(eurAfter?.released) === Number(eurBefore.released),
+        `released EUR changed: ${JSON.stringify(eurBefore)} -> ${JSON.stringify(eurAfter)}`);
+    assert(Number(eurAfter?.accrued) === Number(eurBefore.accrued),
+        `accrued EUR changed: ${JSON.stringify(eurBefore)} -> ${JSON.stringify(eurAfter)}`);
+
+    // And the entry itself is still there to point at, not merely a total that happens to agree.
+    const entries = (after.data.entries ?? after.data.items ?? []) as any[];
+    assert(entries.some(e => (e.tracking_code ?? e.trackingCode) === trackingCode),
+        `the released entry for ${trackingCode} survived: ${JSON.stringify(entries.slice(0, 3))}`);
+
     const gone = await provAgent.session.call('aimeat_commerce_beneficiary_splits', { remove_ext: EXT, remove_action: 'lookup' });
     assert(gone.isError && /NOT_FOUND/.test(gone.text), `second removal should 404, got ${gone.text}`);
 });

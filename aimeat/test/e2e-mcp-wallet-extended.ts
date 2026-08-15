@@ -272,6 +272,73 @@ await test('5. aimeat_wallet_transactions transaction shape has required fields'
     assert(typeof tx.timestamp === 'string', `tx.timestamp should be string, got: ${typeof tx.timestamp}`);
 });
 
+// ─── The other half of "scope-gated": an agent that was NOT given the word ───
+//
+// Test 1 asserts the tool IS present for an agent registered with the `wallet` capability, and no
+// agent without it is ever built here. The handler in src/mcp/wallet-extended.ts does no scope check
+// of its own — it goes straight to storage.getTransactions, unlike its HTTP twin GET
+// /v1/wallet/transactions which carries requireScope('wallet:read') — so the registration filter is
+// the ENTIRE gate. Delete the `aimeat_wallet_transactions: 'wallet:read'` entry from
+// mcp/catalog/scopes.ts and every agent the owner ever connected reads the whole morsel ledger:
+// counterparties, tracking codes, amounts. All eleven tests stay green.
+await test('12. An agent WITHOUT wallet:read neither sees the tool nor can call it', async () => {
+    const reg = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: 'mcpwltxnarrow', owner: ownerName,
+            capabilities: ['memory'], model: 'gpt-4o', scopes: ['memory:read'],
+        }),
+    });
+    assert(reg.status === 201, `narrow agent ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const narrowGaii = reg.body.data.agent.gaii as string;
+    const narrowKey = reg.body.data.private_key as string;
+
+    const client = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'narrow', redirect_uris: [] }) });
+    const ts = new Date().toISOString();
+    const sig = await signMsg(narrowKey, narrowGaii + NODE_ID + ts);
+    const authz = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: client.body.client_id, gaii: narrowGaii, signature: sig, timestamp: ts })}`);
+    const tok = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: authz.body.code, client_id: client.body.client_id, client_secret: client.body.client_secret }),
+    });
+    const narrowToken = tok.body.access_token as string;
+    assert(typeof narrowToken === 'string', `narrow mcp token: ${JSON.stringify(tok.body)}`);
+
+    // Its own session, so the tool list is the one this agent was served.
+    let narrowSession = '';
+    const rpc = async (method: string, params: Record<string, unknown>, id: number) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+                Authorization: `Bearer ${narrowToken}`,
+                ...(narrowSession ? { 'mcp-session-id': narrowSession, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        const sid = res.headers.get('mcp-session-id');
+        if (sid) narrowSession = sid;
+        const ct = res.headers.get('content-type') ?? '';
+        return ct.includes('text/event-stream')
+            ? (parseSSE(await res.text()).find((m: any) => m.id === id) ?? {})
+            : await res.json() as any;
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'narrow', version: '1.0.0' } }, 200);
+
+    const list = await rpc('tools/list', {}, 201);
+    const names = (list.result?.tools ?? []).map((t: any) => t.name);
+    assert(names.length > 0, 'the narrow agent was served a tool surface at all');
+    assert(!names.includes('aimeat_wallet_transactions'),
+        'an agent without wallet:read was handed the owner\'s ledger tool');
+
+    // Absence from the list is the registration filter. A client that already knows the name does not
+    // read the list, so the call has to fail too — and this handler has no check of its own.
+    const call = await rpc('tools/call', { name: 'aimeat_wallet_transactions', arguments: {} }, 202);
+    assert(call.error !== undefined || call.result?.isError === true,
+        `the narrow agent CALLED the ledger tool: ${JSON.stringify(call).slice(0, 200)}`);
+});
+
 // ─── Summary ───
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

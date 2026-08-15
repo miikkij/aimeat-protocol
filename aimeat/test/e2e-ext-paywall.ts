@@ -64,6 +64,10 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'paidcall', method: 'POST', path: '/paidcall', script: 'echo', commercial: { payMorsels: 5 } },
     { id: 'tollcall', method: 'POST', path: '/tollcall', script: 'echo', tollMorsels: 2 },
     { id: 'moneycall', method: 'POST', path: '/moneycall', script: 'echo', commercial: { payMoney: { amount: 500000, currency: 'EUR' } } },
+    // A SECOND money-priced action, identical in price, so a token bought for one can be offered to
+    // the other. Without it the suite can only ever spend a token on the action it was bought for,
+    // which is the half of the binding it already proved.
+    { id: 'moneycall2', method: 'POST', path: '/moneycall2', script: 'echo', commercial: { payMoney: { amount: 500000, currency: 'EUR' } } },
     // Priced far above a welcome bonus (100) to prove the insufficient-balance 402, but under
     // the node's manifest price ceiling — the point is that the caller cannot afford it, not that
     // the number is astronomical.
@@ -163,6 +167,55 @@ if (!moneyEnabled) {
   await test('Money chain: REPLAY the same token → 402 (single-use)', async () => {
     const r = await json(`/v1/ext/${EXT}/moneycall`, { method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': payToken }, body: JSON.stringify({ hi: 1 }) });
     assert(r.status === 402, `expected 402 on replay, got ${r.status}`);
+  });
+
+  // WHAT THE TOKEN IS BOUND TO. Single use was proved; the binding was not. consumeExtPayToken
+  // (services/ext-pay-token.ts) checks buyerOwner, ext and action, and this suite only ever spent the
+  // moneycall token on moneycall, as its own buyer. Delete that comparison and one 0.50 EUR checkout
+  // settles any priced action of any extension, for anybody — with every test in this file green,
+  // because none of them ever offers a token anywhere else.
+  /** Buy one pay token for `moneycall` as the caller. Each binding case gets its own, so a refusal
+   *  that also consumes the token cannot be mistaken for the binding holding. */
+  const buyToken = async (): Promise<string> => {
+    const open = await json('/v1/commerce/checkout-sessions', {
+      method: 'POST', headers: auth(caller.token),
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: EXT, tool: 'moneycall' }] }),
+    });
+    assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
+    const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
+      method: 'POST', headers: auth(caller.token), body: JSON.stringify({ payment: { handler: 'test.money' } }),
+    });
+    const t = done.body.data.session.fulfillment?.results?.[0]?.result?.pay_token as string;
+    assert(typeof t === 'string' && t.length > 0, `pay token: ${JSON.stringify(done.body.data.session.fulfillment)}`);
+    return t;
+  };
+
+  await test('Money chain: a token bought for one action does not pay for another', async () => {
+    const t = await buyToken();
+    const wrongAction = await json(`/v1/ext/${EXT}/moneycall2`, {
+      method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
+    });
+    assert(wrongAction.status === 402, `a moneycall token paid for moneycall2: ${wrongAction.status}`);
+  });
+
+  await test('Money chain: a token bought by one buyer does not pay for another buyer', async () => {
+    // The token is the buyer's receipt, not a bearer coupon: whoever holds the string must not be
+    // able to spend somebody else's purchase.
+    const t = await buyToken();
+    const third = await setupOwner('third');
+    const wrongBuyer = await json(`/v1/ext/${EXT}/moneycall`, {
+      method: 'POST', headers: { ...auth(third.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
+    });
+    assert(wrongBuyer.status === 402, `another owner spent the caller's token: ${wrongBuyer.status}`);
+  });
+
+  await test('Money chain: and a token IS good for what it was bought for (the control)', async () => {
+    // Without this the two refusals above are satisfied by a token that never worked at all.
+    const t = await buyToken();
+    const right = await json(`/v1/ext/${EXT}/moneycall`, {
+      method: 'POST', headers: { ...auth(caller.token), 'x-aimeat-pay-token': t }, body: JSON.stringify({ hi: 1 }),
+    });
+    assert(right.status === 200, `a freshly bought token did not pay for its own action: ${right.status}`);
   });
 }
 
