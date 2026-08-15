@@ -234,6 +234,20 @@ export async function validateWorkflow(
           if (!declaredVars.has(v)) errors.push(`step "${step.id}": input or result_to_key references undeclared var "{${v}}"`);
         }
       }
+      if (a.kind === 'datapackage') {
+        // `changes` is refused at SAVE as well as at publish. The publish contract requires it, and
+        // a workflow that only discovers that at 06:00 has already lost the run it was written for.
+        if (!a.name?.trim()) errors.push(`step "${step.id}": a datapackage step needs a package name`);
+        if (!a.from_key?.trim()) errors.push(`step "${step.id}": a datapackage step needs from_key — the owner-namespace key an earlier step wrote`);
+        if (!a.changes?.trim()) {
+          errors.push(`step "${step.id}": a datapackage step needs changes — every version says what moved against the previous one, and a version nobody explained is one a consumer cannot decide about`);
+        }
+        for (const v of collectVarRefs([a.from_key ?? '', a.changes ?? '', a.name ?? ''])) {
+          if (!declaredVars.has(v)) errors.push(`step "${step.id}": references undeclared var "{${v}}"`);
+        }
+        // Its deliverable is the package, not a memory key, so there is nothing for the default
+        // key-signal to read. The step's own outcome is the gate: a publish that refused threw.
+      }
       if (a.kind === 'human-input') {
         // The answer key is the step's deliverable: fresh clears it, skip_done greens on an existing
         // answer without re-asking, signals-only checks it — all via the synthesized success_signal.

@@ -27,6 +27,7 @@ import { collectSignalKeys, runKey, type ResolvedStep } from './store.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
 import { runExtensionActionAsSystem } from '../extension-system-run.js';
+import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -57,6 +58,12 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
   // ecosystem step, so its success_signal decides green or red the same way.
   if (step.action?.kind === 'extension') {
     dispatchExtensionStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
+    return [];
+  }
+  // A datapackage step publishes what an earlier step produced. Also here rather than over a wire:
+  // it reads an owner-namespace key and calls the same publish the REST route calls.
+  if (step.action?.kind === 'datapackage') {
+    dispatchDataPackageStep(deps, ownerGhii, run, step, step.action, onPushTerminal);
     return [];
   }
   // Ecosystem action steps push to / invoke a GEAI over the tunnel; completion arrives via the
@@ -215,6 +222,110 @@ export function dispatchExtensionStep(
       // The reason has to survive: a red step with no message sends the owner to the run log for a
       // sentence that was thrown away here.
       logger.warn(`workflow ${workflowId} run ${runId}: extension step "${stepId}" failed`, { error: String(err) });
+      return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);
+    });
+}
+
+/** Walk a dotted path into a value. Returns undefined the moment a segment is missing, so a caller
+ *  can tell "the path is wrong" from "the array was empty" — which are different bugs. */
+function atPath(value: unknown, path: string | undefined): unknown {
+  if (!path) return value;
+  let cursor: unknown = value;
+  for (const segment of path.split('.')) {
+    if (cursor === null || typeof cursor !== 'object') return undefined;
+    cursor = (cursor as Record<string, unknown>)[segment];
+  }
+  return cursor;
+}
+
+/**
+ * Run a `datapackage` step: publish one version from what an earlier step wrote.
+ *
+ * THIS IS THE BINDING A REPEATING PACKAGE NEEDS, and it is the join no other component could make.
+ * An extension step lands its return value in the OWNER'S namespace as a private record — right,
+ * because an intermediate result is not something to publish — and that is precisely what the
+ * sandbox cannot read back: `ctx.memory.get` sees `ext:{name}`, `ctx.memory.getPublic` returns only
+ * public records. So the two halves, "call the producer" and "publish what it returned", can only
+ * meet in the engine, which already runs as the owner and already wrote that key.
+ *
+ * It calls the same publishPackage() the REST route and the sandbox capability call, so a package a
+ * workflow refreshes weekly is the same object, at the same kind of address, as one a person
+ * published from the app. The producer block records that a workflow made it, and the schedule that
+ * drives the workflow rides along — a buyer choosing between two packages can see which is which.
+ *
+ * REFUSALS ARE RED, and loudly. A quality-gate refusal throws with the coordinates in the message:
+ * nothing was written, the package still stands on its previous version, and the step is red rather
+ * than green-with-nothing-produced. `recordFailure` puts the same sentence on the package's own
+ * pointer, so an owner looking at the package — not at a run log — learns that the latest attempt
+ * broke and which version they are still on.
+ */
+export function dispatchDataPackageStep(
+  deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep,
+  action: Extract<NonNullable<WorkflowStep['action']>, { kind: 'datapackage' }>,
+  onPushTerminal: OnPushTerminal,
+): void {
+  const { workflowId, runId } = run;
+  const stepId = step.id;
+  const name = template(action.name, run.vars);
+
+  const fire = async (): Promise<void> => {
+    const key = (run.keyPrefix ?? '') + template(action.from_key, run.vars);
+    const record = await deps.storage.getMemory(ownerGhii, key);
+    if (!record) {
+      throw new Error(`no value at "${key}" — the step that produces it either did not run or wrote somewhere else`);
+    }
+    const found = atPath(record.value, action.rows_at);
+    if (found === undefined) {
+      throw new Error(`"${key}" has nothing at path "${action.rows_at}". A producer usually answers with an `
+        + 'envelope, so name the path to the table inside it.');
+    }
+    if (!Array.isArray(found)) {
+      throw new Error(`"${key}"${action.rows_at ? ` at "${action.rows_at}"` : ''} is ${typeof found}, not an array of rows`);
+    }
+    const out = await publishPackage(
+      { storage: deps.storage, config: deps.config },
+      ownerGhii,
+      {
+        name,
+        changes: template(action.changes, run.vars),
+        resources: [{
+          name: action.resource ?? 'rows',
+          rows: found as Array<Record<string, unknown>>,
+          // Declared when the step says so. Inference is the convenient default and the wrong
+          // one for a repeating producer: it widens to fit whatever arrived, so a bad run
+          // changes a column's type instead of being refused.
+          schema: (action.schema as never) ?? 'infer',
+        }],
+        ...(action.title ? { title: action.title } : {}),
+        ...(action.description ? { description: action.description } : {}),
+        ...(action.provenance ? { provenance: action.provenance as never } : {}),
+        ...(action.retention_policy ? { retentionPolicy: action.retention_policy as never } : {}),
+      },
+      {
+        gaii: ownerGhii,
+        kind: 'workflow',
+        ref: `${workflowId}/${stepId}`,
+        run: runId,
+        ...(run.defSnapshot.trigger?.kind === 'schedule' ? { schedule: run.defSnapshot.trigger.cron } : {}),
+      },
+    );
+    if (!out.ok) {
+      const detail = out.issues?.length
+        ? ` First: row ${out.issues[0].row ?? '?'}, field "${out.issues[0].field ?? '?'}" — ${out.issues[0].message}`
+        : '';
+      // On the package's own pointer, not only in the run log: an owner watching the package has to
+      // be able to see that the newest attempt failed and which version they are still reading.
+      await recordFailure({ storage: deps.storage, config: deps.config }, ownerGhii, name, out.message + detail);
+      throw new Error(`${out.code}: ${out.message}${detail}`);
+    }
+    logger.info(`workflow ${workflowId} run ${runId}: published ${out.descriptor.aimeat.packageId}`,
+      { contentHash: out.contentHash, unchanged: out.unchanged, rows: out.resources[0]?.rowCount });
+  };
+
+  fire()
+    .then(() => onPushTerminal(ownerGhii, workflowId, runId, stepId, true))
+    .catch(async err => {
+      logger.warn(`workflow ${workflowId} run ${runId}: datapackage step "${stepId}" failed`, { error: String(err) });
       return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);
     });
 }

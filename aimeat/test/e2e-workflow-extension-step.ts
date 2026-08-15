@@ -87,6 +87,21 @@ const SCRIPTS = {
   // guest's `undefined` arrives as the four characters "undefined" — see test 6b.
   sloppy: `export default async function(ctx, input){ var out = await ctx.files.write(input.key, input.b64, { mime: 'text/csv' }); return { wrote: out.key }; }`,
   probe: `export default async function(ctx){ return { gaii: ctx.caller.gaii, roles: ctx.caller.roles, hasFiles: !!ctx.files, hasWallet: !!(ctx.wallet && ctx.wallet.consume) }; }`,
+  // A REAL producer's shape: an envelope with the table inside it, which is why a datapackage step
+  // names a path rather than assuming the value is the array.
+  rows: `export default async function(ctx, input){
+    var n = input.n || 3;
+    var out = [];
+    for (var i = 0; i < n; i++) out.push({ vnr: '00' + (1000 + i), company: 'Firma ' + (i % 2), days: i * 7, active: i % 2 === 0 });
+    return { ok: true, total: out.length, results: out };
+  }`,
+  // The same envelope with a word where a number belongs: the quality gate's case.
+  badrows: `export default async function(){
+    return { ok: true, total: 2, results: [
+      { vnr: '001000', company: 'Firma 0', days: 7, active: true },
+      { vnr: '001001', company: 'Firma 1', days: 'seitseman', active: false }
+    ] };
+  }`,
 };
 
 const manifest = (name: string) => JSON.stringify({
@@ -97,6 +112,8 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'boom', method: 'POST', path: '/boom', script: 'boom' },
     { id: 'sloppy', method: 'POST', path: '/sloppy', script: 'sloppy' },
     { id: 'probe', method: 'POST', path: '/probe', script: 'probe' },
+    { id: 'rows', method: 'POST', path: '/rows', script: 'rows' },
+    { id: 'badrows', method: 'POST', path: '/badrows', script: 'badrows' },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 8000, max_api_calls: 4 },
@@ -368,6 +385,111 @@ await test('11. A stranger cannot read the result key the engine wrote for the o
   const path = `/v1/memory/${encodeURIComponent(owner.gaii)}/${encodeURIComponent(RESULT_KEY)}`;
   const denied = await json(path, { headers: auth(stranger.token) });
   assert(denied.status === 403, `a second owner must be refused, got ${denied.status}`);
+});
+
+await test('12. THE BINDING: a producer step and a datapackage step make a repeating package', async () => {
+  // The join no other component could make. An extension step lands its result in the OWNER'S
+  // namespace as a PRIVATE record — which the sandbox cannot read back, by design — so "call the
+  // producer, then publish what it returned" can only be composed here.
+  const PKG = `wfpkg${Date.now()}`;
+  const def = {
+    title: { en_US: 'Producer to package' }, description: { en_US: 'the binding' },
+    trigger: { kind: 'manual' }, vars: [{ name: 'day', type: 'string', description: { en_US: 'day' }, default: '2026-08-16' }],
+    on_step_fail: 'inspect',
+    steps: [
+      {
+        id: 'fetch', description: { en_US: 'Ask the producer' }, required_to_function: 'none',
+        action: { kind: 'extension', extension: EXT, action: 'rows', input: { n: 4 }, result_to_key: 'bind.raw' },
+      },
+      {
+        id: 'publish', description: { en_US: 'Publish what it returned' }, after: ['fetch'], required_to_function: 'none',
+        action: {
+          kind: 'datapackage', name: PKG, from_key: 'bind.raw', rows_at: 'results',
+          changes: 'Refreshed on {day} from the producer.',
+          title: 'Bound package',
+          provenance: { license: 'CC-BY-4.0', legalBasis: 'test' },
+        },
+      },
+    ],
+  };
+  const save = await json('/v1/workflows/bind-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  assert(save.status === 200, `save: expected 200, got ${save.status}: ${JSON.stringify(save.body?.data?.errors ?? save.body?.error)}`);
+
+  const r = await json('/v1/workflows/bind-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const runId = r.body.data.run?.runId ?? r.body.data.runId;
+  const run = await settle('bind-wf', runId, owner.token);
+  assert(run.steps.publish.state === 'green', `publish step ${run.steps.publish.state}: ${JSON.stringify(run.steps.publish.outputObserved ?? {})}`);
+
+  // The package exists, at a real address, with the rows the producer returned.
+  const pkg = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  assert(pkg.status === 200, `package ${pkg.status}: ${JSON.stringify(pkg.body?.error)}`);
+  const d = pkg.body.data.descriptor;
+  assert(d.resources[0].rowCount === 4, `4 rows from the producer, got ${d.resources[0].rowCount}`);
+  // The producer block records WHICH road made it — a buyer choosing between packages sees that.
+  assert(d.aimeat.producer.kind === 'workflow', `producer kind ${d.aimeat.producer.kind}`);
+  assert(d.aimeat.producer.ref === `bind-wf/publish`, `producer ref ${d.aimeat.producer.ref}`);
+  // {day} was templated into the mandatory explanation, so a repeating package explains each run.
+  assert(d.aimeat.changes.includes('2026-08-16'), `changes not templated: ${d.aimeat.changes}`);
+  // The types came from the rows, so a reader gets a schema rather than a wall of strings.
+  const types = Object.fromEntries(d.resources[0].schema.fields.map((f: { name: string; type: string }) => [f.name, f.type]));
+  assert(types.days === 'integer' && types.active === 'boolean' && types.vnr === 'string',
+    `schema did not survive: ${JSON.stringify(types)}`);
+});
+
+await test('12b. A refused publish is RED, and the package stands on its previous version', async () => {
+  // The whole design in one test: a producer whose data went bad must not produce a version, must
+  // not go green, and must leave a consumer reading the last good bytes.
+  const PKG = `wfbad${Date.now()}`;
+  const good = {
+    title: { en_US: 'Good then bad' }, description: { en_US: 'gate' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [
+      { id: 'fetch', description: { en_US: 'ask' }, required_to_function: 'none',
+        action: { kind: 'extension', extension: EXT, action: 'rows', input: { n: 3 }, result_to_key: 'bad.raw' } },
+      { id: 'publish', description: { en_US: 'publish' }, after: ['fetch'], required_to_function: 'none',
+        // DECLARED, not inferred. Inference would widen `days` to string the moment a word arrived
+        // and the bad run would publish happily — the whole point of the gate is that it cannot.
+        action: { kind: 'datapackage', name: PKG, from_key: 'bad.raw', rows_at: 'results', changes: 'First version.',
+          schema: { fields: [{ name: 'vnr', type: 'string' }, { name: 'company', type: 'string' },
+                             { name: 'days', type: 'integer' }, { name: 'active', type: 'boolean' }] } } },
+    ],
+  };
+  const s1 = await json('/v1/workflows/bad-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(good) });
+  assert(s1.status === 200, `save: expected 200, got ${s1.status}: ${JSON.stringify(s1.body?.data?.errors ?? s1.body?.error)}`);
+  const first = await json('/v1/workflows/bad-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  assert(first.status === 200, `run ${first.status}: ${JSON.stringify(first.body?.error)}`);
+  await settle('bad-wf', first.body.data.run?.runId ?? first.body.data.runId, owner.token);
+  const before = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  assert(before.status === 200, 'the first version published');
+  const firstHash = before.body.data.descriptor.aimeat.contentHash;
+
+  // Same package, same schema shape, one word where a number belongs.
+  const bad = { ...good, steps: [
+    { ...good.steps[0], action: { ...good.steps[0].action, action: 'badrows' } },
+    { ...good.steps[1], action: { ...good.steps[1].action, changes: 'A run whose upstream sent a word.' } },
+  ] };
+  const s2 = await json('/v1/workflows/bad-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(bad) });
+  assert(s2.status === 200, `a re-save updates: expected 200, got ${s2.status}: ${JSON.stringify(s2.body?.data?.errors ?? s2.body?.error)}`);
+  const second = await json('/v1/workflows/bad-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const run = await settle('bad-wf', second.body.data.run?.runId ?? second.body.data.runId, owner.token);
+
+  assert(run.steps.publish.state !== 'green', `a refused publish went ${run.steps.publish.state}`);
+  const after = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  assert(after.body.data.descriptor.aimeat.contentHash === firstHash,
+    'the package must still stand on its previous version');
+  // …and the failure is on the PACKAGE's own pointer, not only in a run log: an owner looking at
+  // the package learns the newest attempt broke and which version they are still reading.
+  assert(after.body.data.latest?.lastError?.message, `no lastError on the pointer: ${JSON.stringify(after.body.data.latest)}`);
+});
+
+await test('12c. A datapackage step with no changes is refused at SAVE', async () => {
+  const def = {
+    title: { en_US: 'No explanation' }, description: { en_US: 'x' }, trigger: { kind: 'manual' }, vars: [],
+    steps: [{ id: 'p', description: { en_US: 'p' }, required_to_function: 'none',
+      action: { kind: 'datapackage', name: 'somepkg', from_key: 'x.y', changes: '' } }],
+  };
+  const r = await json('/v1/workflows/nochanges-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  assert(r.status === 400, `expected 400, got ${r.status}`);
 });
 
 await test('Cleanup', async () => {

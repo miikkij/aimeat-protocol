@@ -175,7 +175,50 @@ export type WorkflowStepAction =
   // human-input step — and the signal gates on that. A step must declare either this or its own
   // success_signal; with neither, the only thing left to green on is "the script returned", which is
   // the covering fallback this design exists to remove.
-  | { kind: 'extension'; extension: string; action: string; instance_id?: string; input?: Record<string, unknown>; result_to_key?: string };
+  | { kind: 'extension'; extension: string; action: string; instance_id?: string; input?: Record<string, unknown>; result_to_key?: string }
+  // Publish one version of a data package from what an earlier step produced.
+  //
+  // WHY THIS IS A STEP KIND AND NOT AN EXTENSION. The binding a repeating package needs is "call the
+  // producer, then publish what it returned", and the two halves cannot be joined any other way. An
+  // extension step already writes its return value to `result_to_key` in the OWNER'S namespace, as a
+  // PRIVATE record — which is right, since an intermediate result is not something to publish. But
+  // that is also exactly what the sandbox cannot read: `ctx.memory.get` reads `ext:{name}`, and
+  // `ctx.memory.getPublic` returns only public records. So a publisher EXTENSION could never see the
+  // rows, and the alternatives are worse: widening the sandbox to read an owner's private keys, or
+  // making intermediate results public. The engine already runs as the owner and already reads that
+  // key, so the join belongs here.
+  //
+  // `rows_at` is a dotted path INTO the step's result, because a producer answers with an envelope
+  // (`{ ok, total, results }`) far more often than with a bare array. Naming the path is how a
+  // workflow says which part of the answer is the table.
+  | {
+      kind: 'datapackage';
+      /** Package name — becomes part of the permanent address, so it is not a sentence. */
+      name: string;
+      /** Owner-namespace key an earlier step wrote (templated, keyPrefix honoured). */
+      from_key: string;
+      /** Dotted path to the rows inside that value. Omit when the value IS the array. */
+      rows_at?: string;
+      /**
+       * The Table Schema this package's rows must satisfy. Omitting it INFERS from the rows, and for
+       * a repeating producer that is the wrong default even though it is the convenient one:
+       * inference widens to fit whatever arrived, so a run where the upstream sent a word instead of
+       * a number produces a version whose column is quietly a string, and every consumer's join
+       * against it stops matching without an error anywhere. Declare it, and the same run is refused
+       * with the row and the field named, and the package stands on its previous version.
+       *
+       * Shape-checked by the publish service, which owns that contract. Typing it loosely here is
+       * deliberate: two definitions of a Table Schema in two files is how they drift apart.
+       */
+      schema?: { fields: Array<{ name: string; type: string }> };
+      /** REQUIRED by the publish contract: what moved against the previous version and why. */
+      changes: string;
+      title?: string;
+      description?: string;
+      resource?: string;
+      provenance?: Record<string, unknown>;
+      retention_policy?: { keep: number; unit: string };
+    };
 
 export interface WorkflowStep {
   id: string;                         // stable; marks "what happened where" per run
@@ -398,6 +441,28 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     /** Owner-namespace key the action's return value is written to, so a signal can gate on it.
      *  See the type above for why an extension step needs this and an agent step does not. */
     result_to_key: z.string().min(1).max(400).optional(),
+  }),
+  z.object({
+    kind: z.literal('datapackage'),
+    // Part of the permanent address, so it is a name rather than a sentence: the same shape the
+    // publish route enforces.
+    name: z.string().min(2).max(64).regex(/^[a-z0-9][a-z0-9-]*$/),
+    /** The owner-namespace key an earlier step wrote (its `result_to_key`), {var}-templated. */
+    from_key: z.string().min(1).max(400),
+    /** Dotted path to the rows INSIDE that value — a producer answers with an envelope far more
+     *  often than with a bare array. Omit when the value is the array itself. */
+    rows_at: z.string().min(1).max(200).optional(),
+    /** A declared Table Schema. Shape-checked by the publish service, which owns that contract;
+     *  validating it twice, in two places, is how the two definitions drift apart. */
+    schema: z.object({ fields: z.array(z.object({ name: z.string().min(1), type: z.string().min(1) }).loose()).min(1) }).loose().optional(),
+    /** Required, and required here rather than only at publish: a workflow that discovers the
+     *  contract at 06:00 has already lost the run it was written for. */
+    changes: z.string().min(1).max(2000),
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().min(1).max(2000).optional(),
+    resource: z.string().min(2).max(64).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
+    provenance: z.record(z.string().max(60), z.unknown()).optional(),
+    retention_policy: z.object({ keep: z.number().int().min(0), unit: z.string().min(1).max(20) }).optional(),
   }),
 ]);
 

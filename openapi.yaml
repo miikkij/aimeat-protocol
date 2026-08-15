@@ -4066,7 +4066,7 @@ components:
             else's capability, API keys and quota.
           required: [kind]
           properties:
-            kind: { type: string, enum: [agent, export-out, trigger-geai, human-input, extension] }
+            kind: { type: string, enum: [agent, export-out, trigger-geai, human-input, extension, datapackage] }
             geai: { type: string, description: 'export-out / trigger-geai: the target GEAI.' }
             capability: { type: string, description: 'trigger-geai (required) / export-out (default __deposit__).' }
             from: { type: string, description: 'export-out: owner memory key whose value is pushed.' }
@@ -4089,6 +4089,68 @@ components:
                 workflow's signals read owner scope, and those never intersect: a signal pointed at what
                 the extension wrote for itself can only read nothing. Absent `success_signal`, the
                 default gate is that this key is non-empty. A step must declare one or the other.
+            name:
+              type: string
+              maxLength: 64
+              pattern: '^[a-z0-9][a-z0-9-]*$'
+              description: >-
+                datapackage: the package name. It becomes part of the permanent address, so it is a
+                name rather than a sentence.
+            from_key:
+              type: string
+              maxLength: 400
+              description: >-
+                datapackage: the owner-namespace key an earlier step wrote (its `result_to_key`),
+                {var}-templated. This is the join a repeating package needs and the one no other
+                component can make: an extension step lands its result in the owner's namespace as a
+                PRIVATE record, which the sandbox cannot read back (ctx.memory.get sees `ext:{name}`,
+                getPublic returns only public records). The engine already runs as the owner and
+                already wrote that key.
+            rows_at:
+              type: string
+              maxLength: 200
+              description: >-
+                datapackage: dotted path to the rows INSIDE that value. A producer answers with an
+                envelope (`{ ok, total, results }`) far more often than with a bare array, so naming
+                the path is how a workflow says which part of the answer is the table. Omit when the
+                value is the array itself.
+            changes:
+              type: string
+              maxLength: 2000
+              description: >-
+                datapackage: what moved against the previous version and why, {var}-templated.
+                Required, and required at SAVE as well as at publish — a workflow that discovers the
+                contract at 06:00 has already lost the run it was written for.
+            schema:
+              type: object
+              description: >-
+                datapackage: the Table Schema the rows must satisfy. Omitting it INFERS from the rows,
+                and for a repeating producer that is the wrong default even though it is the
+                convenient one: inference widens to fit whatever arrived, so a run where the upstream
+                sent a word instead of a number publishes a version whose column is quietly a string,
+                and every consumer's join against it stops matching with no error anywhere. Declared,
+                the same run is refused with the row and the field named, and the package stands on
+                its previous version.
+              properties:
+                fields:
+                  type: array
+                  items:
+                    type: object
+                    required: [name, type]
+                    properties:
+                      name: { type: string }
+                      type: { type: string }
+            resource: { type: string, maxLength: 64, description: 'datapackage: resource name, default `rows`.' }
+            provenance:
+              type: object
+              additionalProperties: true
+              description: 'datapackage: sources, licence, legal basis and transformations, carried into the descriptor.'
+            retention_policy:
+              type: object
+              description: 'datapackage: how many old versions to keep.'
+              properties:
+                keep: { type: integer, minimum: 0 }
+                unit: { type: string }
             question:
               type: object
               description: 'human-input: the structured question (AskUserQuestion-shaped).'
@@ -18905,6 +18967,60 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft to discard }
 
+  /v1/apps/{owner}/{filename}/screenshot/capture:
+    post:
+      operationId: captureAppScreenshot
+      summary: Render the published app now and store the screenshot
+      description: |
+        Renders `{owner}/{filename}` in a real headless browser at 1200x750, stores the JPEG, and
+        returns the URL of `GET .../screenshot`. The sibling `POST .../screenshot` accepts a picture
+        the caller already has; this one takes it.
+
+        Until this existed the node had no request path that rendered, deliberately: rendering is the
+        most expensive thing it does, and an open one is a denial-of-service shape. It exists because
+        a caller that has just published an app otherwise cannot see what it made. The publish
+        response says the bytes arrived, not that the page works, and a blank screen, a broken layout
+        or a script that never ran all answer 200.
+
+        The screenshot URL needs no authentication, which is what makes it usable as a model input:
+        an address a provider can fetch, rather than bytes to carry.
+
+        Owner or operator only, and throttled per owner. Only published apps can be rendered; a draft
+        has no public page.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The app was rendered and the screenshot stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          captured: { type: boolean }
+                          size: { type: integer, description: JPEG size in bytes }
+                          screenshot_url: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Not your app
+        '404':
+          description: No published app by that name
+        '429':
+          description: RATE_LIMITED - the owner's hourly render allowance is used up
+        '502':
+          description: RENDER_FAILED - the page did not render; the message carries the reason
+        '503':
+          description: NO_BROWSER - this node has no usable browser to render with
   /v1/apps/{owner}/{filename}/draft/write:
     post:
       operationId: writeAppDraft
