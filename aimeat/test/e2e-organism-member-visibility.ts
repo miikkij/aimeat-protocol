@@ -86,6 +86,24 @@ await test('3. Tighten to "members": an outsider is now blind; the member still 
     // the member's own detail answers your_membership even under redaction
     const md = await json(`/v1/organisms/${orgId}`, { headers: auth(memberTok) });
     assert(md.body.data.your_membership?.status === 'active', `your_membership: ${JSON.stringify(md.body.data.your_membership)}`);
+
+    // THE OTHER DOOR THAT SERVES THE SAME ROSTER. GET /v1/organisms/:id is a separate handler with
+    // its own canSeeMembers call, and after the default-tier test at the top nothing looks at its
+    // roster again: test 3 and test 4 call detail as the MEMBER and read only your_membership, and
+    // the outsider never calls detail after the tier is tightened at all. Replace the detail
+    // handler's `canSeeMembers(...)` with `!!detailCaller.ownerName` — anon still hidden, a signed-in
+    // outsider still sees the roster under the default tier — and 9 of 9 pass while any signed-in
+    // stranger reads the complete member list and agentGaiis of a members-tier organism.
+    const od = await json(`/v1/organisms/${orgId}`, { headers: auth(outsiderTok) });
+    assert(od.status === 200, `outsider detail ${od.status}`);
+    assert(od.body.data.members_hidden === true,
+        `the outsider's DETAIL still exposes the roster: members_hidden=${od.body.data.members_hidden}`);
+    assert(!(od.body.data.organism.members ?? []).includes(memberName),
+        `the member leaked through detail: ${JSON.stringify(od.body.data.organism.members)}`);
+    assert((od.body.data.organism.agentGaiis ?? []).length === 0,
+        `and their agent GAIIs with them: ${JSON.stringify(od.body.data.organism.agentGaiis)}`);
+    // The count survives — hiding who is in it is not the same as hiding that it has members.
+    assert(od.body.data.member_count >= 2, `member_count stays: ${od.body.data.member_count}`);
 });
 
 await test('4. Tighten to "admins": a plain member sees only self+creator (no OTHER member leaks); creator sees all', async () => {

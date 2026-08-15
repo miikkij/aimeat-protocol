@@ -177,6 +177,33 @@ async function main() {
         });
 
         console.log('\nPhase 2: Security — no cross-user / cross-app leakage');
+        await test('a NON-OPERATOR owner cannot point a subdomain at anybody\'s app', async () => {
+            // The premise of everything above: an app origin is bound to the app whose owner controls
+            // it. That binding is what the silent grant trusts when it decides whose session may be
+            // turned into a scoped token — and both mappings here are assigned with A's token, where
+            // A is the first owner on this suite's own fresh database and therefore the auto-promoted
+            // operator. So replacing `...operatorOnly` with `requireAuth()` on POST
+            // /v1/admin/subdomains leaves the whole suite green while any owner points a subdomain at
+            // another owner's app.
+            //
+            // B is a plain owner. Their own app is not the point — the point is that the mapping is
+            // not theirs to make.
+            const own = await json('/v1/admin/subdomains', {
+                method: 'POST', headers: { Authorization: `Bearer ${B.token}` },
+                body: JSON.stringify({ subdomain: 'ccc', kind: 'app', target: `${bn}/app-b.html` }),
+            });
+            assert(own.status === 403, `a plain owner mapped a subdomain to their own app: ${own.status} ${JSON.stringify(own.body?.error)}`);
+
+            const theirs = await json('/v1/admin/subdomains', {
+                method: 'POST', headers: { Authorization: `Bearer ${B.token}` },
+                body: JSON.stringify({ subdomain: 'ddd', kind: 'app', target: `${a}/app-a.html` }),
+            });
+            assert(theirs.status === 403, `a plain owner pointed a subdomain at ANOTHER owner's app: ${theirs.status}`);
+
+            // And nothing was created, so no origin now resolves to a binding nobody approved.
+            const ddd = await silent(`https://ddd.${APP_HOST}`, 'memory:read', B.rt);
+            assert(ddd.ok === false, `the refused mapping still produced a working origin: ${JSON.stringify(ddd)}`);
+        });
         await test('owner A on ANOTHER owner\'s app (bbb) → consent_required (session NOT leaked)', async () => {
             const r = await silent(ORIGIN_B, 'memory:read', A.rt);
             assert(r.ok === false && r.error === 'consent_required', `expected consent_required, got ${JSON.stringify(r)}`);

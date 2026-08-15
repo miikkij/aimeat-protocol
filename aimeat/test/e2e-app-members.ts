@@ -285,9 +285,8 @@ await test('a demotion WITHDRAWS what the smaller role no longer covers, in the 
     assert(live.length === 1, `one grant remains, got ${live.length}`);
 });
 
-await test('an offering that is not the owner\'s is REPORTED, not skipped', async () => {
-    const theirs = await setupOwner('oth');
-    // A listing the approver does not own must not be silently dropped from the promise.
+await test('an offering that does not exist is REPORTED, not skipped', async () => {
+    // A listing id the node has never heard of must not be silently dropped from the promise.
     const r = await json(`/v1/apps/${owner.name}/${APP}/members`, {
         method: 'POST', headers: auth(owner.token),
         body: JSON.stringify({ account: member.name, role: 'reader', offerings: [offA, 'off-does-not-exist'] }),
@@ -297,7 +296,72 @@ await test('an offering that is not the owner\'s is REPORTED, not skipped', asyn
     assert(acc.failed.length === 1, `the bad one is named: ${JSON.stringify(acc.failed)}`);
     assert(acc.failed[0].offeringId === 'off-does-not-exist', 'by id');
     assert(acc.unchanged.length === 1, 'and the good one still stands');
-    void theirs;
+});
+
+/** A second provider with a real listed offering of their own, so "not yours" is testable. */
+async function providerWithOffering(label: string): Promise<{ owner: Awaited<ReturnType<typeof setupOwner>>; offeringId: string }> {
+    const them = await setupOwner(label);
+    const theirExt = `otherext${Date.now().toString(36)}`;
+    const action = 'theirtool';
+    const manifest = [
+        'metadata:', `  name: ${theirExt}`, '  version: 1.0.0', '  description: other provider fixture', '  author: t',
+        'required_apis:', '  - memory', 'actions:',
+        `  - id: ${action}`, '    method: POST', `    path: /${action}`,
+        '    input: { type: object }', '    output: { type: object }', `    script: ${action}.js`,
+    ].join('\n');
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(them.token),
+        body: JSON.stringify({ manifest, scripts: { [`${action}.js`]: 'export default async function () { return { ok: true }; }' } }),
+    });
+    assert(inst.status === 200 || inst.status === 201, `their install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    assert((await json(`/v1/extensions/${theirExt}/activate`, { method: 'POST', headers: auth(them.token), body: '{}' })).status === 200, 'their activate');
+
+    const schema = { type: 'object', properties: { q: { type: 'string' } } };
+    const theirApp = `otherapp${Date.now().toString(36)}.html`;
+    const put = await json('/v1/memory', {
+        method: 'POST', headers: auth(them.token),
+        body: JSON.stringify({
+            key: `apps.${theirApp}.tools`, visibility: 'public',
+            value: { version: 1, tools: [{ name: action, description: 'theirs', action_id: `ext:${theirExt}:${action}`, inputSchema: schema, outputSchema: schema, price: { morsels: 9 }, exchange: true }] },
+        }),
+    });
+    assert(put.status === 200 || put.status === 201, `their manifest ${put.status}: ${JSON.stringify(put.body?.error)}`);
+
+    const listed = await json('/v1/exchange/offerings', { headers: auth(them.token) });
+    const theirs = (listed.body.data.offerings as any[]).find(o => o.providerOwner === them.name && o.action === action);
+    assert(!!theirs, `their offering is listed: ${JSON.stringify((listed.body.data.offerings as any[]).map(o => `${o.providerOwner}/${o.action}`))}`);
+    return { owner: them, offeringId: theirs.offeringId };
+}
+
+await test('an offering that belongs to ANOTHER PROVIDER is refused, not carried on their tab', async () => {
+    // The test above passes a nonexistent id, which hits the "no such listed offering" branch. The
+    // cross-provider branch — `o.providerOwner !== input.providerOwner` in services/grant-sync.ts —
+    // was exercised by nothing: this file registered a second owner for it and then never used them
+    // (`void theirs`). Delete that comparison and an app owner approves a member onto ANOTHER
+    // provider's listing; issueGrant runs with the REAL provider's ghii, so the member calls free on
+    // a stranger's tab. The old test still sees failed.length === 1 from the nonexistent id and
+    // passes.
+    const other = await providerWithOffering('xprov');
+    // A fresh account, so the carry state of `member` — which the next test reads — is untouched.
+    const newbie = await setupOwner('xmem');
+
+    const r = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: newbie.name, role: 'reader', offerings: [other.offeringId] }),
+    });
+    // 201: this is the account's FIRST approval, so the roster row is created rather than updated.
+    assert(r.status === 201, `approve ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const acc = r.body.data.access;
+    assert((acc.granted ?? []).every((g: any) => g.offeringId !== other.offeringId),
+        `the app owner carried a member onto another provider's listing: ${JSON.stringify(acc.granted)}`);
+    assert((acc.failed ?? []).some((f: any) => f.offeringId === other.offeringId),
+        `and it was not even reported: ${JSON.stringify(acc)}`);
+
+    // And no grant exists against the other provider, which is where the bill would have landed.
+    const theirGrants = await json('/v1/exchange/grants', { headers: auth(other.owner.token) });
+    const rows = (theirGrants.body.data?.grants ?? theirGrants.body.data?.entitlements ?? []) as any[];
+    assert(!rows.some(g => g.consumer_gaii === `${newbie.name}@${NODE_ID}` || g.consumerGaii === `${newbie.name}@${NODE_ID}`),
+        `a grant was issued on the other provider's account: ${JSON.stringify(rows.slice(0, 3))}`);
 });
 
 await test('removing the member takes the carried access with them', async () => {
@@ -638,6 +702,26 @@ await test('defaultRole: a signed-in stranger holds the public tier, an anonymou
 // not have to know listing ids. Without a declared plan that approval set a role and carried
 // nothing: the panel said "approved" and the member was billed at list price on every call. The two
 // disagreeing is worse than either alone, so the plan is declared once and applied from then on.
+await test('the carry plan is the APP OWNER\'s declaration — a stranger can neither read nor write it', async () => {
+    // Every PUT and the only GET of /members/plan in this file is made with owner.token. Delete the
+    // `if (!c.isOwner) return 403` from both handlers in routes/app-members.ts and a stranger PUTs
+    // `{roles:{}, access:'free'}` on somebody else's paid app — every priced action goes free — or
+    // sets rosterVisibility:'members' and joins to read the private roster. All 36 tests stay green.
+    const write = await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
+        method: 'PUT', headers: auth(stranger.token),
+        body: JSON.stringify({ roles: { member: [] }, access: 'free' }),
+    });
+    assert(write.status === 403, `a stranger rewrote the carry plan: ${write.status} ${JSON.stringify(write.body?.error)}`);
+
+    const read = await json(`/v1/apps/${owner.name}/${APP}/members/plan`, { headers: auth(stranger.token) });
+    assert(read.status === 403, `a stranger read the carry plan: ${read.status}`);
+
+    // Anonymous is refused too — the plan names what an approval is worth, and a paid app's pricing
+    // stance is not public.
+    const anon = await json(`/v1/apps/${owner.name}/${APP}/members/plan`);
+    assert(anon.status === 401 || anon.status === 403, `anonymous read of the plan: ${anon.status}`);
+});
+
 await test('a declared carry plan makes a bare approval actually carry the member', async () => {
     const plan = await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
         method: 'PUT', headers: auth(owner.token),

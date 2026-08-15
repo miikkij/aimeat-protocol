@@ -297,6 +297,63 @@ await test('6. Revoked consent shows status revoked in list', async () => {
     assert(found.revoked_at !== null, 'has revoked_at timestamp');
 });
 
+// EVERY ASSERTION ABOVE READS THE CONSENT RECORD'S OWN STATUS BACK. Nothing in this suite — or in
+// the corpus — ever reads DATA through a consent and then tries again after revoking it. So dropping
+// `AND status = 'active'` from findMatchingConsents (both storage providers), or dropping the
+// in-loop expiry check, leaves revoked and expired consents granting private reads forever while
+// every test here still reports `status: 'revoked'` off the row it just wrote.
+await test('6b. A consent OPENS a private read, and revoking it CLOSES the read', async () => {
+    const probeKey = `profile.consentprobe${Date.now()}`;
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: probeKey, value: { secret: 'only via consent' }, visibility: 'private' }),
+    });
+    assert(w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+
+    // A second account, which has no reason to see it.
+    const readerName = `mcpcntr${Date.now()}`;
+    const reg = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: readerName, display_name: 'Consent Reader', password: 'McpCnt1234' }),
+    });
+    assert(reg.status === 201, `reader ghii ${reg.status}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: readerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, readerName + NODE_ID + ts) }),
+    });
+    const readerToken = tok.body.data.token as string;
+    const readerGhii = `${readerName}@${NODE_ID}`;
+    const ownerGhii = `${ownerName}@${NODE_ID}`;
+    const readIt = () => json(`/v1/memory/${encodeURIComponent(ownerGhii)}/${encodeURIComponent(probeKey)}`,
+        { headers: { Authorization: `Bearer ${readerToken}` } });
+
+    // Before: no consent, no read. Without this the "after" could be a key that was never readable.
+    const before = await readIt();
+    assert(before.status === 403, `a stranger read a private key with no consent: ${before.status}`);
+
+    const granted = await mcpRpc('tools/call', {
+        name: 'aimeat_consent_grant',
+        arguments: { target_gaii: readerGhii, scope: 'private', data_pattern: 'profile.*', purpose: 'read-through probe' },
+    }, 1041);
+    const grant = JSON.parse(granted.body.result.content[0].text);
+    assert(typeof grant.consent_id === 'string', `grant: ${JSON.stringify(grant)}`);
+
+    const during = await readIt();
+    assert(during.status === 200, `the consent did not open the read: ${during.status} ${JSON.stringify(during.body?.error)}`);
+    assert(during.body.data?.value?.secret === 'only via consent',
+        `and did not return the value: ${JSON.stringify(during.body.data?.value)}`);
+
+    const revoked = await mcpRpc('tools/call', {
+        name: 'aimeat_consent_revoke', arguments: { consent_id: grant.consent_id },
+    }, 1042);
+    assert(JSON.parse(revoked.body.result.content[0].text).revoked === true, 'revoke reported');
+
+    const after = await readIt();
+    assert(after.status === 403,
+        `a REVOKED consent still opens the read: ${after.status} ${JSON.stringify(after.body?.data?.value)}`);
+});
+
 await test('7. aimeat_consent_grant without ttl_hours creates indefinite consent', async () => {
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_consent_grant',

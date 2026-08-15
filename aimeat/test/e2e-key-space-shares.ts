@@ -259,6 +259,42 @@ async function main() {
         assert(gotValue(c), `group 2 still reads: ${c.status}`);
     });
 
+    await test('an EXPIRED share ends the reads too, without anyone revoking it', async () => {
+        // Revocation was proved; expiry was not. `expires_at` is a first-class field on the create
+        // route and isLive() is the only thing that ends a timed grant, so deleting the
+        // `if (!isLive(share, now)) continue;` in isKeyShared and the `.filter(s => isLive(s, now))`
+        // in listIncomingShares leaves every test in this file green while an expired share grants
+        // cross-owner reads forever. Nobody had ever set one.
+        const gx = await createGroup(A, 'timed group', [B.ghii]);
+        const key = `${SPACE}.timed`;
+        const w = await writePrivate(key, { text: 'timed' });
+        assert(w.status === 201, `write: ${w.status}`);
+
+        // Live first, so the expiry below is the thing that ends it and not a share that never worked.
+        const live = await json(`/v1/groups/${gx}/shares`, {
+            method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+            body: JSON.stringify({ key_pattern: `${SPACE}.**`, expires_at: new Date(Date.now() + 3600_000).toISOString() }),
+        });
+        assert(live.status === 201, `timed share: ${live.status} ${JSON.stringify(live.body)}`);
+        assert(gotValue(await readForeign(B.ownerToken, A.ghii, key)), 'a share with a future expiry reads');
+        await json(`/v1/shares/${live.body.data.share.id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } });
+
+        // And one whose clock has already run out grants nothing.
+        const past = await json(`/v1/groups/${gx}/shares`, {
+            method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+            body: JSON.stringify({ key_pattern: `${SPACE}.**`, expires_at: new Date(Date.now() - 60_000).toISOString() }),
+        });
+        assert(past.status === 201, `expired share created: ${past.status} ${JSON.stringify(past.body)}`);
+        const r = await readForeign(B.ownerToken, A.ghii, key);
+        assert(r.status === 403, `an expired share still granted the read: ${r.status}`);
+
+        // It must not be advertised either — the incoming list is how a member learns what they hold.
+        const incoming = await json('/v1/shares/incoming', { headers: { Authorization: `Bearer ${B.ownerToken}` } });
+        const rows = (incoming.body.data?.shares ?? incoming.body.data?.items ?? []) as any[];
+        assert(!rows.some(s => s.id === past.body.data.share.id),
+            `an expired share is listed as incoming: ${JSON.stringify(rows.map(s => s.id))}`);
+    });
+
     await test('removing the member ends it too, with the share left in place', async () => {
         const del = await json(`/v1/groups/${g2}/members/${encodeURIComponent(C.ghii)}`, {
             method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` },
