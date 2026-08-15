@@ -83,6 +83,49 @@ describe('a file whose verdict is stored is never read beyond the range asked fo
         expect(calls.all + calls.range, 'a HEAD read the file').toBe(0);
     });
 
+    it('a HEAD carrying a Range answers 206, because that IS the question it is asking', async () => {
+        // Not pedantry about RFC 9110. `HEAD` with `Range: bytes=0-` is the probe a client uses to
+        // find out whether this server does ranges at all, and DuckDB-Wasm's own condition for the
+        // answer is `contentLength !== null && status == 206`. An earlier version of serveStoredFile
+        // short-circuited before reading the Range header, so the probe got 200 and the full length.
+        // DuckDB read that as "no ranges here": it pulled an 8.45 MB Parquet file in ONE request to
+        // answer a two-column aggregate, and with full reads disabled it refused to open the file.
+        const { reader, calls } = countingReader(UTF8);
+        const { res, out } = fakeRes();
+        await serveStoredFile(res, withVerdict(UTF8, true), 'bytes=0-', reader, { headOnly: true });
+
+        expect(out.status, 'a ranged HEAD answered 200, which reads as "no ranges here"').toBe(206);
+        expect(out.headers['content-range']).toBe(`bytes 0-${UTF8.length - 1}/${UTF8.length}`);
+        expect(out.headers['content-length'], 'the LENGTH OF THE RANGE, not of the file').toBe(String(UTF8.length));
+        expect(out.body, 'a HEAD must still carry no body').toBeNull();
+        expect(calls.all + calls.range, 'and must still read nothing').toBe(0);
+    });
+
+    it('a HEAD with a partial Range reports that range, not the whole file', async () => {
+        const { res, out } = fakeRes();
+        const { reader } = countingReader(UTF8);
+        await serveStoredFile(res, withVerdict(UTF8, true), 'bytes=10-19', reader, { headOnly: true });
+        expect(out.status).toBe(206);
+        expect(out.headers['content-range']).toBe(`bytes 10-19/${UTF8.length}`);
+        expect(out.headers['content-length']).toBe('10');
+    });
+
+    it('a HEAD with an unsatisfiable Range is a 416, exactly as the GET would be', async () => {
+        const { res, out } = fakeRes();
+        const { reader } = countingReader(UTF8);
+        await serveStoredFile(res, withVerdict(UTF8, true), 'bytes=999999-', reader, { headOnly: true });
+        expect(out.status).toBe(416);
+        expect(out.headers['content-range']).toBe(`bytes */${UTF8.length}`);
+    });
+
+    it('every representation carries Last-Modified, which a ranged reader keeps between requests', async () => {
+        const { res, out } = fakeRes();
+        const { reader } = countingReader(UTF8);
+        await serveStoredFile(res, { ...withVerdict(UTF8, true), createdAt: '2026-08-15T21:00:00.000Z' },
+            'bytes=-8', reader);
+        expect(out.headers['last-modified']).toBe('Sat, 15 Aug 2026 21:00:00 GMT');
+    });
+
     it('an unsatisfiable range is a 416 and reads nothing', async () => {
         const { reader, calls } = countingReader(UTF8);
         const { res, out } = fakeRes();

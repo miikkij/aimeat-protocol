@@ -27,6 +27,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `toastui/toastui-editor-all.min.js` + `.min.css` | TOAST UI Editor | (SPA-internal) | — | `https://uicdn.toast.com` | MIT |
 | `pdfjs@6/pdf.min.mjs` + `pdf.worker.min.mjs` | `pdfjs-dist` (ESM + worker) | 6.1.200 | `pdfjs` | `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.1.200/build/` | Apache-2.0 |
 | `ffmpeg-core@0.12.6/ffmpeg-core.js` + `.umd.js` + `ffmpeg-core.wasm` | `@ffmpeg/core` (ffmpeg 5.1.4, single-threaded) | 0.12.6 | `ffmpeg-core` | `https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/` (UMD loader from `dist/umd/`) | GPL-2.0-or-later (the compiled ffmpeg: `--enable-gpl --enable-libx264 --enable-libx265`; the npm `license: MIT` covers only the packaging) |
+| `duckdb-wasm@1.32.0/duckdb-browser.js` + `duckdb-browser-eh.worker.js` + `duckdb-eh.wasm` + `extensions/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm` | `@duckdb/duckdb-wasm` (eh = single-threaded) + `apache-arrow` bundled in | 1.32.0 (arrow 17.0.0) | `duckdb-wasm` | built by `aimeat/scripts/vendor-duckdb-wasm.mjs`; the two .wasm files fetched by `pnpm vendor:libs` | MIT (arrow: Apache-2.0) |
 | `yaml.mjs` | `yaml` (ESM) | 2.x | `yaml` | jsdelivr | ISC |
 | `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `minidenticons.min.js` | preact / htm / minidenticons (ESM) | (SPA-internal, importmap) | — | jsdelivr | MIT |
 | `live-updates.js` | AIMEAT-local (SSE ESM wrapper) | (SPA-internal) | — | this repo | MIT |

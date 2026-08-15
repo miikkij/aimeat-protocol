@@ -10,6 +10,25 @@
       "license": "GPL-2.0-or-later",
       "licenseNote": "The COMPILED ffmpeg is GPL (--enable-gpl with libx264/libx265); npm's `license: MIT` field covers only the packaging. AIMEAT itself stays MIT: this binary is installed separately by this script, is not committed to the repository and is not part of any AIMEAT distribution. Source: https://github.com/ffmpegwasm/ffmpeg.wasm (build scripts) and https://ffmpeg.org (ffmpeg 5.1.4).",
       "why": "32 MB. The dist/umd and dist/esm builds ship the SAME binary (verified byte-identical), so one copy serves both loaders. Too large to carry in git; the pinned URL plus the hash makes the fetch reproducible."
+    },
+    {
+      "path": "lib/duckdb-wasm@1.32.0/duckdb-eh.wasm",
+      "url": "https://unpkg.com/@duckdb/duckdb-wasm@1.32.0/dist/duckdb-eh.wasm",
+      "sha256": "4c221bfa59c11f24dbd750e70c90b9252eca6eec5633936e6a2ec766e55fd879",
+      "bytes": 34242586,
+      "package": "@duckdb/duckdb-wasm@1.32.0",
+      "license": "MIT",
+      "licenseNote": "DuckDB and DuckDB-Wasm are MIT. The loader beside this file also carries apache-arrow 17.0.0 (Apache-2.0); both notices are in the bundle banner.",
+      "why": "32.7 MiB. The `eh` build is the SINGLE-THREADED one, and it is the only one that runs here: the `coi` build needs SharedArrayBuffer, which needs COOP and COEP, which this node deliberately does not set. Too large to carry in git for the same reason as ffmpeg-core; the pinned URL plus the hash makes the fetch reproducible. The two small files next to it (the IIFE loader and the worker) ARE committed — see scripts/vendor-duckdb-wasm.mjs."
+    },
+    {
+      "path": "lib/duckdb-wasm@1.32.0/extensions/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+      "url": "https://extensions.duckdb.org/v1.4.3/wasm_eh/parquet.duckdb_extension.wasm",
+      "sha256": "22765c8f7dc741cda2b571a66ac7bb355295d7d69a6c37e5315b265672984f55",
+      "bytes": 3045039,
+      "package": "duckdb parquet extension (duckdb 1.4.3, wasm_eh)",
+      "license": "MIT",
+      "why": "MEASURED, not anticipated: reading a Parquet file makes duckdb-wasm fetch this extension from extensions.duckdb.org AT RUNTIME. The app CSP happens to allow it (connect-src https:), so it works and would have gone unnoticed — but it is exactly the CDN dependency self-hosting exists to remove, and it puts Parquet reading at the mercy of somebody else's uptime. Mirrored here under the upstream's own directory layout, because that is what duckdb appends to the repository it is given: SET custom_extension_repository = '<base>/extensions'."
     }
   ]
 }

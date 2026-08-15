@@ -193,11 +193,18 @@ export interface StoredFileReader {
  */
 export async function serveStoredFile(
     res: Response,
-    file: { key: string; mimeType: string; size: number; utf8Verified?: boolean },
+    file: { key: string; mimeType: string; size: number; utf8Verified?: boolean; createdAt?: string },
     rangeHeader: string | undefined,
     read: StoredFileReader,
     opts: { headOnly?: boolean } = {},
 ): Promise<boolean> {
+    // A validator, on every representation of the file. A ranged reader keeps one of these between
+    // requests to know the bytes did not move under it, and DuckDB reads Last-Modified straight off
+    // the probe. It costs nothing: the write time is already in the metadata.
+    if (file.createdAt) {
+        const at = new Date(file.createdAt);
+        if (!Number.isNaN(at.getTime())) res.setHeader('Last-Modified', at.toUTCString());
+    }
     // ONE decision, made before anything is sent: can this file's content type be named without its
     // bytes? With a stored verdict, yes, and nothing outside the requested range is ever read. For a
     // file written before the verdict existed the charset still lives in the content, so the whole
@@ -213,18 +220,33 @@ export async function serveStoredFile(
     if (needsBytesForType(file) && !whole) return false;
     const described = whole ? { ...file, data: whole } : file;
 
-    // A HEAD answers out of that and reads nothing more. Express auto-handles HEAD through the GET
-    // handler, so /v1/pub was loading the entire file and discarding the body: 114 ms measured, for
-    // a 10 MB file, to send zero bytes.
+    const verdict = parseRangeHeader(rangeHeader, file.size);
+
+    // A HEAD answers out of the metadata and reads nothing more. Express auto-handles HEAD through
+    // the GET handler, so /v1/pub was loading the entire file and discarding the body: 114 ms
+    // measured, for a 10 MB file, to send zero bytes.
+    //
+    // IT STILL HONOURS `Range`, and that is not pedantry about RFC 9110's "same headers a GET would
+    // send". A HEAD carrying `Range: bytes=0-` is how a client ASKS whether this server does ranges,
+    // and DuckDB-Wasm's own words for the answer are `if (contentLength !== null && status == 206)`.
+    // An earlier version of this function short-circuited before reading the Range header, so that
+    // probe got 200 and the full length. DuckDB read it as "no ranges here" and downloaded an 8.45 MB
+    // Parquet file in one request to answer a two-column aggregate — and with full reads disabled it
+    // refused to open the file at all. A fast HEAD that lies about ranges is worse than a slow one.
     if (opts.headOnly) {
+        if (verdict.kind === 'unsatisfiable') { rangeNotSatisfiable(res, file.size, verdict.reason); return true; }
         setStoredFileHeaders(res, described);
         setAcceptRanges(res);
-        res.setHeader('Content-Length', file.size);
+        if (verdict.kind === 'partial') {
+            res.status(206);
+            res.setHeader('Content-Range', `bytes ${verdict.start}-${verdict.end}/${file.size}`);
+            res.setHeader('Content-Length', verdict.end - verdict.start + 1);
+        } else {
+            res.setHeader('Content-Length', file.size);
+        }
         res.end();
         return true;
     }
-
-    const verdict = parseRangeHeader(rangeHeader, file.size);
     if (verdict.kind === 'unsatisfiable') { rangeNotSatisfiable(res, file.size, verdict.reason); return true; }
     if (verdict.kind === 'partial') {
         // When the file is already in hand there is nothing to gain from asking the database for a
