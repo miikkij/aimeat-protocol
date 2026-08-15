@@ -93,7 +93,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         name: 'aimeat_organism_owner_add',
         description: 'Make an existing active member a co-owner of an organism you own. ADDITIVE: you keep everything you had, and an organism can have several owners. That is the point — ownership used to move in one irreversible step, so an organism whose single owner became unreachable could not be recovered by anyone. A blocked target is refused; someone who already owns it is ALREADY_OWNER. To hand it over and step back in one call instead, use the transfer route.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: false },
         input: {
             organism_id: { type: 'string', required: true, description: 'The organism ID.' },
             ghii: { type: 'string', required: true, description: 'Bare owner name of an active member to make a co-owner.' },
@@ -103,7 +103,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         name: 'aimeat_organism_owner_remove',
         description: 'Take an owner off an organism you own; they stay on as an admin. Any owner may remove any other. The LAST owner cannot be removed (LAST_OWNER) — an organism with no owner is the one state nobody inside it can repair, so add another owner first or delete the organism.',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: false },
         input: {
             organism_id: { type: 'string', required: true, description: 'The organism ID.' },
             ghii: { type: 'string', required: true, description: 'Bare owner name to take off the owners.' },

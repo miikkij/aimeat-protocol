@@ -3,6 +3,8 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   v1.6.1 -- 2026-08-15 -- owner_add / owner_remove: plural organism ownership over the
+ *     connector, mirroring POST/DELETE /v1/organisms/:id/owners. Ships in aimeat@3.2.0.
  *   v1.6.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_workspace_comment carries
  *     `ai_provenance` / `ai_provenance_id` and echoes what was recorded.
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -171,6 +173,24 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     if (role) body.role = role;
     if (workspaces) body.workspaces = workspaces;
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/members`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  // Ownership is plural: adding is additive, and the LAST owner cannot be removed. Both mirror the
+  // REST routes, which call services/organism-ownership.ts — the connector adds no rules of its own.
+  mcp.tool('aimeat_organism_owner_add', descriptionFor('aimeat_organism_owner_add'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ghii: z.string().describe('Bare owner name of an active member to make a co-owner'),
+  }, annotationsFor('aimeat_organism_owner_add'), async ({ organism_id, ghii }) => {
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/owners`, { ghii });
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_owner_remove', descriptionFor('aimeat_organism_owner_remove'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ghii: z.string().describe('Bare owner name to take off the owners; they stay as an admin'),
+  }, annotationsFor('aimeat_organism_owner_remove'), async ({ organism_id, ghii }) => {
+    const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/owners/${encodeURIComponent(ghii)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
