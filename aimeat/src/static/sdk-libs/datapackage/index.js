@@ -33,6 +33,8 @@
  *   v1.0.0 — 2026-08-15 — Initial (TARGET-063 vaihe 1, B1).
  *   v1.1.0 — 2026-08-15 — Three session.fetch contract errors fixed against a real browser (see call()),
  *                         and parseTable() added so an app does not rebuild paste handling.
+ *   v1.2.0 — 2026-08-16 — versions(): a package's history, each entry with the explanation it was
+ *                         published with, so an app can show a chain rather than a hash.
  */
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-datapackage.js');
@@ -239,6 +241,21 @@ const datapackage = {
 
   /** The caller's own packages, newest version each, with `lastError` when the last run failed. */
   list() { return call('/v1/datapackages', { method: 'GET' }); },
+
+  /**
+   * Every version of one package, newest first: `{ contentHash, at, current, changes, rowCount,
+   * bytes, descriptorUrl, supersedes }`.
+   *
+   * `changes` is why this is worth showing rather than a list of hashes — it is the sentence the
+   * producer had to write to publish at all. Pin any of them by passing
+   * `pkg:owner/name@<contentHash>` to open() or rows().
+   */
+  versions(ref) {
+    const p = parseRef(ref);
+    if (!p) return Promise.reject(new Error('versions() needs a reference like "pkg:owner/name"'));
+    return call('/v1/datapackages/' + encodeURIComponent(p.owner) + '/' + encodeURIComponent(p.name) + '/versions',
+      { method: 'GET' });
+  },
 
   /** A descriptor. `ref` is `pkg:owner/name`, optionally `@sha256:…` to pin a version. */
   open(ref) {

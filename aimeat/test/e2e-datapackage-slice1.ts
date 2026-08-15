@@ -351,6 +351,34 @@ await test('10a. ACCEPTANCE: each version says what it replaced, and saying so m
     'and be reported as unchanged rather than announced as a version that was written');
 });
 
+await test('10a2. The history is readable as a chain, not as a list of hashes', async () => {
+  const v = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}/versions`);
+  assert(v.status === 200, `versions ${v.status}: ${JSON.stringify(v.body?.error)}`);
+  const versions = v.body.data.versions;
+  assert(versions.length >= 2, `at least the two published versions, got ${versions.length}`);
+
+  // Newest first, exactly one current, and every entry carries the sentence its producer had to
+  // write. A version with no explanation cannot be decided about, which is why `changes` is
+  // mandatory on the way in and shown here on the way out.
+  assert(versions.filter((x: { current: boolean }) => x.current).length === 1, 'exactly one version is current');
+  assert(versions[0].current, 'and it is the newest');
+  assert(versions.every((x: { changes: string }) => typeof x.changes === 'string' && x.changes.length > 0),
+    'every version says what moved');
+  assert(versions.every((x: { rowCount: number }) => x.rowCount > 0), 'and how many rows it has');
+
+  // The chain: the newest names the one below it, the oldest names nothing.
+  const oldest = versions[versions.length - 1];
+  assert(!oldest.supersedes, 'the first version replaced nothing');
+  assert(versions[0].supersedes && versions[0].supersedes.includes(versions[1].contentHash),
+    `the newest names the one below it, got ${versions[0].supersedes}`);
+
+  // Public, like the descriptor: a history nobody can see is not one a consumer can rely on.
+  const anon = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}/versions`);
+  assert(anon.status === 200, `no token needed, got ${anon.status}`);
+  const missing = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/no-such-package/versions`);
+  assert(missing.status === 404, `a package that does not exist is 404, got ${missing.status}`);
+});
+
 await test('10b. ACCEPTANCE: the package is sellable — odps.yaml rides with every version', async () => {
   // The product sheet is generated from the descriptor and stored beside it, so a pinned version
   // carries the sheet that describes THAT version. Schema conformance is asserted against the

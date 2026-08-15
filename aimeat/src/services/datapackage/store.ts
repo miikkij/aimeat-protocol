@@ -484,6 +484,70 @@ export async function listPackages(deps: StoreDeps, ownerGhii: string): Promise<
     return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/** One entry in a package's history: enough to decide about a version without opening it. */
+export interface VersionEntry {
+    contentHash: string;
+    /** When this version's descriptor was written. Not the descriptor's own `created`, which is the
+     *  first producer's clock; this is when these bytes landed here. */
+    at: string;
+    /** True for the one `latest.json` points at. There is exactly one, unless nothing is published. */
+    current: boolean;
+    /** The mandatory explanation. It is the reason a history is readable rather than a list of hashes. */
+    changes: string;
+    rowCount: number;
+    bytes: number;
+    descriptorUrl: string;
+    supersedes?: string;
+}
+
+/**
+ * Every version of one package, newest first.
+ *
+ * The versions are DISCOVERED FROM THE KEYS rather than from an index, because the keys are the
+ * index: a version is a directory named by its content hash, so nothing can be published without
+ * appearing here and nothing can be listed here without existing. An index would be a second thing
+ * to keep in step with the first.
+ *
+ * Each descriptor is read, which is one small GET per version. That is what makes `changes` and
+ * `rowCount` available, and it is bounded by the owner's retention policy rather than by time.
+ */
+export async function listVersions(deps: StoreDeps, ownerGhii: string, name: string): Promise<VersionEntry[]> {
+    const root = `${packageKeyRoot(name)}/`;
+    const currentHash = (await readLatestPointer(deps, ownerGhii, name))?.contentHash ?? '';
+    const files = (await deps.storage.listStorageFiles(ownerGhii))
+        .filter(f => f.key.startsWith(root) && f.key.endsWith('/datapackage.json'));
+
+    const out: VersionEntry[] = [];
+    for (const f of files) {
+        const hash = f.key.slice(root.length).split('/')[0];
+        if (!/^[a-f0-9]{64}$/.test(hash)) continue;
+        const body = await deps.storage.getStorageFile(ownerGhii, f.key);
+        if (!body) continue;
+        let descriptor: Descriptor;
+        try {
+            descriptor = JSON.parse(body.data.toString('utf8')) as Descriptor;
+        } catch (err) {
+            // A descriptor that will not parse is not skipped quietly: a history with a hole in it
+            // reads as a history, and a consumer counting versions would be counting wrong. The
+            // caller gets the failure and can say which version is unreadable.
+            throw new Error(`datapackage "${name}": the descriptor at ${f.key} is not readable JSON, so the `
+                + 'version history cannot be listed honestly', { cause: err });
+        }
+        const resource = descriptor.resources?.[0];
+        out.push({
+            contentHash: descriptor.aimeat.contentHash,
+            at: f.createdAt,
+            current: bare(descriptor.aimeat.contentHash) === bare(currentHash),
+            changes: descriptor.aimeat.changes,
+            rowCount: resource?.rowCount ?? 0,
+            bytes: resource?.bytes ?? 0,
+            descriptorUrl: publicUrl(deps.config.baseUrl, ownerGhii, f.key),
+            ...(descriptor.aimeat.supersedes ? { supersedes: descriptor.aimeat.supersedes } : {}),
+        });
+    }
+    return out.sort((a, b) => b.at.localeCompare(a.at));
+}
+
 /** `pkg:{owner}/{name}` or `pkg:{owner}/{name}@sha256:…`, or the bare `{name}` of your own. */
 export function parseRef(ref: string, nodeId: string): { ownerGhii: string; name: string; contentHash?: string } | null {
     const m = /^pkg:([^/@]+)\/([^@]+)(?:@(sha256:[a-f0-9]{64}))?$/.exec(String(ref || '').trim());

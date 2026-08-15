@@ -35,7 +35,7 @@ import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { inferSchema, validateRows, type ValidationIssue } from '../services/datapackage/table.js';
 import type { PublishInput, TableSchema } from '../services/datapackage/contract.js';
-import { publishPackage, openPackage, readRows, listPackages, parseRef } from '../services/datapackage/store.js';
+import { publishPackage, openPackage, readRows, listPackages, listVersions, parseRef } from '../services/datapackage/store.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
  *  OPTIONAL on the wire — an app that hands over rows and nothing else is asking for a proposal — so
@@ -178,6 +178,28 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             ...(opened.latest ? { latest: opened.latest } : {}),
         }, [
             { description: 'The permanent address of these bytes', method: 'GET', url: opened.descriptorUrl },
+        ]));
+    });
+
+    /**
+     * Every version of one package, newest first, each with the explanation it was published with.
+     *
+     * Same door as the read above: a public package's history is public, because a history you
+     * cannot see is not a history a consumer can rely on. `openPackage` is called first so a
+     * package nobody may read answers 404 here too, rather than leaking its shape through a list.
+     */
+    router.get('/v1/datapackages/:owner/:name/versions', optionalAuth(), async (req, res) => {
+        const owner = req.params.owner as string;
+        const name = req.params.name as string;
+        const opened = await openPackage(store, buildRef(owner, name, undefined), config.nodeId);
+        if (!opened) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such data package: ${buildRef(owner, name, undefined)}`));
+            return;
+        }
+        const ownerGhii = owner.includes('@') ? owner : `${owner}@${config.nodeId}`;
+        const versions = await listVersions(store, ownerGhii, name);
+        res.json(success(config.nodeId, { package_id: opened.descriptor.aimeat.packageId, versions, total: versions.length }, [
+            { description: 'The newest version', method: 'GET', url: `/v1/datapackages/${owner}/${name}` },
         ]));
     });
 

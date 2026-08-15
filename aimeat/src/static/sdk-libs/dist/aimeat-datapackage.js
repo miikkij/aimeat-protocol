@@ -217,6 +217,22 @@
     list() {
       return call("/v1/datapackages", { method: "GET" });
     },
+    /**
+     * Every version of one package, newest first: `{ contentHash, at, current, changes, rowCount,
+     * bytes, descriptorUrl, supersedes }`.
+     *
+     * `changes` is why this is worth showing rather than a list of hashes — it is the sentence the
+     * producer had to write to publish at all. Pin any of them by passing
+     * `pkg:owner/name@<contentHash>` to open() or rows().
+     */
+    versions(ref) {
+      const p = parseRef(ref);
+      if (!p) return Promise.reject(new Error('versions() needs a reference like "pkg:owner/name"'));
+      return call(
+        "/v1/datapackages/" + encodeURIComponent(p.owner) + "/" + encodeURIComponent(p.name) + "/versions",
+        { method: "GET" }
+      );
+    },
     /** A descriptor. `ref` is `pkg:owner/name`, optionally `@sha256:…` to pin a version. */
     open(ref) {
       const p = parseRef(ref);

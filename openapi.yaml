@@ -12793,6 +12793,32 @@ paths:
         '404':
           description: No such package or version
 
+  /v1/datapackages/{owner}/{name}/versions:
+    get:
+      operationId: listDataPackageVersions
+      summary: Every version of one package
+      description: |
+        Newest first, each with the explanation it was published with, its row count, its size and
+        its permanent address. `current: true` marks the one the pointer names, and `supersedes`
+        names the version each one replaced, so the history reads as a chain rather than a list of
+        hashes.
+
+        The versions are discovered from the stored keys rather than from an index, so nothing can
+        be published without appearing here. How far back it goes is the owner's retention policy.
+
+        No authentication, for the same reason as the descriptor: a history nobody can see is not a
+        history a consumer can rely on.
+      tags: [Data Packages]
+      security: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The version list, newest first
+        '404':
+          description: No such package
+
   /v1/datapackages/{owner}/{name}/rows/{resource}:
     get:
       operationId: readDataPackageRows
