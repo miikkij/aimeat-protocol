@@ -10,6 +10,15 @@
  *
  *   WHAT THIS DOES NOT COVER: a successful transcription (CI has no provider key). Verified by hand.
  * @version-history
+ *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-message-transcript:145): the one test
+ *     for the mailbox-scoped lookup accepted "404 or 200", which is the exact range an UNSCOPED
+ *     lookup produces. Mailbox copies are per-owner and share the message id, so the recipient
+ *     legitimately gets a 200 on their own copy — the principal that makes the gate visible is a
+ *     THIRD owner, party to nothing. They are refused 404 on the plain and the force:true paths, the
+ *     sender's copy is read back unchanged, and the recipient reaching their own copy is the
+ *     positive control. Measured with the owner key removed from the sqlite lookup: the stranger
+ *     reads the sender's transcript. (The route-level mutation the audit named is not expressible:
+ *     dropping the argument makes every lookup fail, not just the scoped one.)
  *   v1.0.0 — 2026-08-01 — Initial version.
  */
 
@@ -134,15 +143,54 @@ await test('Sender copy keeps the transcript, the duration, and by=sender (clien
 
 console.log('\nPhase 2 — The transcribe route stays inside the caller\'s mailbox');
 
-await test('Transcribing a message the caller does not own → 404', async () => {
+// The gate is `storage.getDirectMessage(id, ghii)` — owner-keyed. Mailbox copies are PER OWNER and
+// share the message id, so the recipient legitimately finds their own copy: the test that used to
+// stand here accepted `404 || 200` and could not tell that apart from an unscoped lookup handing the
+// recipient the SENDER's copy. The principal that makes the gate visible is a third owner who is
+// party to nothing, and the property that matters for the parties is that a write stays on the
+// caller's own copy.
+const stranger = await makeOwner('vmstranger');
+
+await test('A THIRD owner transcribing this message id → 404', async () => {
+  const { status, body } = await json(`/v1/messages/${messageId}/attachments/at0/transcribe`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${stranger.token}` },
+    body: JSON.stringify({}),
+  });
+  assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+});
+
+await test('…and a third owner cannot force one either, nor touch the sender\'s copy', async () => {
   const { status } = await json(`/v1/messages/${messageId}/attachments/at0/transcribe`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${stranger.token}` },
+    body: JSON.stringify({ force: true }),
+  });
+  assert(status === 404, `expected 404 on the force path, got ${status}`);
+
+  // The sender's copy is untouched: same text, still by 'sender'.
+  const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${sender.token}` } });
+  // The sender is the first owner on a cleared database, so it is the operator and every new
+  // registration puts a welcome thread at the top of its list. Pick the conversation by PEER.
+  const conv = (convs.body.data?.conversations || []).find((c: any) => c.peerGhii === recipient.ghii);
+  assert(!!conv, `no conversation with the recipient: ${JSON.stringify(convs.body.data)}`);
+  const thread = await json(`/v1/messages/conversations/${conv.conversationId}`, {
+    headers: { Authorization: `Bearer ${sender.token}` },
+  });
+  const msg = (thread.body.data?.messages || []).find((m: any) => m.id === messageId);
+  const att = (msg?.attachments || [])[0];
+  assert(att?.transcript?.text === 'Moi, soitellaan huomenna.', `sender transcript changed: ${JSON.stringify(att?.transcript)}`);
+  assert(att?.transcript?.by === 'sender', `sender transcript by changed: ${att?.transcript?.by}`);
+});
+
+await test('The RECIPIENT reaches their OWN copy → 200 (so the 404 above is ownership, not absence)', async () => {
+  const { status, body } = await json(`/v1/messages/${messageId}/attachments/at0/transcribe`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${recipient.token}` },
     body: JSON.stringify({}),
   });
-  // The recipient's copy has a DIFFERENT attachment id space only after delivery; before accepting
-  // the first-contact request there is no copy to transcribe at all. Either way: not found.
-  assert(status === 404 || status === 200, `expected 404 (or 200 once accepted), got ${status}`);
+  assert(status === 200, `the recipient's own copy must be reachable, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+  assert(body.data?.transcript?.text === 'Moi, soitellaan huomenna.', `the travelled transcript: ${JSON.stringify(body.data?.transcript)}`);
 });
 
 await test('Unknown attachment id → 404', async () => {

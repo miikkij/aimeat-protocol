@@ -117,10 +117,6 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "6bb6ee5195ac41dc"
     },
-    "test/e2e-organism-bulk-app-origin.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "067ec45de559b6d2"
-    },
     "test/e2e-workspace-publish-guard.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "c9d466047db413a4"
@@ -162,8 +158,8 @@
       "sha": "f7c0ce1ae8df2766"
     },
     "test/e2e-message-transcript.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "cc93f9090d00affd"
+      "reason": "REVIEWED 2026-08-16 (E2E test-quality audit, finding e2e-message-transcript:145). This surface refuses with 404, not 403, and that is deliberate: the transcribe route looks the message up as storage.getDirectMessage(id, ownerGhii), so a caller who is not a party to the message is told the message does not exist rather than that it exists and is not theirs. The suite now drives that refusal with a THIRD owner, on the plain and the force:true paths, and reads the sender's copy back afterwards to show nothing was written; the recipient reaching their OWN copy is the positive control. There is no 401 or 403 on this route to assert.",
+      "sha": "fb430ca2ff090d70"
     },
     "test/e2e-dm-send-as-owner.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
@@ -176,10 +172,6 @@
     "test/e2e-members.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "f3bc7fae3449b261"
-    },
-    "test/e2e-tracked-response.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "417da2e8b410d254"
     },
     "test/e2e-attachment-sweep.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
