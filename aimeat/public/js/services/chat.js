@@ -15,6 +15,8 @@
  *   import * as chat from '/js/services/chat.js';
  *   for await (const u of chat.streamTurn(threadId, 'build me pong')) { … }
  * @version-history
+ *   v1.2.0 — 2026-08-16 — uploadImage(): an attached picture takes the presigned road to the owner's
+ *     own storage, and the turn carries its key. The model gets the bytes from the node.
  *   v1.1.0 — 2026-08-16 — speakToText: a spoken message goes through storage and comes back as text.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
@@ -67,11 +69,11 @@ export async function resetThread(id) {
  *
  * `signal` aborts the read. The turn keeps running on the node; the connection is what closes.
  */
-export async function* streamTurn(id, text, signal) {
+export async function* streamTurn(id, text, signal, images = []) {
     const res = await fetch(`${getNodeUrl()}/v1/chat/threads/${enc(id)}/turn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...authHeaders() },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(images.length ? { text, images } : { text }),
         signal,
     });
 
@@ -176,6 +178,38 @@ export async function speakToText(file) {
     });
     if (res?.ok === false) throw new Error(res.error?.message || 'The recording could not be transcribed.');
     return String(res?.data?.text ?? '').trim();
+}
+
+/**
+ * A picture the person attached, stored under their own namespace, returned as its key.
+ *
+ * The same presigned road as a voice recording and for the same reason: bytes never travel through a
+ * JSON body, the size is checked against the storage quota before the one-shot token is spent, and
+ * the thing that reaches the turn is a key. Private on purpose — the model receives the BYTES from
+ * the node, so the picture never needs a public address to be understood.
+ */
+export async function uploadImage(file) {
+    const rand = Math.random().toString(36).slice(2, 8);
+    const ext = (file.name?.split('.').pop() || (file.type.split('/')[1] || 'png')).toLowerCase().slice(0, 5);
+    const key = `chat-images/${Date.now()}-${rand}.${ext}`;
+    const mime = file.type || 'image/png';
+    if (!mime.startsWith('image/')) throw new Error('That file is not an image.');
+
+    const mint = await api('/v1/storage', {
+        method: 'POST',
+        body: JSON.stringify({ key, mime_type: mime, visibility: 'private', mode: 'presigned' }),
+    });
+    const uploadUrl = mint?.data?.upload_url;
+    if (!uploadUrl) throw new Error(mint?.error?.message || 'The node would not accept the picture.');
+
+    const maxBytes = Number(mint?.data?.max_size_bytes) || 0;
+    if (maxBytes && file.size > maxBytes) {
+        throw new Error(`That picture is ${(file.size / 1048576).toFixed(1)} MB; this node accepts ${(maxBytes / 1048576).toFixed(0)} MB.`);
+    }
+
+    const put = await fetch(uploadTarget(uploadUrl), { method: 'PUT', headers: { 'Content-Type': mime }, body: file });
+    if (!put.ok) throw new Error(`The picture could not be stored (${put.status}).`);
+    return key;
 }
 
 /** The node mints an absolute upload URL. Collapse it to a path on the same origin so the PUT stays

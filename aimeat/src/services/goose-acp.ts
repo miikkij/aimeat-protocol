@@ -23,6 +23,10 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.3.0 — 2026-08-16 — prompt() takes images and sends them as ACP image blocks. A picture the
+ *     person attached goes to the model as bytes: a private address on this node is one the
+ *     provider's servers cannot fetch, and a link they silently fail to open is indistinguishable
+ *     from a model that ignored the picture.
  *   v2.2.0 — 2026-08-16 — A completed tool call carries a `card` when it produced something openable
  *     (services/chat-cards.ts). The work log proved what happened and handed nothing over: the
  *     address was inside the tool's JSON, which nobody reads.
@@ -47,6 +51,13 @@ import { logger } from '../utils/logger.js';
 import { cardFromToolResult, type ChatCard } from './chat-cards.js';
 
 /** An MCP server handed to one session. `http` is the transport goose reports as supported. */
+/** One picture handed to the model with a turn: the bytes, and what they are. */
+export interface PromptImage {
+    mimeType: string;
+    /** Base64, no data: prefix — ACP carries the encoding in the block, not in the string. */
+    base64: string;
+}
+
 export interface AcpMcpServer {
     name: string;
     type: 'http';
@@ -258,7 +269,7 @@ export class GooseAcpClient {
     }
 
     /** Run one turn, yielding what happens as it happens. */
-    async *prompt(sessionId: string, text: string): AsyncGenerator<SessionUpdate> {
+    async *prompt(sessionId: string, text: string, images: PromptImage[] = []): AsyncGenerator<SessionUpdate> {
         const queue: SessionUpdate[] = [];
         let wake: (() => void) | null = null;
         const push = (u: SessionUpdate) => { queue.push(u); wake?.(); wake = null; };
@@ -266,7 +277,14 @@ export class GooseAcpClient {
         const onUpdate = (update: Record<string, unknown>) => push(normalise(update));
         this.bus.on(`update:${sessionId}`, onUpdate);
 
-        void this.call('session/prompt', { sessionId, prompt: [{ type: 'text', text }] }, TURN_TIMEOUT_MS)
+        // ACP content blocks: the text, and any pictures as BYTES rather than as a link. A model's
+        // servers cannot fetch a private address on this node, and handing over a URL they silently
+        // fail to open looks exactly like a model that ignored the picture.
+        const prompt: Array<Record<string, unknown>> = [{ type: 'text', text }];
+        for (const img of images) {
+            prompt.push({ type: 'image', mimeType: img.mimeType, data: img.base64 });
+        }
+        void this.call('session/prompt', { sessionId, prompt }, TURN_TIMEOUT_MS)
             .then((r) => {
                 const res = r as { stopReason?: string; usage?: { totalTokens?: number } };
                 push({ kind: 'done', stopReason: String(res?.stopReason ?? 'end_turn'), tokens: res?.usage?.totalTokens });

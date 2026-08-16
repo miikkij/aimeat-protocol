@@ -28,6 +28,7 @@ import { speak, stop as stopSpeaking, isSpeechSupported, textToParagraphs } from
 import { CopyButton } from '/components/CopyButton.js';
 import { AiInteractionNotice } from '/components/ai-label.js';
 import { Modal } from '/components/Modal.js';
+import { ImageView } from '/components/ImageDeliverable.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -121,6 +122,18 @@ export function Turn({ turn, id }) {
     return html`
         <div class="chat-turn chat-turn--${mine ? 'user' : 'agent'}">
             <div class="chat-bubble">
+                ${/* An attachment is PRIVATE, and a private file is not something an <img src> can
+                      fetch: the tag carries no Authorization header, so the picture the person just
+                      sent renders as a broken frame in their own conversation. ImageView is the
+                      component that already solves this — it fetches with the session and shows the
+                      bytes as a blob — and reusing it keeps one answer to "how does an authed image
+                      get on screen" rather than a second one living here. */''}
+                ${turn.images && turn.images.length > 0 && html`
+                    <div class="chat-turn-images">
+                        ${turn.images.map((key) => html`
+                            <${ImageView} key=${key}
+                                desc=${{ url: `/v1/storage/${encodeURIComponent(key)}`, alt: key }} />`)}
+                    </div>`}
                 ${mine
                     ? html`<p class="chat-said">${turn.text}</p>`
                     : html`<${Markdown} text=${stripChoices(turn.text)} />`}
@@ -364,8 +377,10 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
  * person's hands already expect. The field grows with what is in it up to a ceiling, so a long ask
  * is readable while being written without the composer eating the conversation.
  */
-export function Composer({ value, onInput, onSend, onStop, onSpeak, busy, disabled, note, listening, voiceMaxSeconds = 300 }) {
+export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, attachments = [], onDropAttachment,
+    busy, disabled, note, listening, voiceMaxSeconds = 300 }) {
     const ref = useRef(null);
+    const fileRef = useRef(null);
 
     // Re-measured on a resize as well as on every keystroke. Height depends on WIDTH: a line that
     // fits on a desktop wraps on a phone, and a height measured before the turn left the field
@@ -393,6 +408,21 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, busy, disabl
         <div class="chat-composer">
             ${note ? html`<p class="chat-composer-note">${note}</p>` : ''}
             ${listening ? html`<p class="chat-composer-note">${tr('chat.hearing', 'Working out what you said…')}</p>` : ''}
+            ${/* Attached and not yet sent. Each one is removable: a picture picked by mistake should
+                  cost one press, not a reload. */''}
+            ${attachments.length > 0 && html`
+                <div class="chat-attachments">
+                    ${attachments.map((att) => html`
+                        <span class=${'chat-attachment' + (att.state === 'error' ? ' chat-attachment--error' : '')} key=${att.id}>
+                            ${att.preview && html`<img class="chat-attachment-thumb" src=${att.preview} alt="" />`}
+                            <span class="chat-attachment-name">${att.name}</span>
+                            ${att.state === 'uploading' && html`<span class="chat-attachment-state">${tr('chat.attachUploading', 'uploading…')}</span>`}
+                            ${att.state === 'error' && html`<span class="chat-attachment-state">${att.error || tr('chat.attachFailed', 'failed')}</span>`}
+                            <button type="button" class="btn-ghost chat-attachment-drop"
+                                title=${tr('chat.attachRemove', 'Remove')}
+                                onClick=${() => onDropAttachment(att.id)}>×</button>
+                        </span>`)}
+                </div>`}
             <div class="chat-composer-row">
                 <textarea ref=${ref} class="chat-input" rows="1"
                     value=${value}
@@ -402,6 +432,12 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, busy, disabl
                         : tr('chat.placeholder', 'Ask for something, or describe what you want built.')}
                     onInput=${(e) => onInput(e.target.value)}
                     onKeyDown=${keydown}></textarea>
+                ${onAttach && !busy ? html`
+                    <input type="file" accept="image/*" multiple ref=${fileRef} class="chat-file-input"
+                        onChange=${(e) => { onAttach([...e.target.files]); e.target.value = ''; }} />
+                    <button type="button" class="btn-outline chat-attach" disabled=${disabled}
+                        title=${tr('chat.attachTitle', 'Attach a picture')}
+                        onClick=${() => fileRef.current?.click()}>📎</button>` : ''}
                 ${onSpeak && !busy ? html`
                     <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}
                         className="btn-outline chat-voice" onRecorded=${(file) => onSpeak(file)} />` : ''}

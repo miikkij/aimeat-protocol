@@ -37,9 +37,19 @@ import { GooseAcpClient, aimeatMcpServer, type SessionUpdate } from './goose-acp
 import { ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
+import type { PromptImage } from './goose-acp.js';
 import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
+
+/**
+ * How many pictures one turn may carry.
+ *
+ * Each one is read whole and base64-encoded into the prompt, so the ceiling is about the model's
+ * context and the node's memory rather than about politeness. Four is more than any real question
+ * needs and small enough that a mistake costs a request rather than a process.
+ */
+const MAX_IMAGES_PER_TURN = 4;
 
 /** The single agent process, and which generation it is. */
 let client: GooseAcpClient | null = null;
@@ -125,6 +135,7 @@ async function sessionFor(
  */
 export async function* runChatTurn(
     deps: ChatDeps, ownerName: string, threadId: string, text: string, signal?: AbortSignal,
+    imageKeys: string[] = [],
 ): AsyncGenerator<SessionUpdate> {
     const { storage, config } = deps;
     if (!chatEnabled(config)) {
@@ -134,7 +145,26 @@ export async function* runChatTurn(
 
     const gaii = await resolveGhii(storage, ownerName, `${ownerName}@${config.nodeId}`);
     const now = new Date().toISOString();
-    await appendTurn(storage, gaii, threadId, { role: 'user', text, at: now });
+
+    // Pictures the person attached, read from THEIR OWN namespace by key. The browser uploaded them
+    // through the ordinary presigned path, so they are the person's files under their quota, and the
+    // key is all that travelled through the request — bytes never go through a JSON body.
+    const images: PromptImage[] = [];
+    for (const key of imageKeys.slice(0, MAX_IMAGES_PER_TURN)) {
+        const file = await storage.getStorageFile(gaii, key);
+        if (!file) {
+            logger.warn(`[chat] attachment not found for ${gaii}: ${key}`);
+            continue;
+        }
+        const mimeType = file.mimeType || 'image/png';
+        if (!mimeType.startsWith('image/')) continue;
+        images.push({ mimeType, base64: Buffer.from(file.data).toString('base64') });
+    }
+
+    await appendTurn(storage, gaii, threadId, {
+        role: 'user', text, at: now,
+        ...(imageKeys.length ? { images: imageKeys.slice(0, MAX_IMAGES_PER_TURN) } : {}),
+    });
 
     let sessionId: string;
     try {
@@ -169,7 +199,7 @@ export async function* runChatTurn(
     let answer = '';
 
     try {
-        for await (const update of acp.prompt(sessionId, text)) {
+        for await (const update of acp.prompt(sessionId, text, images)) {
             if (update.kind === 'text') answer += update.text;
             if (update.kind === 'tool_call') {
                 const key = update.id || update.title;

@@ -9287,5 +9287,9 @@
   "chat.aiDialogWhat": "Cada respuesta aquí la genera un modelo de lenguaje. Se escribe de nuevo cada vez, no se consulta en ninguna parte, y puede equivocarse de una forma que suena segura.",
   "chat.aiDialogCheck": "Comprueba lo que importe. El registro de trabajo bajo cada respuesta enumera cada llamada a herramienta, así que lo que el agente dice haber hecho se puede verificar en vez de creer.",
   "chat.aiDialogLaw": "Este aviso es el Reglamento de IA de la UE, artículo 50(1): una persona tiene derecho a saber que trata con una máquina. El contenido publicado desde aquí lleva su propia etiqueta, con el icono oficial de la UE, siempre que exista un registro de cómo se hizo.",
-  "chat.aiNoticeBody": "Puede equivocarse, así que comprueba lo que importe. Cada llamada a herramienta aparece bajo la respuesta."
+  "chat.aiNoticeBody": "Puede equivocarse, así que comprueba lo que importe. Cada llamada a herramienta aparece bajo la respuesta.",
+  "chat.attachTitle": "Adjuntar una imagen",
+  "chat.attachUploading": "subiendo…",
+  "chat.attachFailed": "falló",
+  "chat.attachRemove": "Quitar"
 }

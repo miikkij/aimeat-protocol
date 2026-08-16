@@ -85,6 +85,9 @@ export default function ChatView() {
     // than a column that would leave neither readable.
     const [listOpen, setListOpen] = useState(false);
     const [listening, setListening] = useState(false);
+    // Pictures picked but not yet sent. Each carries its own state, because one failing upload must
+    // not take the others with it or block a message that never needed it.
+    const [attachments, setAttachments] = useState([]);
 
     const abortRef = useRef(null);
     const bottomRef = useRef(null);
@@ -241,6 +244,12 @@ export default function ChatView() {
             ...prev,
             turns: [...(prev.turns ?? []), { role: 'user', text, at: new Date().toISOString() }],
         } : prev));
+        // Cleared once they are on their way: they belong to the message that was just sent.
+        setAttachments((prev) => { prev.forEach((a) => a.preview && URL.revokeObjectURL(a.preview)); return []; });
+
+        // Only the ones that actually landed. An upload still running or failed is not silently
+        // dropped from the person's view — it stays in the row, and they can send again with it.
+        const imageKeys = attachments.filter((a) => a.state === 'ready' && a.key).map((a) => a.key);
 
         const controller = new AbortController();
         abortRef.current = controller;
@@ -249,7 +258,7 @@ export default function ChatView() {
         const tools = new Map();
         const cards = new Map();
         try {
-            for await (const update of chat.streamTurn(target.id, text, controller.signal)) {
+            for await (const update of chat.streamTurn(target.id, text, controller.signal, imageKeys)) {
                 if (update.kind === 'text') {
                     answer += update.text;
                     setLive((l) => ({ ...l, text: answer }));
@@ -303,9 +312,35 @@ export default function ChatView() {
                 }
             }
         }
-    }, [draft, busy, thread, startThread, loadThreads]);
+    }, [draft, busy, thread, startThread, loadThreads, attachments]);
 
     const stop = useCallback(() => { abortRef.current?.abort(); }, []);
+
+    /**
+     * Attach pictures: upload each on its own, in the background, while the person keeps typing.
+     *
+     * Uploading on ATTACH rather than on send is what keeps the send instant — by the time they have
+     * finished the sentence the bytes are already in their storage, and a failure has been reported
+     * next to the thumbnail rather than swallowing the message.
+     */
+    const attach = useCallback((files) => {
+        for (const file of files.slice(0, 4)) {
+            const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+            const preview = URL.createObjectURL(file);
+            setAttachments((prev) => [...prev, { id, name: file.name || 'image', preview, state: 'uploading' }]);
+            chat.uploadImage(file)
+                .then((key) => setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, key, state: 'ready' } : a))))
+                .catch((err) => setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, state: 'error', error: err.message } : a))));
+        }
+    }, []);
+
+    const dropAttachment = useCallback((id) => {
+        setAttachments((prev) => {
+            const gone = prev.find((a) => a.id === id);
+            if (gone?.preview) URL.revokeObjectURL(gone.preview);
+            return prev.filter((a) => a.id !== id);
+        });
+    }, []);
 
     /**
      * A recording becomes text in the box, not a sent message.
@@ -427,6 +462,9 @@ export default function ChatView() {
                     onSend=${() => send()}
                     onStop=${stop}
                     onSpeak=${speakToText}
+                    onAttach=${attach}
+                    attachments=${attachments}
+                    onDropAttachment=${dropAttachment}
                     listening=${listening}
                     busy=${busy}
                     disabled=${disabled}

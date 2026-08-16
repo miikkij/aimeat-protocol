@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-chat
  * @version-history
+ *   v1.2.0 — 2026-08-16 — A turn may carry attached pictures: the keys travel, a non-string is
+ *     dropped at the door, and the record keeps what was attached.
  *   v1.1.0 — 2026-08-16 — The status names who pays, including for an owner who HAS stored a key.
  *     The page was deciding that for itself and telling the person their own key was being used
  *     while the node's key paid for every turn.
@@ -113,6 +115,40 @@ await test('Status names WHO PAYS for a turn, and it is not derived from having 
     assert(after.body.data.pays === 'node',
         `an owner key that the chat never receives must not be reported as paying, got ${after.body.data.pays}`);
     await json('/v1/openrouter/settings', aAuthed({ method: 'DELETE' }));
+});
+
+await test('A turn carries attached pictures as KEYS, and drops what is not one', async () => {
+    // The bytes take the presigned road into the person's own storage; what travels with the turn is
+    // a key. What is asserted here is the DOOR: the request is accepted, the stream opens, and a
+    // non-string in the list never reaches the service.
+    //
+    // The record half is asserted only on a node that HAS an agent. Without one, runChatTurn refuses
+    // before it writes anything — deliberately, so a node with no agent does not accumulate
+    // conversations nobody can answer — and asserting a record here would be asserting the absence
+    // of the feature this suite runs without.
+    const created = await json('/v1/chat/threads', aAuthed({ method: 'POST', body: JSON.stringify({ title: 'pictures' }) }));
+    const id = created.body.data.thread.id;
+
+    const res = await fetch(`${BASE}/v1/chat/threads/${id}/turn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(aAuthed().headers as Record<string, string>) },
+        body: JSON.stringify({ text: 'what is this?', images: ['chat-images/nope.png', 42, ''] }),
+    });
+    assert(res.status === 200, `the stream opens with 200, got ${res.status}`);
+    await res.body?.cancel();
+
+    const status = await json('/v1/chat/status', aAuthed());
+    if (!status.body.data.enabled) {
+        console.log('     ↳ no agent on this node: the door was asserted, the record was not');
+        return;
+    }
+
+    const read = await json(`/v1/chat/threads/${id}`, aAuthed());
+    const mine = (read.body.data.thread.turns as any[]).find(t => t.role === 'user');
+    assert(!!mine, 'the message is in the conversation');
+    assert(Array.isArray(mine.images) && mine.images.length === 1,
+        `only the string key survives the filter, got ${JSON.stringify(mine.images)}`);
+    assert(mine.images[0] === 'chat-images/nope.png', `the key is kept as given, got ${mine.images[0]}`);
 });
 
 await test('An unauthenticated caller sees nothing', async () => {

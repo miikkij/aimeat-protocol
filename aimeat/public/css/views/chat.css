@@ -454,6 +454,35 @@
   line-height: 1.5;
 }
 
+/* Pictures attached but not yet sent, and the ones already in the conversation. */
+.chat-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.chat-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  font-size: 0.75rem;
+  max-width: 220px;
+}
+.chat-attachment--error { border-color: var(--danger); color: var(--danger); }
+.chat-attachment-thumb { width: 28px; height: 28px; object-fit: cover; border-radius: 3px; }
+.chat-attachment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-attachment-state { color: var(--text-muted); }
+.chat-attachment-drop { padding: 0 4px; line-height: 1; }
+.chat-file-input { display: none; }
+.chat-attach { flex: 0 0 auto; padding: 6px 10px; }
+
+.chat-turn-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.chat-turn-image {
+  max-width: 220px;
+  max-height: 180px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+}
+
 /* ── The composer ── */
 .chat-composer {
   border-top: 1px solid var(--border-subtle);

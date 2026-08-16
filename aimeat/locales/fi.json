@@ -9295,5 +9295,9 @@
   "chat.aiDialogWhat": "Jokainen vastaus tässä on kielimallin tuottama. Se kirjoitetaan joka kerta uudestaan eikä haeta mistään, ja se voi olla väärässä tavalla joka kuulostaa varmalta.",
   "chat.aiDialogCheck": "Tarkista se mikä on tärkeää. Jokaisen vastauksen alla oleva työloki listaa jokaisen työkalukutsun, joten sen mitä agentti kertoo tehneensä voi tarkistaa eikä tarvitse uskoa.",
   "chat.aiDialogLaw": "Tämä ilmoitus on EU:n tekoälyasetuksen artikla 50(1): ihmisellä on oikeus tietää asioivansa koneen kanssa. Täältä julkaistu sisältö kantaa oman merkintänsä ja virallisen EU-ikonin aina kun siitä on olemassa tieto siitä miten se tehtiin.",
-  "chat.aiNoticeBody": "Se voi olla väärässä, joten tarkista se mikä on tärkeää. Jokainen sen tekemä työkalukutsu näkyy vastauksen alla."
+  "chat.aiNoticeBody": "Se voi olla väärässä, joten tarkista se mikä on tärkeää. Jokainen sen tekemä työkalukutsu näkyy vastauksen alla.",
+  "chat.attachTitle": "Liitä kuva",
+  "chat.attachUploading": "lähetetään…",
+  "chat.attachFailed": "epäonnistui",
+  "chat.attachRemove": "Poista"
 }

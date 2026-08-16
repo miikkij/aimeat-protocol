@@ -13,6 +13,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.3.0 — 2026-08-16 — A turn may carry `images`: storage keys of pictures the person attached,
+ *     which the service reads from their own namespace and hands to the model as bytes.
  *   v1.2.0 — 2026-08-16 — A closed stream aborts the turn, so Stop and "I left the page" both reach
  *     the agent instead of only the browser.
  *   v1.1.0 — 2026-08-16 — /v1/chat/status answers who PAYS for a turn and on which model, because
@@ -145,7 +147,12 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     // something, and a person watching a spinner for four minutes cannot tell work from a hang.
     router.post('/v1/chat/threads/:id/turn', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
         const threadId = req.params.id as string;
-        const { text } = req.body ?? {};
+        const { text, images } = req.body ?? {};
+        // Storage keys, never bytes: the browser has already uploaded through the presigned path,
+        // which is the one place a file size is checked against the owner's quota.
+        const imageKeys = Array.isArray(images)
+            ? images.filter((k: unknown): k is string => typeof k === 'string' && k.length > 0 && k.length < 512)
+            : [];
         if (typeof text !== 'string' || !text.trim()) {
             res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'text is required.'));
             return;
@@ -191,7 +198,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         });
 
         try {
-            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal)) {
+            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal, imageKeys)) {
                 if (finished) break;
                 send(update);
             }
