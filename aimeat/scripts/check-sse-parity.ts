@@ -76,6 +76,11 @@ const EXEMPT: Record<string, string> = {
         + '\'apps\' frame belongs to the promotion (publishAppDraft) where the catalogue actually '
         + 'changes. Emitting per chunk would also mean a frame per append while a 400 kB app is being '
         + 'built. Silence here is parity with the REST twin, not a gap.',
+    'src/mcp/ai-image.ts':
+        'The generated image is written to the caller\'s own storage, and POST /v1/ai/image emits '
+        + 'nothing either. Storage has no SSE domain: a file appears in the owner\'s own list when '
+        + 'that list is next read, and nothing on screen is showing a stale version of it meanwhile. '
+        + 'Silence is parity with the REST twin.',
     'src/mcp/capabilities.ts':
         'routes/capabilities.ts emits nothing either — a published capability is read through the '
         + 'catalogue, which is not SSE-backed. Silence here is parity, not a gap.',

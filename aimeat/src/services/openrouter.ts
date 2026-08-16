@@ -6,6 +6,12 @@
  *   - transcribe(apiKey, model, audio, baseUrl?, opts?) — call audio transcriptions (STT)
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
  * @version-history
+ *   v1.6.0 — 2026-08-16 — generateImage(): POST {baseUrl}/images/generations, and 'image' joins
+ *     ModelModality so the picker can list image models the same way it lists whisper ones. The
+ *     three-attempt retry is not padding: some providers' moderation throws false positives and the
+ *     SAME prompt passes on the next attempt, which scripts/gen_image.py has worked around since it
+ *     was written. Only moderation is retried; every other failure is reported at once, because
+ *     retrying a real error only makes the person wait longer for it.
  *   v1.5.0 — 2026-08-01 — Speech-to-text: transcribe() posts multipart/form-data to
  *     `${baseUrl}/audio/transcriptions` (OpenAI-compatible, so it also reaches a local whisper.cpp /
  *     faster-whisper server), and listModels() takes a modality. The modality is not cosmetic:
@@ -67,6 +73,88 @@ export interface OpenRouterModel {
   output_modalities?: string[];
 }
 
+/** What an image generation returns: the bytes, what they are, and what the provider charged. */
+export interface ImageGenerationResult {
+  data: Buffer;
+  mime: string;
+  model: string;
+  /** Provider-reported cost in USD when it says; undefined otherwise, never estimated. */
+  costUsd?: number;
+}
+
+/** How many times a moderation refusal is retried before the model is given up on. */
+const IMAGE_MODERATION_ATTEMPTS = 3;
+
+/**
+ * Generate an image, OpenAI-compatible (`POST {baseUrl}/images/generations`).
+ *
+ * The retry is not defensive padding. Some providers' moderation throws false positives on ordinary
+ * prompts and the SAME prompt passes on the next attempt, which scripts/gen_image.py has been
+ * working around since it was written. Only a moderation refusal is retried; every other failure is
+ * reported at once, because retrying a real error just makes the person wait longer for it.
+ */
+export async function generateImage(
+  apiKey: string | undefined,
+  model: string,
+  prompt: string,
+  baseUrl: string = OPENROUTER_BASE,
+  opts?: { size?: string },
+): Promise<ImageGenerationResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  logger.info(`[openrouter] image: model=${model}, size=${opts?.size ?? 'default'}`);
+
+  try {
+    let lastErr: (Error & { status?: number }) | null = null;
+    for (let attempt = 1; attempt <= IMAGE_MODERATION_ATTEMPTS; attempt++) {
+      const resp = await fetch(`${baseUrl}/images/generations`, {
+        method: 'POST',
+        headers: { ...providerHeaders(apiKey, baseUrl), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model, prompt, ...(opts?.size ? { size: opts.size } : {}), usage: { include: true } }),
+        signal: controller.signal,
+      });
+
+      if (!resp.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body only enriches an error already being reported; an unreadable body is honestly reported as empty
+        const body = await resp.text().catch(() => '');
+        const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
+        err.status = resp.status;
+        if (!/moderat/i.test(body) || attempt === IMAGE_MODERATION_ATTEMPTS) throw err;
+        lastErr = err;
+        logger.info(`[openrouter] image: moderation refusal on attempt ${attempt}, retrying`);
+        continue;
+      }
+
+      const json = await resp.json() as {
+        data?: Array<{ b64_json?: string; url?: string }>;
+        usage?: { cost?: number };
+        error?: { message?: string };
+      };
+      if (json.error?.message) throw new Error(`OpenRouter: ${json.error.message}`);
+
+      const first = json.data?.[0];
+      // Providers answer with either a base64 field or a data: URL carrying the same bytes.
+      const b64 = first?.b64_json
+        ?? (first?.url?.startsWith('data:') ? first.url.split('base64,', 2)[1] : undefined);
+      if (!b64) throw new Error('OpenRouter returned no image data.');
+
+      const data = Buffer.from(b64, 'base64');
+      // Sniff rather than trust: the response does not say which format came back, and a wrong
+      // Content-Type on the stored file is what makes an image fail to render later.
+      const isPng = data.length > 8 && data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47;
+      return {
+        data,
+        mime: isPng ? 'image/png' : 'image/jpeg',
+        model,
+        costUsd: typeof json.usage?.cost === 'number' ? json.usage.cost : undefined,
+      };
+    }
+    throw lastErr ?? new Error('OpenRouter: image generation failed.');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 /**
  * Which slice of a provider's catalogue to list.
  *
@@ -74,7 +162,7 @@ export interface OpenRouterModel {
  * OpenRouter's `output_modalities` filter — they are NOT in the default listing, so asking for the
  * default and filtering client-side returns nothing.
  */
-export type ModelModality = 'chat' | 'transcription' | 'speech';
+export type ModelModality = 'chat' | 'transcription' | 'speech' | 'image';
 
 /** Audio bytes handed to transcribe(). `filename` only decides the multipart part name the provider
  *  sees; `mime` is what actually tells it how to decode. */

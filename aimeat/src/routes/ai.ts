@@ -19,6 +19,11 @@
  *   import { aiRouter } from './routes/ai.js';
  *   app.use(aiRouter(config, storage));
  * @version-history
+ *   v1.x — 2026-08-16 — POST /v1/ai/image. The bytes land in the caller's storage and the answer is
+ *     a key and a URL, never base64: a picture returned inline would travel through a tool result
+ *     and an agent's context for nothing. Gated with requireScope('ai:use') as middleware as well
+ *     as the in-handler check, so the route says which permission it needs where an audit can read
+ *     it; an owner session bypasses scopes, so the two admit the same callers.
  *   v1.0.0 — 2026-05-29 — Initial: app-level AI calls with budget enforcement
  *   v1.1.0 — 2026-06-03 — Delegate completion to services/ai-completion.ts (shared
  *     with the scheduler); route is now a thin wrapper.
@@ -45,7 +50,7 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -55,6 +60,7 @@ import {
 } from '../services/ai-completion.js';
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
 import { transcribeForOwner } from '../services/ai-transcription.js';
+import { generateForOwner } from '../services/ai-image.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
 /** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
@@ -245,6 +251,56 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
             remaining_usd: r.budget.remainingUsd,
           },
         }));
+      } catch (e) {
+        if (e instanceof AiCompletionError) {
+          return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        }
+        return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+      }
+    });
+
+  // ── POST /v1/ai/image ── generate an image on the owner's key.
+  // The bytes land in the caller's own storage and the answer is a key and a URL, never base64: a
+  // picture returned inline would travel through a tool result and an agent's context for nothing,
+  // and this node already has a place where bytes live and can be pointed at.
+  // requireScope('ai:use') as MIDDLEWARE rather than only the in-handler gate: an owner session
+  // bypasses scopes there, so it admits exactly who gateOwnerOrAiUseAgent admits, and it says so
+  // where the route-scope audit can read it. The in-handler gate stays because it also refuses an
+  // owner-role token that is really an agent or an ecosystem app, which a scope word cannot express.
+  router.post('/v1/ai/image',
+    requireAuth(), requireScope('ai:use'), aiRateLimit,
+    async (req: Request, res: Response) => {
+      if (!gateOwnerOrAiUseAgent(req, res)) return;
+      req.setTimeout(300_000);
+      res.setTimeout(300_000);
+
+      const gaii = resolve(req);
+      const { prompt, model, size, storage_key, public: isPublic, app_id } = req.body as {
+        prompt?: string; model?: string; size?: string; storage_key?: string;
+        public?: boolean; app_id?: string;
+      };
+
+      try {
+        const r = await generateForOwner(storage, config, gaii, {
+          prompt: prompt ?? '', model, size, storageKey: storage_key,
+          publicVisibility: isPublic === true, appId: app_id,
+        });
+        res.json(success(config.nodeId, {
+          storage_key: r.storageKey,
+          mime_type: r.mime,
+          size: r.sizeBytes,
+          model: r.model,
+          visibility: r.visibility,
+          url: `/v1/storage/${r.storageKey.split('/').map(encodeURIComponent).join('/')}`,
+          usage: { cost_usd: r.usage.costUsd, cost_exact: r.usage.costExact },
+          budget: {
+            daily_budget_usd: r.budget.dailyBudgetUsd,
+            spent_today_usd: r.budget.spentTodayUsd,
+            remaining_usd: r.budget.remainingUsd,
+          },
+        }, [
+          { description: 'Download the image', method: 'GET', url: `/v1/storage/${r.storageKey}` },
+        ]));
       } catch (e) {
         if (e instanceof AiCompletionError) {
           return res.status(e.status).json(error(config.nodeId, e.code, e.message));

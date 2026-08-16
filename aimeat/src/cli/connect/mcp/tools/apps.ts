@@ -155,6 +155,24 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft/seed`, body));
   });
 
+  // → POST /v1/ai/image — make a picture on the owner's key; the bytes land in storage, not here.
+  mcp.tool('aimeat_image_generate', descriptionFor('aimeat_image_generate'), {
+    prompt: z.string().describe('What the picture should show.'),
+    size: z.string().optional().describe('Provider-specific size, e.g. "1024x1024".'),
+    storage_key: z.string().optional().describe('Where to store it.'),
+    public: z.boolean().optional().describe('Make it publicly readable so a model or page can fetch it.'),
+    model: z.string().optional().describe('Override the image model.'),
+    app_id: z.string().optional().describe('Attribution for the per-app quota and the spend report.'),
+  }, annotationsFor('aimeat_image_generate'), async ({ prompt, size, storage_key, public: isPublic, model, app_id }) => {
+    const body: Record<string, unknown> = { prompt };
+    if (size) body.size = size;
+    if (storage_key) body.storage_key = storage_key;
+    if (isPublic) body.public = true;
+    if (model) body.model = model;
+    if (app_id) body.app_id = app_id;
+    return out(await client.post('/v1/ai/image', body));
+  });
+
   // → POST /v1/apps/:owner/:filename/screenshot/capture — render the live app and store the picture.
   mcp.tool('aimeat_app_screenshot', descriptionFor('aimeat_app_screenshot'), {
     filename: z.string().describe('The published app to photograph (e.g. "pong.html").'),

@@ -136,6 +136,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_draft_read:                    'app:write',
     aimeat_app_draft_seed:                    'app:write',
     aimeat_app_screenshot:                    'app:write',
+    aimeat_image_generate:                    'ai:use',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
 

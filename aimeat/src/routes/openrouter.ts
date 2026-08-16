@@ -12,6 +12,10 @@
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.9.0 — 2026-08-16 — `imageModel` persists beside the other roles, for POST /v1/ai/image. It is
+ *     read through services/ai-model-defaults.ts like the rest, so an owner who sets nothing gets
+ *     the node's default and a node that sets nothing refuses by name rather than handing an image
+ *     request to a chat model.
  *   v1.8.0 — 2026-08-01 — Speech-to-text settings: `sttModel` + `sttLanguage` persist alongside
  *     visionModel, and GET /models takes `?modality=`. The modality is load-bearing rather than
  *     cosmetic — OpenRouter's default catalogue has no transcription models in it, so without the
@@ -139,13 +143,14 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
-      const { apiKey, model, reasoningModel, executionModel, visionModel, sttModel, sttLanguage, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
+      const { apiKey, model, reasoningModel, executionModel, visionModel, sttModel, sttLanguage, imageModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
         apiKey?: string;
         model?: string;
         reasoningModel?: string;
         executionModel?: string;
         visionModel?: string;
         sttModel?: string;
+        imageModel?: string;
         sttLanguage?: string;
         autoRetry?: unknown;
         maxRetries?: unknown;
@@ -212,6 +217,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       // the default is a text model, and handing it audio yields an opaque provider error instead of
       // an instruction the owner can act on.
       if (sttModel !== undefined) prefs.sttModel = (sttModel === null || sttModel === '') ? null : sttModel;
+      // imageModel: an IMAGE model (one whose output modality is image), used by POST /v1/ai/image.
+      // Cleared the same way as the others: '' or null means "let the node decide".
+      if (imageModel !== undefined) prefs.imageModel = (imageModel === null || imageModel === '') ? null : imageModel;
       // sttLanguage: ISO-639-1 hint. Empty = auto-detect, which is what mixed-language speech wants;
       // a hint measurably helps a single known language (Finnish in particular).
       if (sttLanguage !== undefined) prefs.sttLanguage = (sttLanguage === null || sttLanguage === '') ? null : String(sttLanguage).slice(0, 8);
@@ -247,6 +255,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         executionModel: prefs.executionModel ?? null,
         visionModel: prefs.visionModel ?? null,
         sttModel: prefs.sttModel ?? null,
+        imageModel: prefs.imageModel ?? null,
         sttLanguage: prefs.sttLanguage ?? null,
         autoRetry: prefs.autoRetry ?? true,
         maxRetries: prefs.maxRetries ?? 3,

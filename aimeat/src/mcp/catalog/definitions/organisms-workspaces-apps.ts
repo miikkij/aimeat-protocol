@@ -615,6 +615,20 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_image_generate',
+        description: 'Make a picture from a description, on the owner\'s AI key, and store it. Returns a storage key and a URL rather than the image itself, so the bytes never travel through your context. Pass public: true when a model or a web page has to fetch it back by URL; leave it off for anything private. Needs an IMAGE model to be configured (Profile > OpenRouter, or a node default) — it refuses by name rather than handing the request to a chat model, because a chat model answers an image request with prose. Spends the owner\'s daily AI budget and reports what it cost.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            prompt: { type: 'string', required: true, description: 'What the picture should show.' },
+            size: { type: 'string', description: 'Provider-specific size, e.g. "1024x1024".' },
+            storage_key: { type: 'string', description: 'Where to store it. Defaults to ai-images/<timestamp>-<random>.<ext>.' },
+            public: { type: 'boolean', description: 'Make it publicly readable so a model or page can fetch it. Default false.' },
+            model: { type: 'string', description: 'Override the image model.' },
+            app_id: { type: 'string', description: 'Attribution for the per-app quota and the spend report.' },
+        },
+    },
+    {
         name: 'aimeat_extension_list',
         description: 'List the node\'s ACTIVE server-side extensions with their version, description, author, available actions (id/method/path), and federation flags. Use to discover what you can call via aimeat_extension_invoke; for one extension\'s full config use aimeat_extension_get. Inactive/installed-but-not-activated extensions are not shown here.',
         caller: 'agent',

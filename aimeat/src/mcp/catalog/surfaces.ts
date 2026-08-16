@@ -68,6 +68,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
+        'aimeat_image_generate',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
         'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete', 'aimeat_iam_define',
         'aimeat_cortex_install', 'aimeat_cortex_activate', 'aimeat_cortex_deactivate', 'aimeat_cortex_list', 'aimeat_cortex_delete',
@@ -80,6 +81,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_handbook_get',
     ],
     agent: [
+        'aimeat_image_generate',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',

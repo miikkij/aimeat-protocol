@@ -109,4 +109,26 @@ export const appDraftEditTools: ConnectCliToolDefinition[] = [
             return client.post(`/v1/apps/${encodeURIComponent(config.owner)}/${encodeURIComponent(filename)}/screenshot/capture`, {});
         },
     },
+    {
+        // → POST /v1/ai/image
+        name: 'aimeat_image_generate',
+        description: 'Make a picture from a description on the owner AI key and store it. Returns a storage key and a URL, not the image.',
+        input: {
+            prompt: { type: 'string', required: true, description: 'What the picture should show.' },
+            size: { type: 'string', description: 'Provider-specific size, e.g. "1024x1024".' },
+            storage_key: { type: 'string', description: 'Where to store it.' },
+            public: { type: 'boolean', description: 'Make it publicly readable so a model or page can fetch it.' },
+            model: { type: 'string', description: 'Override the image model.' },
+            app_id: { type: 'string', description: 'Attribution for the per-app quota and the spend report.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = { prompt: requiredString(input, 'prompt') };
+            const size = optionalString(input, 'size'); if (size) body.size = size;
+            const key = optionalString(input, 'storage_key'); if (key) body.storage_key = key;
+            if (optionalBoolean(input, 'public')) body.public = true;
+            const model = optionalString(input, 'model'); if (model) body.model = model;
+            const appId = optionalString(input, 'app_id'); if (appId) body.app_id = appId;
+            return client.post('/v1/ai/image', body);
+        },
+    },
 ];
