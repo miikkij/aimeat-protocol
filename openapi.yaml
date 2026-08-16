@@ -15274,6 +15274,28 @@ paths:
             text/markdown:
               schema: { type: string }
 
+  /sitemap-index.xml:
+    get:
+      operationId: sitemapIndex
+      summary: Sitemap index over the node and every published app
+      description: >-
+        A sitemaps.org sitemapindex built from the current state on every request: this node's own
+        page sitemap, then the sitemap of each published app that is public and ungated. Every app
+        lives on its own host and serves a valid sitemap.xml there with a robots.txt naming it,
+        which is what makes the cross-host entries legitimate; the index is the only thing on the
+        apex that tells a crawler those hosts exist at all. Parked and operator-hidden apps are
+        excluded by the anonymous listing, and an app behind an access code or a price is excluded
+        deliberately: its origin serves the NODE's agent documents rather than its own, so listing
+        it would advertise a host that refuses to describe what was advertised. /sitemap.xml is
+        unchanged and still holds exactly the page registry. Apex only.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Sitemap index
+          content:
+            application/xml:
+              schema: { type: string }
+
   /AGENTS.md:
     get:
       operationId: agentsMd

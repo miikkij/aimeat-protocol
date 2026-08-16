@@ -1,7 +1,8 @@
 /**
  * @file bootstrap.ts
  * @description Bootstrap and discovery routes: GET / (node discovery JSON for AI agents and
- *   assistants), /llms.txt, /sitemap.xml, /favicon, /v1/help/prompt, and /v1/health.
+ *   assistants), /llms.txt, /favicon, /v1/help/prompt, and /v1/health. The two sitemaps moved to
+ *   ./sitemaps.ts when this file passed the line ceiling.
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
@@ -52,9 +53,10 @@ import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
-import { sitemapPages, buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
+import { buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
 import { buildGettingStarted } from '../data/getting-started.js';
 import { apexOnly } from './agent-docs.js';
+import { mountSitemapRoutes } from './sitemaps.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
 import { logger } from '../utils/logger.js';
 
@@ -86,24 +88,9 @@ export function bootstrapRouter(
 ): Router {
   const router = Router();
 
-  // Indexable HTML pages only, from the shared registry (src/data/public-pages.ts). The API
-  // endpoints this list used to carry — /v1/spec (YAML), /v1/catalogue and /v1/health (JSON) —
-  // are discoverable through the RFC 9727 API catalog, the Link headers on every GET, llms.txt
-  // and the bootstrap response. A sitemap advertises pages a crawler should index, and a JSON
-  // endpoint listed there only invites HTML checks it can never satisfy.
-  router.get('/sitemap.xml', (_req, res) => {
-    const b = config.baseUrl;
-    const now = new Date().toISOString().split('T')[0];
-    const xml = [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...sitemapPages().map(p =>
-        `  <url><loc>${b}${p.path === '/' ? '/' : p.path}</loc><lastmod>${now}</lastmod><changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`
-      ),
-      '</urlset>',
-    ].join('\n');
-    res.type('application/xml').send(xml);
-  });
+  // The two sitemaps live in ./sitemaps.ts — a pure extraction when this file hit the line
+  // ceiling. Nothing about them changed in the move.
+  mountSitemapRoutes(router, config, storage);
 
   router.get('/favicon.ico', (_req, res) => {
     res.type('image/svg+xml').send(FAVICON_SVG);

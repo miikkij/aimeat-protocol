@@ -154,6 +154,28 @@ function locs(xml: string): string[] {
         assert(/^> /m.test(agents.body), 'no blockquote summary');
     });
 
+    await test('sitemap-index.xml is a sitemapindex naming the page sitemap', async () => {
+        // The apex is the only place that can tell a crawler an app host exists. The index is that
+        // place. On a server with no published apps it still has to be valid and still has to
+        // carry the node's own page sitemap, or nothing downstream has an entry point.
+        const idx = await text('/sitemap-index.xml');
+        assert(idx.status === 200, `status ${idx.status}`);
+        assert(idx.ct.includes('xml'), `content-type ${idx.ct}`);
+        assert(idx.body.startsWith('<?xml'), 'missing XML declaration');
+        assert(idx.body.includes('<sitemapindex'), 'not a sitemapindex');
+        assert(!idx.body.includes('<urlset'), 'an index must not carry <urlset> entries');
+        assert(idx.body.includes(`${BASE}/sitemap.xml`), 'the index does not name the page sitemap');
+        for (const m of idx.body.matchAll(/<loc>([^<]+)<\/loc>/g)) {
+            assert(m[1].endsWith('/sitemap.xml'), `an index entry must point at a sitemap: ${m[1]}`);
+        }
+    });
+
+    await test('robots.txt names both sitemaps', async () => {
+        const robots = await text('/robots.txt');
+        assert(robots.body.includes(`Sitemap: ${BASE}/sitemap.xml`), 'robots.txt omits the page sitemap');
+        assert(robots.body.includes(`Sitemap: ${BASE}/sitemap-index.xml`), 'robots.txt omits the sitemap index');
+    });
+
     // ── llms.txt structure + /llms-full.txt (phase 05) ──────────────────────────────────────
 
     const llms = await text('/llms.txt');

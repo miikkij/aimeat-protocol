@@ -112,4 +112,8 @@ Disallow: /
 # /llms.txt is the curated index; /llms-full.txt is the full builder's manual.
 # API entry point for AI agents: GET /?format=json
 
+# The page sitemap, and the index over every published app's own sitemap. Each app lives on
+# its own host and names its sitemap in its own robots.txt, which is what makes the
+# cross-host entries in the index legitimate.
 Sitemap: {{BASE_URL}}/sitemap.xml
+Sitemap: {{BASE_URL}}/sitemap-index.xml
