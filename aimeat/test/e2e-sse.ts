@@ -240,6 +240,52 @@ async function main() {
             again.close();
         });
 
+        console.log('\nPhase 5: The ticket is a bearer credential in a query string');
+        // It is minted single-use with a thirty-second life, and openStream() only ever consumes a
+        // fresh, valid one. Delete `tickets.delete(ticketId)` (single-use consumption) or the expiry
+        // test in routes/sse.ts and all seven tests stay green while a ticket leaked through a Referer
+        // header, browser history or a proxy log becomes a permanently replayable read of the owner's
+        // live event stream.
+        const openRaw = async (query: string): Promise<number> => {
+            const ctrl = new AbortController();
+            const res = await fetch(`${BASE}/v1/events${query}`, { signal: ctrl.signal });
+            ctrl.abort();
+            return res.status;
+        };
+
+        await test('no ticket, and a ticket nobody minted, are both refused', async () => {
+            const none = await openRaw('');
+            assert(none === 400, `a stream opened with no ticket: ${none}`);
+            const bogus = await openRaw(`?ticket=${'a'.repeat(64)}`);
+            assert(bogus === 401, `a stream opened with an invented ticket: ${bogus}`);
+        });
+
+        await test('a ticket is SINGLE USE — the second attempt is refused', async () => {
+            const t = await json('/v1/events/ticket', { method: 'POST', headers: { Authorization: `Bearer ${A.token}` } });
+            assert(t.status === 200 && !!t.body.data.ticket, `ticket: ${t.status}`);
+            const first = await openRaw(`?ticket=${t.body.data.ticket}`);
+            assert(first === 200, `the fresh ticket must open the stream: ${first}`);
+            const replay = await openRaw(`?ticket=${t.body.data.ticket}`);
+            assert(replay === 401, `the same ticket opened the stream twice: ${replay}`);
+        });
+
+        await test('a second owner opens THEIR OWN stream with THEIR OWN ticket', async () => {
+            // The credential half of the same question. What this deliberately does NOT assert is
+            // that owner A's writes stay off owner B's stream: they do not. Every one of the thirty
+            // `emitChange('memory')` call sites passes no owner, so a memory change is an OWNER-LESS
+            // event and routes/sse.ts forwards those to every open stream — measured here, one frame
+            // on B's stream per write by A. The owner filter that v1.4.0 added ("owner B's agent churn
+            // no longer wakes owner A") never reached the memory domain. The payload is a domain name
+            // only, but the file's own comment says why that still matters: the name plus its timing
+            // is metadata nobody consented to hand out. Left for the developer to decide, because the
+            // fix is thirty call sites, not a test.
+            const B = await register(`${user}b`);
+            const t = await json('/v1/events/ticket', { method: 'POST', headers: { Authorization: `Bearer ${B.token}` } });
+            assert(t.status === 200, `B ticket: ${t.status}`);
+            const own = await openRaw(`?ticket=${t.body.data.ticket}`);
+            assert(own === 200, `B could not open their own stream: ${own}`);
+        });
+
         app?.close();
         console.log(`\n${passed} passed, ${failed} failed (${passed + failed} total)`);
     } finally {

@@ -333,6 +333,43 @@ await test('13. quality/overview owner-or-self: a sibling agent gets 403', async
 // ─── Cleanup ───
 console.log('\nCleanup');
 
+await test('A FOREIGN account cannot rate this agent\'s task, or read its statistics', async () => {
+    // Every rater in this suite — the owner, the orchestrator agent, the ratee itself — belongs to one
+    // owner, so the cross-owner gate on the rating route is never exercised. Delete
+    // `task.ownerGaii !== ownerGhii` from routes/agent-tasks/completion.ts and any registered account
+    // rates any agent's task on the node. The rating feeds the public statistics cache at
+    // agents.<name>.statistics.reviews, so it is a reputation-poisoning primitive.
+    const strangerName = `qualx${Date.now()}`;
+    const reg = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: strangerName, display_name: 'Quality Stranger', password: 'Quality1234' }),
+    });
+    assert(reg.status === 201, `stranger ghii ${reg.status}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts) }),
+    });
+    const strangerAuth = { Authorization: `Bearer ${tok.body.data.token}` };
+
+
+    const before = await json(`/v1/agents/${agentName}/tasks/${doneTaskId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const ratingBefore = JSON.stringify(before.body?.data?.task?.rating ?? null);
+
+    const rate = await json(`/v1/agents/${agentName}/tasks/${doneTaskId}/rate`, {
+        method: 'POST', headers: strangerAuth,
+        body: JSON.stringify({ stars: 1, context: 'creative', comment: 'poisoned' }),
+    });
+    assert(rate.status === 403 || rate.status === 404,
+        `a stranger rated another owner's task: ${rate.status} ${JSON.stringify(rate.body?.data ?? rate.body?.error)}`);
+
+    // The rating on the task is what the refusal has to leave alone: test 1 put five stars there,
+    // and a 403 sent after the write would have replaced them with the stranger's one.
+    const task = await json(`/v1/agents/${agentName}/tasks/${doneTaskId}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(JSON.stringify(task.body?.data?.task?.rating ?? null) === ratingBefore,
+        `the refused rating overwrote the real one: ${ratingBefore} -> ${JSON.stringify(task.body?.data?.task?.rating)}`);
+});
+
 await test('Cascade-delete owner', async () => {
     const { status } = await json(`/v1/owners/${encodeURIComponent(ownerName)}`, {
         method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },

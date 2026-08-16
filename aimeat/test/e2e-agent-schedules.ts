@@ -340,6 +340,22 @@ await test('12. Cross-owner cannot delete another owner\'s schedule', async () =
     assert(status === 403 || status === 404, `expected 403/404, got ${status}`);
 });
 
+await test('12b. Cross-owner cannot TRIGGER another owner\'s schedule — the one that spends', async () => {
+    // Cross-owner is proved for DELETE (12), the list (13), the occurrences projection (24) and
+    // targeting (20) — never for the trigger, which is the operation that costs money. Delete the
+    // canManageSchedule guard in triggerScheduleRecord and owner 2 fires owner 1's `ai` schedules and
+    // charges the AI spend to owner 1; every trigger in this suite is fired by its own owner or by the
+    // creating sibling agent, so tests 7, 8, 8b, 8c, 10, 11 and 18 all stay green.
+    const before = await countOccurrences();
+    const { status, body } = await json(`/v1/schedules/${agentTaskScheduleId}/trigger`, { method: 'POST', headers: auth2 });
+    assert(status === 403 || status === 404, `another owner fired this schedule: ${status} ${JSON.stringify(body?.data ?? body?.error)}`);
+    assert(await countOccurrences() === before, 'and it materialised an occurrence anyway');
+
+    // The AI schedule is the sharper case: firing it spends the owner's budget.
+    const ai = await json(`/v1/schedules/${aiScheduleId}/trigger`, { method: 'POST', headers: auth2 });
+    assert(ai.status === 403 || ai.status === 404, `another owner fired an AI schedule: ${ai.status}`);
+});
+
 await test('13. Cross-owner master list does not leak the schedule', async () => {
     const { body } = await json('/v1/schedules', { headers: auth2 });
     const ids = (body.data.managed || []).map((s: any) => s.id);
