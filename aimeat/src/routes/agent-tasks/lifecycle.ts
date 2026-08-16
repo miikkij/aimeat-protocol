@@ -22,7 +22,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { refuseNotYours } from '../../middleware/refusals.js';
+import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
@@ -304,7 +304,7 @@ export function registerTaskLifecycleRoutes(
       return;
     }
     if (isApp && !tokenHasScope(req, 'task:write')) {
-      res.status(403).json(error(config.nodeId, 'SCOPE_DENIED', 'Scope "task:write" required to start tasks'));
+      res.status(403).json(refuseNeedsPermission(config, { want: 'start work for your agents', scope: 'task:write' }));
       return;
     }
 

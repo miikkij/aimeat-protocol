@@ -55,7 +55,7 @@ const JARGON = [
     'slug', 'prefix', 'regex', 'middleware', 'manifest', 'descriptor', 'idempotent', 'envelope',
     'dispatch', 'handler', 'mcp', 'rest', 'cron', 'dag', 'blob', 'mime', 'querystring', 'sha256',
     'hash', 'boolean', 'null', 'undefined', 'array', 'params', 'param', 'parameter', 'field',
-    'denied', 'forbidden', 'unauthorized', 'invalid', 'malformed', 'unprocessable',
+    'denied', 'forbidden', 'unauthorized', 'malformed', 'unprocessable',
 ];
 
 /** Somewhere to go: an instruction, an alternative, or a question they can answer. */
@@ -72,20 +72,35 @@ const walk = (d: string, out: string[] = []): string[] => {
     return out;
 };
 
+/**
+ * DOORS THAT DO NOT OPEN ONTO A PERSON, whatever code they answer with.
+ *
+ * The code alone is not enough to know who is listening. A federation handshake answers
+ * `UNAUTHORIZED` with "Invalid signature" — a person-facing code carrying a machine-to-machine
+ * message, because the caller is another node. And the admin surface answers an OPERATOR, who knows
+ * perfectly well what CORS is; telling them "some settings could not be saved" would be worse than
+ * the sentence they have.
+ *
+ * Flagging either would be a false positive, and false positives are how a gate gets ignored — which
+ * costs more than the messages it would have caught.
+ */
+const NOT_A_PERSON = /\/(federation|peers?|admin|operator)[-/.]|\/routes\/(federation|admin)\b/;
+
 /** Every message built with error(), which is the only way a refusal reaches a caller. */
 function collect(): Message[] {
     const found: Message[] = [];
     for (const file of walk(path.join(ROOT, 'src', 'routes'))) {
+        const rel = path.relative(ROOT, file).split(path.sep).join('/');
         const src = readFileSync(file, 'utf8');
         const re = /error\(\s*config\.nodeId\s*,\s*'([A-Z_]+)'\s*,\s*(['"`])([\s\S]*?)\2/g;
         let m: RegExpExecArray | null;
         while ((m = re.exec(src)) !== null) {
             found.push({
-                file: path.relative(ROOT, file).split(path.sep).join('/'),
+                file: rel,
                 line: src.slice(0, m.index).split('\n').length,
                 code: m[1],
                 text: m[3],
-                audience: audienceOf(m[1]),
+                audience: NOT_A_PERSON.test(rel) ? 'machine' : audienceOf(m[1]),
             });
         }
     }
@@ -110,16 +125,20 @@ function score(m: Message): Finding | null {
     // Only what a person hears. A machine reading its own mistake is better served by precision.
     if (m.audience !== 'person' && m.audience !== 'ours') return null;
 
+    // SCORE WHAT THE PERSON SEES, not the template that produces it. `${ghii?.morselBalance ?? 0}`
+    // renders as "3"; scoring the source would fail that message for the word `ghii`, which nobody
+    // is ever shown. The placeholder keeps the sentence's shape so length and flow still count.
+    const shown = m.text.replace(/\$\{[^}]*\}/g, 'that');
     const reasons: string[] = [];
-    const words = new Set(m.text.toLowerCase().match(/[a-z_]+/g) ?? []);
+    const words = new Set(shown.toLowerCase().match(/[a-z_]+/g) ?? []);
     const hits = JARGON.filter(j => words.has(j));
     if (hits.length) reasons.push(`words only we understand: ${hits.join(', ')}`);
     // An identifier in the sentence, rather than in `details` where a technical reader looks.
-    if (/`[^`]+`|[a-z]+_[a-z_]+|\/v1\//.test(m.text)) reasons.push('an identifier in the sentence');
+    if (/`[^`]+`|[a-z]+_[a-z_]+|\/v1\//.test(shown)) reasons.push('an identifier in the sentence');
     // Somewhere to go, from EITHER the sentence itself or the floor error() gives this code. Asking
     // for it twice would be asking 696 routes to repeat what the envelope already says.
-    if (!NEXT_STEP.test(m.text) && !nextStepFor(m.code)) reasons.push('nowhere to go next');
-    if (m.text.length > 160) reasons.push(`${m.text.length} characters`);
+    if (!NEXT_STEP.test(shown) && !nextStepFor(m.code)) reasons.push('nowhere to go next');
+    if (shown.length > 160) reasons.push(`${shown.length} characters`);
 
     // Keyed on the CODE plus a digest of the text, not on file and line. A line number churns on
     // every unrelated edit above it, and file+code would let a second bad message hide behind a

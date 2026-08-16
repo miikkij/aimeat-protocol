@@ -19,7 +19,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { refuseNotYours } from '../../middleware/refusals.js';
+import { refuseNotYours, refuseNeedsPermission } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
@@ -85,7 +85,7 @@ export function registerTaskCreateReadRoutes(
     // H-2 app grant: needs task:write AND may only target its own owner's agents (never cross-owner).
     if (isApp) {
       if (!tokenHasScope(req, 'task:write')) {
-        res.status(403).json(error(config.nodeId, 'SCOPE_DENIED', 'Scope "task:write" required to create tasks'));
+        res.status(403).json(refuseNeedsPermission(config, { want: 'set up work for your agents', scope: 'task:write' }));
         return;
       }
       if (agent.owner !== req.auth!.owner) {
@@ -160,7 +160,7 @@ export function registerTaskCreateReadRoutes(
 
     // An app principal without task:read cannot list tasks (owner bypass never applies to it).
     if (req.auth!.roles.includes('app') && !isAppReading) {
-      res.status(403).json(error(config.nodeId, 'SCOPE_DENIED', 'Scope "task:read" required to list tasks'));
+      res.status(403).json(refuseNeedsPermission(config, { want: 'see what your agents are working on', scope: 'task:read' }));
       return;
     }
 
