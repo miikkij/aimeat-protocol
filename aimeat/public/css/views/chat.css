@@ -188,6 +188,17 @@
 
 .chat-welcome p { margin: 0; line-height: 1.6; font-size: 0.9rem; }
 
+/* One concrete opening each, wrapping on a phone. Outline buttons: they are suggestions, and the
+   composer stays the primary way in. */
+.chat-starters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+.chat-starter { font-size: 0.82rem; padding: 6px 12px; }
+
 /* ── One turn ── */
 .chat-turn {
   display: flex;

@@ -9272,5 +9272,11 @@
   "chat.copyAllTitle": "Copy the whole conversation as text",
   "chat.youLabel": "You",
   "chat.agentLabel": "Agent",
-  "chat.jumpLatest": "Jump to the latest"
+  "chat.jumpLatest": "Jump to the latest",
+  "chat.starterPage": "Make my welcome page",
+  "chat.starterPageAsk": "Put up my welcome page — keep it simple, and tell me the address when it is live.",
+  "chat.starterTools": "What can you do here?",
+  "chat.starterToolsAsk": "What can you actually do for me on this node? Answer with three concrete things, not a list of features.",
+  "chat.starterConnect": "Connect my own AI",
+  "chat.starterConnectAsk": "I already pay for an AI subscription. How do I connect it to this node so it can do this work?"
 }

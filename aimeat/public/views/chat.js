@@ -50,6 +50,23 @@ function conversationAsText(title, turns) {
     return `${head}${body}\n`;
 }
 
+/**
+ * The openings offered on an empty conversation.
+ *
+ * Each one is a request a person could have typed, and the first is the one that ends with an
+ * address they own: a page at /p/<their name> that did not exist a minute ago. The button sends the
+ * sentence rather than filling the box with it — a half-written prompt waiting to be edited is one
+ * more decision, and the point of these is to remove decisions.
+ */
+const STARTERS = [
+    { key: 'chat.starterPageAsk', fallback: 'Put up my welcome page — keep it simple, and tell me the address when it is live.',
+      label: 'chat.starterPage', labelFallback: 'Make my welcome page' },
+    { key: 'chat.starterToolsAsk', fallback: 'What can you actually do for me on this node? Answer with three concrete things, not a list of features.',
+      label: 'chat.starterTools', labelFallback: 'What can you do here?' },
+    { key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it to this node so it can do this work?',
+      label: 'chat.starterConnect', labelFallback: 'Connect my own AI' },
+];
+
 /** Close enough to the bottom to count as "following the conversation". */
 const BOTTOM_SLACK_PX = 48;
 /** How long a scroll up suspends auto-follow. Long enough to read a paragraph and look back up. */
@@ -364,6 +381,18 @@ export default function ChatView() {
                         <div class="chat-welcome">
                             <h2>${tr('chat.welcomeTitle', 'Your first agent')}</h2>
                             <p>${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}</p>
+                            <!-- One concrete thing to ask for, not a menu. An empty box asks a person
+                                 to invent a task for a system they have not used; a first request
+                                 that ends in a real address they can open answers "what is this for"
+                                 better than any paragraph on this screen could. -->
+                            <div class="chat-starters">
+                                ${STARTERS.map((st) => html`
+                                    <button type="button" class="btn-outline chat-starter" key=${st.key}
+                                        disabled=${disabled}
+                                        onClick=${() => send(tr(st.key, st.fallback))}>
+                                        ${tr(st.label, st.labelFallback)}
+                                    </button>`)}
+                            </div>
                         </div>` : ''}
 
                     ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}

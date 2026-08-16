@@ -9272,5 +9272,11 @@
   "chat.copyAllTitle": "Kopioi koko keskustelu tekstinä",
   "chat.youLabel": "Sinä",
   "chat.agentLabel": "Agentti",
-  "chat.jumpLatest": "Hyppää uusimpaan"
+  "chat.jumpLatest": "Hyppää uusimpaan",
+  "chat.starterPage": "Tee minulle kotisivu",
+  "chat.starterPageAsk": "Laita kotisivuni pystyyn — pidä se yksinkertaisena ja kerro osoite kun se on julkaistu.",
+  "chat.starterTools": "Mitä osaat täällä?",
+  "chat.starterToolsAsk": "Mitä osaat oikeasti tehdä puolestani tällä nodella? Vastaa kolmella konkreettisella asialla, älä ominaisuuslistalla.",
+  "chat.starterConnect": "Kytke oma tekoälyni",
+  "chat.starterConnectAsk": "Maksan jo tekoälytilauksesta. Miten kytken sen tähän nodeen niin että se tekee tämän työn?"
 }

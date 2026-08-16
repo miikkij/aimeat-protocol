@@ -9264,5 +9264,11 @@
   "chat.copyAllTitle": "Copiar toda la conversación como texto",
   "chat.youLabel": "Tú",
   "chat.agentLabel": "Agente",
-  "chat.jumpLatest": "Ir a lo último"
+  "chat.jumpLatest": "Ir a lo último",
+  "chat.starterPage": "Crea mi página de bienvenida",
+  "chat.starterPageAsk": "Publica mi página de bienvenida — sencilla, y dime la dirección cuando esté en línea.",
+  "chat.starterTools": "¿Qué sabes hacer aquí?",
+  "chat.starterToolsAsk": "¿Qué puedes hacer realmente por mí en este nodo? Responde con tres cosas concretas, no con una lista de funciones.",
+  "chat.starterConnect": "Conecta mi propia IA",
+  "chat.starterConnectAsk": "Ya pago una suscripción de IA. ¿Cómo la conecto a este nodo para que haga este trabajo?"
 }
