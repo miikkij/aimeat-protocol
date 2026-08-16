@@ -228,6 +228,13 @@ export function registerAgentTaskTools(
                             id: t.id,
                             title: t.title,
                             status: t.status,
+                            // The field a fleet DISPATCHES on — `kind`, `memory_key`, `app_id`. It was
+                            // trimmed out of this listing to keep the response small, which is the one
+                            // saving that costs the most: without it a runner cannot tell what any of
+                            // these tasks ARE, so it fetches every one of them individually and the
+                            // single call it was given becomes a hundred. The REST listing and both
+                            // connector doors have always carried it; this surface alone did not.
+                            scope: t.scope,
                             todos_total: t.todos.length,
                             todos_done: t.todos.filter(td => td.status === 'done').length,
                             created_at: t.createdAt,
