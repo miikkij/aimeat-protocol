@@ -342,6 +342,45 @@ await test('10b. deliverableKey persists on subsequent reads', async () => {
     assert(body.data.task.deliverableKey === 'agents.dirbot.report', `deliverableKey after read: ${body.data.task.deliverableKey}`);
 });
 
+await test('10b2. THE ANSWER IS READABLE: a finished task reports what it produced', async () => {
+    // Reported by crewaimeat-dev against a real run: a task-runner worked for 104 seconds, the task
+    // went to `done`, and the answer could not be read back from anywhere. The completion MESSAGE
+    // was written to the 'completed' event and nowhere else, and the deliverable pointer was on the
+    // record but never returned — so the caller saw `status: "done"` and had to already know that a
+    // second, differently-shaped endpoint existed before it could find out what happened.
+    // A finished task whose result nobody can reach is indistinguishable from one that produced
+    // nothing.
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    const outcome = body.data.outcome;
+    assert(outcome, `no outcome on a done task: ${JSON.stringify(Object.keys(body.data))}`);
+    assert(outcome.state === 'done', `state: ${outcome.state}`);
+    // The agent's own sentence, on the same read as the status.
+    assert(outcome.message === 'All steps finished successfully', `message: ${JSON.stringify(outcome.message)}`);
+    assert(outcome.deliverable_key === 'agents.dirbot.report', `deliverable_key: ${outcome.deliverable_key}`);
+    // An ADDRESS, not the content: a deliverable may be megabytes, and a task read that inlined it
+    // would make every listing as expensive as its largest output.
+    assert(outcome.deliverable_url?.includes('agents.dirbot.report'), `deliverable_url: ${outcome.deliverable_url}`);
+    assert(typeof outcome.at === 'string', 'and when it happened');
+});
+
+await test('10b3. A task still running reports NO outcome, rather than an empty one', async () => {
+    // An unfinished task has no outcome. Reporting an empty one would read as "finished with
+    // nothing", which is the opposite of true.
+    const created = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Still going', description: 'not finished' }),
+    });
+    const id = created.body.data.task.id;
+    const { body } = await json(`/v1/agents/${agentName}/tasks/${id}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(body.data.outcome === undefined, `a running task reported an outcome: ${JSON.stringify(body.data.outcome)}`);
+});
+
 await test('10c. Completing the task reclaims the live-progress record', async () => {
     // The reclaim is fired after the response (best-effort, must never fail a completion), so poll
     // rather than assume it has landed by the time /complete returned.

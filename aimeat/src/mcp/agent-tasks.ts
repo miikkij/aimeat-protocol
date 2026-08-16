@@ -72,6 +72,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { taskWithFileHandles } from '../services/task-files.js';
+import { taskOutcome } from '../services/task-outcome.js';
 import { completeTask, failTask } from '../services/agent-task-fanout.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
@@ -290,6 +291,10 @@ export function registerAgentTaskTools(
                         })),
                         parent_task_id: task.parentTaskId,
                         telemetry: task.telemetry,
+                        // WHAT IT PRODUCED. Absent until now, which made a finished task
+                        // indistinguishable from one that produced nothing: the caller saw
+                        // status 'done' and fifteen fields, none of them the answer.
+                        outcome: await taskOutcome(storage, task),
                         last_event_at: task.lastEventAt,
                         created_at: task.createdAt,
                         updated_at: task.updatedAt,

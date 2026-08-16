@@ -32714,7 +32714,18 @@ paths:
     get:
       operationId: getAgentTask
       summary: Get task detail
-      description: Get full task detail including all events and TODO items.
+      description: >-
+        Full task detail: TODO items, attachments as presigned handles authorized for this reader,
+        and — once the task has finished — `outcome`: what it actually produced.
+
+        `outcome` carries the agent's own completion message and the address of the deliverable it
+        published. It is absent while the task is still running, because an unfinished task has no
+        outcome and an empty one would read as "finished with nothing". Before this, a completed
+        task answered with `status: "done"` and nothing else: the completion message lived only on
+        the terminal event and the deliverable pointer was stored but never returned, so a caller
+        had to already know that a second, differently-shaped endpoint existed in order to find out
+        what happened. The deliverable comes back as an ADDRESS rather than as content, because an
+        output may be megabytes.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []

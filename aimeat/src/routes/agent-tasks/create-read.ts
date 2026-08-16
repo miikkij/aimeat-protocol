@@ -24,6 +24,7 @@ import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { createTask } from '../../services/agent-task-write.js';
 import { taskWithFileHandles } from '../../services/task-files.js';
+import { taskOutcome } from '../../services/task-outcome.js';
 import type { TaskRouteHelpers } from './helpers.js';
 import { respondDeduplicated } from './dedupe.js';
 
@@ -238,6 +239,13 @@ export function registerTaskCreateReadRoutes(
     const withFiles = await taskWithFileHandles(storage, config, task, {
       gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined,
     });
-    res.json(success(config.nodeId, { task: withFiles }));
+    // …and WHAT IT PRODUCED, on the same read. Both doors, because a finished task whose result
+    // nobody can reach is indistinguishable from one that produced nothing, and which door the
+    // caller happened to use should not decide whether they can find out.
+    const outcome = await taskOutcome(storage, task);
+    res.json(success(config.nodeId, { task: withFiles, ...(outcome ? { outcome } : {}) },
+      outcome?.deliverable_url
+        ? [{ description: 'The deliverable this task published', method: 'GET', url: outcome.deliverable_url }]
+        : []));
   });
 }
