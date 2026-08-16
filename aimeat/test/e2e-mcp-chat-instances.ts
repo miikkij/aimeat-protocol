@@ -8,6 +8,12 @@
  *     share services/chat-instance-write.ts, so re-registering a session behaves the same way
  *     through either, and a session opened through one is visible through the other.
  */
+// 2026-08-16 (August 2026 test-quality audit, e2e-mcp-chat-instances:283): one owner in the suite,
+// and test 6 asked about an id that exists for nobody — the same isError branch the cross-owner check
+// produces, so the two were indistinguishable. Test 6b gives a second owner their own agent and MCP
+// session: A's instance id is refused, A's instance is absent from B's list, and A still reads their
+// own. An instance id is computable (platform + app name + owner + node), not secret. Measured with
+// the ownerName checks removed: B reads A's row — id, platform, app name, GHII.
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-chat-instances.ts
 
@@ -286,6 +292,72 @@ await test('6. aimeat_instance_status returns error for unknown instance', async
         arguments: { instance_id: 'nonexistent-instance-id' },
     }, 105);
     assert(body.result?.isError === true, 'returns isError for unknown instance');
+});
+
+// Test 6 asks about an id that exists for nobody, so it lands in the same isError branch the
+// cross-owner check produces — the two are indistinguishable, and only one of them was ever tried.
+// An instance id is not a secret: buildChatInstanceId derives it from platform, app name, owner and
+// node id, so a foreign id is computable rather than guessable.
+await test('6b. A second owner\'s agent cannot read A\'s instance, and does not see it listed', async () => {
+    const otherName = `mcpcib${Date.now()}`;
+    const ghii = await json('/v1/ghii', {
+        method: 'POST', body: JSON.stringify({ username: otherName, display_name: 'MCP CI B', password: 'McpCiB1234' }),
+    });
+    assert(ghii.status === 201, `B ghii ${ghii.status}: ${JSON.stringify(ghii.body)}`);
+    const ts0 = new Date().toISOString();
+    const bTok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: otherName, timestamp: ts0, signature: await signMsg(ghii.body.data.private_key, otherName + NODE_ID + ts0) }),
+    });
+    assert(bTok.body.ok === true, `B token: ${JSON.stringify(bTok.body.error)}`);
+    const bAgent = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${bTok.body.data.token}` },
+        body: JSON.stringify({ name: 'mcpcibagent', owner: otherName, capabilities: ['memory'] }),
+    });
+    assert(bAgent.status === 201, `B agent ${bAgent.status}: ${JSON.stringify(bAgent.body)}`);
+
+    // A full MCP session of B's own: register → authorize → token → initialize.
+    const { body: reg } = await json('/v1/mcp/register', { method: 'POST', body: JSON.stringify({ client_name: 'ci cross-owner', redirect_uris: [] }) });
+    const gaiiB = bAgent.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const sig = await signMsg(bAgent.body.data.private_key, gaiiB + NODE_ID + ts);
+    const { body: auth } = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.client_id, gaii: gaiiB, signature: sig, timestamp: ts })}`);
+    const { body: tok } = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret }),
+    });
+    let sid = '';
+    const bRpc = async (method: string, params: Record<string, any>, id: number) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+                Authorization: `Bearer ${tok.access_token}`,
+                ...(sid ? { 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        const got = res.headers.get('mcp-session-id'); if (got) sid = got;
+        const ct = res.headers.get('content-type') ?? '';
+        if (ct.includes('text/event-stream')) {
+            const msgs: any[] = [];
+            for (const line of (await res.text()).split('\n')) if (line.startsWith('data:')) { try { msgs.push(JSON.parse(line.slice(5).trim())); } catch { /* */ } }
+            return msgs.find(m => m.id === id) ?? {};
+        }
+        return await res.json() as any;
+    };
+    await bRpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'ci-b', version: '1.0.0' } }, 200);
+
+    const status = await bRpc('tools/call', { name: 'aimeat_instance_status', arguments: { instance_id: instanceId } }, 201);
+    assert(status.result?.isError === true, `B must be refused A's instance, got: ${JSON.stringify(status.result?.content?.[0]?.text ?? status).slice(0, 200)}`);
+
+    const list = await bRpc('tools/call', { name: 'aimeat_instance_list', arguments: {} }, 202);
+    const text = list.result?.content?.[0]?.text ?? '[]';
+    assert(!text.includes(instanceId), `A's instance must not appear in B's list: ${text.slice(0, 200)}`);
+
+    // A still reads their own, so the refusal is ownership and not a broken tool.
+    const mine = await mcpRpc('tools/call', { name: 'aimeat_instance_status', arguments: { instance_id: instanceId } }, 203);
+    assert(mine.body.result?.isError !== true, 'A must still read A\'s own instance');
 });
 
 await test('7. aimeat_instance_create is idempotent (returns existing on duplicate)', async () => {
