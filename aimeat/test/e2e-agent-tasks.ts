@@ -1,4 +1,18 @@
-// E2E Tests for Agent Tasks
+/**
+ * @file e2e-agent-tasks.ts
+ * @description E2E for the agent task surface: create, list, detail, start, complete, fail, todos,
+ *   triage, buckets, search, and the live-trace reclaim that runs on completion.
+ * @version-history
+ *   v1.1.0 — 2026-08-17 — E2E quality, agent-tasks:325 and :359. One owner and one agent drove the
+ *     whole file, so canAccessTask had only ever been asked about a principal it says yes to: 10e
+ *     adds a second owner with its own agent, and 10f walks seven write doors as each of them and as
+ *     an anonymous caller, against a fixture task of its own so a broken gate cannot take five later
+ *     tests down with it. And 10d asserted that a deliverable survives the reclaim while writing it
+ *     seventy lines AFTER the completion, so the sweep had run over a namespace that did not contain
+ *     it; both records it now reads are seeded in 9f, before the completion, one of them another
+ *     task's live key, which is what makes the assertion about the sweep's scope.
+ *   v1.0.0 — pre-dates the header standard.
+ */
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-tasks.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -322,6 +336,35 @@ await test('9e. Agent writes a live-progress record while the task runs', async 
     assert([200, 201].includes(status), `seed live key: ${status}: ${JSON.stringify(body)}`);
 });
 
+/**
+ * The two records the reclaim must NOT eat, written HERE rather than after the completion.
+ *
+ * 10d used to write the deliverable seventy lines after the completion it claims the deliverable
+ * survived, so the reclaim had swept a namespace that did not contain it yet and the assertion was
+ * true of a record that had never been at risk. A prefix-scoped sweep can only be proven by records
+ * that existed when it ran.
+ *
+ * Two of them: the deliverable, which sits outside the task prefix entirely, and a live key of a
+ * DIFFERENT task, which sits under the same agent and the same shape and must survive because the
+ * sweep is scoped to one task id.
+ */
+const otherTaskLiveKey = `agents.${agentName}.tasks.other-${Date.now()}.live`;
+
+await test('9f. …and two records that the completion must leave alone', async () => {
+    const deliverable = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'agents.dirbot.report', value: { body: 'the deliverable' }, visibility: 'owner' }),
+    });
+    assert([200, 201].includes(deliverable.status), `seed deliverable: ${deliverable.status}`);
+    const otherTask = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: otherTaskLiveKey, value: { state: 'running' }, visibility: 'owner' }),
+    });
+    assert([200, 201].includes(otherTask.status), `seed the other task's live key: ${otherTask.status}`);
+});
+
 await test('10. Complete task (active -> done) with deliverable_key', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${queuedTaskId}/complete`, {
         method: 'POST',
@@ -395,21 +438,118 @@ await test('10c. Completing the task reclaims the live-progress record', async (
     assert(status === 404, `live key should be reclaimed on completion: got ${status}`);
 });
 
-await test('10d. Completing does NOT touch the deliverable the agent published', async () => {
-    // The reclaim is prefix-scoped to agents.{name}.tasks.{id}. — a deliverable under any other key
-    // must survive it, or completing a task would eat the work it produced.
-    const key = 'agents.dirbot.report';
-    const seed = await json('/v1/memory', {
+/**
+ * ONE OWNER AND ONE AGENT DRIVE THIS ENTIRE FILE. The two 403s it already has are state gates under
+ * that same owner (request-changes is owner-only; an agent cannot release its own draft), not
+ * identity gates. So canAccessTask, which every write and lifecycle door calls, has only ever been
+ * asked about a principal it says yes to.
+ *
+ * Behind those doors: completing or failing another owner's task fans out into their workflows,
+ * their counters and a publicly readable deliverable, under their name.
+ */
+const otherOwnerName = `taskother${Date.now()}`;
+let otherOwnerToken = '';
+let otherAgentToken = '';
+
+await test('10e. A second owner and its own agent exist', async () => {
+    const reg = await json('/v1/owners', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
-        body: JSON.stringify({ key, value: { body: 'the deliverable' }, visibility: 'owner' }),
+        body: JSON.stringify({ name: otherOwnerName, public_key: 'placeholder' }),
     });
-    assert([200, 201].includes(seed.status), `seed deliverable: ${seed.status}`);
-    await sleep(300);
-    const { status } = await json(`/v1/memory/${encodeURIComponent(key)}`, {
+    assert(reg.status === 201, `register owner B: ${reg.status}: ${JSON.stringify(reg.body)}`);
+    otherOwnerToken = await getToken(otherOwnerName, reg.body.data.private_key, false);
+
+    const ag = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ name: 'otherbot', owner: otherOwnerName, capabilities: ['memory', 'actions'] }),
+    });
+    assert(ag.status === 201, `register B's agent: ${ag.status}: ${JSON.stringify(ag.body.error)}`);
+    otherAgentToken = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+});
+
+await test('10f. Owner B and B\'s agent are refused every write door on A\'s task, and no credential too', async () => {
+    // A task of its own, created for this case. The doors under test include DELETE and complete, so
+    // aiming them at a task the rest of the file depends on would take five later tests down with it
+    // whenever the gate is broken, and the redness would then say nothing about which hole it found.
+    // A fresh queued task also means `complete` would really complete rather than answer 409.
+    const created = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Denial fixture', description: 'Only the refusals touch this one', status: 'queued' }),
+    });
+    assert(created.status === 201 || created.status === 200, `create the fixture task: ${created.status}`);
+    const fixtureTaskId = created.body.data.task.id as string;
+    // Started, so that complete and fail are state-valid: a queued task answers 409 on those doors
+    // whoever asks, and a refusal that would have happened anyway proves nothing about identity.
+    const started = await json(`/v1/agents/${agentName}/tasks/${fixtureTaskId}/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({}),
+    });
+    assert(started.status === 200, `start the fixture task: ${started.status}: ${JSON.stringify(started.body.error)}`);
+
+    const before = await json(`/v1/agents/${agentName}/tasks/${fixtureTaskId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(before.status === 200, `read A's task: ${before.status}`);
+    const statusBefore = before.body.data.task.status;
+    const completedBefore = before.body.data.task.completedAt;
+
+    const doors: Array<{ label: string; method: string; suffix: string; body?: unknown }> = [
+        { label: 'complete', method: 'POST', suffix: '/complete', body: { message: 'hijacked' } },
+        { label: 'fail', method: 'POST', suffix: '/fail', body: { error: 'hijacked' } },
+        { label: 'event', method: 'POST', suffix: '/event', body: { type: 'progress', message: 'hijacked' } },
+        { label: 'patch', method: 'PATCH', suffix: '', body: { title: 'hijacked' } },
+        { label: 'rate', method: 'POST', suffix: '/rate', body: { rating: 1, comment: 'hijacked' } },
+        { label: 'triage', method: 'PATCH', suffix: '/triage', body: { priority: 'low' } },
+        { label: 'delete', method: 'DELETE', suffix: '' },
+    ];
+
+    const call = (token: string | null, d: typeof doors[number]) => json(
+        `/v1/agents/${agentName}/tasks/${fixtureTaskId}${d.suffix}`,
+        {
+            method: d.method,
+            ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+            ...(d.body ? { body: JSON.stringify(d.body) } : {}),
+        },
+    );
+
+    const refused: string[] = [];
+    for (const d of doors) {
+        const asOwnerB = await call(otherOwnerToken, d);
+        if (asOwnerB.status !== 403) refused.push(`owner B ${d.label} → ${asOwnerB.status}`);
+        const asAgentB = await call(otherAgentToken, d);
+        // The agent arm answers 403 on the doors that gate on the task, and 403 on the owner-only
+        // ones too, so both are the same expectation here.
+        if (asAgentB.status !== 403) refused.push(`B's agent ${d.label} → ${asAgentB.status}`);
+        const anon = await call(null, d);
+        if (anon.status !== 401) refused.push(`no credential ${d.label} → ${anon.status}`);
+    }
+    assert(refused.length === 0, `these doors did not refuse a stranger: ${refused.join(', ')}`);
+
+    // A 403 that had already written would still be a defect, so the task is read back.
+    const after = await json(`/v1/agents/${agentName}/tasks/${fixtureTaskId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(after.status === 200, `the task must still exist: ${after.status}`);
+    assert(after.body.data.task.status === statusBefore,
+        `the task's status moved: ${statusBefore} → ${after.body.data.task.status}`);
+    assert(after.body.data.task.completedAt === completedBefore, 'the completion stamp moved');
+    assert(after.body.data.task.title !== 'hijacked', 'the title was rewritten by a refused call');
+});
+
+await test('10d. Completing does NOT touch the deliverable, nor another task\'s live key', async () => {
+    // Both records were written in 9f, BEFORE the completion, so the reclaim ran with them in place.
+    // 10c has already proven the sweep happened (this task's own live key is 404), which is what
+    // makes these two reads a statement about its scope rather than about its existence.
+    const deliverable = await json(`/v1/memory/${encodeURIComponent('agents.dirbot.report')}`, {
         headers: { Authorization: `Bearer ${agentToken}` },
     });
-    assert(status === 200, `deliverable must survive completion: got ${status}`);
+    assert(deliverable.status === 200, `the deliverable must survive completion: got ${deliverable.status}`);
+
+    const other = await json(`/v1/memory/${encodeURIComponent(otherTaskLiveKey)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(other.status === 200, `another task's live key must survive: got ${other.status}`);
 });
 
 // ─── Phase 4: Fail scenario ───
