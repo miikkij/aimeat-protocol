@@ -23,6 +23,12 @@ export interface AiCapabilityConfig {
    * needs no port, no shared secret and no loopback surface to protect.
    */
   gooseBin: string;
+  /**
+   * How many chat conversations stay open before the oldest rolls into a per-month archive record.
+   * A memory namespace holds 1000 keys, and one key per conversation forever would spend them: five
+   * a day is 1825 in a year.
+   */
+  chatMaxLiveThreads: number;
   /** GOOSE_PATH_ROOT for the child: its own config and session store, away from any human's. */
   goosePathRoot: string;
   /** The provider key the agent calls with. Who may spend it is decided before a turn starts. */

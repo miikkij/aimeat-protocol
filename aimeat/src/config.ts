@@ -277,6 +277,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     sttMaxMb: parseInt(process.env.AIMEAT_STT_MAX_MB ?? '25', 10),
     sttMaxSeconds: parseInt(process.env.AIMEAT_STT_MAX_SECONDS ?? '600', 10),
     voiceMsgMaxSeconds: parseInt(process.env.AIMEAT_VOICE_MSG_MAX_SECONDS ?? '300', 10),
+    chatMaxLiveThreads: parseInt(process.env.AIMEAT_CHAT_MAX_LIVE_THREADS ?? '50', 10),
     gooseBin: process.env.AIMEAT_GOOSE_BIN ?? '',
     goosePathRoot: process.env.AIMEAT_GOOSE_PATH_ROOT ?? '',
     gooseProviderApiKey: process.env.AIMEAT_GOOSE_PROVIDER_API_KEY ?? '',

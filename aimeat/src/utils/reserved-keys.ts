@@ -16,6 +16,9 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.4.0 — 2026-08-16 — `chat.` joins the list. A conversation is what the person said and what
+ *     the agent did on their behalf, and an app-grant token that could append to one could put
+ *     words in either mouth — including instructions the next turn would read as the person's own.
  *   v1.3.0 — 2026-08-11 — `finance.` and `commerce.` join the list (August 2026 audit H-6, H-23).
  *     Both became server-trusted after the list was written and neither was added.
  *     `finance.accountants` is the CROSS-OWNER authorization list for the whole finance area:
@@ -59,7 +62,7 @@
  * keys all use.
  */
 export const RESERVED_OWNER_KEY_PREFIXES = [
-  'openrouter.', 'ai-usage.', 'profile.', 'finance.', 'commerce.',
+  'openrouter.', 'ai-usage.', 'profile.', 'finance.', 'commerce.', 'chat.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */

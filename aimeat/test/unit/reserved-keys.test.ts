@@ -16,11 +16,14 @@
  *   agent writing in its own namespace, and the one agent the owner handed
  *   `memory:write-reserved` are asserted to still get through.
  * @structure
- *   - the list itself: the five prefixes, and no accidental removal
+ *   - the list itself: the six prefixes, and no accidental removal
  *   - isReservedServerKey: prefix matching, including the near-misses that must NOT match
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-08-16 — `chat.` is the sixth. A conversation is what the person said and what the
+ *     agent did for them; an app-grant token able to append to one could put words in either
+ *     mouth, including instructions the next turn would read as the person's own.
  *   v1.0.0 — 2026-08-11 — Initial, with the August 2026 audit fix (H-6 finance., H-23 commerce.).
  */
 import { describe, it, expect } from 'vitest';
@@ -33,9 +36,9 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all five, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all six, and a removal is a test failure rather than a silent regression', () => {
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['ai-usage.', 'commerce.', 'finance.', 'openrouter.', 'profile.'],
+            ['ai-usage.', 'chat.', 'commerce.', 'finance.', 'openrouter.', 'profile.'],
         );
     });
 
@@ -56,6 +59,8 @@ describe('isReservedServerKey covers the keys the audit found and nothing beside
         ['openrouter.settings', 'the URL a decrypted AI key is posted to'],
         ['ai-usage.2026-08-11', 'the daily spend cap'],
         ['profile.alice.interests', 'the public directory entry'],
+        ['chat.thread.abc123', 'a conversation an app could otherwise put words into'],
+        ['chat.archive.2026-08', 'the same, after it was rolled into a month'],
     ])('%s is reserved (%s)', (key) => {
         expect(isReservedServerKey(key)).toBe(true);
     });
