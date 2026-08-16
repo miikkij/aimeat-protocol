@@ -14,6 +14,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import * as http from 'node:http';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import type { Server } from 'node:http';
@@ -127,6 +128,64 @@ await test('6. P1 peers+key-exchanges G, then pulls + mirrors the book', async (
   assert(book.body.data.is_primary === false, `P1 is_primary should be false`);
   const again = await P1.json('/v1/federation/book/pull', { method: 'POST', headers: auth(P1.ownerToken), body: JSON.stringify({ source_url: G.baseUrl }) });
   assert(again.body.data.applied === false && again.body.data.reason === 'not_newer', `second pull not_newer: ${JSON.stringify(again.body)}`);
+});
+
+// Test 6 pulls G's GENUINE book from G's real node, so the signature check has never refused
+// anything — and `book/pull` appears in no other file, `INVALID_SIGNATURE` in none at all. The book
+// is the node directory: who exists in this federation and at which address. A document accepted
+// without verification rewrites that list on every node that mirrors it.
+await test('7. a book that is unsigned or tampered is refused, and the mirrored directory does not move', async () => {
+  const genuine = (await G.json('/v1/federation/book')).body.data.book;
+  assert(typeof genuine?.book_version === 'number', `G must serve a book: ${JSON.stringify(genuine)}`);
+
+  let served: unknown = genuine;
+  const stub = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, node_id: 'stub', data: { book: served, is_primary: true } }));
+  });
+  await new Promise<void>(r => stub.listen(40281, r));
+  const STUB = 'http://localhost:40281';
+  const pullFromStub = () => P1.json('/v1/federation/book/pull', {
+    method: 'POST', headers: auth(P1.ownerToken), body: JSON.stringify({ source_url: STUB }),
+  });
+  const nodeIds = async () => ((await P1.json('/v1/federation/book')).body.data.book.nodes ?? []).map((n: any) => n.node_id).sort();
+
+  try {
+    // POSITIVE CONTROL FIRST: the genuine book reaches the version gate, which proves the stub is
+    // reachable, the issuer resolved to G's key, and the signature VERIFIED over the re-serialised
+    // bytes — the check runs above the version comparison.
+    served = genuine;
+    const ok = await pullFromStub();
+    assert(ok.status === 200, `control status ${ok.status}: ${JSON.stringify(ok.body)}`);
+    assert(ok.body.data?.reason === 'not_newer',
+      `the genuine book must reach the version gate: ${JSON.stringify(ok.body.data ?? ok.body)}`);
+
+    const before = await nodeIds();
+
+    // TAMPERED: a newer version with an extra node spliced in, G's original signature still attached.
+    served = {
+      ...genuine,
+      book_version: genuine.book_version + 5,
+      nodes: [...(genuine.nodes ?? []), { node_id: 'aimeat-impostor-001', url: 'http://localhost:49911', tier: 'member' }],
+    };
+    const tampered = await pullFromStub();
+    assert(tampered.body?.data?.applied !== true,
+      `a tampered book must not apply: ${JSON.stringify(tampered.body?.data ?? tampered.body)}`);
+
+    // UNSIGNED: the same widened book with the signature stripped.
+    const { signature: _drop, ...bare } = served as Record<string, unknown>;
+    served = bare;
+    const unsigned = await pullFromStub();
+    assert(unsigned.body?.data?.applied !== true,
+      `an unsigned book must not apply: ${JSON.stringify(unsigned.body?.data ?? unsigned.body)}`);
+
+    const after = await nodeIds();
+    assert(JSON.stringify(after) === JSON.stringify(before),
+      `the refused pulls must not change the directory: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+    assert(!after.includes('aimeat-impostor-001'), 'and the spliced node must not be in it');
+  } finally {
+    stub.close();
+  }
 });
 
 console.log(`\n${'═'.repeat(50)}`);
