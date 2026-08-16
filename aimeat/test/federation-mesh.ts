@@ -283,6 +283,60 @@ await test('PUT /v1/federation/peers/:nodeId -- restore to federation mode', asy
     assert(body.data.peer_mode === 'federation', 'peer_mode restored');
 });
 
+// Every peer call in this file is the suite's own operator, so requireRole('operator') on the peer
+// doors has never been asked to refuse anything. These doors decide who this node federates with:
+// who is on the roster, what they may replicate, and whether they stay peered at all.
+let outsiderToken = '';
+
+await test('Setup: a second owner, minted WITHOUT the operator role', async () => {
+    const outsiderName = `meshoutsider${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: outsiderName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const ts2 = new Date().toISOString();
+    const sig = await signMsg(reg.body.data.private_key, outsiderName + NODE_ID + ts2);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: outsiderName, timestamp: ts2, signature: sig }) });
+    assert(tok.body.ok === true, `token: ${JSON.stringify(tok.body.error)}`);
+    outsiderToken = tok.body.data.token;
+    // The premise every assertion below rests on, read from the mint rather than from a door.
+    assert(Array.isArray(tok.body.data.roles) && !tok.body.data.roles.includes('operator'),
+        `the second owner must not be an operator: ${JSON.stringify(tok.body.data.roles)}`);
+});
+
+await test('A non-operator owner cannot register, read, retune or de-peer a peer → 403', async () => {
+    const asOutsider = { Authorization: `Bearer ${outsiderToken}` };
+    const intruderNode = `aimeat-mesh-intruder-${Date.now()}`;
+
+    const register = await json('/v1/federation/peers', {
+        method: 'POST', headers: asOutsider,
+        body: JSON.stringify({ node_id: intruderNode, url: 'http://localhost:9995' }),
+    });
+    assert(register.status === 403, `register-peer expected 403, got ${register.status}: ${JSON.stringify(register.body.error)}`);
+
+    const list = await json('/v1/federation/peers', { headers: asOutsider });
+    assert(list.status === 403, `peer list expected 403, got ${list.status}`);
+    assert(list.body.data === undefined, `no roster may leak in the error envelope: ${JSON.stringify(list.body.data)}`);
+
+    // Aimed at the peer this suite created, so a landed write would show in the read-back below.
+    const retune = await json(`/v1/federation/peers/${fakePeerNodeId}`, {
+        method: 'PUT', headers: asOutsider,
+        body: JSON.stringify({ share_catalogue: false, replicate_memory: false, allow_routing: false, peer_mode: 'private' }),
+    });
+    assert(retune.status === 403, `update-peer expected 403, got ${retune.status}: ${JSON.stringify(retune.body.error)}`);
+
+    const depeer = await json(`/v1/federation/peers/${fakePeerNodeId}`, { method: 'DELETE', headers: asOutsider });
+    assert(depeer.status === 403, `de-peer expected 403, got ${depeer.status}: ${JSON.stringify(depeer.body.error)}`);
+
+    // Read back as the operator: the peer is still there and still tuned the way the test above left it.
+    const asOperator = await json('/v1/federation/peers', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(asOperator.status === 200, `operator list: ${asOperator.status}`);
+    const peers = asOperator.body.data.peers as any[];
+    assert(!peers.some(p => p.node_id === intruderNode), 'the refused registration must not have created a peer');
+    const ours = peers.find(p => p.node_id === fakePeerNodeId);
+    assert(!!ours, `our peer must still exist: ${JSON.stringify(peers.map(p => p.node_id))}`);
+    assert(ours.share_catalogue === true && ours.replicate_memory === true && ours.allow_routing === true,
+        `the refused retune must not have moved anything: ${JSON.stringify(ours)}`);
+});
+
 // ─── Test: Action federate flag ───
 console.log('\nAction Federate Flag');
 
