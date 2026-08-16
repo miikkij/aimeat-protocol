@@ -1,4 +1,3 @@
-import { swallowed } from '/js/swallowed.js';
 /**
  * @file public/sw.js
  * @description AIMEAT push-notification service worker. Displays incoming Web Push messages and
@@ -16,7 +15,26 @@ import { swallowed } from '/js/swallowed.js';
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-18 — Render notification action buttons + route action clicks to the SPA.
+ *   v1.2.0 — 2026-08-16 — Classic-worker compatible again: every register('/sw.js') call runs this
+ *     as a CLASSIC worker, where a static `import` is a syntax error, so the import of
+ *     /js/swallowed.js added on 2026-07-26 made registration reject on every browser. A local
+ *     recorder keeps the suppressed-failure ring readable (self.AIMEAT_SWALLOWED() in the worker
+ *     console) without the module dependency.
  */
+
+// Local stand-in for /js/swallowed.js: this file must stay importable as a CLASSIC worker
+// (see v1.2.0 above), so it cannot use ESM. Same contract — record quietly, readable on demand.
+const SWALLOWED_MAX = 200;
+const swallowedRing = [];
+function swallowed(where, err) {
+  swallowedRing.push({
+    at: new Date().toISOString(),
+    where,
+    error: err instanceof Error ? (err.message || err.name) : String(err),
+  });
+  if (swallowedRing.length > SWALLOWED_MAX) swallowedRing.shift();
+}
+self.AIMEAT_SWALLOWED = () => swallowedRing.slice();
 
 // Take over immediately so click-routing fixes apply without waiting for every tab to close.
 self.addEventListener('install', () => self.skipWaiting());

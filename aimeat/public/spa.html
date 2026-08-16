@@ -70,7 +70,14 @@
   <link rel="alternate" type="text/plain" href="/llms-full.txt" title="Full content for LLMs">
   <link rel="describedby" type="text/plain" href="/llms.txt">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192">
   <link rel="manifest" href="/manifest.json">
+  <!-- Installable app (PWA): the manifest above carries the identity and icons; these four are
+       what iOS reads instead of the manifest when a person uses Add to Home Screen. -->
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="AIMEAT.IO">
   <!-- WebMCP bridge (TARGET-034 phase C): registers node-level tools (commerce feed, node info)
        on document/navigator.modelContext for in-browser agents + readiness scanners. No-op when
        no agent API is present. -->
@@ -897,6 +904,14 @@
 
     // ── Bootstrap ──
     async function boot() {
+      // Register the service worker on every visit, not only when push notifications are enabled.
+      // An installed app (desktop PWA / home-screen) needs an active worker for notification-click
+      // routing, and registering is idempotent — the push tabs re-register the same script.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+          .catch((err) => console.warn('Service worker registration failed:', err.message));
+      }
+
       // Load translations
       await loadTranslations();
 

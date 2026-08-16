@@ -1,17 +1,17 @@
 {
-  "name": "AIMEAT",
-  "short_name": "AIMEAT",
+  "id": "/",
+  "name": "AIMEAT.IO",
+  "short_name": "AIMEAT.IO",
   "description": "AI Memory Exchange and Action Transfer — your node, your data",
   "start_url": "/v1/portal",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#FAFAF8",
   "theme_color": "#FAFAF8",
-  "orientation": "portrait-primary",
   "icons": [
     { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml" },
-    { "src": "/icons/icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "categories": ["social", "utilities"],
   "lang": "en",

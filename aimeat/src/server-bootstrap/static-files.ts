@@ -300,7 +300,8 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     app.use('/locales', express.static(localeDir, { maxAge: '1h' }));
   }
 
-  // PWA static files (manifest.json, sw.js, offline.html, icons)
+  // PWA manifest + app-catalog + silent-bridge pages. The service worker is NOT here: /sw.js
+  // resolves to public/sw.js, which the public/ mount above serves first.
   const pwaCandidates = [
     join(process.cwd(), 'static'),                       // scaffolded: CWD/static
     join(__dirname, '..', '..', 'src', 'static'),       // dev

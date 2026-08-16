@@ -5,6 +5,18 @@
       "date": "2026-08-16",
       "kind": "feature",
       "title": {
+        "en": "Install aimeat.io as an app, on the desktop and on your phone",
+        "fi": "aimeat.io asentuu sovellukseksi työpöydälle ja puhelimeen"
+      },
+      "body": {
+        "en": "Chrome and Edge now offer to install this node as an app of its own: on the desktop a window without browser chrome, on an Android phone an icon on the home screen. On iPhone and iPad the same install is behind Share → Add to Home Screen. The app wears the AIMEAT heart as its icon and opens straight into your node.\n\nOne repair rode along: switching push notifications on had been failing since late July, because every browser refused the part of the site that receives them. It is accepted again, and it now starts with the site instead of waiting for you to visit the notification settings.",
+        "fi": "Chrome ja Edge tarjoavat nyt tämän noden asentamista omaksi sovellukseksi: työpöydälle oma ikkuna ilman selaimen reunuksia, Android-puhelimeen kuvake aloitusnäytölle. iPhonella ja iPadilla sama asennus löytyy jakovalikon kohdasta Lisää Koti-valikkoon. Sovelluksen kuvakkeena on AIMEATin sydän, ja se avautuu suoraan omaan nodeesi.\n\nSamalla korjaantui yksi vika: push-ilmoitusten kytkeminen on epäonnistunut heinäkuun lopusta asti, koska jokainen selain hylkäsi sen osan sivustoa, joka ottaa ilmoitukset vastaan. Nyt se kelpaa taas, ja se käynnistyy sivuston mukana eikä vasta ilmoitusasetuksista."
+      }
+    },
+    {
+      "date": "2026-08-16",
+      "kind": "feature",
+      "title": {
         "en": "An AI that meets this node reads a page, not a manual",
         "fi": "Tekoäly joka kohtaa tämän noden lukee sivun, ei käsikirjaa"
       },
