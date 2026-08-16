@@ -10,6 +10,12 @@
  *   Node: port 40272, aimeat-test-001-presence (memory storage, in-process — same pattern as the
  *   federation-* suites, so the test shares the server's PresenceTracker instance).
  * @version-history
+ *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-presence:160): test 10 proved an
+ *     everyone owner IS in the federation snapshot and nothing proved the other two settings stay
+ *     out of it. 10b drives bob through everyone → contacts → nobody and reads the tracker after
+ *     each, with bob broadcastable first (an owner who never PUT is absent from a dead tracker too)
+ *     and alice asserted still present (so the absence is bob's setting, not an empty list).
+ *     Measured with the visibility filter removed: a contacts-only owner's busy status is pushed.
  *   v1.0.0 — 2026-06-19 — Initial presence test suite (local visibility + federated receive/serve).
  */
 
@@ -162,6 +168,37 @@ await test('10. getSnapshot() includes a local everyone owner', async () => {
   const snap = presence.getSnapshot();
   const entry = snap.find(u => u.ghii === alice.ghii);
   assert(entry !== undefined && entry.status === 'available', `snapshot should include alice available, got ${JSON.stringify(snap)}`);
+});
+
+// Test 10 proves an 'everyone' owner IS in the snapshot; nothing proved the other two settings stay
+// out of it, and the snapshot is what the flush loop pushes to peers. Bob has to be broadcastable
+// FIRST or his absence proves nothing: getSnapshot reads lastBroadcast, which recompute() writes
+// only on setConfig or markOnline/markOffline, so an owner who never PUT is missing from a dead
+// tracker and a live one alike.
+await test('10b. only an everyone owner leaves the node — contacts and nobody do not', async () => {
+  const on = await json('/v1/presence/me', {
+    method: 'PUT', headers: auth(bob.token),
+    body: JSON.stringify({ mode: 'manual', status: 'busy', visibility: 'everyone' }),
+  });
+  assert(on.status === 200, `bob everyone: ${on.status} ${JSON.stringify(on.body)}`);
+  assert(on.body.data.config.visibility === 'everyone', `visibility echoed: ${JSON.stringify(on.body.data.config)}`);
+  const withBob = presence.getSnapshot().find(u => u.ghii === bob.ghii);
+  assert(withBob !== undefined && withBob.status === 'busy',
+    `an everyone owner must be in the snapshot: ${JSON.stringify(presence.getSnapshot())}`);
+
+  for (const hidden of ['contacts', 'nobody'] as const) {
+    const set = await json('/v1/presence/me', {
+      method: 'PUT', headers: auth(bob.token), body: JSON.stringify({ visibility: hidden }),
+    });
+    assert(set.status === 200, `bob ${hidden}: ${set.status} ${JSON.stringify(set.body)}`);
+    const snap = presence.getSnapshot();
+    assert(snap.find(u => u.ghii === bob.ghii) === undefined,
+      `a '${hidden}' owner must not be pushed to peers: ${JSON.stringify(snap)}`);
+    // …and the snapshot is still alive, so the absence above is bob's setting and not an empty list.
+    const alice0 = snap.find(u => u.ghii === alice.ghii);
+    assert(alice0 !== undefined && alice0.status === 'available',
+      `alice must still be in the snapshot while bob is ${hidden}: ${JSON.stringify(snap)}`);
+  }
 });
 
 console.log('\nPhase 5 — Federation receive + serve');
