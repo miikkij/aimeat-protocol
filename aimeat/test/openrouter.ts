@@ -62,7 +62,6 @@ let ownerPrivKey = '';
 const ownerName = `ortest${Date.now()}`;
 
 // Track whether encryption is available
-let encryptionAvailable = false;
 
 console.log('\n=== OpenRouter Settings E2E Tests ===\n');
 
@@ -149,23 +148,18 @@ await test('PUT /v1/openrouter/settings — save API key and preferences', async
     }),
   });
 
-  // If encryption is not configured, the endpoint returns 503 — note and skip further CRUD tests
-  if (status === 503) {
-    console.log('    (Encryption not configured on test node — CRUD tests skipped)');
-    return;
-  }
+  // 503 is NOT an environment question here. AIMEAT_ENCRYPTION_KEY is set in .env.test.sqlite and
+  // .env.test.postgres-kysely and defaulted again in test/run-e2e-server.ts, so an ENCRYPTION_NOT_
+  // CONFIGURED answer means the node is broken. This used to return early and take twelve tests with
+  // it, which is how a suite disables itself without anyone noticing.
+  assert(status !== 503, `encryption must be configured on the test node, got 503: ${JSON.stringify(body)}`);
 
   assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
   assert(body.ok === true, `body.ok: ${JSON.stringify(body)}`);
   assert(body.data?.saved === true, `data.saved: ${JSON.stringify(body.data)}`);
-  encryptionAvailable = true;
 });
 
 await test('GET /v1/openrouter/settings — returns hasApiKey: true, no raw key', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available)');
-    return;
-  }
   const { status, body } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
@@ -179,10 +173,6 @@ await test('GET /v1/openrouter/settings — returns hasApiKey: true, no raw key'
 });
 
 await test('GET /v1/openrouter/settings — no apiKey or encrypted field in response', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available)');
-    return;
-  }
   const { status, body } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
@@ -196,10 +186,6 @@ await test('GET /v1/openrouter/settings — no apiKey or encrypted field in resp
 });
 
 await test('PUT /v1/openrouter/settings — update preferences only (no apiKey)', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available)');
-    return;
-  }
   const { status, body } = await json('/v1/openrouter/settings', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -210,10 +196,6 @@ await test('PUT /v1/openrouter/settings — update preferences only (no apiKey)'
 });
 
 await test('GET /v1/openrouter/settings — preferences updated, hasApiKey still true', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available)');
-    return;
-  }
   const { status, body } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
@@ -224,10 +206,6 @@ await test('GET /v1/openrouter/settings — preferences updated, hasApiKey still
 });
 
 await test('PUT/GET /v1/openrouter/settings — visionModel persists and clears', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available)');
-    return;
-  }
   // Set a vision-capable model (used for image inputs — the Secretary doc/image intake).
   const set = await json('/v1/openrouter/settings', {
     method: 'PUT', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -247,10 +225,6 @@ await test('PUT/GET /v1/openrouter/settings — visionModel persists and clears'
 });
 
 await test('DELETE /v1/openrouter/settings — removes key and settings', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available)');
-    return;
-  }
   const { status, body } = await json('/v1/openrouter/settings', {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -260,10 +234,6 @@ await test('DELETE /v1/openrouter/settings — removes key and settings', async 
 });
 
 await test('GET /v1/openrouter/settings after delete — hasApiKey: false', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available)');
-    return;
-  }
   const { status, body } = await json('/v1/openrouter/settings', {
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
@@ -306,10 +276,6 @@ await test('POST /v1/openrouter/complete without prompt → 400', async () => {
 });
 
 await test('POST /v1/openrouter/complete with non-existent project → 404', async () => {
-  if (!encryptionAvailable) {
-    console.log('    (Skipped — encryption not available; 503 expected instead of 404)');
-    return;
-  }
   const { status, body } = await json('/v1/openrouter/complete', {
     method: 'POST',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -323,7 +289,6 @@ await test('POST /v1/openrouter/complete with non-existent project → 404', asy
 console.log('\nPhase 5 — Speech-to-text settings');
 
 await test('PUT settings — sttModel + sttLanguage round-trip', async () => {
-  if (!encryptionAvailable) { console.log('    (Skipped — encryption not available)'); return; }
   const put = await json('/v1/openrouter/settings', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ownerToken}` },
@@ -337,7 +302,6 @@ await test('PUT settings — sttModel + sttLanguage round-trip', async () => {
 });
 
 await test('PUT settings — empty sttModel CLEARS it (transcription off, no silent fallback)', async () => {
-  if (!encryptionAvailable) { console.log('    (Skipped — encryption not available)'); return; }
   await json('/v1/openrouter/settings', {
     method: 'PUT',
     headers: { Authorization: `Bearer ${ownerToken}` },
