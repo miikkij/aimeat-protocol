@@ -22,6 +22,14 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=app-publish-provenance-doors
  * @version-history
+ *   v1.1.0 — 2026-08-16 — E2E quality, provenance-doors:284: the agent half of the silent door. That a
+ *     machine's undeclared publish gets a record was covered; its SHAPE was not, anywhere in the tree.
+ *     The stamp is now read for stampedBy 'node', observed false, level, humanInvolvement and the
+ *     principal it names, and the served app is read for the headers a crawler gets, with the Link
+ *     tied to this record's id. The owner's own silent app is re-read afterwards to prove it was not
+ *     retroactively stamped. Plus the refusal this suite lacked entirely: on the presigned door the
+ *     token is the statement of who published, so a forged one is refused 401 and an edited address
+ *     resolves to nothing (410), with neither leaving an app behind.
  *   v1.0.0 — 2026-08-01 — TARGET-058: the declaration survives every publish door.
  */
 import * as ed from '@noble/ed25519';
@@ -48,6 +56,10 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 const owner = `pdowner${Date.now() % 1000000}`;
 let ownerToken = '';
+let agentToken = '';
+let agentGaii = '';
+/** Self-reported and lowercased by the node, so the expectation is written lowercase here. */
+const AGENT_MODEL = 'test-model';
 
 /** Big enough that presigned upload is the realistic door, which is the whole point. */
 const APP_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
@@ -119,6 +131,37 @@ async function main() {
         assert(reg.status === 201, `register: ${reg.status}`);
         if (typeof reg.body.node === 'string' && reg.body.node) NODE_ID = reg.body.node;
         ownerToken = await getOwnerToken(owner, reg.body.data.private_key);
+    });
+
+    /**
+     * The agent half of the same doors. It reports a platform and a model through the onboarding
+     * step, because that is the only door that writes agent.model — and the node reads that field
+     * when it stamps a machine write, so without it the record cannot name who generated the bytes.
+     */
+    await test('connect an agent that has told the node what model drives it', async () => {
+        const agentName = `doorbot${Date.now() % 1000000}`;
+        const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner }) });
+        assert(da.status === 200, `device-authorize: ${da.status}`);
+        const v = await json('/v1/agents/verify', {
+            method: 'POST',
+            body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read', 'apps:write', 'agent:write'], owner_token: ownerToken }),
+        });
+        assert(v.status === 200, `verify: ${v.status} ${JSON.stringify(v.body.error ?? '')}`);
+        const t = await json('/v1/agents/device-token', {
+            method: 'POST',
+            body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+        });
+        assert(t.status === 200, `device-token: ${t.status}`);
+        agentToken = t.body.token;
+        agentGaii = t.body.gaii;
+
+        const start = await json(`/v1/agents/${encodeURIComponent(agentName)}/onboarding/start`, { method: 'POST', headers: auth(agentToken) });
+        assert(start.status === 200 || start.status === 201, `onboarding start: ${start.status} ${JSON.stringify(start.body.error ?? '')}`);
+        const step = await json(`/v1/agents/${encodeURIComponent(agentName)}/onboarding/step/identify_platform`, {
+            method: 'POST', headers: auth(agentToken),
+            body: JSON.stringify({ platform: 'claude-code', model: AGENT_MODEL }),
+        });
+        assert(step.status === 200, `identify_platform: ${step.status} ${JSON.stringify(step.body.error ?? '')}`);
     });
 
     console.log('\nDoor 1: presigned upload — the one the tooling recommends above 1 KB');
@@ -296,6 +339,112 @@ async function main() {
         assert(put.status === 200, `PUT: ${put.status}`);
         const { prov } = await storedRecord(f);
         assert(!prov, `an owner who declared nothing must not get a record, got ${JSON.stringify(prov?.record?.level)}`);
+    });
+
+    /**
+     * The other side of that door. A machine's silence is not a human's silence: MINT-3 stamps the
+     * agent's write with what the NODE observed, and the two cases above and below are the same
+     * endpoint distinguishing its two principals.
+     *
+     * That a record EXISTS here is already covered (e2e-app-ai-posture mints presigned as an agent
+     * and asserts an id). What no test in the tree reads is its SHAPE — who stamped it, whether the
+     * node claims to have observed the generation, and which principal it names — or the headers the
+     * served app then carries. A record saying the principal declared this, or naming the owner
+     * instead of the agent, would pass every existing assertion.
+     */
+    const agentSilentFile = 'door-agent-silent.html';
+    let agentProvId = '';
+    await test('an AGENT publishing presigned with NO declaration is stamped BY THE NODE, and the stamp names the agent', async () => {
+        const mint = await json('/v1/apps', {
+            method: 'POST', headers: auth(agentToken),
+            body: JSON.stringify({ mode: 'presigned', filename: agentSilentFile, name: 'Agent silent door', description: 'No declaration.' }),
+        });
+        assert(mint.status === 200 && mint.body.data?.upload_url, `mint: ${mint.status} ${JSON.stringify(mint.body)}`);
+        const put = await fetch(mint.body.data.upload_url, {
+            method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: APP_HTML,
+        });
+        const putBody = await put.json() as any;
+        assert(put.status === 200 && putBody.success, `PUT: ${put.status} ${JSON.stringify(putBody)}`);
+
+        const { prov } = await storedRecord(agentSilentFile);
+        assert(!!prov?.id, 'a machine publishing through this door must be stamped');
+        agentProvId = prov.id;
+        const rec = prov.record;
+        // The node's own inference, never a claim it was handed. 'principal' here would mean the
+        // node recorded something the caller said, and the caller said nothing.
+        assert(rec.attestation?.stampedBy === 'node',
+            `an undeclared machine write is stamped by the node, got ${rec.attestation?.stampedBy}`);
+        assert(rec.attestation?.observed === false,
+            `the node infers this from who is calling, it did not watch the generation: observed=${rec.attestation?.observed}`);
+        assert(rec.level === 'ai-generated', `level should be ai-generated, got ${rec.level}`);
+        assert(rec.humanInvolvement === 'none', `humanInvolvement should be none, got ${rec.humanInvolvement}`);
+        // WHO, and this is the assertion the presigned token had to carry across the handshake:
+        // the upload arrives later, on a token, and `sub` alone resolves to the owner.
+        assert(rec.generator?.principal === agentGaii,
+            `the record must name the agent that published, got ${JSON.stringify(rec.generator)} (expected ${agentGaii})`);
+        assert(rec.generator?.model === AGENT_MODEL,
+            `the record must carry the model the agent reported, got ${JSON.stringify(rec.generator)}`);
+        assert(typeof rec.attestation?.contentHash === 'string' && rec.attestation.contentHash.startsWith('sha256:'),
+            `the node must hash the bytes itself, got ${rec.attestation?.contentHash}`);
+    });
+
+    await test('...and the served app carries that stamp in the headers a crawler reads', async () => {
+        const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(agentSilentFile)}?mode=inline`);
+        assert(res.status === 200, `inline serve: ${res.status}`);
+        assert(!!res.headers.get('ai-disclosure'), 'no AI-Disclosure header on a machine-stamped app');
+        const link = res.headers.get('link') ?? '';
+        assert(link.includes('rel="ai-provenance"'), `no rel="ai-provenance" Link header, got: ${link}`);
+        // Tied to THIS record rather than to any record.
+        assert(link.includes(`/v1/provenance/${agentProvId}`),
+            `the Link header must point at the record stored for this app (${agentProvId}), got: ${link}`);
+    });
+
+    /**
+     * On the presigned door the token IS the statement of who published: the bytes arrive later, on
+     * their own request, and the record's principal is read off that token rather than off any
+     * session. A token whose payload can be edited would therefore let anyone publish an app in
+     * another identity's name and choose the provenance it is stamped with. The signature is what
+     * stands between those two things, so it is asserted here rather than assumed.
+     */
+    await test('a tampered publish token is refused, so nobody can publish in another name', async () => {
+        const mint = await json('/v1/apps', {
+            method: 'POST', headers: auth(ownerToken),
+            body: JSON.stringify({ mode: 'presigned', filename: 'door-tampered.html', name: 'Tampered door', description: 'Never published.' }),
+        });
+        assert(mint.status === 200, `mint: ${mint.status}`);
+        const url = mint.body.data.upload_url as string;
+
+        // A hand-made token claiming this owner and naming an actor of the forger's choosing. It is
+        // the shape the node's own tokens have, minus the one thing that cannot be made up.
+        const forgedPayload = [
+            Buffer.from(JSON.stringify({ alg: 'EdDSA', typ: 'JWT' })).toString('base64url'),
+            Buffer.from(JSON.stringify({
+                sub: `${owner}@${NODE_ID}`, actor: `forged#${owner}@${NODE_ID}`, typ: 'upload', utype: 'app',
+                exp: Math.floor(Date.now() / 1000) + 3600, meta: { filename: 'door-forged.html' },
+            })).toString('base64url'),
+            'ZmFrZXNpZ25hdHVyZQ',
+        ].join('.');
+        const forged = await fetch(`${BASE}/v1/upload/${forgedPayload}`, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: APP_HTML });
+        assert(forged.status === 401, `a forged upload token must be refused, got ${forged.status}`);
+
+        // The last four characters of the ADDRESS changed. That address is a handle rather than the
+        // credential, so an edited one stands for nothing and the node says so with 410 Gone — a
+        // different refusal from the forgery above, and the reason this asserts both.
+        const tampered = url.slice(0, -4) + (url.slice(-4) === 'AAAA' ? 'BBBB' : 'AAAA');
+        const put = await fetch(tampered, { method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: APP_HTML });
+        assert(put.status === 410, `an edited upload address must resolve to nothing, got ${put.status}`);
+
+        // And neither refusal left an app behind.
+        const listed = await json(`/v1/apps?q=door-tampered&limit=50`);
+        assert(listed.status === 200, `list: ${listed.status}`);
+        const rows = (listed.body.data.apps ?? []) as any[];
+        assert(!rows.some(a => a.owner === owner && (a.filename === 'door-tampered.html' || a.filename === 'door-forged.html')),
+            'a refused upload must not have published an app');
+    });
+
+    await test('...and the human\'s silent app was not retroactively stamped', async () => {
+        const { prov } = await storedRecord('door-silent.html');
+        assert(!prov, `the owner's own silent app must still carry no record, got ${JSON.stringify(prov?.record?.level)}`);
     });
 
     console.log(`\n${passed} passed, ${failed} failed\n`);
