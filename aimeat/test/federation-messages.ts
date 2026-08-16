@@ -295,6 +295,40 @@ await test('7. Bob blocks Alice; Alice cross-node send becomes undeliverable', a
     assert(send.body.data.message.status === 'undeliverable', `expected undeliverable, got ${send.body.data.message.status}`);
 });
 
+// Test 7 reads only the SENDER's copy on node A — 'undeliverable' is what A wrote about itself.
+// Whether the block actually kept the message out of Bob's mailbox on node B is a different claim,
+// and the read-back door is unfiltered for it: GET /v1/messages/inbox hides senders whose contact
+// state is 'pending' and nothing else, so a blocked sender's row would show. The refusal has to
+// happen BEFORE the copy is written, not merely be reported afterwards.
+await test('7b. The blocked message never reaches the recipient\'s mailbox on the other node', async () => {
+    const inbox = await B!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    assert(inbox.status === 200, `inbox status ${inbox.status}`);
+    const msgs = (inbox.body.data?.messages ?? []) as any[];
+    assert(!msgs.some(m => m.body === 'are you there?'),
+        `the blocked message must not be in Bob's inbox: ${JSON.stringify(msgs.map(m => m.body))}`);
+
+    // The thread is the second, filter-free door onto the same rows: conversationIdFor is a
+    // deterministic hash over the sorted GHII pair, so the blocked send would land in this very
+    // conversation if it had been written at all.
+    const convs = await B!.json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${B!.ownerToken}` } });
+    const conv = (convs.body.data?.conversations ?? []).find((c: any) => c.peerGhii === A!.ownerGhii);
+    if (conv) {
+        const thread = await B!.json(`/v1/messages/conversations/${conv.conversationId}`, {
+            headers: { Authorization: `Bearer ${B!.ownerToken}` },
+        });
+        const bodies = ((thread.body.data?.messages ?? []) as any[]).map(m => m.body);
+        assert(!bodies.includes('are you there?'),
+            `the blocked message must not be in the thread either: ${JSON.stringify(bodies)}`);
+    }
+
+    // POSITIVE CONTROL, same reader, same sender, same door: the message Alice delivered BEFORE the
+    // block is still there. So the inbox read works and does show rows from this sender — the absence
+    // above is the block and not an empty or broken mailbox. (There is no unblock route to undo with:
+    // POST .../block is the only contact-state door in routes/messages.ts.)
+    assert(msgs.some(m => m.body === 'Hello across the federation!'),
+        `the pre-block message must still be in Bob's inbox: ${JSON.stringify(msgs.map(m => m.body))}`);
+});
+
 await test('8. Cross-node DM to an AGENT: the agent reads it AND its owner sees it', async () => {
     // Fresh owner on B (independent of the operator Bob, who blocked Alice above) + an agent with read.
     const owner = await registerOwnerOn(B!, `bagent${ts}`);
