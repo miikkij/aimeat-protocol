@@ -51,6 +51,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
+import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
@@ -93,20 +94,10 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
    * never an owner session — can still spend the owner's AI budget once the
    * owner granted `ai:use`. Reject anything else.
    */
-  function gateOwnerOrAiUseAgent(req: Request, res: Response): boolean {
-    const roles = req.auth?.roles ?? [];
-    // The owner branch is requireScope's owner branch, exclusions and all: an agent or ecosystem
-    // session is scoped, and reaches this endpoint through `ai:use` or not at all. Testing
-    // roles.includes('owner') on its own let a mirrored agent token (POST /v1/auth/token copied the
-    // owner's roles onto it until 2026-08-11, audit H-2) spend the owner's AI budget without the
-    // word the owner would have had to grant for it.
-    if (roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
-    const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
-    if (scopes.includes('ai:use') || scopes.includes('*')) return true;
-    res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-      'AI completion requires an owner session or a token with the ai:use scope.'));
-    return false;
-  }
+  // The same test the chat proxy applies, in one place (src/auth/ai-gate.ts). A permission word
+  // enforced on one door and not the next is the shape the August 2026 audit kept finding.
+  const gateOwnerOrAiUseAgent = (req: Request, res: Response): boolean =>
+    assertAiUseAllowed(req, res, config.nodeId);
 
   // ── POST /v1/ai/complete ──
   router.post('/v1/ai/complete',

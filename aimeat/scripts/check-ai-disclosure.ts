@@ -26,6 +26,10 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.2.0 — 2026-08-16 — The transport check knows every provider-reaching export, not only
+ *     `complete`. src/routes/llm-proxy.ts imports `chatCompletionRaw`, and the check would have
+ *     passed it silently — a new provider path admitted because the checker predated it. The proxy
+ *     is now declared, with why it is not a second decision path.
  *   v1.4.0 — 2026-08-12 — Assertion 5 reads the language list off locales/ instead of naming en and
  *     fi. Spanish was added, and a gate that had to be edited to notice a new language would have
  *     reported green on a disclosure nobody had written.
@@ -124,10 +128,21 @@ const LLM_CHOKEPOINT = 'src/services/ai-completion.ts';
  * A new entry is a decision to produce model output that nothing stamps and nothing bills. Adding
  * one is deliberately awkward: it means editing this file, in front of this comment.
  */
-const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {};
+const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {
+  'src/routes/llm-proxy.ts':
+    'Reviewed 2026-08-16. It forwards an OpenAI-shaped request and the provider response back byte '
+    + 'for byte, streamed frames included, so it needs the raw transport rather than the parsed '
+    + 'answer complete() returns. It is NOT a second decision path: prepareAiCall and settleAiCall, '
+    + 'the chokepoint own functions, run before and after every call, so the key choice, the budget, '
+    + 'the allowance, the usage record and the provenance mint are the same ones every other AI door '
+    + 'uses.',
+};
+
+/** The exports of the transport file that actually reach a provider over HTTP. */
+const RAW_TRANSPORT_EXPORTS = ['complete', 'chatCompletionRaw'];
 
 /**
- * Does this file import `complete` (or `completeOwner`-style aliases of it) FROM the raw transport?
+ * Does this file import a provider-reaching export FROM the raw transport?
  *
  * Reads the import CLAUSE rather than scanning the file for the word. The word is everywhere:
  * `src/routes/openrouter.ts` contains the string `'/v1/openrouter/complete'` and legitimately imports
@@ -140,7 +155,10 @@ export function importsTransportComplete(src: string): boolean {
   for (const m of src.matchAll(importClause)) {
     if (m[1]) continue;                                   // `import type { … }` binds no runtime call
     const bindings = m[2].split(',').map(s => s.trim().split(/\s+as\s+/)[0].trim());
-    if (bindings.includes('complete')) return true;
+    // Every export of this file that speaks HTTP to a provider, not just `complete`. The proxy
+    // imports `chatCompletionRaw`, and a check that only knew one name would have let a whole new
+    // provider path in without anyone deciding it was allowed.
+    if (bindings.some(b => RAW_TRANSPORT_EXPORTS.includes(b))) return true;
   }
   // A namespace import can reach anything on the module, so it counts as reaching `complete`.
   return /import\s+\*\s+as\s+\w+\s+from\s+['"](?:\.{1,2}\/)+(?:services\/)?openrouter\.js['"]/.test(src);

@@ -6,6 +6,9 @@
  *   - transcribe(apiKey, model, audio, baseUrl?, opts?) — call audio transcriptions (STT)
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
  * @version-history
+ *   v3.1.0 — 2026-08-16 — chatCompletionRaw(): the request as given, the provider's response as it
+ *     came. The chat proxy forwards both untouched, and this file is the node's only HTTP transport
+ *     to a provider, which is a checked rule rather than a convention.
  *   v1.6.0 — 2026-08-16 — generateImage(): POST {baseUrl}/images/generations, and 'image' joins
  *     ModelModality so the picker can list image models the same way it lists whisper ones. The
  *     three-attempt retry is not padding: some providers' moderation throws false positives and the
@@ -220,7 +223,12 @@ const TIMEOUT_MS = 1_800_000; // 30 minutes
 const STT_TIMEOUT_MS = 120_000;
 
 /** Auth + the OpenRouter-only attribution headers (which a non-OpenRouter endpoint has no use for). */
-function providerHeaders(apiKey: string | undefined, baseUrl: string): Record<string, string> {
+/**
+ * The headers every outbound call to the provider carries. Exported because the chat proxy sends the
+ * request itself rather than through complete(), and two places building these by hand is how the
+ * attribution headers end up on one door and not the other.
+ */
+export function providerHeaders(apiKey: string | undefined, baseUrl: string): Record<string, string> {
   const headers: Record<string, string> = {};
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
   if (baseUrl === OPENROUTER_BASE) {
@@ -347,6 +355,35 @@ export async function complete(
  * Content-Type is deliberately NOT set: fetch derives it from the FormData together with the
  * multipart boundary, and setting it by hand produces a body the provider cannot parse.
  */
+/**
+ * Send a chat-completion request exactly as given, and hand back the provider's own response.
+ *
+ * `complete()` above builds the request and parses the answer, which is what a caller wanting a
+ * string needs. The chat proxy needs neither: it already has an OpenAI-shaped body from its caller
+ * and it forwards the provider's bytes untouched, streamed frames included. So this returns the raw
+ * `Response`.
+ *
+ * It lives here because this file is the node's only HTTP transport to a model provider, and that is
+ * enforced rather than agreed (`pnpm check:llm-transport`). A second place speaking to a provider is
+ * a second place that can forget to meter the call.
+ *
+ * Deciding whether the call may happen, whose key pays and what it cost is NOT this function's job —
+ * that is services/ai-completion.ts, and every caller of this goes through it first.
+ */
+export async function chatCompletionRaw(
+  apiKey: string | undefined,
+  baseUrl: string,
+  body: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<Response> {
+  return fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...providerHeaders(apiKey, baseUrl) },
+    body: JSON.stringify(body),
+    signal,
+  });
+}
+
 export async function transcribe(
   apiKey: string | undefined,
   model: string,

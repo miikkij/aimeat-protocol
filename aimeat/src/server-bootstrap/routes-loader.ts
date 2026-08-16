@@ -151,6 +151,7 @@ import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
 import { aiRouter } from '../routes/ai.js';
 import { chatRouter } from '../routes/chat.js';
+import { llmProxyRouter } from '../routes/llm-proxy.js';
 import { aiProvenanceRouter } from '../routes/ai-provenance.js';
 import { aiTransparencyRouter } from '../routes/ai-transparency.js';
 import { uploadRouter } from '../routes/upload.js';
@@ -478,6 +479,7 @@ export async function mountRoutes(
   app.use(openrouterRouter(config, storage));   // OpenRouter AI autopilot
   app.use(aiRouter(config, storage));            // App-level AI completion (user's key, budget-gated)
   app.use(chatRouter(config, storage));         // The person's own chat with their built-in agent
+  app.use(llmProxyRouter(config, storage));   // The OpenAI-shaped door the chat agent's model calls come through
   // AI provenance (TARGET-058). The by-hash detection lookup is PUBLIC + unauthenticated by
   // design — it is the Code of Practice's detection access point, not an admin API.
   app.use(aiProvenanceRouter(config, storage));

@@ -199,6 +199,8 @@ tags:
     description: Saved AI chat instances — per-owner chat configuration and management
   - name: Chat
     description: The node's built-in chat agent — conversations and one turn streamed as it happens
+  - name: LLM Proxy
+    description: An OpenAI-compatible door in front of the node's own key choice, budget and usage record
   - name: Matches
     description: Directory matching — match suggestions, stats, and respond-to-match
 
@@ -7026,6 +7028,84 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/llm/chat/completions:
+    post:
+      operationId: llmProxyChatCompletion
+      tags: [LLM Proxy]
+      summary: One completion, in OpenAI's request shape
+      description: |
+        For an agent that speaks OpenAI's dialect and would otherwise call a provider directly. Point
+        it at `<node>/v1/llm` as its base URL and every call goes through the same gate
+        `POST /v1/ai/complete` goes through: the owner's own key first and the node's allowance
+        second, the daily budget, the per-app quota, the usage record, and the free-model fallback
+        when the allowance is spent.
+
+        `model` in the request is ignored on purpose. The node is the one that knows whose money this
+        is and how much is left, so the owner's own preference decides and the node's default for the
+        role follows; the response says which model actually ran. Honouring the caller's name would
+        also disable the free-model fallback, which is deliberately left alone for an explicit model.
+
+        `tools`, `tool_choice` and `response_format` pass through untouched — the node has no opinion
+        about which tools a caller offers its own model. With `stream: true` the provider's own
+        `text/event-stream` frames are forwarded byte for byte, so any client that understands
+        OpenAI's stream understands this one.
+
+        Requires an owner session or a token carrying `ai:use`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                messages:
+                  type: array
+                  items: { type: object }
+                  description: OpenAI chat messages.
+                stream: { type: boolean, description: Forward the provider's SSE frames as they arrive. }
+                temperature: { type: number }
+                top_p: { type: number }
+                max_tokens: { type: integer }
+                tools: { type: array, items: { type: object } }
+                tool_choice: {}
+                response_format: { type: object }
+      responses:
+        '200':
+          description: An OpenAI chat completion, or its SSE stream when `stream` is true
+          content:
+            application/json:
+              schema: { type: object }
+            text/event-stream:
+              schema: { type: string }
+        '400':
+          description: messages is missing, or no key is configured for this owner
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: The allowance is spent and this node has no free-model fallback configured
+        '403':
+          description: Not an owner session and no ai:use scope
+        '429':
+          description: The model is rate limited. Free models reach this first.
+        '502':
+          description: The model is overloaded, unavailable, or answered with an error
+  /v1/llm/models:
+    get:
+      operationId: llmProxyListModels
+      tags: [LLM Proxy]
+      summary: The models this node will actually run
+      description: |
+        OpenAI's model-list shape, for a client that asks before it asks for anything else. The list
+        comes from the provider through the same service the node's own model pickers use, so a model
+        that appears here is one the node can reach. Requires an owner session or `ai:use`.
+      responses:
+        '200':
+          description: '`{ object: "list", data: [{ id, object, owned_by }] }`'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not an owner session and no ai:use scope
   /v1/chat/status:
     get:
       operationId: getChatStatus

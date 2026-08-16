@@ -372,6 +372,7 @@ const ALL_SUITES = [
     'test/e2e-ai-transcribe.ts',
     'test/e2e-ai-image.ts',
     'test/e2e-chat.ts',
+    'test/e2e-llm-proxy.ts',
     'test/e2e-message-transcript.ts',
     'test/ai.ts',
     'test/e2e-sharing-groups.ts',
