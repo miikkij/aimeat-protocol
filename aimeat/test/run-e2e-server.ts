@@ -238,6 +238,12 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         AIMEAT_AI_COP_SECTIONS: process.env.AIMEAT_AI_COP_SECTIONS ?? '',
         AIMEAT_AI_COP_SIGNED_ON: process.env.AIMEAT_AI_COP_SIGNED_ON ?? '',
 
+        // ── Prometheus metrics ──
+        // Pinned ON so the per-request metrics middleware runs under every suite and
+        // e2e-metrics can assert aimeat_http_requests_total actually grows. Restored
+        // 2026-08-17 after a merge dropped the pin the day it shipped.
+        AIMEAT_METRICS_ENABLED: process.env.AIMEAT_METRICS_ENABLED ?? 'true',
+
         // ── The money rails ──
         // x402 settlement: pin the rail ON and settle against the OFF-CHAIN double. e2e-x402 needs
         // the handler registered, and its X-PAYMENT proofs carry a FIXED placeholder signature

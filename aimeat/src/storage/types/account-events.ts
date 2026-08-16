@@ -13,6 +13,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-08-17 — eight kinds the code already emits (consent grant/revoke, AI settings and key
+ *     changes, workflow lifecycle): the union lost them in a merge and main failed typecheck.
  *   v1.0.0 — 2026-08-17 — Initial: account events as their own system, not as memory records.
  */
 
@@ -44,7 +46,17 @@ export type AccountEventKind =
   // Permissions and limits
   | 'app_granted'
   | 'app_revoked'
-  | 'ai_budget_reached';
+  | 'consent_granted'
+  | 'consent_revoked'
+  | 'ai_budget_reached'
+  // AI settings
+  | 'ai_settings_changed'
+  | 'ai_key_changed'
+  // Workflows
+  | 'workflow_created'
+  | 'workflow_updated'
+  | 'workflow_deleted'
+  | 'workflow_run_started';
 
 /** One thing that happened, as stored. */
 export interface AccountEventRecord {

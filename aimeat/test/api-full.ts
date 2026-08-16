@@ -2212,12 +2212,17 @@ await test('GET /v1/health includes subsystems', async () => {
     assert(body.data.subsystems.storage.healthy === true, 'storage should be healthy');
 });
 
-await test('GET /v1/metrics returns 503 when disabled', async () => {
+await test('GET /v1/metrics never serves an anonymous caller', async () => {
     const { status, body } = await json('/v1/metrics');
-    // Metrics disabled by default (AIMEAT_METRICS_ENABLED=false)
-    // Should return 503 FEATURE_DISABLED
-    assert(status === 503, `expected 503, got ${status}`);
-    assert(body.error?.code === 'FEATURE_DISABLED', 'should be FEATURE_DISABLED');
+    // Under the E2E runner metrics is pinned ON (run-e2e-server.ts) and the endpoint is
+    // operator-gated → 403 ACCESS_DENIED. On a bare server without the flag it is
+    // 503 FEATURE_DISABLED. Both prove the exposition never reaches an anonymous caller.
+    if (status === 503) {
+        assert(body.error?.code === 'FEATURE_DISABLED', 'disabled → FEATURE_DISABLED');
+    } else {
+        assert(status === 403, `expected 403 (or 503 when disabled), got ${status}`);
+        assert(body.error?.code === 'ACCESS_DENIED', 'enabled → operator-gated ACCESS_DENIED');
+    }
 });
 
 // ─── Phase 7: Consent Recipient Patterns ───

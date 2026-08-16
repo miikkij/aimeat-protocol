@@ -219,6 +219,7 @@ import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
+import { metricsMiddleware } from '../middleware/metrics.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
 import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.js';
 
@@ -291,9 +292,14 @@ export async function mountRoutes(
   });
 
   // Prometheus metrics registry (opt-in)
+  // The per-request middleware mounts HERE, before any route, or the
+  // aimeat_http_requests_total counter and the duration histogram never increment.
+  // Restored 2026-08-17 after a merge dropped it the same day it first shipped;
+  // e2e-metrics fails within a minute whenever this line is missing.
   const metricsRegistry = config.metricsEnabled
     ? createMetricsRegistry(config)
     : undefined;
+  if (metricsRegistry) app.use(metricsMiddleware(metricsRegistry));
 
   // Presigned upload endpoint (raw body — no JSON parsing needed)
   app.use(uploadRouter(config, storage));
