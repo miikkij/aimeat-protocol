@@ -111,6 +111,37 @@ async function run() {
     } finally { await tunnel.close(); }
   });
 
+  await test('A STRANGER cannot invoke this private ecosystem capability', async () => {
+    // The capability is registered `visibility: 'private'`, and this suite has exactly one owner, so
+    // the invoke route is only ever called by the capability's own owner. Delete the owner/visibility
+    // check and any account invokes a stranger's private ecosystem capability OVER THAT STRANGER'S
+    // TUNNEL — arbitrary calls into somebody else's connected app.
+    const strangerName = `ecocapx${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `stranger register ${reg.status}`);
+    const strangerAuth = { Authorization: `Bearer ${await getOwnerToken(strangerName, reg.body.data.private_key)}` };
+
+    // A live tunnel, so a missing one cannot be the reason for the refusal.
+    const g = await connectGeai('billing', ['memory:read']);
+    const tunnel = await TunnelClient.connect(BASE, g.token);
+    let reached = false;
+    tunnel.onInvoke(f => { reached = true; return { ok: true, result: { echoed: f.input } }; });
+    try {
+      const r = await json(`/v1/capabilities/${capId}/invoke`, {
+        method: 'POST', headers: strangerAuth, body: JSON.stringify({ input: { x: 1 } }),
+      });
+      assert(r.status === 403 || r.status === 404,
+        `a stranger invoked a private ecosystem capability: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+      assert(!reached, 'and the call reached the owner\'s connected app');
+
+      // The control: the owner's own invoke still works over the same tunnel.
+      const mine = await json(`/v1/capabilities/${capId}/invoke`, {
+        method: 'POST', headers: auth, body: JSON.stringify({ input: { x: 2 } }),
+      });
+      assert(mine.status === 200, `the owner's own invoke broke: ${mine.status} ${JSON.stringify(mine.body?.error)}`);
+    } finally { await tunnel.close(); }
+  });
+
   await test('Invoking an offline GEAI capability → 502 ECOSYSTEM_OFFLINE', async () => {
     // No tunnel held for 'billing' now (closed above).
     const r = await json(`/v1/capabilities/${capId}/invoke`, { method: 'POST', headers: auth, body: JSON.stringify({ input: {} }) });
@@ -219,6 +250,38 @@ async function run() {
     const g = await connectGeai('depositapp', ['memory:read', 'memory:write'], [{ area: 'organisms', pattern: `organism.${orgId}.**`, rights: ['write'] }]);
     const r = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${g.token}` }, body: JSON.stringify({ key: `organism.${orgId}.w.${WS}.refined`, value: { ok: 1 }, visibility: 'owner' }) });
     assert(r.status === 200 || r.status === 201, `deposit should succeed, got ${r.status}: ${JSON.stringify(r.body)}`);
+  });
+
+  await test('The grant PATTERN is a boundary: a second organism is not covered', async () => {
+    // Phases 4 and 6 claim to prove the data-area allowlist, but only ONE organism exists in the whole
+    // suite, so the grant's `pattern` is never a boundary — every case flips only the `rights` array.
+    // Drop the consentMatchPattern clause from grantsCover (services/ecosystem-access.ts) and a GEAI
+    // granted `organism.<A>.**` reads and writes EVERY organism on the node, with all four data-area
+    // tests green.
+    const o2 = await json('/v1/organisms', { method: 'POST', headers: auth, body: JSON.stringify({ name: 'Eco Org Two', description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }) });
+    assert(o2.status === 200 || o2.status === 201, `second org ${o2.status}: ${JSON.stringify(o2.body)}`);
+    const otherOrgId = (o2.body.data.id ?? o2.body.data.organism?.id) as string;
+    assert(!!otherOrgId && otherOrgId !== orgId, `a genuinely different organism: ${otherOrgId}`);
+
+    // The SAME grant as the deposit test above: scoped to the first organism only.
+    const g = await connectGeai('patternapp', ['memory:read', 'memory:write'], [{ area: 'organisms', pattern: `organism.${orgId}.**`, rights: ['write'] }]);
+    const hdr = { Authorization: `Bearer ${g.token}` };
+
+    const inside = await json('/v1/memory', {
+      method: 'POST', headers: hdr,
+      body: JSON.stringify({ key: `organism.${orgId}.w.${WS}.covered`, value: { ok: 1 }, visibility: 'owner' }),
+    });
+    assert(inside.status === 200 || inside.status === 201,
+      `the granted organism is still writable: ${inside.status} ${JSON.stringify(inside.body?.error)}`);
+
+    const outside = await json('/v1/memory', {
+      method: 'POST', headers: hdr,
+      body: JSON.stringify({ key: `organism.${otherOrgId}.w.${WS}.escaped`, value: { bad: 1 }, visibility: 'owner' }),
+    });
+    assert(outside.status === 403,
+      `the grant reached another organism: ${outside.status} ${JSON.stringify(outside.body?.data ?? outside.body?.error)}`);
+    assert(outside.body.error?.code === 'DATA_AREA_DENIED',
+      `refused, but not as a data-area denial: ${outside.body.error?.code}`);
   });
 
   await test('A GEAI WITHOUT the grant is denied (DATA_AREA_DENIED)', async () => {
