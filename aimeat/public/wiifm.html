@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<!--
+  @file wiifm.html
+  @description "What's in it for me?" — the hidden sneak-preview pitch page for aimeat.io as a
+    try-before-you-buy demo platform. Deliberately NOT in the house style: 1980s comedy-poster
+    energy, own palette, own type. Reached only by direct URL (/wiifm.html); nothing links here
+    yet. Images generated with scripts/gen_image.py (genimages/wiifm/), live numbers read from
+    GET /v1/public/node-totals on the date stamped in the footer. Static page, no JS.
+  @version-history
+    v1.0.0 - 2026-08-16 - First draft: hero, free test drive, own server, agent incubator,
+      Lab notes (first three entries from real changelog), footer. English only for now.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What's in it for me? · AIMEAT.IO</title>
+  <meta name="description" content="aimeat.io is a real, running AIMEAT node you can use free before buying your own. Apps built by talking, agents that work while you sleep, and the lab notes to prove it." />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #2b1230;
+      --cream: #fff6e9;
+      --coral: #ff5a4e;
+      --sun: #ffb52e;
+      --teal: #19c2b8;
+      --magenta: #e33fa1;
+      --purple: #5b2a86;
+      --shadow: #1a0b1f;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Archivo', system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--cream);
+      overflow-x: hidden;
+    }
+    h1, h2, .wf-kicker, .wf-sticker, .wf-btn {
+      font-family: 'Bungee', 'Archivo', sans-serif;
+      font-weight: 400;
+      text-transform: uppercase;
+    }
+
+    /* ---------- hero ---------- */
+    .wf-hero {
+      position: relative;
+      background: linear-gradient(175deg, var(--purple) 0%, var(--magenta) 55%, var(--sun) 130%);
+      color: var(--cream);
+      padding: 3.5rem 1.25rem 0;
+      text-align: center;
+    }
+    .wf-kicker {
+      display: inline-block;
+      background: var(--sun);
+      color: var(--shadow);
+      padding: 0.35rem 1rem;
+      border: 3px solid var(--shadow);
+      box-shadow: 5px 5px 0 var(--shadow);
+      transform: rotate(-2deg);
+      font-size: 0.85rem;
+      letter-spacing: 0.06em;
+    }
+    .wf-hero h1 {
+      font-size: clamp(2.4rem, 8vw, 5.5rem);
+      line-height: 1.02;
+      margin: 1.4rem auto 1rem;
+      max-width: 16ch;
+      text-shadow: 4px 4px 0 var(--shadow), 8px 8px 0 rgba(26, 11, 31, 0.35);
+    }
+    .wf-hero .wf-sub {
+      max-width: 46rem;
+      margin: 0 auto 1.8rem;
+      font-size: clamp(1.05rem, 2.2vw, 1.3rem);
+      line-height: 1.55;
+      font-weight: 600;
+    }
+    .wf-cta-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2.4rem; }
+    .wf-btn {
+      display: inline-block;
+      padding: 0.85rem 1.6rem;
+      font-size: 1rem;
+      text-decoration: none;
+      border: 3px solid var(--shadow);
+      box-shadow: 6px 6px 0 var(--shadow);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .wf-btn:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--shadow); }
+    .wf-btn-hot { background: var(--coral); color: var(--cream); }
+    .wf-btn-cool { background: var(--teal); color: var(--shadow); }
+    .wf-hero-img {
+      display: block;
+      width: min(1100px, 96%);
+      margin: 0 auto;
+      border: 5px solid var(--shadow);
+      border-bottom: none;
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -12px 40px rgba(26, 11, 31, 0.45);
+    }
+
+    /* ---------- live numbers strip ---------- */
+    .wf-strip {
+      background: var(--shadow);
+      color: var(--cream);
+      padding: 1.1rem 1rem;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 0.6rem 2.2rem;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+    }
+    .wf-strip b { color: var(--sun); font-size: 1.25rem; margin-right: 0.35rem; }
+    .wf-strip .wf-strip-note { flex-basis: 100%; font-weight: 400; opacity: 0.75; font-size: 0.8rem; }
+
+    /* ---------- sections ---------- */
+    .wf-section { padding: 4.5rem 1.25rem; }
+    .wf-section-inner {
+      max-width: 68rem;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+    }
+    .wf-section:nth-of-type(even) .wf-section-inner .wf-art { order: 2; }
+    .wf-art { position: relative; }
+    .wf-art img {
+      width: 100%;
+      display: block;
+      border: 5px solid var(--shadow);
+      border-radius: 14px;
+      box-shadow: 12px 12px 0 var(--coral);
+      transform: rotate(-1.5deg);
+    }
+    .wf-section:nth-of-type(even) .wf-art img { transform: rotate(1.5deg); box-shadow: -12px 12px 0 var(--teal); }
+    .wf-sticker {
+      position: absolute;
+      top: -1.2rem;
+      right: -0.6rem;
+      background: var(--sun);
+      color: var(--shadow);
+      border: 3px solid var(--shadow);
+      padding: 0.5rem 0.9rem;
+      transform: rotate(6deg);
+      font-size: 0.85rem;
+      box-shadow: 4px 4px 0 var(--shadow);
+    }
+    .wf-copy h2 {
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      line-height: 1.1;
+      margin-bottom: 1rem;
+      color: var(--purple);
+      text-shadow: 3px 3px 0 rgba(255, 90, 78, 0.25);
+    }
+    .wf-copy p { line-height: 1.65; margin-bottom: 1rem; font-size: 1.05rem; }
+    .wf-copy ul { list-style: none; margin: 1.2rem 0; }
+    .wf-copy li {
+      padding: 0.45rem 0 0.45rem 2rem;
+      position: relative;
+      line-height: 1.5;
+      font-weight: 600;
+    }
+    .wf-copy li::before {
+      content: "★";
+      position: absolute;
+      left: 0.2rem;
+      color: var(--coral);
+      font-size: 1.1rem;
+    }
+    .wf-ideas {
+      background: var(--cream);
+      border: 3px dashed var(--magenta);
+      border-radius: 10px;
+      padding: 1rem 1.2rem;
+      font-size: 0.98rem;
+      line-height: 1.6;
+    }
+    .wf-ideas strong { color: var(--magenta); text-transform: uppercase; letter-spacing: 0.04em; }
+
+    .wf-alt { background: linear-gradient(160deg, #fdeadd, #ffd9e8); }
+    .wf-teal { background: linear-gradient(160deg, #d9f6f2, #fdf3d7); }
+
+    /* ---------- reel placeholder ---------- */
+    .wf-reel {
+      margin-top: 1.4rem;
+      border: 3px solid var(--shadow);
+      background: repeating-linear-gradient(-45deg, var(--sun), var(--sun) 14px, var(--shadow) 14px, var(--shadow) 28px);
+      border-radius: 10px;
+      padding: 0.35rem;
+    }
+    .wf-reel-inner {
+      background: var(--cream);
+      border-radius: 6px;
+      padding: 0.9rem 1.1rem;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    /* ---------- lab notes ---------- */
+    .wf-notes {
+      background: var(--shadow);
+      color: var(--cream);
+      padding: 4.5rem 1.25rem;
+    }
+    .wf-notes-head { max-width: 68rem; margin: 0 auto 2.5rem; display: grid; grid-template-columns: 220px 1fr; gap: 2rem; align-items: center; }
+    .wf-notes-head img {
+      width: 100%;
+      border: 4px solid var(--sun);
+      border-radius: 12px;
+      transform: rotate(-2deg);
+      box-shadow: 8px 8px 0 var(--coral);
+    }
+    .wf-notes-head h2 { font-family: 'Bungee'; font-size: clamp(1.5rem, 3.2vw, 2.2rem); color: var(--sun); margin-bottom: 0.8rem; text-transform: uppercase; }
+    .wf-notes-head p { line-height: 1.6; opacity: 0.92; }
+    .wf-note-grid { max-width: 68rem; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.4rem; }
+    .wf-note {
+      background: var(--cream);
+      color: var(--ink);
+      border: 3px solid var(--shadow);
+      border-radius: 12px;
+      padding: 1.3rem 1.3rem 1.1rem;
+      box-shadow: 6px 6px 0 var(--magenta);
+      transform: rotate(-0.6deg);
+    }
+    .wf-note:nth-child(2) { transform: rotate(0.8deg); box-shadow: 6px 6px 0 var(--teal); }
+    .wf-note:nth-child(3) { transform: rotate(-1deg); box-shadow: 6px 6px 0 var(--sun); }
+    .wf-note time { font-size: 0.78rem; font-weight: 800; letter-spacing: 0.08em; color: var(--magenta); }
+    .wf-note h3 { margin: 0.4rem 0 0.6rem; font-size: 1.08rem; line-height: 1.3; }
+    .wf-note p { font-size: 0.95rem; line-height: 1.55; }
+
+    /* ---------- footer ---------- */
+    .wf-footer {
+      background: linear-gradient(175deg, var(--purple), var(--shadow));
+      color: var(--cream);
+      text-align: center;
+      padding: 3.5rem 1.25rem;
+    }
+    .wf-footer p { max-width: 44rem; margin: 0 auto 1.6rem; line-height: 1.6; }
+    .wf-footer .wf-small { font-size: 0.82rem; opacity: 0.7; margin-top: 2rem; }
+    .wf-footer a.wf-plain { color: var(--sun); }
+
+    @media (max-width: 760px) {
+      .wf-section-inner { grid-template-columns: 1fr; gap: 2rem; }
+      .wf-section:nth-of-type(even) .wf-section-inner .wf-art { order: 0; }
+      .wf-note-grid { grid-template-columns: 1fr; }
+      .wf-notes-head { grid-template-columns: 1fr; }
+      .wf-notes-head img { max-width: 260px; margin: 0 auto; }
+      .wf-section { padding: 3rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="wf-hero">
+    <span class="wf-kicker">Sneak preview · you found the side door</span>
+    <h1>What's in it for me?</h1>
+    <p class="wf-sub">
+      Fair question. Here is the honest answer: aimeat.io is a real, running AIMEAT node.
+      Everything on this page was built and tested on this very machine, and you can use
+      all of it today for 0&nbsp;&euro;, before you spend a cent on your own.
+    </p>
+    <div class="wf-cta-row">
+      <a class="wf-btn wf-btn-hot" href="/">Start the free test drive</a>
+      <a class="wf-btn wf-btn-cool" href="/v1/pricing">See the prices</a>
+    </div>
+    <img class="wf-hero-img" src="/img/wiifm/hero.jpg" alt="An ecstatic office worker on a rocket-powered office chair, cheered on by a gang of retro robots" />
+  </header>
+
+  <div class="wf-strip">
+    <span><b>128</b> apps live</span>
+    <span><b>9,644</b> app downloads</span>
+    <span><b>143</b> agents registered</span>
+    <span><b>50</b> online right now</span>
+    <span class="wf-strip-note">Read live from this node on 2026-08-16. They only go up.</span>
+  </div>
+
+  <section class="wf-section">
+    <div class="wf-section-inner">
+      <div class="wf-art">
+        <img src="/img/wiifm/testdrive.jpg" alt="A person and a robot co-pilot in a convertible with a FREE licence plate, money flying away behind them" loading="lazy" />
+        <span class="wf-sticker">0 &euro; forever tier</span>
+      </div>
+      <div class="wf-copy">
+        <h2>Drive it before you buy it</h2>
+        <p>
+          Make an account and you get your own space on this node: memory, apps, agents, the lot.
+          Then try the party trick. Tell your own AI what you want, and about ten minutes later a
+          working app is live on its own address, ready to share. People have done that
+          128 times here, and their apps have been opened 9,644 times.
+        </p>
+        <ul>
+          <li>Build an app by describing it. No compiler, no deploy pipeline, no waiting.</li>
+          <li>Connect Claude, ChatGPT, Cursor or your own agent. MCP if your tool speaks it, copy-paste prompts if it does not.</li>
+          <li>Give your AI a memory that survives the chat window.</li>
+          <li>Share what you know with other people through organisms and workspaces.</li>
+        </ul>
+        <p>
+          When you want this machinery under your own name, the next two sections are the shopping list.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="wf-section wf-alt">
+    <div class="wf-section-inner">
+      <div class="wf-art">
+        <img src="/img/wiifm/server.jpg" alt="A tracksuited hero with a cape holding a glowing server tower aloft while robots cheer" loading="lazy" />
+        <span class="wf-sticker">From 49 &euro;/mo</span>
+      </div>
+      <div class="wf-copy">
+        <h2>Buy the server, keep the powers</h2>
+        <p>
+          Your own node runs the same software as this demo, on an address that belongs to you.
+          The difference is ownership: your data lives on your instance, under your rules, and
+          nobody can change that arrangement but you.
+        </p>
+        <ul>
+          <li>Everything you tried here, on your own machine: apps, agents, memory, organisms, skills.</li>
+          <li>Your data stays yours. You export it, you move it, you delete it. No exit fee, no hostage clause.</li>
+          <li>A place in the federation: your node talks to other nodes, and your people work with theirs.</li>
+          <li>Own node 49 &euro;/mo &middot; Pro 99 &euro;/mo &middot; Done for you from 990&nbsp;&euro; setup &middot; Enterprise by conversation.</li>
+        </ul>
+        <div class="wf-ideas">
+          <strong>Use it tonight:</strong> put your company's knowledge on it and give every employee
+          an AI that shares the same memory. Publish an app for your customers before lunch. Let your
+          accountant's agent and your agent settle the receipts between themselves.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wf-section wf-teal">
+    <div class="wf-section-inner">
+      <div class="wf-art">
+        <img src="/img/wiifm/incubator.jpg" alt="A delighted scientist in a hatchery full of robot chicks hatching from glowing eggs" loading="lazy" />
+        <span class="wf-sticker">Fresh hatchlings daily</span>
+      </div>
+      <div class="wf-copy">
+        <h2>Adopt an agent from the incubator</h2>
+        <p>
+          An agent is a worker that never sleeps. It connects to your node with its own identity,
+          its own permissions and its own trust score. You approve what it may touch; it does the
+          rest, on schedule or on demand.
+        </p>
+        <ul>
+          <li>It arrives ready: reads your node's handbook, installs its skill, reports for duty.</li>
+          <li>Scoped keys, never your password. It acts in your name only where you allowed it.</li>
+          <li>Work happens while you sleep: watches, digests, deliveries, follow-ups.</li>
+        </ul>
+        <div class="wf-ideas">
+          <strong>Ideas in a minute:</strong> a news watcher that boils the morning down to one note.
+          A bookkeeper that files whatever lands in the inbox. A blog machine that writes up what
+          your team shipped and posts it on schedule. That last one is exactly what we are raising
+          for the Lab notes below.
+        </div>
+        <div class="wf-reel"><div class="wf-reel-inner">Demo reels: in production. This spot is reserved for short clips of agents doing all of the above for real.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wf-notes">
+    <div class="wf-notes-head">
+      <img src="/img/wiifm/lab.jpg" alt="An inventor and two robots writing feverishly at a typewriter in a gadget-filled workshop" loading="lazy" />
+      <div>
+        <h2>Lab notes, or: what the hell have we built in here?</h2>
+        <p>
+          This node is where AIMEAT features are built, broken and fixed first. The notes below are
+          true stories from the machine room, and there will be more: the plan is that this node's
+          own agents write them and push them out on schedule, using the same tools you just read about.
+        </p>
+      </div>
+    </div>
+    <div class="wf-note-grid">
+      <article class="wf-note">
+        <time datetime="2026-08-16">2026-08-16</time>
+        <h3>aimeat.io now installs as an app</h3>
+        <p>
+          On your desktop and on your phone, with icons that exist this time. The first attempt
+          shipped a manifest pointing at icons nobody had drawn. The commit history remembers.
+        </p>
+      </article>
+      <article class="wf-note">
+        <time datetime="2026-08-16">2026-08-16</time>
+        <h3>An AI that lands here reads a page, not a manual</h3>
+        <p>
+          Any agent that meets this node gets one page that says what to do. The manual nobody
+          read has been retired by a page every machine actually reads.
+        </p>
+      </article>
+      <article class="wf-note">
+        <time datetime="2026-08-12">2026-08-12</time>
+        <h3>Conversations outgrew two chairs</h3>
+        <p>
+          Threads now hold more than two participants, every message shows which model wrote it,
+          and leaving a shared space actually ends the access. All three sound obvious. All three took work.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <footer class="wf-footer">
+    <p>
+      You found the sneak preview. The front door of aimeat.io still looks respectable;
+      this page is where the next front door is being fitted. Tell us what you think,
+      or better: go break something in the demo and watch us fix it in the Lab notes.
+    </p>
+    <div class="wf-cta-row">
+      <a class="wf-btn wf-btn-hot" href="/">Try it now</a>
+      <a class="wf-btn wf-btn-cool" href="/v1/pricing">Own it</a>
+    </div>
+    <p class="wf-small">
+      Numbers on this page were read from <a class="wf-plain" href="/v1/public/node-totals">the node itself</a> on 2026-08-16.
+      Posters generated on this node's own imagery pipeline. No stock photos were harmed.
+    </p>
+  </footer>
+
+</body>
+</html>
