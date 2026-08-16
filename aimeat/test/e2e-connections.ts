@@ -19,6 +19,13 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.3.0 — 2026-08-17 — E2E quality, connections :945 and :405. Phase 13 ran synthetic principals
+ *     through guards the TEST built, which proves the middleware behaves and nothing about which guard
+ *     each route mounts; 13b drives the real doors with a real app-grant bearer holding connections:use,
+ *     and reads the connection back after the refused DELETE. And the delegated publish path — app_id
+ *     plus action, the branch where the one-gesture stop and the per-publisher cap live — had never
+ *     been taken by any test: its cap, its stop and its fixed parameters are now enforced against real
+ *     publishes, the last of them at the gate because the test provider ignores params.
  *   v1.2.1 — 2026-08-12 — The attach-refusal check probed with the password 'wrong', which the error
  *     envelope's own support hint carries as ordinary prose, so the "secret was not echoed"
  *     assertion failed on a response that had leaked nothing. The probe is a sentinel now.
@@ -742,6 +749,69 @@ async function main(): Promise<void> {
       assert(r.status === 404, `status ${r.status}`);
     });
 
+    /**
+     * THE DELEGATED PUBLISH PATH, which nothing in this file has ever taken. Every publish here sends
+     * a connection_id, which is the owner's own channel; the route's OTHER branch takes app_id plus
+     * action and goes through the delegation gate instead. That gate is where the one-gesture stop
+     * and the per-publisher cap live, and Phase 7 asserts both of them by reading the record back
+     * rather than by trying to publish past them.
+     *
+     * The delegation from Phase 7 is app:funvids / publish-video on the shared channel, with a
+     * per-user limit of 2 in 24 hours.
+     */
+    await test('a delegated publish goes through, and the per-publisher cap stops the third', async () => {
+      const publish = (caption: string) => api('/v1/connections/publish', {
+        bearer: jwtA,
+        body: { app_id: 'app:funvids', action: 'publish-video', storage_key: 'vid/test.mp4', caption },
+      });
+
+      const before = provider.stats.publishes;
+      const first = await publish(`delegated-1-${Date.now()}`);
+      assert(first.status === 200, `the delegated publish was refused: ${first.status} ${first.data?.error?.code} ${first.data?.error?.message}`);
+      assert(provider.stats.publishes === before + 1, 'the delegated publish never reached the provider');
+
+      const second = await publish(`delegated-2-${Date.now()}`);
+      assert(second.status === 200, `the second delegated publish was refused: ${second.status} ${second.data?.error?.code}`);
+
+      // Two is the cap. The third is where the delegation's per_user_limit becomes a refusal instead
+      // of a number in a record.
+      const third = await publish(`delegated-3-${Date.now()}`);
+      assert(third.status === 400, `the third publish should have been capped, got ${third.status}`);
+      assert(third.data?.error?.code === 'USER_LIMIT_REACHED', `expected USER_LIMIT_REACHED, got ${third.data?.error?.code}`);
+      assert(provider.stats.publishes === before + 2, 'a capped publish still reached the provider');
+    });
+
+    await test('the one-gesture stop is a refusal, not just a flag in a record', async () => {
+      // Its own delegation, with no per-user cap, so that a broken stop shows up as a PUBLISH rather
+      // than as the cap answering first and hiding what happened.
+      const made = await api(`/v1/connections/${sharedId}/delegations`, {
+        bearer: jwtA, body: { app_id: 'app:stopper', action: 'publish-video', moderation: 'auto' },
+      });
+      assert(made.status === 201, `delegation for the stop test: ${made.status} ${made.data?.error?.message}`);
+      const stopId = made.data.data.delegation.id;
+
+      const off = await api(`/v1/connections/delegations/${stopId}`, { method: 'PATCH', bearer: jwtA, body: { enabled: false } });
+      assert(off.status === 200, `disable: ${off.status}`);
+
+      const before = provider.stats.publishes;
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtA,
+        body: { app_id: 'app:stopper', action: 'publish-video', storage_key: 'vid/test.mp4', caption: `after-stop-${Date.now()}` },
+      });
+      assert(r.status === 400, `a disabled delegation should refuse, got ${r.status}`);
+      assert(r.data?.error?.code === 'DELEGATION_DISABLED', `expected DELEGATION_DISABLED, got ${r.data?.error?.code}`);
+      assert(provider.stats.publishes === before, 'a publish went out through a delegation that was turned off');
+
+      // …and turning it back on lets the same request through, so the refusal is the switch.
+      const on = await api(`/v1/connections/delegations/${stopId}`, { method: 'PATCH', bearer: jwtA, body: { enabled: true } });
+      assert(on.status === 200, `re-enable: ${on.status}`);
+      const after = await api('/v1/connections/publish', {
+        bearer: jwtA,
+        body: { app_id: 'app:stopper', action: 'publish-video', storage_key: 'vid/test.mp4', caption: `after-restart-${Date.now()}` },
+      });
+      assert(after.status === 200, `the re-enabled delegation still refuses: ${after.status} ${after.data?.error?.code}`);
+    });
+
     await test('a missing file is refused BEFORE an attempt is opened', async () => {
       const r = await api('/v1/connections/publish', {
         bearer: jwtA,
@@ -769,6 +839,41 @@ async function main(): Promise<void> {
         { publisher: 'q@test', connectionId: 'q1', storageKey: 'b.mp4', caption: 'two' }, { sharedDailyLimit: 1 });
       assert(second.ok && second.attempt.status === 'queued',
         `expected queued, got ${second.ok ? second.attempt.status : 'refused'}`);
+      storage.close();
+    });
+
+    await test('the delegation\'s FIXED parameters win over what the app asked for', async () => {
+      // Observed at the gate rather than through the provider, because the test provider's recipe
+      // ignores params entirely: it posts the bytes and nothing else. The merge is the whole point of
+      // `fixed` — an app that asks for `public` on a channel whose owner fixed `unlisted` must not
+      // get it — and a spread written the other way round would silently hand it over.
+      const { openPublish } = await import('../src/services/connections/publish-gate.js');
+      const { SqliteStorage } = await import('../src/storage/providers/sqlite/index.js');
+      const storage = new SqliteStorage(':memory:');
+      const now = new Date().toISOString();
+      await storage.createConnection({
+        id: 'f1', principal: 'f@test', mode: 'shared', provider: 'fake', instance: null,
+        accountLabel: 'F', externalId: 'f', credential: 'x', credentialShape: 'oauth2', scopes: [],
+        expiresAt: null, status: 'active', lastOkAt: now, lastError: null, createdAt: now, updatedAt: now,
+      });
+      await storage.upsertDelegation({
+        id: 'd1', connectionId: 'f1', appId: 'app:fixer', action: 'publish-video',
+        fixed: { visibility: 'unlisted', tags: ['fixed'] }, perUserLimit: null,
+        moderation: 'auto', enabled: true, createdAt: now, updatedAt: now,
+      });
+
+      const gate = await openPublish(storage as any, {
+        publisher: 'someone@test', appId: 'app:fixer', action: 'publish-video',
+        storageKey: 'a.mp4', caption: 'one',
+        params: { visibility: 'public', tags: ['asked'], alt: 'kept' },
+      }, { sharedDailyLimit: null });
+      assert(gate.ok, `the gate refused: ${gate.ok ? '' : gate.code}`);
+      assert((gate as any).params.visibility === 'unlisted',
+        `the app's visibility overrode the owner's: ${JSON.stringify((gate as any).params)}`);
+      assert(JSON.stringify((gate as any).params.tags) === JSON.stringify(['fixed']),
+        `a fixed array was overridden: ${JSON.stringify((gate as any).params.tags)}`);
+      // …and a parameter the owner did NOT fix still travels, or `fixed` would be a whitelist.
+      assert((gate as any).params.alt === 'kept', `an unfixed parameter was dropped: ${JSON.stringify((gate as any).params)}`);
       storage.close();
     });
 
@@ -975,6 +1080,44 @@ async function main(): Promise<void> {
       const writing = requireScope('connections:write');
       assert(run(writing, app) === 403, 'an app with connections:use was allowed to WRITE connections');
       assert(run(writing, reader) === 403, 'a read scope was allowed to write');
+    });
+
+    /**
+     * The phase above runs synthetic principals through guards the TEST constructs, so it proves the
+     * middleware behaves — and nothing about which guard each route actually mounts. A route that
+     * dropped its scope, or carried the wrong word, passes every assertion up there.
+     *
+     * This one drives the real routes with a real app-grant bearer. The distinction matters here more
+     * than elsewhere: requireScope is the only middleware that stops role 'app', because the owner
+     * bypass excludes it, so these doors are exactly where an app's limits are decided.
+     */
+    await test('the doors themselves refuse an app that holds only connections:use', async () => {
+      const useOnly = await grantAppToken(jwtA, userA, ['connections:use']);
+
+      // The read side admits it: requireAnyScope('connections:read','connections:use').
+      const listed = await api('/v1/connections', { method: 'GET', bearer: useOnly });
+      assert(listed.status === 200, `an app with connections:use must still LIST connections, got ${listed.status}`);
+
+      // The write side must not. Attaching an account or registering an app in the owner's name is a
+      // human act at the provider's consent screen.
+      const writes: Array<{ label: string; path: string; method?: string; body?: any }> = [
+        { label: 'register a client', path: '/v1/connections/clients', method: 'PUT', body: { provider: 'mastodon', client_id: 'x', client_secret: 'y' } },
+        { label: 'attach an account', path: '/v1/connections/attach', body: { provider: 'mastodon', access_token: 'stolen' } },
+        { label: 'start an oauth flow', path: '/v1/connections/start', body: { provider: 'mastodon' } },
+        { label: 'delete a connection', path: `/v1/connections/${connA}`, method: 'DELETE' },
+      ];
+      const leaks: string[] = [];
+      for (const w of writes) {
+        const r = await api(w.path, { method: w.method ?? 'POST', bearer: useOnly, body: w.body });
+        if (r.status !== 403) leaks.push(`${w.label} → ${r.status}`);
+        else if (r.data?.error?.code !== 'SCOPE_DENIED') leaks.push(`${w.label} → 403 but ${r.data?.error?.code}`);
+      }
+      assert(leaks.length === 0, `an app holding only connections:use got past these doors: ${leaks.join(', ')}`);
+
+      // Read back as the owner: the connection the app tried to delete is still there.
+      const after = await api('/v1/connections', { method: 'GET', bearer: jwtA });
+      assert((after.data?.data?.connections ?? []).some((c: any) => c.id === connA),
+        `the refused DELETE removed the connection: ${JSON.stringify((after.data?.data?.connections ?? []).map((c: any) => c.id))}`);
     });
 
     console.log('\nPhase 14 — History, and how it did');
