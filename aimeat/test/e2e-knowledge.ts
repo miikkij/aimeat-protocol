@@ -340,6 +340,53 @@ await test('Clone a package', async () => {
   assert(body.data?.entries_cloned >= 1, 'Expected at least 1 cloned entry');
 });
 
+await test('Export hands out PUBLIC entries only — a private one stays behind', async () => {
+  // Both the export and the clone tests use `discoverablePackageId`, which has ONE public entry and
+  // nothing else, so the `.filter(e => e.visibility === 'public')` in routes/knowledge/sharing.ts is
+  // never observed: drop it and both stay green. The FIRST package is the one that matters — it
+  // carries a `private-notes` entry whose body is 'Secret stuff' AND allow_clone: true — and export
+  // is unauthenticated, so that body would be anonymously downloadable.
+  const { status, body } = await json(`/v1/knowledge/${firstPackageId}/export?format=json`);
+  assert(status === 200, `Expected 200, got ${status}`);
+  const text = JSON.stringify(body);
+  assert(!text.includes('Secret stuff'),
+    `the private entry's body was exported: ${text.slice(0, 300)}`);
+  const keys = (body.package?.entries ?? body.entries ?? []).map((e: any) => e.key);
+  assert(!keys.includes('private-notes'), `the private entry was listed: ${JSON.stringify(keys)}`);
+  // The control: the public entry IS there, so the absence above is a filter and not an empty export.
+  assert(keys.length > 0, `the export carries the public entries: ${JSON.stringify(keys)}`);
+});
+
+await test('Clone copies PUBLIC entries only — the private one is not carried across', async () => {
+  const { status, body } = await json(`/v1/knowledge/${firstPackageId}/clone`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ target_prefix: 'private-probe-clone' }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+  const clonedId = body.data?.cloned_package_id as string;
+  assert(!!clonedId, 'Expected cloned_package_id');
+
+  // Read the cloned ENTRY out of memory as the cloner, which is where the bytes actually land
+  // (`packages/{id}/{name}` under the requester's namespace). A manifest read would depend on the
+  // response shape and on the read door's own filtering; the key either exists or it does not.
+  const carried = await json(`/v1/memory/${encodeURIComponent(`packages/${clonedId}/private-notes`)}`, {
+    headers: { Authorization: `Bearer ${agentToken}` },
+  });
+  assert(carried.status !== 200,
+    `the clone carried the private entry: ${JSON.stringify(carried.body?.data?.value)}`);
+  assert(!JSON.stringify(carried.body ?? {}).includes('Secret stuff'),
+    `and its body with it: ${JSON.stringify(carried.body).slice(0, 200)}`);
+
+  // The control: the PUBLIC entry did land, so the absence above is the filter and not a clone that
+  // copied nothing.
+  const publicOne = await json(`/v1/memory/${encodeURIComponent(`packages/${clonedId}/findings`)}`, {
+    headers: { Authorization: `Bearer ${agentToken}` },
+  });
+  assert(publicOne.status === 200, `the public entry was not cloned: ${publicOne.status}`);
+  assert(body.data?.entries_cloned >= 1, `the public entries were cloned: ${body.data?.entries_cloned}`);
+});
+
 // ─── Phase 4: Quality and Moderation ───
 console.log('\nPhase 4: Quality and Moderation');
 
@@ -369,6 +416,41 @@ await test('Operator can review a package', async () => {
   });
   assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
   assert(body.data?.review_id, 'Expected review_id');
+});
+
+await test('An ORDINARY owner cannot list or review packages node-wide', async () => {
+  // Both moderation tests above use ownerToken, and that account is the first owner registered on the
+  // cleared database — operator only by the bootstrap promotion. So no ordinary owner is ever refused:
+  // delete requireRole('operator') from GET /v1/admin/knowledge and POST /v1/admin/knowledge/:id/review
+  // and node-wide moderation opens to every account, with the suite green.
+  const plainName = `knowplain${Date.now()}`;
+  const reg = await json('/v1/ghii', {
+    method: 'POST',
+    body: JSON.stringify({ username: plainName, display_name: 'Plain Owner', password: 'Knowledge1234' }),
+  });
+  assert(reg.status === 201, `plain ghii ${reg.status}`);
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', {
+    method: 'POST',
+    body: JSON.stringify({ owner: plainName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, plainName + NODE_ID + ts) }),
+  });
+  const plainToken = tok.body.data.token as string;
+
+  const list = await json('/v1/admin/knowledge', { headers: { Authorization: `Bearer ${plainToken}` } });
+  assert(list.status === 403, `a plain owner listed every package on the node: ${list.status}`);
+
+  const review = await json(`/v1/admin/knowledge/${discoverablePackageId}/review`, {
+    method: 'POST', headers: { Authorization: `Bearer ${plainToken}` },
+    body: JSON.stringify({ reason: 'not_my_call', action: 'reject' }),
+  });
+  assert(review.status === 403, `a plain owner moderated somebody else's package: ${review.status}`);
+
+  // And the refusal refused: the package still carries the operator's approve, not this rejection.
+  const reviews = await json(`/v1/knowledge/${discoverablePackageId}/reviews`, {
+    headers: { Authorization: `Bearer ${agentToken}` },
+  });
+  assert(!((reviews.body.data?.reviews ?? []) as any[]).some(r => r.action === 'reject'),
+    `the refused review was recorded: ${JSON.stringify(reviews.body.data?.reviews)}`);
 });
 
 await test('Package owner can see operator reviews', async () => {
