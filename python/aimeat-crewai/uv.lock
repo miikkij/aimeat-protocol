@@ -19,7 +19,7 @@ resolution-markers = [
 
 [[package]]
 name = "aimeat-crewai"
-version = "0.20.0"
+version = "0.20.1"
 source = { editable = "." }
 dependencies = [
     { name = "crewai" },

@@ -100,6 +100,61 @@ def test_rows_of_reads_the_same_data_without_pandas(pkg):
     assert all(isinstance(v, str) or v is None for v in rows[0].values())
 
 
+def test_the_rest_address_works_too_and_reports_the_permanent_one():
+    """The address the node hands out, the docs printed, and an agent naturally has.
+
+    It used to fail with a message claiming the package was somebody else's Frictionless file — the
+    `aimeat` block sits one layer down inside the response envelope — and the first crew to use the
+    library worked around it by unwrapping. An error naming the wrong cause costs more than the bug."""
+    import re
+
+    m = re.match(r"(https?://[^/]+)/v1/pub/([^/]+)/datapkg/([^/]+)/", URL)
+    if not m:
+        pytest.skip("AIMEAT_TEST_PACKAGE is not a /v1/pub address, so the REST twin cannot be derived")
+    base, owner, name = m.group(1), m.group(2).split("%40")[0], m.group(3)
+
+    viaRest = read_package(f"{base}/v1/datapackages/{owner}/{name}")
+    assert viaRest.package_id.startswith("pkg:")
+    assert viaRest.changes
+    # And it reports the PERMANENT address of the bytes it read, not the REST URL it was given: a
+    # package read through the API still knows where its bytes live.
+    assert "/v1/pub/" in viaRest.url and "datapackage.json" in viaRest.url
+    assert to_dataframe(viaRest).shape[0] > 0
+
+
+def test_a_refusal_names_the_row_and_the_field_in_its_message():
+    """What an agent prints is `str(exc)`. The coordinates were on `.issues` from the start and the
+    message said only "2 row/column problem(s)", so the one thing a crew could tell its user was a
+    count of problems it could not point at."""
+    from aimeat_crewai.datapackage import QualityGateRefused
+
+    exc = QualityGateRefused(
+        "2 row/column problem(s): the data does not validate against its own Table Schema.",
+        [{"resource": "rows", "row": 3, "field": "days", "message": 'expected integer, got "seitseman"'},
+         {"resource": "rows", "row": 9, "field": "startDate", "message": "expected date"}],
+    )
+    said = str(exc)
+    assert "row 3" in said and "days" in said, said
+    assert "seitseman" in said, said
+    assert "1 more" in said, said
+    assert len(exc.issues) == 2
+
+
+def test_the_version_the_package_reports_is_the_version_that_shipped():
+    """0.20.0 shipped announcing itself as 0.19.0. Two places, kept in step by hand, and nothing
+    checked them against each other."""
+    import tomllib
+    import pathlib
+
+    import aimeat_crewai
+
+    root = pathlib.Path(__file__).resolve().parents[1]
+    declared = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    assert aimeat_crewai.__version__ == declared, (
+        f"__init__ says {aimeat_crewai.__version__}, pyproject says {declared}"
+    )
+
+
 def test_a_plain_frictionless_descriptor_is_refused_rather_than_half_read():
     """A package without the AIMEAT block has no provenance, no chain and no producer. Inventing
     values for those fields would be worse than saying so.

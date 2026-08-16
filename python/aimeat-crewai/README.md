@@ -340,7 +340,8 @@ no column documentation.
 ```python
 from aimeat_crewai import serve_client, read_package, to_dataframe, publish_package
 
-pkg = read_package("https://aimeat.io/v1/pub/alice@node/datapkg/laake-saatavuus/<hash>/datapackage.json")
+# Either address works: the node's REST read (newest version), or the permanent one (that version, for good)
+pkg = read_package("https://aimeat.io/v1/datapackages/alice/laake-saatavuus")
 pkg.changes        # what moved in this version, and why
 pkg.license        # what you may do with it
 pkg.supersedes     # the version it replaced
@@ -371,8 +372,14 @@ out["unchanged"]   # True = these exact bytes were already published; say "no ch
 
 `changes` is required by the node: a version nobody explained is a version a consumer cannot decide
 about. When the rows do not validate against their own schema the call raises `QualityGateRefused`
-with the resource, row and field of every problem — and **nothing was written**, so the package
-still stands on its previous version.
+— and **nothing was written**, so the package still stands on its previous version. The message
+names the first offending row and field (the rest are on `.issues`), because what an agent shows its
+user is `str(exc)`:
+
+```
+2 row/column problem(s): the data does not validate against its own Table Schema.
+First: row 3, field "days" — expected integer, got "seitseman". (1 more on .issues)
+```
 
 Parquet is an optional extra, because pyarrow is tens of megabytes and most crews never write one:
 

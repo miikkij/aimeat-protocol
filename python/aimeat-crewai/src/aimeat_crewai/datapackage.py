@@ -43,6 +43,14 @@ Mirrors the node contract in aimeat/src/services/datapackage/ (the node schema w
 mismatch) and the browser library in aimeat/src/static/sdk-libs/datapackage/.
 
 Changelog:
+  0.20.1 -- Fixes, all four from the first crew to use this in anger (crewaimeat-dev):
+    read_package() now accepts the REST address `/v1/datapackages/<owner>/<name>` as well as the raw
+    descriptor URL -- the REST one is what the node hands out and what the docs said to use, and it
+    used to fail with a message claiming the package was somebody else's Frictionless file.
+    QualityGateRefused puts the row and the field IN THE MESSAGE: they were on `.issues` all along
+    and an agent prints `str(exc)`, so the one thing it could tell its user was a count.
+    __version__ said 0.19.0 in a 0.20.0 release. And resource_url()'s docstring now says out loud
+    that it is a call, because forgetting the parens fails deep inside pandas.
   0.20.0 -- New: read_package() / to_dataframe() / rows_of() / publish_package() / to_parquet() /
     package_versions(). Requires a node with /v1/datapackages (TARGET-063). pyarrow is an optional
     extra [parquet]; to_parquet raises rather than falling back to CSV when it is missing.
@@ -73,7 +81,19 @@ class QualityGateRefused(AimeatPackageError):
     field, so a crew can fix the cell rather than re-send the table and hope."""
 
     def __init__(self, message: str, issues: Sequence[Mapping[str, Any]]) -> None:
-        super().__init__(message)
+        # THE COORDINATES GO IN THE MESSAGE, not only on the attribute. They were on `.issues` from
+        # the start and the first crew to hit this still had nothing to tell its user: what an agent
+        # prints is `str(exc)`, and that said "2 row/column problem(s)" and stopped. The gate had
+        # done its whole job — nothing written, the package still on its previous version — and the
+        # only thing missing was the sentence that makes it actionable.
+        detail = ''
+        if issues:
+            first = issues[0]
+            where = f"row {first.get('row', '?')}, field \"{first.get('field', '?')}\""
+            detail = f" First: {where} — {first.get('message', 'invalid')}."
+            if len(issues) > 1:
+                detail += f" ({len(issues) - 1} more on .issues)"
+        super().__init__(message + detail)
         self.issues = list(issues)
 
 
@@ -132,7 +152,12 @@ class DataPackage:
 
     def resource_url(self, name: str | None = None) -> str:
         """The permanent address of one resource's bytes. This is what you hand to DuckDB, Excel or
-        a colleague -- it needs no AIMEAT client and no token."""
+        a colleague -- it needs no AIMEAT client and no token.
+
+        CALL IT: `pkg.resource_url()`, with the parentheses. `resources` beside it is a property and
+        this is not, which is a wart worth naming rather than hiding: forgetting the parens passes a
+        bound method to pandas, and the failure surfaces many frames deep inside read_csv where it
+        reads like a pandas problem. `to_dataframe(pkg)` avoids the question entirely."""
         r = self.resource(name)
         base = self.url.rsplit("/", 1)[0]
         return f"{base}/{r['path']}"
@@ -156,17 +181,35 @@ def _unwrap(resp: Any, what: str) -> dict[str, Any]:
 
 
 def read_package(url: str, *, timeout: int = 60) -> DataPackage:
-    """Read a descriptor from its permanent address. No token: a published package is public.
+    """Read a package from EITHER address. No token: a published package is public.
 
-    Pass the `datapackage.json` URL, which is what every AIMEAT surface hands out."""
+    Both of these work, and they are different things:
+
+      /v1/pub/<owner>/datapkg/<name>/<hash>/datapackage.json   the permanent address of one version
+      /v1/datapackages/<owner>/<name>                          the node's REST read, newest version
+
+    ACCEPTING BOTH IS A FIX, not a convenience. The first version of this took only the raw
+    descriptor, so the REST URL — the one the node hands out, the one written in the docs, the one
+    an agent naturally has — came back wrapped in the response envelope, the `aimeat` block sat one
+    layer down at `data.descriptor.aimeat`, and the error said the package was somebody else's
+    Frictionless file. It said that about a perfectly good AIMEAT package, and the first crew to use
+    the library worked around it by unwrapping the envelope themselves. An error message that names
+    the wrong cause costs more than the bug."""
     resp = requests.get(url, timeout=timeout)
     if resp.status_code >= 300:
-        raise AimeatPackageError(f"could not read the descriptor at {url}: HTTP {resp.status_code}")
+        raise AimeatPackageError(f"could not read the package at {url}: HTTP {resp.status_code}")
     try:
-        descriptor = resp.json()
+        body = resp.json()
     except Exception as exc:  # noqa: BLE001
-        raise AimeatPackageError(f"{url} is not a JSON descriptor") from exc
-    return _to_package(descriptor, url)
+        raise AimeatPackageError(f"{url} did not answer with JSON") from exc
+
+    # The node's envelope carries the descriptor AND the permanent address of these exact bytes;
+    # prefer that address, so a package read through REST still reports where its bytes live.
+    if isinstance(body, Mapping) and isinstance(body.get("data"), Mapping):
+        data = body["data"]
+        if isinstance(data.get("descriptor"), Mapping):
+            return _to_package(data["descriptor"], str(data.get("descriptor_url") or url))
+    return _to_package(body, url)
 
 
 def _to_package(descriptor: Mapping[str, Any], url: str) -> DataPackage:
