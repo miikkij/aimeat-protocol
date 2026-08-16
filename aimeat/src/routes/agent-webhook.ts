@@ -21,6 +21,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
@@ -65,7 +66,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
   router.get('/v1/agents/:name/integration/overview', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
     const agentGaii = resolveAgentGaii(req, agentName);
@@ -83,7 +84,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -137,7 +138,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -171,7 +172,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -204,7 +205,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -300,7 +301,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     const agentName = req.params.name as string;
 
     if (!canAccessAgent(req, agentName)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 

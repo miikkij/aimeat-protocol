@@ -30,6 +30,7 @@ import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { refuseNotYours } from '../middleware/refusals.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
@@ -96,7 +97,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
     const agentName = req.params.name as string;
     const agentGaii = resolveAgentGaii(req, agentName);
     if (!canAccessAgent(req, agentGaii)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
     const agent = await storage.getAgent(agentGaii);

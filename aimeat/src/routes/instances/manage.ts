@@ -12,6 +12,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, PackageComponentType } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { refuseNotYours } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
 import {
   deleteComponent,
@@ -240,7 +241,7 @@ export function registerManageRoutes(
 
     // Must be owner or operator
     if (instance.owner !== owner && !roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 

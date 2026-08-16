@@ -22,6 +22,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
+import { refuseNotYours } from '../../middleware/refusals.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
@@ -49,7 +50,7 @@ export function registerTaskLifecycleRoutes(
     }
 
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -180,7 +181,7 @@ export function registerTaskLifecycleRoutes(
     }
 
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -255,7 +256,7 @@ export function registerTaskLifecycleRoutes(
 
     const appOwnsTask = isApp && task.ownerGaii === `${req.auth!.owner}@${config.nodeId}`;
     if (!appOwnsTask && !canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -318,7 +319,7 @@ export function registerTaskLifecycleRoutes(
     // Owner-match: an app (task:write) may only start its OWN owner's task.
     const appOwnsTask = isApp && task.ownerGaii === `${req.auth!.owner}@${config.nodeId}`;
     if (!appOwnsTask && !canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -415,7 +416,7 @@ export function registerTaskLifecycleRoutes(
       return;
     }
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
     // The whole acceptance — the live-plan guard, the preserved history, the renumbering, the status
@@ -465,7 +466,7 @@ export function registerTaskLifecycleRoutes(
       return;
     }
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -571,7 +572,7 @@ export function registerTaskLifecycleRoutes(
     }
 
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 

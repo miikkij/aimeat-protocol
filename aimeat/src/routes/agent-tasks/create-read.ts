@@ -19,6 +19,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
+import { refuseNotYours } from '../../middleware/refusals.js';
 import { requireAuth, agentNotFoundResponse } from '../../auth/middleware.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
@@ -231,7 +232,7 @@ export function registerTaskCreateReadRoutes(
     }
 
     if (!canReadTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 

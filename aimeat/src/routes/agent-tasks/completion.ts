@@ -30,6 +30,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskRating, RaterType } from '../../storage/interface.js';
 import { RATING_CONTEXTS_REQUIRING_GROUNDING } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
+import { refuseNotYours } from '../../middleware/refusals.js';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -56,7 +57,7 @@ export function registerTaskCompletionRoutes(
     }
 
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -84,7 +85,7 @@ export function registerTaskCompletionRoutes(
     }
 
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -129,7 +130,7 @@ export function registerTaskCompletionRoutes(
     }
 
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -173,7 +174,7 @@ export function registerTaskCompletionRoutes(
     const isOwnerSession = callerRoles.includes('owner') && !callerRoles.includes('agent');
     const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
     if (task.ownerGaii !== ownerGhii) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
     // No self-rating: an agent cannot rate the deliverable it produced.
@@ -265,7 +266,7 @@ export function registerTaskCompletionRoutes(
     }
     const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
     if (task.ownerGaii !== ownerGhii) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -304,7 +305,7 @@ export function registerTaskCompletionRoutes(
     }
 
     if (!canAccessTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'task', action: 'open', listUrl: '/v1/agents' }));
       return;
     }
 
@@ -336,7 +337,7 @@ export function registerTaskCompletionRoutes(
     }
 
     if (!canReadTask(req, task)) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      res.status(403).json(refuseNotYours(config, { thing: 'agent', action: 'use', listUrl: '/v1/agents' }));
       return;
     }
 
