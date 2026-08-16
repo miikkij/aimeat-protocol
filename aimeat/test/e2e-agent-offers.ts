@@ -5,6 +5,13 @@
  *   joins each agent's offers with its mode + online state. Covers the happy path + invalid-descriptor
  *   rejection + owner-scoping.
  * @version-history
+ *   v1.3.0 — 2026-08-16 — E2E quality, agent-offers :116, :82 and :207. The money had never moved in this
+ *     suite: all three invokes stopped at a refusal, the last of them at the missing-capability 404, so
+ *     the price, the debit, the 402, the refund, the fee, the provider's credit, both ledger rows and
+ *     the receipt had never executed. Test 14b builds a capability that really dispatches, 14c buys
+ *     from a different owner and reads every morsel back, 14d proves the refusal happens before the
+ *     work. Plus the cross-owner publish refusal, which the bare-name request in test 7 could not
+ *     reach, and what a stranger sees of the offer list when an offer declares no visibility at all.
  *   v1.0.0 — 2026-06-12 — Initial: publish/read/aggregate + validation.
  *   v1.1.0 — 2026-06-13 — Cover deliverable.format "image" round-trip (test 11b) for the inline
  *     image deliverable rendering feature.
@@ -118,6 +125,33 @@ await test('7. Owner B cannot publish offers for A\'s agent (owner-scoped → 40
     assert(r.status === 404, `expected 404 (B has no such agent), got ${r.status}`);
 });
 
+/**
+ * Test 7 sends a BARE agent name, which the route resolves under the CALLER's owner, so B is asking
+ * about an agent of its own that does not exist and the 404 comes from the lookup. The cross-owner
+ * refusal one line further down (`agent.owner !== owner` → 403 ACCESS_DENIED) was unreachable by that
+ * request, and no suite in the tree reached it either: an offer document is what an agent sells and
+ * for how much, so writing another owner's is the interesting act, not writing a missing one's.
+ */
+await test('7b. Owner B cannot publish offers for A\'s agent addressed by its full GAII → 403', async () => {
+    const before = await json(`/v1/agents/${agentName}/offers`, { headers: auth(A.token) });
+    const versionBefore = before.body.data?.version;
+    const idsBefore = JSON.stringify((before.body.data?.offers ?? []).map((o: any) => o.id));
+
+    const providerGaii = encodeURIComponent(`${agentName}#${A.name}@${NODE_ID}`);
+    const r = await json(`/v1/agents/${providerGaii}/offers`, {
+        method: 'PUT', headers: auth(B.token),
+        body: JSON.stringify({ offers: [{ ...validOffers.offers[0], id: 'hijacked', title: 'Mine now' }] }),
+    });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${r.body.error?.code}`);
+
+    // A 200 that wrote nothing would still be a defect, so the document is read back rather than trusted.
+    const after = await json(`/v1/agents/${agentName}/offers`, { headers: auth(A.token) });
+    assert(after.body.data?.version === versionBefore, `the version moved: ${versionBefore} → ${after.body.data?.version}`);
+    assert(JSON.stringify((after.body.data?.offers ?? []).map((o: any) => o.id)) === idsBefore,
+        `the offer list changed: ${idsBefore} → ${JSON.stringify((after.body.data?.offers ?? []).map((o: any) => o.id))}`);
+});
+
 // ── Inbox (phase 2): the deliverables aggregate + rating gate ──
 let taskId = '';
 await test('8. An asked task appears in the deliverables Inbox with provenance', async () => {
@@ -189,6 +223,25 @@ await test('11b. An offer can declare deliverable.format "image" and round-trips
     assert(!!o && o.deliverable?.format === 'image', `image format preserved: ${JSON.stringify(o?.deliverable)}`);
 });
 
+/**
+ * Every GET of this document in the file reads it as A, the agent's own owner, for whom the route
+ * returns the list unfiltered. What a STRANGER sees has never been read here. The unset-visibility
+ * case is the part no other suite covers: research-topic declares no visibility at all, and silence
+ * has to mean private rather than public.
+ */
+await test('11c. A stranger sees only the public offers, and an offer that said nothing stays hidden', async () => {
+    const providerGaii = encodeURIComponent(`${agentName}#${A.name}@${NODE_ID}`);
+    const r = await json(`/v1/agents/${providerGaii}/offers`, { headers: auth(B.token) });
+    assert(r.status === 200, `stranger read: ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const ids = (r.body.data.offers ?? []).map((o: any) => o.id);
+    assert(ids.includes('summarize'), `the public offer must be visible: ${JSON.stringify(ids)}`);
+    assert(!ids.includes('research-topic'), `an offer with no visibility must not be shown to a stranger: ${JSON.stringify(ids)}`);
+    // The owner still sees both, which is what makes the line above a filter rather than a deletion.
+    const own = await json(`/v1/agents/${agentName}/offers`, { headers: auth(A.token) });
+    const ownIds = (own.body.data.offers ?? []).map((o: any) => o.id);
+    assert(ownIds.includes('research-topic') && ownIds.includes('summarize'), `the owner sees everything: ${JSON.stringify(ownIds)}`);
+});
+
 await test('12. Invoking an offer with no callable binding → 422 OFFER_NOT_CALLABLE', async () => {
     // A self-invokes research-topic (self skips the visibility gate, falls through to the callable check).
     const r = await json(`/v1/agents/${agentName}/offers/research-topic/invoke`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ input: {} }) });
@@ -206,6 +259,152 @@ await test('14. A callable offer whose backing capability is missing → 404 CAP
     // The 'summarize' offer (published in #11) is public + callable but points at a non-existent capability.
     const r = await json(`/v1/agents/${agentName}/offers/summarize/invoke`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ input: { url: 'https://example.com' } }) });
     assert(r.status === 404 && r.body.error?.code === 'CAPABILITY_NOT_FOUND', `expected 404 CAPABILITY_NOT_FOUND, got ${r.status} ${r.body.error?.code}`);
+});
+
+/**
+ * THE MONEY HAS NEVER MOVED IN THIS SUITE. The three invokes above all stop at a refusal, and the
+ * last of them stops at `if (!cap) 404`, so everything after that line — the price, the debit, the
+ * 402, the refund, the marketplace fee, the provider's credit, both ledger rows and the receipt —
+ * has never executed. A priced offer is the agent economy's till, and nothing rang it.
+ *
+ * Three things had to be true for a real invoke: a capability that actually dispatches (an extension
+ * action of A's), the offer bound to it, and a caller who is NOT the provider, since offers.ts treats
+ * a self-invoke as free.
+ */
+const extName = `offersecho${Date.now() % 1000000}`;
+const capId = `offers-echo-${Date.now() % 1000000}`;
+let paidOfferReady = false;
+
+await test('14b. A callable capability of A, backed by a real extension action', async () => {
+    const manifest = JSON.stringify({
+        metadata: { name: extName, version: '1.0.0', description: 'Offers E2E: an action a paid offer can call', author: A.name },
+        actions: [{ id: 'echo', method: 'POST', path: '/echo', script: 'echo', description: 'Echo the input back' }],
+        limits: { timeout_ms: 5000, max_api_calls: 1 },
+    });
+    const script = 'export default async function(ctx, input){ return { echoed: "Echo: " + (input.message || "(empty)") }; }';
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ manifest, scripts: { echo: script } }),
+    });
+    assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body.error)}`);
+    const act = await json(`/v1/extensions/${extName}/activate`, { method: 'POST', headers: auth(A.token) });
+    assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body.error)}`);
+
+    // Private on purpose: this node runs capabilityPublishing 'self_only', and the offer's own
+    // visibility is what decides who may buy. The capability is the machinery behind it.
+    const cap = await json('/v1/capabilities', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({
+            id: capId, name: 'Offers echo', summary: 'Echoes the input back', visibility: 'private',
+            source: { type: 'extension', ref: `ext:${extName}:echo` }, callable: true,
+            usage: 'POST an input object; the same message comes back.',
+        }),
+    });
+    assert(cap.status === 201, `capability ${cap.status}: ${JSON.stringify(cap.body.error)}`);
+    paidOfferReady = true;
+});
+
+await test('14c. A pays for an invoke: the buyer is debited, the provider credited, both rows written', async () => {
+    assert(paidOfferReady, 'the capability fixture must exist');
+    const pub = await json(`/v1/agents/${agentName}/offers`, {
+        method: 'PUT', headers: auth(A.token),
+        body: JSON.stringify({ offers: [
+            validOffers.offers[0],
+            {
+                id: 'summarize', title: 'Summarize a URL', ask: 'Give me a URL; I return a summary.',
+                deliverable: { format: 'document', sample: 'untested' },
+                price: { morsels: 25, unit: 'per-call' }, visibility: 'public',
+                callable: { action_id: capId },
+            },
+        ] }),
+    });
+    assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+
+    const balance = async (token: string) => {
+        const w = await json('/v1/wallet', { headers: auth(token) });
+        assert(w.status === 200, `wallet ${w.status}`);
+        return Number(w.body.data.balance);
+    };
+    const buyerBefore = await balance(B.token);
+    const providerBefore = await balance(A.token);
+
+    const providerGaii = encodeURIComponent(`${agentName}#${A.name}@${NODE_ID}`);
+    const r = await json(`/v1/agents/${providerGaii}/offers/summarize/invoke`, {
+        method: 'POST', headers: auth(B.token), body: JSON.stringify({ input: { message: 'hello' } }),
+    });
+    assert(r.status === 200, `invoke ${r.status}: ${JSON.stringify(r.body.error)}`);
+
+    const receipt = r.body.data?.receipt ?? {};
+    assert(receipt.charged === 25, `the buyer must be charged the asking price, got ${JSON.stringify(receipt)}`);
+    assert(typeof receipt.earned === 'number' && typeof receipt.fee === 'number', `receipt shape: ${JSON.stringify(receipt)}`);
+    assert(receipt.earned + receipt.fee === 25, `the fee comes out of the price, not on top: ${JSON.stringify(receipt)}`);
+    assert(typeof receipt.trackingCode === 'string' && receipt.trackingCode.length > 0, 'the receipt must carry a tracking code');
+
+    const buyerAfter = await balance(B.token);
+    const providerAfter = await balance(A.token);
+    assert(buyerBefore - buyerAfter === 25, `the buyer must be down exactly 25: ${buyerBefore} → ${buyerAfter}`);
+
+    // Both explaining rows, under the same tracking code, each on the wallet its owner reads. The
+    // ledger is filed under the human, so an agent-keyed row would be invisible here.
+    const rows = async (token: string) => {
+        const t = await json('/v1/wallet/transactions', { headers: auth(token) });
+        assert(t.status === 200, `transactions ${t.status}`);
+        return (t.body.data.transactions ?? []) as any[];
+    };
+    // The fee leg is filed under the same code with a ':<source>' suffix (services/marketplace-fee.ts),
+    // so the family is what has to be summed, not the exact string.
+    const family = (x: any) => String(x.tracking_code ?? '').startsWith(receipt.trackingCode);
+    const buyerRows = (await rows(B.token)).filter(family);
+    const spend = buyerRows.find(x => x.type === 'offer_spend');
+    assert(!!spend, `the buyer's row is missing for ${receipt.trackingCode}`);
+    assert(Number(spend.amount) === -25, `buyer row: ${JSON.stringify(spend)}`);
+    const providerRows = (await rows(A.token)).filter(family);
+    const earn = providerRows.find(x => x.type === 'offer_earn');
+    assert(!!earn, `the provider's row is missing for ${receipt.trackingCode}`);
+    assert(Number(earn.amount) === receipt.earned, `provider row: ${JSON.stringify(earn)}`);
+
+    // EVERY MORSEL THAT MOVED IS EXPLAINED BY A ROW, which is the statement worth making and the one
+    // that does not depend on who the node operator happens to be. The marketplace fee routes to the
+    // operator, and when the provider IS the operator (this suite's owner A is, whenever the suite
+    // runs first on a cleared database) the fee comes back as a second row on the same code. Summing
+    // the rows covers both worlds; asserting `+ earned` would pass only in one of them.
+    const sum = (list: any[]) => list.reduce((n, x) => n + Number(x.amount), 0);
+    assert(providerAfter - providerBefore === sum(providerRows),
+        `the provider's balance moved by ${providerAfter - providerBefore} but its rows explain ${sum(providerRows)}: ${JSON.stringify(providerRows)}`);
+    assert(buyerAfter - buyerBefore === sum(buyerRows),
+        `the buyer's balance moved by ${buyerAfter - buyerBefore} but its rows explain ${sum(buyerRows)}: ${JSON.stringify(buyerRows)}`);
+});
+
+await test('14d. A price beyond the buyer\'s balance is refused, and nothing moves', async () => {
+    assert(paidOfferReady, 'the capability fixture must exist');
+    const pub = await json(`/v1/agents/${agentName}/offers`, {
+        method: 'PUT', headers: auth(A.token),
+        body: JSON.stringify({ offers: [
+            validOffers.offers[0],
+            {
+                id: 'expensive', title: 'Cost the earth', ask: 'Anything, for a lot.',
+                deliverable: { format: 'document', sample: 'untested' },
+                price: { morsels: 10_000_000, unit: 'per-call' }, visibility: 'public',
+                callable: { action_id: capId },
+            },
+        ] }),
+    });
+    assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+
+    const balance = async (token: string) => Number((await json('/v1/wallet', { headers: auth(token) })).body.data.balance);
+    const buyerBefore = await balance(B.token);
+    const providerBefore = await balance(A.token);
+
+    const providerGaii = encodeURIComponent(`${agentName}#${A.name}@${NODE_ID}`);
+    const r = await json(`/v1/agents/${providerGaii}/offers/expensive/invoke`, {
+        method: 'POST', headers: auth(B.token), body: JSON.stringify({ input: { message: 'hello' } }),
+    });
+    assert(r.status === 402, `expected 402, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+    assert(r.body.error?.code === 'INSUFFICIENT_BALANCE', `expected INSUFFICIENT_BALANCE, got ${r.body.error?.code}`);
+
+    // The refusal happens before the work, so neither side's balance may move by a single morsel.
+    assert(await balance(B.token) === buyerBefore, 'the refused buyer was charged');
+    assert(await balance(A.token) === providerBefore, 'the provider was paid for work nobody bought');
 });
 
 // ── v2.3: richer Offerings — JSON deliverables, per-offer run history, prerequisite gating ──
