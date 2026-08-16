@@ -8243,7 +8243,10 @@
       "usageAi": "AI allowance",
       "usageAiOwnKey": "your own key — no house limit",
       "usageAiNoGrant": "no house allowance on this node",
-      "usageAiLeftOf": "left of"
+      "usageAiLeftOf": "left of",
+      "usageAiSpent": "Used up. Two ways on, both cheaper than they look:",
+      "usageAiOwnKeyCta": "Bring your own OpenRouter key",
+      "usageAiConnectCta": "Connect the AI you already pay for"
     },
     "mcpConnected": "MCP connected",
     "openrouter": {

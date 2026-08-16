@@ -8243,7 +8243,10 @@
       "usageAi": "Tekoälysaldo",
       "usageAiOwnKey": "oma avaimesi — ei talon rajaa",
       "usageAiNoGrant": "tällä nodella ei ole talon saldoa",
-      "usageAiLeftOf": "jäljellä, alkuperäinen"
+      "usageAiLeftOf": "jäljellä, alkuperäinen",
+      "usageAiSpent": "Käytetty loppuun. Kaksi tapaa jatkaa, molemmat halvempia kuin miltä näyttävät:",
+      "usageAiOwnKeyCta": "Tuo oma OpenRouter-avain",
+      "usageAiConnectCta": "Kytke tekoäly josta jo maksat"
     },
     "mcpConnected": "MCP kytketty",
     "openrouter": {

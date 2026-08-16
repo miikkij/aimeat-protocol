@@ -233,8 +233,25 @@ export function UsageCard({ switchTab, initialUsage }) {
           </div>
         </div>`;
     }
-    return bar(t('profile.landing.usageAi'), ai,
-      `$${(ai.remaining_usd ?? 0).toFixed(2)} ${t('profile.landing.usageAiLeftOf')} $${(ai.granted_usd ?? 0).toFixed(2)}`);
+    const spent = (ai.remaining_usd ?? 0) <= 0;
+    return html`
+      ${bar(t('profile.landing.usageAi'), ai,
+        `$${(ai.remaining_usd ?? 0).toFixed(2)} ${t('profile.landing.usageAiLeftOf')} $${(ai.granted_usd ?? 0).toFixed(2)}`)}
+      ${/* A bar at zero states a fact and leaves the person there. The grant is once per person and
+            nothing renews it, so "used up" is permanent unless they do one of two things — and both
+            of them are cheaper than they assume, which is exactly what an empty bar does not say. */''}
+      ${spent && html`
+        <div class="pf-usage-exhausted text-meta-sm">
+          ${t('profile.landing.usageAiSpent')}
+          ${' '}
+          <button type="button" class="btn-ghost btn-sm" onClick=${() => switchTab('generator')}>
+            ${t('profile.landing.usageAiOwnKeyCta')}
+          </button>
+          ${' '}
+          <button type="button" class="btn-ghost btn-sm" onClick=${() => switchTab('agents')}>
+            ${t('profile.landing.usageAiConnectCta')}
+          </button>
+        </div>`}`;
   };
 
   const chip = (label, value, tab) => html`

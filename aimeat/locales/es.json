@@ -8235,7 +8235,10 @@
       "usageAi": "Saldo de IA",
       "usageAiOwnKey": "tu propia clave — sin límite de la casa",
       "usageAiNoGrant": "este nodo no da saldo",
-      "usageAiLeftOf": "de"
+      "usageAiLeftOf": "de",
+      "usageAiSpent": "Agotado. Dos formas de seguir, ambas más baratas de lo que parecen:",
+      "usageAiOwnKeyCta": "Trae tu propia clave de OpenRouter",
+      "usageAiConnectCta": "Conecta la IA que ya pagas"
     },
     "mcpConnected": "MCP conectado",
     "openrouter": {

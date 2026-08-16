@@ -85,6 +85,7 @@
  *     -save), .pf-eco-auto-how(-toggle/-lead/-steps/-doc), .pf-eco-auto-produces(-cap),
  *     .pf-eco-auto-status(-timeline/-step/-head/-dot/-dot-*/-label/-body/-agents/-note/-chip/-pending-count),
  *     .pf-eco-auto-status-{ok,wait,off,error}.
+.pf .pf-usage-exhausted{margin:.25rem 0 .5rem;display:flex;align-items:center;gap:.25rem;flex-wrap:wrap}
  *   v2.1.0 — 2026-06-15 — Ecosystem Setup playbook + MCP promo (top of expanded card):
  *     .pf-eco-setup(-lead/-progress/-progress-chip/-steps/-step/-step-done/-dot/-dot-done/-dot-wait/
  *     -step-body/-step-title/-step-why/-step-note/-cta), .pf-eco-mcp(-head/-icon/-title/-sub/-connect/
