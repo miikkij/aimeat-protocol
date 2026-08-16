@@ -307,7 +307,15 @@ await test('The same upload as JSON { html } — the door an MCP agent can reach
     assert(up.status === 200, `json upload ${up.status}: ${JSON.stringify(up.body.error)}`);
 
     // The file and the switch are two things: uploading a page does not publish it, and the public
-    // reader refuses until the owner has turned the portfolio on.
+    // reader refuses until the owner has turned the portfolio on. Asserted BETWEEN the upload and the
+    // enable, because that is the only moment the difference exists — the comment above claimed this
+    // rule and nothing measured it, so a portfolio that published on upload would have passed.
+    const beforeEnable = await json(`/v1/portfolio/data/${name}`);
+    assert(beforeEnable.status === 404,
+        `an uploaded but not-yet-enabled portfolio must not serve, got ${beforeEnable.status}: ${JSON.stringify(beforeEnable.body)}`);
+    assert(!JSON.stringify(beforeEnable.body).includes('json upload'),
+        'and the page bytes must not leak in the refusal');
+
     const cfg = await json('/v1/portfolio/config', auth(t, { method: 'PUT', body: JSON.stringify({ enabled: true }) }));
     assert(cfg.status === 200, `enable ${cfg.status}: ${JSON.stringify(cfg.body.error)}`);
 
