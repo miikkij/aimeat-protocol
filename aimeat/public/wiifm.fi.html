@@ -1,30 +1,18 @@
 <!DOCTYPE html>
 <!--
-  @file wiifm.html
-  @description "What's in it for me?" — the hidden sneak-preview pitch page for aimeat.io as a
-    try-before-you-buy demo platform. Deliberately NOT in the house style: 1980s comedy-poster
-    energy, own palette, own type. Reached only by direct URL (/wiifm.html); nothing links here
-    yet. Images generated with scripts/gen_image.py (genimages/wiifm/), live numbers read from
-    GET /v1/public/node-totals on the date stamped in the footer. Static page, no JS.
+  @file wiifm.fi.html
+  @description "Mitä mä tästä saan?" — the Finnish sibling of wiifm.html, composed in Finnish
+    rather than translated (aimeat-writing skill). Same structure, same CSS, same images; only
+    the words differ. Reached by direct URL (/wiifm.fi.html) or the EN/FI switch on either page.
   @version-history
-    v1.3.0 - 2026-08-16 - EN/FI language switch top right; the Finnish sibling is wiifm.fi.html,
-      composed in Finnish rather than translated, per the writing skill.
-    v1.2.0 - 2026-08-16 - Server section reframed as your own private space (solo-founder angle),
-      and a takeaway-menu flyer added before the footer: dishes are capabilities in human words,
-      the ingredients line under each carries the tech jargon, prices are minutes of your time.
-    v1.1.0 - 2026-08-16 - Copy rewritten human-to-human per owner feedback: "Get something you
-      need" wish box replaces "build an app", tech vocabulary (MCP, nodes, scopes, federation)
-      out of every sentence a non-technical reader sees, agent reframed as a named buddy,
-      Lab notes intro as the mad scientist's kitchen.
-    v1.0.0 - 2026-08-16 - First draft: hero, free test drive, own server, agent incubator,
-      Lab notes (first three entries from real changelog), footer. English only for now.
+    v1.0.0 - 2026-08-16 - First Finnish version, matching wiifm.html v1.3.0.
 -->
-<html lang="en">
+<html lang="fi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>What's in it for me? · AIMEAT.IO</title>
-  <meta name="description" content="Say what you need and get it. aimeat.io is the real, running thing: try everything free before you buy your own, with helpers that work while you sleep and the lab notes to prove it." />
+  <title>Mitä mä tästä saan? · AIMEAT.IO</title>
+  <meta name="description" content="Sano mitä tarvitset, ja saat sen. aimeat.io on se oikea, käynnissä oleva alusta: kokeile kaikkea ilmaiseksi ennen kuin ostat omasi, apureilla jotka tekevät töitä kun nukut." />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -357,65 +345,65 @@
 <body>
 
   <header class="wf-hero">
-    <nav class="wf-lang" aria-label="Language">
-      <a class="wf-lang-on" href="/wiifm.html" aria-current="true">EN</a>
-      <a href="/wiifm.fi.html" lang="fi">FI</a>
+    <nav class="wf-lang" aria-label="Kieli">
+      <a href="/wiifm.html" lang="en">EN</a>
+      <a class="wf-lang-on" href="/wiifm.fi.html" aria-current="true">FI</a>
     </nav>
-    <span class="wf-kicker">Sneak preview · you found the side door</span>
-    <h1>What's in it for me?</h1>
+    <span class="wf-kicker">Ennakkoesitys · löysit sivuoven</span>
+    <h1>Mitä mä tästä saan?</h1>
     <p class="wf-sub">
-      Fair question. Here is the honest answer: you say what you need, and you get it.
-      aimeat.io is the real thing, running right here. Everything on this page was built
-      and tested on this very machine, and you can use all of it today for 0&nbsp;&euro;,
-      before you spend a cent on your own.
+      Hyvä kysymys. Rehellinen vastaus: sanot mitä tarvitset, ja saat sen.
+      aimeat.io on se oikea, käynnissä tässä ja nyt. Kaikki tällä sivulla on rakennettu
+      ja testattu juuri tällä koneella, ja saat käyttää kaikkea tänään 0&nbsp;eurolla,
+      ennen kuin maksat sentin omastasi.
     </p>
     <div class="wf-cta-row">
-      <a class="wf-btn wf-btn-hot" href="/">Start the free test drive</a>
-      <a class="wf-btn wf-btn-cool" href="/v1/pricing">See the prices</a>
+      <a class="wf-btn wf-btn-hot" href="/">Aloita ilmainen koeajo</a>
+      <a class="wf-btn wf-btn-cool" href="/v1/pricing">Katso hinnat</a>
     </div>
-    <img class="wf-hero-img" src="/img/wiifm/hero.jpg" alt="An ecstatic office worker on a rocket-powered office chair, cheered on by a gang of retro robots" />
+    <img class="wf-hero-img" src="/img/wiifm/hero.jpg" alt="Riemastunut toimistotyöläinen rakettikäyttöisessä työtuolissa retrorobottien hurratessa ympärillä" />
   </header>
 
   <div class="wf-strip">
-    <span><b>128</b> wishes running as apps</span>
-    <span><b>9,644</b> times opened</span>
-    <span><b>143</b> AI helpers on the payroll</span>
-    <span><b>50</b> awake right now</span>
-    <span class="wf-strip-note">Counted on this very machine on 2026-08-16. They only go up.</span>
+    <span><b>128</b> toivetta pyörii appeina</span>
+    <span><b>9&nbsp;644</b> avausta</span>
+    <span><b>143</b> AI-apuria palkkalistoilla</span>
+    <span><b>50</b> hereillä juuri nyt</span>
+    <span class="wf-strip-note">Laskettu tällä samalla koneella 2026-08-16. Luvut vain kasvavat.</span>
   </div>
 
   <section class="wf-section">
     <div class="wf-section-inner">
       <div class="wf-art">
-        <img src="/img/wiifm/testdrive.jpg" alt="A person and a robot co-pilot in a convertible with a FREE licence plate, money flying away behind them" loading="lazy" />
-        <span class="wf-sticker">0 &euro; forever tier</span>
+        <img src="/img/wiifm/testdrive.jpg" alt="Ihminen ja robottiapukuski avoautossa, jonka rekisterikilvessä lukee FREE, setelien lentäessä taivaalle" loading="lazy" />
+        <span class="wf-sticker">0 €, ikuisesti</span>
       </div>
       <div class="wf-copy">
-        <h2>Get something you need</h2>
+        <h2>Saat sen mitä tarvitset</h2>
         <p>
-          So, what do you need? Say it in the box. Then press GO, make a free account,
-          and say it again to the machine waiting on the other side. About ten minutes
-          later the thing you asked for is live on its own address, ready to share.
+          No, mitä sä tarvitset? Sano se laatikkoon. Paina GO, tee ilmainen tili ja sano
+          sama koneelle, joka odottaa toisella puolella. Noin kymmenen minuuttia myöhemmin
+          pyytämäsi juttu on livenä omassa osoitteessaan, valmiina jaettavaksi.
         </p>
         <form class="wf-wish" action="/" method="get">
-          <input type="text" name="wish" placeholder="Peace of mind?" aria-label="What do you need?" maxlength="200" />
+          <input type="text" name="wish" placeholder="Sielunrauhaa?" aria-label="Mitä sä tarvitset?" maxlength="200" />
           <button class="wf-btn wf-btn-hot" type="submit">GO</button>
         </form>
         <p>
-          &ldquo;Peace of mind&rdquo; gets you a meditation app. &ldquo;A book of dark poems&rdquo;
-          gets you exactly that. The world's dullest budget sheet arrives filled in while you
-          ramble at it. Wedding invitations, the whole wedding party organised, birthday
-          greetings with your aunt's name spelled right: same door. Serious work and glorious
-          nonsense, side by side. People have walked through it 128 times already.
+          &rdquo;Sielunrauhaa&rdquo; antaa sinulle meditointisovelluksen. &rdquo;Pimeyden
+          runokirja&rdquo; tulee juuri sellaisena. Maailman tylsin budjettipohja täyttyy sillä
+          aikaa, kun höpiset sille. Hääkutsut, koko hääbileiden järjestely ja synttärionnittelut,
+          joissa tädin nimi on kirjoitettu oikein: sama ovi. Tosityöt ja riemukas hölynpöly
+          rinta rinnan. Ovesta on kävelty jo 128 kertaa.
         </p>
         <ul>
-          <li>No coding, no installing, no waiting. You describe, it appears.</li>
-          <li>Bring the AI you already talk to. Whichever one it is, it works for you here.</li>
-          <li>It remembers you tomorrow. And next month.</li>
-          <li>Show your stuff to exactly the people you choose, and nobody else.</li>
+          <li>Ei koodausta, ei asentamista, ei odottelua. Sinä kuvailet, se ilmestyy.</li>
+          <li>Tuo se tekoäly, jolle jo puhut. Mikä tahansa se onkin, täällä se tekee töitä sinulle.</li>
+          <li>Se muistaa sinut huomenna. Ja ensi kuussa.</li>
+          <li>Näytä juttusi juuri niille, joille haluat, eikä kenellekään muulle.</li>
         </ul>
         <p>
-          When you want all this under your own name, the next two sections are the shopping list.
+          Kun haluat tämän kaiken omiin nimiisi, seuraavat kaksi osiota ovat se ostoslista.
         </p>
       </div>
     </div>
@@ -424,27 +412,27 @@
   <section class="wf-section wf-alt">
     <div class="wf-section-inner">
       <div class="wf-art">
-        <img src="/img/wiifm/server.jpg" alt="A tracksuited hero with a cape holding a glowing server tower aloft while robots cheer" loading="lazy" />
-        <span class="wf-sticker">From 49 &euro;/mo</span>
+        <img src="/img/wiifm/server.jpg" alt="Verkkarisankari viitta hulmuten, sylissään hehkuva servertorni, robottien hurratessa jaloissa" loading="lazy" />
+        <span class="wf-sticker">Alk. 49 €/kk</span>
       </div>
       <div class="wf-copy">
-        <h2>Get your own private space, keep the powers</h2>
+        <h2>Hanki oma tila, pidä voimat</h2>
         <p>
-          Your own space is this whole place, but entirely yours, on an address with your name
-          on it. Nobody else's eyes, nobody else's rules. Invite people in when you feel like
-          company, or build alone with the door closed. Most seem to pick alone, and no wonder:
-          this is the golden age of the solo founder.
+          Oma tilasi on tämä koko paikka, mutta kokonaan sinun, osoitteessa, jossa lukee sinun
+          nimesi. Ei kenenkään muun silmiä, ei kenenkään muun sääntöjä. Kutsu porukkaa kylään,
+          kun siltä tuntuu, tai rakenna yksin ovi kiinni. Useimmat taitavat valita yksin, eikä
+          ihme: nyt eletään soolofounderin kulta-aikaa.
         </p>
         <ul>
-          <li>The whole toy box and the workbench too, everything you tried here, under your own roof.</li>
-          <li>Keeping your own stuff is a joy. Here nobody takes it, rents it back to you, or peeks at it.</li>
-          <li>Friends running their own? You just became a super-squad with magical powers: you get things done together without booking a single meeting. That is what AI-native means.</li>
-          <li>Own space 49 &euro;/mo &middot; Pro 99 &euro;/mo &middot; Done for you from 990&nbsp;&euro; setup &middot; Enterprise by conversation.</li>
+          <li>Koko lelulaatikko ja työpenkki kaupan päälle: kaikki, minkä täällä kokeilit, oman katon alla.</li>
+          <li>Omien juttujen pitäminen on ilo. Täällä kukaan ei vie niitä, vuokraa niitä takaisin sinulle tai kurki niitä.</li>
+          <li>Kavereillakin omansa? Teistä tuli juuri superjoukko maagisilla kyvyillä: saatte asioita aikaan varaamatta yhtään palaveria. Sitä AI-natiivius on.</li>
+          <li>Oma tila 49 €/kk &middot; Pro 99 €/kk &middot; Avaimet käteen alkaen 990 € &middot; Enterprise: jutellaan.</li>
         </ul>
         <div class="wf-ideas">
-          <strong>Use it tonight:</strong> run your business on it, so everyone in the company asks
-          the same brain and gets the same answer. Publish an app for your customers before lunch.
-          Let your helper and your accountant's helper settle the receipts between themselves.
+          <strong>Kokeile jo tänään:</strong> laita firmasi tieto sinne, niin jokainen työntekijä
+          kysyy samoilta aivoilta ja saa saman vastauksen. Julkaise appi asiakkaillesi ennen
+          lounasta. Anna sinun apurisi ja kirjanpitäjäsi apurin selvittää kuitit keskenään.
         </div>
       </div>
     </div>
@@ -453,69 +441,72 @@
   <section class="wf-section wf-teal">
     <div class="wf-section-inner">
       <div class="wf-art">
-        <img src="/img/wiifm/incubator.jpg" alt="A delighted scientist in a hatchery full of robot chicks hatching from glowing eggs" loading="lazy" />
-        <span class="wf-sticker">Fresh hatchlings daily</span>
+        <img src="/img/wiifm/incubator.jpg" alt="Riemuissaan oleva tiedemies hautomossa, jossa robottitipuja kuoriutuu hehkuvista munista" loading="lazy" />
+        <span class="wf-sticker">Tuoreita tipuja joka päivä</span>
       </div>
       <div class="wf-copy">
-        <h2>Adopt a buddy from the incubator</h2>
+        <h2>Adoptoi kaveri hautomosta</h2>
         <p>
-          It has a name, and other people know it by that name. It is your buddy that never
-          sleeps: you say what it may touch, and it handles the rest, on a schedule or the
-          moment you ask.
+          Sillä on nimi, ja muutkin tuntevat sen sillä nimellä. Se on sinun kaverisi, joka ei
+          koskaan nuku: sinä sanot, mihin se saa koskea, ja loput se hoitaa, aikataulussa tai
+          heti kun pyydät.
         </p>
         <ul>
-          <li>It arrives ready. It reads the instructions so you never have to, and starts tinkering toward what you actually want: value delivered, hassle removed, every day.</li>
-          <li>It never gets your password. You decide what it may touch, and that decision holds.</li>
-          <li>Work happens while you sleep: it watches, collects, delivers and follows up.</li>
+          <li>Se saapuu valmiina. Se lukee ohjeet puolestasi ja alkaa väkertää kohti sitä, mitä oikeasti haluat: arvoa taloon, vaivaa pois, joka päivä.</li>
+          <li>Se ei koskaan saa salasanaasi. Sinä päätät, mihin se saa koskea, ja se päätös pitää.</li>
+          <li>Työ tapahtuu, kun nukut: se vahtii, kerää, toimittaa ja hoitaa perään.</li>
         </ul>
         <div class="wf-ideas">
-          <strong>Ideas in a minute:</strong> a news watcher that boils the morning down to one note.
-          A bookkeeper that files whatever lands in the inbox. A blog machine that writes up what
-          your team shipped and posts it on schedule. That last one is exactly what we are raising
-          for the Lab notes below.
+          <strong>Ideoita minuutissa:</strong> uutisvahti, joka tiivistää aamun yhteen lappuun.
+          Kirjanpitäjä, joka arkistoi kaiken, mitä postilaatikkoon tipahtaa. Blogikone, joka
+          kirjoittaa, mitä porukkasi sai valmiiksi, ja julkaisee sen aikataulussa. Sitä viimeistä
+          me juuri kasvatamme alempana olevia Labran muistiinpanoja varten.
         </div>
-        <div class="wf-reel"><div class="wf-reel-inner">Demo reels: in production. This spot is reserved for short clips of these buddies doing all of the above for real.</div></div>
+        <div class="wf-reel"><div class="wf-reel-inner">Demovideot: tuotannossa. Tämä paikka on varattu lyhyille pätkille, joissa nämä kaverit tekevät kaiken yllä olevan ihan oikeasti.</div></div>
       </div>
     </div>
   </section>
 
   <section class="wf-notes">
     <div class="wf-notes-head">
-      <img src="/img/wiifm/lab.jpg" alt="An inventor and two robots writing feverishly at a typewriter in a gadget-filled workshop" loading="lazy" />
+      <img src="/img/wiifm/lab.jpg" alt="Keksijä ja kaksi robottia kirjoittamassa kuumeisesti kirjoituskoneella vempaimia täynnä olevassa verstaassa" loading="lazy" />
       <div>
-        <h2>Lab notes, or: what the hell have we built in here?</h2>
+        <h2>Labran muistiinpanot, eli: mitä helvettiä tänne on rakennettu?</h2>
         <p>
-          Picture a mad scientist's kitchen. We stir the recipes, and to everyone's surprise
-          things keep coming out of the oven: some delicious, some briefly on fire. What people
-          actually do here decides what gets cooked next. The notes below are true stories from
-          that kitchen, and there will be more, written and served on a schedule by the house
-          helpers themselves.
+          Kuvittele hullun tiedemiehen keittokomero. Me hämmennämme reseptejä, ja uunista tulee
+          ulos kaikenlaista: osa herkullista, osa hetken tulessa. Se, mitä ihmiset täällä
+          oikeasti tekevät, ratkaisee, mitä kokataan seuraavaksi. Alla olevat laput ovat tosia
+          tarinoita siitä keittiöstä, ja lisää tulee: talon omat apurit kirjoittavat ja
+          tarjoilevat ne aikataulussa.
         </p>
       </div>
     </div>
     <div class="wf-note-grid">
       <article class="wf-note">
         <time datetime="2026-08-16">2026-08-16</time>
-        <h3>aimeat.io now installs as an app</h3>
+        <h3>aimeat.io asentuu nyt sovellukseksi</h3>
         <p>
-          On your desktop and on your phone, with icons that exist this time. The first attempt
-          shipped a manifest pointing at icons nobody had drawn. The commit history remembers.
+          Työpöydälle ja puhelimeen, ja tällä kertaa ikoneilla, jotka ovat olemassa. Ensimmäinen
+          yritys julkaisi manifestin, joka osoitti ikoneihin, joita kukaan ei ollut piirtänyt.
+          Commit-historia muistaa.
         </p>
       </article>
       <article class="wf-note">
         <time datetime="2026-08-16">2026-08-16</time>
-        <h3>An AI that lands here reads a page, not a manual</h3>
+        <h3>Tänne astuva tekoäly lukee sivun, ei manuaalia</h3>
         <p>
-          Any AI that walks in the door gets one page that says what to do. The manual nobody
-          read has been retired by a page every machine actually reads.
+          Jokainen ovesta sisään kävelevä tekoäly saa yhden sivun, joka kertoo, mitä tehdä.
+          Manuaali, jota kukaan ei lukenut, on eläkkeellä; tilalla on sivu, jonka jokainen kone
+          oikeasti lukee.
         </p>
       </article>
       <article class="wf-note">
         <time datetime="2026-08-12">2026-08-12</time>
-        <h3>Conversations outgrew two chairs</h3>
+        <h3>Keskustelut kasvoivat kahta isommiksi</h3>
         <p>
-          Threads now hold more than two participants, every message shows which model wrote it,
-          and leaving a shared space actually ends the access. All three sound obvious. All three took work.
+          Ketjuun mahtuu nyt useampi kuin kaksi, jokainen viesti näyttää, mikä malli sen
+          kirjoitti, ja yhteisestä tilasta lähteminen päättää pääsyn oikeasti. Kaikki kolme
+          kuulostavat itsestäänselvyyksiltä. Kaikki kolme vaativat töitä.
         </p>
       </article>
     </div>
@@ -524,70 +515,70 @@
   <section class="wf-menu">
     <div class="wf-menu-paper">
       <div class="wf-menu-head">
-        <span class="wf-menu-open">Grand opening &middot; free delivery</span>
-        <h2>The AIMEAT takeaway menu</h2>
+        <span class="wf-menu-open">Avajaiset &middot; ilmainen kuljetus</span>
+        <h2>AIMEATin ruokalista</h2>
         <p>
-          The kind of flyer that used to land through your mail slot between the kebab place
-          and the pizzeria. This one delivers superpowers. All prices in minutes of your time.
+          Sellainen lappu, joka ennen tipahti postiluukusta kebabpaikan ja pizzerian mainosten
+          välissä. Tämä toimittaa supervoimia. Kaikki hinnat minuutteina sinun aikaasi.
         </p>
       </div>
 
       <div class="wf-dish">
-        <div class="wf-dish-row"><span class="wf-dish-name">The Wish, Deluxe</span><span class="wf-dish-dots"></span><span class="wf-dish-price">10 min</span></div>
-        <p class="wf-dish-desc">Say what you need, and it lands as an app on its own address, ready to share.</p>
-        <p class="wf-dish-contains">Contains: app generator, single-file HTML5, prompt templates, hosted subdomains.</p>
+        <div class="wf-dish-row"><span class="wf-dish-name">Toive Deluxe</span><span class="wf-dish-dots"></span><span class="wf-dish-price">10 min</span></div>
+        <p class="wf-dish-desc">Sano, mitä tarvitset, ja se laskeutuu appina omaan osoitteeseensa, valmiina jaettavaksi.</p>
+        <p class="wf-dish-contains">Sisältää: appigeneraattori, yhden tiedoston HTML5, promptipohjat, omat aliverkkotunnukset.</p>
       </div>
 
       <div class="wf-dish">
-        <div class="wf-dish-row"><span class="wf-dish-name">House Buddy</span><span class="wf-dish-dots"></span><span class="wf-dish-price">15 min + one bold decision</span></div>
-        <p class="wf-dish-desc">A helper with a name, working while you sleep. Never gets your password.</p>
-        <p class="wf-dish-contains">Contains: AI agents, scoped permissions, device authorization, trust scores.</p>
+        <div class="wf-dish-row"><span class="wf-dish-name">Kotikaveri</span><span class="wf-dish-dots"></span><span class="wf-dish-price">15 min + yksi rohkea päätös</span></div>
+        <p class="wf-dish-desc">Apuri, jolla on nimi ja joka tekee töitä, kun nukut. Ei saa koskaan salasanaasi.</p>
+        <p class="wf-dish-contains">Sisältää: AI-agentit, rajatut oikeudet, laitevaltuutus, luottamuspisteet.</p>
       </div>
 
       <div class="wf-dish">
-        <div class="wf-dish-row"><span class="wf-dish-name">Memory That Stays</span><span class="wf-dish-dots"></span><span class="wf-dish-price">2 min</span></div>
-        <p class="wf-dish-desc">Your AI remembers you tomorrow, next month, and at Christmas.</p>
-        <p class="wf-dish-contains">Contains: memory records, MCP tools, provenance, consent ledger.</p>
+        <div class="wf-dish-row"><span class="wf-dish-name">Muisti joka pysyy</span><span class="wf-dish-dots"></span><span class="wf-dish-price">2 min</span></div>
+        <p class="wf-dish-desc">Tekoälysi muistaa sinut huomenna, ensi kuussa ja jouluna.</p>
+        <p class="wf-dish-contains">Sisältää: muistitietueet, MCP-työkalut, alkuperätiedot, suostumuskirjanpito.</p>
       </div>
 
       <div class="wf-dish">
-        <div class="wf-dish-row"><span class="wf-dish-name">Super-Squad Combo <small>(family size)</small></span><span class="wf-dish-dots"></span><span class="wf-dish-price">20 min + a group chat</span></div>
-        <p class="wf-dish-desc">You and your friends running as one brain, zero meetings booked.</p>
-        <p class="wf-dish-contains">Contains: federation, organisms, workspaces, knowledge packages.</p>
+        <div class="wf-dish-row"><span class="wf-dish-name">Superjoukko-combo <small>(perhekoko)</small></span><span class="wf-dish-dots"></span><span class="wf-dish-price">20 min + yksi ryhmächätti</span></div>
+        <p class="wf-dish-desc">Sinä ja kaverisi yksinä aivoina, nolla varattua palaveria.</p>
+        <p class="wf-dish-contains">Sisältää: federaatio, organismit, työtilat, tietopaketit.</p>
       </div>
 
       <div class="wf-dish">
-        <div class="wf-dish-row"><span class="wf-dish-name">Talk-to-Anything Sauce</span><span class="wf-dish-dots"></span><span class="wf-dish-price">on the house</span></div>
-        <p class="wf-dish-desc">Bring whichever AI you already talk to. It works here.</p>
-        <p class="wf-dish-contains">Contains: MCP, copy-paste prompt workflows, skills registry.</p>
+        <div class="wf-dish-row"><span class="wf-dish-name">Puhu mille vain -kastike</span><span class="wf-dish-dots"></span><span class="wf-dish-price">talon piikkiin</span></div>
+        <p class="wf-dish-desc">Tuo se tekoäly, jolle jo puhut. Se toimii täällä.</p>
+        <p class="wf-dish-contains">Sisältää: MCP, copy-paste-promptit, skillirekisteri.</p>
       </div>
 
       <div class="wf-dish">
-        <div class="wf-dish-row"><span class="wf-dish-name">Lab Special <small>(chef's surprise)</small></span><span class="wf-dish-dots"></span><span class="wf-dish-price">market price, ask the kitchen</span></div>
-        <p class="wf-dish-desc">Whatever came out of the oven this week. Sometimes briefly on fire.</p>
-        <p class="wf-dish-contains">Contains: the changelog, the Lab notes above, this very demo.</p>
+        <div class="wf-dish-row"><span class="wf-dish-name">Labran yllätys <small>(kokin valinta)</small></span><span class="wf-dish-dots"></span><span class="wf-dish-price">päivän hinta, kysy keittiöstä</span></div>
+        <p class="wf-dish-desc">Mitä ikinä uunista tällä viikolla tuli. Joskus hetken tulessa.</p>
+        <p class="wf-dish-contains">Sisältää: muutosloki, Labran muistiinpanot, tämä sama demo.</p>
       </div>
 
       <p class="wf-menu-foot">
-        Free delivery through every mail slot on the internet &middot; we also cater weddings
-        and birthdays &middot; the kitchen never closes.
+        Ilmainen kuljetus jokaisesta internetin postiluukusta &middot; järjestämme myös häät
+        ja synttärit &middot; keittiö ei sulkeudu koskaan.
       </p>
     </div>
   </section>
 
   <footer class="wf-footer">
     <p>
-      You found the sneak preview. The front door of aimeat.io still looks respectable;
-      this page is where the next front door is being fitted. Tell us what you think,
-      or better: go break something in the demo and watch us fix it in the Lab notes.
+      Löysit ennakkoesityksen. aimeat.io:n etuovi näyttää yhä siistiltä; tällä sivulla
+      sovitetaan seuraavaa etuovea. Kerro, mitä ajattelit, tai vielä parempaa: mene rikkomaan
+      demosta jotain ja katso, kun korjaamme sen Labran muistiinpanoissa.
     </p>
     <div class="wf-cta-row">
-      <a class="wf-btn wf-btn-hot" href="/">Try it now</a>
-      <a class="wf-btn wf-btn-cool" href="/v1/pricing">Own it</a>
+      <a class="wf-btn wf-btn-hot" href="/">Kokeile nyt</a>
+      <a class="wf-btn wf-btn-cool" href="/v1/pricing">Omista se</a>
     </div>
     <p class="wf-small">
-      Numbers on this page were read from <a class="wf-plain" href="/v1/public/node-totals">the machine itself</a> on 2026-08-16.
-      Posters cooked in our own imagery kitchen. No stock photos were harmed.
+      Tämän sivun luvut on luettu <a class="wf-plain" href="/v1/public/node-totals">koneelta itseltään</a> 2026-08-16.
+      Julisteet kokattiin omassa kuvakeittiössämme. Yhtään kuvapankkikuvaa ei vahingoitettu.
     </p>
   </footer>
 
