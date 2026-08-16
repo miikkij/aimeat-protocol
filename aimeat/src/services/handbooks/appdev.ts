@@ -21,7 +21,13 @@ one-off query.
 
 **Apps (HTML apps, versioned).** \`aimeat_app_publish\` (presigned upload for files > ~1 KB: omit
 content, PUT the file to the returned URL; inline for tiny files) · \`aimeat_app_list\` ·
-\`aimeat_app_get\` · \`aimeat_app_versions\` · \`aimeat_app_delete\`.
+\`aimeat_app_get\` · \`aimeat_app_versions\` · \`aimeat_app_delete\`. All five take the app's OWNER and
+FILENAME, on every surface — MCP, the connector, and \`/local/call\`.
+
+**Component packages are a different thing** and have their own tools: \`aimeat_package_list\` ·
+\`aimeat_package_get\` · \`aimeat_package_versions\` · \`aimeat_package_publish\` ·
+\`aimeat_package_delete\`, addressed by \`group_id\`. If you want the thing a person opens in a
+browser, you want the app tools above.
 
 **Extensions (server-side sandboxed WASM; can store ext: memory + ctx.fetch external APIs).**
 \`aimeat_extension_install\` (UPLOAD mode recommended: no manifest → get an upload_url, PUT a ZIP with
