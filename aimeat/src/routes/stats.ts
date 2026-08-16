@@ -185,7 +185,7 @@ export function statsRouter(
 
   router.get('/v1/metrics', async (req, res) => {
     if (!config.metricsEnabled || !metricsRegistry) {
-      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Metrics endpoint is disabled'));
+      res.status(503).json(error(config.nodeId, 'FEATURE_DISABLED', 'Usage figures are switched off on this node. Whoever runs it can turn them on.'));
       return;
     }
 

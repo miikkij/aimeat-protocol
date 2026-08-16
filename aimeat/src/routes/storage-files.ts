@@ -650,7 +650,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
                 return;
             }
-            res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `Access denied: ${result.reason}`));
+            res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `You have not given permission for this: ${result.reason}. You can change what you share in Profile → Consent.`));
             return;
         }
 

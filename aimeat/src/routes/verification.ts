@@ -81,7 +81,7 @@ export function verificationRouter(
       if (state) {
         const nonceRecord = await storage.getVerificationNonce(state);
         if (!nonceRecord) {
-          res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'Invalid or expired state parameter'));
+          res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'This verification link has expired. Start the check again and you will get a fresh one.'));
           return;
         }
         if (nonceRecord.owner !== req.auth!.owner) {
@@ -158,7 +158,7 @@ export function verificationRouter(
 
       const nonceRecord = await storage.getVerificationNonce(state);
       if (!nonceRecord) {
-        res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'Invalid or expired state parameter'));
+        res.status(400).json(error(config.nodeId, 'INVALID_STATE', 'This verification link has expired. Start the check again and you will get a fresh one.'));
         return;
       }
       if (new Date(nonceRecord.expiresAt) < new Date()) {

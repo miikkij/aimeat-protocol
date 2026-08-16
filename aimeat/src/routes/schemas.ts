@@ -54,7 +54,7 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
     const existing = await storage.getSchema(key, apply_to);
 
     if (existing && existing.lockedBy !== req.auth!.sub && !roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'SCHEMA_LOCKED_BY_OTHER', `Schema is locked by ${existing.lockedBy}`));
+      res.status(403).json(error(config.nodeId, 'SCHEMA_LOCKED_BY_OTHER', `This structure is locked by ${existing.lockedBy}. Ask them to unlock it, or make your own copy.`));
       return;
     }
 
@@ -123,12 +123,12 @@ export function schemaRouter(config: AimeatConfig, storage: Storage): Router {
     const record = await storage.getSchema(key, 'exact') ?? await storage.getSchema(key, 'prefix');
 
     if (!record) {
-      res.status(404).json(error(config.nodeId, 'NO_SCHEMA', `No schema found for key: ${key}`));
+      res.status(404).json(error(config.nodeId, 'NO_SCHEMA', `Nothing has a set structure under "${key}" yet. Create one first if you want to lock its shape.`));
       return;
     }
 
     if (record.lockedBy !== req.auth!.sub && !req.auth!.roles.includes('operator')) {
-      res.status(403).json(error(config.nodeId, 'NOT_SCHEMA_OWNER', 'Only the schema owner or an operator can delete this schema'));
+      res.status(403).json(error(config.nodeId, 'NOT_SCHEMA_OWNER', 'Only whoever set this structure, or whoever runs the node, can remove it. Ask one of them.'));
       return;
     }
 

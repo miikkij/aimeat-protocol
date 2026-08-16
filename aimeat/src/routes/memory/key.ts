@@ -608,7 +608,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     });
 
     if (!consentResult.allowed) {
-      res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `Access denied: ${consentResult.reason}`));
+      res.status(403).json(error(config.nodeId, 'CONSENT_DENIED', `You have not given permission for this: ${consentResult.reason}. You can change what you share in Profile → Consent.`));
       return;
     }
 

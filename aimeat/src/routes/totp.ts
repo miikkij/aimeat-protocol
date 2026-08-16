@@ -90,7 +90,7 @@ export function totpRouter(config: AimeatConfig, storage: Storage): Router {
     }
 
     if (!ghiiRecord.totpSecret) {
-      res.status(400).json(error(config.nodeId, 'TOTP_NOT_SETUP', 'TOTP has not been set up yet. Call POST /v1/ghii/totp/setup first.'));
+      res.status(400).json(error(config.nodeId, 'TOTP_NOT_SETUP', 'Two-step sign-in is not set up yet. Set it up first in Profile → Security, then come back.'));
       return;
     }
 

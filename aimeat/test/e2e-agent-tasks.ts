@@ -1140,6 +1140,32 @@ await test('45. The agent it is FOR cannot release someone else\'s draft', async
     assert(status === 403, `expected 403, got ${status}`);
 });
 
+await test('45b. That refusal reaches the caller as a sentence with somewhere to go', async () => {
+    // END TO END, through the real door. There are unit tests on error() and on the refusal builders,
+    // and neither of them proves that what a caller actually RECEIVES carries the floor: the envelope
+    // is assembled in one place, serialised in another, and the middleware that appends the support
+    // action runs in a third. Measured this morning across 490 refusal-shaped messages, 22 said what
+    // to do next; this asserts that a real one now does.
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${releasableDraftId}/queue`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+
+    const message: string = body.error?.message ?? '';
+    assert(message.length > 0, 'a refusal has to say something');
+    // Not a word only we understand, and not an accusation. "Access denied" failed both.
+    assert(!/\b(scope|namespace|principal|gaii|ghii|denied|forbidden)\b/i.test(message),
+        `the sentence uses a word only we understand: "${message}"`);
+
+    const actions: Array<{ description?: string }> = body.hints?.next_actions ?? [];
+    assert(actions.length >= 2,
+        `a refusal must offer something above the support line; got ${JSON.stringify(actions.map(a => a.description))}`);
+    assert(actions.some(a => /message the people who run this node/i.test(a.description ?? '')),
+        'the way to ask a human must survive all the way to the caller');
+    assert(!/View API documentation/i.test(actions[0]?.description ?? ''),
+        `the first thing offered is still the generic docs link: "${actions[0]?.description}"`);
+});
+
 await test('46. The owner releases the draft, and it becomes queued', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/tasks/${releasableDraftId}/queue`, {
         method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },

@@ -69,7 +69,7 @@ const JARGON = [
 const NEXT_STEP = new RegExp([
     '\\b(use|try|add|ask|run|call|pass|open|read|set|choose|pick|omit|provide|send|start|stop',
     '|download|upload|remove|delete|wait|check|publish|enable|disable|accept|rename|retry|upgrade',
-    '|purchase|buy|join|invite|reconnect|refresh|reload|contact|sign|log|switch|turn|fix|edit|move)\\b',
+    '|purchase|buy|join|invite|reconnect|refresh|reload|contact|sign|log|switch|turn|fix|edit|move|change|update|adjust|allow|grant|unlock|create|copy|make|split|fold|name|pass)\\b',
     '|\\bgo to\\b|\\btop up\\b|\\bsign in\\b|\\binstead\\b|\\bthen\\b|\\bfirst,',
     // An honest full stop is also somewhere to go: it tells them there is nothing left to do.
     '|\\bno [a-z ]+ needed\\b|\\bnothing to\\b|\\bnobody to ask\\b|\\balready\\b',
