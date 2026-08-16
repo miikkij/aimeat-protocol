@@ -51,6 +51,7 @@ import { issueJWT, revokeToken, generateSessionId } from '../auth/jwt.js';
 import { requireAuth, requireRole, optionalAuth, isAnonymousMode, getAnonymousCredentials } from '../auth/middleware.js';
 import { registerOtkRoutes } from './auth-otk.js';
 import { success, error } from '../middleware/envelope.js';
+import { loginTarpit } from '../middleware/login-tarpit.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, isExternalPrincipal } from '../utils/gaii.js';
@@ -255,7 +256,16 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // POST /v1/auth/token — exchange signature for JWT
-  router.post('/v1/auth/token', validateBody(AuthTokenRequestSchema, config.nodeId), async (req, res) => {
+  // The agent and owner credential door. It verifies an Ed25519 signature, which is cheap to
+  // attempt and expensive in aggregate, and it stood behind nothing.
+  //
+  // The TARPIT and not the login rate limit. This door is not a password prompt: a fleet mints
+  // tokens here all day, legitimately and in bursts, and a whole office or a whole fleet sits
+  // behind one address. A fifteen-a-minute ceiling refuses the honest traffic and barely
+  // inconveniences a signature guesser, who cannot get anywhere against Ed25519 anyway. The tarpit
+  // costs nothing when the signature is right and grows only for whoever keeps getting it wrong,
+  // which is the shape this door actually needs.
+  router.post('/v1/auth/token', loginTarpit(config), validateBody(AuthTokenRequestSchema, config.nodeId), async (req, res) => {
     const { gaii, owner: ownerName, timestamp, signature } = req.body ?? {};
 
     // Agent auth (gaii provided)

@@ -50,6 +50,7 @@ import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
 import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
+import { recordAuthFailure, type AuthFailureContext } from '../services/auth-audit.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resourceMetadataUrl } from '../services/protected-resource.js';
@@ -270,10 +271,6 @@ export function requireAuth() {
       touchAgentLastSeen(req.auth);
       // SECURITY: Reject anonymous credentials — requireAuth() requires real authentication
       if (req.auth.anonymous) {
-        const stats = getStats();
-        if (stats) stats.increment('auth_failures_total');
-        const prom = getPromMetrics();
-        if (prom) prom.authFailuresTotal.inc();
         deny401(req, res, 'This endpoint requires authentication');
         return;
       }
@@ -283,10 +280,6 @@ export function requireAuth() {
 
     const token = extractToken(req);
     if (!token) {
-      const stats = getStats();
-      if (stats) stats.increment('auth_failures_total');
-      const prom = getPromMetrics();
-      if (prom) prom.authFailuresTotal.inc();
       deny401(req, res, 'Authentication required');
       return;
     }
@@ -296,10 +289,6 @@ export function requireAuth() {
     if (token.startsWith(PAT_PREFIX)) {
       const patAuth = await resolvePatToken(token);
       if (!patAuth) {
-        const stats = getStats();
-        if (stats) stats.increment('auth_failures_total');
-        const prom = getPromMetrics();
-        if (prom) prom.authFailuresTotal.inc();
         deny401(req, res, 'Invalid or revoked access token');
         return;
       }
@@ -311,20 +300,12 @@ export function requireAuth() {
     }
 
     if (await isRevoked(token)) {
-      const stats = getStats();
-      if (stats) stats.increment('auth_failures_total');
-      const prom = getPromMetrics();
-      if (prom) prom.authFailuresTotal.inc();
       deny401(req, res, 'Token has been revoked');
       return;
     }
 
     const verified = await verifyJWT(token);
     if (!verified) {
-      const stats = getStats();
-      if (stats) stats.increment('auth_failures_total');
-      const prom = getPromMetrics();
-      if (prom) prom.authFailuresTotal.inc();
       deny401(req, res, 'Invalid or expired token');
       return;
     }
@@ -335,10 +316,6 @@ export function requireAuth() {
     if (verified.sessionId && _sessionStorage) {
       const revokedSession = await _sessionStorage.isSessionRevoked(verified.sessionId);
       if (revokedSession) {
-        const stats = getStats();
-        if (stats) stats.increment('auth_failures_total');
-        const prom = getPromMetrics();
-        if (prom) prom.authFailuresTotal.inc();
         deny401(req, res, 'Session has been revoked');
         return;
       }
@@ -373,17 +350,13 @@ export function requireAuthOrAnonymous() {
 export function requireRole(role: string) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {
-      const stats = getStats();
-      if (stats) stats.increment('auth_failures_total');
-      const prom = getPromMetrics();
-      if (prom) prom.authFailuresTotal.inc();
       deny401(req, res, 'Authentication required');
       return;
     }
 
     // Federated sessions cannot access operator functions
     if (role === 'operator' && req.auth.federated) {
-      res.status(403).json(errorEnvelope('FORBIDDEN', 'Federated sessions cannot access operator functions'));
+      deny403(req, res, 'FORBIDDEN', 'Federated sessions cannot access operator functions');
       return;
     }
 
@@ -398,7 +371,7 @@ export function requireRole(role: string) {
       (role === 'owner' && req.auth.roles.includes('operator'));
 
     if (!hasRole) {
-      res.status(403).json(errorEnvelope('ACCESS_DENIED', `Role "${role}" required`));
+      deny403(req, res, 'ACCESS_DENIED', `Role "${role}" required`);
       return;
     }
 
@@ -458,9 +431,8 @@ export function requireOwnerPrincipal() {
       return;
     }
     logger.warn(`[account-security-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
-    res.status(403).json(errorEnvelope('ACCESS_DENIED',
-      'This changes how the account is signed into, so it is reserved to the account holder. ' +
-      `An agent needs the "${ACCOUNT_SECURITY_SCOPE}" permission, which the owner grants per agent.`));
+    deny403(req, res, 'ACCESS_DENIED', 'This changes how the account is signed into, so it is reserved to the account holder. ' +
+      `An agent needs the "${ACCOUNT_SECURITY_SCOPE}" permission, which the owner grants per agent.`);
   };
 }
 
@@ -491,7 +463,7 @@ export function requireOperatorPrincipal(storage: Storage) {
       return;
     }
     if (req.auth.federated) {
-      res.status(403).json(errorEnvelope('FORBIDDEN', 'Federated sessions cannot access operator functions'));
+      deny403(req, res, 'FORBIDDEN', 'Federated sessions cannot access operator functions');
       return;
     }
     const roles = req.auth.roles;
@@ -502,20 +474,19 @@ export function requireOperatorPrincipal(storage: Storage) {
       return;
     }
     if (roles.includes('app')) {
-      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'An app grant cannot carry operator functions'));
+      deny403(req, res, 'ACCESS_DENIED', 'An app grant cannot carry operator functions');
       return;
     }
     // Anything else: the ACCOUNT must be an operator, and the principal must carry the exact word.
     const owner = await storage.getOwner(req.auth.owner as string);
     if (!owner?.roles.includes('operator')) {
-      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'Node operator required'));
+      deny403(req, res, 'ACCESS_DENIED', 'Node operator required');
       return;
     }
     if (!(req.auth.scopes ?? []).includes(OPERATOR_ORGANISM_REPAIR_SCOPE)) {
       logger.warn(`[operator-scope-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
-      res.status(403).json(errorEnvelope('SCOPE_DENIED',
-        `Scope "${OPERATOR_ORGANISM_REPAIR_SCOPE}" required. The node operator grants it per agent, ` +
-        'and no wildcard carries it.'));
+      deny403(req, res, 'SCOPE_DENIED', `Scope "${OPERATOR_ORGANISM_REPAIR_SCOPE}" required. The node operator grants it per agent, ` +
+        'and no wildcard carries it.');
       return;
     }
     next();
@@ -533,10 +504,6 @@ export function requireOperatorPrincipal(storage: Storage) {
 export function requireExternalPrincipal() {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {
-      const stats = getStats();
-      if (stats) stats.increment('auth_failures_total');
-      const prom = getPromMetrics();
-      if (prom) prom.authFailuresTotal.inc();
       deny401(req, res, 'Authentication required');
       return;
     }
@@ -548,7 +515,7 @@ export function requireExternalPrincipal() {
     const ok = roles.includes('agent') || roles.includes('ecosystem') ||
       roles.includes('app') || roles.includes('owner') || roles.includes('operator');
     if (!ok) {
-      res.status(403).json(errorEnvelope('ACCESS_DENIED', 'Agent, ecosystem-app, or app principal required'));
+      deny403(req, res, 'ACCESS_DENIED', 'Agent, ecosystem-app, or app principal required');
       return;
     }
     next();
@@ -605,7 +572,7 @@ export function agentNotFoundResponse(
 export function requireLocalSession() {
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.auth?.federated) {
-      res.status(403).json(errorEnvelope('FORBIDDEN', 'This action requires a local session'));
+      deny403(req, res, 'FORBIDDEN', 'This action requires a local session');
       return;
     }
     next();
@@ -656,7 +623,7 @@ export function requireRoleOrScope(role: string, ...scopes: string[]) {
     // scopeIsCovered()'s, not this function's; see requireScope below for why that matters.
     const have = req.auth.scopes ?? [];
     if (scopes.some(s => scopeIsCovered(have, s))) { next(); return; }
-    res.status(403).json(errorEnvelope('ACCESS_DENIED', `Requires role '${role}' or one of scopes: [${scopes.join(', ')}]`));
+    deny403(req, res, 'ACCESS_DENIED', `Requires role '${role}' or one of scopes: [${scopes.join(', ')}]`);
   };
 }
 
@@ -690,7 +657,7 @@ export function requireScope(...requiredScopes: string[]) {
     for (const required of requiredScopes) {
       if (!scopeIsCovered(agentScopes, required)) {
         logger.warn(`[scope-denied] ${req.auth.sub} needs "${required}", has [${agentScopes.join(', ')}] on ${req.method} ${req.path}`);
-        res.status(403).json(errorEnvelope('SCOPE_DENIED', `Scope "${required}" required. Agent scopes: [${agentScopes.join(', ')}]`));
+        deny403(req, res, 'SCOPE_DENIED', `Scope "${required}" required. Agent scopes: [${agentScopes.join(', ')}]`);
         return;
       }
     }
@@ -728,8 +695,7 @@ export function requireAnyScope(...acceptableScopes: string[]) {
       return;
     }
     logger.warn(`[scope-denied] ${req.auth.sub} needs any of "${acceptableScopes.join('", "')}", has [${held.join(', ')}] on ${req.method} ${req.path}`);
-    res.status(403).json(errorEnvelope('SCOPE_DENIED',
-      `One of these scopes is required: ${acceptableScopes.join(', ')}. Agent scopes: [${held.join(', ')}]`));
+    deny403(req, res, 'SCOPE_DENIED', `One of these scopes is required: ${acceptableScopes.join(', ')}. Agent scopes: [${held.join(', ')}]`);
   };
 }
 
@@ -744,17 +710,69 @@ function extractToken(req: Request): string | null {
 }
 
 /**
+ * What the refusal log needs, lifted off the request.
+ *
+ * This is the ONE place that reads a Request for the audit, which is why the service itself takes
+ * plain data: a door hands over what it knows, and a surface that is not HTTP can hand over the
+ * same shape without pretending to be one.
+ */
+function auditContext(req: Request): AuthFailureContext {
+  return {
+    method: req.method,
+    path: req.path,
+    ip: req.ip ?? req.socket?.remoteAddress ?? '',
+    host: String(req.headers.host ?? ''),
+    userAgent: String(req.headers['user-agent'] ?? ''),
+    authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
+    hasCookie: !!req.headers.cookie,
+    principal: req.auth
+      ? {
+        sub: req.auth.sub, owner: req.auth.owner, roles: req.auth.roles,
+        ...(req.auth.app ? { app: req.auth.app } : {}),
+        ...(req.auth.anonymous ? { anonymous: true } : {}),
+      }
+      : undefined,
+  };
+}
+
+/**
  * Refuse an unauthenticated request with 401 AND the RFC 9728 discovery hint. The
  * `resource_metadata` parameter names the protected-resource metadata of the ORIGIN the client
  * actually reached (apex, app origin, portfolio origin), which is how an MCP client learns where
  * to get a token without having been told out of band. Header omitted when the config was never
  * wired (unit tests constructing middleware standalone) — the 401 body is unchanged either way.
  */
+/**
+ * Refuse an unauthenticated request with 401 AND the RFC 9728 discovery hint.
+ *
+ * The counter and the refusal log live HERE rather than at each call site. They used to be four
+ * lines copied in front of twelve of the fourteen `deny401` calls, which meant two doors refused
+ * people without counting them: `aimeat_auth_failures_total` has been reading low, and the operator
+ * reading it had no way to know by how much.
+ */
 function deny401(req: Request, res: Response, message: string): void {
+  const stats = getStats();
+  if (stats) stats.increment('auth_failures_total');
+  const prom = getPromMetrics();
+  if (prom) prom.authFailuresTotal.inc();
+  recordAuthFailure(auditContext(req), { status: 401, code: 'AUTH_REQUIRED', reason: message });
   if (_config && !res.headersSent) {
     res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, _config)}"`);
   }
   res.status(401).json(errorEnvelope('AUTH_REQUIRED', message));
+}
+
+/**
+ * Refuse an AUTHENTICATED request that lacks the authority: wrong role, missing scope, a principal
+ * class the door does not serve.
+ *
+ * These are the most informative lines in the refusal log and the ones nothing was recording. A 401
+ * is usually a stranger with nothing; a 403 is a real, named principal reaching for a door it may
+ * not open, and that is either a misconfigured integration or somebody testing the fence.
+ */
+function deny403(req: Request, res: Response, code: string, message: string): void {
+  recordAuthFailure(auditContext(req), { status: 403, code, reason: message });
+  res.status(403).json(errorEnvelope(code, message));
 }
 
 function errorEnvelope(code: string, message: string) {

@@ -105,6 +105,7 @@ const ALL_SUITES = [
     'test/e2e-anonymous.ts',
     'test/e2e-auth-lib.ts',
     'test/e2e-account-security-gate.ts',
+    'test/e2e-auth-tarpit.ts',
     'test/e2e-oauth-login.ts',
     'test/e2e-session-refresh.ts',
     'test/e2e-access-tokens.ts',

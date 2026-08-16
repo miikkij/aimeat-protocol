@@ -31,6 +31,8 @@ import { issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
+import { loginTarpit } from '../../middleware/login-tarpit.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 
 export function registerWebVerifyRoutes(
     router: Router,
@@ -247,7 +249,10 @@ export function registerWebVerifyRoutes(
     });
 
     // POST /v1/ghii/verify-email — Verify email code (no auth)
-    router.post('/v1/ghii/verify-email', async (req, res) => {
+    // A short emailed CODE is the most guessable credential on the node, and this door stood
+    // behind nothing at all: no limiter, no delay. Both now, tarpit first so a guesser pays
+    // before the node looks anything up.
+    router.post('/v1/ghii/verify-email', loginTarpit(config), rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), async (req, res) => {
         const { verification_id, code } = req.body ?? {};
 
         if (!verification_id || typeof verification_id !== 'string') {
@@ -390,7 +395,9 @@ export function registerWebVerifyRoutes(
     });
 
     // POST /v1/ghii/magic-link — Request magic link login (no auth)
-    router.post('/v1/ghii/magic-link', async (req, res) => {
+    // Sending a sign-in link is sending mail on request. Unlimited, it is a way to use this node
+    // to post at somebody else's address.
+    router.post('/v1/ghii/magic-link', rateLimit({ max: 5, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
         const { email } = req.body ?? {};
 
         if (!email || typeof email !== 'string') {

@@ -9,6 +9,8 @@
  *   v1.0.0 — 2026-07-13 — Extracted from config.ts (max-file-lines)
  */
 
+import type { SecurityDoorConfig } from './config-security.js';
+
 export interface ExtensionHooks {
   pre_owner_registration: string[];
   post_owner_registration: string[];
@@ -169,7 +171,7 @@ export interface SiteLinksConfig {
 
 import type { AiCapabilityConfig } from './config-types-ai.js';
 
-export interface AimeatConfig extends AiCapabilityConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig {
   port: number;
   baseUrl: string;
   /**

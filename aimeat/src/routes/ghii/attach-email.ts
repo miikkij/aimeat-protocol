@@ -18,6 +18,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { createHash } from 'node:crypto';
 import { verifyPassword } from '../../services/password.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
+import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
 
 export function registerAttachEmailRoute(
@@ -26,7 +27,7 @@ export function registerAttachEmailRoute(
     storage: Storage,
     emailService: EmailService | undefined,
 ): void {
-    router.post('/v1/ghii/login/attach-email', rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), async (req, res) => {
+    router.post('/v1/ghii/login/attach-email', loginTarpit(config), rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), async (req, res) => {
         const { username, password, email } = req.body ?? {};
 
         if (!username || typeof username !== 'string') {

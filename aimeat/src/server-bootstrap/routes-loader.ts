@@ -215,6 +215,7 @@ import { onMemoryWrittenEvent, onChangeEvent } from '../services/event-bus.js';
 import { invalidateTag } from '../services/cache.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
+import { configureAuthAudit } from '../services/auth-audit.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
@@ -267,6 +268,10 @@ export async function mountRoutes(
 
   // Statistics collector (with persistence via storage)
   const stats = await initStats(storage);
+
+  // The refusal log. Wired before any route exists, because the first thing a node does on a public
+  // address is refuse somebody, and the point of this file is that those refusals are not lost.
+  configureAuthAudit(config);
 
   // In-memory accumulator for high-frequency agent signals (telemetry + heartbeat),
   // flushed to storage on an interval instead of per request.

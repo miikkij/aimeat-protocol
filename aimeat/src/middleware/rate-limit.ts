@@ -27,7 +27,7 @@ interface RateBucket {
  * customer, so without this an attacker rotates the 64 host bits to get an
  * unlimited supply of fresh buckets. IPv4 is keyed by the full address.
  */
-function ipRateKey(ip: string | undefined): string {
+export function ipRateKey(ip: string | undefined): string {
     if (!ip) return 'unknown';
     if (!ip.includes(':')) return ip; // IPv4
     // Expand any `::` compression, then keep the first 4 hextets (the /64 network).

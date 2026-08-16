@@ -41,6 +41,7 @@
  */
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
 import { parseSiteContacts } from './config-site-contacts.js';
+import { securityDoorDefaults } from './config-security.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
@@ -456,6 +457,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     pushMaxFailures: parseInt(process.env.AIMEAT_PUSH_MAX_FAILURES ?? '3', 10),
     emailRateLimitMin: parseInt(process.env.AIMEAT_EMAIL_RATE_LIMIT_MIN ?? '30', 10),
     outboundDailyLimit: parseInt(process.env.AIMEAT_OUTBOUND_DAILY_LIMIT ?? '200', 10),
+    // The refusal log and the credential-door tarpit (src/config-security.ts).
+    ...securityDoorDefaults(),
     finvoiceOperator: process.env.AIMEAT_FINVOICE_OPERATOR ?? '',
     finvoiceOperatorUrl: process.env.AIMEAT_FINVOICE_OPERATOR_URL ?? null,
     finvoiceOperatorApiKey: process.env.AIMEAT_FINVOICE_OPERATOR_KEY ?? null,
