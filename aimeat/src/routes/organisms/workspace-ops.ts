@@ -581,7 +581,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     // agent's context); the UI downloads the binary directly.
     if (req.query.format === 'base64') {
       if (buffer.length > 1_500_000) {
-        res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'Workspace too large for inline (base64) export — use the UI/REST binary download.'));
+        res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'This workspace is too big to send in one piece. Download it from the page instead.'));
         return;
       }
       res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));
@@ -636,7 +636,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     // registry + records are GHII-owned (an agent-session GAII used to yield a near-empty bundle).
     const { buffer, filename } = await exportOrganism(storage, config, { orgId: id, exporterGaii: `${ownerName}@${config.nodeId}`, exportedAt: new Date().toISOString() });
     if (req.query.format === 'base64') {
-      if (buffer.length > 1_500_000) { res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'Organism too large for inline (base64) export — use the UI/REST binary download.')); return; }
+      if (buffer.length > 1_500_000) { res.status(413).json(error(config.nodeId, 'TOO_LARGE', 'This organism is too big to send in one piece. Download it from the page instead.')); return; }
       res.json(success(config.nodeId, { filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') }));
       return;
     }

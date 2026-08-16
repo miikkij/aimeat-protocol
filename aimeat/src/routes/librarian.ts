@@ -54,7 +54,7 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
     if (scopes.includes('ai:use') || scopes.includes('*')) return true;
     res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-      'This endpoint requires an owner session or a token with the ai:use scope.'));
+      'Sign in, or give your assistant permission to use AI on your behalf in Profile → Agents.'));
     return false;
   }
 

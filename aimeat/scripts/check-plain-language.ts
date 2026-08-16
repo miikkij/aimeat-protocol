@@ -100,6 +100,21 @@ const walk = (d: string, out: string[] = []): string[] => {
  */
 const NOT_A_PERSON = /\/(federation|peers?|admin|operator)[-/.]|\/routes\/(federation|admin)\b/;
 
+/**
+ * DOORS A BUILDER KNOCKS ON. Still a person — just a technical one, and the rule for them is not the
+ * same rule.
+ *
+ * Somebody publishing an extension, installing a cortex pack or locking a workspace schema knows
+ * what a manifest is; it is the word they used to describe their own work. "The description of your
+ * add-on is too big" would be WORSE for them than "Manifest size 42KB exceeds limit of 32KB",
+ * because they can act on the second and not the first. Precision is the kindness here.
+ *
+ * What does NOT change is the other half. A builder still deserves to be told what to do next, so
+ * only the vocabulary rules are lifted and the somewhere-to-go rule stays. Being technical is not a
+ * reason to be left standing there.
+ */
+const BUILDER_SURFACE = /\/routes\/(apps?|extensions?|cortex|packages|library-packs|instances|app-templates)[-/.]|\/routes\/(apps|extensions|instances)\//;
+
 /** Every message built with error(), which is the only way a refusal reaches a caller. */
 function collect(): Message[] {
     const found: Message[] = [];
@@ -144,11 +159,14 @@ function score(m: Message): Finding | null {
     // is ever shown. The placeholder keeps the sentence's shape so length and flow still count.
     const shown = m.text.replace(/\$\{[^}]*\}/g, 'that');
     const reasons: string[] = [];
-    const words = new Set(shown.toLowerCase().match(/[a-z_]+/g) ?? []);
-    const hits = JARGON.filter(j => words.has(j));
-    if (hits.length) reasons.push(`words only we understand: ${hits.join(', ')}`);
-    // An identifier in the sentence, rather than in `details` where a technical reader looks.
-    if (/`[^`]+`|[a-z]+_[a-z_]+|\/v1\//.test(shown)) reasons.push('an identifier in the sentence');
+    // A builder is exempt from the vocabulary rules and from nothing else — see BUILDER_SURFACE.
+    if (!BUILDER_SURFACE.test(m.file)) {
+        const words = new Set(shown.toLowerCase().match(/[a-z_]+/g) ?? []);
+        const hits = JARGON.filter(j => words.has(j));
+        if (hits.length) reasons.push(`words only we understand: ${hits.join(', ')}`);
+        // An identifier in the sentence, rather than in `details` where a technical reader looks.
+        if (/`[^`]+`|[a-z]+_[a-z_]+|\/v1\//.test(shown)) reasons.push('an identifier in the sentence');
+    }
     // Somewhere to go, from EITHER the sentence itself or the floor error() gives this code. Asking
     // for it twice would be asking 696 routes to repeat what the envelope already says.
     if (!NEXT_STEP.test(shown) && !nextStepFor(m.code)) reasons.push('nowhere to go next');

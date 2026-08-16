@@ -119,7 +119,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       return;
     }
     if (!canWriteNamespace(role, namespace)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to publish in a meta.* namespace'));
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can publish here. Ask one of them, or publish somewhere you own.'));
       return;
     }
     // Archived content is read-only — block publishing into an archived organism/workspace.
@@ -228,7 +228,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     }
     if (list.length > 1000) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'At most 1000 records per request')); return; }
     if (!canWriteNamespace(role, namespace)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to publish in a meta.* namespace'));
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can publish here. Ask one of them, or publish somewhere you own.'));
       return;
     }
     const pubGuard = await isKeyArchived(storage, wsId ? `organism.${id}.w.${wsId}.` : `organism.${id}.`);
@@ -296,7 +296,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
       return;
     }
     if (!canWriteNamespace(role, namespace)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Admin/creator role required to edit in a meta.* namespace'));
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only an admin or whoever created this space can change this. Ask one of them.'));
       return;
     }
 

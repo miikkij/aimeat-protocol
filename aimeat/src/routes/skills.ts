@@ -118,7 +118,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       const { skill_md, files: extraFiles, scope: scopeRaw, visibility, organism, ws } = req.body ?? {};
       const scope: SkillScope = scopeRaw === 'node' ? 'node' : scopeRaw === 'workspace' ? 'workspace' : 'user';
       if (scope === 'node' && !accessor.isOperator) {
-        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Node-scope skills are operator-managed'));
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Skills shared with the whole node are looked after by whoever runs it. Ask them, or publish this one under your own name instead.'));
         return;
       }
       if (scope === 'workspace' && (typeof organism !== 'string' || typeof ws !== 'string')) {
@@ -275,7 +275,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       }
       const scope: SkillScope = req.query.scope === 'node' ? 'node' : req.query.scope === 'workspace' ? 'workspace' : 'user';
       if (scope === 'node' && !accessor.isOperator) {
-        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Node-scope skills are operator-managed'));
+        res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Skills shared with the whole node are looked after by whoever runs it. Ask them, or publish this one under your own name instead.'));
         return;
       }
       const deleted = await deleteSkill(storage, config, scope, name, {

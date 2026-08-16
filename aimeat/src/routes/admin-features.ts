@@ -161,7 +161,7 @@ export function adminFeaturesRouter(
             allowedOrigins: allowed_origins === null ? undefined : allowed_origins,
         });
         if (!updated) {
-            res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update CORS settings'));
+            res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the change could not be saved. It is already reported; try again in a moment.'));
             return;
         }
         res.json(success(config.nodeId, {

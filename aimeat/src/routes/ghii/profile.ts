@@ -143,7 +143,7 @@ export function registerProfileRoutes(
 
         const updated = await storage.updateGHII(ghiiRecord.ghii, updates);
         if (!updated) {
-            res.status(500).json(error(config.nodeId, 'INTERNAL', 'Failed to update CORS settings'));
+            res.status(500).json(error(config.nodeId, 'INTERNAL', 'This one is on us — the change could not be saved. It is already reported; try again in a moment.'));
             return;
         }
 
