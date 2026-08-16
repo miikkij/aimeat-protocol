@@ -9273,5 +9273,13 @@
   "chat.starterTools": "¿Qué sabes hacer aquí?",
   "chat.starterToolsAsk": "¿Qué puedes hacer realmente por mí en este nodo? Responde con tres cosas concretas, no con una lista de funciones.",
   "chat.starterConnect": "Conecta mi propia IA",
-  "chat.starterConnectAsk": "Ya pago una suscripción de IA. ¿Cómo la conecto a este nodo para que haga este trabajo?"
+  "chat.starterConnectAsk": "Ya pago una suscripción de IA. ¿Cómo la conecto a este nodo para que haga este trabajo?",
+  "chat.card.open": "Abrir",
+  "chat.card.page": "Página",
+  "chat.card.app": "Aplicación",
+  "chat.card.image": "Imagen",
+  "chat.card.file": "Archivo",
+  "chat.card.memory": "Registro guardado",
+  "chat.card.workspace": "Documento del espacio",
+  "chat.choicesNote": "o di otra cosa"
 }

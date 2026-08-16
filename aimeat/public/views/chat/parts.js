@@ -68,6 +68,36 @@ export function WorkLog({ tools }) {
 }
 
 /**
+ * What a turn produced, as things rather than as sentences about things.
+ *
+ * The work log says a tool ran; this hands the result over. An address that only appears inside the
+ * agent's prose is an address that scrolls away, and one that only exists in the live stream is a
+ * link the person had a single chance to click — so cards are stored on the turn and drawn again
+ * every time the conversation is opened.
+ */
+export function ResultCards({ cards }) {
+    if (!cards || cards.length === 0) return null;
+    return html`
+        <div class="chat-cards">
+            ${cards.map((card, i) => html`
+                <div class=${'chat-card chat-card--' + (card.kind || 'page')} key=${card.url || card.ref || i}>
+                    ${card.image && html`
+                        <img class="chat-card-img" src=${card.image} alt=${card.title || ''} loading="lazy" />`}
+                    <div class="chat-card-body">
+                        <div class="chat-card-kind">${tr('chat.card.' + (card.kind || 'page'), card.kind || '')}</div>
+                        <div class="chat-card-title">${card.title}</div>
+                        ${card.ref && !card.url && html`<code class="chat-card-ref">${card.ref}</code>`}
+                    </div>
+                    ${card.url && html`
+                        <a class="btn-outline chat-card-open" href=${card.url} target="_blank" rel="noopener noreferrer">
+                            ${tr('chat.card.open', 'Open')}
+                        </a>`}
+                </div>`)}
+        </div>
+    `;
+}
+
+/**
  * One turn.
  *
  * The agent's words go through the markdown renderer because the agent writes markdown; the
@@ -91,7 +121,8 @@ export function Turn({ turn, id }) {
             <div class="chat-bubble">
                 ${mine
                     ? html`<p class="chat-said">${turn.text}</p>`
-                    : html`<${Markdown} text=${turn.text || ''} />`}
+                    : html`<${Markdown} text=${stripChoices(turn.text)} />`}
+                <${ResultCards} cards=${turn.cards} />
                 <${WorkLog} tools=${turn.tools} />
             </div>
             <div class="chat-meta">
@@ -118,14 +149,15 @@ export function Turn({ turn, id }) {
  * A person watching a spinner for four minutes cannot tell work from a hang, so the live turn shows
  * the words as they are written and each tool call as it starts.
  */
-export function LiveTurn({ text, thought, tools, busy }) {
+export function LiveTurn({ text, thought, tools, cards, busy }) {
     if (!busy && !text && (!tools || tools.length === 0)) return null;
     return html`
         <div class="chat-turn chat-turn--agent chat-turn--live">
             <div class="chat-bubble">
-                ${text ? html`<${Markdown} text=${text} />` : ''}
+                ${text ? html`<${Markdown} text=${stripChoices(text)} />` : ''}
                 ${!text && thought ? html`<p class="chat-thinking">${thought}</p>` : ''}
                 ${!text && !thought && busy ? html`<p class="chat-thinking">${tr('chat.working', 'Working…')}</p>` : ''}
+                <${ResultCards} cards=${cards} />
                 <${WorkLog} tools=${tools} />
                 ${busy && html`<${LiveStatus} tools=${tools} hasText=${!!text} />`}
             </div>
@@ -184,6 +216,56 @@ export function GooseCredit() {
                 <span class="chat-credit-mark" aria-hidden="true">🪿</span>
                 <span>${tr('chat.poweredBy', 'Powered by goose')}</span>
             </a>
+        </div>
+    `;
+}
+
+/**
+ * The fork an agent named, as data and as text.
+ *
+ * One definition for both halves: the buttons are drawn from the block and the block is taken OUT of
+ * the prose, because a person who is looking at three buttons should not also be reading the same
+ * three lines as a code fence above them. Two copies of this pattern in two files is how those two
+ * halves come to disagree.
+ */
+const CHOICE_BLOCK = /```aimeat-choices\s*\n([\s\S]*?)```/;
+
+/** The options an agent offered, at most six, each already trimmed of its bullet. */
+export function choicesIn(text) {
+    const m = CHOICE_BLOCK.exec(text || '');
+    if (!m) return [];
+    return m[1].split('\n')
+        .map((line) => line.replace(/^\s*[-*\d.)\s]+/, '').trim())
+        .filter((line) => line.length > 0 && line.length <= 120)
+        .slice(0, 6);
+}
+
+/** The same answer with the block removed, which is what a person reads. */
+export function stripChoices(text) {
+    return (text || '').replace(CHOICE_BLOCK, '').trimEnd();
+}
+
+/**
+ * The choices an agent offered, as buttons.
+ *
+ * Asking a clarifying question in prose puts the work back on the person: they have to invent the
+ * answer, type it, and guess which words the agent will understand. Naming the options and letting
+ * one be pressed is how every good assistant handles a fork — and the box stays open underneath,
+ * because a list of three is never the whole space and pretending otherwise is worse than not
+ * asking.
+ *
+ * The convention is the agent's, not the protocol's: a fenced ```aimeat-choices block, one option
+ * per line. It survives any model and any version of goose, and a client that has never heard of it
+ * shows a code block rather than breaking.
+ */
+export function Choices({ options, onPick, disabled }) {
+    if (!options || options.length === 0) return null;
+    return html`
+        <div class="chat-choices">
+            ${options.map((opt, i) => html`
+                <button type="button" class="btn-outline chat-choice" key=${i}
+                    disabled=${disabled} onClick=${() => onPick(opt)}>${opt}</button>`)}
+            <span class="chat-choices-note">${tr('chat.choicesNote', 'or say something else')}</span>
         </div>
     `;
 }

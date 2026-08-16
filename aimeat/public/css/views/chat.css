@@ -242,6 +242,46 @@
 
 .chat-model { font-family: var(--font-mono); }
 
+/* What the turn produced. A card is a handover, so the open control is a real link with a real
+   address and the picture, when there is one, is the thing itself rather than an icon for it. */
+.chat-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.chat-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+}
+.chat-card-img {
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex: 0 0 auto;
+}
+.chat-card--image .chat-card-img { width: 120px; height: 90px; }
+.chat-card-body { min-width: 0; flex: 1 1 auto; }
+.chat-card-kind {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.chat-card-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.chat-card-ref { font-size: 0.72rem; color: var(--text-dim); overflow-wrap: anywhere; }
+.chat-card-open { flex: 0 0 auto; font-size: 0.78rem; padding: 4px 10px; }
+
 /* ── The work log ── */
 .chat-work {
   margin-top: 10px;
@@ -343,6 +383,19 @@
 }
 .chat-credit-link:hover { color: var(--text-muted); text-decoration: underline; }
 .chat-credit-mark { font-size: 0.9rem; }
+
+/* The fork an agent named, as buttons. The note keeps the box in play: three options are never the
+   whole space, and a row of buttons with no way past them is a form. */
+.chat-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  max-width: 85%;
+}
+.chat-choice { font-size: 0.82rem; padding: 6px 12px; }
+.chat-choices-note { font-size: 0.75rem; color: var(--text-dim); }
 
 /* ── A turn that could not run ── */
 .chat-error {

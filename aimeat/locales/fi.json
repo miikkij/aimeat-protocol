@@ -9281,5 +9281,13 @@
   "chat.starterTools": "Mitä osaat täällä?",
   "chat.starterToolsAsk": "Mitä osaat oikeasti tehdä puolestani tällä nodella? Vastaa kolmella konkreettisella asialla, älä ominaisuuslistalla.",
   "chat.starterConnect": "Kytke oma tekoälyni",
-  "chat.starterConnectAsk": "Maksan jo tekoälytilauksesta. Miten kytken sen tähän nodeen niin että se tekee tämän työn?"
+  "chat.starterConnectAsk": "Maksan jo tekoälytilauksesta. Miten kytken sen tähän nodeen niin että se tekee tämän työn?",
+  "chat.card.open": "Avaa",
+  "chat.card.page": "Sivu",
+  "chat.card.app": "Appi",
+  "chat.card.image": "Kuva",
+  "chat.card.file": "Tiedosto",
+  "chat.card.memory": "Tallennettu tietue",
+  "chat.card.workspace": "Workspace-dokumentti",
+  "chat.choicesNote": "tai sano jotain muuta"
 }

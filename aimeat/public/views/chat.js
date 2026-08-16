@@ -28,7 +28,7 @@ import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
-import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit } from './chat/parts.js';
+import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn } from './chat/parts.js';
 import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
@@ -78,7 +78,7 @@ export default function ChatView() {
     const [thread, setThread] = useState(null);
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
-    const [live, setLive] = useState({ text: '', thought: '', tools: [] });
+    const [live, setLive] = useState({ text: '', thought: '', tools: [], cards: [] });
     const [failure, setFailure] = useState('');
     const [loading, setLoading] = useState(true);
     // On a phone the conversation takes the whole screen, so the list is a separate place rather
@@ -99,7 +99,7 @@ export default function ChatView() {
         const res = await chat.getThread(id);
         setThread(res?.data?.thread ?? null);
         setFailure('');
-        setLive({ text: '', thought: '', tools: [] });
+        setLive({ text: '', thought: '', tools: [], cards: [] });
         setListOpen(false);
     }, []);
 
@@ -154,7 +154,7 @@ export default function ChatView() {
     useEffect(() => {
         if (!pinned) return;
         bottomRef.current?.scrollIntoView({ block: 'end' });
-    }, [thread?.turns?.length, live.text, live.tools.length, pinned]);
+    }, [thread?.turns?.length, live.text, live.tools.length, live.cards.length, pinned]);
 
     // The on-screen keyboard, measured rather than calculated.
     //
@@ -236,7 +236,7 @@ export default function ChatView() {
         setDraft('');
         setFailure('');
         setBusy(true);
-        setLive({ text: '', thought: '', tools: [] });
+        setLive({ text: '', thought: '', tools: [], cards: [] });
         setThread((prev) => (prev ? {
             ...prev,
             turns: [...(prev.turns ?? []), { role: 'user', text, at: new Date().toISOString() }],
@@ -247,6 +247,7 @@ export default function ChatView() {
 
         let answer = '';
         const tools = new Map();
+        const cards = new Map();
         try {
             for await (const update of chat.streamTurn(target.id, text, controller.signal)) {
                 if (update.kind === 'text') {
@@ -266,6 +267,11 @@ export default function ChatView() {
                         tools.set(key, { title: update.title, status: update.status });
                     }
                     setLive((l) => ({ ...l, tools: [...tools.values()] }));
+                    // Keyed by what it points at: the same thing produced twice is one card.
+                    if (update.card) {
+                        cards.set(update.card.url || update.card.ref || update.card.title, update.card);
+                        setLive((l) => ({ ...l, cards: [...cards.values()] }));
+                    }
                 } else if (update.kind === 'error') {
                     setFailure(update.message || tr('chat.turnFailed', 'The turn could not be completed.'));
                 }
@@ -278,7 +284,7 @@ export default function ChatView() {
         } finally {
             abortRef.current = null;
             setBusy(false);
-            setLive({ text: '', thought: '', tools: [] });
+            setLive({ text: '', thought: '', tools: [], cards: [] });
             // Read the conversation back from the node: it is the record, and what it holds is what
             // was actually saved rather than what this page happened to see.
             try {
@@ -292,7 +298,7 @@ export default function ChatView() {
                 if (answer) {
                     setThread((prev) => (prev ? {
                         ...prev,
-                        turns: [...(prev.turns ?? []), { role: 'agent', text: answer, at: new Date().toISOString(), tools: [...tools.values()] }],
+                        turns: [...(prev.turns ?? []), { role: 'agent', text: answer, at: new Date().toISOString(), tools: [...tools.values()], cards: [...cards.values()] }],
                     } : prev));
                 }
             }
@@ -343,6 +349,10 @@ export default function ChatView() {
     if (loading) return html`<div class="chat-view"><${Spinner} /></div>`;
 
     const turns = thread?.turns ?? [];
+    // Offered by the LAST agent turn only, and only while nothing is running: a fork the agent
+    // named three answers ago has been overtaken by everything said since.
+    const lastAgentTurn = [...turns].reverse().find((t) => t.role !== 'user');
+    const openChoices = busy ? [] : choicesIn(lastAgentTurn?.text);
     const disabled = status ? !status.enabled : false;
 
     return html`
@@ -396,7 +406,9 @@ export default function ChatView() {
                         </div>` : ''}
 
                     ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}
-                    <${LiveTurn} text=${live.text} thought=${live.thought} tools=${live.tools} busy=${busy} />
+                    <${LiveTurn} text=${live.text} thought=${live.thought} tools=${live.tools} cards=${live.cards} busy=${busy} />
+                    ${!busy && html`<${Choices} options=${openChoices} disabled=${disabled}
+                        onPick=${(opt) => send(opt)} />`}
                     <${TurnError} message=${failure}
                         onRetry=${lastAskRef.current && !busy ? () => send(lastAskRef.current) : null} />
                     <div ref=${bottomRef}></div>

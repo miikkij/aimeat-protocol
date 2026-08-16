@@ -32,6 +32,10 @@ export interface ChatTurn {
     at: string;
     /** Compact record of the tool calls this turn made, for the work log. */
     tools?: Array<{ title: string; status: string }>;
+    /** The things this turn produced, as the page draws them: a page, an app, an image, a record.
+     *  Kept ON the turn so reopening the conversation still hands them over — a card that existed
+     *  only in the live stream is a link the person had one chance to click. */
+    cards?: Array<{ kind: string; title: string; url?: string; image?: string; ref?: string }>;
     /** Which model answered. Shown per turn, so "quality may vary" is checkable. */
     model?: string;
 }

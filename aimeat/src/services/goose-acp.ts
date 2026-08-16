@@ -23,6 +23,9 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.2.0 — 2026-08-16 — A completed tool call carries a `card` when it produced something openable
+ *     (services/chat-cards.ts). The work log proved what happened and handed nothing over: the
+ *     address was inside the tool's JSON, which nobody reads.
  *   v2.1.0 — 2026-08-16 — GOOSE_PROVIDER and GOOSE_MODEL come from the node's own configuration when
  *     it names them, so the model is changed where every other setting lives and the node can write
  *     down which model answered a turn. ACP reports a stop reason and a token count and never a
@@ -41,6 +44,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { cardFromToolResult, type ChatCard } from './chat-cards.js';
 
 /** An MCP server handed to one session. `http` is the transport goose reports as supported. */
 export interface AcpMcpServer {
@@ -54,7 +58,7 @@ export interface AcpMcpServer {
 export type SessionUpdate =
     | { kind: 'text'; text: string }
     | { kind: 'thought'; text: string }
-    | { kind: 'tool_call'; id: string; title: string; status: string; raw: unknown }
+    | { kind: 'tool_call'; id: string; title: string; status: string; raw: unknown; card?: ChatCard | null }
     | { kind: 'other'; type: string; raw: unknown }
     | { kind: 'done'; stopReason: string; tokens?: number }
     | { kind: 'error'; message: string };
@@ -316,14 +320,19 @@ function normalise(update: Record<string, unknown>): SessionUpdate {
         case 'agent_thought_chunk':
             return { kind: 'thought', text: content?.text ?? '' };
         case 'tool_call':
-        case 'tool_call_update':
+        case 'tool_call_update': {
+            const status = String(update.status ?? 'pending');
             return {
                 kind: 'tool_call',
                 id: String(update.toolCallId ?? ''),
                 title: String(update.title ?? ''),
-                status: String(update.status ?? 'pending'),
+                status,
                 raw: update,
+                // Only a FINISHED call can have produced something. Reading a card off a pending one
+                // would show an address before the thing behind it exists.
+                card: status === 'completed' ? cardFromToolResult(update) : null,
             };
+        }
         default:
             // usage_update, session_info_update, available_commands_update and whatever goose adds
             // next. Kept rather than dropped: the chat shows spend and the work log from these.

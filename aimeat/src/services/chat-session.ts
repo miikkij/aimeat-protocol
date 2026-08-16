@@ -165,6 +165,7 @@ export async function* runChatTurn(
     // once as it finishes — and only the first carries a title, so matching on the title leaves
     // every call in the log reading "starting" forever, whatever actually happened to it.
     const tools = new Map<string, { title: string; status: string }>();
+    const cards = new Map<string, { kind: string; title: string; url?: string; image?: string; ref?: string }>();
     let answer = '';
 
     try {
@@ -179,6 +180,9 @@ export async function* runChatTurn(
                 } else {
                     tools.set(key, { title: update.title, status: update.status });
                 }
+                // Keyed by what it points at, so the same thing published twice in one turn is one
+                // card rather than two identical ones.
+                if (update.card) cards.set(update.card.url ?? update.card.ref ?? update.card.title, update.card);
             }
             yield update;
         }
@@ -191,6 +195,7 @@ export async function* runChatTurn(
             text: answer,
             at: new Date().toISOString(),
             ...(tools.size ? { tools: [...tools.values()] } : {}),
+            ...(cards.size ? { cards: [...cards.values()] } : {}),
             // Only what the node itself chose. ACP's `done` update carries a stop reason and a token
             // count and no model name, so a node that leaves the model to goose's own configuration
             // genuinely does not know which one answered — and says nothing rather than guessing.
