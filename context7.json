@@ -17,7 +17,16 @@
     "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "LICENSE",
-    "CLAUDE.md"
+    "CLAUDE.md",
+    "file-headers.md",
+    "code-style.md",
+    "testing-requirements.md",
+    "shell-and-git.md",
+    "storage-sync.md",
+    "dependency-management.md",
+    "prompt-writing.md",
+    "init-wizard.md",
+    "pitfalls.md"
   ],
   "rules": [
     "An AIMEAT node is reached over MCP first and REST second. The hosted node is https://aimeat.io/v1/mcp; a self-hosted node exposes the same surface at <node>/v1/mcp.",
