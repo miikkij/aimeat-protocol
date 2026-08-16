@@ -12,6 +12,7 @@
  *   v1.3.0 — 2026-07-05 — Add "AI Apps Usage" tab (operator cross-user AI-spend charts).
  *   v1.4.0 — 2026-07-11 — Replace the "AI Apps Usage" nav entry with a unified "Usage" tab
  *     (agent LLM ledger + AI apps spend, two labeled never-summed sections).
+ *   v1.6.0 — 2026-08-17 — Metrics tab: the /v1/metrics Prometheus exposition rendered as a page.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -35,6 +36,7 @@ import HooksTab        from './admin/hooks-tab.js';
 import PortalTab       from './admin/portal-tab.js';
 import StatsTab        from './admin/stats-tab.js';
 import DatabaseTab     from './admin/database-tab.js';
+import MetricsTab      from './admin/metrics-tab.js';
 import UsageTab        from './admin/usage-tab.js';
 import OwnersTab       from './admin/owners-tab.js';
 import AgentsTab       from './admin/agents-tab.js';
@@ -85,6 +87,7 @@ const NAV_GROUPS = [
     { id: 'subdomains',   key: 'admin.subdomains.title', component: SubdomainsAdminTab },
     { id: 'stats',        key: 'dashboard.stats',      component: StatsTab },
     { id: 'database',     key: 'dashboard.database',   component: DatabaseTab },
+    { id: 'metrics',      key: 'dashboard.metrics',    component: MetricsTab },
     { id: 'usage',        key: 'dashboard.usage',      component: UsageTab },
     { id: 'prompts',      key: 'dashboard.promptsTab', component: PromptsTab },
   ]},

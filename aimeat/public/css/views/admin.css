@@ -933,3 +933,16 @@
 .adm-oo-row { display: flex; gap: 0.5rem; align-items: center; margin: 0.75rem 0; flex-wrap: wrap; }
 .adm-oo-row .input-field { flex: 1 1 20rem; }
 .adm-oo-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.4rem 0.9rem; margin: 0.75rem 0; }
+
+/* ── Metrics tab ── */
+/* Session sparkline inside a stat card: recessive line in the tab accent, endpoint dot filled. */
+.adm-metrics-spark { display: block; margin-top: 0.4rem; }
+.adm-metrics-spark polyline { stroke: var(--blue); opacity: 0.8; }
+.adm-metrics-spark circle { fill: var(--blue); }
+.adm-metrics-poll-note { font-size: 0.78rem; color: var(--muted); white-space: nowrap; }
+.adm-metrics-off p { margin: 0.4rem 0; }
+.adm-metrics-off-hint { color: var(--muted); font-size: 0.85rem; }
+.adm-metrics-filter { max-width: 16rem; }
+.adm-metrics-route { font-family: var(--font-mono, monospace); font-size: 0.82rem; word-break: break-all; }
+.adm-metrics-labels { font-family: var(--font-mono, monospace); font-size: 0.76rem; color: var(--muted); word-break: break-all; }
+.adm-metrics-all td { vertical-align: top; }

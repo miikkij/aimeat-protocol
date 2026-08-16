@@ -10,12 +10,17 @@
  *   - Delta                       -- +N / -N with up/down colour
  *   - DatabaseTab (default)       -- summary cards + capture button + per-table counts table
  * @version-history
+ *   v1.2.0 -- 2026-08-17 -- Two defects found while the Metrics tab was built from this file as
+ *     the model. (1) Root wrapper is a plain div: class="adm" is the dashboard SHELL's flex-row
+ *     class, so the nested copy laid this tab out as one horizontal row of full-height columns
+ *     (delta cards pushed off-screen). (2) `load` depended on useToast's unstable showErr, so
+ *     every fetch re-ran the load effect: a continuous ~25 req/s poll whenever the tab was open.
  *   v1.1.0 -- 2026-07-16 -- Total-rows card sub-line shows the memory-table composition
  *     (version-history + archived row counts) when the server reports them.
  *   v1.0.0 -- 2026-07-16 -- Initial: live counts, hour/24h/7d totals, per-table 24h growth.
  */
 import { h } from 'preact';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -43,13 +48,20 @@ export default function DatabaseTab() {
   const [capturing, setCapturing] = useState(false);
   const [toast, showErr, showOk, clearToast] = useToast();
 
+  // useToast returns fresh function identities every render; reached through a ref so `load`
+  // stays stable. With showErr as a dependency every completed fetch re-rendered, rebuilt
+  // `load`, re-ran the load effect and fetched again — a continuous poll measured at about
+  // 25 requests/s while this tab was open.
+  const showErrRef = useRef(showErr);
+  showErrRef.current = showErr;
+
   const load = useCallback(async () => {
     try {
       const res = await api.getStorageStats(168);   // up to 7 days of hourly snapshots
       setData(res.data);
-    } catch (e) { showErr(e.message); }
+    } catch (e) { showErrRef.current(e.message); }
     finally { setLoading(false); }
-  }, [showErr]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -82,7 +94,7 @@ export default function DatabaseTab() {
     .sort((a, b) => b[1] - a[1])
     .map(([table, n]) => ({ table, n, delta: baseCounts[table] === undefined ? null : n - baseCounts[table], pct: Math.round((n / maxCount) * 100) }));
 
-  return html`<div class="adm">
+  return html`<div>
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <div class="adm-section-head">
       <div>

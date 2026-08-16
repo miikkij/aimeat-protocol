@@ -12,6 +12,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-07 — Reads the session through /js/services/auth.js (single session source)
+ *   v1.2.0 — 2026-08-17 — apiGetText for text/plain endpoints (/v1/metrics): non-JSON success
+ *     bodies return as a string; JSON error envelopes still parse and throw
  */
 import { getSession } from '/js/services/auth.js';
 
@@ -71,6 +73,13 @@ export async function api(path, opts = {}) {
         await sleep(RETRY_BASE_MS * Math.pow(2, attempt));
         continue;
       }
+      // Raw-text mode: a non-JSON success body (e.g. Prometheus text at /v1/metrics)
+      // returns as a string; a JSON body falls through to envelope handling so error
+      // responses still parse and throw with their code and message.
+      if (opts.rawText) {
+        const ct = resp.headers.get('content-type') || '';
+        if (!ct.includes('json')) return await resp.text();
+      }
       const json = await resp.json();
       if (json && json.ok === false && json.error) {
         const err = new Error(json.error.message || json.error.code || 'Request failed');
@@ -116,6 +125,11 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 /** GET shorthand. */
 export function apiGet(path) {
   return api(path, { method: 'GET' });
+}
+
+/** GET shorthand for text/plain endpoints — resolves to the raw body string. */
+export function apiGetText(path) {
+  return api(path, { method: 'GET', rawText: true });
 }
 
 /** POST shorthand. */

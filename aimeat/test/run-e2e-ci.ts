@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.18.0 -- 2026-08-17 -- Add e2e-metrics.ts (/v1/metrics exposition, the HTTP counter
+ *            actually growing, and the operator gate). The runner pins
+ *            AIMEAT_METRICS_ENABLED=true so the middleware is exercised under every suite.
  *   v1.17.0 -- 2026-08-15 -- GUARD_SUITES and --guards: the tier CI blocks on. Both E2E steps in
  *            .github/workflows/ci.yml were `continue-on-error: true`, so no red suite has ever
  *            stopped a merge and every improvement to this directory was optional. The full sweep
@@ -301,6 +304,7 @@ const ALL_SUITES = [
     'test/e2e-organism-structure.ts',
     'test/e2e-organism-decision-cap.ts',
     'test/e2e-admin-storage-stats.ts',
+    'test/e2e-metrics.ts',
     'test/e2e-usage-telemetry.ts',
     'test/e2e-organism-delete-cascade.ts',
     'test/e2e-organism-bulk-delete.ts',
