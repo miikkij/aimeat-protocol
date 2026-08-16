@@ -5,6 +5,16 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.4.0 — 2026-08-16 — August 2026 test-quality audit, three findings, and a setup bug the fix
+ *     uncovered. wallet.request asked for 10 and asserted only that new_balance was a NUMBER, so an
+ *     uncapped credit passed; it now measures the balance across each grant, shows the ask clamped
+ *     to the same allowance twice, and drives the accumulation cap to QUOTA_EXCEEDED. The work
+ *     phase drove accept/deliver/rate with the correct principal only, so the guards reserving them
+ *     to the provider and the requester were never asked; each is now refused 403 first. THE SETUP
+ *     BUG: the action was published by agent1 and the work ordered from agent2, and createWorkItem
+ *     looks an action up by (id, providerGaii) — so it found none, priced the work at zero, and the
+ *     settlement these tests claim to cover moved nothing. The action is now published by the
+ *     provider and the delivery is asserted to pay it exactly the base price.
  *   v1.3.0 — 2026-07-28 — aimeat-game.js coverage: every component exported, the NO-NETWORK and
  *     NO-HARDCODED-COLOUR boundary guards (the two promises the library makes and the two an
  *     edit could quietly break), the EN+FI strings, the --ag-* theming contract and its imported
@@ -417,13 +427,82 @@ await test('wallet.history — legacy history', async () => {
     assert(Array.isArray(data.data.transactions), 'transactions should be array');
 });
 
-await test('wallet.request — request morsels', async () => {
+// The allowance is money the node hands out, and the route clamps twice: per call to
+// config.dailyAllowance, and in total to config.dailyAllowanceCap. The test used to ask for 10 and
+// assert only that new_balance was a NUMBER, so an uncapped credit — or a credit landing on the
+// agent's GAII instead of the owner's GHII — passed either way.
+async function walletBalance(jwt: string): Promise<number> {
+    const w = await authApi('/v1/wallet', jwt);
+    assert(w.ok === true, `wallet read: ${w.error?.message}`);
+    return Number(w.data.balance);
+}
+
+await test('wallet.request — the grant lands on the OWNER balance, exactly what was granted', async () => {
+    const before = await walletBalance(agentJwt);
     const data = await authApi('/v1/wallet/request', agentJwt, {
         method: 'POST',
         body: JSON.stringify({ amount: 10, reason: 'E2E test request' }),
     });
     assert(data.ok === true, `Request failed: ${data.error?.message}`);
-    assert(typeof data.data.new_balance === 'number', 'new_balance should be number');
+    assert(data.data.granted === 10, `asked for 10, granted ${data.data.granted}`);
+    const after = await walletBalance(agentJwt);
+    assert(after === before + data.data.granted, `balance must move by exactly what was granted: ${before} + ${data.data.granted} != ${after}`);
+    assert(data.data.new_balance === after, `new_balance must be the balance: ${data.data.new_balance} != ${after}`);
+
+    // The agent's OWN record stays at zero — one balance per human, and it is the owner's.
+    const agents = await authApi('/v1/agents', ownerJwt);
+    const mine = (agents.data.agents as any[]).find(a => a.gaii === agentGaii);
+    assert(!!mine, 'the agent is listed');
+    assert((mine.morsel_balance ?? 0) === 0, `an agent holds no morsels of its own, got ${mine.morsel_balance}`);
+});
+
+// MorselRequestSchema caps the ASK at 1000; the route then clamps the GRANT to the node's daily
+// allowance. The allowance is not hardcoded here: two maximum asks in a row must be granted the same
+// figure, and that figure must be below the ask. Drop the clamp and one of the two gives: either the
+// ask is granted whole, or the first ask drains the headroom and the second answers QUOTA_EXCEEDED.
+const MAX_ASK = 1000;
+
+await test('wallet.request — the ask is clamped, and the same clamp applies twice', async () => {
+    const before = await walletBalance(agentJwt);
+    const first = await authApi('/v1/wallet/request', agentJwt, {
+        method: 'POST', body: JSON.stringify({ amount: MAX_ASK, reason: 'E2E clamp probe 1' }),
+    });
+    assert(first.ok === true, `first max ask failed: ${first.error?.message}`);
+    const mid = await walletBalance(agentJwt);
+    assert(mid - before === first.data.granted, `balance moved by ${mid - before}, granted says ${first.data.granted}`);
+    assert(first.data.granted < MAX_ASK, `the ask must be clamped below ${MAX_ASK}, got ${first.data.granted}`);
+
+    const second = await authApi('/v1/wallet/request', agentJwt, {
+        method: 'POST', body: JSON.stringify({ amount: MAX_ASK, reason: 'E2E clamp probe 2' }),
+    });
+    assert(second.ok === true, `second max ask failed: ${second.error?.code} ${second.error?.message}`);
+    const after = await walletBalance(agentJwt);
+    assert(after - mid === second.data.granted, `balance moved by ${after - mid}, granted says ${second.data.granted}`);
+    assert(second.data.granted === first.data.granted,
+        `the per-call clamp is a fixed allowance, got ${first.data.granted} then ${second.data.granted}`);
+});
+
+await test('wallet.request — repeated asks stop at the accumulation cap (409 QUOTA_EXCEEDED)', async () => {
+    let last: any = null;
+    let hitTheCap = false;
+    let granted = 0;
+    for (let i = 0; i < 40; i++) {
+        last = await authApi('/v1/wallet/request', agentJwt, {
+            method: 'POST',
+            body: JSON.stringify({ amount: MAX_ASK, reason: `E2E cap probe ${i}` }),
+        });
+        if (last.ok !== true) { hitTheCap = true; break; }
+        granted += last.data.granted;
+    }
+    assert(hitTheCap, `the allowance must run into its accumulation cap rather than paying out forever (granted ${granted} and still going)`);
+    assert(last.error?.code === 'QUOTA_EXCEEDED', `expected QUOTA_EXCEEDED, got ${last.error?.code}: ${last.error?.message}`);
+    // …and the refusal is real: the balance did not move on the refused call.
+    const atCap = await walletBalance(agentJwt);
+    const again = await authApi('/v1/wallet/request', agentJwt, {
+        method: 'POST', body: JSON.stringify({ amount: MAX_ASK, reason: 'E2E cap probe again' }),
+    });
+    assert(again.ok !== true, 'a second ask at the cap is refused too');
+    assert(await walletBalance(agentJwt) === atCap, 'a refused allowance request must not move the balance');
 });
 
 // ═══════════════════════════════════════════════
@@ -457,29 +536,6 @@ await test('work.hash — catalogue hash (public)', async () => {
 
 // Publish an action so we can test work requests
 let testActionId = '';
-
-await test('Publish action for work test', async () => {
-    testActionId = `e2e-test-${Date.now()}`;
-    const data = await authApi('/v1/actions', agentJwt, {
-        method: 'POST',
-        body: JSON.stringify({
-            id: testActionId,
-            display_name: 'E2E Test Action',
-            description: 'Test action for work library E2E',
-            category: 'utility',
-            input_schema: { type: 'object', properties: { prompt: { type: 'string' } } },
-            output_schema: { type: 'object', properties: { result: { type: 'string' } } },
-            pricing: { base_morsels: 1 },
-        }),
-    });
-    assert(data.ok === true, `Publish failed: ${data.error?.message}`);
-});
-
-await test('work.getAction — action detail (public)', async () => {
-    const data = await api(`/v1/catalogue/${testActionId}`);
-    assert(data.ok === true, `Get action failed: ${data.error?.message}`);
-    assert(data.data.display_name === 'E2E Test Action', 'display_name mismatch');
-});
 
 // Register a second owner + agent for cross-owner work tests
 let agent2Gaii = '';
@@ -527,6 +583,33 @@ await test('Register provider agent under second owner', async () => {
     agent2Jwt = tokenData.data.token;
 });
 
+// The action must be published BY THE PROVIDER: createWorkItem looks it up by (id, providerGaii),
+// so an action owned by the requester is not found and the work is priced at zero. It used to be
+// published as agent1 and ordered from agent2, so every work item in this suite was free and the
+// settlement the tests claimed to exercise moved nothing.
+await test('Publish action for work test', async () => {
+    testActionId = `e2e-test-${Date.now()}`;
+    const data = await authApi('/v1/actions', agent2Jwt, {
+        method: 'POST',
+        body: JSON.stringify({
+            id: testActionId,
+            display_name: 'E2E Test Action',
+            description: 'Test action for work library E2E',
+            category: 'utility',
+            input_schema: { type: 'object', properties: { prompt: { type: 'string' } } },
+            output_schema: { type: 'object', properties: { result: { type: 'string' } } },
+            pricing: { base_morsels: 1 },
+        }),
+    });
+    assert(data.ok === true, `Publish failed: ${data.error?.message}`);
+});
+
+await test('work.getAction — action detail (public)', async () => {
+    const data = await api(`/v1/catalogue/${testActionId}`);
+    assert(data.ok === true, `Get action failed: ${data.error?.message}`);
+    assert(data.data.display_name === 'E2E Test Action', 'display_name mismatch');
+});
+
 let trackingCode = '';
 
 await test('work.request — submit work request', async () => {
@@ -556,17 +639,51 @@ await test('work.status — check work status', async () => {
     assert(data.data.tracking_code === trackingCode, 'tracking code mismatch');
 });
 
+// Every call in this phase is made by the correct principal, so the guards that reserve these doors
+// to the provider and the requester were never asked for anything. A tracking code is all they take.
+await test('work.accept — the REQUESTER cannot accept their own request → 403', async () => {
+    const data = await authApi(`/v1/work/${trackingCode}/accept`, agentJwt, { method: 'POST' });
+    assert(data._status === 403, `the requester must not be able to accept work they ordered, got ${data._status}`);
+    assert(data.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${data.error?.code}: ${data.error?.message}`);
+});
+
 await test('work.accept — accept work', async () => {
     const data = await authApi(`/v1/work/${trackingCode}/accept`, agent2Jwt, { method: 'POST' });
     assert(data.ok === true, `Accept failed: ${data.error?.message}`);
 });
 
-await test('work.deliver — deliver output', async () => {
+await test('work.deliver — the REQUESTER cannot deliver on the provider\'s behalf → 403', async () => {
+    const data = await authApi(`/v1/work/${trackingCode}/deliver`, agentJwt, {
+        method: 'POST', body: JSON.stringify({ output: { result: 'not mine to deliver' } }),
+    });
+    assert(data._status === 403, `only the provider delivers, got ${data._status}`);
+    assert(data.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${data.error?.code}: ${data.error?.message}`);
+});
+
+await test('work.deliver — deliver output, and the escrow settles to the PROVIDER', async () => {
+    // The action was published at base_morsels 1, so real money is in flight. The requester was
+    // debited at request time (escrow); delivery is when the provider is paid.
+    const providerBefore = await walletBalance(agent2Jwt);
     const data = await authApi(`/v1/work/${trackingCode}/deliver`, agent2Jwt, {
         method: 'POST',
         body: JSON.stringify({ output: { result: 'Done!' } }),
     });
     assert(data.ok === true, `Deliver failed: ${data.error?.message}`);
+    const providerAfter = await walletBalance(agent2Jwt);
+    assert(providerAfter - providerBefore === 1, `the provider is paid the action's base price: ${providerBefore} → ${providerAfter}`);
+
+    // NOT asserted here, because it is currently false: the 'earned' row settlePayment writes is
+    // filed under work.providerGaii (the AGENT), while GET /v1/wallet/transactions reads the OWNER's
+    // GHII with an exact-match query. The money lands on the owner's balance and the row explaining
+    // it does not appear on any wallet surface. Reported as a product finding, not fixed here.
+});
+
+await test('work.rate — the PROVIDER cannot rate their own delivery → 403', async () => {
+    const data = await authApi(`/v1/work/${trackingCode}/rate`, agent2Jwt, {
+        method: 'POST', body: JSON.stringify({ rating: 'positive', comment: 'rating myself' }),
+    });
+    assert(data._status === 403, `only the requester rates, got ${data._status}`);
+    assert(data.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${data.error?.code}: ${data.error?.message}`);
 });
 
 await test('work.rate — rate delivery', async () => {
