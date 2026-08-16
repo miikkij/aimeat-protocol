@@ -7,6 +7,9 @@
     yet. Images generated with scripts/gen_image.py (genimages/wiifm/), live numbers read from
     GET /v1/public/node-totals on the date stamped in the footer. Static page, no JS.
   @version-history
+    v1.2.0 - 2026-08-16 - Server section reframed as your own private space (solo-founder angle),
+      and a takeaway-menu flyer added before the footer: dishes are capabilities in human words,
+      the ingredients line under each carries the tech jargon, prices are minutes of your time.
     v1.1.0 - 2026-08-16 - Copy rewritten human-to-human per owner feedback: "Get something you
       need" wish box replaces "build an app", tech vocabulary (MCP, nodes, scopes, federation)
       out of every sentence a non-technical reader sees, agent reframed as a named buddy,
@@ -255,6 +258,45 @@
     .wf-note h3 { margin: 0.4rem 0 0.6rem; font-size: 1.08rem; line-height: 1.3; }
     .wf-note p { font-size: 0.95rem; line-height: 1.55; }
 
+    /* ---------- takeaway menu flyer ---------- */
+    .wf-menu {
+      padding: 4.5rem 1.25rem;
+      background:
+        repeating-linear-gradient(45deg, #c0392b 0, #c0392b 24px, transparent 24px, transparent 48px),
+        repeating-linear-gradient(-45deg, #c0392b 0, #c0392b 24px, #fff6e9 24px, #fff6e9 48px);
+    }
+    .wf-menu-paper {
+      max-width: 46rem;
+      margin: 0 auto;
+      background: var(--cream);
+      border: 3px solid var(--shadow);
+      border-radius: 6px;
+      box-shadow: 10px 12px 0 rgba(26, 11, 31, 0.55);
+      transform: rotate(-0.8deg);
+      padding: 2.2rem 2rem 1.6rem;
+    }
+    .wf-menu-head { text-align: center; border-bottom: 3px double var(--shadow); padding-bottom: 1.1rem; margin-bottom: 1.4rem; }
+    .wf-menu-head .wf-menu-open {
+      display: inline-block;
+      font-family: 'Bungee';
+      font-size: 0.8rem;
+      color: var(--cream);
+      background: #c0392b;
+      padding: 0.25rem 0.8rem;
+      transform: rotate(-2deg);
+      margin-bottom: 0.7rem;
+    }
+    .wf-menu-head h2 { font-family: 'Bungee'; font-size: clamp(1.4rem, 3vw, 2rem); color: #c0392b; text-transform: uppercase; }
+    .wf-menu-head p { font-size: 0.92rem; margin-top: 0.5rem; font-style: italic; }
+    .wf-dish { margin-bottom: 1.35rem; }
+    .wf-dish-row { display: flex; align-items: baseline; gap: 0.5rem; }
+    .wf-dish-name { font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; font-size: 1.02rem; }
+    .wf-dish-dots { flex: 1; border-bottom: 3px dotted var(--shadow); opacity: 0.45; transform: translateY(-4px); }
+    .wf-dish-price { font-family: 'Bungee'; font-size: 0.85rem; color: #c0392b; white-space: nowrap; }
+    .wf-dish-desc { font-size: 0.95rem; line-height: 1.5; margin: 0.25rem 0 0.15rem; }
+    .wf-dish-contains { font-size: 0.78rem; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; opacity: 0.62; }
+    .wf-menu-foot { text-align: center; border-top: 3px double var(--shadow); padding-top: 0.9rem; font-size: 0.85rem; font-style: italic; }
+
     /* ---------- footer ---------- */
     .wf-footer {
       background: linear-gradient(175deg, var(--purple), var(--shadow));
@@ -266,6 +308,13 @@
     .wf-footer .wf-small { font-size: 0.82rem; opacity: 0.7; margin-top: 2rem; }
     .wf-footer a.wf-plain { color: var(--sun); }
 
+    @media (max-width: 560px) {
+      .wf-menu { padding: 3rem 0.8rem; }
+      .wf-menu-paper { padding: 1.6rem 1.1rem 1.2rem; }
+      .wf-dish-row { flex-wrap: wrap; }
+      .wf-dish-dots { min-width: 2.5rem; }
+      .wf-dish-price { white-space: normal; }
+    }
     @media (max-width: 760px) {
       .wf-section-inner { grid-template-columns: 1fr; gap: 2rem; }
       .wf-section:nth-of-type(even) .wf-section-inner .wf-art { order: 0; }
@@ -346,17 +395,18 @@
         <span class="wf-sticker">From 49 &euro;/mo</span>
       </div>
       <div class="wf-copy">
-        <h2>Buy the server, keep the powers</h2>
+        <h2>Get your own private space, keep the powers</h2>
         <p>
-          Your own server is this whole place, but yours, on an address with your name on it.
-          It is yours the way your house is yours: everything you make lives with you,
-          and this thing is built so it stays that way.
+          Your own space is this whole place, but entirely yours, on an address with your name
+          on it. Nobody else's eyes, nobody else's rules. Invite people in when you feel like
+          company, or build alone with the door closed. Most seem to pick alone, and no wonder:
+          this is the golden age of the solo founder.
         </p>
         <ul>
           <li>The whole toy box and the workbench too, everything you tried here, under your own roof.</li>
           <li>Keeping your own stuff is a joy. Here nobody takes it, rents it back to you, or peeks at it.</li>
           <li>Friends running their own? You just became a super-squad with magical powers: you get things done together without booking a single meeting. That is what AI-native means.</li>
-          <li>Own server 49 &euro;/mo &middot; Pro 99 &euro;/mo &middot; Done for you from 990&nbsp;&euro; setup &middot; Enterprise by conversation.</li>
+          <li>Own space 49 &euro;/mo &middot; Pro 99 &euro;/mo &middot; Done for you from 990&nbsp;&euro; setup &middot; Enterprise by conversation.</li>
         </ul>
         <div class="wf-ideas">
           <strong>Use it tonight:</strong> run your business on it, so everyone in the company asks
@@ -435,6 +485,60 @@
           and leaving a shared space actually ends the access. All three sound obvious. All three took work.
         </p>
       </article>
+    </div>
+  </section>
+
+  <section class="wf-menu">
+    <div class="wf-menu-paper">
+      <div class="wf-menu-head">
+        <span class="wf-menu-open">Grand opening &middot; free delivery</span>
+        <h2>The AIMEAT takeaway menu</h2>
+        <p>
+          The kind of flyer that used to land through your mail slot between the kebab place
+          and the pizzeria. This one delivers superpowers. All prices in minutes of your time.
+        </p>
+      </div>
+
+      <div class="wf-dish">
+        <div class="wf-dish-row"><span class="wf-dish-name">The Wish, Deluxe</span><span class="wf-dish-dots"></span><span class="wf-dish-price">10 min</span></div>
+        <p class="wf-dish-desc">Say what you need, and it lands as an app on its own address, ready to share.</p>
+        <p class="wf-dish-contains">Contains: app generator, single-file HTML5, prompt templates, hosted subdomains.</p>
+      </div>
+
+      <div class="wf-dish">
+        <div class="wf-dish-row"><span class="wf-dish-name">House Buddy</span><span class="wf-dish-dots"></span><span class="wf-dish-price">15 min + one bold decision</span></div>
+        <p class="wf-dish-desc">A helper with a name, working while you sleep. Never gets your password.</p>
+        <p class="wf-dish-contains">Contains: AI agents, scoped permissions, device authorization, trust scores.</p>
+      </div>
+
+      <div class="wf-dish">
+        <div class="wf-dish-row"><span class="wf-dish-name">Memory That Stays</span><span class="wf-dish-dots"></span><span class="wf-dish-price">2 min</span></div>
+        <p class="wf-dish-desc">Your AI remembers you tomorrow, next month, and at Christmas.</p>
+        <p class="wf-dish-contains">Contains: memory records, MCP tools, provenance, consent ledger.</p>
+      </div>
+
+      <div class="wf-dish">
+        <div class="wf-dish-row"><span class="wf-dish-name">Super-Squad Combo <small>(family size)</small></span><span class="wf-dish-dots"></span><span class="wf-dish-price">20 min + a group chat</span></div>
+        <p class="wf-dish-desc">You and your friends running as one brain, zero meetings booked.</p>
+        <p class="wf-dish-contains">Contains: federation, organisms, workspaces, knowledge packages.</p>
+      </div>
+
+      <div class="wf-dish">
+        <div class="wf-dish-row"><span class="wf-dish-name">Talk-to-Anything Sauce</span><span class="wf-dish-dots"></span><span class="wf-dish-price">on the house</span></div>
+        <p class="wf-dish-desc">Bring whichever AI you already talk to. It works here.</p>
+        <p class="wf-dish-contains">Contains: MCP, copy-paste prompt workflows, skills registry.</p>
+      </div>
+
+      <div class="wf-dish">
+        <div class="wf-dish-row"><span class="wf-dish-name">Lab Special <small>(chef's surprise)</small></span><span class="wf-dish-dots"></span><span class="wf-dish-price">market price, ask the kitchen</span></div>
+        <p class="wf-dish-desc">Whatever came out of the oven this week. Sometimes briefly on fire.</p>
+        <p class="wf-dish-contains">Contains: the changelog, the Lab notes above, this very demo.</p>
+      </div>
+
+      <p class="wf-menu-foot">
+        Free delivery through every mail slot on the internet &middot; we also cater weddings
+        and birthdays &middot; the kitchen never closes.
+      </p>
     </div>
   </section>
 
