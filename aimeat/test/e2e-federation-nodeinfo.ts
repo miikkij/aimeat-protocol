@@ -94,6 +94,36 @@ await test('4. directory exposes peer software_version too', async () => {
   assert(p?.software_version === '9.9.9', `directory version: ${JSON.stringify(p)}`);
 });
 
+// Tests 3 and 4 send a VALID signature, so the ping's signature check has answered nothing here.
+// The stamp it writes is peer-controlled data on a record the operator reads, and the refusal has to
+// happen BEFORE the write: a 401 that has already moved software_version and last_seen is not a
+// refusal. Both halves are driven from the KNOWN ACTIVE peer, which is the only principal that
+// reaches the signature check at all — an unknown node id is stopped one step earlier.
+await test('5. the ping is refused unsigned and tampered, and the peer record does not move', async () => {
+  const before = await json('/v1/federation/peers', { headers: auth(ownerToken) });
+  const beforeRow = before.body.data.peers.find((x: any) => x.node_id === PEER);
+  assert(beforeRow?.software_version === '9.9.9', `precondition: ${JSON.stringify(beforeRow)}`);
+  assert(beforeRow?.status === 'active', `precondition status: ${beforeRow?.status}`);
+  const beforeSeen = beforeRow.last_seen;
+
+  const payload = { node_id: PEER, timestamp: new Date().toISOString(), version: 'v1', software_version: '6.6.6', stats: { agents_active: 0 } };
+
+  const unsigned = await json('/v1/federation/ping', { method: 'POST', body: JSON.stringify(payload) });
+  assert(unsigned.status === 401, `unsigned ping: expected 401, got ${unsigned.status}: ${JSON.stringify(unsigned.body)}`);
+
+  // Signed over one payload, sent as another — the point of signing the body rather than the node id.
+  const honest = { ...payload, software_version: '9.9.9' };
+  const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(JSON.stringify(honest)), peerPrivBytes)).toString('base64');
+  const tampered = await json('/v1/federation/ping', { method: 'POST', body: JSON.stringify({ ...payload, signature: sig }) });
+  assert(tampered.status === 401, `tampered ping: expected 401, got ${tampered.status}: ${JSON.stringify(tampered.body)}`);
+
+  const after = await json('/v1/federation/peers', { headers: auth(ownerToken) });
+  const afterRow = after.body.data.peers.find((x: any) => x.node_id === PEER);
+  assert(afterRow?.software_version === '9.9.9', `a refused ping must not stamp the record: ${afterRow?.software_version}`);
+  assert(afterRow?.last_seen === beforeSeen, `a refused ping must not move last_seen: ${beforeSeen} → ${afterRow?.last_seen}`);
+  assert(afterRow?.status === 'active', `and must not change status: ${afterRow?.status}`);
+});
+
 console.log(`\n${'═'.repeat(50)}`);
 console.log(`Node-Info E2E: ${passed} passed, ${failed} failed (${passed + failed} total)`);
 console.log('═'.repeat(50));
