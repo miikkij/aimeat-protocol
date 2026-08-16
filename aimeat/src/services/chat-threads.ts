@@ -38,8 +38,10 @@ export interface ChatTurn {
     cards?: Array<{ kind: string; title: string; url?: string; image?: string; ref?: string }>;
     /** Which model answered. Shown per turn, so "quality may vary" is checkable. */
     model?: string;
-    /** Storage keys of the pictures the person attached, so the conversation still shows them when
-     *  it is reopened. Keys, never bytes: the record is read on every list. */
+    /** Storage keys of what the person attached, so the conversation still shows them when it is
+     *  reopened. Keys, never bytes: the record is read on every list. */
+    attachments?: string[];
+    /** The name this field had for a day. Read on old records, written on none. */
     images?: string[];
 }
 

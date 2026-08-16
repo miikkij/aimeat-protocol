@@ -267,7 +267,7 @@ export default function ChatView() {
 
         // Only the ones that actually landed. An upload still running or failed is not silently
         // dropped from the person's view — it stays in the row, and they can send again with it.
-        const imageKeys = attachments.filter((a) => a.state === 'ready' && a.key).map((a) => a.key);
+        const attachmentKeys = attachments.filter((a) => a.state === 'ready' && a.key).map((a) => a.key);
 
         const controller = new AbortController();
         abortRef.current = controller;
@@ -276,7 +276,7 @@ export default function ChatView() {
         const tools = new Map();
         const cards = new Map();
         try {
-            for await (const update of chat.streamTurn(target.id, text, controller.signal, imageKeys)) {
+            for await (const update of chat.streamTurn(target.id, text, controller.signal, attachmentKeys)) {
                 if (update.kind === 'text') {
                     answer += update.text;
                     setLive((l) => ({ ...l, text: answer }));
@@ -356,9 +356,11 @@ export default function ChatView() {
     const attach = useCallback((files) => {
         for (const file of files.slice(0, 4)) {
             const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-            const preview = URL.createObjectURL(file);
+            // A thumbnail for a picture; a name and a type for everything else, because a preview
+            // of a CSV is a grey rectangle that says nothing.
+            const preview = file.type?.startsWith('image/') ? URL.createObjectURL(file) : null;
             setAttachments((prev) => [...prev, { id, name: file.name || 'image', preview, state: 'uploading' }]);
-            chat.uploadImage(file)
+            chat.uploadAttachment(file)
                 .then((key) => setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, key, state: 'ready' } : a))))
                 .catch((err) => setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, state: 'error', error: err.message } : a))));
         }

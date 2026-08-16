@@ -128,12 +128,21 @@ export function Turn({ turn, id }) {
                       component that already solves this — it fetches with the session and shows the
                       bytes as a blob — and reusing it keeps one answer to "how does an authed image
                       get on screen" rather than a second one living here. */''}
-                ${turn.images && turn.images.length > 0 && html`
-                    <div class="chat-turn-images">
-                        ${turn.images.map((key) => html`
-                            <${ImageView} key=${key}
-                                desc=${{ url: `/v1/storage/${encodeURIComponent(key)}`, alt: key }} />`)}
-                    </div>`}
+                ${(() => {
+                    // `images` is what this field was called for a day; a record written then still
+                    // renders.
+                    const keys = turn.attachments ?? turn.images ?? [];
+                    if (keys.length === 0) return null;
+                    const isPicture = (k) => /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(k);
+                    return html`
+                        <div class="chat-turn-images">
+                            ${keys.map((key) => (isPicture(key)
+                                ? html`<${ImageView} key=${key}
+                                    desc=${{ url: `/v1/storage/${encodeURIComponent(key)}`, alt: key }} />`
+                                : html`<a class="chat-turn-file" key=${key} target="_blank" rel="noopener noreferrer"
+                                    href=${`/v1/storage/${encodeURIComponent(key)}`}>📄 ${key.split('/').pop()}</a>`))}
+                        </div>`;
+                })()}
                 ${mine
                     ? html`<p class="chat-said">${turn.text}</p>`
                     : html`<${Markdown} text=${stripChoices(turn.text)} />`}
@@ -470,10 +479,10 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
                     onInput=${(e) => onInput(e.target.value)}
                     onKeyDown=${keydown}></textarea>
                 ${onAttach && !busy ? html`
-                    <input type="file" accept="image/*" multiple ref=${fileRef} class="chat-file-input"
+                    <input type="file" multiple ref=${fileRef} class="chat-file-input"
                         onChange=${(e) => { onAttach([...e.target.files]); e.target.value = ''; }} />
                     <button type="button" class="btn-outline chat-attach" disabled=${disabled}
-                        title=${tr('chat.attachTitle', 'Attach a picture')}
+                        title=${tr('chat.attachTitle', 'Attach a file')}
                         onClick=${() => fileRef.current?.click()}>📎</button>` : ''}
                 ${onSpeak && !busy ? html`
                     <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}

@@ -118,9 +118,9 @@ await test('Status names WHO PAYS for a turn, and it is not derived from having 
     await json('/v1/openrouter/settings', aAuthed({ method: 'DELETE' }));
 });
 
-await test('A turn carries attached pictures as KEYS, and drops what is not one', async () => {
+await test('A turn carries attached files as KEYS, and drops what is not one', async () => {
     // The bytes take the presigned road into the person's own storage; what travels with the turn is
-    // a key. What is asserted here is the DOOR: the request is accepted, the stream opens, and a
+    // a key — for a picture and for a file alike. What is asserted here is the DOOR: the request is accepted, the stream opens, and a
     // non-string in the list never reaches the service.
     //
     // The record half is asserted only on a node that HAS an agent. Without one, runChatTurn refuses
@@ -133,7 +133,7 @@ await test('A turn carries attached pictures as KEYS, and drops what is not one'
     const res = await fetch(`${BASE}/v1/chat/threads/${id}/turn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(aAuthed().headers as Record<string, string>) },
-        body: JSON.stringify({ text: 'what is this?', images: ['chat-images/nope.png', 42, ''] }),
+        body: JSON.stringify({ text: 'what is this?', attachments: ['chat-files/nope.csv', 42, ''] }),
     });
     assert(res.status === 200, `the stream opens with 200, got ${res.status}`);
     await res.body?.cancel();
@@ -147,9 +147,9 @@ await test('A turn carries attached pictures as KEYS, and drops what is not one'
     const read = await json(`/v1/chat/threads/${id}`, aAuthed());
     const mine = (read.body.data.thread.turns as any[]).find(t => t.role === 'user');
     assert(!!mine, 'the message is in the conversation');
-    assert(Array.isArray(mine.images) && mine.images.length === 1,
-        `only the string key survives the filter, got ${JSON.stringify(mine.images)}`);
-    assert(mine.images[0] === 'chat-images/nope.png', `the key is kept as given, got ${mine.images[0]}`);
+    assert(Array.isArray(mine.attachments) && mine.attachments.length === 1,
+        `only the string key survives the filter, got ${JSON.stringify(mine.attachments)}`);
+    assert(mine.attachments[0] === 'chat-files/nope.csv', `the key is kept as given, got ${mine.attachments[0]}`);
 });
 
 await test('Status counts the DEVICES that can be reached, which is what the phone nudge reads', async () => {
