@@ -243,7 +243,57 @@ await test('Second owner CANNOT deactivate/activate first owner\'s extension (40
     const chk = await json('/v1/extensions/test-echo');
     assert(chk.body.data?.extension?.status === 'active', 'test-echo still active after blocked cross-owner calls');
 
+    // UNINSTALL was not part of this test, and it is the one that takes the most with it. Every
+    // DELETE in this file uses ownerToken, so removing the canManageInstalledExt check from
+    // DELETE /v1/extensions/:name leaves the suite green while a second owner uninstalls another
+    // owner's extension — and uninstallExtension() takes its scheduled jobs, its `ext:{name}`
+    // namespace and every instance namespace with it.
+    const del = await json('/v1/extensions/test-echo', {
+        method: 'DELETE', headers: { Authorization: `Bearer ${otherToken}` },
+    });
+    assert(del.status === 403, `a second owner uninstalled it: ${del.status} ${JSON.stringify(del.body)}`);
+    const afterDel = await json('/v1/extensions/test-echo');
+    assert(afterDel.body.data?.extension?.status === 'active', 'the refused uninstall removed it anyway');
+
     await json(`/v1/owners/${otherName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${otherToken}` } });
+});
+
+// Installing is a privileged act: it registers sandboxed JS, any @activate cron the manifest
+// declares and (operator-only today) an email policy. Every install in this file uses ownerToken,
+// which was registered through /v1/admin/setup/register WITH the operator role, and the agent at the
+// top carries capabilities ['memory','actions'] and no ext:write — but it is only ever used to INVOKE
+// actions. So deleting hasExtWritePermission from POST /v1/extensions leaves all 31 tests green while
+// any authenticated agent installs and activates code.
+await test('An agent WITHOUT ext:write cannot install an extension', async () => {
+    // The suite's own agent is not that principal: the E2E runner pins
+    // AIMEAT_DEFAULT_AGENT_SCOPES='*', so every agent registered without an explicit list holds the
+    // wildcard and would install happily. A narrow one has to be asked for by name.
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            name: 'extnarrowagent', owner: ownerName,
+            capabilities: ['memory'], model: 'gpt-4o', scopes: ['memory:read'],
+        }),
+    });
+    assert(reg.status === 201, `narrow agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+    });
+    const narrowToken = tok.body.data.token as string;
+
+    const r = await json('/v1/extensions', {
+        method: 'POST', headers: { Authorization: `Bearer ${narrowToken}` },
+        body: JSON.stringify({
+            manifest: testManifest.replace('test-echo', 'agent-installed-echo'),
+            scripts: testScripts,
+        }),
+    });
+    assert(r.status === 403, `an agent without ext:write installed an extension: ${r.status} ${JSON.stringify(r.body)}`);
+    const chk = await json('/v1/extensions/agent-installed-echo');
+    assert(chk.status === 404, `and it exists: ${chk.status}`);
 });
 
 // ─── Phase 3: Action Execution ───
