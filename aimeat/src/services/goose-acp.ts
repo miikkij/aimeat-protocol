@@ -23,6 +23,10 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.0.1 — 2026-08-16 — Listen for the child's `error` event. A binary that cannot be spawned
+ *     emits `error` rather than `exit`, and an unlistened `error` is thrown: one wrong character in
+ *     an operator's path took the whole node down on the first person who said hello, and the turn
+ *     waited out the 30 s handshake timeout first.
  *   v2.0.0 — 2026-08-16 — Stdio replaces HTTP. `goose serve` delivers no session/update over its
  *     HTTP transport, which makes every turn silent; `goose acp` on stdio delivers them and the
  *     same turn completes in seconds. The dispatch, the callback answers and the update
@@ -90,6 +94,15 @@ export class GooseAcpClient {
             this.closed = true;
             this.failAllPending(new Error(`goose exited (code ${code}, signal ${signal})`));
             logger.warn(`[goose] agent process exited: code ${code}, signal ${signal}`);
+        });
+        // A child process that cannot be spawned at all — a path that names no binary — emits `error`
+        // rather than `exit`, and an `error` nobody listens for is thrown. Without this line one
+        // wrong character in the operator's configuration takes the whole node down on the first
+        // person who says hello, instead of failing that one turn with the reason.
+        child.on('error', (err: Error) => {
+            this.closed = true;
+            this.failAllPending(new Error(`goose could not be started: ${err.message}`));
+            logger.warn(`[goose] agent process could not be started: ${err.message}`);
         });
     }
 

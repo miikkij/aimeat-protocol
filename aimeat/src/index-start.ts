@@ -425,6 +425,9 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   const { getStats: getStatsInstance } = await import('./services/stats.js');
   const handleShutdown = async (signal: string) => {
     logger.info(`Received ${signal}, shutting down...`);
+    // The chat agent is a child of this process; it goes when we go, or it is orphaned.
+    const { shutdownChat } = await import('./services/chat-session.js');
+    shutdownChat();
     const statsInstance = getStatsInstance();
     if (statsInstance) await statsInstance.shutdown();
     const { shutdownTelemetryBuffer } = await import('./services/telemetry-buffer.js');

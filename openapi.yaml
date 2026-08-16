@@ -197,6 +197,8 @@ tags:
     description: WebRTC realtime rooms — signalling, relay, ICE servers, and federated room discovery
   - name: Chat Instances
     description: Saved AI chat instances — per-owner chat configuration and management
+  - name: Chat
+    description: The node's built-in chat agent — conversations and one turn streamed as it happens
   - name: Matches
     description: Directory matching — match suggestions, stats, and respond-to-match
 
@@ -7024,6 +7026,164 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/chat/status:
+    get:
+      operationId: getChatStatus
+      tags: [Chat]
+      summary: Whether this node has a built-in chat agent
+      description: |
+        Report whether an operator has configured a chat agent on this node, what the owner's chat
+        agent is called, how much of their AI allowance is left, and whether they have their own
+        OpenRouter key. A node with no agent says so plainly rather than offering a box that will
+        never answer. Owner sessions only.
+      responses:
+        '200':
+          description: |
+            `{ enabled, agent_name, allowance_remaining_usd, has_own_key, note? }`. `note` is present
+            only when `enabled` is false, and names what an operator has to set.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/chat/threads:
+    get:
+      operationId: listChatThreads
+      tags: [Chat]
+      summary: The owner's open conversations
+      description: |
+        List the owner's live conversations, newest first, without their turns. Older conversations
+        roll into one record per month once more than the node's ceiling are open, and those are not
+        listed here. Owner sessions only.
+      responses:
+        '200':
+          description: '`{ threads: [{ id, title, created_at, updated_at, turns }] }`'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createChatThread
+      tags: [Chat]
+      summary: Start a conversation
+      description: |
+        Start a conversation and provision the owner's chat agent if this is their first. The agent
+        is a real GAII principal that appears in the Agents tab beside the ones they connected
+        themselves, and its scopes are edited in the same place. The title is a placeholder until the
+        first thing the person says replaces it. Owner sessions only.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 60, description: Optional title. Otherwise taken from the first message. }
+      responses:
+        '201':
+          description: '`{ thread: { id, title, createdAt, updatedAt, turns: [] } }`'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /v1/chat/threads/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getChatThread
+      tags: [Chat]
+      summary: One conversation, in full
+      description: |
+        Return one conversation with every turn it holds, including the tool calls the agent made and
+        which model answered each turn. A conversation the caller does not own is reported as absent.
+        Owner sessions only.
+      responses:
+        '200':
+          description: '`{ thread: { id, title, createdAt, updatedAt, gooseSessionId?, turns: [{ role, text, at, tools?, model? }] } }`'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteChatThread
+      tags: [Chat]
+      summary: Throw a conversation away
+      description: |
+        Delete one conversation and its turns. The conversation is looked up first, so a caller who
+        cannot see it is told nothing exists rather than being told a deletion happened. Owner
+        sessions only.
+      responses:
+        '200':
+          description: '`{ deleted: true }`'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/chat/threads/{id}/reset:
+    post:
+      operationId: resetChatThreadSession
+      tags: [Chat]
+      summary: Forget the agent session, keep the conversation
+      description: |
+        Drop the agent session this conversation runs on. The next message opens a fresh one, which
+        is how a change to the chat agent's scopes takes effect: the session's credential carries the
+        scopes it was minted with. The conversation itself is untouched. Owner sessions only.
+      responses:
+        '200':
+          description: '`{ reset: true }`'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /v1/chat/threads/{id}/turn:
+    post:
+      operationId: sendChatTurn
+      tags: [Chat]
+      summary: Say something, and watch what happens
+      description: |
+        Send one message and receive the agent's work as it happens, as `text/event-stream`. A turn
+        takes minutes when the agent is building something, so a single response at the end would be
+        indistinguishable from a hang.
+
+        Each `data:` frame is one update: `{ kind: 'text', text }` as words are written,
+        `{ kind: 'thought', text }`, `{ kind: 'tool_call', id, title, status }` as each tool call
+        starts and finishes, `{ kind: 'done', stopReason, tokens }` at the end, and
+        `{ kind: 'error', message }` when the turn could not run — a node with no agent configured
+        answers with exactly that rather than hanging. `:keepalive` comments arrive every 15 s.
+
+        The person's own words are written to the conversation before the agent is asked anything,
+        so a turn that fails halfway leaves a record of what was said. Owner sessions only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, description: What to say. Must not be empty. }
+      responses:
+        '200':
+          description: SSE stream of turn updates
+          content:
+            text/event-stream:
+              schema: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
   /v1/checkin:
     post:
       operationId: agentCheckin

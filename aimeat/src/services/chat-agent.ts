@@ -19,6 +19,10 @@
  *   const agent = await ensureChatAgent(storage, config, ownerName);
  *   const { token } = await mintChatAgentToken(storage, config, agent);
  * @version-history
+ *   v1.0.1 — 2026-08-16 — Write every column the agents table requires. `morselBalance` and `mode`
+ *     were left off a partial record, which the sqlite schema refuses with a NOT NULL error, so
+ *     starting a conversation was a 500 on any node with the shipped schema. Found by the first E2E
+ *     run of the chat routes, not by the developer's own database.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { randomBytes } from 'node:crypto';
@@ -68,7 +72,10 @@ export async function ensureChatAgent(
     const keyPair = await generateKeyPair();
     const now = new Date().toISOString();
 
-    const record: Partial<AgentRecord> & { name: string; owner: string; gaii: string } = {
+    // Every field the agents table requires, in the same shape the device-authorization path writes.
+    // `morselBalance` is zero and stays zero: the human pays, and an agent's balance resolves to the
+    // owner's GHII everywhere it is spent.
+    const record: AgentRecord = {
         name: CHAT_AGENT_NAME,
         owner: ownerName,
         gaii,
@@ -78,10 +85,12 @@ export async function ensureChatAgent(
         publicKey: keyPair.publicKey,
         defaultScopes: scopes,
         trustScore: 50,
+        morselBalance: 0,
+        mode: 'interactive',
         createdAt: now,
         lastSeen: now,
-    };
-    await storage.createAgent(record as AgentRecord);
+    } as AgentRecord;
+    await storage.createAgent(record);
     emitChange('agents', `${ownerName}@${config.nodeId}`);
     logger.info(`[chat] created ${gaii} with ${scopes.length} scope(s)`);
 
