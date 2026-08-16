@@ -10,6 +10,12 @@
  * @version-history
  *   v1.0.0 — 2026-08-01 — Initial version.
  */
+// 2026-08-16 (August 2026 test-quality audit, e2e-ai-transcribe:96): every call here was an owner
+// session, so gateOwnerOrAiUseAgent — the word that stops an agent from spending the owner's provider
+// budget — was never executed on THIS route; the same gate is exercised elsewhere only on
+// /v1/ai/complete. Phase 1 now drives both halves: an agent without ai:use is refused 403 with the
+// word named, and one with it is past the gate and gets a work-level answer instead. Measured with
+// the transcribe gate deleted (src/routes/ai.ts:194): the scopeless agent walks through it.
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-ai-transcribe.ts
 
@@ -99,6 +105,57 @@ await test('POST /v1/ai/transcribe without auth → 401', async () => {
     body: JSON.stringify({ storage_key: AUDIO_KEY }),
   });
   assert(status === 401, `expected 401, got ${status}`);
+});
+
+// 401 is the door; the gate that matters on this route is gateOwnerOrAiUseAgent, because a
+// transcription spends the OWNER's provider key against their daily budget. Every call in this file
+// was an owner session, and no other suite touches transcribe with a non-owner principal — the same
+// gate is only ever exercised on /v1/ai/complete.
+await test('An agent WITHOUT ai:use is refused → 403 naming the word', async () => {
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+    body: JSON.stringify({ name: 'sttnarrow', owner: alice.name, capabilities: ['memory'], scopes: ['memory:read'] }),
+  });
+  assert(reg.status === 201, `create agent: ${reg.status} ${JSON.stringify(reg.body)}`);
+  const gaii = reg.body.data.agent.gaii as string;
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', {
+    method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+  });
+  assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+
+  const r = await json('/v1/ai/transcribe', {
+    method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+    body: JSON.stringify({ storage_key: AUDIO_KEY }),
+  });
+  assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+  assert(JSON.stringify(r.body.error ?? '').includes('ai:use'), `the refusal must name the word: ${JSON.stringify(r.body.error)}`);
+});
+
+await test('An agent WITH ai:use passes the gate and meets the same refusal an owner gets', async () => {
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+    body: JSON.stringify({ name: 'sttwide', owner: alice.name, capabilities: ['memory'], scopes: ['memory:read', 'ai:use'] }),
+  });
+  assert(reg.status === 201, `create agent: ${reg.status} ${JSON.stringify(reg.body)}`);
+  const gaii = reg.body.data.agent.gaii as string;
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', {
+    method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+  });
+  assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+
+  const r = await json('/v1/ai/transcribe', {
+    method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+    body: JSON.stringify({ storage_key: AUDIO_KEY }),
+  });
+  assert(r.status !== 403, `an ai:use agent must be past the gate, got 403: ${JSON.stringify(r.body.error)}`);
+  // Past the gate the route answers about the WORK, not about permission. Here that is a 404: the
+  // storage lookup is keyed to the calling principal, and the fixture was stored by the owner, so
+  // the agent has no such file of its own. 400/402/502 are the other work-level answers.
+  assert([400, 402, 404, 502].includes(r.status),
+    `expected a work-level refusal rather than a permission one, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+  assert(!JSON.stringify(r.body.error ?? '').includes('ai:use'), `and not the scope refusal: ${JSON.stringify(r.body.error)}`);
 });
 
 await test('No audio source → 400 INVALID_BODY', async () => {
