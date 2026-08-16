@@ -9,12 +9,18 @@
  *     - each surface     vs  catalog `input`   (informational — catalog drives CLI-fallback schema)
  * @structure
  *   - captureServer() / captureConnector() — register against a Proxy fake-MCP, collect schema keys
- *   - main() — diff report; --strict exits 1 on server↔connector input drift
+ *   - main() — diff report; --check gates input drift only, --strict adds v2 surface coverage
  * @usage
  *   pnpm audit:mcp-schemas
- *   pnpm audit:mcp-schemas -- --strict   # CI gate
+ *   pnpm check:mcp-schemas               # pre-commit + CI gate (input drift only)
+ *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 6 (F10): runtime schema-parity audit
+ *   v1.1.0 -- 2026-08-16 -- --check mode, and wired into the pre-commit hook at last. This script
+ *     had named the aimeat_task_complete/deliverable_key drift on its own line since the day the
+ *     parameter was added, and nothing ran it: a crew found the defect instead, by building an agent
+ *     that lost its own output. An audit nobody runs is a document, not a gate. The nine remaining
+ *     drifts are recorded in KNOWN_INPUT_DRIFT with what each one costs a caller.
  */
 import type { AimeatConfig } from '../src/config.js';
 import type { Storage } from '../src/storage/interface.js';
@@ -147,6 +153,28 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     // intentional: server MCP instance_create targets chat-instances (model -> derived platform),
     // connector instance_create targets package instances (template); two different concepts.
     'aimeat_instance_create',
+
+    // ── NOT intentional. Recorded 2026-08-16, when this audit was wired into the pre-commit gate. ──
+    //
+    // These nine are the same defect crewaimeat-dev hit on aimeat_task_complete: a capability was
+    // added to the server MCP tool and the connector's copy was left behind, so zod strips the
+    // parameter from the call before it leaves the client and the operation succeeds having quietly
+    // done less than it was asked. They are listed rather than fixed in the same pass because each
+    // needs its own verification against the REST door it forwards to, and one of them
+    // (memory_write.expected_version) needs a REST change first: POST /v1/memory has no optimistic
+    // lock, the server MCP calls the write service directly, and the PUT route spells it `version`.
+    //
+    // This list is a DEBT REGISTER, not an approval. Each entry names what a connector caller
+    // cannot currently reach.
+    'aimeat_memory_read',        // owner_scope — cannot read the owner's or a sibling agent's record
+    'aimeat_memory_write',       // owner_scope (write lands in the agent's namespace, never the owner's), expected_version (no optimistic lock)
+    'aimeat_memory_search',      // include_versions, limit
+    'aimeat_extension_install',  // activate, update
+    'aimeat_knowledge_contribute', // model
+    'aimeat_capabilities_create',  // status
+    'aimeat_capabilities_update',  // status
+    'aimeat_app_draft_publish',  // spec_ack, spec_token — belongs to the app_* two-backends debt above
+    'aimeat_app_draft_save',     // content_base64 vs content — same app_* debt
 ]);
 
 function diffKeys(serverKeys: string[], connectorKeys: string[]): { onlyServer: string[]; onlyConnector: string[] } {
@@ -160,6 +188,7 @@ function diffKeys(serverKeys: string[], connectorKeys: string[]): { onlyServer: 
 
 function main(): void {
     const strict = process.argv.includes('--strict');
+    const check = process.argv.includes('--check');
     const server = captureServer();
     const connector = captureConnector();
     const catalog = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(d => [d.name, Object.keys(d.input ?? {})]));
@@ -232,6 +261,23 @@ function main(): void {
 
     const surfaceFail = surfaceUnregistered.length > 0 || unknownTools.length > 0 || uncovered.length > 0;
 
+    // --check is the PRE-COMMIT gate and it watches ONE axis: a parameter that exists on one MCP
+    // surface and not the other. That axis is a silent-wrong-answer bug — zod strips the unknown key,
+    // the call returns ok, and the caller is told nothing — which is why it earns a blocking check.
+    //
+    // It deliberately does NOT gate v2 surface coverage. That list is long, it is about tools served
+    // by a different registration path (appdev, workspaces, exchange), and reconciling it is its own
+    // piece of work; folding it in here would mean the gate could never go green and would therefore
+    // be turned off, which is how this audit came to sit unwired for two and a half months in the
+    // first place. --strict keeps both axes for the full report.
+    if (check && newDrift.length > 0) {
+        console.error(`\n✖ ${newDrift.length} NEW server↔connector input-schema drift(s) beyond the baseline:`);
+        for (const n of newDrift) console.error(`  ${driftDetail.get(n)?.trim()}`);
+        console.error('\nA parameter on one surface and not the other is stripped in silence: the call'
+            + '\nsucceeds and does less than it was asked. Declare it on BOTH surfaces and forward it,'
+            + '\nor add it to KNOWN_INPUT_DRIFT with a line saying what a caller cannot reach.');
+        process.exit(1);
+    }
     if (strict && (newDrift.length > 0 || surfaceFail)) {
         if (newDrift.length) console.error(`\n✖ STRICT: ${newDrift.length} NEW server↔connector input-schema drift(s) beyond the baseline.`);
         if (surfaceUnregistered.length) console.error(`✖ STRICT: surface tools not registered on the server: ${surfaceUnregistered.join(', ')}`);

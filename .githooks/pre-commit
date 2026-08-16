@@ -13,6 +13,7 @@
 #   8b. Landing change log is well-formed — pnpm check:changelog
 #   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
+#   9b. MCP tool input-schema parity      — pnpm check:mcp-schemas
 #  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
 #  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
 #  11b. Language files agree with en.json  — pnpm check:locales
@@ -79,6 +80,13 @@ pnpm -s check:sdk
 
 echo "[pre-commit] MCP tool surface/handler parity (check:mcp-tools)…"
 pnpm -s check:mcp-tools
+
+# Names are not enough. check:mcp-tools proves the two MCP surfaces expose the same tool NAMES;
+# this one proves they take the same PARAMETERS. A parameter declared on one surface and not the
+# other is stripped by zod in silence — the call returns ok and does less than it was asked, which
+# is how aimeat_task_complete lost every deliverable_key a connector client ever sent.
+echo "[pre-commit] MCP tool input-schema parity (check:mcp-schemas)…"
+pnpm -s check:mcp-schemas
 
 echo "[pre-commit] Cortex pack integrity: embed + VERSION constants (check:viewport)…"
 pnpm -s check:viewport

@@ -1,7 +1,10 @@
 /**
  * @file src/routes/agent-tasks/lifecycle.ts
- * @description Agent-task lifecycle routes (update, delete, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
+ * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-16 — POST .../queue: the exit a draft never had. Reported by crewaimeat-dev,
+ *     who created a task over REST, got 'draft' from the body-schema default, and found nothing
+ *     anywhere that could move it out again.
  *   v1.2.0 — 2026-08-11 — The propose-todos WRITE moves to services/agent-task-write.ts, so
  *     aimeat_task_propose_todos stops keeping its own copy of the plan build. Behaviour here is
  *     unchanged.
@@ -19,11 +22,12 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AgentTaskRecord, AgentTaskTodo, AgentMessageRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { recordTaskStarted } from '../../services/activity-recorder.js';
 import { AgentTaskUpdateSchema, AgentTaskRequestChangesSchema } from '../../models/agent-task-schemas.js';
+import { resolveAutoActivation, AUTO_ACTIVATED_EVENT_MESSAGE } from '../../services/agent-task-rules.js';
 import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import type { TaskRouteHelpers } from './helpers.js';
@@ -208,6 +212,83 @@ export function registerTaskLifecycleRoutes(
     res.json(success(config.nodeId, { deleted: true }));
     emitChange('agent-tasks', resolve(req));
     try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('DELETE /v1/agents/:name/tasks/:id: MCP not connected', { error: String(err) }); }
+  });
+
+  /* ── POST /v1/agents/:name/tasks/:id/queue -- Release a draft to the agent (draft -> queued) ──
+   *
+   * THE EXIT DRAFT NEVER HAD. A draft is the owner's "let me look at this before the agent sees
+   * it", and until this route there was no way to finish that sentence: PATCH carries no status
+   * field, /start refuses anything that is not queued|paused|stalled, and no other route or service
+   * moved an existing task to queued. A draft was therefore permanent, and the only thing that kept
+   * it from being obvious was that every in-house caller passed status:'queued' at create time.
+   *
+   * Owner or a same-owner app holding task:write, matching /start: releasing work to an agent is the
+   * same authority as starting it, and the agent the task is FOR must not be able to let itself off
+   * the leash.
+   *
+   * A task-runner agent goes straight to 'active' here, for the same reason it does at create time —
+   * the owner has already pre-authorised that agent to begin without per-task gating, and making the
+   * release path the one exception would mean a draft released to a runner sat waiting for a second
+   * click that no other route asks for.
+   */
+  // The scope sits in MIDDLEWARE rather than in the handler, unlike its neighbours. requireScope
+  // waves an owner session straight through (owners act for all their agents), so this costs the
+  // owner path nothing and refuses an app-grant token that never held `task:write` at the door,
+  // before any of the reads below. /start and the rest of this file do the same test by hand and
+  // are on the seeded route-scope exemption list because of it; that list may only shrink, so a
+  // route added today does not join it.
+  router.post('/v1/agents/:name/tasks/:id/queue', requireAuth(), requireScope('task:write'), async (req, res) => {
+    const queueRoles = req.auth!.roles;
+    const isOwner = queueRoles.includes('owner') && !queueRoles.includes('agent');
+    const isApp = queueRoles.includes('app');
+    if (!isOwner && !isApp) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the owner or a granted app can release a draft task'));
+      return;
+    }
+
+    const id = req.params.id as string;
+    const task = await storage.getAgentTask(id);
+    if (!task) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Task not found'));
+      return;
+    }
+
+    const appOwnsTask = isApp && task.ownerGaii === `${req.auth!.owner}@${config.nodeId}`;
+    if (!appOwnsTask && !canAccessTask(req, task)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    if (task.status !== 'draft') {
+      res.status(409).json(error(config.nodeId, 'INVALID_STATE',
+        `Only a draft task can be released to the agent (current: ${task.status})`));
+      return;
+    }
+
+    const targetAgent = await storage.getAgent(task.agentGaii);
+    const { autoActivated, effectiveStatus } = resolveAutoActivation(targetAgent, 'queued');
+
+    const now = new Date().toISOString();
+    const updated = await storage.updateAgentTask(id, {
+      status: effectiveStatus,
+      lastEventAt: now,
+      updatedAt: now,
+    });
+
+    if (autoActivated) {
+      await storage.appendTaskEvent({
+        id: randomUUID(), taskId: id, type: 'started',
+        message: AUTO_ACTIVATED_EVENT_MESSAGE, timestamp: now,
+      });
+      await recordTaskStarted(storage, task.agentGaii);
+    }
+
+    res.json(success(config.nodeId, { task: updated, auto_activated: autoActivated }));
+    emitChange('agent-tasks', resolve(req));
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('POST /v1/agents/:name/tasks/:id/queue: MCP not connected', { error: String(err) }); }
+    // Only a task that is RUNNABLE wakes the daemon. A plain queued task is waiting for the owner's
+    // /start, and pushing it would have the agent pick up work nobody released to it yet.
+    if (autoActivated) emitDelivery({ target: task.agentGaii, kind: 'task_assigned', id: updated!.id, payload: updated });
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued|paused|stalled -> active) ── */

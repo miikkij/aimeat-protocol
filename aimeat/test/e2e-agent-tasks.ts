@@ -957,6 +957,74 @@ await test('42. Once the run is finished, the same job can be ordered again', as
     assert(again.body.data.task.id !== firstDedupeId, 'a new run, not the finished one');
 });
 
+// ─── Phase 11: draft is not a dead end ───
+//
+// FOUND BY A CREW, NOT BY US. A task created over plain REST without naming a status landed in
+// 'draft', because the REST body schema defaulted there while the MCP tool and the connector both
+// defaulted to 'queued'. Nothing anywhere moved a task OUT of draft: PATCH has no status field,
+// /start demands queued|paused|stalled, and no route or service transitions one. So the documented
+// agent-facing door created tasks in a state with no exit, and the 409 that followed read as a race
+// rather than as the dead end it was. Every in-house caller had already learned to pass
+// status:'queued' by hand — one of them with a comment saying REQUIRED — which is the shape of a
+// default nobody wants.
+console.log('\nPhase 11 -- Draft is not a dead end');
+
+let releasableDraftId = '';
+
+await test('43. Creating a task without naming a status queues it, as the other two doors do', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'No status named', description: 'The default decides' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'queued',
+        `an omitted status must queue, not draft; got ${body.data.task.status}`);
+});
+
+await test('44. An explicit draft is still a draft', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Held back', description: 'Owner reviews first', status: 'draft' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'draft', `status: ${body.data.task.status}`);
+    releasableDraftId = body.data.task.id;
+});
+
+await test('45. The agent it is FOR cannot release someone else\'s draft', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/tasks/${releasableDraftId}/queue`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(status === 403, `expected 403, got ${status}`);
+});
+
+await test('46. The owner releases the draft, and it becomes queued', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${releasableDraftId}/queue`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'queued', `status: ${body.data.task.status}`);
+});
+
+await test('47. The released task can then be started -- the exit actually leads somewhere', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${releasableDraftId}/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'active', `status: ${body.data.task.status}`);
+});
+
+await test('48. Releasing a task that is not a draft is refused, and the message names its state', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${releasableDraftId}/queue`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 409, `expected 409, got ${status}`);
+    assert(String(body.error?.message ?? '').includes('active'),
+        `the refusal must name the current state: ${JSON.stringify(body)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

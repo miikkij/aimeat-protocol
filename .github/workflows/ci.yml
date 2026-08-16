@@ -102,6 +102,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:mcp-tools
 
+      - name: MCP tool input-schema parity (check:mcp-schemas)
+        working-directory: aimeat
+        run: pnpm check:mcp-schemas
+
       - name: Cortex pack integrity (embedded viewport + VERSION constants)
         working-directory: aimeat
         run: pnpm check:viewport

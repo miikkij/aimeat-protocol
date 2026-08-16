@@ -56,7 +56,18 @@ export const AgentTaskCreateSchema = z.object({
     estimate_minutes: z.number().optional(),
     status: TodoStatusSchema.optional().default('pending'),
   })).optional().default([]),
-  status: z.enum(['draft', 'queued']).optional().default('draft'),
+  // 'queued', because that is what the OTHER TWO DOORS have always defaulted to and because 'draft'
+  // was, until POST .../queue existed, a state with no exit at all. A caller who omitted `status`
+  // over REST got a task nothing could start, complete or advance, and the 409 that followed said
+  // INVALID_STATE, which reads as a race rather than as a one-way door. Every in-house caller had
+  // already worked around it by passing 'queued' explicitly — one of them with a comment saying it
+  // was REQUIRED — which is what a wrong default looks like from the outside.
+  //
+  // This does not loosen the owner's review gate. 'queued' means visible to the agent, not started:
+  // resolveAutoActivation() only runs the task on its own when the target agent's mode is
+  // 'task-runner', which is the owner's own standing pre-authorisation. Every other mode still waits
+  // for POST .../start. 'draft' remains available, now as an explicit choice rather than a trap.
+  status: z.enum(['draft', 'queued']).optional().default('queued'),
   parent_task_id: z.string().optional(),
   // One-live-commission guard. A caller that knows which job this is (a form submit id, a row id)
   // sends its own key; everyone else gets a server-derived fingerprint over agent + title +

@@ -32741,7 +32741,10 @@ paths:
                 status:
                   type: string
                   enum: [draft, queued]
-                  default: draft
+                  default: queued
+                  description: >-
+                    queued means the agent can see it; draft holds it for your review and is
+                    released later with POST .../{id}/queue.
                 todos:
                   type: array
                   items:
@@ -33139,6 +33142,54 @@ paths:
                           message: { type: object }
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /v1/agents/{name}/tasks/{id}/queue:
+    post:
+      operationId: queueAgentTask
+      summary: Release a draft task to the agent
+      description: >-
+        Move a draft task to queued, which is the point at which the agent it is for can see it.
+        Owner, or a same-owner app holding task:write. When the target agent's mode is task-runner
+        the task goes straight to active, exactly as it would have at create time, and the response
+        says so in auto_activated.
+      tags: [Agent Tasks]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Draft released
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task:
+                            $ref: '#/components/schemas/AgentTask'
+                          auto_activated:
+                            type: boolean
+                            description: The target agent is a task-runner, so the task is already active.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

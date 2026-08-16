@@ -208,6 +208,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             ...aiProvenanceCatalogInput,
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             message: { type: 'string', description: 'Completion message.' },
+            deliverable_key: { type: 'string', description: "The memory key, under the agent's own namespace, where the result was published. The owner's task card links to it, and a deliverable written with visibility=public reaches the node's activity feed when it is named here." },
         },
     },
     {

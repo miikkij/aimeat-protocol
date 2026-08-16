@@ -5,6 +5,10 @@
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the
  *   registry's primary agent is used.
  * @version-history
+ *   2026-08-16 — aimeat_task_complete takes `deliverable_key`. It had been on the REST route and the
+ *     server MCP tool and missing here, so zod stripped it from every connector call: the completion
+ *     succeeded and the pointer to the agent's own output was gone. Found by crewaimeat-dev, who
+ *     spent an afternoon proving the node had lost a value the client never sent.
  *   2026-08-14 — aimeat_task_create takes `scope`, parity with the server MCP surface.
  *   v2.4.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_task_complete carries `ai_provenance` /
  *     `ai_provenance_id` and echoes what was recorded.
@@ -166,12 +170,22 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     message: z.string().optional().describe('Completion message'),
+    // MISSING HERE, PRESENT ON BOTH OTHER DOORS, AND THAT IS THE WHOLE FAILURE. The REST route reads
+    // `deliverable_key` and the server MCP tool declares it; this one did not, so zod stripped it
+    // from the call before it ever left the client. The completion then succeeded — the parameter is
+    // optional, so nothing had grounds to refuse — and the pointer to the agent's own output simply
+    // was not there afterwards. A crew spent an afternoon proving the node had lost it.
+    deliverable_key: z.string().max(256).optional().describe(
+      'The memory key, under the TARGET AGENT\'s own namespace, where the result was published. '
+      + "It is what the owner's task card links to, and a deliverable written with visibility=public "
+      + "reaches the node's activity feed when it is named here."),
     ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message, ai_provenance, ai_provenance_id }) => {
+  }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message, deliverable_key, ai_provenance, ai_provenance_id }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const body: Record<string, unknown> = {};
     if (message) body.message = message;
+    if (deliverable_key) body.deliverable_key = deliverable_key;
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/complete`, body);
     return provenanceEchoedResult(client,
       { tool: 'aimeat_task_complete', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
