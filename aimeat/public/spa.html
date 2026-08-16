@@ -100,6 +100,10 @@
     })();
   </script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <!-- The palette definitions (--color-* per data-palette, light and dark), loaded BEFORE
+       theme.css on purpose: theme.css ends with the bridge that maps these onto the shell's own
+       tokens, and it re-declares --border — a width here, a color there — so order is the tiebreak. -->
+  <link rel="stylesheet" href="/lib/aimeat-theme.css">
   <link rel="stylesheet" href="/css/theme.css">
   <!-- Canonical styles for the shared <Markdown> component — load before views so it styles
        rendered markdown everywhere the component is used (no per-view re-definition). -->

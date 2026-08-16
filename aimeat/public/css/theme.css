@@ -10,6 +10,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.28.0 — 2026-08-17 — The palette bridge: html[data-palette] maps aimeat-theme.css's
+       --color-* tokens onto the shell's own, so the golden pill's palette picker finally changes
+       what the apex looks like. Inert with no palette chosen (the default removes the attribute).
      v1.27.0 — 2026-08-09 — Header slims, footer arrives. `.topnav-me*` (the "Me" dropdown) is gone:
        Apps/Profile/Admin are plain links again, because the marketing links now leave the bar when a
        person signs in. New `.site-footer` carries what the header stopped carrying, inside
@@ -326,6 +329,94 @@
   --pf-hero-gradient: linear-gradient(135deg, #16151A 0%, #201820 45%, #15191F 100%);
   --pf-cta-gradient: linear-gradient(135deg, #231A1E, #1A1F28);
   --pf-callout-gradient: linear-gradient(135deg, #1C1A29, #221A29);
+}
+
+/* ── PALETTE BRIDGE — the golden pill's palette picker, finally wired to this shell ──
+   The pill sets `data-palette` on <html> and /lib/aimeat-theme.css defines each palette's
+   --color-* tokens (light and dark per palette, contrast-audited there). Until this block
+   existed, NOTHING on the apex read those tokens: picking Paper or Circuit wrote an attribute
+   no rule reacted to, and the person watched nothing happen. spa.html now loads
+   /lib/aimeat-theme.css BEFORE this file, and this block maps the shell's own vocabulary onto
+   the palette's — so every view built on these tokens follows the choice without knowing
+   palettes exist.
+
+   Selector is `html[data-palette]`: the default 'aimeat' palette REMOVES the attribute
+   (auth/palette.js), so with no palette chosen this block is inert and the shell renders
+   byte-identically to before. Dark mode needs nothing here — aimeat-theme.css flips the
+   --color-* values under html[data-palette][data-theme='dark'], and these are references.
+
+   Two deliberate boundaries. --border is re-declared because aimeat-theme.css uses that name
+   for a WIDTH (1px) while this shell uses it for a color — this file loads later, so the color
+   wins. And the semantic family (success/warn/danger and their tint triplets) is NOT bridged:
+   danger stays the same red in every palette, because a warning that changes hue with the
+   wallpaper is a warning that trained people to look twice. */
+html[data-palette] {
+  /* Background tiers: base-100 is the page, base-200 the card (aimeat-theme's convention). */
+  --bg: var(--color-base-100);
+  --bg-surface: color-mix(in srgb, var(--color-base-300) 26%, var(--color-base-100));
+  --bg-card: var(--color-base-200);
+  --bg-elevated: var(--color-base-200);
+  --card-bg: var(--color-base-200);
+  --card-bg-hover: color-mix(in srgb, var(--color-base-300) 12%, var(--color-base-200));
+  --card-bg-solid: var(--color-base-200);
+  --card-bg-alt: color-mix(in srgb, var(--color-base-300) 26%, var(--color-base-100));
+  --card-border: color-mix(in srgb, var(--color-base-content) 14%, transparent);
+
+  /* Accent: --color-primary is what each palette's swatch advertises as its accent. */
+  --accent: var(--color-primary);
+  --accent-bright: color-mix(in srgb, var(--color-primary) 82%, var(--color-base-200));
+  --accent-deep: color-mix(in srgb, var(--color-primary) 86%, var(--color-base-content));
+  --accent-glow: color-mix(in srgb, var(--color-primary) 30%, transparent);
+  --accent-subtle: color-mix(in srgb, var(--color-primary) 7%, transparent);
+  --accent-border: color-mix(in srgb, var(--color-primary) 24%, transparent);
+
+  /* The love gradient follows the palette's primary/secondary pair. */
+  --love1: var(--color-primary);
+  --love2: color-mix(in srgb, var(--color-primary) 65%, var(--color-secondary));
+  --love3: var(--color-secondary);
+  --love4: color-mix(in srgb, var(--color-primary) 65%, var(--color-secondary));
+  --love5: var(--color-primary);
+
+  /* Text tiers, mixed toward the page so dimming works on any base. */
+  --text: var(--color-base-content);
+  --text-bright: var(--color-base-content);
+  --text-dim: color-mix(in srgb, var(--color-base-content) 64%, var(--color-base-100));
+  --text-muted: color-mix(in srgb, var(--color-base-content) 46%, var(--color-base-100));
+
+  /* Borders as translucent content, so they sit on any surface. */
+  --border: color-mix(in srgb, var(--color-base-content) 15%, transparent);
+  --border-subtle: color-mix(in srgb, var(--color-base-content) 8%, transparent);
+  --border-focus: var(--color-primary);
+
+  /* Inputs and controls. */
+  --bg-input: var(--color-base-100);
+  --bg-input-focus: var(--color-base-200);
+  --control-bg: var(--color-base-200);
+  --control-border: color-mix(in srgb, var(--color-base-content) 24%, transparent);
+  --code-bg: color-mix(in srgb, var(--color-base-300) 30%, var(--color-base-100));
+  --scrollbar-thumb: color-mix(in srgb, var(--color-base-content) 25%, transparent);
+  --morsel-bg: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-primary) 10%, var(--color-base-200)),
+    color-mix(in srgb, var(--color-primary) 20%, var(--color-base-200)));
+
+  /* Decorative gradients, from the same pair the love palette uses. */
+  --pf-hero-gradient: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-primary) 8%, var(--color-base-100)) 0%,
+    color-mix(in srgb, var(--color-secondary) 10%, var(--color-base-100)) 100%);
+  --pf-cta-gradient: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-primary) 12%, var(--color-base-200)),
+    color-mix(in srgb, var(--color-secondary) 10%, var(--color-base-200)));
+  --pf-callout-gradient: linear-gradient(135deg,
+    color-mix(in srgb, var(--color-secondary) 10%, var(--color-base-200)),
+    color-mix(in srgb, var(--color-primary) 10%, var(--color-base-200)));
+}
+
+/* --border needs one more rung. Each palette's DARK block in aimeat-theme.css re-declares it as a
+   width at html[data-palette][data-theme='dark'] specificity (0,2,1), which outranks the bridge
+   above (0,1,1) — measured: every dark palette resolved --border to "1px" and every hairline in
+   the shell vanished. This matches that specificity, and being in the later file, wins the tie. */
+html[data-palette][data-theme] {
+  --border: color-mix(in srgb, var(--color-base-content) 15%, transparent);
 }
 
 /* ── Base ── */

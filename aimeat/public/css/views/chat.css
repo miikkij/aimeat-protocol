@@ -9,6 +9,9 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.3.0 — 2026-08-17 — Phones: the composer wraps into two rows (the textarea was the smallest
+ *     thing on its own row), the GAII line yields its row, and a wide markdown table scrolls inside
+ *     the bubble instead of crushing its columns.
  *   v1.2.0 — 2026-08-16 — .chat-status-model: which model answered, beside the payer line.
  *   v1.1.0 — 2026-08-16 — The recorder beside the send button, and the read-aloud control on a turn.
  *   v1.0.0 — 2026-08-16 — Initial.
@@ -237,6 +240,15 @@
 .chat-turn--live .chat-bubble { border-left-color: var(--accent); }
 
 .chat-said { margin: 0; white-space: pre-wrap; }
+
+/* A wide table scrolls inside the bubble instead of crushing its columns until "Versio" wraps
+   mid-word. Layout containment is the view's concern (markdown.css owns typography, not where a
+   bubble puts its overflow). */
+.chat-bubble .md-body table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
 
 .chat-thinking {
   margin: 0;
@@ -609,4 +621,22 @@
   .chat-composer {
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   }
+
+  /* The composer, two honest rows. One row squeezed the textarea to a slot between three
+     buttons — the writing surface was the smallest thing on the writing row. The box takes the
+     full width; the controls sit under it, attach and voice on the left, Send grown to a real
+     target on the right. */
+  .chat-composer-row { flex-wrap: wrap; }
+  .chat-input { flex: 1 1 100%; }
+  .chat-attach, .chat-voice { flex: 0 0 auto; min-height: 40px; }
+  .chat-send { flex: 1 1 auto; margin-left: auto; max-width: 50%; min-height: 40px; }
+
+  /* The status area earns its rows. The agent's GAII is identity chrome a phone screen cannot
+     afford — it is on the desktop, in the profile, and in every record; the money line and the
+     model stay because one is about their wallet and the other makes answers checkable. */
+  .chat-status { padding: 4px 12px; gap: 8px; }
+  .chat-status-agent { display: none; }
+  .chat-ai-notice { padding: 4px 12px; }
+  .chat-head { padding: 10px 12px; }
+  .chat-copy-all { font-size: 0.7rem; padding: 2px 6px; }
 }
