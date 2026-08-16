@@ -14,6 +14,13 @@
 
 export interface AiCapabilityConfig {
   /**
+   * Where a `goose serve` ACP agent is listening. Empty (the default) disables the chat entirely,
+   * which is what every node does until an operator runs one.
+   */
+  gooseUrl: string;
+  /** Its GOOSE_SERVER__SECRET_KEY. The ACP port authenticates with the header X-Secret-Key. */
+  gooseSecret: string;
+  /**
    * This node's own OpenRouter key, used for a person who has not brought one. Empty (the default)
    * means the node pays for nothing and everyone brings their own, which is how every node behaved
    * before this existed.

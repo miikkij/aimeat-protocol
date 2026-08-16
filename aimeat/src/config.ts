@@ -277,6 +277,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     sttMaxMb: parseInt(process.env.AIMEAT_STT_MAX_MB ?? '25', 10),
     sttMaxSeconds: parseInt(process.env.AIMEAT_STT_MAX_SECONDS ?? '600', 10),
     voiceMsgMaxSeconds: parseInt(process.env.AIMEAT_VOICE_MSG_MAX_SECONDS ?? '300', 10),
+    gooseUrl: process.env.AIMEAT_GOOSE_URL ?? '',
+    gooseSecret: process.env.AIMEAT_GOOSE_SECRET ?? '',
     openrouterInstanceKey: process.env.AIMEAT_OPENROUTER_INSTANCE_KEY ?? '',
     chatFreeAllowanceUsd: parseFloat(process.env.AIMEAT_CHAT_FREE_ALLOWANCE_USD ?? '0') || 0,
     modelFreeFallback: process.env.AIMEAT_MODEL_FREE_FALLBACK ?? 'openrouter/free',
