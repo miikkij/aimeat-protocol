@@ -5,6 +5,11 @@
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).
  *   Translated 1:1 from the SQLite/Prisma implementations.
  * @version-history
+ *   v1.2.0 — 2026-08-16 — The ledger resolves the principal on both sides, the way every balance op
+ *     already did: a row written with an agent GAII is filed under the owner GHII (with initiatorGaii
+ *     keeping who acted), and a lookup by an agent GAII resolves too, so the federation replay guard
+ *     still finds what it wrote. Before this, an agent earning on a work item moved the owner balance
+ *     and left a row no wallet surface could see. E2E test-quality audit, reported and then fixed.
  *   v1.1.0 — 2026-07-15 — Phase 5: atomic balance mutations (debit/credit/creditCapped/transfer).
  *   v1.0.0 — 2026-07-15 — Phase 5: wallet transaction ledger on Postgres+Kysely.
  */
@@ -43,21 +48,35 @@ async function resolveGhii(db: Kysely<DB>, identity: string): Promise<string | n
 }
 
 export const walletMethods = {
+  // ── The ledger is filed under the HUMAN, on both sides of the read/write pair ──
+  // There is one balance per person (GHIIRecord.morselBalance) and every balance op below already
+  // resolves any principal to it. The ledger did not: a row written with an agent's GAII stayed
+  // filed under that GAII, while every wallet surface reads the owner's GHII with an exact match.
+  // So an agent earning on a work item moved the owner's balance and left no row explaining it.
+  // Resolving on WRITE alone would be worse than the bug — the settlement replay guard looks a
+  // tracking code up by the identity it was written with, and a guard that stops finding the
+  // original row lets a signed settlement be credited twice — so both sides resolve here.
+  // `initiatorGaii` keeps who acted, which is the whole reason that column exists.
   async addTransaction(this: PostgresKyselyStorage, tx: WalletTransaction): Promise<WalletTransaction> {
+    const owner = await resolveGhii(this.db, tx.gaii);
+    const filedUnder = owner ?? tx.gaii;
+    const initiator = tx.initiatorGaii ?? (filedUnder !== tx.gaii ? tx.gaii : null);
     const [row] = await this.db.insertInto('Transaction').values({
-      txId: tx.id, gaii: tx.gaii, type: tx.type, amount: tx.amount,
+      txId: tx.id, gaii: filedUnder, type: tx.type, amount: tx.amount,
       counterpartyGaii: tx.counterpartyGaii ?? null, trackingCode: tx.trackingCode ?? null,
-      initiatorGaii: tx.initiatorGaii ?? null, timestamp: new Date(tx.timestamp),
+      initiatorGaii: initiator, timestamp: new Date(tx.timestamp),
     }).returningAll().execute();
     return mapTx(row);
   },
   async getTransactions(this: PostgresKyselyStorage, gaii: string, limit = 50): Promise<WalletTransaction[]> {
-    const rows = await this.db.selectFrom('Transaction').selectAll().where('gaii', '=', gaii).orderBy('timestamp', 'desc').limit(limit).execute();
+    const identity = (await resolveGhii(this.db, gaii)) ?? gaii;
+    const rows = await this.db.selectFrom('Transaction').selectAll().where('gaii', '=', identity).orderBy('timestamp', 'desc').limit(limit).execute();
     return rows.map(mapTx);
   },
   async findTransactionByTrackingCode(this: PostgresKyselyStorage, gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null> {
+    const identity = (await resolveGhii(this.db, gaii)) ?? gaii;
     const r = await this.db.selectFrom('Transaction').selectAll()
-      .where('gaii', '=', gaii).where('trackingCode', '=', trackingCode).where('type', '=', type)
+      .where('gaii', '=', identity).where('trackingCode', '=', trackingCode).where('type', '=', type)
       .executeTakeFirst();
     return r ? mapTx(r) : null;
   },

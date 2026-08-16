@@ -7,6 +7,11 @@
  *     of this same board domain and NOTHING IMPORTS IT. The methods here are the live ones (they are
  *     what index.ts merges onto the prototype). This was found the expensive way — by editing the
  *     repo file, watching the test still fail, and only then discovering the twin.
+ *   v1.2.0 — 2026-08-16 — The wallet ledger resolves the principal on both sides, the way
+ *     creditBalance/debitBalance already did: a row written with an agent GAII is filed under the
+ *     owner GHII (initiatorGaii keeps who acted), and a lookup by an agent GAII resolves too, so the
+ *     federation replay guard still finds what it wrote. Before this, an agent earning on a work item
+ *     moved the owner balance and left a row no wallet surface could see.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
@@ -240,28 +245,40 @@ export const workMethods = {
   // ── Wallet Transactions ──
   // ══════════════════════════════════════════════════════════
 
+  // ── The ledger is filed under the HUMAN, on both sides of the read/write pair ──
+  // There is one balance per person (GHIIRecord.morselBalance) and debitBalance/creditBalance
+  // resolve any principal to it. The ledger did not: a row written with an agent's GAII stayed
+  // filed under that GAII, while every wallet surface reads the owner's GHII with an exact match.
+  // So an agent earning on a work item moved the owner's balance and left no row explaining it.
+  // Resolving on WRITE alone would be worse than the bug — the settlement replay guard looks a
+  // tracking code up by the same identity it was written with — so both sides resolve here.
+  // `initiatorGaii` keeps who acted, which is the whole reason that column exists.
   async addTransaction(this: SqliteStorage, tx: WalletTransaction): Promise<WalletTransaction> {
+    const filedUnder = this.resolveGhii(tx.gaii) ?? tx.gaii;
+    const initiator = tx.initiatorGaii ?? (filedUnder !== tx.gaii ? tx.gaii : null);
     this.db.prepare(
       `INSERT INTO wallet_transactions (id, gaii, type, amount, counterpartyGaii, trackingCode, initiatorGaii, timestamp)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
-      tx.id, tx.gaii, tx.type, tx.amount,
-      tx.counterpartyGaii ?? null, tx.trackingCode ?? null, tx.initiatorGaii ?? null, tx.timestamp,
+      tx.id, filedUnder, tx.type, tx.amount,
+      tx.counterpartyGaii ?? null, tx.trackingCode ?? null, initiator, tx.timestamp,
     );
-    return tx;
+    return { ...tx, gaii: filedUnder, ...(initiator ? { initiatorGaii: initiator } : {}) };
   },
 
   async getTransactions(this: SqliteStorage, gaii: string, limit = 50): Promise<WalletTransaction[]> {
+    const identity = this.resolveGhii(gaii) ?? gaii;
     const rows = this.db.prepare(
       'SELECT * FROM wallet_transactions WHERE gaii = ? ORDER BY timestamp DESC LIMIT ?'
-    ).all(gaii, limit) as Record<string, unknown>[];
+    ).all(identity, limit) as Record<string, unknown>[];
     return rows.reverse().map(r => this.deserializeTransaction(r));
   },
 
   async findTransactionByTrackingCode(this: SqliteStorage, gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null> {
+    const identity = this.resolveGhii(gaii) ?? gaii;
     const row = this.db.prepare(
       'SELECT * FROM wallet_transactions WHERE gaii = ? AND trackingCode = ? AND type = ? LIMIT 1'
-    ).get(gaii, trackingCode, type) as Record<string, unknown> | undefined;
+    ).get(identity, trackingCode, type) as Record<string, unknown> | undefined;
     return row ? this.deserializeTransaction(row) : null;
   },
 

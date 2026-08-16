@@ -164,6 +164,43 @@ describe('storage providers agree on what they do, not just on their signatures'
         }
     }, 60_000);
 
+    it('the ledger is filed under the human, and an agent-keyed lookup still finds it', async () => {
+        // One balance per person: debitBalance/creditBalance resolve any principal to the owner's
+        // GHII. The ledger has to agree, or money moves with no row to account for it — an agent
+        // earning on a work item credited the owner and filed the row under the agent, where no
+        // wallet surface looks. The read has to resolve too: the federation replay guard looks a
+        // settlement up by the identity it was written with, and a guard that stops finding the
+        // original row lets a signed settlement be credited twice.
+        for (const { name, storage } of provs) {
+            const owner = `conftxid${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const { ghii, gaii } = await seedOwner(storage, owner);
+            const tc = `settle:agent-${randomUUID()}`;
+
+            const written = await storage.addTransaction({
+                id: `tx-${randomUUID()}`, gaii, type: 'federation_settlement', amount: 7,
+                trackingCode: tc, timestamp: new Date().toISOString(),
+            });
+            expect(written.gaii, `${name}: the row is filed under the owner`).toBe(ghii);
+            expect(written.initiatorGaii, `${name}: and it still names the agent that acted`).toBe(gaii);
+
+            // The owner's wallet surface reads its own GHII and must see it.
+            const ownerRows = await storage.getTransactions(ghii, 500);
+            expect(ownerRows.some(r => r.trackingCode === tc), `${name}: the owner's ledger carries the row`).toBe(true);
+
+            // The replay guard passes the AGENT's identity — the one the settlement named.
+            const byAgent = await storage.findTransactionByTrackingCode(gaii, tc, 'federation_settlement');
+            expect(byAgent, `${name}: an agent-keyed replay lookup must still find it`).toBeTruthy();
+            const byOwner = await storage.findTransactionByTrackingCode(ghii, tc, 'federation_settlement');
+            expect(byOwner, `${name}: and so must an owner-keyed one`).toBeTruthy();
+
+            // Reading as the agent gives the owner's ledger — an agent has no ledger of its own.
+            const agentRows = await storage.getTransactions(gaii, 500);
+            expect(agentRows.some(r => r.trackingCode === tc), `${name}: the agent read resolves to the owner`).toBe(true);
+
+            await storage.deleteOwner(owner);
+        }
+    }, 60_000);
+
     it('findTransactionByTrackingCode finds a row no recent-window scan would reach', async () => {
         for (const { name, storage } of provs) {
             const owner = `conftx${Date.now()}${Math.floor(Math.random() * 1000)}`;

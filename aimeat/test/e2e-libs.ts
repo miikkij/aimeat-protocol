@@ -672,10 +672,26 @@ await test('work.deliver — deliver output, and the escrow settles to the PROVI
     const providerAfter = await walletBalance(agent2Jwt);
     assert(providerAfter - providerBefore === 1, `the provider is paid the action's base price: ${providerBefore} → ${providerAfter}`);
 
-    // NOT asserted here, because it is currently false: the 'earned' row settlePayment writes is
-    // filed under work.providerGaii (the AGENT), while GET /v1/wallet/transactions reads the OWNER's
-    // GHII with an exact-match query. The money lands on the owner's balance and the row explaining
-    // it does not appear on any wallet surface. Reported as a product finding, not fixed here.
+    // …and the row that EXPLAINS the payment is on the provider's wallet. settlePayment writes it
+    // with work.providerGaii — an agent — while every wallet surface reads the owner's GHII, so
+    // until the ledger resolved the principal the balance moved with nothing to account for it.
+    const tx = await authApi('/v1/wallet/transactions', agent2Jwt);
+    assert(tx.ok === true, `transactions: ${tx.error?.message}`);
+    const rows = tx.data.transactions as any[];
+    const earned = rows.find(r => r.tracking_code === trackingCode && r.type === 'earned');
+    assert(!!earned, `an 'earned' row for ${trackingCode} must be on the provider's ledger: ${JSON.stringify(rows.map(r => [r.type, r.tracking_code]))}`);
+    assert(earned.amount === 1, `the row carries the amount paid, got ${earned.amount}`);
+    // Filed under the human, but it still says which agent did the work.
+    assert(typeof earned.initiator_gaii === 'string' && earned.initiator_gaii.includes('#'),
+        `the row names the acting agent: ${JSON.stringify(earned.initiator_gaii)}`);
+
+    // The requester's side is the mirror: the escrow debit is on THEIR ledger, not the provider's.
+    const reqTx = await authApi('/v1/wallet/transactions', agentJwt);
+    const reqRows = reqTx.data.transactions as any[];
+    assert(reqRows.some(r => r.tracking_code === trackingCode && r.type === 'escrow_hold'),
+        `the requester's escrow_hold row for ${trackingCode} must be on the requester's ledger: ${JSON.stringify(reqRows.map(r => [r.type, r.tracking_code]))}`);
+    assert(!reqRows.some(r => r.tracking_code === trackingCode && r.type === 'earned'),
+        'the requester must not carry the provider\'s earning');
 });
 
 await test('work.rate — the PROVIDER cannot rate their own delivery → 403', async () => {
