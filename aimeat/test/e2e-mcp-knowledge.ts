@@ -118,6 +118,12 @@ let clientSecret = '';
 // Knowledge state
 let packageId = '';
 
+// 2026-08-16 (August 2026 test-quality audit, e2e-mcp-knowledge:238): every read here was the
+// importer reading its own package, and test 2 asserted only that the list WAS an array, never that
+// it was empty — so nothing distinguished an owner-scoped lookup from a node-wide one. Phase 5 adds a
+// second owner with their own agent and MCP session: their library is empty, A's package id opens
+// nothing for them, and A still reads their own as the positive control. Measured with the storage
+// lookup falling back to any owner: B reads A's manifest.
 console.log('\n=== AIMEAT MCP Knowledge E2E Test ===\n');
 
 // ─── Setup: Register GHII + agent + MCP OAuth token ───
@@ -493,6 +499,84 @@ await test('14. Read non-existent package resource', async () => {
 
 // ─── Cleanup ───
 console.log('\nCleanup');
+
+// ─── Phase 5: a second owner's agent, on the same node ───
+// Every read above is the importer reading its own package, so nothing distinguished an owner-scoped
+// lookup from a node-wide one. Test 2 ('List returns empty array initially') asserted only that the
+// answer WAS an array, never that it was empty, so even that could not tell the two apart.
+console.log('\nPhase 5 — Another owner\'s agent sees none of it');
+
+/** A complete MCP session for an arbitrary agent: register → authorize → token → initialize. */
+async function sessionFor(gaii: string, privKey: string) {
+    const { body: reg } = await json('/v1/mcp/register', {
+        method: 'POST', body: JSON.stringify({ client_name: 'kwl cross-owner', redirect_uris: [] }),
+    });
+    const ts = new Date().toISOString();
+    const sig = await signMsg(privKey, gaii + NODE_ID + ts);
+    const { body: auth } = await json(`/v1/mcp/authorize?${new URLSearchParams({ response_type: 'code', client_id: reg.client_id, gaii, signature: sig, timestamp: ts })}`);
+    const { body: tok } = await json('/v1/mcp/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code: auth.code, client_id: reg.client_id, client_secret: reg.client_secret }),
+    });
+    const token = tok.access_token as string;
+    let sid = '';
+    const rpc = async (method: string, params: Record<string, any>, id: number) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+                Authorization: `Bearer ${token}`,
+                ...(sid ? { 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' } : {}),
+            },
+            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+        });
+        const got = res.headers.get('mcp-session-id'); if (got) sid = got;
+        const ct = res.headers.get('content-type') ?? '';
+        if (ct.includes('text/event-stream')) {
+            const msgs: any[] = [];
+            for (const line of (await res.text()).split('\n')) if (line.startsWith('data:')) { try { msgs.push(JSON.parse(line.slice(5).trim())); } catch { /* */ } }
+            return msgs.find(m => m.id === id) ?? {};
+        }
+        return await res.json() as any;
+    };
+    await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'kwl-b', version: '1.0.0' } }, 1);
+    return { call: (name: string, args: Record<string, any>, id: number) => rpc('tools/call', { name, arguments: args }, id) };
+}
+
+await test('9. A second owner\'s agent lists NO packages and cannot read A\'s', async () => {
+    const otherName = `mcpkwlb${Date.now()}`;
+    const ghii = await json('/v1/ghii', {
+        method: 'POST', body: JSON.stringify({ username: otherName, display_name: 'MCP Knowledge B', password: 'McpKwlB1234' }),
+    });
+    assert(ghii.status === 201, `B ghii ${ghii.status}: ${JSON.stringify(ghii.body)}`);
+    const ts = new Date().toISOString();
+    const bTok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: otherName, timestamp: ts, signature: await signMsg(ghii.body.data.private_key, otherName + NODE_ID + ts) }),
+    });
+    assert(bTok.body.ok === true, `B token: ${JSON.stringify(bTok.body.error)}`);
+    const bAgent = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${bTok.body.data.token}` },
+        body: JSON.stringify({ name: 'mcpkwlbagent', owner: otherName, capabilities: ['memory'] }),
+    });
+    assert(bAgent.status === 201, `B agent ${bAgent.status}: ${JSON.stringify(bAgent.body)}`);
+
+    const b = await sessionFor(bAgent.body.data.agent.gaii, bAgent.body.data.private_key);
+
+    // B's own library is EMPTY — the assertion test 2 never made.
+    const list = await b.call('aimeat_knowledge_list', {}, 400);
+    const packages = JSON.parse(list.result.content[0].text);
+    assert(Array.isArray(packages), 'B gets an array');
+    assert(packages.length === 0, `B's library must be empty, got ${JSON.stringify(packages.map((p: any) => p.package_id))}`);
+
+    // …and A's package id, which B could compute or overhear, opens nothing.
+    const get = await b.call('aimeat_knowledge_get', { package_id: packageId }, 401);
+    assert(get.result?.isError === true, `B must be refused A's package, got: ${JSON.stringify(get.result?.content?.[0]?.text ?? get).slice(0, 200)}`);
+
+    // The importer still reads their own, so the refusal is ownership and not a broken tool.
+    const mine = await mcpRpc('tools/call', { name: 'aimeat_knowledge_get', arguments: { package_id: packageId } }, 402);
+    assert(mine.body.result?.isError !== true, `A must still read A's own package: ${JSON.stringify(mine.body.result?.content?.[0]?.text ?? '').slice(0, 160)}`);
+});
 
 await test('Delete owner (cascade)', async () => {
     const { status } = await json(`/v1/owners/${ownerName}`, {
