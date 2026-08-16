@@ -95,6 +95,16 @@ const SCRIPTS = {
     for (var i = 0; i < n; i++) out.push({ vnr: '00' + (1000 + i), company: 'Firma ' + (i % 2), days: i * 7, active: i % 2 === 0 });
     return { ok: true, total: out.length, results: out };
   }`,
+  // A REAL producer's nesting: an object and an array inside every row, which is what a Table
+  // Schema cannot describe and what the step's `columns` mapping exists to flatten.
+  nested: `export default async function(){
+    return { ok: true, results: [
+      { date: '2026-08-16', buyer: { name: 'Tampereen kaupunki', businessId: '0211675-2' },
+        detail: { cpvLabel: 'IT services', lotCount: 12 }, cpvCodes: ['72000000', '72200000'] },
+      { date: '2026-08-15', buyer: { name: 'Espoon kaupunki', businessId: '0101263-6' },
+        detail: { cpvLabel: 'Software', lotCount: 3 }, cpvCodes: ['48000000'] }
+    ] };
+  }`,
   // The same envelope with a word where a number belongs: the quality gate's case.
   badrows: `export default async function(){
     return { ok: true, total: 2, results: [
@@ -114,6 +124,7 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'probe', method: 'POST', path: '/probe', script: 'probe' },
     { id: 'rows', method: 'POST', path: '/rows', script: 'rows' },
     { id: 'badrows', method: 'POST', path: '/badrows', script: 'badrows' },
+    { id: 'nested', method: 'POST', path: '/nested', script: 'nested' },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 8000, max_api_calls: 4 },
@@ -480,6 +491,61 @@ await test('12b. A refused publish is RED, and the package stands on its previou
   // …and the failure is on the PACKAGE's own pointer, not only in a run log: an owner looking at
   // the package learns the newest attempt broke and which version they are still reading.
   assert(after.body.data.latest?.lastError?.message, `no lastError on the pointer: ${JSON.stringify(after.body.data.latest)}`);
+});
+
+await test('12d. A nested producer is flattened by the step, or nothing could publish it', async () => {
+  // The case the first production run of this binding hit: a real producer answers with objects and
+  // arrays inside every row, a Table Schema describes scalars, and the quality gate refused 200 row
+  // problems. `columns` is the transformation those bindings actually need.
+  const PKG = `wfflat${Date.now()}`;
+  const def = {
+    title: { en_US: 'Nested' }, description: { en_US: 'flatten' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [
+      { id: 'fetch', description: { en_US: 'ask' }, required_to_function: 'none',
+        action: { kind: 'extension', extension: EXT, action: 'nested', result_to_key: 'flat.raw' } },
+      { id: 'publish', description: { en_US: 'publish' }, after: ['fetch'], required_to_function: 'none',
+        action: {
+          kind: 'datapackage', name: PKG, from_key: 'flat.raw', rows_at: 'results',
+          changes: 'Flattened from the nested answer the producer gave.',
+          columns: {
+            date: 'date',
+            buyerName: 'buyer.name',
+            buyerBusinessId: 'buyer.businessId',
+            cpvLabel: 'detail.cpvLabel',
+            lotCount: 'detail.lotCount',
+            cpvCodes: 'cpvCodes',
+            missing: 'detail.thereIsNoSuchField',
+          },
+          schema: { fields: [
+            { name: 'date', type: 'date' }, { name: 'buyerName', type: 'string' },
+            { name: 'buyerBusinessId', type: 'string' }, { name: 'cpvLabel', type: 'string' },
+            { name: 'lotCount', type: 'integer' }, { name: 'cpvCodes', type: 'string' },
+            { name: 'missing', type: 'string' },
+          ] },
+        } },
+    ],
+  };
+  const save = await json('/v1/workflows/flat-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  assert(save.status === 200, `save ${save.status}: ${JSON.stringify(save.body?.data?.errors ?? save.body?.error)}`);
+  const r = await json('/v1/workflows/flat-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const run = await settle('flat-wf', r.body.data.run?.runId ?? r.body.data.runId, owner.token);
+  assert(run.steps.publish.state === 'green', `publish ${run.steps.publish.state}: ${JSON.stringify(run.steps.publish.outputObserved ?? {})}`);
+
+  const pkg = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  const rows = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}/rows/rows`);
+  const first = rows.body.data.rows[0];
+  assert(first.buyerName === 'Tampereen kaupunki', `buyer.name did not flatten: ${JSON.stringify(first)}`);
+  assert(first.buyerBusinessId === '0211675-2', 'buyer.businessId flattened');
+  assert(first.lotCount === 12, `a number survived as a number: ${JSON.stringify(first.lotCount)}`);
+  // An array becomes ONE delimited cell rather than its first element: a notice can carry several
+  // codes, and a column that says so beats a column that hides the rest.
+  assert(first.cpvCodes === '72000000;72200000', `array not joined: ${JSON.stringify(first.cpvCodes)}`);
+  // A path that is not there is a GAP, not a dropped column — the table's shape must not depend on
+  // whether one row happened to carry a field.
+  assert('missing' in first && (first.missing === null || first.missing === ''), `absent path should be a gap: ${JSON.stringify(first.missing)}`);
+  const fields = pkg.body.data.descriptor.resources[0].schema.fields.map((f: { name: string }) => f.name);
+  assert(fields.includes('buyerName') && !fields.includes('buyer'), `the published schema is the flat one: ${fields.join(',')}`);
 });
 
 await test('12c. A datapackage step with no changes is refused at SAVE', async () => {

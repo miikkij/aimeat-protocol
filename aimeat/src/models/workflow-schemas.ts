@@ -200,6 +200,27 @@ export type WorkflowStepAction =
       /** Dotted path to the rows inside that value. Omit when the value IS the array. */
       rows_at?: string;
       /**
+       * Column name → dotted path INSIDE each row. Omit to publish the rows as they are.
+       *
+       * WHY A STEP NEEDS THIS AT ALL. A Table Schema describes scalars, and a real producer answers
+       * with nested objects: `buyer: { name, businessId }`, `detail: { cpvLabel, lotCount }`, an
+       * array of codes. Publishing those rows unchanged means either a schema that cannot describe
+       * them or a quality gate that refuses every row — the first production run of this binding
+       * refused 200 row problems for exactly that reason, which is the gate working and the step
+       * being unable to do the one thing the data needed.
+       *
+       * It is a MAPPING rather than a script on purpose. Flattening is the transformation these
+       * producers actually need, it is declarative, and it is recorded in the descriptor as one; a
+       * scripting language in a workflow descriptor would be a sandbox with no boundary and no
+       * provenance.
+       *
+       * A path that is missing yields null rather than dropping the column, so a row that lost a
+       * field is visible as a gap instead of silently changing the table's shape. An ARRAY at the
+       * end of a path is joined with a semicolon: a notice can carry several codes, and one column
+       * that says so beats a column that keeps the first.
+       */
+      columns?: Record<string, string>;
+      /**
        * The Table Schema this package's rows must satisfy. Omitting it INFERS from the rows, and for
        * a repeating producer that is the wrong default even though it is the convenient one:
        * inference widens to fit whatever arrived, so a run where the upstream sent a word instead of
@@ -452,6 +473,9 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     /** Dotted path to the rows INSIDE that value — a producer answers with an envelope far more
      *  often than with a bare array. Omit when the value is the array itself. */
     rows_at: z.string().min(1).max(200).optional(),
+    /** Column name -> dotted path inside each row. See the type above for why this is a mapping
+     *  and not a script. */
+    columns: z.record(z.string().min(1).max(64), z.string().min(1).max(200)).optional(),
     /** A declared Table Schema. Shape-checked by the publish service, which owns that contract;
      *  validating it twice, in two places, is how the two definitions drift apart. */
     schema: z.object({ fields: z.array(z.object({ name: z.string().min(1), type: z.string().min(1) }).loose()).min(1) }).loose().optional(),

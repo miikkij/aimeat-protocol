@@ -282,6 +282,21 @@ export function dispatchDataPackageStep(
     if (!Array.isArray(found)) {
       throw new Error(`"${key}"${action.rows_at ? ` at "${action.rows_at}"` : ''} is ${typeof found}, not an array of rows`);
     }
+    // Flatten, when the step says how. A Table Schema describes scalars and a real producer answers
+    // with nested objects, so this is the transformation these bindings actually need — declarative,
+    // recorded in the descriptor, and with no scripting language in a workflow descriptor.
+    const rows = action.columns
+      ? (found as Array<Record<string, unknown>>).map(row => {
+          const flat: Record<string, unknown> = {};
+          for (const [column, path] of Object.entries(action.columns!)) {
+            const value = atPath(row, path);
+            // An array at the end of a path becomes one delimited cell rather than the first element:
+            // a notice can carry several codes, and a column that says so beats one that hides it.
+            flat[column] = Array.isArray(value) ? value.join(';') : (value === undefined ? null : value);
+          }
+          return flat;
+        })
+      : (found as Array<Record<string, unknown>>);
     const out = await publishPackage(
       { storage: deps.storage, config: deps.config },
       ownerGhii,
@@ -290,7 +305,7 @@ export function dispatchDataPackageStep(
         changes: template(action.changes, run.vars),
         resources: [{
           name: action.resource ?? 'rows',
-          rows: found as Array<Record<string, unknown>>,
+          rows,
           // Declared when the step says so. Inference is the convenient default and the wrong
           // one for a repeating producer: it widens to fit whatever arrived, so a bad run
           // changes a column's type instead of being refused.

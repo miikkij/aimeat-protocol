@@ -4114,6 +4114,20 @@ components:
                 envelope (`{ ok, total, results }`) far more often than with a bare array, so naming
                 the path is how a workflow says which part of the answer is the table. Omit when the
                 value is the array itself.
+            columns:
+              type: object
+              additionalProperties: { type: string }
+              description: >-
+                datapackage: column name to a dotted path INSIDE each row. Omit to publish the rows
+                as they are. A Table Schema describes scalars and a real producer answers with nested
+                objects (`buyer: { name, businessId }`) and arrays, so this is the transformation
+                these bindings actually need — the first production run of one refused 200 row
+                problems for exactly that reason. It is a mapping rather than a script on purpose:
+                flattening is declarative and lands in the descriptor as a recorded transformation,
+                where a scripting language in a workflow descriptor would be a sandbox with no
+                boundary. A missing path yields null rather than dropping the column, so a row that
+                lost a field is a visible gap instead of a silently different table; an array at the
+                end of a path is joined with a semicolon.
             changes:
               type: string
               maxLength: 2000
@@ -9659,6 +9673,97 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/ai/image:
+    post:
+      operationId: generateImage
+      summary: Generate an image on the owner's AI key
+      description: |
+        Makes a picture from a description and stores it in the caller's own storage, answering with
+        a key and a URL rather than the image. Bytes returned inline would travel through a tool
+        result and an agent's context for nothing, and this node already has a place where files live
+        and can be pointed at.
+
+        Needs an image model: the owner's `imageModel`, or the node's default. With neither it
+        refuses as NO_IMAGE_MODEL rather than falling back to a chat model, which would answer an
+        image request with prose and leave the caller holding an opaque provider error.
+
+        Spends the owner's daily AI budget and is refused before the provider is called when that
+        budget is used up. Gated like the other AI routes: an owner session, or any principal holding
+        `ai:use`.
+
+        Pass `public: true` when a model or a web page has to fetch the image back by URL; the
+        default is private.
+      tags: [AI]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [prompt]
+              properties:
+                prompt:
+                  type: string
+                  description: What the picture should show.
+                  maxLength: 4000
+                size:
+                  type: string
+                  description: Provider-specific size string, e.g. "1024x1024". Passed through untouched.
+                storage_key:
+                  type: string
+                  description: Where to store it. Defaults to ai-images/<timestamp>-<random>.<ext>.
+                public:
+                  type: boolean
+                  default: false
+                  description: Store it publicly readable, so a model or page can fetch it by URL.
+                model:
+                  type: string
+                  description: Override the image model.
+                app_id:
+                  type: string
+                  description: Attribution for the per-app quota and the spend report.
+      responses:
+        '200':
+          description: The image was generated and stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          storage_key: { type: string }
+                          mime_type: { type: string }
+                          size: { type: integer }
+                          model: { type: string }
+                          visibility: { type: string, enum: [public, private] }
+                          url: { type: string }
+                          usage:
+                            type: object
+                            properties:
+                              cost_usd: { type: number }
+                              cost_exact: { type: boolean, description: false when the provider reported no cost; never estimated }
+                          budget:
+                            type: object
+                            properties:
+                              daily_budget_usd: { type: number }
+                              spent_today_usd: { type: number }
+                              remaining_usd: { type: number }
+        '400':
+          description: INVALID_BODY, PROMPT_TOO_LONG, or NO_IMAGE_MODEL when neither the owner nor the node has named one
+        '401':
+          description: Unauthorized, or INVALID_API_KEY when the provider rejected the key
+        '402':
+          description: QUOTA_EXHAUSTED - the daily budget is spent; nothing was generated
+        '429':
+          description: RATE_LIMITED by the provider
+        '502':
+          description: PROVIDER_ERROR - the provider failed; the message carries what it said
   /v1/ai/transcribe:
     post:
       operationId: aiTranscribe
