@@ -1,6 +1,20 @@
-// T-1: Federation E2E Tests
-// Run: cd aimeat && pnpm exec tsx test/e2e-federation.ts
-// Requires: server running on :40251
+/**
+ * @file test/e2e-federation.ts
+ * @description T-1 federation E2E: peering lifecycle, data replication, catalogue sync, de-peering,
+ *   trust advisories and the node's own federation surface.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=federation
+ * @version-history
+ *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit, two findings. Phase 3b: every replication
+ *     and sync in the file carried a VALID signature, and the two existing refusals are stopped
+ *     earlier by the not-an-active-peer check, so the signature block itself had never answered
+ *     anything — a node accepting unsigned replication from anyone who guessed a peer node id passed
+ *     this suite. Adds unsigned, tampered and foreign-key cases from the KNOWN ACTIVE peer, each with
+ *     a read-back proving nothing landed. Phase 6: the suite's owner is the first owner on a cleared
+ *     database and therefore the operator, so peering, de-peering, peer registration, peering
+ *     decisions and trust advisories were only ever exercised by a principal that could not be
+ *     refused; a second plain owner is now refused all of them.
+ *   v1.0.0 — pre-dates the header standard.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -443,6 +457,91 @@ await test('14b. Catalogue sync (update existing)', async () => {
     assert(body.data.synced === 0, `synced (new): ${body.data.synced}`);
 });
 
+// ─── Phase 3b: the signature is the authentication ───
+// Every replication and sync above carries a VALID signature, and the two refusals the suite already
+// has (21, 22) are stopped earlier by the not-an-active-peer check. So nothing here had ever sent a
+// bad or absent signature from a KNOWN ACTIVE PEER, which is the only case the signature block
+// answers. A node that accepted unsigned replication from anyone who guessed a peer node id passed
+// this suite. CLAUDE.md: federation Ed25519 signatures are verified unconditionally.
+console.log('\nPhase 3b — A known peer still has to sign');
+
+/** Is the replica there? Reads the owner's memory the way the replicate handler writes it. */
+async function replicaExists(key: string): Promise<boolean> {
+    const { body } = await json(`/v1/memory/${encodeURIComponent(`replica:${directPeerNodeId}:${key}`)}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    return body.ok === true;
+}
+
+await test('12b. An ACTIVE peer with NO signature is refused → 401, and nothing is written', async () => {
+    const payload = {
+        source_node: directPeerNodeId, gaii: agentGaii, key: 'unsigned-pref',
+        value: { theme: 'stolen' }, visibility: 'public', version: 1, timestamp: new Date().toISOString(),
+    };
+    const { status, body } = await json('/v1/federation/replicate', { method: 'POST', body: JSON.stringify(payload) });
+    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(!(await replicaExists('unsigned-pref')), 'an unsigned replication must write nothing');
+});
+
+await test('12c. A signature over a TAMPERED payload is refused → 401, and nothing is written', async () => {
+    const payload = {
+        source_node: directPeerNodeId, gaii: agentGaii, key: 'tampered-pref',
+        value: { theme: 'dark' }, visibility: 'public', version: 1, timestamp: new Date().toISOString(),
+    };
+    const signature = await signMsg(directPeerPrivKeyB64, JSON.stringify(payload));
+    // Signed one thing, sent another — the whole point of signing the payload rather than the peer id.
+    const { status, body } = await json('/v1/federation/replicate', {
+        method: 'POST', body: JSON.stringify({ ...payload, value: { theme: 'tampered' }, signature }),
+    });
+    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(!(await replicaExists('tampered-pref')), 'a tampered replication must write nothing');
+});
+
+await test('12d. A signature from a DIFFERENT key is refused → 401, and nothing is written', async () => {
+    const otherPriv = ed.utils.randomSecretKey();
+    const payload = {
+        source_node: directPeerNodeId, gaii: agentGaii, key: 'wrongkey-pref',
+        value: { theme: 'dark' }, visibility: 'public', version: 1, timestamp: new Date().toISOString(),
+    };
+    const signature = Buffer.from(
+        await ed.signAsync(new TextEncoder().encode(JSON.stringify(payload)), otherPriv),
+    ).toString('base64');
+    const { status, body } = await json('/v1/federation/replicate', {
+        method: 'POST', body: JSON.stringify({ ...payload, signature }),
+    });
+    assert(status === 401, `expected 401, got ${status}: ${JSON.stringify(body.error)}`);
+    assert(!(await replicaExists('wrongkey-pref')), 'a foreign-key replication must write nothing');
+});
+
+await test('14c. Catalogue sync from an active peer is refused unsigned and tampered → 401', async () => {
+    const actions = [{
+        id: 'remote-action-unsigned', provider_gaii: `remoteagent#remoteowner@${directPeerNodeId}`,
+        display_name: 'Unsigned Action', description: 'should never land', category: 'misc',
+        pricing: { base_morsels: 1 }, tags: [],
+    }];
+    const payload = { source_node: directPeerNodeId, actions, since_timestamp: undefined, catalogue_hash: undefined };
+
+    const bare = await json('/v1/federation/catalogue-sync', { method: 'POST', body: JSON.stringify(payload) });
+    assert(bare.status === 401, `unsigned sync expected 401, got ${bare.status}: ${JSON.stringify(bare.body.error)}`);
+
+    const signature = await signMsg(directPeerPrivKeyB64, JSON.stringify(payload));
+    const tampered = await json('/v1/federation/catalogue-sync', {
+        method: 'POST',
+        body: JSON.stringify({
+            ...payload,
+            actions: [{ ...actions[0], id: 'remote-action-swapped', display_name: 'Swapped Action' }],
+            signature,
+        }),
+    });
+    assert(tampered.status === 401, `tampered sync expected 401, got ${tampered.status}: ${JSON.stringify(tampered.body.error)}`);
+
+    // Neither action reached the catalogue.
+    const cat = await json('/v1/catalogue?limit=200');
+    const ids = ((cat.body.data?.actions ?? cat.body.data ?? []) as any[]).map(a => a.id);
+    assert(!ids.includes('remote-action-unsigned') && !ids.includes('remote-action-swapped'),
+        `a refused sync must land nothing: ${JSON.stringify(ids)}`);
+});
+
 // ─── Phase 4: De-peering ───
 console.log('\nPhase 4 — De-peering');
 
@@ -728,6 +827,81 @@ await test('30. Federation directory is public', async () => {
     assert(body.ok === true, 'ok');
     assert(body.data.self.node_id === NODE_ID, `node_id: ${body.data.self.node_id}`);
     assert(Array.isArray(body.data.peers), 'has peers array');
+});
+
+// ─── Phase 6: peering is an operator decision ───
+// The suite's owner is registered through POST /v1/owners on a freshly cleared database, so it is
+// auto-promoted to operator and every call above went through on that role without anybody saying
+// so. A second plain owner is the missing principal: peering, de-peering, peer registration and
+// trust advisories decide who this node federates with, and a registered account is not that.
+console.log('\nPhase 6 — Peering is an operator decision');
+
+let plainOwnerToken = '';
+const plainOwnerName = `fedplain${Date.now()}`;
+
+await test('Setup: a second owner, minted WITHOUT the operator role', async () => {
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: plainOwnerName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const ts = new Date().toISOString();
+    const sig = await signMsg(reg.body.data.private_key, plainOwnerName + NODE_ID + ts);
+    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: plainOwnerName, timestamp: ts, signature: sig }) });
+    assert(body.ok === true, `token: ${JSON.stringify(body.error)}`);
+    plainOwnerToken = body.data.token;
+    // The premise of every assertion below: this account is not an operator.
+    assert(Array.isArray(body.data.roles) && !body.data.roles.includes('operator'),
+        `the second owner must not be an operator: ${JSON.stringify(body.data.roles)}`);
+});
+
+await test('23b. A plain owner cannot register, update, promote or de-peer a peer → 403', async () => {
+    const auth = { Authorization: `Bearer ${plainOwnerToken}` };
+    const intruderNode = `aimeat-intruder-${Date.now()}`;
+
+    const register = await json('/v1/federation/peers', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ node_id: intruderNode, url: 'http://localhost:9995', public_key: directPeerPubKeyB64 }),
+    });
+    assert(register.status === 403, `register-peer expected 403, got ${register.status}: ${JSON.stringify(register.body.error)}`);
+
+    const list = await json('/v1/federation/peers', { headers: auth });
+    assert(list.status === 403, `peer list expected 403, got ${list.status}`);
+
+    const update = await json(`/v1/federation/peers/${emergencyPeerId}`, {
+        method: 'PUT', headers: auth, body: JSON.stringify({ status: 'active' }),
+    });
+    assert(update.status === 403, `update-peer expected 403, got ${update.status}: ${JSON.stringify(update.body.error)}`);
+
+    const depeer = await json(`/v1/federation/peers/${directPeerNodeId}`, { method: 'DELETE', headers: auth });
+    assert(depeer.status === 403, `de-peer expected 403, got ${depeer.status}: ${JSON.stringify(depeer.body.error)}`);
+
+    // Nothing they tried exists, read back as the operator.
+    const asOperator = await json('/v1/federation/peers', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(asOperator.status === 200, `operator list: ${asOperator.status}`);
+    assert(!(asOperator.body.data.peers as any[]).some(p => p.node_id === intruderNode),
+        'the refused registration must not have created a peer');
+});
+
+await test('23c. A plain owner cannot decide a peering request or file a trust advisory → 403', async () => {
+    const auth = { Authorization: `Bearer ${plainOwnerToken}` };
+
+    const requests = await json('/v1/admin/peering/requests', { headers: auth });
+    assert(requests.status === 403, `peering requests expected 403, got ${requests.status}`);
+
+    const decide = await json('/v1/admin/peering/requests/whatever', {
+        method: 'PUT', headers: auth, body: JSON.stringify({ decision: 'approve' }),
+    });
+    assert(decide.status === 403, `peering decision expected 403, got ${decide.status}: ${JSON.stringify(decide.body.error)}`);
+
+    const ask = await json('/v1/federation/peer/request', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ node_url: 'http://localhost:9994', reason: 'let me in' }),
+    });
+    assert(ask.status === 403, `peer request expected 403, got ${ask.status}: ${JSON.stringify(ask.body.error)}`);
+
+    const advisory = await json('/v1/federation/trust-advisory', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ subject_gaii: agentGaii, severity: 'ban', reason: 'because I said so' }),
+    });
+    assert(advisory.status === 403, `trust advisory expected 403, got ${advisory.status}: ${JSON.stringify(advisory.body.error)}`);
 });
 
 // ─── Cleanup ───

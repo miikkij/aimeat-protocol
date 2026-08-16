@@ -439,6 +439,27 @@ await test('13. Token revocation', async () => {
         }),
     });
     const tokenToRevoke = tokenBody.access_token;
+    const refreshToRevoke = tokenBody.refresh_token;
+
+    // A session handshake with THIS token: it works before the revocation, so what follows is the
+    // revocation and not a token that never worked.
+    const openSession = async (token: string) => {
+        const res = await fetch(`${BASE}/v1/mcp`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json, text/event-stream',
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                jsonrpc: '2.0', id: 900, method: 'initialize',
+                params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'revoke probe', version: '1.0.0' } },
+            }),
+        });
+        return res.status;
+    };
+    const before = await openSession(tokenToRevoke);
+    assert(before === 200, `the fresh token must work before revocation, got ${before}`);
 
     const { status, body } = await json('/v1/mcp/token/revoke', {
         method: 'POST',
@@ -446,6 +467,41 @@ await test('13. Token revocation', async () => {
     });
     assert(status === 200, `status ${status}`);
     assert(body.revoked === true, 'revoked');
+
+    // `revoked: true` is answered unconditionally per RFC 7009 — test 14 revokes a nonsense string
+    // and gets the same body — so the echo proves nothing. The credential itself has to stop working.
+    const after = await openSession(tokenToRevoke);
+    assert(after === 401, `a revoked access token must be refused, got ${after}`);
+
+    // The refresh token is a SEPARATE credential and is revoked separately (the same endpoint takes
+    // both). Revoking it must stop the exchange, or a leaked pair can mint its way back forever.
+    if (refreshToRevoke) {
+        const stillWorks = await json('/v1/mcp/token', {
+            method: 'POST',
+            body: JSON.stringify({
+                grant_type: 'refresh_token', refresh_token: refreshToRevoke,
+                client_id: clientId, client_secret: clientSecret,
+            }),
+        });
+        assert(stillWorks.status === 200, `the refresh token works before ITS revocation, got ${stillWorks.status}`);
+        const rotated = stillWorks.body.refresh_token ?? refreshToRevoke;
+
+        const revokeRefresh = await json('/v1/mcp/token/revoke', {
+            method: 'POST',
+            body: JSON.stringify({ token: rotated, token_type_hint: 'refresh_token' }),
+        });
+        assert(revokeRefresh.status === 200, `revoke refresh: ${revokeRefresh.status}`);
+
+        const renew = await json('/v1/mcp/token', {
+            method: 'POST',
+            body: JSON.stringify({
+                grant_type: 'refresh_token', refresh_token: rotated,
+                client_id: clientId, client_secret: clientSecret,
+            }),
+        });
+        assert(renew.status === 400 || renew.status === 401,
+            `a revoked refresh token must not mint a new access token, got ${renew.status}: ${JSON.stringify(renew.body).slice(0, 160)}`);
+    }
 });
 
 await test('14. Revoke already-revoked token → 200', async () => {

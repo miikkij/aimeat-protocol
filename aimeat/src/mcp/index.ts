@@ -9,6 +9,13 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.15.0 -- 2026-08-16 -- SECURITY: a revoked access token is refused at this door. POST
+ *     /v1/mcp/token/revoke writes the JWT into the revocation list and answers {revoked:true}, and
+ *     nothing here ever read that list, so a credential that was dead on every REST route stayed
+ *     alive on the MCP one until it expired. auth/middleware.ts checks isRevoked on all three of its
+ *     paths; this was the fourth. The check sits above the session-resume branch, so a live session
+ *     does not outlive the credential that opened it. Found by the E2E test-quality audit finding
+ *     e2e-mcp:448, which noted the suite was asserting the endpoint echo rather than the effect.
  *   v1.14.0 -- 2026-08-16 -- registerAppDraftEditTools: the four incremental app-draft tools (write/replace/read/seed). They live in their own module
  *     because apps.ts is already near the 800-line ceiling.
  *   v1.13.0 -- 2026-08-11 -- August audit step 8: registerAppdevProofTools receives the session
@@ -282,6 +289,26 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Extract auth: Bearer token only (spec: token MUST NOT be in query string)
         const authHeader = req.headers.authorization;
         const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
+
+        // A REVOKED token is refused here, before anything else looks at it. POST /v1/mcp/token/revoke
+        // writes the JWT into the revocation list and answers `{revoked:true}`, and this door was the
+        // one place that never read the list: auth/middleware.ts checks isRevoked on all three of its
+        // paths, so the same credential was dead on the REST surface and alive on the MCP one. The
+        // check sits ABOVE the session-resume branch on purpose — a live session must not outlive the
+        // credential it was opened with, and that branch even refreshes the session's stored bearer
+        // from the request. E2E test-quality audit, e2e-mcp:448: the suite asserted the endpoint's
+        // `revoked: true` echo, which RFC 7009 answers unconditionally for any string.
+        if (token) {
+            const { isRevoked } = await import('../auth/jwt.js');
+            if (await isRevoked(token)) {
+                res.status(401).json({
+                    jsonrpc: '2.0',
+                    error: { code: -32001, message: 'Token has been revoked. Obtain a new access token via /v1/mcp/token.' },
+                    id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
+                });
+                return;
+            }
+        }
 
         // Determine session ID from header
         const sessionId = req.headers['mcp-session-id'] as string | undefined;
