@@ -145,6 +145,34 @@ await test('SECURITY 9. a non-member is denied the enriched list AND gets no com
     assert(c.status === 200 && Object.keys(c.body.data.comments || {}).length === 0, 'non-member batch returns no comments (ws omitted)');
 });
 
+await test('SECURITY 9b. a MEMBER without a workspace grant gets the row but no enrichment', async () => {
+    // The only negative principal above is a complete outsider, and the organism membership gate
+    // refuses them before the enrichment branch is ever reached. Delete
+    // `if (w.access === 'none') { enriched.push({ ...w }); continue; }` from
+    // GET /v1/organisms/:id/workspaces?include=enrichment and — this organism is join_policy 'open' —
+    // anyone who joins gets recs/docs counts, lastEvent (which carries record titles) and participants
+    // for workspaces they were never granted.
+    const joiner = await newOwner(`join${Date.now()}`);
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(joiner), body: '{}' });
+    assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body?.error)}`);
+
+    const enr = await json(`/v1/organisms/${orgId}/workspaces?include=enrichment`, { headers: auth(joiner) });
+    assert(enr.status === 200, `a member may list the workspaces: ${enr.status}`);
+    const row = ((enr.body.data?.workspaces ?? []) as any[]).find(w => w.id === WSA);
+    assert(!!row, `ws-a is listed to the member: ${JSON.stringify((enr.body.data?.workspaces ?? []).map((w) => w.id))}`);
+    assert(row.access === 'none', `the member has no grant on ws-a: ${row.access}`);
+    assert(row.enrichment === undefined && row.lastEvent === undefined && row.participants === undefined,
+        `an ungranted workspace was enriched anyway: ${JSON.stringify(row)}`);
+
+    // And the batch keeps its side of it: no comments for a workspace they cannot read.
+    const c = await json(`/v1/organisms/${orgId}/comments/batch`, {
+        method: 'POST', headers: auth(joiner),
+        body: JSON.stringify({ instances: [{ ws: WSA, space: 'task', instance_id: 't1' }] }),
+    });
+    assert(c.status === 200 && Object.keys(c.body.data.comments || {}).length === 0,
+        `the member got comments for an ungranted workspace: ${JSON.stringify(c.body.data.comments)}`);
+});
+
 await test('Cleanup', async () => { await json(`/v1/owners/${ownerName}`, { method: 'DELETE', headers: auth(token) }); });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

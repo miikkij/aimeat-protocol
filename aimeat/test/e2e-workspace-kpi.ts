@@ -130,6 +130,34 @@ await test('7. a newer .latest overrides a bare write for the same instance (pub
     assert(k.current === 56000, `expected 56000 (11k + 20k(.latest) + 25k), got ${k.current}`);
 });
 
+await test('SECURITY. the KPI numbers are gated: a member without the workspace, and a non-member', async () => {
+    // Test 1 asserts `readable` and then trusts it. Every call in this suite is the creator's, so no
+    // non-member and no member-without-a-workspace-grant is ever refused. Change
+    // `objectives: readable ? summary.objectives : []` to `objectives: summary.objectives` in
+    // GET /v1/organisms/:id/workspace/overview and — this organism is join_policy 'open' — anyone who
+    // joins reads the cost and location KPI values of a gated workspace.
+    const memberName = `kpimem${Date.now()}`;
+    const memberTok = await mkOwner(memberName);
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(memberTok), body: '{}' });
+    assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body?.error)}`);
+
+    const r = await json(`/v1/organisms/${orgId}/workspace/overview?ws=${WS}`, { headers: auth(memberTok) });
+    assert(r.status === 200, `a member may ask: ${r.status}`);
+    assert(r.body.data.readable === false, `the member has no grant on this workspace: ${r.body.data.readable}`);
+    assert(Array.isArray(r.body.data.objectives) && r.body.data.objectives.length === 0,
+        `the KPI objectives were served to an ungranted member: ${JSON.stringify(r.body.data.objectives)}`);
+    // The markdown rendering is the same data by another door.
+    const md = await json(`/v1/organisms/${orgId}/workspace/overview?ws=${WS}&format=md`, { headers: auth(memberTok) });
+    const text = JSON.stringify(md.body ?? {});
+    assert(!text.includes('66000') && !text.includes('the-cabin'),
+        `the markdown carried the KPI numbers: ${text.slice(0, 200)}`);
+
+    // And a complete stranger does not get as far as asking.
+    const outsiderTok = await mkOwner(`kpiout${Date.now()}`);
+    const out = await json(`/v1/organisms/${orgId}/workspace/overview?ws=${WS}`, { headers: auth(outsiderTok) });
+    assert(out.status === 403 || out.status === 404, `a non-member read the overview: ${out.status}`);
+});
+
 await test('Cleanup', async () => {
     await json(`/v1/owners/${creator}`, { method: 'DELETE', headers: auth(creatorTok) });
 });
