@@ -50,6 +50,37 @@ describe('who hears which error', () => {
     });
 });
 
+describe('the family rules, which carry the long tail of 232 one-off codes', () => {
+    it('reads a suffix the way it is always meant', () => {
+        expect(audienceOf('CAPABILITY_NOT_FOUND')).toBe('machine');
+        expect(audienceOf('NAME_MISMATCH')).toBe('machine');
+        expect(audienceOf('EXTENSION_TIMEOUT')).toBe('ours');
+        expect(audienceOf('STORAGE_STATS_FAILED')).toBe('ours');
+    });
+
+    it('lets an EXACT entry beat the pattern — this is the one that would bite', () => {
+        // `^INVALID_` means the caller sent something unusable, and for almost every code it does.
+        // Not these two: a person typed the wrong six digits, and telling them "the machine will fix
+        // it" would be both wrong and useless. The explicit classification has to win.
+        expect(audienceOf('INVALID_TOTP')).toBe('person');
+        expect(audienceOf('INVALID_CODE')).toBe('person');
+        expect(audienceOf('INVALID_REDIRECT_URI')).toBe('machine');
+    });
+
+    it('gives the tail somewhere to go, generically and honestly', () => {
+        expect(nextStepFor('CONSUL_DISABLED')).toMatch(/not switched on here/i);
+        expect(nextStepFor('SESSION_EXPIRED')).toMatch(/start again/i);
+        expect(nextStepFor('ALREADY_PROCESSED')).toMatch(/already done/i);
+        expect(nextStepFor('CONTENT_TOO_LARGE')).toMatch(/smaller/i);
+        expect(nextStepFor('CONSENT_REQUIRED')).toMatch(/first/i);
+    });
+
+    it('says nothing rather than guessing when no family fits', () => {
+        // Silence falls back to the support hint, which is honest. A made-up instruction would not be.
+        expect(nextStepFor('SOMETHING_NOBODY_HAS_SEEN')).toBeUndefined();
+    });
+});
+
 describe('where somebody goes next when the message does not say', () => {
     it('reaches a person rather than the API documentation', () => {
         // "View API documentation" is not an answer to somebody who has just been told their name is

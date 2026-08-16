@@ -77,9 +77,27 @@ export const AUDIENCE_BY_CODE: Readonly<Record<string, MessageAudience>> = Objec
     ...Object.fromEntries(UPSTREAM.map(c => [c, 'upstream' as const])),
 });
 
+/**
+ * FAMILIES, for the long tail. 232 of the codes in this node appear once or twice, and naming each
+ * one by hand would produce a map nobody can read and everybody stops updating. A suffix carries
+ * real meaning here — `*_NOT_FOUND` is always the caller pointing at something that is not there,
+ * `*_FAILED` is always something breaking rather than refusing — so the pattern answers for the tail
+ * and an exact entry always wins over it.
+ */
+const AUDIENCE_PATTERNS: ReadonlyArray<readonly [RegExp, MessageAudience]> = [
+    // The caller named something that is not there, or sent something the parser cannot use.
+    [/_NOT_FOUND$|^NOT_FOUND_|_MISMATCH$|^MISSING_|_MALFORMED$|^MALFORMED_/, 'machine'],
+    [/^INVALID_/, 'machine'],
+    // Something broke rather than refused.
+    [/_FAILED$|_ERROR$|_TIMEOUT$|^NO_ENCRYPTION|_UNAVAILABLE$/, 'ours'],
+];
+
 /** Who hears this. Unknown codes are assumed to reach a person — see the note in the file header. */
 export function audienceOf(code: string): MessageAudience {
-    return AUDIENCE_BY_CODE[code] ?? 'person';
+    const exact = AUDIENCE_BY_CODE[code];
+    if (exact) return exact;
+    for (const [re, audience] of AUDIENCE_PATTERNS) if (re.test(code)) return audience;
+    return 'person';
 }
 
 /**
@@ -159,7 +177,31 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     OPENROUTER_ERROR: 'The AI service did not answer. Not your doing — try again shortly.',
 });
 
+/**
+ * The same families, for where somebody goes next.
+ *
+ * These are the most general sentences in the file and that is on purpose: a family answer cannot
+ * know the particulars, and a confidently wrong instruction wastes somebody's afternoon in a way a
+ * vague true one never does. Each still beats the alternative, which is "View API documentation".
+ */
+const NEXT_STEP_PATTERNS: ReadonlyArray<readonly [RegExp, string]> = [
+    [/_DISABLED$|^NO_[A-Z_]+_CONFIGURED$|_NOT_CONFIGURED$|_NOT_ENABLED$|_NOT_SETUP$/,
+        'This is not switched on here. Whoever runs this node can turn it on.'],
+    [/_EXPIRED$|^SESSION_/, 'Start again and you will get a fresh one.'],
+    [/^ALREADY_|_ALREADY_/, 'This one is already done. Start a new one if you need to.'],
+    [/_TOO_LARGE$|_TOO_LOW$|_LIMIT_EXCEEDED$|^CONTENT_TOO_|_EXCEEDED$/,
+        'Try a smaller one, or ask for more room.'],
+    [/_REQUIRED$/, 'Do that part first and then come back to this.'],
+    [/^RATE_LIMITED$|^TOO_MANY_/, 'Wait a moment and try again.'],
+    [/^INSUFFICIENT_|^BUDGET_|^PURCHASE_|^PAYMENT_/, 'Top up your balance, or try a smaller version of this.'],
+    [/_FAILED$|_ERROR$|_TIMEOUT$/, 'This one is on us. It is already reported — try again in a moment.'],
+    [/^NOT_|_GONE$|_REVOKED$|_CLOSED$/, 'This one is not available. Whoever owns it can tell you more.'],
+];
+
 /** The floor a person is given when the message itself does not say where to go. */
 export function nextStepFor(code: string): string | undefined {
-    return NEXT_STEP_BY_CODE[code];
+    const exact = NEXT_STEP_BY_CODE[code];
+    if (exact) return exact;
+    for (const [re, step] of NEXT_STEP_PATTERNS) if (re.test(code)) return step;
+    return undefined;
 }
