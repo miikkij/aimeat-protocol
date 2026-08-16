@@ -79,8 +79,9 @@
   }
 
   window.addEventListener('beforeinstallprompt', function (e) {
-    // Held for the pill; also keeps Android's automatic mini-bar from competing with it.
-    e.preventDefault();
+    // Held for the pill — WITHOUT preventDefault, so the browser's own offer (where one exists)
+    // stays available beside it. Cancelling and then not prompting is how an app ends up with no
+    // install offer at all.
     offer = e;
     if (!pill) {
       pill = buildPill();

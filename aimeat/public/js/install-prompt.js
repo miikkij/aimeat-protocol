@@ -38,8 +38,11 @@ if (typeof window !== 'undefined') {
     installed = window.matchMedia?.('(display-mode: standalone)').matches
         || /** @type {{ standalone?: boolean }} */ (window.navigator).standalone === true;
     window.addEventListener('beforeinstallprompt', (e) => {
-        // Held for our own UI; this also keeps Android's automatic mini-bar from competing with it.
-        e.preventDefault();
+        // Held for our own UI — WITHOUT preventDefault. The event fires on every page, but the
+        // card renders only where a view mounts it (Home, the chat): cancelling here would
+        // suppress the browser's own offer everywhere else and show nothing in its place, which
+        // is how "Banner not shown: preventDefault() called" ended up in the console. Both offers
+        // may exist; whichever the person meets first installs the same app.
         deferred = e;
         notify();
     });
