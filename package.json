@@ -41,6 +41,7 @@
     "check:sdk": "cd aimeat && pnpm check:sdk",
     "check:mcp-tools": "cd aimeat && pnpm check:mcp-tools",
     "check:mcp-schemas": "cd aimeat && pnpm check:mcp-schemas",
+    "check:plain-language": "cd aimeat && pnpm check:plain-language",
     "telemetry:stats": "cd aimeat && pnpm telemetry:stats",
     "telemetry:prune": "cd aimeat && pnpm telemetry:prune",
     "consent-audit:stats": "cd aimeat && pnpm consent-audit:stats",

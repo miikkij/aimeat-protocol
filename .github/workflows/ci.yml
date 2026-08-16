@@ -110,6 +110,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:mcp-schemas
 
+      - name: Plain language for the messages a person hears (check:plain-language)
+        working-directory: aimeat
+        run: pnpm check:plain-language
+
       - name: Cortex pack integrity (embedded viewport + VERSION constants)
         working-directory: aimeat
         run: pnpm check:viewport

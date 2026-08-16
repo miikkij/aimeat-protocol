@@ -15,6 +15,7 @@
 #   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #   9b. MCP tool input-schema parity      — pnpm check:mcp-schemas
+#   9c. Plain language for a person       — pnpm check:plain-language
 #  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
 #  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
 #  11b. Language files agree with en.json  — pnpm check:locales
@@ -91,6 +92,13 @@ pnpm -s check:mcp-tools
 # is how aimeat_task_complete lost every deliverable_key a connector client ever sent.
 echo "[pre-commit] MCP tool input-schema parity (check:mcp-schemas)…"
 pnpm -s check:mcp-schemas
+
+# A message a PERSON hears must read like a sentence and must leave them somewhere to go. Measured
+# before this existed: 490 refusal-shaped messages, 22 of which said what to do next, and 43 reading
+# exactly "Access denied". Only the audience that actually hears it is held to this — a machine
+# correcting its own call is better served by precision. src/middleware/message-audience.ts decides.
+echo "[pre-commit] Plain language for the messages a person hears (check:plain-language)…"
+pnpm -s check:plain-language
 
 echo "[pre-commit] Cortex pack integrity: embed + VERSION constants (check:viewport)…"
 pnpm -s check:viewport

@@ -31,6 +31,7 @@
     "check:sdk": "tsx scripts/build-sdk-libs.ts --check",
     "check:mcp-tools": "tsx scripts/audit-mcp-tools.ts --check",
     "check:mcp-schemas": "tsx scripts/audit-mcp-schemas.ts --check",
+    "check:plain-language": "tsx scripts/check-plain-language.ts --check",
     "check:packs-doc": "vitest run test/unit/library-packs-doc-truth.test.ts",
     "aeb:prove": "tsx scripts/aeb-prove.ts",
     "aeb:ledger": "tsx scripts/aeb-ledger.ts",
