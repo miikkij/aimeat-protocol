@@ -17,6 +17,11 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/run-e2e-ci.ts --test=agent-file-handoff
  * @version-history
  *   v1.0.0 -- 2026-07-26 -- Initial: file handoff to agents (owner-visibility read, DM ref, task files).
+ *   v1.1.0 -- 2026-08-16 -- August 2026 test-quality audit (e2e-agent-file-handoff:171): the presigned
+ *     download route performs no other check — the token IS the capability — and nothing in the whole
+ *     test tree had ever sent a token the node did not mint. Test 3 now also fetches the URL with its
+ *     last four characters altered and with a hand-made token, both 401 TOKEN_INVALID. Measured with
+ *     jwtVerify replaced by a bare decode: the tampered URL streams the file.
  */
 
 import * as ed from '@noble/ed25519';
@@ -171,6 +176,20 @@ await test('3. ?mode=handle returns a presigned URL that fetches the same bytes'
     const dl = await fetch(url);
     assert(dl.status === 200, `presigned download: ${dl.status}`);
     assert(sha(Buffer.from(await dl.arrayBuffer())) === EXPECT, 'sha256 mismatch on presigned download');
+
+    // The route performs no other check — the token IS the capability — so its signature is the only
+    // thing standing between a stranger and any private file. Nothing in the tree had ever sent a
+    // token the node did not mint, so a decode-instead-of-verify would have passed every suite.
+    const tampered = url.slice(0, -4) + (url.slice(-4) === 'AAAA' ? 'BBBB' : 'AAAA');
+    const bad = await fetch(tampered);
+    assert(bad.status === 401, `a tampered download token must 401, got ${bad.status}`);
+    const badBody = await bad.text();
+    assert(/TOKEN_INVALID/.test(badBody), `expected TOKEN_INVALID, got ${badBody.slice(0, 160)}`);
+
+    // …and a token for somebody else's file cannot be forged out of a valid one's shape.
+    const forged = url.replace(/\/v1\/download\/[^?]+/, '/v1/download/' + Buffer.from(JSON.stringify({ sub: ownerGhii, key: KEY_PRIVATE })).toString('base64url'));
+    const forgedRes = await fetch(forged);
+    assert(forgedRes.status === 401, `a hand-made token must 401, got ${forgedRes.status}`);
 });
 
 // ─── Phase 2: the refusals ───

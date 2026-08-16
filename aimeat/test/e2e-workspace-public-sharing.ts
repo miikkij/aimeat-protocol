@@ -6,6 +6,14 @@
  *   PUBLISHED docs the share meta marks public are served, that drafts never leak, that per-doc
  *   overrides win over the space flag, and that the share write is creator/admin-gated.
  * @version-history
+ *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit (e2e-workspace-public-sharing:103): the
+ *     share write has TWO gates — active membership, then creator/admin — and only a NON-MEMBER was
+ *     ever refused, so the second one was covered by nothing. This organism is join_policy 'open', so
+ *     the case that matters is somebody who simply joins: test 3b has owner B join and then be
+ *     refused 403, with the public documents endpoint read back at 404. Measured with the
+ *     creator/admin block deleted: the plain member publishes the whole workspace (200, spaces.page
+ *     true) — every member's documents on the anonymous internet — while e2e-workspace-public-records
+ *     and e2e-signage-agent-faced stay green, because they repeat the same non-member shape.
  *   v1.1.0 — 2026-07-10 — TARGET-025 share access modes: password mode (unlock → X-Share-Token,
  *     wrong password generic 401, per-IP rate limit 429, member bypass), account mode
  *     (anon → 401 SHARE_ACCOUNT_REQUIRED, any authenticated account → 200), hash redaction
@@ -103,6 +111,24 @@ await test('2. GET share returns the empty default for a member (owner A)', asyn
 await test('3. share write is gated: owner B (not a member/creator) gets 403', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, { method: 'PUT', headers: { Authorization: `Bearer ${B.ownerToken}` }, body: JSON.stringify({ spaces: { page: true } }) });
     assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body.error || r.body)}`);
+});
+
+// Test 3 refuses a NON-MEMBER, who is stopped by the first of the route's two gates. The second one
+// — creator/admin — was exercised by nothing, and this organism is join_policy 'open': anyone on the
+// node can join. A plain member publishing the workspace would put every member's documents on the
+// anonymous internet, which is the one act this gate exists to reserve.
+await test('3b. A plain MEMBER (not creator/admin) cannot publish the workspace → 403', async () => {
+    const join = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: { Authorization: `Bearer ${B.ownerToken}` }, body: JSON.stringify({}) });
+    assert(join.status === 200 || join.status === 201, `B joins the open organism: ${join.status} ${JSON.stringify(join.body?.error)}`);
+
+    const r = await json(`/v1/organisms/${orgId}/workspace/share?ws=${WS}`, {
+        method: 'PUT', headers: { Authorization: `Bearer ${B.ownerToken}` }, body: JSON.stringify({ spaces: { page: true } }),
+    });
+    assert(r.status === 403, `a plain member must be refused, got ${r.status}: ${JSON.stringify(r.body.error || r.body)}`);
+
+    // …and nothing became public on the way.
+    const pub = await json(`/v1/organisms/${orgId}/workspace/public/documents?ws=${WS}`);
+    assert(pub.status === 404, `nothing may be public after the refusal, got ${pub.status}`);
 });
 
 // ── Make the whole 'page' space public ──
