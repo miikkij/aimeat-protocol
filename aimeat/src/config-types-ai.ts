@@ -34,6 +34,19 @@ export interface AiCapabilityConfig {
   /** The provider key the agent calls with. Who may spend it is decided before a turn starts. */
   gooseProviderApiKey: string;
   /**
+   * Which provider and model the chat agent runs on, handed to the child as GOOSE_PROVIDER and
+   * GOOSE_MODEL. Empty (the default) leaves goose's own configuration alone, which is what every
+   * node did before these existed.
+   *
+   * The node sets them for two reasons rather than one. The obvious one is that an operator should
+   * not have to edit a second configuration file to change the model. The other is that the node
+   * cannot otherwise NAME the model that answered: ACP reports a stop reason and a token count and
+   * not a model, so `ChatTurn.model` stayed empty and the chip that says which model answered never
+   * appeared. What the node sets, the node can write down.
+   */
+  gooseProvider: string;
+  gooseModel: string;
+  /**
    * This node's own OpenRouter key, used for a person who has not brought one. Empty (the default)
    * means the node pays for nothing and everyone brings their own, which is how every node behaved
    * before this existed.

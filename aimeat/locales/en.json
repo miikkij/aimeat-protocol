@@ -698,6 +698,7 @@
   "chat.loadFailed": "The chat could not be loaded.",
   "chat.modelTitle": "The model that answered this turn",
   "chat.new": "New conversation",
+  "chat.nodeKey": "This node pays for the conversation, on its own key.",
   "chat.noThreads": "Nothing here yet. Say something and this is where it will be.",
   "chat.openList": "Conversations",
   "chat.ownKey": "Running on your own OpenRouter key.",

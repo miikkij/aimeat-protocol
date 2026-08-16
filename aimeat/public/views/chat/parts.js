@@ -234,20 +234,30 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, busy, disabl
 }
 
 /**
- * Who is answering, and what it costs.
+ * Who is answering, on whose money, and on which model.
  *
- * The allowance is shown because a person about to fall back to a free model deserves to have seen
- * it coming. It is a line of text, not a gauge: this is not the thing they came here to look at.
+ * The payer is READ from the server (`status.pays`) rather than worked out here. This component used
+ * to decide it from whether the person had a key stored, and told them "running on your own
+ * OpenRouter key" while the node's key paid for every turn — a sentence about their own money that
+ * described somebody else's. Only the node knows which key a turn is actually spent from, so only
+ * the node gets to say.
+ *
+ * It is a line of text, not a gauge: this is not the thing they came here to look at.
  */
 export function StatusBar({ status, onReset }) {
     if (!status) return null;
     const remaining = Number(status.allowance_remaining_usd ?? 0);
+    const payer = {
+        own: () => tr('chat.ownKey', 'Running on your own OpenRouter key.'),
+        allowance: () => tr('chat.allowance', '{n} USD left of your allowance.').replace('{n}', remaining.toFixed(2)),
+        node: () => tr('chat.nodeKey', 'This node pays for the conversation, on its own key.'),
+    }[status.pays] ?? null;
     return html`
         <div class="chat-status">
             <span class="chat-status-agent">${status.agent_name}</span>
-            ${status.has_own_key
-                ? html`<span class="chat-status-key">${tr('chat.ownKey', 'Running on your own OpenRouter key.')}</span>`
-                : html`<span class="chat-status-key">${tr('chat.allowance', '{n} USD left of your allowance.').replace('{n}', remaining.toFixed(2))}</span>`}
+            ${payer && html`<span class="chat-status-key">${payer()}</span>`}
+            ${status.model && html`<span class="chat-model chat-status-model"
+                title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`
                 <button type="button" class="btn-ghost chat-status-reset"
                     title=${tr('chat.resetTitle', 'Start a fresh agent session for this conversation. Needed after changing what the agent may do.')}

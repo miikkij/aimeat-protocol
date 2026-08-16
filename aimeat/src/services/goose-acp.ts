@@ -23,6 +23,10 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.1.0 — 2026-08-16 — GOOSE_PROVIDER and GOOSE_MODEL come from the node's own configuration when
+ *     it names them, so the model is changed where every other setting lives and the node can write
+ *     down which model answered a turn. ACP reports a stop reason and a token count and never a
+ *     model name, so this is the only way `ChatTurn.model` is ever filled.
  *   v2.0.1 — 2026-08-16 — Listen for the child's `error` event. A binary that cannot be spawned
  *     emits `error` rather than `exit`, and an unlistened `error` is thrown: one wrong character in
  *     an operator's path took the whole node down on the first person who said hello, and the turn
@@ -120,6 +124,11 @@ export class GooseAcpClient {
         // Every model call this agent makes is billed to whoever owns this key. The node decides who
         // may spend it before a turn is ever started; goose only sees the key.
         if (config.gooseProviderApiKey) env.OPENROUTER_API_KEY = config.gooseProviderApiKey;
+        // The provider and model, when the operator names them here rather than in goose's own
+        // config. Set only when non-empty: an unset value must leave goose's configuration exactly
+        // as it was, because a node that overrides it with '' configures the agent to nothing.
+        if (config.gooseProvider) env.GOOSE_PROVIDER = config.gooseProvider;
+        if (config.gooseModel) env.GOOSE_MODEL = config.gooseModel;
 
         const child = spawn(bin, ['acp'], { stdio: ['pipe', 'pipe', 'pipe'], env });
         const client = new GooseAcpClient(child);

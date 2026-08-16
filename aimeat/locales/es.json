@@ -698,6 +698,7 @@
   "chat.loadFailed": "No se pudo cargar el chat.",
   "chat.modelTitle": "El modelo que respondió este turno",
   "chat.new": "Nueva conversación",
+  "chat.nodeKey": "Este nodo paga la conversación con su propia clave.",
   "chat.noThreads": "Todavía no hay nada. Di algo y la conversación aparecerá aquí.",
   "chat.openList": "Conversaciones",
   "chat.ownKey": "Se está usando tu propia clave de OpenRouter.",

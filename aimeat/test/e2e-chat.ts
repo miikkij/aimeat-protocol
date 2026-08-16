@@ -13,6 +13,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-chat
  * @version-history
+ *   v1.1.0 — 2026-08-16 — The status names who pays, including for an owner who HAS stored a key.
+ *     The page was deciding that for itself and telling the person their own key was being used
+ *     while the node's key paid for every turn.
  *   v1.0.0 — 2026-08-16 — initial: status, thread lifecycle, cross-owner refusal, the disabled turn.
  */
 
@@ -87,6 +90,29 @@ await test('Status says whether this node has an agent, and never pretends', asy
     assert(String(body.data?.agent_name).startsWith(`chat#${ownerAName}@`), `names the agent, got ${body.data?.agent_name}`);
     if (!body.data.enabled) assert(!!body.data.note, 'a disabled node explains itself');
     console.log(`     ↳ chat ${body.data.enabled ? 'enabled' : 'not configured'} on this node`);
+});
+
+await test('Status names WHO PAYS for a turn, and it is not derived from having a key', async () => {
+    // The page used to work the payer out for itself: a stored OpenRouter key meant "running on
+    // your own key" and no key meant an allowance counting down. Neither described a chat turn.
+    // The agent is one shared process with one process-wide provider key, no owner key is ever
+    // handed to it, and nothing on this road debits the allowance. So the server says who pays.
+    const { body } = await json('/v1/chat/status', aAuthed());
+    assert(['own', 'allowance', 'node'].includes(body.data?.pays),
+        `pays must name a payer, got ${JSON.stringify(body.data?.pays)}`);
+    assert(body.data.pays === 'node',
+        `while the agent runs on the node's own provider key, the answer is "node", got ${body.data.pays}`);
+
+    // …and it stays 'node' for an owner who HAS brought a key, which is the case that was wrong.
+    const put = await json('/v1/openrouter/settings', aAuthed({
+        method: 'PUT', body: JSON.stringify({ apiKey: 'sk-or-e2e-not-a-real-key', model: 'openrouter/free' }),
+    }));
+    assert(put.status === 200, `store a key: ${put.status} ${JSON.stringify(put.body?.error)}`);
+    const after = await json('/v1/chat/status', aAuthed());
+    assert(after.body.data.has_own_key === true, 'the key is stored');
+    assert(after.body.data.pays === 'node',
+        `an owner key that the chat never receives must not be reported as paying, got ${after.body.data.pays}`);
+    await json('/v1/openrouter/settings', aAuthed({ method: 'DELETE' }));
 });
 
 await test('An unauthenticated caller sees nothing', async () => {

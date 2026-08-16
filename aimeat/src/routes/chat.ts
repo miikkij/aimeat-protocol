@@ -13,6 +13,9 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.1.0 — 2026-08-16 — /v1/chat/status answers who PAYS for a turn and on which model, because
+ *     the page was deciding both for itself and getting the first one wrong: an owner with a key
+ *     stored was told it was being used while the node's key paid for every turn.
  *   v1.0.0 — 2026-08-16 — Initial. Delete and reset look the conversation up before acting, so a
  *     caller who cannot see it is told nothing exists rather than that something happened.
  */
@@ -47,6 +50,23 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             agent_name: `chat#${owner(req)}@${config.nodeId}`,
             allowance_remaining_usd: remainingOf(allowance),
             has_own_key: !!(await storage.getMemory(gaii, 'openrouter.apikey')),
+            // WHO ACTUALLY PAYS FOR A TURN, decided here rather than guessed on the page.
+            //
+            // The page used to derive it: an owner with a key stored was told "running on your own
+            // OpenRouter key" and everyone else was shown an allowance counting down. Neither was
+            // true of a chat turn. The agent is one shared `goose acp` process with one
+            // process-wide provider key (AIMEAT_GOOSE_PROVIDER_API_KEY), so every person's turn is
+            // spent from the node's key, no owner key is ever handed to it, and nothing debits the
+            // allowance — `debitAllowance` is called from services/ai-completion.ts and from
+            // nowhere on this road. A person deciding whether to bring their own key was reading a
+            // sentence about their own money that described somebody else's.
+            //
+            // 'own' and 'allowance' stay in the vocabulary because they become the answer the day
+            // the agent's provider is pointed at this node's own /v1/llm proxy, where
+            // prepareAiCall makes exactly that choice per person. Until then the honest answer is
+            // 'node', and it is the server that says so.
+            pays: 'node' as const,
+            model: config.gooseModel || undefined,
             note: enabled ? undefined
                 : 'No chat agent is configured on this node. An operator sets AIMEAT_GOOSE_BIN.',
         }));

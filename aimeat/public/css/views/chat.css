@@ -9,6 +9,7 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.2.0 — 2026-08-16 — .chat-status-model: which model answered, beside the payer line.
  *   v1.1.0 — 2026-08-16 — The recorder beside the send button, and the read-aloud control on a turn.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
@@ -156,6 +157,9 @@
 }
 
 .chat-status-agent { font-family: var(--font-mono); }
+/* The model sits beside the payer line, not in place of it: which model answered and whose money
+   paid are two different questions and a person checking one still needs the other. */
+.chat-status-model { color: var(--text-dim); }
 .chat-status-reset { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; }
 
 .chat-scroll {

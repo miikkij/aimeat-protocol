@@ -698,6 +698,7 @@
   "chat.loadFailed": "Chatin lataaminen ei onnistunut.",
   "chat.modelTitle": "Malli, joka vastasi tähän vuoroon",
   "chat.new": "Uusi keskustelu",
+  "chat.nodeKey": "Tämä node maksaa keskustelun omalla avaimellaan.",
   "chat.noThreads": "Täällä ei ole vielä mitään. Sano jotain, niin keskustelu ilmestyy tähän.",
   "chat.openList": "Keskustelut",
   "chat.ownKey": "Käytössä on oma OpenRouter-avaimesi.",

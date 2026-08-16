@@ -20,6 +20,9 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.1.0 — 2026-08-16 — An agent turn records the model when the node is the one that chose it
+ *     (AIMEAT_GOOSE_MODEL). ChatTurn.model has existed since the first version and nothing ever
+ *     wrote it, so the chip naming the model never appeared.
  *   v1.0.1 — 2026-08-16 — The work log keys tool calls by id rather than title. Only the opening
  *     event carries a title, so every call stayed at "starting" no matter how it ended. Seen in a
  *     browser against a real agent, where one completed call read as still running.
@@ -170,6 +173,10 @@ export async function* runChatTurn(
             text: answer,
             at: new Date().toISOString(),
             ...(tools.size ? { tools: [...tools.values()] } : {}),
+            // Only what the node itself chose. ACP's `done` update carries a stop reason and a token
+            // count and no model name, so a node that leaves the model to goose's own configuration
+            // genuinely does not know which one answered — and says nothing rather than guessing.
+            ...(config.gooseModel ? { model: config.gooseModel } : {}),
         };
         await appendTurn(storage, gaii, threadId, turn).catch((e: Error) => {
             logger.warn(`[chat] could not save the agent turn: ${e.message}`);

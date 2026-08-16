@@ -281,6 +281,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     gooseBin: process.env.AIMEAT_GOOSE_BIN ?? '',
     goosePathRoot: process.env.AIMEAT_GOOSE_PATH_ROOT ?? '',
     gooseProviderApiKey: process.env.AIMEAT_GOOSE_PROVIDER_API_KEY ?? '',
+    gooseProvider: process.env.AIMEAT_GOOSE_PROVIDER ?? '',
+    gooseModel: process.env.AIMEAT_GOOSE_MODEL ?? '',
     openrouterInstanceKey: process.env.AIMEAT_OPENROUTER_INSTANCE_KEY ?? '',
     chatFreeAllowanceUsd: parseFloat(process.env.AIMEAT_CHAT_FREE_ALLOWANCE_USD ?? '0') || 0,
     modelFreeFallback: process.env.AIMEAT_MODEL_FREE_FALLBACK ?? 'openrouter/free',
