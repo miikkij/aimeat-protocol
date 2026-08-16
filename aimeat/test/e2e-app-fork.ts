@@ -25,6 +25,12 @@
  *     through the same service as the routes above, so the fork copies the source screenshot, a
  *     duplicate target gives the shared ALREADY_EXISTS answer, and a delete takes the app's
  *     screenshot with it instead of leaving it for whoever republishes the filename.
+ *   v1.3.0 — 2026-08-16 — August 2026 test-quality audit, two findings. The paid-fork test read a
+ *     201 as "the marketplace must be disabled" and skipped, so it passed exactly when the paywall
+ *     leaked; the flag is now read from POST /v1/app-store/purchase (403 APP_STORE_DISABLED before
+ *     it looks at the body) and the 402 is unconditional. Phase 5b adds the MCP door across an
+ *     owner boundary: both gates in src/mcp/apps-fork.ts open with !sameOwner and every fork in
+ *     phase 5 was the agent forking its own owner, so neither had ever been reached.
  */
 
 import * as ed from '@noble/ed25519';
@@ -267,17 +273,33 @@ await test('Owner A publishes a PAID, forkable app', async () => {
     assert(on.status === 200 && on.body.data?.forkable === true, 'paid app flagged forkable');
 });
 
+// Whether the paywall applies is a property of the NODE, and it is read from a door that has nothing
+// to do with forking: POST /v1/app-store/purchase answers 403 APP_STORE_DISABLED before it looks at
+// anything in the body, so an empty body is a read-only probe of config.marketplaceEnabled. It used
+// to be derived from the fork response itself, which meant a 201 — the paywall failing — was read as
+// "the feature must be off" and the test passed exactly when the money leaked.
+async function marketplaceEnabled(): Promise<boolean> {
+    const { status, body } = await json('/v1/app-store/purchase', bAuthed({ method: 'POST', body: JSON.stringify({}) }));
+    if (status === 403 && body?.error?.code === 'APP_STORE_DISABLED') return false;
+    assert(status === 400, `the marketplace probe must be 400 (enabled) or 403 APP_STORE_DISABLED (off), got ${status}: ${JSON.stringify(body).slice(0, 160)}`);
+    return true;
+}
+let marketplaceOn = true;
+
+await test('Read the marketplace flag from the node, not from the response under test', async () => {
+    marketplaceOn = await marketplaceEnabled();
+    console.log(`    (marketplace ${marketplaceOn ? 'enabled — the paywall must hold' : 'disabled — the paid-fork cases do not apply'})`);
+});
+
 await test('An unlicensed OUTSIDER cannot fork the paid app (402)', async () => {
+    if (!marketplaceOn) { console.log('    (skipped: the node has no marketplace)'); return; }
     const { status, body } = await json(`/v1/apps/${ownerAName}/${PAID_FILE}/fork`, bAuthed({
         method: 'POST', body: JSON.stringify({ new_filename: 'b-paid-fork.html' }),
     }));
-    // Only enforced when the marketplace is enabled (default on). If a deployment
-    // disables it, the paywall does not apply — tolerate a 201 in that case.
-    if (status === 201) {
-        console.log('    (marketplace disabled — paid fork paywall not enforced; skipping)');
-        return;
-    }
     assert(status === 402, `unlicensed outsider paid fork must 402, got ${status}: ${JSON.stringify(body)}`);
+    // A 402 that still copied the bytes would be worse than no gate at all.
+    const leaked = await fetch(`${BASE}/v1/apps/${ownerBName}/b-paid-fork.html`);
+    assert(leaked.status === 404, `the refused fork must not exist in B's catalogue, got ${leaked.status}`);
 });
 
 await test('The seller (owner) can still fork their OWN paid app → 201', async () => {
@@ -456,6 +478,67 @@ await test('aimeat_app_fork refuses a filename the owner already has', async () 
     });
     assert(out.isError, 'a duplicate fork target must be refused');
     assert(/already have an app named/.test(out.text), `expected the shared ALREADY_EXISTS wording, got: ${out.text.slice(0, 200)}`);
+});
+
+// ── Phase 5b: the MCP door across an owner boundary ──
+// Every fork above is owner A's agent forking owner A's app, and both gates in src/mcp/apps-fork.ts
+// start with `!sameOwner`, so neither had ever been reached. The claim that the tool "performs the
+// same act as the HTTP door" is only worth something if its refusals are exercised too. Owner B
+// publishes the sources; A's agent goes after them.
+console.log('\nPhase 5b: the MCP fork door, across owners');
+
+const B_LOCKED = 'b-locked.html';
+const B_PAID = 'b-paid-mcp.html';
+
+await test("Setup: owner B publishes a locked app and a paid one", async () => {
+    const locked = await json('/v1/apps', bAuthed({
+        method: 'POST',
+        body: JSON.stringify({ filename: B_LOCKED, content: b64('<h1>b locked</h1>'), name: 'B Locked', description: 'not open for forking', category: 'utility', tags: [] }),
+    }));
+    assert(locked.status === 201, `B locked publish: ${locked.status} ${JSON.stringify(locked.body).slice(0, 160)}`);
+    const paid = await json('/v1/apps', bAuthed({
+        method: 'POST',
+        body: JSON.stringify({ filename: B_PAID, content: b64('<h1>b paid</h1>'), name: 'B Paid', description: 'costs morsels', category: 'utility', tags: [], price_morsels: 50, license_type: 'single' }),
+    }));
+    assert(paid.status === 201, `B paid publish: ${paid.status} ${JSON.stringify(paid.body).slice(0, 160)}`);
+    const on = await json(`/v1/apps/${B_PAID}`, bAuthed({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
+    assert(on.status === 200 && on.body.data?.forkable === true, 'B\'s paid app is forkable, so only the paywall can stop it');
+    // A fresh publish is not forkable (services/app-publish.ts: forkable = !!live?.forkable).
+    const { body: list } = await json('/v1/apps?limit=200', bAuthed());
+    const lockedRow = (list.data?.apps ?? []).find((a: any) => a.filename === B_LOCKED && a.owner === ownerBName);
+    assert(lockedRow?.forkable !== true, `B's locked app must not be forkable: ${JSON.stringify(lockedRow?.forkable)}`);
+});
+
+await test("aimeat_app_fork refuses another owner's NON-FORKABLE app", async () => {
+    const out = await mcpCall('aimeat_app_fork', {
+        owner: ownerBName, filename: B_LOCKED, new_filename: 'a-took-b-locked.html',
+    });
+    assert(out.isError, `the tool must refuse a locked cross-owner source, got: ${out.text.slice(0, 200)}`);
+    assert(/not open for forking/.test(out.text), `expected the forkable wording, got: ${out.text.slice(0, 200)}`);
+    const leaked = await fetch(`${BASE}/v1/apps/${ownerAName}/a-took-b-locked.html`);
+    assert(leaked.status === 404, `the refused fork must not exist, got ${leaked.status}`);
+});
+
+await test("aimeat_app_fork refuses another owner's PAID app with no license", async () => {
+    if (!marketplaceOn) { console.log('    (skipped: the node has no marketplace)'); return; }
+    const out = await mcpCall('aimeat_app_fork', {
+        owner: ownerBName, filename: B_PAID, new_filename: 'a-took-b-paid.html',
+    });
+    assert(out.isError, `the tool must refuse an unlicensed paid source, got: ${out.text.slice(0, 200)}`);
+    assert(/costs 50 morsels/.test(out.text) && /Purchase it first/.test(out.text), `expected the purchase wording, got: ${out.text.slice(0, 200)}`);
+    const leaked = await fetch(`${BASE}/v1/apps/${ownerAName}/a-took-b-paid.html`);
+    assert(leaked.status === 404, `the refused paid fork must not exist, got ${leaked.status}`);
+});
+
+await test('…and when B opens the app, the same call succeeds (so the refusals were the gates)', async () => {
+    const on = await json(`/v1/apps/${B_LOCKED}`, bAuthed({ method: 'PATCH', body: JSON.stringify({ forkable: true }) }));
+    assert(on.status === 200 && on.body.data?.forkable === true, 'B opened the app for forking');
+    const out = await mcpCall('aimeat_app_fork', {
+        owner: ownerBName, filename: B_LOCKED, new_filename: 'a-took-b-locked.html',
+    });
+    assert(!out.isError, `an opened cross-owner fork must succeed: ${out.text.slice(0, 200)}`);
+    const forked = await fetch(`${BASE}/v1/apps/${ownerAName}/a-took-b-locked.html`);
+    assert(forked.status === 200, `the fork should now be in A's catalogue, got ${forked.status}`);
 });
 
 await test('aimeat_app_delete removes the app\'s screenshot with it', async () => {

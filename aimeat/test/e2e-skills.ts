@@ -5,6 +5,11 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   v1.3.0 -- 2026-08-16 -- August 2026 test-quality audit: test 27 said node-scope publish is
+ *     operator-gated but accepted 201 OR 403 and only ever tried it as owner A, who is the first
+ *     owner on a freshly cleared E2E database and therefore the bootstrap operator — so the 403
+ *     branch never ran. Operator status is now read from GET /v1/owners/:name (roles), the refusal
+ *     is a separate case driven by the second owner, and DELETE ?scope=node is covered the same way.
  *   v1.2.0 -- 2026-07-19 -- 27b3: seeded public aimeat-app-builder (AppDev KB Phase 2) —
  *     present in the discovery index, digest-consistent, carries spec-first + research + pitfalls
  *   v1.1.0 -- 2026-07-14 -- Phase 5b: Agent Skills discovery index (/.well-known/agent-skills,
@@ -569,22 +574,60 @@ await test('26. aimeat_skill_link + unlink round-trip', async () => {
 // ─── Phase 5: Node scope (operator-gated) ───
 console.log('\nPhase 5 -- Node scope');
 
-await test('27. Node-scope publish is operator-gated (403 for non-operator, 201+library for operator)', async () => {
+// A node-scope skill lands in EVERY member's library, which makes it loadable instructions for every
+// agent on the node. Whether owner A is the operator is a property of the account, and it is read
+// from the account: GET /v1/owners/:name discloses `roles` to the owner themselves. It used to be
+// derived from the publish response — the very thing under test — so the 403 branch never ran once.
+let ownerAIsOperator = false;
+
+await test('26b. Read owner A\'s roles from the account, not from the response under test', async () => {
+    const { status, body } = await json(`/v1/owners/${ownerName}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `owner card status ${status}`);
+    assert(Array.isArray(body.data?.roles), `the owner sees their own roles: ${JSON.stringify(body.data)}`);
+    ownerAIsOperator = body.data.roles.includes('operator');
+    console.log(`    (owner A ${ownerAIsOperator ? 'IS' : 'is NOT'} the node operator)`);
+});
+
+await test('27. A non-operator CANNOT publish a node-scope skill → 403', async () => {
+    const md = SKILL_MD.replace('research-briefs', 'other-runbook');
+    const { status, body } = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ skill_md: md, scope: 'node' }),
+    });
+    assert(status === 403, `a non-operator node-scope publish must 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'FORBIDDEN', `expected FORBIDDEN, got ${body.error?.code}`);
+    // Nothing reached the shared library the refusal was protecting.
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${otherOwnerToken}` } });
+    const names = (lib.body.data.library.node ?? []).map((s: any) => s.name);
+    assert(!names.includes('other-runbook'), `the refused skill must not be in the node library: ${names}`);
+});
+
+await test('27a. The operator CAN, and it lands in every member\'s library', async () => {
     const md = SKILL_MD.replace('research-briefs', 'node-runbook');
     const { status, body } = await json('/v1/skills', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ skill_md: md, scope: 'node' }),
     });
-    if (status === 201) {
-        // This owner happens to be the node's first owner (= operator on a fresh test DB).
-        assert(body.data.skill.ref === 'node:node-runbook', `ref ${body.data.skill.ref}`);
-        const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${otherOwnerToken}` } });
-        const names = lib.body.data.library.node.map((s: any) => s.name);
-        assert(names.includes('node-runbook'), `node library visible to all members: ${names}`);
-    } else {
-        assert(status === 403, `expected 403 or 201, got ${status}: ${JSON.stringify(body)}`);
-    }
+    assert(status === (ownerAIsOperator ? 201 : 403), `operator=${ownerAIsOperator} expected ${ownerAIsOperator ? 201 : 403}, got ${status}: ${JSON.stringify(body)}`);
+    if (!ownerAIsOperator) return;
+    assert(body.data.skill.ref === 'node:node-runbook', `ref ${body.data.skill.ref}`);
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${otherOwnerToken}` } });
+    const names = lib.body.data.library.node.map((s: any) => s.name);
+    assert(names.includes('node-runbook'), `node library visible to all members: ${names}`);
+});
+
+await test('27a2. A non-operator cannot DELETE a node-scope skill either → 403', async () => {
+    if (!ownerAIsOperator) { console.log('    (skipped: no node-scope skill exists to delete)'); return; }
+    const del = await json('/v1/skills/node-runbook?scope=node', {
+        method: 'DELETE', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+    });
+    assert(del.status === 403, `a non-operator node-scope delete must 403, got ${del.status}: ${JSON.stringify(del.body)}`);
+    // Still there for everyone it was published to.
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${otherOwnerToken}` } });
+    const names = lib.body.data.library.node.map((s: any) => s.name);
+    assert(names.includes('node-runbook'), `the skill must survive the refused delete: ${names}`);
 });
 
 // ─── Phase 5b: Agent Skills discovery index (/.well-known/agent-skills, RFC v0.2.0) ───
@@ -603,8 +646,8 @@ await test('27b. index.json serves $schema + RFC-shaped entries; public node ski
         headers: { Authorization: `Bearer ${ownerToken}` },
         body: JSON.stringify({ skill_md: DISCOVERY_MD, scope: 'node', visibility: 'public' }),
     });
-    discoveryIsOperator = pub.status === 201;
-    assert(discoveryIsOperator || pub.status === 403, `expected 201 or 403, got ${pub.status}`);
+    discoveryIsOperator = ownerAIsOperator;
+    assert(pub.status === (ownerAIsOperator ? 201 : 403), `operator=${ownerAIsOperator} expected ${ownerAIsOperator ? 201 : 403}, got ${pub.status}`);
 
     // The index is anonymous — no Authorization header.
     const res = await rawFetch('/.well-known/agent-skills/index.json');

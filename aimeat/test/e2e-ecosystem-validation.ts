@@ -6,6 +6,11 @@
  *   (back-compat). Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-validation
  * @version-history
  *   v1.0.0 — 2026-06-14 — Initial creation (connector-profile static validation, chunk 4).
+ *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit: approval was only ever exercised by the
+ *     owner the hello named, so the check that the approver IS that owner was untested — and
+ *     approval is what mints the GEAI credential and its scopes. Adds a second owner holding the
+ *     user_code (403 ACCESS_DENIED, still pending, no binding on either side) plus the owner
+ *     approving it afterwards as the positive control.
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -89,6 +94,47 @@ async function run() {
     assert(p?.validation === 'none', `pending should be none, got ${p?.validation}`);
     const ap = await json(`/v1/ecosystem-apps/${p.user_code}/approve`, { method: 'POST', headers: auth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read'] }) });
     assert(ap.body.data?.status === 'approved', `approve should succeed: ${JSON.stringify(ap.body)}`);
+  });
+
+  // Approval is what mints the GEAI credential and hands it scopes over the approving owner's
+  // memory. Everything above approves as the owner the hello named, so the check that the approver
+  // IS that owner had never been asked for. A user_code is short and travels through a chat window.
+  await test('A DIFFERENT owner holding the user_code cannot approve → 403, and it stays pending', async () => {
+    const hello = await json('/v1/ecosystem-apps/hello', { method: 'POST', body: JSON.stringify({
+      owner: ownerName, app: 'stolencode', public_key: 'a2V5', scopes: ['memory:read', 'memory:write'],
+      manifest: { app: 'stolencode', origin: 'https://stolencode.example', scopes: ['memory:read'], capabilities: [{ id: 'reply' }] },
+    }) });
+    assert(hello.body.data?.validation?.ok === true, `hello should validate: ${JSON.stringify(hello.body.data?.validation)}`);
+    const p = await pendingFor('stolencode');
+    assert(!!p?.user_code, 'the request is pending with a user_code');
+
+    const otherName = `ecovalthief${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register the second owner: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const ts = new Date().toISOString();
+    const sig = Buffer.from(await ed.signAsync(new TextEncoder().encode(otherName + NODE_ID + ts), Buffer.from(reg.body.data.private_key, 'base64'))).toString('base64');
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: otherName, timestamp: ts, signature: sig }) });
+    const otherAuth = { Authorization: `Bearer ${tok.body.data.token}` };
+
+    const ap = await json(`/v1/ecosystem-apps/${p.user_code}/approve`, {
+      method: 'POST', headers: otherAuth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+    });
+    assert(ap.status === 403, `a stranger's approve must 403, got ${ap.status}: ${JSON.stringify(ap.body)}`);
+    assert(ap.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${ap.body.error?.code}`);
+
+    // Nothing was minted and nothing was decided: it is still the real owner's to approve.
+    const still = await pendingFor('stolencode');
+    assert(!!still, 'the request must still be pending for the owner it named');
+    const theirs = await json('/v1/ecosystem-apps', { headers: otherAuth });
+    assert(!(theirs.body.data?.apps ?? []).some((a: any) => a.app === 'stolencode'), 'no binding may appear under the stranger');
+    const mine = await json('/v1/ecosystem-apps', { headers: auth });
+    assert(!(mine.body.data?.apps ?? []).some((a: any) => a.app === 'stolencode'), 'and none under the owner either — approval never happened');
+
+    // The owner can still approve it themselves, so the 403 was the identity check and not a dead code.
+    const ok = await json(`/v1/ecosystem-apps/${p.user_code}/approve`, {
+      method: 'POST', headers: auth, body: JSON.stringify({ action: 'approve', scopes: ['memory:read'] }),
+    });
+    assert(ok.body.data?.status === 'approved', `the real owner's approve must still work: ${JSON.stringify(ok.body)}`);
   });
 
   console.log('\n' + '─'.repeat(48));
