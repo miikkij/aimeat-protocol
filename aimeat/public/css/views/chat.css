@@ -118,7 +118,11 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg-card);
+  /* A soft wash of the node's own accent rather than flat white. The chat was three greys deep —
+     surface, card and muted text — which reads as a disabled form rather than a conversation, and
+     none of the theme's colour reached it. Everything here is a theme token, so it follows the
+     accent wherever the theme takes it. */
+  background: linear-gradient(180deg, var(--accent-subtle) 0%, var(--bg-card) 220px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -129,13 +133,14 @@
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-bottom: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--accent-border);
 }
 
 .chat-title {
   margin: 0;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--accent);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -153,10 +158,10 @@
   font-size: 0.75rem;
   color: var(--text-muted);
   border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-surface);
+  background: transparent;
 }
 
-.chat-status-agent { font-family: var(--font-mono); }
+.chat-status-agent { font-family: var(--font-mono); color: var(--accent); }
 /* The model sits beside the payer line, not in place of it: which model answered and whose money
    paid are two different questions and a person checking one still needs the other. */
 .chat-status-model { color: var(--text-dim); }
@@ -213,7 +218,9 @@
 .chat-bubble {
   padding: 10px 14px;
   border-radius: var(--radius);
-  background: var(--bg-surface);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
   line-height: 1.6;
   font-size: 0.92rem;
   overflow-wrap: anywhere;
@@ -223,6 +230,11 @@
   background: var(--accent-subtle);
   border: 1px solid var(--accent-border);
 }
+
+/* The agent's side gets the accent as a spine rather than a fill: readable at any length, and it
+   makes the two speakers tellable apart at a glance instead of by position alone. */
+.chat-turn--agent .chat-bubble { border-left: 3px solid var(--accent-border); }
+.chat-turn--live .chat-bubble { border-left-color: var(--accent); }
 
 .chat-said { margin: 0; white-space: pre-wrap; }
 
@@ -274,6 +286,20 @@
   letter-spacing: 0.04em;
   color: var(--text-muted);
 }
+/* One colour per kind of thing, so a page, an app and a saved record are distinguishable before
+   the words are read. Palette tokens only: they flip with the theme. */
+.chat-card--page .chat-card-kind { color: var(--accent); }
+.chat-card--app .chat-card-kind { color: var(--blue); }
+.chat-card--image .chat-card-kind { color: var(--purple); }
+.chat-card--file .chat-card-kind { color: var(--teal); }
+.chat-card--memory .chat-card-kind { color: var(--mint); }
+.chat-card--workspace .chat-card-kind { color: var(--orange); }
+.chat-card--page { border-left: 3px solid var(--accent); }
+.chat-card--app { border-left: 3px solid var(--blue); }
+.chat-card--image { border-left: 3px solid var(--purple); }
+.chat-card--file { border-left: 3px solid var(--teal); }
+.chat-card--memory { border-left: 3px solid var(--mint); }
+.chat-card--workspace { border-left: 3px solid var(--orange); }
 .chat-card-title {
   font-size: 0.85rem;
   font-weight: 600;
@@ -320,8 +346,8 @@
   color: var(--text-muted);
 }
 
-.chat-work-line--completed .chat-work-status { color: var(--success, var(--text-secondary)); }
-.chat-work-line--failed .chat-work-status { color: var(--accent); }
+.chat-work-line--completed .chat-work-status { color: var(--success); }
+.chat-work-line--failed .chat-work-status { color: var(--danger); }
 
 .chat-work-title {
   min-width: 0;
@@ -367,6 +393,17 @@
 
 .chat-copy { padding: 0 4px; }
 .chat-copy-all { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; }
+
+/* That a machine is on the other end. Quiet, above the conversation, with the rest one press away. */
+.chat-ai-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 16px;
+}
+.chat-ai-notice-line { flex: 1 1 260px; }
+.chat-ai-more { font-size: 0.72rem; padding: 2px 8px; }
 
 /* Whose agent this is. Quiet, and permanently there. */
 .chat-credit {

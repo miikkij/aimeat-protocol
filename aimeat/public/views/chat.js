@@ -28,7 +28,7 @@ import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
-import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn } from './chat/parts.js';
+import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice } from './chat/parts.js';
 import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
@@ -385,6 +385,7 @@ export default function ChatView() {
                 </header>
 
                 <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
+                <${AiNotice} />
 
                 <div class="chat-scroll" onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`
