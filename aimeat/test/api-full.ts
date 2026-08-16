@@ -5,6 +5,13 @@
  *   broad happy-path sweep across the core API surface.
  * @usage cd aimeat && pnpm exec tsx test/api-full.ts
  * @version-history
+ *   v1.3.0 — 2026-08-16 — E2E quality, api-full:1766 and :926. The two system-board denials opened with
+ *     `if (isOperator) { passed++; return; }`, and isOperator is true on every backend the runner uses,
+ *     so both counted as passed without an HTTP call. They now run as a plain owner's agent, cover the
+ *     public arm as well as the system arm, and assert the refusal MESSAGE, because requireScope stands
+ *     in front of the route and answers the same 403 code. The whole /v1/admin surface was likewise
+ *     only ever called by the admin-setup operator; four doors plus one unauthenticated call are now
+ *     refused, starting with roles/grant, which is where the operator role is handed out.
  *   v1.2.0 — 2026-07-14 — Markdown for Agents tests: Accept: text/markdown negotiation on
  *     / + /v1/portal + /v1/connect (content-type, x-markdown-tokens, Vary), HTML/JSON unchanged
  *   v1.1.0 — 2026-07-13 — Add MCP Server Card, RFC 9727 api-catalog, and RFC 8288 Link-header tests
@@ -944,6 +951,121 @@ await test('Federation — peer request + status', async () => {
     assert(stBody.data?.status === 'pending', 'status is pending');
 });
 
+/**
+ * A plain owner and its agent, neither of them an operator.
+ *
+ * This suite's ownerToken comes from the admin-setup branch, which grants ['owner','operator']
+ * unconditionally, so every /v1/admin call below and every board denial further down has been made
+ * by an operator. That is why the two system-board denials could open with `if (isOperator) return`
+ * and still count as passed: the skip was laundered into a pass on every backend the runner uses,
+ * because AIMEAT_ADMIN_PASSWORD is set in both .env.test files.
+ *
+ * Registered here rather than reusing the scoped principals at the end of the file, because those
+ * are built a thousand lines later and both of these findings are about doors up here.
+ */
+const plainOwnerName = `plainowner${Date.now()}`;
+let plainOwnerToken = '';
+let plainAgentToken = '';
+
+await test('A plain owner and its agent exist, and neither holds the operator role', async () => {
+    const { body: reg } = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: plainOwnerName, public_key: 'placeholder' }),
+    });
+    assert(reg.ok === true, `register plain owner: ${JSON.stringify(reg.error)}`);
+    const ts = new Date().toISOString();
+    const sig = await signMsg(reg.data.private_key, plainOwnerName + NODE_ID + ts);
+    const { body: tk } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: plainOwnerName, timestamp: ts, signature: sig }),
+    });
+    plainOwnerToken = tk.data?.token;
+    assert(typeof plainOwnerToken === 'string' && plainOwnerToken.length > 0, 'plain owner token');
+
+    // The premise, read off the token rather than off registration order: /v1/ghii register and login
+    // both promote when a node has no operator, so only the roles claim is honest about this account.
+    const claims = JSON.parse(Buffer.from(plainOwnerToken.split('.')[1], 'base64url').toString());
+    assert(Array.isArray(claims.roles) && claims.roles.includes('owner'), `owner role: ${JSON.stringify(claims.roles)}`);
+    assert(!claims.roles.includes('operator'), `this account must NOT be an operator: ${JSON.stringify(claims.roles)}`);
+
+    const { status: agStatus, body: ag } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${plainOwnerToken}` },
+        body: JSON.stringify({
+            name: `plainbot${Date.now() % 1000000}`,
+            owner: plainOwnerName,
+            capabilities: ['memory'],
+            // social:write on purpose: the board doors carry requireScope('social:write') in front of
+            // the operator rule, so an agent without it is refused by the scope gate and never reaches
+            // the rule under test. The denials below are about WHO may speak as the node, not about
+            // whether the agent was allowed to write at all.
+            scopes: ['memory:read', 'social:write'],
+        }),
+    });
+    assert(agStatus === 201, `register plain agent: ${agStatus} ${JSON.stringify(ag.error)}`);
+    const at = new Date().toISOString();
+    const asig = await signMsg(ag.data.private_key, ag.data.agent.gaii + at);
+    const { body: atk } = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii: ag.data.agent.gaii, timestamp: at, signature: asig }),
+    });
+    plainAgentToken = atk.data?.token;
+    assert(typeof plainAgentToken === 'string' && plainAgentToken.length > 0, 'plain agent token');
+    const aclaims = JSON.parse(Buffer.from(plainAgentToken.split('.')[1], 'base64url').toString());
+    assert(!aclaims.roles.includes('operator'), `an agent session must never carry operator: ${JSON.stringify(aclaims.roles)}`);
+});
+
+/**
+ * Every /v1/admin call in this file carries ownerToken, which is the admin-setup operator. No admin
+ * route is ever reached by a plain owner, an agent or an anonymous caller, so requireRole('operator')
+ * has never been distinguished from plain authentication anywhere in the suite. The door that matters
+ * most is the first one: /v1/admin/roles/grant is where the operator role is handed out, so a gate
+ * downgraded there is self-service privilege escalation for any account on the node.
+ */
+await test('Admin — a plain owner is refused every admin door, and no header is refused too', async () => {
+    const asPlain = { Authorization: `Bearer ${plainOwnerToken}` };
+    // A well-formed body on purpose: roles/grant runs validateBody AFTER requireRole, and a 403 from
+    // a validation failure would pass this test for the wrong reason.
+    const grant = await json('/v1/admin/roles/grant', {
+        method: 'POST', headers: asPlain,
+        body: JSON.stringify({ owner: plainOwnerName, role: 'operator' }),
+    });
+    assert(grant.status === 403, `roles/grant expected 403, got ${grant.status}`);
+    assert(grant.body.error?.code === 'ACCESS_DENIED', `roles/grant: expected ACCESS_DENIED, got ${grant.body.error?.code}`);
+
+    const cfg = await json('/v1/admin/config', {
+        method: 'PUT', headers: asPlain,
+        body: JSON.stringify({ key: 'node.name', value: 'hijacked' }),
+    });
+    assert(cfg.status === 403, `config PUT expected 403, got ${cfg.status}`);
+    assert(cfg.body.error?.code === 'ACCESS_DENIED', `config PUT: expected ACCESS_DENIED, got ${cfg.body.error?.code}`);
+
+    const maint = await json('/v1/admin/maintenance', {
+        method: 'POST', headers: asPlain,
+        body: JSON.stringify({ action: 'cleanup' }),
+    });
+    assert(maint.status === 403, `maintenance expected 403, got ${maint.status}`);
+    assert(maint.body.error?.code === 'ACCESS_DENIED', `maintenance: expected ACCESS_DENIED, got ${maint.body.error?.code}`);
+
+    const backup = await json('/v1/admin/backup', { headers: asPlain });
+    assert(backup.status === 403, `backup expected 403, got ${backup.status}`);
+    assert(backup.body.error?.code === 'ACCESS_DENIED', `backup: expected ACCESS_DENIED, got ${backup.body.error?.code}`);
+
+    const anon = await json('/v1/admin/backup');
+    assert(anon.status === 401, `backup with no credential expected 401, got ${anon.status}`);
+
+    // Read back from the account itself, not from the token, which was minted before the call: the
+    // refused grant did not happen, and this account is still the non-operator the board denials
+    // further down depend on.
+    const card = await json(`/v1/owners/${plainOwnerName}`, { headers: asPlain });
+    assert(card.status === 200, `owner card: ${card.status}`);
+    assert(!(card.body.data?.roles ?? []).includes('operator'),
+        `the refused grant must not have taken effect, roles are ${JSON.stringify(card.body.data?.roles)}`);
+});
+
+// The operator's own success on these same doors is the test immediately below, which is what makes
+// the four refusals above the role gate rather than a broken route.
+
 await test('Admin — config GET + roles grant', async () => {
     // GET config
     const { body: cfgBody } = await json('/v1/admin/config', {
@@ -1799,19 +1921,55 @@ await test('System board — operator can create', async () => {
     assert(body.data?.visibility === 'system', 'visibility is system');
 });
 
-await test('System board — agent cannot create system board', async () => {
-    if (isOperator) {
-        // When owner is operator, agent inherits operator role and CAN create system boards
-        console.log('    ⏩ Skipped (agent owner is operator)');
-        passed++;
-        return;
-    }
-    const { status } = await json('/v1/boards', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
-        body: JSON.stringify({ name: 'agent-sys', description: 'Should fail', visibility: 'system' }),
+/**
+ * This case and its sibling below used to open with `if (isOperator) { passed++; return; }`, and
+ * isOperator is true on every backend the runner uses, because AIMEAT_ADMIN_PASSWORD is set in both
+ * .env.test files and registration therefore takes the admin-setup branch. So both denials counted
+ * as passed without making a single HTTP call, and the reason given for the skip was false: an agent
+ * session is pinned to exactly ['agent'] (src/routes/auth.ts), it never inherits the owner's roles.
+ *
+ * The principal is a plain owner's agent, registered near the admin block. Neither agentToken nor
+ * ownerToken can be used here: both descend from the admin-setup operator, which is the whole reason
+ * these two tests were unreachable.
+ *
+ * A system board is the node's own announcement channel: publicly readable with no credential, and
+ * served into the portal front page. Anything that can post there speaks as the node.
+ */
+await test('System board — an agent of a plain owner cannot create one, public either', async () => {
+    const asPlainAgent = { Authorization: `Bearer ${plainAgentToken}` };
+    const sys = await json('/v1/boards', {
+        method: 'POST', headers: asPlainAgent,
+        body: JSON.stringify({ name: `agent-sys-${Date.now()}`, description: 'Should fail', visibility: 'system' }),
     });
-    assert(status === 403, `expected 403, got ${status}`);
+    assert(sys.status === 403, `system board create expected 403, got ${sys.status}: ${JSON.stringify(sys.body?.error)}`);
+    // The message, not just the status: requireScope('social:write') stands in front of this route and
+    // also answers 403 ACCESS_DENIED, so the code alone cannot say which layer refused. The agent
+    // holds social:write precisely so that the answer has to come from the operator rule.
+    assert(/only operators/i.test(String(sys.body?.error?.message)),
+        `the refusal must be the operator rule, got "${sys.body?.error?.message}"`);
+
+    // The same condition in board-write.ts covers 'public', and nothing in the tree asserted that arm.
+    const pub = await json('/v1/boards', {
+        method: 'POST', headers: asPlainAgent,
+        body: JSON.stringify({ name: `agent-pub-${Date.now()}`, description: 'Should fail', visibility: 'public' }),
+    });
+    assert(pub.status === 403, `public board create expected 403, got ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    assert(/only operators/i.test(String(pub.body?.error?.message)),
+        `the public arm must be the operator rule too, got "${pub.body?.error?.message}"`);
+
+    // …and the same agent CAN create a board of its own, which is what makes the two refusals the
+    // visibility rule rather than the scope gate or a broken route.
+    const own = await json('/v1/boards', {
+        method: 'POST', headers: asPlainAgent,
+        body: JSON.stringify({ name: `agent-own-${Date.now()}`, description: 'Allowed', visibility: 'private' }),
+    });
+    assert(own.status === 201, `the agent's own private board must be allowed, got ${own.status}: ${JSON.stringify(own.body?.error)}`);
+
+    // Neither refusal left a board behind.
+    const listed = await json('/v1/boards', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const names = (listed.body.data?.boards ?? []).map((b: any) => b.name);
+    assert(!names.some((n: string) => String(n).startsWith('agent-sys-') || String(n).startsWith('agent-pub-')),
+        `a refused create must not have made a board: ${JSON.stringify(names)}`);
 });
 
 await test('System board — operator can post (free)', async () => {
@@ -1831,25 +1989,32 @@ await test('System board — operator can post (free)', async () => {
     assert(body.data?.title === 'Welcome', 'post title');
 });
 
-await test('System board — agent cannot post', async () => {
-    if (isOperator) {
-        // When owner is operator, agent inherits operator role and CAN post to system boards
-        console.log('    ⏩ Skipped (agent owner is operator)');
-        passed++;
-        return;
-    }
+// Posting is a second gate in a second file (services/board-post.ts), so refusing the create says
+// nothing about it. This is the one that decides who can speak on the node's front page.
+await test('System board — an agent of a plain owner cannot post to one', async () => {
     const { body: listBody } = await json('/v1/boards', {
         headers: { Authorization: `Bearer ${ownerToken}` },
     });
     const sysBoard = listBody.data?.boards?.find((b: any) => b.name === 'announcements');
     assert(sysBoard, 'found announcements board');
 
-    const { status } = await json(`/v1/boards/${sysBoard.id}/posts`, {
+    const before = await json(`/v1/boards/${sysBoard.id}/posts`);
+    const countBefore = (before.body.data?.posts ?? []).length;
+
+    const { status, body } = await json(`/v1/boards/${sysBoard.id}/posts`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${agentToken}` },
+        headers: { Authorization: `Bearer ${plainAgentToken}` },
         body: JSON.stringify({ title: 'Nope', body: 'Should fail' }),
     });
-    assert(status === 403, `expected 403, got ${status}`);
+    assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body?.error)}`);
+    assert(/only operators/i.test(String(body?.error?.message)),
+        `the refusal must be the system-board rule, not the scope gate: "${body?.error?.message}"`);
+
+    // The board is publicly readable with no credential, so the read-back is what an outsider sees.
+    const after = await json(`/v1/boards/${sysBoard.id}/posts`);
+    const titles = (after.body.data?.posts ?? []).map((p: any) => p.title);
+    assert(titles.length === countBefore, `a refused post must not appear: ${JSON.stringify(titles)}`);
+    assert(!titles.includes('Nope'), `the refused post is on the public board: ${JSON.stringify(titles)}`);
 });
 
 await test('System board — publicly readable (no auth)', async () => {
