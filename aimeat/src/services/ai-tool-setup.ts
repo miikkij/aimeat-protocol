@@ -30,6 +30,10 @@
  *   remake's branch decision, kept beside the list it reads rather than in the calling code.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.3.0 — 2026-08-16 — goose joins the table as the ninth tool. It has been a supported
+ *     client since the connect adapter shipped (src/cli/connect/clients/goose.ts), so a person
+ *     who chose it was told to configure something this page did not list. Free on its own
+ *     tier: it is Apache-2.0 and brings its own model provider.
  *   v1.2.0 — 2026-08-07 — REMAKE phase 1: the alias map (what a model may call its own app →
  *     one of these eight ids) and the branch decision live here, next to the list, because an
  *     earlier draft put them in a five-row table of their own and that table would have dropped
@@ -330,6 +334,41 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
             },
         },
         {
+            id: 'goose',
+            label: 'goose',
+            mcp: {
+                docs: 'https://goose-docs.ai/docs/getting-started/using-extensions',
+                steps: [
+                    s(l, 'Let this node write the configuration for you: run `aimeat connect client goose --url <node URL> --owner <your handle>`. It adds the extension and keeps your token out of the file.',
+                        'Anna tämän noden kirjoittaa konfiguraatio puolestasi: aja `aimeat connect client goose --url <noden osoite> --owner <tunnuksesi>`. Se lisää laajennuksen ja pitää tokenin poissa tiedostosta.'),
+                    s(l, 'By hand instead: open the goose config file below and add an extension of type streamable_http with the values here.',
+                        'Käsin sen sijaan: avaa alla oleva goose-konfiguraatiotiedosto ja lisää siihen laajennus, jonka tyyppi on streamable_http, alla olevilla arvoilla.'),
+                    s(l, 'Start a session with `goose session` and ask it what AIMEAT tools it can see.',
+                        'Käynnistä istunto komennolla `goose session` ja kysy siltä, mitkä AIMEAT-työkalut se näkee.'),
+                ],
+                command: 'aimeat connect client goose --url <node URL> --owner <your handle>',
+                params: [
+                    { label: s(l, 'Extension name', 'Laajennuksen nimi'), value: 'aimeat' },
+                    {
+                        label: s(l, 'Type', 'Tyyppi'), value: 'streamable_http',
+                        note: s(l, 'goose calls HTTP transport streamable_http. SSE is a different, older setting and does not work here.',
+                            'goose kutsuu HTTP-kuljetusta nimellä streamable_http. SSE on eri ja vanhempi asetus, eikä se toimi tässä.'),
+                    },
+                    { label: 'URL', value: mcpUrl },
+                    {
+                        label: s(l, 'Config file', 'Konfiguraatiotiedosto'),
+                        value: '~/.config/goose/config.yaml',
+                        note: s(l, 'On Windows the same file lives under the Block/goose folder in %APPDATA%.',
+                            'Windowsissa sama tiedosto on %APPDATA%-kansion Block/goose-hakemistossa.'),
+                    },
+                ],
+            },
+            instructions: {
+                where: s(l, '.goosehints at the root of the project, which goose reads at the start of every session there. For something that should apply everywhere, use a recipe instead.',
+                    '.goosehints projektin juuressa, jonka goose lukee siellä jokaisen istunnon alussa. Jos sääntö koskee kaikkea, käytä sen sijaan recipeä.'),
+            },
+        },
+        {
             id: 'grok',
             label: 'Grok',
             mcp: {
@@ -369,6 +408,7 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
 /** All ids in this table, for callers that need the set without building the localized list. */
 export const AI_TOOL_IDS = [
     'claude-web', 'claude-desktop', 'claude-code', 'chatgpt', 'codex', 'cursor', 'vscode', 'grok',
+    'goose',
 ] as const;
 export type AiToolId = typeof AI_TOOL_IDS[number];
 
@@ -417,6 +457,12 @@ export const AI_CLIENT_ALIASES: Readonly<Record<string, AiToolId>> = {
     gpt4o: 'chatgpt',
     gpt5: 'chatgpt',
     gpt51: 'chatgpt',
+    // goose — open source, Apache-2.0, now under the Linux Foundation's Agentic AI Foundation.
+    goose: 'goose',
+    blockgoose: 'goose',
+    codenamegoose: 'goose',
+    goosecli: 'goose',
+    goosedesktop: 'goose',
     // Codex CLI
     codex: 'codex',
     codexcli: 'codex',
