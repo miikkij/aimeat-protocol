@@ -40,6 +40,7 @@ function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
   if (row.interactive) record.interactive = JSON.parse(row.interactive as string);
   if (row.broadcastId) record.broadcastId = row.broadcastId as string;
   if (row.respondable != null) record.respondable = (row.respondable as number) === 1;
+  if (row.kind) record.kind = row.kind as DirectMessageRecord['kind'];
   if (row.replyToId) record.replyToId = row.replyToId as string;
   if (row.error) record.error = row.error as string;
   if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
@@ -67,9 +68,9 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
   db.prepare(
     `INSERT INTO direct_messages
      (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, interactive,
-      broadcastId, respondable, status,
+      broadcastId, respondable, kind, status,
       direction, replyToId, origin, originNodeId, error, aiProvenanceId, createdAt, deliveredAt, readAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.ownerGhii,
@@ -82,6 +83,7 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     record.interactive ? JSON.stringify(record.interactive) : null,
     record.broadcastId ?? null,
     record.respondable == null ? null : (record.respondable ? 1 : 0),
+    record.kind ?? null,
     record.status,
     record.direction,
     record.replyToId ?? null,

@@ -472,5 +472,35 @@ await test('S7. An outsider reading a support thread learns nothing about it', a
         `the operator must still see the reporter, got ${JSON.stringify(theirs.body.data?.conversation)}`);
 });
 
+// ─── The node reports its OWN faults, without asking anyone to describe them ───
+// 108 places raise INTERNAL_ERROR, and every one of them used to be a dead end: one person saw
+// "An unexpected error occurred" and the operators heard nothing unless that person happened to
+// write in. The machine knows what it was doing better than the user could describe it, and asking
+// somebody to file a bug report at the moment we already failed them is asking them to do our work.
+console.log('\nPhase 9 -- the node reports its own faults');
+
+await test('F1. REFUSAL — a caller cannot mark their own message as a node fault', async () => {
+    // The mark is what tells an operator "no human is waiting on this, and nobody needs an answer".
+    // If a caller could set it, anyone could post a message that an operator is invited to ignore,
+    // and the one channel built for hearing from people becomes a way to be unheard.
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ to: 'support@operators', subject: 'Forged', body: 'pretending to be the node', kind: 'system-fault' }),
+    });
+    assert(status === 201 || status === 400, `unexpected status ${status}: ${JSON.stringify(body)}`);
+    if (status === 201) {
+        const { body: inbox } = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${op.token}` } });
+        const forged = (inbox.data?.messages ?? []).find((m: any) => m.subject === 'Forged' || /pretending/.test(m.preview ?? ''));
+        assert(!forged?.kind, `a caller's message must never carry a kind, got "${forged?.kind}"`);
+    }
+});
+
+await test('F2. A person asking for help carries no mark at all — that is what makes the mark mean something', async () => {
+    const { body } = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${op.token}` } });
+    const question = (body.data?.messages ?? []).find((m: any) => m.conversationId === supportConvId);
+    assert(question, 'the support question from Phase 6 is still in the inbox');
+    assert(!question.kind, `a person's question must carry no kind, got "${question.kind}"`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

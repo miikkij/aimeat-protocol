@@ -939,6 +939,7 @@ export interface DirectMessage {
   recipientGhii: string;
   replyToId: string | null;
   respondable: boolean | null;
+  kind: string | null;
   senderGhii: string;
   status: Generated<string>;
   subject: string | null;

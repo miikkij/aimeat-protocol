@@ -36,6 +36,7 @@ import { initializeConfig } from './server-bootstrap/config-init.js';
 import { initializeServices } from './server-bootstrap/service-init.js';
 import { setupGuards } from './server-bootstrap/middleware-guards.js';
 import { mountRoutes } from './server-bootstrap/routes-loader.js';
+import { systemFaultReporter } from './middleware/system-fault.js';
 import { perfTraceMiddleware } from './services/perf-trace.js';
 
 export interface ServerResult {
@@ -176,6 +177,12 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Wire storage into CORS middleware (lazy reference, now populated)
   storageForCors = storage;
+
+  // When a response says the NODE broke, tell whoever runs the node — the user is never asked to
+  // describe it. It wraps res.json, so it must be mounted before any route can answer, and it reads
+  // the ENVELOPE rather than the status code: a 500 carrying a caller-error code is not a fault, and
+  // a fault answered with a 200 still is one. services/system-fault-report.ts decides what counts.
+  app.use(systemFaultReporter(config, storage));
 
   // ── Service Initialization ──
   const services = await initializeServices(config, storage);

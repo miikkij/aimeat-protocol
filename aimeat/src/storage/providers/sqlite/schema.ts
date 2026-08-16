@@ -115,6 +115,9 @@ export function initializeSchema(db: Database.Database): void {
   // Broadcast / send-to-many: groups the per-recipient copies + marks announcements (non-respondable).
   safeAddColumn('direct_messages', 'broadcastId', 'TEXT');
   safeAddColumn('direct_messages', 'respondable', 'INTEGER');
+  // What KIND of message this is when it is not a person writing to a person: 'system-fault' is the
+  // node reporting its own failure, which an operator triages differently from a question.
+  safeAddColumn('direct_messages', 'kind', 'TEXT');
 
   // Phase 2 CORS — GHII-level allowed origins
   safeAddColumn('ghiis', 'allowedOrigins', 'TEXT');

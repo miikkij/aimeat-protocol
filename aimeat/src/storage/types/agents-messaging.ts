@@ -594,6 +594,19 @@ export interface DirectMessageRecord {
   interactive?: InteractivePayload;
   /** Set when this message is one copy of a broadcast (send-to-many) — groups the copies for results. */
   broadcastId?: string;
+  /**
+   * What KIND of message this is, when it is not a person writing to a person.
+   *
+   * `system-fault` is the node reporting its own failure to whoever runs it, without the user being
+   * asked to describe anything. It exists so an operator's inbox can tell the two apart on sight,
+   * because they are answered differently: a person's question wants an answer, a fault report wants
+   * a fix and at most an acknowledgement. When one IS answered, the reply says the same three
+   * things — it was not the user's doing, it is being corrected, and thank you for finding it.
+   *
+   * Omitted means an ordinary message. The field is the extension point, not a taxonomy: add a value
+   * only when an operator would triage it differently.
+   */
+  kind?: 'system-fault';
   /** false = an announcement (recipients cannot reply); omitted/true = a normal message. Travels with the
    *  message (incl. cross-node) so the recipient's node can enforce/hide replies. */
   respondable?: boolean;

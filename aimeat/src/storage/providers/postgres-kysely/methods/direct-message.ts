@@ -46,6 +46,7 @@ function toDirectMessageRecord(r: Selectable<DirectMessage>): DirectMessageRecor
   if (r.interactive) record.interactive = r.interactive as unknown as DirectMessageRecord['interactive'];
   if (r.broadcastId) record.broadcastId = r.broadcastId;
   if (r.respondable != null) record.respondable = r.respondable;
+  if (r.kind) record.kind = r.kind as DirectMessageRecord['kind'];
   if (r.replyToId) record.replyToId = r.replyToId;
   if (r.error) record.error = r.error;
   if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId;
@@ -98,7 +99,7 @@ export const directMessageMethods = {
       id: dmDocId(record.id, record.ownerGhii), mid: record.id, ownerGhii: record.ownerGhii, conversationId: record.conversationId,
       subject: record.subject ?? null, senderGhii: record.senderGhii, recipientGhii: record.recipientGhii, body: record.body,
       attachments: jsonb(record.attachments ?? null), interactive: jsonb(record.interactive ?? null), broadcastId: record.broadcastId ?? null,
-      respondable: record.respondable ?? null, status: record.status, direction: record.direction, replyToId: record.replyToId ?? null,
+      respondable: record.respondable ?? null, kind: record.kind ?? null, status: record.status, direction: record.direction, replyToId: record.replyToId ?? null,
       origin: record.origin, originNodeId: record.originNodeId, error: record.error ?? null,
       aiProvenanceId: record.aiProvenanceId ?? null, createdAt: new Date(record.createdAt),
       deliveredAt: record.deliveredAt ? new Date(record.deliveredAt) : null, readAt: record.readAt ? new Date(record.readAt) : null,
