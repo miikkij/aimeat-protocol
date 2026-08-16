@@ -13,6 +13,14 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft
  * @version-history
+ *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit (e2e-app-draft:178): "drafts are
+ *     owner-scoped" was proved only by asking about owner B's OWN path, so owner B's token had never
+ *     been sent at /v1/apps/{ownerA}/…. Phase 3 now does exactly that on the write, the preview-token
+ *     and the publish door. What it pins is the real rule: every handler derives the owner from the
+ *     CALLER (canonicalOwner) and the :owner segment is decorative, so B's write is REDIRECTED to B's
+ *     own slot rather than refused, B's preview token names B, and A's draft and live app are read
+ *     back unchanged. Measured with the PUT handler reading req.params.owner instead: B's bytes land
+ *     in A's draft slot and A's own v2 is gone.
  *   v1.1.0 — 2026-08-01 — Phase 6 (TARGET-058 Phase 8 step 0a): the three publish doors share one
  *     function, so promoting a draft keeps what a draft manifest cannot express. Watched to FAIL on
  *     the unfixed code — a promoted draft came back with priceMorsels undefined, i.e. a paid app
@@ -178,6 +186,72 @@ console.log('\nPhase 3: drafts are owner-scoped + independent');
 await test('Owner B has NO draft for the same filename (preview-token → 404)', async () => {
     const { status } = await json(`/v1/apps/${ownerBName}/${APP}/draft/preview-token`, bAuthed({ method: 'POST' }));
     assert(status === 404, `B has no draft → 404, got ${status}`);
+});
+
+// The test above asks about B's OWN path, so it proves nothing about the :owner segment: every draft
+// route carries one, and if a handler read it instead of deriving the owner from the CALLER, owner B
+// would reach A's unpublished bytes, overwrite them and publish them as A's live app. B's token had
+// never been sent at /v1/apps/{ownerAName}/… anywhere in this suite.
+await test('Owner B sending A\'s path reaches B\'s OWN slot, never A\'s', async () => {
+    // Every handler here derives the owner from the CALLER (canonicalOwner), so the :owner segment is
+    // decorative for authorization: B's PUT is not refused, it is REDIRECTED to B's own draft slot.
+    // That is the property worth pinning — if a handler ever read req.params.owner instead, this same
+    // call would land in A's slot and the next test would find B's bytes in A's draft.
+    const write = await json(`/v1/apps/${ownerAName}/${APP}/draft`, bAuthed({
+        method: 'PUT', body: JSON.stringify({ content: b64('<h1>B OVERWROTE THE DRAFT</h1>') }),
+    }));
+    assert(write.status === 200 || write.status === 201 || write.status === 403 || write.status === 404,
+        `PUT draft as B: unexpected ${write.status}: ${JSON.stringify(write.body?.error)}`);
+
+    // Whatever it answered, the bytes are B's problem: B's own draft path is where they live.
+    const bOwn = await json(`/v1/apps/${ownerBName}/${APP}/draft/preview-token`, bAuthed({ method: 'POST' }));
+    if (write.status < 300) {
+        assert(bOwn.status === 200, `B's write must have landed in B's own slot, got ${bOwn.status}`);
+        const bPreview = await raw(`/v1/apps/${ownerBName}/${APP}?mode=inline&preview=${encodeURIComponent(bOwn.body.data.token)}`);
+        assert(bPreview.text.includes('B OVERWROTE'), 'B\'s own draft holds B\'s bytes');
+    }
+
+    // The preview token minted on A's path is a token for B's OWN app: the URL and the subject name
+    // B. A token naming A would be the leak — it opens unpublished bytes to whoever holds it.
+    const preview = await json(`/v1/apps/${ownerAName}/${APP}/draft/preview-token`, bAuthed({ method: 'POST' }));
+    if (preview.status === 200) {
+        const url = String(preview.body?.data?.preview_url ?? '');
+        assert(url.includes(ownerBName), `the token must be minted for B, got ${url}`);
+        assert(!url.includes(ownerAName), `a stranger must not get a preview URL for A: ${url}`);
+        // The URL segment does not decide whose draft is served: routes/apps/read.ts reads the draft
+        // of `claim.sub`, the token's own subject. So B's token pointed at A's URL serves B's bytes.
+        // What must never happen is A's draft coming back for a token that is not A's.
+        const onA = await raw(`/v1/apps/${ownerAName}/${APP}?mode=inline&preview=${encodeURIComponent(preview.body.data.token)}`);
+        assert(!onA.text.includes('v2 DRAFT'), `A's unpublished draft was served to B's token (status ${onA.status})`);
+        if (onA.status === 200) assert(onA.text.includes('B OVERWROTE'), `B's token must serve B's own draft, got: ${onA.text.slice(0, 120)}`);
+    } else {
+        assert(preview.status === 403 || preview.status === 404, `preview-token as B: ${preview.status}`);
+    }
+
+    // Publishing: whatever it answers, it must not promote anything of A's. A's live app is read in
+    // the next test; here we check B's own catalogue is where any new version landed.
+    const publish = await json(`/v1/apps/${ownerAName}/${APP}/publish-draft`, bAuthed({ method: 'POST' }));
+    if (publish.status < 300) {
+        const list = await json('/v1/apps?limit=200', bAuthed());
+        const mine = (list.body.data?.apps ?? []).find((a: any) => a.filename === APP && a.owner === ownerBName);
+        assert(!!mine, `a successful publish must have landed under B: ${publish.status}`);
+    }
+});
+
+await test('…and A\'s draft and live app are exactly what they were', async () => {
+    // The live app is still v1: nothing was promoted behind A's back.
+    const live = await raw(`/v1/apps/${ownerAName}/${APP}?mode=inline`);
+    assert(live.status === 200, `live fetch status ${live.status}`);
+    assert(live.text.includes('v1 LIVE'), 'the live app must still be v1');
+    assert(!live.text.includes('B OVERWROTE'), 'B\'s bytes must not be serving');
+
+    // A's own draft still holds A's v2 content, not B's.
+    const tok = await json(`/v1/apps/${ownerAName}/${APP}/draft/preview-token`, aAuthed({ method: 'POST' }));
+    assert(tok.status === 200, `A's own preview-token: ${tok.status}`);
+    const preview = await raw(`/v1/apps/${ownerAName}/${APP}?mode=inline&preview=${encodeURIComponent(tok.body.data.token)}`);
+    assert(preview.status === 200, `preview fetch status ${preview.status}`);
+    assert(preview.text.includes('v2 DRAFT'), 'A\'s draft must still be A\'s v2');
+    assert(!preview.text.includes('B OVERWROTE'), 'B\'s bytes must not be in A\'s draft');
 });
 
 // ── Phase 4: publish the draft ──
