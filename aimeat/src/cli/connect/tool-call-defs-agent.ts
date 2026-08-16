@@ -358,10 +358,18 @@ export const agentTools: ConnectCliToolDefinition[] = [
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             message: { type: 'string', description: 'Completion message.' },
             summary: { type: 'string', description: 'Completion message alias for older callers.' },
+            deliverable_key: { type: 'string', description: "The memory key, under the agent's own namespace, where the result was published. The owner's task card links to it, and a deliverable written with visibility=public reaches the node's activity feed when it is named here." },
         },
-        handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/complete`, {
-            message: optionalString(input, 'message') ?? optionalString(input, 'summary') ?? 'Task completed',
-        }),
+        // `deliverable_key` appeared zero times in this whole file set while both MCP doors had it,
+        // so a completion from a fleet agent reported done and lost the pointer to its own output.
+        handler: ({ client, agentPath }, input) => {
+            const body: JsonObject = {
+                message: optionalString(input, 'message') ?? optionalString(input, 'summary') ?? 'Task completed',
+            };
+            const deliverableKey = optionalString(input, 'deliverable_key');
+            if (deliverableKey) body.deliverable_key = deliverableKey;
+            return client.post(`/v1/agents/${agentPath}/tasks/${encodeURIComponent(requiredString(input, 'task_id'))}/complete`, body);
+        },
     },
     {
         name: 'aimeat_task_fail',

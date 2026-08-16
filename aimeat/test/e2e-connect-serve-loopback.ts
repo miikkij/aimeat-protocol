@@ -203,6 +203,65 @@ await test('POST /local/call/:tool — write then read a memory key via the tunn
   assert(JSON.stringify(r.body.data ?? {}).includes('"hello":"tunnel"'), `value did not round-trip: ${JSON.stringify(r.body.data)}`);
 });
 
+await test('POST /local/call/:tool — owner_scope reaches the node from the CLI dispatch, not just from MCP', async () => {
+  // THE THIRD SURFACE. /local/call dispatches through CONNECT_CLI_TOOLS, a separate definition set
+  // from either MCP registration, and a crew whose 61 agents use this door exclusively found that a
+  // fix landing on both MCP surfaces did not exist for them at all. Their tell was that
+  // aimeat_memory_list had always honoured owner_scope from here while aimeat_memory_read never
+  // had — the same file, three entries apart.
+  const key = `loopback.clicall.ownerscope.${Date.now().toString(36)}`;
+  const written = await json(BASE, '/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({ key, value: { written_by: 'the owner' }, visibility: 'private' }),
+  });
+  assert(written.status === 200 || written.status === 201, `owner write: ${written.status}`);
+
+  const plain = await json(loopbackBase, '/local/call/aimeat_memory_read', {
+    method: 'POST', body: JSON.stringify({ key }),
+  });
+  assert(!JSON.stringify(plain.body).includes('the owner'),
+    `without the flag the agent must not see it: ${JSON.stringify(plain.body).slice(0, 200)}`);
+
+  const scoped = await json(loopbackBase, '/local/call/aimeat_memory_read', {
+    method: 'POST', body: JSON.stringify({ key, owner_scope: true }),
+  });
+  assert(JSON.stringify(scoped.body).includes('the owner'),
+    `owner_scope did not survive the CLI dispatch: ${JSON.stringify(scoped.body).slice(0, 300)}`);
+});
+
+await test('POST /local/call/:tool — deliverable_key survives the CLI dispatch onto the task record', async () => {
+  const created = await json(BASE, `/v1/agents/${agentName}/tasks`, {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({ title: 'CLI dispatch deliverable', description: 'x', status: 'queued' }),
+  });
+  assert(created.status === 201, `create: ${created.status} ${JSON.stringify(created.body)}`);
+  const taskId = created.body.data.task.id;
+  const started = await json(BASE, `/v1/agents/${agentName}/tasks/${taskId}/start`, {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+  });
+  assert(started.status === 200, `start: ${started.status} ${JSON.stringify(started.body)}`);
+
+  const done = await json(loopbackBase, '/local/call/aimeat_task_complete', {
+    method: 'POST',
+    body: JSON.stringify({ task_id: taskId, message: 'Published', deliverable_key: 'crews.cli-dispatch.output' }),
+  });
+  assert(done.status === 200, `complete: ${done.status} ${JSON.stringify(done.body).slice(0, 200)}`);
+
+  const read = await json(BASE, `/v1/agents/${agentName}/tasks/${taskId}`, {
+    headers: { Authorization: `Bearer ${account.ownerToken}` },
+  });
+  assert(read.body.data?.outcome?.deliverable_key === 'crews.cli-dispatch.output',
+    `the pointer was dropped between the CLI dispatch and the record: ${JSON.stringify(read.body.data?.outcome)}`);
+
+  // Starting a task pushes `task_assigned` down the tunnel, and Phase 3 asserts on the NEXT thing
+  // the long-poll hands back. Leave the queue as this test found it, or Phase 3 reads this task's id
+  // and reports a push failure that never happened.
+  for (let i = 0; i < 5; i++) {
+    const drained = await json(loopbackBase, '/local/tasks/next?wait=0');
+    if (drained.status === 204) break;
+  }
+});
+
 await test('POST /local/call/:tool — unknown tool returns 404 UNKNOWN_TOOL', async () => {
   const r = await json(loopbackBase, '/local/call/not_a_real_tool', { method: 'POST', body: '{}' });
   assert(r.status === 404, `status ${r.status}`);

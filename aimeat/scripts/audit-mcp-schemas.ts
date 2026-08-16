@@ -16,12 +16,21 @@
  *   pnpm audit:mcp-schemas -- --strict   # full report, both axes
  * @version-history
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 6 (F10): runtime schema-parity audit
+ *   v1.2.0 -- 2026-08-16 -- THE THIRD SURFACE. Two MCP registrations were never the whole story:
+ *     /local/call/<tool> dispatches through CONNECT_CLI_TOOLS, which is neither of them, and that is
+ *     the door a fleet daemon uses. A crew running 61 agents through it found the same defect twice
+ *     in a week, the second time AFTER both MCP doors had been fixed and released. This axis reads
+ *     the handler source for each declared parameter and gates on anything not in
+ *     security/cli-param-drift-baseline.json — 72 tools recorded on the day it was written.
  *   v1.1.0 -- 2026-08-16 -- --check mode, and wired into the pre-commit hook at last. This script
  *     had named the aimeat_task_complete/deliverable_key drift on its own line since the day the
  *     parameter was added, and nothing ran it: a crew found the defect instead, by building an agent
  *     that lost its own output. An audit nobody runs is a document, not a gate. The nine remaining
  *     drifts are recorded in KNOWN_INPUT_DRIFT with what each one costs a caller.
  */
+import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../src/config.js';
 import type { Storage } from '../src/storage/interface.js';
 import type { AgentRegistry } from '../src/cli/connect/agent-registry.js';
@@ -58,6 +67,53 @@ import { registerAllTools } from '../src/cli/connect/mcp/tools/index.js';
 interface CapturedTool {
     inputKeys: string[];
     hasOutputSchema: boolean;
+}
+
+/**
+ * THE THIRD SURFACE, and the reason this file needed a second axis.
+ *
+ * `/local/call/<tool>` — the door a fleet daemon actually uses — dispatches through
+ * CONNECT_CLI_TOOLS in tool-call-defs-*.ts, which is neither MCP registration. A parameter added to
+ * BOTH MCP doors therefore still does not exist for a caller on this one. A crew running 61 agents
+ * exclusively through /local/call proved it twice in a week: `deliverable_key` appeared zero times
+ * across these files while both MCP doors declared it, and `owner_scope` was forwarded by
+ * aimeat_memory_list and by neither of its two neighbours in the same file.
+ *
+ * The handlers are plain code, so this reads their SOURCE rather than a schema: each handler names
+ * every parameter it forwards as a string literal (`optionalString(input, 'x')`), so a parameter the
+ * block never mentions is a parameter the node never receives. Crude, and it catches exactly the
+ * defect that has now happened three times.
+ */
+function captureCliHandlerBlocks(): Map<string, string> {
+    const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'cli', 'connect');
+    const blocks = new Map<string, string>();
+    for (const file of readdirSync(dir).filter(f => f.startsWith('tool-call-defs-'))) {
+        const src = readFileSync(path.join(dir, file), 'utf8');
+        const re = /name:\s*'(aimeat_[a-z0-9_]+)'/g;
+        const hits: { name: string; idx: number }[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(src)) !== null) hits.push({ name: m[1], idx: m.index });
+        for (let i = 0; i < hits.length; i++) {
+            blocks.set(hits[i].name, src.slice(hits[i].idx, i + 1 < hits.length ? hits[i + 1].idx : src.length));
+        }
+    }
+    return blocks;
+}
+
+/** Parameters the catalog declares for a tool that its CLI handler never mentions. */
+function cliParamGaps(blocks: Map<string, string>): Map<string, string[]> {
+    const gaps = new Map<string, string[]>();
+    for (const def of CLI_FALLBACK_TOOL_DEFINITIONS) {
+        const block = blocks.get(def.name);
+        if (!block) continue;
+        const declared = Object.keys((def as { input?: Record<string, unknown> }).input ?? {})
+            // response_format is shaped by the dispatcher and agent_name selects the client; neither
+            // is ever forwarded to the node by a handler.
+            .filter(k => k !== 'response_format' && k !== 'agent_name');
+        const missing = declared.filter(p => !block.includes(`'${p}'`) && !block.includes(`"${p}"`)).sort();
+        if (missing.length) gaps.set(def.name, missing);
+    }
+    return gaps;
 }
 
 /** Extract the top-level input-schema keys from an mcp.tool(...) call's arguments. */
@@ -262,6 +318,39 @@ function main(): void {
 
     const surfaceFail = surfaceUnregistered.length > 0 || unknownTools.length > 0 || uncovered.length > 0;
 
+    // ── Third surface: the CLI dispatch behind /local/call ──
+    const gaps = cliParamGaps(captureCliHandlerBlocks());
+    const baselineFile = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'security', 'cli-param-drift-baseline.json');
+    if (process.argv.includes('--record')) {
+        const out: Record<string, string[]> = {};
+        for (const name of [...gaps.keys()].sort()) out[name] = gaps.get(name)!;
+        writeFileSync(baselineFile, `${JSON.stringify({
+            _note: 'Parameters the catalog declares that a CONNECT_CLI_TOOLS handler never forwards. '
+                + 'Recorded debt, NOT approval: every entry is a parameter a /local/call caller cannot reach. '
+                + 'The gate fails on anything NOT listed here, so this file may only shrink. '
+                + 'Regenerate with: pnpm audit:mcp-schemas -- --record',
+            _recorded: '2026-08-16, when a crew running 61 agents through /local/call found the door had been '
+                + 'missing deliverable_key and owner_scope while both MCP surfaces carried them.',
+            tools: out,
+        }, null, 2)}\n`, 'utf8');
+        console.log(`\n✓ Recorded ${Object.keys(out).length} CLI handler param gaps to security/cli-param-drift-baseline.json`);
+    }
+    let cliBaseline: Record<string, string[]> = {};
+    try {
+        cliBaseline = (JSON.parse(readFileSync(baselineFile, 'utf8')) as { tools?: Record<string, string[]> }).tools ?? {};
+    } catch {
+        // Absent baseline means every gap is new, which is the correct reading for a fresh checkout.
+        cliBaseline = {};
+    }
+    const newCliGaps: string[] = [];
+    for (const [name, missing] of [...gaps.entries()].sort()) {
+        const allowed = new Set(cliBaseline[name] ?? []);
+        const fresh = missing.filter(p => !allowed.has(p));
+        if (fresh.length) newCliGaps.push(`  ${name}: handler never forwards [${fresh.join(', ')}]`);
+    }
+    console.log(`\n## CLI dispatch (/local/call) param gaps — ${gaps.size} tools, ${newCliGaps.length} beyond the baseline`);
+    console.log(newCliGaps.length ? newCliGaps.join('\n') : '  None beyond the recorded baseline.');
+
     // --check is the PRE-COMMIT gate and it watches ONE axis: a parameter that exists on one MCP
     // surface and not the other. That axis is a silent-wrong-answer bug — zod strips the unknown key,
     // the call returns ok, and the caller is told nothing — which is why it earns a blocking check.
@@ -271,12 +360,20 @@ function main(): void {
     // piece of work; folding it in here would mean the gate could never go green and would therefore
     // be turned off, which is how this audit came to sit unwired for two and a half months in the
     // first place. --strict keeps both axes for the full report.
-    if (check && newDrift.length > 0) {
-        console.error(`\n✖ ${newDrift.length} NEW server↔connector input-schema drift(s) beyond the baseline:`);
-        for (const n of newDrift) console.error(`  ${driftDetail.get(n)?.trim()}`);
+    if (check && (newDrift.length > 0 || newCliGaps.length > 0)) {
+        if (newDrift.length) {
+            console.error(`\n✖ ${newDrift.length} NEW server↔connector input-schema drift(s) beyond the baseline:`);
+            for (const n of newDrift) console.error(`  ${driftDetail.get(n)?.trim()}`);
+        }
+        if (newCliGaps.length) {
+            console.error(`\n✖ ${newCliGaps.length} CLI handler(s) never forward a declared parameter:`);
+            for (const g of newCliGaps) console.error(g);
+            console.error('  (this is the /local/call door — a fleet daemon uses it and neither MCP surface covers it)');
+        }
         console.error('\nA parameter on one surface and not the other is stripped in silence: the call'
-            + '\nsucceeds and does less than it was asked. Declare it on BOTH surfaces and forward it,'
-            + '\nor add it to KNOWN_INPUT_DRIFT with a line saying what a caller cannot reach.');
+            + '\nsucceeds and does less than it was asked. Declare it on EVERY surface and forward it,'
+            + '\nor record it — KNOWN_INPUT_DRIFT here, or security/cli-param-drift-baseline.json for'
+            + '\nthe CLI door — with a line saying what a caller cannot reach.');
         process.exit(1);
     }
     if (strict && (newDrift.length > 0 || surfaceFail)) {

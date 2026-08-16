@@ -64,8 +64,16 @@ export function knowledgeContributeUnreachable(): ApiResponse {
 
 export const coreTools: ConnectCliToolDefinition[] = [
     {
+        // THE THIRD SURFACE, and the one a fleet actually uses. /local/call/<tool> dispatches through
+        // CONNECT_CLI_TOOLS, not through either MCP registration, so a parameter added to both MCP
+        // doors still never reaches the node from here. Found by a crew whose 61 agents go through
+        // this door exclusively: they watched `owner_scope` work on aimeat_memory_list — three
+        // entries below, which has always forwarded it — and answer NOT_FOUND here, for the same key
+        // with the same token that a direct REST call served in full.
         name: 'aimeat_memory_read',
-        handler: ({ client }, input) => client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}`),
+        handler: ({ client }, input) => client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}${query({
+            owner_scope: optionalBoolean(input, 'owner_scope') ? 'true' : undefined,
+        })}`),
     },
     {
         name: 'aimeat_memory_write',
@@ -77,6 +85,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const tags = optionalArray(input, 'tags');
             if (tags) body.tags = tags;
             if (ttlHours !== undefined) body.ttl_hours = ttlHours;
+            // Where the record LIVES, which is a different question from `visibility`, who may read
+            // it. Without this every write from this door landed under the agent however the caller
+            // meant it, and the owner's own tools could not see it. The route still decides:
+            // resolveWriteTarget() refuses without memory:write-as-owner.
+            if (optionalBoolean(input, 'owner_scope')) body.owner_scope = true;
             // POST /v1/memory takes a pre-minted record id directly (it checks the record belongs to
             // this owner). An inline `ai_provenance` DECLARATION cannot ride here — the route has no
             // field for it — so withProvenanceCarrying() records that one after the write, against
@@ -101,7 +114,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_memory_search',
-        handler: ({ client }, input) => client.get(`/v1/memory/search${query({ q: requiredString(input, 'query') })}`),
+        handler: ({ client }, input) => client.get(`/v1/memory/search${query({
+            q: requiredString(input, 'query'),
+            visibility: optionalString(input, 'visibility'),
+            limit: optionalNumber(input, 'limit'),
+        })}`),
     },
     {
         name: 'aimeat_catalogue_search',

@@ -1,0 +1,332 @@
+{
+  "_note": "Parameters the catalog declares that a CONNECT_CLI_TOOLS handler never forwards. Recorded debt, NOT approval: every entry is a parameter a /local/call caller cannot reach. The gate fails on anything NOT listed here, so this file may only shrink. Regenerate with: pnpm audit:mcp-schemas -- --record",
+  "_recorded": "2026-08-16, when a crew running 61 agents through /local/call found the door had been missing deliverable_key and owner_scope while both MCP surfaces carried them.",
+  "tools": {
+    "aimeat_action_execute": [
+      "provider_gaii",
+      "ttl_hours"
+    ],
+    "aimeat_admin_agents": [
+      "limit"
+    ],
+    "aimeat_agent_activity": [
+      "days"
+    ],
+    "aimeat_app_draft_publish": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_app_publish": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_app_template_propose": [
+      "composes",
+      "derived_from",
+      "model_notes",
+      "packs",
+      "start_mode_rationale"
+    ],
+    "aimeat_app_tools_publish": [
+      "odps",
+      "provenance"
+    ],
+    "aimeat_appdev_pitfall_list": [
+      "applies_to",
+      "category",
+      "limit",
+      "model",
+      "offset",
+      "scope",
+      "status"
+    ],
+    "aimeat_board_create": [
+      "allowed_gaiis"
+    ],
+    "aimeat_board_members": [
+      "add",
+      "remove"
+    ],
+    "aimeat_board_post": [
+      "ai_provenance",
+      "ai_provenance_id",
+      "category"
+    ],
+    "aimeat_board_read": [
+      "category",
+      "limit"
+    ],
+    "aimeat_board_reply": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_board_subscribe": [
+      "callback_url",
+      "filters"
+    ],
+    "aimeat_capabilities_create": [
+      "callable",
+      "id",
+      "inputSchema",
+      "outputSchema",
+      "summary",
+      "tags",
+      "usage",
+      "visibility",
+      "whenToUse"
+    ],
+    "aimeat_capabilities_invoke": [
+      "mode"
+    ],
+    "aimeat_capabilities_list": [
+      "authRequired",
+      "callable",
+      "search",
+      "source_type",
+      "tags"
+    ],
+    "aimeat_capabilities_update": [
+      "summary",
+      "tags",
+      "usage",
+      "visibility",
+      "whenNotToUse",
+      "whenToUse"
+    ],
+    "aimeat_capabilities_vouch": [
+      "comment"
+    ],
+    "aimeat_catalogue_agents": [
+      "category",
+      "search"
+    ],
+    "aimeat_catalogue_directory": [
+      "city",
+      "interest"
+    ],
+    "aimeat_catalogue_search": [
+      "category",
+      "search"
+    ],
+    "aimeat_consent_grant": [
+      "data_pattern",
+      "scope",
+      "target_gaii",
+      "ttl_hours"
+    ],
+    "aimeat_consent_revoke": [
+      "consent_id"
+    ],
+    "aimeat_cortex_install": [
+      "libs"
+    ],
+    "aimeat_datapackage_export": [
+      "limit",
+      "offset",
+      "select"
+    ],
+    "aimeat_datapackage_publish": [
+      "changes",
+      "description",
+      "legal_basis",
+      "license",
+      "name",
+      "resources",
+      "sources",
+      "title"
+    ],
+    "aimeat_dm_ask": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_dm_send": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_dm_send_as_owner": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_extension_install": [
+      "activate",
+      "scripts",
+      "update"
+    ],
+    "aimeat_extension_invoke": [
+      "extension_name",
+      "instance_id"
+    ],
+    "aimeat_flag_report": [
+      "description"
+    ],
+    "aimeat_group_add_member": [
+      "group_id",
+      "identifier_type",
+      "permissions"
+    ],
+    "aimeat_group_create": [
+      "members"
+    ],
+    "aimeat_group_get": [
+      "group_id"
+    ],
+    "aimeat_group_remove_member": [
+      "group_id"
+    ],
+    "aimeat_handbook_get": [
+      "surface"
+    ],
+    "aimeat_instance_create": [
+      "model"
+    ],
+    "aimeat_instance_status": [
+      "instance_id"
+    ],
+    "aimeat_knowledge_contribute": [
+      "ai_provenance",
+      "ai_provenance_id",
+      "content",
+      "entry_key",
+      "model",
+      "package_id"
+    ],
+    "aimeat_knowledge_get": [
+      "package_id"
+    ],
+    "aimeat_knowledge_links": [
+      "direction",
+      "package_id"
+    ],
+    "aimeat_memory_search": [
+      "include_versions"
+    ],
+    "aimeat_memory_write": [
+      "ai_provenance",
+      "expected_version",
+      "group_id"
+    ],
+    "aimeat_message_send": [
+      "ai_provenance",
+      "ai_provenance_id",
+      "thread_id"
+    ],
+    "aimeat_onboarding_confirm_directives_read": [
+      "confirmed"
+    ],
+    "aimeat_operator_agent_configure": [
+      "confirm_token"
+    ],
+    "aimeat_operator_ai_config": [
+      "confirm_token"
+    ],
+    "aimeat_organism_get": [
+      "organism_id"
+    ],
+    "aimeat_organism_join": [
+      "message",
+      "organism_id"
+    ],
+    "aimeat_organism_leave": [
+      "organism_id"
+    ],
+    "aimeat_organism_members": [
+      "organism_id",
+      "role",
+      "status"
+    ],
+    "aimeat_organism_search": [
+      "archived"
+    ],
+    "aimeat_schedule_create": [
+      "action_id",
+      "cron",
+      "display_name",
+      "extension_name",
+      "input_keys",
+      "kind",
+      "output_key",
+      "prompt",
+      "purpose",
+      "task_title",
+      "timezone"
+    ],
+    "aimeat_schedule_update": [
+      "cron",
+      "display_name",
+      "enabled",
+      "timezone"
+    ],
+    "aimeat_skill_list": [
+      "binding",
+      "organism_id",
+      "workspace_id"
+    ],
+    "aimeat_skill_publish": [
+      "files"
+    ],
+    "aimeat_storage_download": [
+      "inline"
+    ],
+    "aimeat_storage_upload": [
+      "data_base64",
+      "group_id",
+      "visibility"
+    ],
+    "aimeat_task_complete": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_task_create": [
+      "files"
+    ],
+    "aimeat_task_list": [
+      "page",
+      "per_page"
+    ],
+    "aimeat_task_propose_todos": [
+      "todos"
+    ],
+    "aimeat_work_deliver": [
+      "metadata",
+      "output"
+    ],
+    "aimeat_workflow_answer": [
+      "other",
+      "picks",
+      "workflow_id"
+    ],
+    "aimeat_workflow_save": [
+      "confirm_token",
+      "propose"
+    ],
+    "aimeat_workspace_comment": [
+      "ai_provenance",
+      "ai_provenance_id"
+    ],
+    "aimeat_workspace_create": [
+      "manifest",
+      "schemas"
+    ],
+    "aimeat_workspace_read": [
+      "ids",
+      "include_archived",
+      "space"
+    ],
+    "aimeat_workspace_update": [
+      "add_spaces",
+      "manifest",
+      "name",
+      "readme",
+      "schemas"
+    ],
+    "aimeat_workspace_write": [
+      "ai_provenance",
+      "ai_provenance_id",
+      "id",
+      "items",
+      "section",
+      "space",
+      "value"
+    ]
+  }
+}
