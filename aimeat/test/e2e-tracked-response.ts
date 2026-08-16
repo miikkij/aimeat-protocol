@@ -120,12 +120,66 @@ await test('2. Alice creates an AUTO Tracked Response bound to the message', asy
     assert(c.source.messageId === reporterMsgId, 'source bound to the message');
 });
 
-await test('3. Binding a message you do not own is rejected', async () => {
+// A tracked response makes the node send a threaded reply under the owner's identity, so the whole
+// surface is requireRole('owner'). Nothing in this suite had ever presented anything else.
+await test('2b. An agent of the owner, and an anonymous caller, cannot create one → 403 / 401', async () => {
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: authA(),
+        body: JSON.stringify({ name: 'trbot', owner: aliceName, capabilities: ['memory'] }),
+    });
+    assert(reg.status === 201, `create agent: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const ts = new Date().toISOString();
+    const sig = await signMsg(reg.body.data.private_key, gaii + ts);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
+    assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+
+    const body = JSON.stringify({
+        message_id: reporterMsgId, title: 'agent-made',
+        watch: { key: autoBugKey, condition: { field: 'status', equals: 'done' } },
+        response: { mode: 'auto' },
+    });
+    const asAgent = await json('/v1/tracked-responses', {
+        method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` }, body,
+    });
+    assert(asAgent.status === 403, `an agent must be refused, got ${asAgent.status}: ${JSON.stringify(asAgent.body?.error)}`);
+
+    const anon = await json('/v1/tracked-responses', { method: 'POST', body });
+    assert(anon.status === 401, `an anonymous caller must be refused, got ${anon.status}`);
+});
+
+await test('3. Binding a message id that exists for NOBODY is rejected', async () => {
     const r = await json('/v1/tracked-responses', {
         method: 'POST', headers: authA(),
         body: JSON.stringify({ message_id: `nope-${stamp}`, watch: { key: autoBugKey, condition: { field: 'status', equals: 'done' } }, response: { mode: 'auto' } }),
     });
     assert(r.status === 404, `should 404, got ${r.status}`);
+});
+
+// Test 3 proves the EXISTENCE check. The route's real guard is the second argument to
+// storage.getDirectMessage(message_id, ownerGhii), and until now no test ever presented an id that
+// exists under a DIFFERENT owner. Drop that argument and any owner who learns a message id binds a
+// contract to someone else's conversation, reads the peer's GHII back off the create response, and
+// has the node auto-send threaded replies to that peer under their own identity.
+await test('3b. Binding a message that exists under ANOTHER owner is rejected → 404', async () => {
+    const carolName = `trcarol${stamp}`;
+    const carol = await registerOwner(carolName);
+
+    const r = await json('/v1/tracked-responses', {
+        method: 'POST', headers: { Authorization: `Bearer ${carol.token}` },
+        body: JSON.stringify({
+            message_id: reporterMsgId,
+            title: 'not my conversation',
+            watch: { key: 'carol.bug', condition: { field: 'status', equals: 'done' } },
+            response: { mode: 'auto' },
+        }),
+    });
+    assert(r.status === 404, `a stranger binding Bob→Alice must 404, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    // Nothing was created, and no peer identity leaked back.
+    assert(!r.body?.data?.trackedResponse, `no contract may be returned: ${JSON.stringify(r.body?.data)}`);
+    const list = await json('/v1/tracked-responses', { headers: { Authorization: `Bearer ${carol.token}` } });
+    const mine = (list.body?.data?.trackedResponses ?? list.body?.data?.items ?? []) as any[];
+    assert(!mine.some(c => c.source?.messageId === reporterMsgId), `the stranger holds no contract on that message: ${JSON.stringify(mine)}`);
 });
 
 await test('4. Marking the bug done fires the reply (reactive; evaluate as fallback)', async () => {

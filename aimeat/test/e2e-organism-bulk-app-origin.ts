@@ -98,6 +98,33 @@ await test('APP publishRecords (batch) succeeds — not blocked by an agent-role
     assert(r.body.data.published === 3, `published ${JSON.stringify(r.body.data)}`);
 });
 
+// This suite is a guard-parity net: it proves an app-origin token CAN reach these doors. It mints
+// ONE grant carrying the full CADENCE scope set, so requireScope('memory:delete') on the batch delete
+// was asserted by nothing — here or anywhere else. An app the owner granted read-only could wipe up
+// to 2000 records per request and every test stayed green.
+await test('A READ-ONLY app grant cannot batch-delete records → 403, and the records survive', async () => {
+    const readOnly = await grantAppToken('memory:read');
+    assert(!!readOnly, 'got a read-only app access token');
+
+    const r = await json(`/v1/organisms/${orgId}/workspace/records/delete`, {
+        method: 'POST', headers: { Authorization: `Bearer ${readOnly}` },
+        body: JSON.stringify({ ws: WS, namespace: NS, ids: ['a1', 'a2', 'a3'] }),
+    });
+    assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.body?.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${r.body?.error?.code}`);
+    assert(JSON.stringify(r.body?.error ?? '').includes('memory:delete'), `the refusal must name the missing word: ${JSON.stringify(r.body?.error)}`);
+
+    // The refusal is about the WORD, not about the door: the same token still reads.
+    const read = await json(`/v1/memory/${encodeURIComponent(`${root()}.${NS}.a1.latest`)}?owner_scope=true`, {
+        headers: { Authorization: `Bearer ${readOnly}` },
+    });
+    assert(read.status === 200, `a read-only grant must still read, got ${read.status}: ${JSON.stringify(read.body?.error)}`);
+
+    // Nothing was removed.
+    const chk = await json(`/v1/memory/${encodeURIComponent(`${root()}.${NS}.a1.latest`)}?owner_scope=true&soft=1`, { headers: ownerAuth() });
+    assert(chk.body.data.value !== null, 'the refused delete must leave the record standing');
+});
+
 await test('APP deleteRecords (batch) succeeds — the regression: app-origin must NOT hit a role-agent gate', async () => {
     const r = await json(`/v1/organisms/${orgId}/workspace/records/delete`, { method: 'POST', headers: appAuth(), body: JSON.stringify({ ws: WS, namespace: NS, ids: ['a1', 'a2', 'a3'] }) });
     assert(r.status === 200, `deleteRecords status ${r.status} ${JSON.stringify(r.body?.error)} — a 403 "Role agent required" is the bug`);
