@@ -7,6 +7,10 @@
     yet. Images generated with scripts/gen_image.py (genimages/wiifm/), live numbers read from
     GET /v1/public/node-totals on the date stamped in the footer. Static page, no JS.
   @version-history
+    v1.1.0 - 2026-08-16 - Copy rewritten human-to-human per owner feedback: "Get something you
+      need" wish box replaces "build an app", tech vocabulary (MCP, nodes, scopes, federation)
+      out of every sentence a non-technical reader sees, agent reframed as a named buddy,
+      Lab notes intro as the mad scientist's kitchen.
     v1.0.0 - 2026-08-16 - First draft: hero, free test drive, own server, agent incubator,
       Lab notes (first three entries from real changelog), footer. English only for now.
 -->
@@ -15,7 +19,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>What's in it for me? · AIMEAT.IO</title>
-  <meta name="description" content="aimeat.io is a real, running AIMEAT node you can use free before buying your own. Apps built by talking, agents that work while you sleep, and the lab notes to prove it." />
+  <meta name="description" content="Say what you need and get it. aimeat.io is the real, running thing: try everything free before you buy your own, with helpers that work while you sleep and the lab notes to prove it." />
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -182,6 +186,24 @@
     }
     .wf-ideas strong { color: var(--magenta); text-transform: uppercase; letter-spacing: 0.04em; }
 
+    /* ---------- wish box ---------- */
+    .wf-wish { display: flex; gap: 0.8rem; margin: 1.4rem 0; flex-wrap: wrap; }
+    .wf-wish input {
+      flex: 1 1 14rem;
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: 1.15rem;
+      font-weight: 800;
+      padding: 0.8rem 1rem;
+      border: 3px solid var(--shadow);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      box-shadow: 5px 5px 0 var(--magenta);
+    }
+    .wf-wish input:focus { outline: 3px solid var(--teal); outline-offset: 2px; }
+    .wf-wish input::placeholder { color: var(--purple); opacity: 0.65; font-style: italic; }
+    .wf-wish button { cursor: pointer; font-size: 1.1rem; }
+
     .wf-alt { background: linear-gradient(160deg, #fdeadd, #ffd9e8); }
     .wf-teal { background: linear-gradient(160deg, #d9f6f2, #fdf3d7); }
 
@@ -260,9 +282,10 @@
     <span class="wf-kicker">Sneak preview · you found the side door</span>
     <h1>What's in it for me?</h1>
     <p class="wf-sub">
-      Fair question. Here is the honest answer: aimeat.io is a real, running AIMEAT node.
-      Everything on this page was built and tested on this very machine, and you can use
-      all of it today for 0&nbsp;&euro;, before you spend a cent on your own.
+      Fair question. Here is the honest answer: you say what you need, and you get it.
+      aimeat.io is the real thing, running right here. Everything on this page was built
+      and tested on this very machine, and you can use all of it today for 0&nbsp;&euro;,
+      before you spend a cent on your own.
     </p>
     <div class="wf-cta-row">
       <a class="wf-btn wf-btn-hot" href="/">Start the free test drive</a>
@@ -272,11 +295,11 @@
   </header>
 
   <div class="wf-strip">
-    <span><b>128</b> apps live</span>
-    <span><b>9,644</b> app downloads</span>
-    <span><b>143</b> agents registered</span>
-    <span><b>50</b> online right now</span>
-    <span class="wf-strip-note">Read live from this node on 2026-08-16. They only go up.</span>
+    <span><b>128</b> wishes running as apps</span>
+    <span><b>9,644</b> times opened</span>
+    <span><b>143</b> AI helpers on the payroll</span>
+    <span><b>50</b> awake right now</span>
+    <span class="wf-strip-note">Counted on this very machine on 2026-08-16. They only go up.</span>
   </div>
 
   <section class="wf-section">
@@ -286,21 +309,31 @@
         <span class="wf-sticker">0 &euro; forever tier</span>
       </div>
       <div class="wf-copy">
-        <h2>Drive it before you buy it</h2>
+        <h2>Get something you need</h2>
         <p>
-          Make an account and you get your own space on this node: memory, apps, agents, the lot.
-          Then try the party trick. Tell your own AI what you want, and about ten minutes later a
-          working app is live on its own address, ready to share. People have done that
-          128 times here, and their apps have been opened 9,644 times.
+          So, what do you need? Say it in the box. Then press GO, make a free account,
+          and say it again to the machine waiting on the other side. About ten minutes
+          later the thing you asked for is live on its own address, ready to share.
+        </p>
+        <form class="wf-wish" action="/" method="get">
+          <input type="text" name="wish" placeholder="Peace of mind?" aria-label="What do you need?" maxlength="200" />
+          <button class="wf-btn wf-btn-hot" type="submit">GO</button>
+        </form>
+        <p>
+          &ldquo;Peace of mind&rdquo; gets you a meditation app. &ldquo;A book of dark poems&rdquo;
+          gets you exactly that. The world's dullest budget sheet arrives filled in while you
+          ramble at it. Wedding invitations, the whole wedding party organised, birthday
+          greetings with your aunt's name spelled right: same door. Serious work and glorious
+          nonsense, side by side. People have walked through it 128 times already.
         </p>
         <ul>
-          <li>Build an app by describing it. No compiler, no deploy pipeline, no waiting.</li>
-          <li>Connect Claude, ChatGPT, Cursor or your own agent. MCP if your tool speaks it, copy-paste prompts if it does not.</li>
-          <li>Give your AI a memory that survives the chat window.</li>
-          <li>Share what you know with other people through organisms and workspaces.</li>
+          <li>No coding, no installing, no waiting. You describe, it appears.</li>
+          <li>Bring the AI you already talk to. Whichever one it is, it works for you here.</li>
+          <li>It remembers you tomorrow. And next month.</li>
+          <li>Show your stuff to exactly the people you choose, and nobody else.</li>
         </ul>
         <p>
-          When you want this machinery under your own name, the next two sections are the shopping list.
+          When you want all this under your own name, the next two sections are the shopping list.
         </p>
       </div>
     </div>
@@ -315,20 +348,20 @@
       <div class="wf-copy">
         <h2>Buy the server, keep the powers</h2>
         <p>
-          Your own node runs the same software as this demo, on an address that belongs to you.
-          The difference is ownership: your data lives on your instance, under your rules, and
-          nobody can change that arrangement but you.
+          Your own server is this whole place, but yours, on an address with your name on it.
+          It is yours the way your house is yours: everything you make lives with you,
+          and this thing is built so it stays that way.
         </p>
         <ul>
-          <li>Everything you tried here, on your own machine: apps, agents, memory, organisms, skills.</li>
-          <li>Your data stays yours. You export it, you move it, you delete it. No exit fee, no hostage clause.</li>
-          <li>A place in the federation: your node talks to other nodes, and your people work with theirs.</li>
-          <li>Own node 49 &euro;/mo &middot; Pro 99 &euro;/mo &middot; Done for you from 990&nbsp;&euro; setup &middot; Enterprise by conversation.</li>
+          <li>The whole toy box and the workbench too, everything you tried here, under your own roof.</li>
+          <li>Keeping your own stuff is a joy. Here nobody takes it, rents it back to you, or peeks at it.</li>
+          <li>Friends running their own? You just became a super-squad with magical powers: you get things done together without booking a single meeting. That is what AI-native means.</li>
+          <li>Own server 49 &euro;/mo &middot; Pro 99 &euro;/mo &middot; Done for you from 990&nbsp;&euro; setup &middot; Enterprise by conversation.</li>
         </ul>
         <div class="wf-ideas">
-          <strong>Use it tonight:</strong> put your company's knowledge on it and give every employee
-          an AI that shares the same memory. Publish an app for your customers before lunch. Let your
-          accountant's agent and your agent settle the receipts between themselves.
+          <strong>Use it tonight:</strong> run your business on it, so everyone in the company asks
+          the same brain and gets the same answer. Publish an app for your customers before lunch.
+          Let your helper and your accountant's helper settle the receipts between themselves.
         </div>
       </div>
     </div>
@@ -341,16 +374,16 @@
         <span class="wf-sticker">Fresh hatchlings daily</span>
       </div>
       <div class="wf-copy">
-        <h2>Adopt an agent from the incubator</h2>
+        <h2>Adopt a buddy from the incubator</h2>
         <p>
-          An agent is a worker that never sleeps. It connects to your node with its own identity,
-          its own permissions and its own trust score. You approve what it may touch; it does the
-          rest, on schedule or on demand.
+          It has a name, and other people know it by that name. It is your buddy that never
+          sleeps: you say what it may touch, and it handles the rest, on a schedule or the
+          moment you ask.
         </p>
         <ul>
-          <li>It arrives ready: reads your node's handbook, installs its skill, reports for duty.</li>
-          <li>Scoped keys, never your password. It acts in your name only where you allowed it.</li>
-          <li>Work happens while you sleep: watches, digests, deliveries, follow-ups.</li>
+          <li>It arrives ready. It reads the instructions so you never have to, and starts tinkering toward what you actually want: value delivered, hassle removed, every day.</li>
+          <li>It never gets your password. You decide what it may touch, and that decision holds.</li>
+          <li>Work happens while you sleep: it watches, collects, delivers and follows up.</li>
         </ul>
         <div class="wf-ideas">
           <strong>Ideas in a minute:</strong> a news watcher that boils the morning down to one note.
@@ -358,7 +391,7 @@
           your team shipped and posts it on schedule. That last one is exactly what we are raising
           for the Lab notes below.
         </div>
-        <div class="wf-reel"><div class="wf-reel-inner">Demo reels: in production. This spot is reserved for short clips of agents doing all of the above for real.</div></div>
+        <div class="wf-reel"><div class="wf-reel-inner">Demo reels: in production. This spot is reserved for short clips of these buddies doing all of the above for real.</div></div>
       </div>
     </div>
   </section>
@@ -369,9 +402,11 @@
       <div>
         <h2>Lab notes, or: what the hell have we built in here?</h2>
         <p>
-          This node is where AIMEAT features are built, broken and fixed first. The notes below are
-          true stories from the machine room, and there will be more: the plan is that this node's
-          own agents write them and push them out on schedule, using the same tools you just read about.
+          Picture a mad scientist's kitchen. We stir the recipes, and to everyone's surprise
+          things keep coming out of the oven: some delicious, some briefly on fire. What people
+          actually do here decides what gets cooked next. The notes below are true stories from
+          that kitchen, and there will be more, written and served on a schedule by the house
+          helpers themselves.
         </p>
       </div>
     </div>
@@ -388,7 +423,7 @@
         <time datetime="2026-08-16">2026-08-16</time>
         <h3>An AI that lands here reads a page, not a manual</h3>
         <p>
-          Any agent that meets this node gets one page that says what to do. The manual nobody
+          Any AI that walks in the door gets one page that says what to do. The manual nobody
           read has been retired by a page every machine actually reads.
         </p>
       </article>
@@ -414,8 +449,8 @@
       <a class="wf-btn wf-btn-cool" href="/v1/pricing">Own it</a>
     </div>
     <p class="wf-small">
-      Numbers on this page were read from <a class="wf-plain" href="/v1/public/node-totals">the node itself</a> on 2026-08-16.
-      Posters generated on this node's own imagery pipeline. No stock photos were harmed.
+      Numbers on this page were read from <a class="wf-plain" href="/v1/public/node-totals">the machine itself</a> on 2026-08-16.
+      Posters cooked in our own imagery kitchen. No stock photos were harmed.
     </p>
   </footer>
 
