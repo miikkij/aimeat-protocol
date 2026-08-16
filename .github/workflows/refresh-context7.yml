@@ -1,0 +1,26 @@
+name: Refresh Context7 Docs
+on:
+  push:
+    branches: [main]
+    # Only the paths Context7 actually parses. A refresh on every push would spend the
+    # rate limit on commits that cannot change a single indexed snippet.
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'context7.json'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    # The job reads nothing from the repo; it only calls out.
+    permissions: {}
+    steps:
+      - name: Ask Context7 to re-parse the library
+        run: |
+          # --fail-with-body so a rejected key or a renamed library breaks the build instead of
+          # failing silently for the 45 days until the automatic refresh would have run anyway.
+          curl --fail-with-body -sS -X POST https://context7.com/api/v1/refresh \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.CONTEXT7_API_KEY }}" \
+            -d '{"libraryName": "/${{ github.repository }}"}'
