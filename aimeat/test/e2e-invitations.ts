@@ -335,6 +335,43 @@ await test('C3. After activation the key shows activated and cannot be cancelled
 });
 
 const bMints: { u: string; c: string; id: string }[] = [];
+await test('C4b. A plain member cannot mint a key that joins somebody as an ORG ADMIN', async () => {
+    // B mints three keys at C4 with only email/username/code, never with org_role, so the
+    // `orgRole === 'admin' && !unlimited` refusal in routes/organisms/workspace-access.ts is
+    // exercised by nothing. Delete it and any active member mints a key that provisions a brand-new
+    // account joined as an ORG ADMIN. The handler's own comment records that as live behaviour once.
+    const r = await json(`/v1/organisms/${orgId}/invitations/code`, {
+        method: 'POST', headers: auth(B.token),
+        body: JSON.stringify({ email: `adm.${Date.now()}@example.com`, username: `e2eadm${Date.now()}`, code: 'EXC91-ABCD-EFGH-JKLM', org_role: 'admin' }),
+    });
+    assert(r.status === 403, `a plain member minted an ADMIN key: ${r.status} ${JSON.stringify(r.body?.data?.invitation ?? r.body?.error)}`);
+
+    // The creator may, because they are unlimited — so the refusal is about standing, not about the
+    // parameter being rejected outright.
+    const u = `e2eadmok${Date.now()}`, c = 'EXC92-ABCD-EFGH-JKLM';
+    const mine = await json(`/v1/organisms/${orgId}/invitations/code`, {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ email: `adm2.${Date.now()}@example.com`, username: u, code: c, org_role: 'admin' }),
+    });
+    assert(mine.status === 201, `the creator could not mint an admin key: ${mine.status} ${JSON.stringify(mine.body?.error)}`);
+    provisioned.push({ u, c });
+});
+
+await test('C4c. A plain member cannot grant a workspace they do not manage', async () => {
+    // Only A, the creator and quota-unlimited, ever mints with a `workspaces` array (C1). Delete the
+    // authorizeWorkspaceGrants call and a plain member mints a key granting contributor access to a
+    // workspace they do not manage — and because applyInvitationWorkspaceGrants writes the consent on
+    // the workspace CREATOR's behalf, the resulting grant carries no trace of who asked for it.
+    const r = await json(`/v1/organisms/${orgId}/invitations/code`, {
+        method: 'POST', headers: auth(B.token),
+        body: JSON.stringify({
+            email: `wsg.${Date.now()}@example.com`, username: `e2ewsg${Date.now()}`,
+            code: 'EXC93-ABCD-EFGH-JKLM', workspaces: [{ ws: WS, role: 'contributor' }],
+        }),
+    });
+    assert(r.status === 403, `a plain member granted a workspace they do not manage: ${r.status} ${JSON.stringify(r.body?.data?.invitation ?? r.body?.error)}`);
+});
+
 await test('C4. Per-inviter quota: a plain member mints 3, the 4th is 429', async () => {
     for (let i = 0; i < 3; i++) {
         const u = `e2eq${i}${Date.now()}`;
@@ -361,6 +398,32 @@ await test('C5. Cancelling an un-activated key deletes the account and frees a s
     const again = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ email: `q5.${Date.now()}@example.com`, username: u, code: c }) });
     assert(again.status === 201, `mint after cancel expected 201, got ${again.status}`);
     provisioned.push({ u, c });
+});
+
+await test('C5b. A member cannot cancel ANOTHER member\'s un-activated key', async () => {
+    // C5 has B cancel B's OWN key. Delete the `inv.invitedBy !== inviter && !gate.unlimited` refusal
+    // and any active member cancels another member's key — which on this path runs
+    // storage.deleteOwner(inv.provisionedOwner): it deletes a real account, revokes its workspace
+    // grants and drops its membership.
+    // NOT bMints[0]: C5 cancels that one, which deletes the account behind it.
+    const target = bMints[1];
+    assert(!!target, 'B has an un-cancelled key to protect');
+
+    // A THIRD member who is neither the inviter nor the creator: the account A's own key provisioned
+    // in C1, which is already joined. It logs in with the credential C2 rotated it to.
+    assert(!!codeCred1, 'need the provisioned account from C2');
+    const keyLogin = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: codeUser1, password: codeCred1!.password }) });
+    assert(keyLogin.status === 200, `keyholder login ${keyLogin.status}: ${JSON.stringify(keyLogin.body?.error)}`);
+    const third = keyLogin.body.data.token as string;
+
+    const cancel = await json(`/v1/organisms/${orgId}/invitations/code/${target!.id}/cancel`, {
+        method: 'POST', headers: auth(third), body: '{}',
+    });
+    assert(cancel.status === 403, `a member cancelled another member's key: ${cancel.status} ${JSON.stringify(cancel.body?.error)}`);
+
+    // And the account behind it is still there, which is what the cancel would have deleted.
+    const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: target!.u, password: target!.c }) });
+    assert(lg.status === 200, `the refused cancel deleted the account anyway: ${lg.status}`);
 });
 
 await test('C6. Mint validates: bad email → 400, short code → 400', async () => {
