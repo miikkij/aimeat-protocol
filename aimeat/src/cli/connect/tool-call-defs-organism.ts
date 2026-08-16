@@ -12,7 +12,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalArray, requiredArray, coerceObject, stampValue, genWsId, wsRoot } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalArray, optionalBoolean, requiredArray, coerceObject, stampValue, genWsId, wsRoot } from './tool-call-helpers.js';
 import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem, type WriteObjectType } from '../../services/workspace-write-items.js';
 
 export const organismTools: ConnectCliToolDefinition[] = [
@@ -140,7 +140,13 @@ export const organismTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_organism_search',
         handler: ({ client }, input) => {
             const ws = optionalString(input, 'ws');
-            return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/search${query({ q: requiredString(input, 'q'), ...(ws ? { ws } : {}) })}`);
+            return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/search${query({
+                q: requiredString(input, 'q'),
+                ...(ws ? { ws } : {}),
+                // An archive SCOPE — "exclude" (default), "only", "include" — not a flag. Read as a
+                // boolean it would have collapsed three answers into two.
+                archived: optionalString(input, 'archived'),
+            })}`);
         },
     },
     {
@@ -217,7 +223,18 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_read',
-        handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({ ws: requiredString(input, 'ws') })}`),
+        // `ids` and `space` are how a caller reads ONE document instead of the whole workspace.
+        // Dropped, every read was a full listing, which is the difference between opening a page and
+        // downloading the book.
+        handler: ({ client }, input) => {
+            const ids = optionalArray(input, 'ids')?.filter((i): i is string => typeof i === 'string');
+            return client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/workspace${query({
+                ws: requiredString(input, 'ws'),
+                ids: ids?.length ? ids.join(',') : undefined,
+                space: optionalString(input, 'space'),
+                include_archived: optionalBoolean(input, 'include_archived') ? 'true' : undefined,
+            })}`);
+        },
     },
     {
         name: 'aimeat_workspace_overview',

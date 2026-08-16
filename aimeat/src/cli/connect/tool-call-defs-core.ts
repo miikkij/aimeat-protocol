@@ -83,8 +83,12 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const ttlHours = optionalNumber(input, 'ttl_hours');
             if (visibility) body.visibility = visibility;
             const tags = optionalArray(input, 'tags');
+            const groupId = optionalString(input, 'group_id');
             if (tags) body.tags = tags;
             if (ttlHours !== undefined) body.ttl_hours = ttlHours;
+            // Required whenever visibility is 'group'. Without it the write is refused, or worse,
+            // stored with a visibility the caller asked for and a group the node never heard of.
+            if (groupId) body.group_id = groupId;
             // Where the record LIVES, which is a different question from `visibility`, who may read
             // it. Without this every write from this door landed under the agent however the caller
             // meant it, and the owner's own tools could not see it. The route still decides:
@@ -122,7 +126,12 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_catalogue_search',
-        handler: ({ client }, input) => client.get(`/v1/catalogue${query({ q: optionalString(input, 'query') })}`),
+        handler: ({ client }, input) => client.get(`/v1/catalogue${query({
+            // `query` is this door's own historical spelling; `search` is what the catalog publishes
+            // and what every other surface takes. Both are accepted so neither caller is broken.
+            search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+            category: optionalString(input, 'category'),
+        })}`),
     },
     {
         name: 'aimeat_discover',
@@ -149,7 +158,13 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const body: JsonObject = { action_id: requiredString(input, 'action_id') };
             const actionInput = optionalRecord(input, 'input');
+            const providerGaii = optionalString(input, 'provider_gaii');
+            const ttlHours = optionalNumber(input, 'ttl_hours');
             if (actionInput) body.input = actionInput;
+            // WHO is being asked, and for how long the grant lasts. Dropping the first sends the
+            // request to whoever the node picks; dropping the second silently takes the default TTL.
+            if (providerGaii) body.provider_gaii = providerGaii;
+            if (ttlHours !== undefined) body.ttl_hours = ttlHours;
             return client.post('/v1/work/request', body);
         },
     },
@@ -174,14 +189,19 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_board_read',
-        handler: ({ client }, input) => client.get(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`),
+        handler: ({ client }, input) => client.get(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts${query({
+            category: optionalString(input, 'category'),
+            limit: optionalNumber(input, 'limit'),
+        })}`),
     },
     {
         name: 'aimeat_board_post',
-        handler: ({ client }, input) => client.post(
-            `/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`,
-            { title: requiredString(input, 'title'), body: requiredString(input, 'body') },
-        ),
+        handler: ({ client }, input) => {
+            const body: JsonObject = { title: requiredString(input, 'title'), body: requiredString(input, 'body') };
+            const category = optionalString(input, 'category');
+            if (category) body.category = category;
+            return client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/posts`, body);
+        },
     },
     {
         name: 'aimeat_storage_upload',
@@ -202,9 +222,12 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const slash = key.indexOf('/');
             const head = slash > 0 ? key.slice(0, slash) : '';
             const owner = optionalString(input, 'owner') ?? (head.includes('@') || head.startsWith('ext:') ? head : '');
-            if (!owner) return client.get(`/v1/storage/${encodeURIComponent(key)}`);
+            // `inline` asks for the BYTES in the response rather than a handle to fetch. It is the
+            // difference between an agent reading a file and an agent being told where one is.
+            const inline = optionalBoolean(input, 'inline') === true;
+            if (!owner) return client.get(`/v1/storage/${encodeURIComponent(key)}${query({ inline: inline ? 'true' : undefined })}`);
             const refKey = optionalString(input, 'owner') ? key : key.slice(slash + 1);
-            return client.get(`/v1/pub/${encodeURIComponent(owner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`);
+            return client.get(`/v1/pub/${encodeURIComponent(owner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=${inline ? 'inline' : 'handle'}`);
         },
     },
     {
@@ -243,7 +266,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_agents',
-        handler: ({ client }) => client.get('/v1/admin/agents'),
+        handler: ({ client }, input) => client.get(`/v1/admin/agents${query({ limit: optionalNumber(input, 'limit') })}`),
     },
     {
         name: 'aimeat_admin_config',
@@ -259,14 +282,25 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const body: JsonObject = { name: requiredString(input, 'name') };
             const description = optionalString(input, 'description');
             const visibility = optionalString(input, 'visibility');
+            const allowedGaiis = optionalArray(input, 'allowed_gaiis');
             if (description) body.description = description;
             if (visibility) body.visibility = visibility;
+            // Without this a shared or private board is created with nobody on it, which reads as
+            // "the board is broken" rather than "the guest list never left your machine".
+            if (allowedGaiis) body.allowed_gaiis = allowedGaiis;
             return client.post('/v1/boards', body);
         },
     },
     {
         name: 'aimeat_board_subscribe',
-        handler: ({ client }, input) => client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/subscribe`),
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const callbackUrl = optionalString(input, 'callback_url');
+            const filters = optionalRecord(input, 'filters');
+            if (callbackUrl) body.callback_url = callbackUrl;
+            if (filters) body.filters = filters;
+            return client.post(`/v1/boards/${encodeURIComponent(requiredString(input, 'board_id'))}/subscribe`, body);
+        },
     },
     {
         name: 'aimeat_board_react',
@@ -295,7 +329,20 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_capabilities_list',
-        handler: ({ client }, input) => client.get(`/v1/capabilities${query({ q: optionalString(input, 'query') })}`),
+        handler: ({ client }, input) => {
+            const tags = optionalArray(input, 'tags')?.filter((t): t is string => typeof t === 'string');
+            return client.get(`/v1/capabilities${query({
+                search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+                tags: tags?.length ? tags.join(',') : undefined,
+                // `callable` is a flag and arrives either as a boolean (JSON caller) or as the
+                // string "true" (shell caller); `authRequired` is NOT a flag at all — the catalog
+                // publishes it as an auth LEVEL (none / anonymous / registered), and reading it as a
+                // boolean would have turned "registered" into "true".
+                callable: optionalBoolean(input, 'callable') || optionalString(input, 'callable') === 'true' ? 'true' : undefined,
+                authRequired: optionalString(input, 'authRequired'),
+                source_type: optionalString(input, 'source_type'),
+            })}`);
+        },
     },
     {
         name: 'aimeat_capabilities_get',
@@ -304,7 +351,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_capabilities_invoke',
         handler: ({ client }, input) => client.post(
-            `/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/invoke`,
+            `/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/invoke${query({ mode: optionalString(input, 'mode') })}`,
             optionalRecord(input, 'input') ?? {},
         ),
     },
@@ -320,10 +367,13 @@ export const coreTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_capabilities_update',
         handler: ({ client }, input) => {
             const body: JsonObject = {};
-            const name = optionalString(input, 'name');
-            const description = optionalString(input, 'description');
-            if (name) body.name = name;
-            if (description) body.description = description;
+            // Every optional field the catalog publishes, not the two this door happened to read.
+            for (const field of ['name', 'description', 'summary', 'visibility', 'usage', 'whenToUse', 'whenNotToUse'] as const) {
+                const v = optionalString(input, field);
+                if (v) body[field] = v;
+            }
+            const tags = optionalArray(input, 'tags');
+            if (tags) body.tags = tags;
             return client.put(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}`, body);
         },
     },
@@ -333,11 +383,20 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_capabilities_vouch',
-        handler: ({ client }, input) => client.post(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/vouch`, {}),
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const comment = optionalString(input, 'comment');
+            // The vouch is the signature; the comment is the reason anyone would trust it.
+            if (comment) body.comment = comment;
+            return client.post(`/v1/capabilities/${encodeURIComponent(requiredString(input, 'id'))}/vouch`, body);
+        },
     },
     {
         name: 'aimeat_catalogue_agents',
-        handler: ({ client }, input) => client.get(`/v1/catalogue/agents${query({ q: optionalString(input, 'query') })}`),
+        handler: ({ client }, input) => client.get(`/v1/catalogue/agents${query({
+            search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+            category: optionalString(input, 'category'),
+        })}`),
     },
     {
         name: 'aimeat_catalogue_boards',
@@ -345,7 +404,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_catalogue_directory',
-        handler: ({ client }, input) => client.get(`/v1/catalogue/directory${query({ q: optionalString(input, 'query') })}`),
+        handler: ({ client }, input) => client.get(`/v1/catalogue/directory${query({
+            q: optionalString(input, 'query'),
+            city: optionalString(input, 'city'),
+            interest: optionalString(input, 'interest'),
+        })}`),
     },
     {
         name: 'aimeat_consent_grant',
@@ -366,11 +429,18 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_flag_report',
-        handler: ({ client }, input) => client.post('/v1/flags', {
-            target_type: requiredString(input, 'target_type'),
-            target_id: requiredString(input, 'target_id'),
-            reason: requiredString(input, 'reason'),
-        }),
+        handler: ({ client }, input) => {
+            const body: JsonObject = {
+                target_type: requiredString(input, 'target_type'),
+                target_id: requiredString(input, 'target_id'),
+                reason: requiredString(input, 'reason'),
+            };
+            const description = optionalString(input, 'description');
+            // `reason` is the category; `description` is what actually happened. A report that
+            // arrives as a category alone is a report nobody can act on.
+            if (description) body.description = description;
+            return client.post('/v1/flags', body);
+        },
     },
     {
         name: 'aimeat_group_list',
@@ -385,7 +455,11 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const body: JsonObject = { name: requiredString(input, 'name') };
             const description = optionalString(input, 'description');
+            const members = optionalArray(input, 'members');
             if (description) body.description = description;
+            // A sharing group created without its members is an empty group, and group visibility
+            // then silently shares with nobody.
+            if (members) body.members = members;
             return client.post('/v1/groups', body);
         },
     },
@@ -431,7 +505,9 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const body: JsonObject = { name: requiredString(input, 'name') };
             const template = optionalString(input, 'template');
+            const model = optionalString(input, 'model');
             if (template) body.template = template;
+            if (model) body.model = model;
             return client.post('/v1/instances', body);
         },
     },
@@ -476,7 +552,22 @@ export const coreTools: ConnectCliToolDefinition[] = [
         handler: ({ client, agentPath }, input) => {
             const view = optionalString(input, 'view') ?? 'library';
             if (view === 'linked') return client.get(`/v1/agents/${agentPath}/skills/links`);
-            return client.get(`/v1/skills?scope=${view === 'mine' ? 'user' : 'library'}`);
+            // `view=workspace` is published in the catalog and was not implemented on either
+            // connector door: it fell through to the library listing, so asking for one workspace's
+            // skills answered with the whole node's and looked like the workspace had none. The
+            // route spells its parameters `organism` and `ws`, not organism_id / workspace_id.
+            if (view === 'workspace') {
+                return client.get(`/v1/skills${query({
+                    scope: 'workspace',
+                    organism: optionalString(input, 'organism_id'),
+                    ws: optionalString(input, 'workspace_id'),
+                    binding: optionalString(input, 'binding'),
+                })}`);
+            }
+            return client.get(`/v1/skills${query({
+                scope: view === 'mine' ? 'user' : 'library',
+                binding: optionalString(input, 'binding'),
+            })}`);
         },
     },
     {

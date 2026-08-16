@@ -20,10 +20,15 @@ export const agentTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_handbook_get',
         description: 'Get the agent operating handbook or one handbook module.',
-        input: { module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' } },
-        handler: ({ client }, input) => client.get(optionalString(input, 'module')
-            ? `/v1/agents/me/handbook/${encodeURIComponent(optionalString(input, 'module')!)}`
-            : '/v1/agents/me/handbook'),
+        input: {
+            module: { type: 'string', description: 'Optional handbook module name, such as tasks or messages.' },
+            surface: { type: 'string', description: 'Which surface the handbook is for. The catalog has published this since the surfaces split; this door read only `module`, so asking for one was the same as asking for none.' },
+        },
+        handler: ({ client }, input) => {
+            const module = optionalString(input, 'module');
+            const q = query({ surface: optionalString(input, 'surface') });
+            return client.get(module ? `/v1/agents/me/handbook/${encodeURIComponent(module)}${q}` : `/v1/agents/me/handbook${q}`);
+        },
     },
     {
         name: 'aimeat_onboarding_status',
@@ -268,8 +273,18 @@ export const agentTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_task_list',
         description: 'List tasks for the connected agent.',
-        input: { status: { type: 'string', description: 'Optional task status filter.' } },
-        handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/tasks${query({ status: optionalString(input, 'status') })}`),
+        input: {
+            status: { type: 'string', description: 'Optional task status filter.' },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Results per page (default 20, max 100).' },
+        },
+        // Without page/per_page a fleet with more than one page of history could not reach the rest
+        // of it from this door at all: the first 20 were the only 20 that existed.
+        handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/tasks${query({
+            status: optionalString(input, 'status'),
+            page: optionalNumber(input, 'page'),
+            per_page: optionalNumber(input, 'per_page'),
+        })}`),
     },
     {
         name: 'aimeat_task_create',
@@ -280,6 +295,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
             description: { type: 'string', required: true, description: 'The actual prompt / instruction.' },
             status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued".' },
             scope: { type: 'array', description: 'Named parameters the receiving runner dispatches on: [{ name, value, type?, description? }]. A fleet runner recognises work by a `kind` entry here, not by the title.' },
+            files: { type: 'array', description: 'Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" each (a bare key means a file the calling agent owns).' },
         },
         handler: ({ client }, input) => {
             const target = requiredString(input, 'target_agent');
@@ -287,11 +303,15 @@ export const agentTools: ConnectCliToolDefinition[] = [
                 const o = (entry && typeof entry === 'object' && !Array.isArray(entry)) ? entry as JsonObject : {};
                 return { ...o, type: typeof o.type === 'string' ? o.type : 'text' };
             });
+            // Attachments. The connector's MCP twin has taken these since August; this door dropped
+            // them, so a task commissioned here arrived without the files it was about.
+            const files = (optionalArray(input, 'files') ?? []).map(ref => ({ ref }));
             return client.post(`/v1/agents/${encodeURIComponent(target)}/tasks`, {
                 title: requiredString(input, 'title'),
                 description: requiredString(input, 'description'),
                 status: optionalString(input, 'status') ?? 'queued',
                 ...(scope.length ? { scope } : {}),
+                ...(files.length ? { resources: { files } } : {}),
                 verification: { user_expects: '', technical_checks: [] },
                 todos: [],
             });

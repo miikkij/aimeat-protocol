@@ -60,7 +60,56 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...appTools,
     ...appDraftEditTools,
     ...exchangeTools,
-].map(withProvenanceCarrying);
+].map(withProvenanceCarrying).map(withDeclaredInputOnly);
+
+/**
+ * REFUSE A PARAMETER THIS TOOL DOES NOT DECLARE, instead of ignoring it.
+ *
+ * THE DEFECT THIS ENDS. A caller sent `deliverable_key` to aimeat_task_complete, got `ok: true`
+ * back, and the pointer to its own output was gone: no error, no warning, no log line. The same
+ * shape then repeated with `owner_scope` on the memory tools, and a crew's public mirror read only
+ * its own namespace for weeks while every call it made succeeded. Silent loss is the whole problem;
+ * a dropped parameter that ANSWERS is worse than one that refuses, because nobody investigates a
+ * success.
+ *
+ * So the contract is enforced in one place, on the assembled table, exactly like
+ * withProvenanceCarrying above — a per-handler version would have left whichever door somebody
+ * forgot still swallowing the field, which is the bug, not the fix.
+ *
+ * A tool that declares NO input anywhere stays permissive: absence of a schema is not evidence that
+ * a parameter is wrong, and guessing would refuse working calls.
+ */
+function withDeclaredInputOnly(tool: ConnectCliToolDefinition): ConnectCliToolDefinition {
+    const declared = new Set<string>([
+        ...Object.keys(tool.input ?? {}),
+        ...Object.keys(getAimeatToolDefinition(tool.name)?.input ?? {}),
+        // Handled by the wrapper above rather than by any handler.
+        'ai_provenance', 'ai_provenance_id',
+        // Chosen by the dispatcher, not forwarded as a field.
+        'agent_name', 'response_format',
+    ]);
+    // Nothing to check against.
+    if (declared.size <= 4) return tool;
+    return {
+        ...tool,
+        handler: (ctx, input) => {
+            const unknown = Object.keys(input ?? {}).filter(key => !declared.has(key));
+            if (unknown.length) {
+                const accepted = [...declared].filter(k => k !== 'ai_provenance' && k !== 'ai_provenance_id' && k !== 'response_format').sort();
+                return Promise.resolve({ ok: false as const, error: {
+                    code: 'UNKNOWN_PARAMETER',
+                    message: `${tool.name} does not take ${unknown.map(u => `"${u}"`).join(', ')}. `
+                        + `It takes: ${accepted.join(', ')}. `
+                        + 'This is a refusal rather than a silent drop on purpose: a parameter that is ignored '
+                        + 'while the call succeeds is how a caller loses data without ever being told.',
+                    unknown_parameters: unknown,
+                    accepted_parameters: accepted,
+                } });
+            }
+            return tool.handler(ctx, input);
+        },
+    };
+}
 
 function getTool(name: string): ConnectCliToolDefinition | undefined {
     return CONNECT_CLI_TOOLS.find(tool => tool.name === name);

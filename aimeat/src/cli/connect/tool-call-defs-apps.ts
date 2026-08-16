@@ -236,12 +236,14 @@ export const appTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_extension_invoke',
         description: 'Invoke an extension action.',
         input: {
-            name: { type: 'string', required: true, description: 'Extension name.' },
+            extension_name: { type: 'string', description: 'Extension name. (`name` is accepted as the older spelling this door used.)' },
+            name: { type: 'string', description: 'Older spelling of extension_name.' },
             action_id: { type: 'string', required: true, description: 'Action identifier.' },
             input: { type: 'object', description: 'Input parameters.' },
+            instance_id: { type: 'string', description: 'Which installed instance to invoke, when the extension has more than one.' },
         },
         handler: ({ client }, input) => client.post(
-            `/v1/ext/${encodeURIComponent(requiredString(input, 'name'))}/${encodeURIComponent(requiredString(input, 'action_id'))}`,
+            `/v1/ext/${encodeURIComponent(optionalString(input, 'extension_name') ?? requiredString(input, 'name'))}/${encodeURIComponent(requiredString(input, 'action_id'))}${query({ instance_id: optionalString(input, 'instance_id') })}`,
             optionalRecord(input, 'input') ?? {},
         ),
     },
@@ -251,11 +253,18 @@ export const appTools: ConnectCliToolDefinition[] = [
         input: {
             name: { type: 'string', required: true, description: 'Extension name.' },
             manifest: { type: 'object', required: true, description: 'Extension manifest object.' },
+            scripts: { type: 'object', description: 'The extension SOURCE, as { path: contents }. POST /v1/extensions reads it; without it the install has a manifest and no code.' },
+            update: { type: 'boolean', description: 'Update an extension that already exists instead of refusing.' },
+            activate: { type: 'boolean', description: 'Activate it once installed.' },
         },
-        handler: ({ client }, input) => client.post('/v1/extensions', {
-            name: requiredString(input, 'name'),
-            manifest: requiredRecord(input, 'manifest'),
-        }),
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name'), manifest: requiredRecord(input, 'manifest') };
+            const scripts = optionalRecord(input, 'scripts');
+            if (scripts) body.scripts = scripts;
+            if (optionalBoolean(input, 'update')) body.update = true;
+            if (optionalBoolean(input, 'activate')) body.activate = true;
+            return client.post('/v1/extensions', body);
+        },
     },
     {
         name: 'aimeat_extension_activate',
@@ -293,11 +302,14 @@ export const appTools: ConnectCliToolDefinition[] = [
         input: {
             name: { type: 'string', required: true, description: 'Cortex name.' },
             manifest: { type: 'object', required: true, description: 'Cortex manifest object.' },
+            libs: { type: 'object', description: 'The cortex library sources, as { path: contents }. POST /v1/cortex reads it; without it the pack installs with no code in it.' },
         },
-        handler: ({ client }, input) => client.post('/v1/cortex', {
-            name: requiredString(input, 'name'),
-            manifest: requiredRecord(input, 'manifest'),
-        }),
+        handler: ({ client }, input) => {
+            const body: JsonObject = { name: requiredString(input, 'name'), manifest: requiredRecord(input, 'manifest') };
+            const libs = optionalRecord(input, 'libs');
+            if (libs) body.libs = libs;
+            return client.post('/v1/cortex', body);
+        },
     },
     {
         name: 'aimeat_cortex_activate',
@@ -358,15 +370,29 @@ export const appTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_workflow_answer',
         description: 'Answer a paused human-input step of a workflow run (resumes the run).',
         input: {
-            id: { type: 'string', required: true, description: 'The workflow id.' },
+            workflow_id: { type: 'string', description: 'The workflow id. (`id` is accepted as the older spelling this door used.)' },
+            id: { type: 'string', description: 'Older spelling of workflow_id.' },
             run_id: { type: 'string', required: true, description: 'The run id (from aimeat_workflow_pending_inputs).' },
             step_id: { type: 'string', required: true, description: 'The paused step id awaiting input.' },
-            answer: { type: 'object', description: 'The answer payload for the step (object).' },
+            picks: { type: 'array', description: 'Option ids from the pinned question (may be empty when answering with `other` alone).' },
+            other: { type: 'string', description: 'Free-text answer; only when the question allows it.' },
         },
-        handler: ({ client }, input) => client.post(
-            `/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}/runs/${encodeURIComponent(requiredString(input, 'run_id'))}/steps/${encodeURIComponent(requiredString(input, 'step_id'))}/answer`,
-            { answer: optionalRecord(input, 'answer') ?? {} },
-        ),
+        // NOT A DROPPED PARAMETER — A BROKEN TOOL. The route reads { picks, other } and this door
+        // sent { answer: {...} }, so every human-input answer from /local/call was accepted as an
+        // empty body and the run stayed parked. `answer` is still read, as an object carrying picks
+        // and other, so a caller written against the old shape keeps working.
+        handler: ({ client }, input) => {
+            const workflowId = optionalString(input, 'workflow_id') ?? requiredString(input, 'id');
+            const legacy = optionalRecord(input, 'answer') ?? {};
+            const picks = optionalArray(input, 'picks') ?? (Array.isArray(legacy.picks) ? legacy.picks : []);
+            const other = optionalString(input, 'other') ?? (typeof legacy.other === 'string' ? legacy.other : undefined);
+            const body: JsonObject = { picks };
+            if (other !== undefined) body.other = other;
+            return client.post(
+                `/v1/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(requiredString(input, 'run_id'))}/steps/${encodeURIComponent(requiredString(input, 'step_id'))}/answer`,
+                body,
+            );
+        },
     },
     {
         // → GET /v1/workflows/pending-inputs — every run of the caller's workflows awaiting human input.
@@ -429,8 +455,28 @@ export const appTools: ConnectCliToolDefinition[] = [
         // → GET /v1/appdev/pitfalls/learned[?include_shared=1] — the caller's learned pitfall entries.
         name: 'aimeat_appdev_pitfall_list',
         description: 'List learned appdev-pitfall entries in your owner scope (optionally including others\' shared entries).',
-        input: { include_shared: { type: 'boolean', description: 'Also include other owners\' public-shared entries.' } },
-        handler: ({ client }, input) => client.get(`/v1/appdev/pitfalls/learned${query({ include_shared: optionalBoolean(input, 'include_shared') ? '1' : undefined })}`),
+        input: {
+            include_shared: { type: 'boolean', description: 'Also include other owners\' public-shared entries.' },
+            scope: { type: 'string', description: 'Filter by scope.' },
+            category: { type: 'string', description: 'Filter by category.' },
+            model: { type: 'string', description: 'Filter by the model that reported it.' },
+            applies_to: { type: 'string', description: 'Filter by what the entry applies to.' },
+            status: { type: 'string', description: 'Filter by entry status.' },
+            limit: { type: 'number', description: 'Max entries to return.' },
+            offset: { type: 'number', description: 'Offset into the result set.' },
+        },
+        // Every filter the catalog published arrived here and stopped: the listing was always the
+        // whole thing, and a caller asking for one category got everything and had to filter twice.
+        handler: ({ client }, input) => client.get(`/v1/appdev/pitfalls/learned${query({
+            include_shared: optionalBoolean(input, 'include_shared') ? '1' : undefined,
+            scope: optionalString(input, 'scope'),
+            category: optionalString(input, 'category'),
+            model: optionalString(input, 'model'),
+            applies_to: optionalString(input, 'applies_to'),
+            status: optionalString(input, 'status'),
+            limit: optionalNumber(input, 'limit'),
+            offset: optionalNumber(input, 'offset'),
+        })}`),
     },
     {
         // → DELETE /v1/appdev/pitfalls/learned/:category/:slug — remove one learned entry.
@@ -560,12 +606,18 @@ export const appTools: ConnectCliToolDefinition[] = [
             model: { type: 'string', required: true, description: 'YOUR OWN model id (self-identify; indicative).' },
             tags: { type: 'array', description: 'Optional tags.' },
             start_mode: { type: 'string', enum: ['fork', 'scaffold', 'either'], description: 'How the next build should start (default either).' },
+            start_mode_rationale: { type: 'string', description: 'Why that start mode, for whoever picks the template up.' },
+            model_notes: { type: 'string', description: 'What the reporting model found hard or easy here.' },
+            packs: { type: 'array', description: 'Library packs the template needs.' },
+            composes: { type: 'array', description: 'Other templates this one composes with.' },
+            derived_from: { type: 'object', description: 'Explicit { owner, filename } source, when it is not the owner/filename pair above.' },
         },
         handler: ({ client }, input) => {
             const id = requiredString(input, 'id');
             const value: JsonObject = {
                 id, title: requiredString(input, 'title'), description: requiredString(input, 'description'),
-                derivedFrom: { owner: requiredString(input, 'owner'), filename: requiredString(input, 'filename') },
+                derivedFrom: optionalRecord(input, 'derived_from')
+                    ?? { owner: requiredString(input, 'owner'), filename: requiredString(input, 'filename') },
                 tier: optionalString(input, 'tier') ?? 'T1',
                 reuseNotes: requiredString(input, 'reuse_notes'),
                 model: requiredString(input, 'model').trim().toLowerCase(),
@@ -573,6 +625,16 @@ export const appTools: ConnectCliToolDefinition[] = [
                 startMode: optionalString(input, 'start_mode') ?? 'either',
                 updatedAt: new Date().toISOString(),
             };
+            // The five fields a template is actually chosen by. Dropped, every proposal looked
+            // identical to the next one in the catalogue.
+            const rationale = optionalString(input, 'start_mode_rationale');
+            const modelNotes = optionalString(input, 'model_notes');
+            const packs = optionalArray(input, 'packs');
+            const composes = optionalArray(input, 'composes');
+            if (rationale) value.startModeRationale = rationale;
+            if (modelNotes) value.modelNotes = modelNotes;
+            if (packs) value.packs = packs;
+            if (composes) value.composes = composes;
             return client.post('/v1/memory', { key: `template.catalog.${id}.manifest`, value, visibility: 'owner', tags: ['app-template'] });
         },
     },
@@ -615,13 +677,22 @@ export const appTools: ConnectCliToolDefinition[] = [
         input: {
             app_id: { type: 'string', required: true, description: 'The app\'s published filename (manifest key is apps.{app_id}.tools).' },
             tools: { type: 'array', required: true, description: 'Full tool list: [{ name, description?, inputSchema?, action_id?, agent?, price?, priceMoney? }].' },
+            odps: { type: 'object', description: 'ODPS product block published alongside the manifest.' },
+            provenance: { type: 'object', description: 'How the manifest was produced.' },
         },
-        handler: ({ client }, input) => client.post('/v1/memory', {
-            key: `apps.${requiredString(input, 'app_id')}.tools`,
-            value: { version: 1, updatedAt: new Date().toISOString(), tools: requiredArray(input, 'tools') },
-            visibility: 'public',
-            tags: ['commerce', 'app-tools'],
-        }),
+        handler: ({ client }, input) => {
+            const value: JsonObject = { version: 1, updatedAt: new Date().toISOString(), tools: requiredArray(input, 'tools') };
+            const odps = optionalRecord(input, 'odps');
+            const provenance = optionalRecord(input, 'provenance');
+            if (odps) value.odps = odps;
+            if (provenance) value.provenance = provenance;
+            return client.post('/v1/memory', {
+                key: `apps.${requiredString(input, 'app_id')}.tools`,
+                value,
+                visibility: 'public',
+                tags: ['commerce', 'app-tools'],
+            });
+        },
     },
     {
         // → GET /v1/memory/apps.{app_id}.tools — read the manifest (own always; others only when public).
@@ -634,9 +705,16 @@ export const appTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const key = `apps.${requiredString(input, 'app_id')}.tools`;
             const owner = optionalString(input, 'owner');
-            // Own manifest: GET /v1/memory/:key. Cross-owner needs a full GHII (owner@node) supplied by
-            // the caller — GET /v1/memory/:gaii/:key (public only); a bare owner falls back to own.
-            return owner && owner.includes('@')
+            // A bare owner used to fall back to reading YOUR OWN manifest, which is the worst kind
+            // of wrong answer: the caller asked about someone else's app and got their own back with
+            // no indication that the question had changed. Say so instead.
+            if (owner && !owner.includes('@')) {
+                return Promise.resolve({ ok: false as const, error: {
+                    code: 'INVALID_INPUT',
+                    message: `owner must be a full GHII ("${owner}@<node-id>"), not a bare name — a cross-owner read needs the node it lives on. Omit owner entirely to read your own manifest.`,
+                } });
+            }
+            return owner
                 ? client.get(`/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}`)
                 : client.get(`/v1/memory/${encodeURIComponent(key)}`);
         },
