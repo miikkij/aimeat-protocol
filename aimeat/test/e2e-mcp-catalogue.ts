@@ -407,6 +407,49 @@ await test('11. aimeat_catalogue_directory with interest filter returns array', 
     assert(Array.isArray(entries), 'result is array');
 });
 
+// The directory is an OPT-IN: it lists people whose profile.location is public, and the two tests
+// above assert only that the answer is an array. An array is what a broken filter returns too. The
+// gate is one line in the per-GHII loop, and nothing had ever asked it about somebody who did not
+// opt in — so publishing every owner on the node would have passed both.
+let dirOwnerB = '';
+
+await test('12. Setup: A keeps a PRIVATE profile, B publishes one', async () => {
+    const priv = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'profile.location', value: { city: 'Tampere' }, visibility: 'private' }),
+    });
+    assert(priv.status === 200 || priv.status === 201, `A private profile: ${priv.status}`);
+
+    dirOwnerB = `catdir${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: dirOwnerB, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `owner B: ${reg.status}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: dirOwnerB, timestamp: ts, signature: await signMsg(reg.body.data.private_key, dirOwnerB + NODE_ID + ts) }),
+    });
+    assert(tok.body.ok === true, `owner B token: ${JSON.stringify(tok.body.error)}`);
+    const bAuth = { Authorization: `Bearer ${tok.body.data.token}` };
+    for (const [key, value] of [['profile.location', { city: 'Helsinki' }], ['profile.interests', ['music', 'sailing']]] as const) {
+        const w = await json('/v1/memory', { method: 'POST', headers: bAuth, body: JSON.stringify({ key, value, visibility: 'public' }) });
+        assert(w.status === 200 || w.status === 201, `B ${key}: ${w.status}`);
+    }
+});
+
+await test('13. The directory lists the owner who opted IN and not the one who did not', async () => {
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_catalogue_directory', arguments: {} }, 303);
+    const entries = JSON.parse(body.result.content[0].text) as any[];
+
+    const b = entries.find(e => e.ghii === `${dirOwnerB}@${NODE_ID}`);
+    assert(!!b, `the opted-in owner must be listed: ${JSON.stringify(entries.map(e => e.ghii))}`);
+    assert(b.city === 'Helsinki', `and carry their public city: ${JSON.stringify(b)}`);
+
+    // The whole point: A's location is private, so A is not in the directory at all.
+    assert(!entries.some(e => e.ghii === `${ownerName}@${NODE_ID}`),
+        `an owner with a PRIVATE profile must not be listed: ${JSON.stringify(entries.map(e => e.ghii))}`);
+    assert(!JSON.stringify(entries).includes('Tampere'), 'and their private city must not appear anywhere in the answer');
+});
+
 // ─── Summary ───
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
