@@ -184,10 +184,55 @@ await test('4. Bob receives it FROM ALICE (the human), not from the agent', asyn
     assert(!m.senderGhii.includes('#'), `sender must NOT be an agent GAII, got ${m.senderGhii}`);
 });
 
+// Tests 2-4 prove the DISPLAY side hard: the message reads as Alice, and the sender is not an agent
+// GAII. The provenance side — which the tool's own comment calls the sharpest case on this surface —
+// was asserted by nothing. Delegation moves the SIGNATURE, not the authorship: the message displays
+// as Alice because she delegated, and the provenance record must still say an agent produced the
+// bytes. A record naming Alice would be the false attribution the whole design exists to prevent.
+await test('4b. the provenance names the AGENT while the message displays as Alice', async () => {
+    const PROV_BODY = `Provenance ${stamp}: tämä teksti on agentin tuottamaa.`;
+    const client = await connectMcp(sendbot.gaii, sendbot.key);
+    // No ai_provenance declaration in the call — silence is exactly the case the rule is about.
+    const { ok, body } = await client.call('aimeat_dm_send_as_owner', { to: bob.ghii, body: PROV_BODY });
+    assert(ok, `call should succeed: ${JSON.stringify(body.result ?? body.error)}`);
+    const res = toolResult(body);
+
+    // The display half, restated so this test carries the whole rule rather than half of it.
+    assert(res.sent_as === alice.ghii, `sent_as should still be Alice, got ${res.sent_as}`);
+
+    const rec = res.ai_provenance?.record;
+    assert(!!rec, `the write must be stamped: ${JSON.stringify(res).slice(0, 240)}`);
+    assert(rec.generator?.principal === sendbot.gaii,
+        `the record must name the AGENT that produced the bytes, got ${rec.generator?.principal}`);
+    assert(rec.generator?.principal !== alice.ghii,
+        'the record must NOT name the human whose name the message carries');
+    assert(rec.attestation?.stampedBy === 'node', `stampedBy: ${rec.attestation?.stampedBy}`);
+    assert(rec.attestation?.observed === false, `observed must be false for a node stamp: ${rec.attestation?.observed}`);
+    const expected = `sha256:${createHash('sha256').update(PROV_BODY).digest('hex')}`;
+    assert(rec.attestation?.contentHash === expected,
+        `the record must be about THESE bytes: ${rec.attestation?.contentHash} != ${expected}`);
+
+    // The delivered copy carries the same record — the recipient can check it, not just the sender.
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    const delivered = (inbox.body.data.messages as any[]).find(x => x.body === PROV_BODY);
+    assert(!!delivered, `Bob must have the message: ${JSON.stringify((inbox.body.data.messages as any[]).map(x => x.body))}`);
+    assert(delivered.aiProvenanceId === res.ai_provenance.id,
+        `the delivered copy must carry the same provenance id: ${delivered.aiProvenanceId} != ${res.ai_provenance.id}`);
+});
+
 await test('5. plainbot (no scope) cannot use the delegated tool', async () => {
     const client = await connectMcp(plainbot.gaii, plainbot.key);
-    const { ok } = await client.call('aimeat_dm_send_as_owner', { to: bob.ghii, body: 'should not go out as Alice' });
+    const { ok, body } = await client.call('aimeat_dm_send_as_owner', { to: bob.ghii, body: 'should not go out as Alice' });
     assert(!ok, 'a filtered (unregistered) tool call must not succeed');
+    // Name the SHAPE of the refusal, not just that something went wrong. Without the scope the tool
+    // is never registered on the session, so the JSON-RPC layer answers with an error rather than a
+    // tool result — an isError body would mean the tool ran and declined, which is a different story.
+    assert(body.error !== undefined || body.result?.isError === true,
+        `the refusal must be an MCP error or an isError result, got ${JSON.stringify(body).slice(0, 200)}`);
+    // …and nothing went out under Alice's name.
+    const inbox = await json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${bob.token}` } });
+    assert(!(inbox.body.data.messages as any[]).some(m => m.body === 'should not go out as Alice'),
+        'the refused delegation must not have delivered anything');
 });
 
 await test('6. Cannot address the owner itself (own-owner-only sender; no self-send)', async () => {

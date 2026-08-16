@@ -161,10 +161,6 @@
       "reason": "REVIEWED 2026-08-16 (E2E test-quality audit, finding e2e-message-transcript:145). This surface refuses with 404, not 403, and that is deliberate: the transcribe route looks the message up as storage.getDirectMessage(id, ownerGhii), so a caller who is not a party to the message is told the message does not exist rather than that it exists and is not theirs. The suite now drives that refusal with a THIRD owner, on the plain and the force:true paths, and reads the sender's copy back afterwards to show nothing was written; the recipient reaching their OWN copy is the positive control. There is no 401 or 403 on this route to assert.",
       "sha": "fb430ca2ff090d70"
     },
-    "test/e2e-dm-send-as-owner.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "1d652db8246ba7b5"
-    },
     "test/e2e-interactive-messages.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "2329b525c19e5057"
@@ -196,10 +192,6 @@
     "test/e2e-agent-connect-email.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "6d1fb46364ba68c7"
-    },
-    "test/e2e-workflows.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "b2fb95e403566c5c"
     },
     "test/e2e-workflows-human.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
