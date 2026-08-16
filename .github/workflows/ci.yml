@@ -70,6 +70,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:profile-tabs
 
+      - name: Config coverage (every setting reachable in the admin Config tab)
+        working-directory: aimeat
+        run: pnpm check:config-coverage
+
       - name: No max_tokens caps on AI calls
         working-directory: aimeat
         run: pnpm check:no-max-tokens

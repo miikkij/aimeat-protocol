@@ -116,6 +116,24 @@ await test('GET /v1/admin/usage/status reports how fresh the layer is', async ()
     assert(body.data.computed_through !== undefined, 'states computed_through, even when null');
 });
 
+await test('GET /v1/admin/usage/house answers the money question, chat agent included', async () => {
+    const { status, body } = await json('/v1/admin/usage/house', { headers: authOp() });
+    assert(status === 200, `house: ${status} ${JSON.stringify(body.error)}`);
+    const d = body.data;
+    assert(typeof d.house_key_configured === 'boolean', 'says whether the house key is set');
+    assert(typeof d.free_allowance_usd === 'number', 'states the per-person grant');
+    assert(typeof d.by_key_scope?.node?.cost_usd === 'number', 'splits spend by whose key paid');
+    assert(typeof d.by_key_scope?.own?.cost_usd === 'number', 'and reports the own-key side too');
+    // The half nobody could see: the chat agent is reported and explicitly NOT part of the totals.
+    assert(d.chat_agent && d.chat_agent.metered_here === false,
+        `the chat agent must be reported as unmetered here, got ${JSON.stringify(d.chat_agent)}`);
+});
+
+await test('CROSS-ROLE: a non-operator owner is refused the house figures', async () => {
+    const { status } = await json('/v1/admin/usage/house', { headers: authOther() });
+    assert(status === 403, `a plain owner must be refused, got ${status}`);
+});
+
 // ── The owner's own view ────────────────────────────────────────────────────────────────────────
 
 await test('An owner sees their own model usage, grouped', async () => {

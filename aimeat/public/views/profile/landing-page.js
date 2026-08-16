@@ -197,10 +197,14 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   // Has this account produced ANYTHING yet? Gates the inventory cards (quotas, spend, commerce)
   // off a brand-new account's first screen (UX-remake v3, P5). Only KNOWN-positive counts flip it,
   // so the cards never flash in before the stats land and then disappear.
+  // The field names are the composite's: `memory` and `files`, not `memories` and no `organisms` at
+  // all (services/db/home-dashboard-service.ts). Reading names that were never in the payload made
+  // this false for anyone whose account holds memory rather than agents or apps, and the whole
+  // inventory — quotas, AI spend, the ledger, commerce — stayed hidden from them for good.
   const hasOwnContent = (apps.length > 0)
     || (typeof stats?.agents === 'number' && stats.agents > 0)
-    || (typeof stats?.organisms === 'number' && stats.organisms > 0)
-    || (typeof stats?.memories === 'number' && stats.memories > 0);
+    || (typeof stats?.memory === 'number' && stats.memory > 0)
+    || (typeof stats?.files === 'number' && stats.files > 0);
 
   /* Fetch app list for app strip */
   const loadApps = useCallback(async () => {

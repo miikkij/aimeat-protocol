@@ -172,6 +172,67 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
       }));
     });
 
+  // ── GET /v1/admin/usage/house ── the money question, answered in one read.
+  //
+  // WHAT AN OPERATOR ACTUALLY WANTS TO KNOW and could not find anywhere: is the house key set, what
+  // does the house grant a newcomer, how much of the spend is the house's rather than people's own
+  // keys, and — the one nobody could see at all — which spending is NOT metered here.
+  //
+  // The split is `apiKeyScope`, the same field the monthly billing rollup splits on: `own` is the
+  // person's own OpenRouter account and costs the operator nothing, `node` is the house key. The
+  // chat agent is reported beside them and deliberately NOT summed with them: it is a `goose acp`
+  // child with one process-wide provider key, so its turns never pass prepareAiCall, never land in
+  // the ledger, and are invisible to every figure on this page. Stating that plainly here is the
+  // difference between an operator who knows their exposure is bounded by the key's own cap and one
+  // who thinks these totals are the whole bill.
+  router.get('/v1/admin/usage/house',
+    requireAuth(), requireRole('operator'),
+    async (req: Request, res: Response) => {
+      const to = typeof req.query.to === 'string' ? req.query.to : dayNDaysAgo(0);
+      const from = typeof req.query.from === 'string' ? req.query.from : dayNDaysAgo(29);
+
+      const rows = await storage.queryUsageDailyAllOwners({ from, to });
+      const scopes: Record<string, { cost_usd: number; calls: number; owners: Set<string> }> = {
+        node: { cost_usd: 0, calls: 0, owners: new Set() },
+        own: { cost_usd: 0, calls: 0, owners: new Set() },
+      };
+      const nodeByOwner = new Map<string, { owner_ghii: string; cost_usd: number; calls: number }>();
+      for (const r of rows) {
+        const bucket = scopes[r.apiKeyScope === 'node' ? 'node' : 'own'];
+        bucket.cost_usd += r.costUsd || 0;
+        bucket.calls += r.calls || 0;
+        bucket.owners.add(r.ownerGhii);
+        if (r.apiKeyScope !== 'node') continue;
+        const seen = nodeByOwner.get(r.ownerGhii)
+          ?? { owner_ghii: r.ownerGhii, cost_usd: 0, calls: 0 };
+        seen.cost_usd += r.costUsd || 0;
+        seen.calls += r.calls || 0;
+        nodeByOwner.set(r.ownerGhii, seen);
+      }
+
+      res.json(success(config.nodeId, {
+        from,
+        to,
+        house_key_configured: !!config.openrouterInstanceKey,
+        free_allowance_usd: config.chatFreeAllowanceUsd,
+        free_fallback_model: config.modelFreeFallback || null,
+        by_key_scope: {
+          node: { cost_usd: scopes.node.cost_usd, calls: scopes.node.calls, people: scopes.node.owners.size },
+          own: { cost_usd: scopes.own.cost_usd, calls: scopes.own.calls, people: scopes.own.owners.size },
+        },
+        top_house_spenders: [...nodeByOwner.values()]
+          .sort((a, b) => b.cost_usd - a.cost_usd)
+          .slice(0, 10),
+        chat_agent: {
+          enabled: !!(config.gooseBin || '').trim(),
+          model: config.gooseModel || null,
+          key_configured: !!config.gooseProviderApiKey,
+          // The honest half. Everything above is metered per person; this is not.
+          metered_here: false,
+        },
+      }));
+    });
+
   // ── POST /v1/admin/usage/rollup/rebuild ── recompute a bucket range from raw.
   //
   // Needed after a new cut is declared (its history is otherwise empty, which on a chart is

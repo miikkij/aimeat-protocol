@@ -2416,7 +2416,39 @@
     "sharingGroupsCreated": "Creado",
     "sharingGroupsTotalCount": "Grupos para compartir",
     "overviewActiveTasks": "Tareas en marcha",
-    "overviewSharingGroups": "Grupos para compartir"
+    "overviewSharingGroups": "Grupos para compartir",
+    "cfgToc": "Secciones",
+    "cfgUnsaved": "{n} cambio(s) sin guardar",
+    "cfgUnsavedHint": "Nada se guarda hasta que pulses guardar.",
+    "cfgEdited": "Editado, sin guardar",
+    "cfgEmpty": "(vacío)",
+    "cfgDomain_ai": "IA y agentes",
+    "cfgDomain_money": "Dinero",
+    "cfgDomain_identity": "Identidad y acceso",
+    "cfgDomain_node": "Nodo y almacenamiento",
+    "cfgDomain_limits": "Límites y cuotas",
+    "cfgDomain_federation": "Federación",
+    "cfgDomain_integrations": "Integraciones",
+    "cfgDomain_other": "Otros",
+    "cfgGroup_ai": "IA: claves, modelos y saldo",
+    "cfgHelp_ai": "Qué clave paga, qué modelo responde en cada rol y qué recibe una persona nueva. La clave de la instancia la gasta quien no ha traído la suya, y el saldo la mide. El agente de chat va aparte: cada turno se gasta de su propia clave y no se mide por persona.",
+    "houseSection": "El dinero de la casa",
+    "houseUnavailable": "No hay cifras de la casa disponibles.",
+    "houseExplain": "Qué clave pagó la IA de este nodo. Lo gastado con clave propia no le cuesta nada al operador; lo gastado con la clave de la casa es la factura del nodo, medida por persona con el saldo. El agente de chat aparece aquí pero nunca se suma a estas cifras: gasta su propia clave fuera de la ruta medida, así que nada en esta página lo cuenta.",
+    "houseSpend": "Gasto de la clave de la casa",
+    "housePeople": "Personas en la clave de la casa",
+    "houseOwnKeySpend": "Gasto con clave propia (no tuyo)",
+    "houseGrant": "Saldo inicial gratuito",
+    "houseKey": "Clave OpenRouter de la casa",
+    "houseKeySet": "Configurada",
+    "houseKeyUnset": "Sin configurar — cada cual trae la suya",
+    "houseFallback": "Modelo cuando se agota el saldo",
+    "houseFallbackNone": "ninguno — el nodo se niega",
+    "houseChat": "Agente de chat",
+    "houseChatOff": "Sin configurar",
+    "houseChatNoModel": "activo, modelo según la configuración de goose",
+    "houseChatUnmetered": "gasta su propia clave, no se cuenta en esta página",
+    "houseTopSpenders": "Quién gasta la clave de la casa"
   },
   "dev": {
     "title": "Conecta tu IA a este nodo",
@@ -8196,7 +8228,11 @@
       "pinAdd": "Fijar",
       "pinRemove": "Dejar de fijar",
       "pinLimit": "Máximo 5 elementos fijados",
-      "menuBusiness": "Negocio"
+      "menuBusiness": "Negocio",
+      "usageAi": "Saldo de IA",
+      "usageAiOwnKey": "tu propia clave — sin límite de la casa",
+      "usageAiNoGrant": "este nodo no da saldo",
+      "usageAiLeftOf": "de"
     },
     "mcpConnected": "MCP conectado",
     "openrouter": {
@@ -9214,5 +9250,6 @@
     "sendBtn": "Enviar",
     "sent": "¡Saludo publicado!",
     "limit": "Un mensaje al día"
-  }
+  },
+  "chat.allowanceElsewhere": "Te quedan {n} USD de saldo, para todo lo que no sea este chat."
 }

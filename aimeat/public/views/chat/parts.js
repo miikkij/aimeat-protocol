@@ -252,10 +252,19 @@ export function StatusBar({ status, onReset }) {
         allowance: () => tr('chat.allowance', '{n} USD left of your allowance.').replace('{n}', remaining.toFixed(2)),
         node: () => tr('chat.nodeKey', 'This node pays for the conversation, on its own key.'),
     }[status.pays] ?? null;
+    // What the person's OWN money is doing while the node pays for this conversation. Shown only
+    // when it is not already the subject of the payer line, and worded so it cannot be read as a
+    // limit on the chat: it is the allowance for everything else on the node, and a person who is
+    // about to run out of it deserves to have seen it coming somewhere they actually look.
+    const elsewhere = status.pays === 'node' && !status.has_own_key && remaining > 0
+        ? tr('chat.allowanceElsewhere', '{n} USD of your allowance left, for everything outside this chat.')
+            .replace('{n}', remaining.toFixed(2))
+        : null;
     return html`
         <div class="chat-status">
             <span class="chat-status-agent">${status.agent_name}</span>
             ${payer && html`<span class="chat-status-key">${payer()}</span>`}
+            ${elsewhere && html`<span class="chat-status-elsewhere">${elsewhere}</span>`}
             ${status.model && html`<span class="chat-model chat-status-model"
                 title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`

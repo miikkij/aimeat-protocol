@@ -119,6 +119,21 @@ await test('GET /v1/owner/usage returns the full summary shape', async () => {
     firstCachedAt = d.cached_at;
 });
 
+await test('The summary carries the AI allowance — the one limit a person could not see', async () => {
+    // The bars on Home are memory, files and micro-memory; what a person may SPEND was on none of
+    // them and on no other page they visit. own_key decides the shape rather than the number: an
+    // owner running on their own key has no house limit at all, and a bar would invent one.
+    const { body } = await json('/v1/owner/usage', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const ai = body.data?.ai;
+    assert(!!ai, `the summary carries an ai block, got ${JSON.stringify(Object.keys(body.data ?? {}))}`);
+    assert(typeof ai.own_key === 'boolean', 'own_key says which shape applies');
+    assert(typeof ai.granted_usd === 'number' && typeof ai.spent_usd === 'number',
+        `granted/spent are numbers, got ${JSON.stringify(ai)}`);
+    assert(ai.remaining_usd === Math.max(0, ai.granted_usd - ai.spent_usd),
+        `remaining is granted minus spent, got ${JSON.stringify(ai)}`);
+    assert(ai.own_key === false, 'this owner has stored no key of their own');
+});
+
 let cachedKeys = 0;
 await test('Second read within TTL is served from cache (same cached_at)', async () => {
     const { body } = await json('/v1/owner/usage', { headers: { Authorization: `Bearer ${ownerToken}` } });

@@ -26,6 +26,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { cached, invalidateKey, TTL } from './cache.js';
+import { readAllowance, remainingOf } from './ai-allowance.js';
 import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
 
@@ -68,6 +69,21 @@ export interface OwnerUsageSummary {
   };
   /** Morsel balance is also shown in the profile stats bar; included here for client completeness. */
   morsels: { balance: number };
+  /**
+   * The AI limit a person actually has, which was the one quota they could not see anywhere.
+   *
+   * `own_key` true means there is no house limit at all: their own OpenRouter key pays and nothing
+   * here applies. Otherwise the node's key pays until the allowance is gone, and `remaining_usd` is
+   * how much of it is left. The grant is once per person and never renews, so a bar that fills is
+   * a bar that stays full — which is exactly what a person needs to see coming.
+   */
+  ai: {
+    own_key: boolean;
+    granted_usd: number;
+    spent_usd: number;
+    remaining_usd: number;
+    percent: number;
+  };
   cached_at: string;
   ttl_seconds: number;
 }
@@ -119,6 +135,14 @@ async function computeOwnerUsageSummary(
     storage.getGHIIByOwner(ownerName),
   ]);
 
+  // The AI allowance, read through the same function the chat status uses so the two can never
+  // disagree about a number the person is told twice.
+  const [allowance, ownKeyRecord] = await Promise.all([
+    readAllowance(storage, config, ghii),
+    storage.getMemory(ghii, 'openrouter.apikey'),
+  ]);
+  const allowanceRemaining = remainingOf(allowance);
+
   const storageBytes = storageAgg.bytes, storageFiles = storageAgg.count;
   const microBytes = microAgg.bytes, microSets = microAgg.sets;
 
@@ -143,6 +167,13 @@ async function computeOwnerUsageSummary(
       services: { used: services, max: config.maxActionsPerAgent },
     },
     morsels: { balance: ghiiRecord?.morselBalance ?? 0 },
+    ai: {
+      own_key: !!ownKeyRecord,
+      granted_usd: allowance.granted_usd,
+      spent_usd: allowance.spent_usd,
+      remaining_usd: allowanceRemaining,
+      percent: pct(allowance.spent_usd, allowance.granted_usd),
+    },
     cached_at: new Date().toISOString(),
     ttl_seconds: Math.round(USAGE_CACHE_TTL_MS / 1000),
   };

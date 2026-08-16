@@ -10,6 +10,10 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.2.0 — 2026-08-16 — The `ai.` group: whose key pays, which model answers each role, the
+ *     free allowance, and the chat agent's binary/provider/model. Every one of them decides what
+ *     the node spends and every one of them was .env-and-restart only, so an operator could not
+ *     see whether the house key was set, let alone change a model.
  *   v1.1.0 — 2026-07-14 — mcpCardCommerceTools row (TARGET-034 phase D)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -379,6 +383,37 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Agent Tasks triage (Phase 1, mutable) ──
   { key: 'taskAutoArchive', dotPath: 'tasks.auto_archive', envVar: 'AIMEAT_TASK_AUTO_ARCHIVE', type: 'boolean', validate: (v: unknown) => typeof v === 'boolean', immutable: false, description: 'Auto-archive completed tasks older than the archive window (Tasks tab)' },
   { key: 'taskArchiveAfterHours', dotPath: 'tasks.archive_after_hours', envVar: 'AIMEAT_TASK_ARCHIVE_AFTER_HOURS', type: 'number', validate: (v: unknown) => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 8760, immutable: false, description: 'Hours a completed task stays in Recent before auto-archiving', range: '1-8760' },
+
+  // ── AI: whose key pays, which model answers, what the house grants (mutable) ──
+  //
+  // These decide what the node SPENDS, and until now every one of them was reachable only by
+  // editing .env and restarting. An operator changing a model had to deploy; an operator wondering
+  // whether the house key was even set had no way to look. Both are the wrong shape for a setting
+  // that costs money.
+  //
+  // The two keys are `configured` rather than `visible`: the admin API answers whether a key is set
+  // and never what it is. A mutable field takes effect on the next read of `config`, so a model
+  // default applies to the very next completion. The chat agent's own settings are the exception
+  // worth knowing: the goose child reads them from its environment at spawn, so a change reaches
+  // the next agent process rather than the one already running.
+  { key: 'openrouterInstanceKey', dotPath: 'ai.instance_key', envVar: 'AIMEAT_OPENROUTER_INSTANCE_KEY', type: 'string', validate: () => true, immutable: false, description: "This node's own OpenRouter key, spent by anyone who has not brought their own (metered per person by the allowance below)", adminDisplay: 'configured' },
+  { key: 'chatFreeAllowanceUsd', dotPath: 'ai.free_allowance_usd', envVar: 'AIMEAT_CHAT_FREE_ALLOWANCE_USD', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1000, immutable: false, description: "Free starting allowance in USD on the node's key, granted ONCE per person and never renewed. 0 grants nothing", range: '0-1000' },
+  { key: 'modelFreeFallback', dotPath: 'ai.model_free_fallback', envVar: 'AIMEAT_MODEL_FREE_FALLBACK', type: 'string', validate: () => true, immutable: false, description: 'Model used when a person on the node key has spent their allowance. Empty refuses instead of degrading' },
+  { key: 'modelDefaultChat', dotPath: 'ai.model_default_chat', envVar: 'AIMEAT_MODEL_DEFAULT_CHAT', type: 'string', validate: () => true, immutable: false, description: 'Default chat model when the owner has not chosen one' },
+  { key: 'modelDefaultReasoning', dotPath: 'ai.model_default_reasoning', envVar: 'AIMEAT_MODEL_DEFAULT_REASONING', type: 'string', validate: () => true, immutable: false, description: 'Default reasoning model when the owner has not chosen one' },
+  { key: 'modelDefaultExecution', dotPath: 'ai.model_default_execution', envVar: 'AIMEAT_MODEL_DEFAULT_EXECUTION', type: 'string', validate: () => true, immutable: false, description: 'Default execution model when the owner has not chosen one' },
+  { key: 'modelDefaultVision', dotPath: 'ai.model_default_vision', envVar: 'AIMEAT_MODEL_DEFAULT_VISION', type: 'string', validate: () => true, immutable: false, description: 'Default model for reading images. Must accept image input' },
+  { key: 'modelDefaultStt', dotPath: 'ai.model_default_stt', envVar: 'AIMEAT_MODEL_DEFAULT_STT', type: 'string', validate: () => true, immutable: false, description: 'Default speech-to-text model. Empty means nobody can use the microphone until they set one themselves' },
+  { key: 'modelDefaultImage', dotPath: 'ai.model_default_image', envVar: 'AIMEAT_MODEL_DEFAULT_IMAGE', type: 'string', validate: () => true, immutable: false, description: 'Default model for generating images. Must produce image output' },
+  { key: 'sttLanguageDefault', dotPath: 'ai.stt_language_default', envVar: 'AIMEAT_STT_LANGUAGE_DEFAULT', type: 'string', validate: () => true, immutable: false, description: 'Language hint for transcription (e.g. fi) when the owner has not set one' },
+
+  // ── AI: the built-in chat agent (a `goose acp` child process) ──
+  { key: 'gooseBin', dotPath: 'ai.chat_agent_bin', envVar: 'AIMEAT_GOOSE_BIN', type: 'string', validate: () => true, immutable: false, description: 'Path to the goose binary. EMPTY DISABLES THE CHAT ENTIRELY. Takes effect on the next agent start' },
+  { key: 'goosePathRoot', dotPath: 'ai.chat_agent_path_root', envVar: 'AIMEAT_GOOSE_PATH_ROOT', type: 'string', validate: () => true, immutable: false, description: "The agent's own config and session store, away from any human's goose profile" },
+  { key: 'gooseProvider', dotPath: 'ai.chat_agent_provider', envVar: 'AIMEAT_GOOSE_PROVIDER', type: 'string', validate: () => true, immutable: false, description: "Provider the chat agent runs on (e.g. openrouter). Empty leaves goose's own configuration alone" },
+  { key: 'gooseModel', dotPath: 'ai.chat_agent_model', envVar: 'AIMEAT_GOOSE_MODEL', type: 'string', validate: () => true, immutable: false, description: 'Model the chat agent runs on. Also what the node records as the model that answered a turn' },
+  { key: 'gooseProviderApiKey', dotPath: 'ai.chat_agent_key', envVar: 'AIMEAT_GOOSE_PROVIDER_API_KEY', type: 'string', validate: () => true, immutable: false, description: 'The key EVERY chat turn is spent from. Not metered per person: the allowance above does not apply to the chat', adminDisplay: 'configured' },
+  { key: 'chatMaxLiveThreads', dotPath: 'ai.chat_max_live_threads', envVar: 'AIMEAT_CHAT_MAX_LIVE_THREADS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'How many conversations stay open before the oldest rolls into a per-month archive record', range: '1-1000' },
 ];
 
 // ── Derived Lookup Maps ──

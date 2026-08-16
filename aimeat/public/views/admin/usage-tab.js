@@ -26,7 +26,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { num, StatsGrid, DataTable, Spinner, Empty } from './shared.js';
+import { num, StatsGrid, DataTable, Spinner, Empty, Badge } from './shared.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import * as api from '/js/services/admin.js';
 import { swallowed } from '/js/swallowed.js';
@@ -60,6 +60,7 @@ export default function UsageTab() {
   const [metric, setMetric] = useState('cost');
   const [ledger, setLedger] = useState(null);
   const [aiUsage, setAiUsage] = useState(null);
+  const [house, setHouse] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [calls, setCalls] = useState(null);
@@ -71,15 +72,17 @@ export default function UsageTab() {
       const quiet = (err) => { swallowed('usage-tab: UsageTab', err); return null; };
       // Five reads in parallel rather than in sequence: they are independent, and the tab is only as
       // fast as its slowest one either way.
-      const [lr, ar, cs, ct, ca] = await Promise.all([
+      const [lr, ar, cs, ct, ca, hs] = await Promise.all([
         api.getLedger(range.from, range.to).catch(quiet),
         api.getAiUsage(range.from, range.to).catch(quiet),
         api.getUsageSummary('surface', range.from, range.to).catch(quiet),
         api.getUsageSummary('tool', range.from, range.to).catch(quiet),
         api.getUsageSummary('apps-used', range.from, range.to).catch(quiet),
+        api.getUsageHouse(range.from, range.to).catch(quiet),
       ]);
       if (lr && lr.data) setLedger(lr.data);
       if (ar && ar.data) setAiUsage(ar.data);
+      if (hs && hs.data) setHouse(hs.data);
       setCalls({ surface: cs?.data ?? null, tool: ct?.data ?? null, apps: ca?.data ?? null });
     } catch (err) { swallowed('usage-tab: UsageTab', err); }
     setLoading(false);
@@ -113,18 +116,81 @@ export default function UsageTab() {
       </span>
     </div>`;
 
-  if (!ledger && !aiUsage && !calls) {
+  if (!ledger && !aiUsage && !calls && !house) {
     return html`<div>${timeRange}${loading ? html`<${Spinner} />` : html`<${Empty} text=${t('dashboard.aiUsageEmpty') || 'No AI usage yet.'} />`}</div>`;
   }
 
   return html`
     <div>
       ${timeRange}
+      ${renderHouseSection(house)}
+      <hr class="adm-mt-lg" />
       ${renderLedgerSection(ledger, metric, selectedUser, setSelectedUser)}
       <hr class="adm-mt-lg" />
       ${renderAiAppsSection(aiUsage, metric)}
       <hr class="adm-mt-lg" />
       <${CallsSection} data=${calls} />
+    </div>`;
+}
+
+/* ── Section 0: the house's money ──
+ *
+ * Whose key paid, what the house grants, and what is NOT counted anywhere on this page. The last
+ * one is the reason this section exists: the chat agent spends a process-wide key outside the
+ * metered path, so every figure below it would otherwise read as the whole bill.
+ */
+function renderHouseSection(data) {
+  const heading = html`<h2 class="adm-section-cyan">${t('dashboard.houseSection')}</h2>`;
+  if (!data) return html`<div>${heading}<${Empty} text=${t('dashboard.houseUnavailable')} /></div>`;
+
+  const node = (data.by_key_scope && data.by_key_scope.node) || {};
+  const own = (data.by_key_scope && data.by_key_scope.own) || {};
+  const chat = data.chat_agent || {};
+
+  const statItems = [
+    { label: t('dashboard.houseSpend'), value: usd(node.cost_usd), tone: 'amber' },
+    { label: t('dashboard.housePeople'), value: num(node.people || 0), tone: 'blue' },
+    { label: t('dashboard.houseOwnKeySpend'), value: usd(own.cost_usd), tone: 'green' },
+    { label: t('dashboard.houseGrant'), value: usd(data.free_allowance_usd), tone: 'cyan' },
+  ];
+
+  const spenderRows = (data.top_house_spenders || []).map((u) => [
+    u.owner_ghii,
+    { text: usd(u.cost_usd), mono: true },
+    { text: num(u.calls || 0), mono: true },
+  ]);
+
+  return html`
+    <div>
+      ${heading}
+      <p class="adm-text-dim adm-text-xs adm-mb-sm">${t('dashboard.houseExplain')}</p>
+      <${StatsGrid} items=${statItems} />
+
+      <div class="adm-hrow">
+        <span class="adm-hmetric">${t('dashboard.houseKey')}</span>
+        <span>${data.house_key_configured
+          ? html`<${Badge} type="healthy" /> ${t('dashboard.houseKeySet')}`
+          : html`<${Badge} type="idle" /> ${t('dashboard.houseKeyUnset')}`}</span>
+      </div>
+      <div class="adm-hrow">
+        <span class="adm-hmetric">${t('dashboard.houseFallback')}</span>
+        <span><code>${data.free_fallback_model || t('dashboard.houseFallbackNone')}</code></span>
+      </div>
+      <div class="adm-hrow">
+        <span class="adm-hmetric">${t('dashboard.houseChat')}</span>
+        <span>
+          ${chat.enabled
+            ? html`<${Badge} type="healthy" /> ${chat.model ? html`<code>${chat.model}</code>` : t('dashboard.houseChatNoModel')}`
+            : html`<${Badge} type="idle" /> ${t('dashboard.houseChatOff')}`}
+          ${chat.enabled && html`<span class="adm-text-dim adm-text-xs"> ${t('dashboard.houseChatUnmetered')}</span>`}
+        </span>
+      </div>
+
+      ${spenderRows.length > 0 && html`
+        <h3 class="adm-mt-md adm-text-base">${t('dashboard.houseTopSpenders')}</h3>
+        <${DataTable}
+          columns=${[t('dashboard.ledgerUser') || 'Owner', t('dashboard.ledgerTotalCost') || 'Cost', t('dashboard.ledgerTotalCalls') || 'Calls']}
+          rows=${spenderRows} />`}
     </div>`;
 }
 

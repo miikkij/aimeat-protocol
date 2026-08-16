@@ -257,6 +257,18 @@ export const getUsageSummary = (report, from, to, owner) => {
   return apiGet('/v1/admin/usage/summary?' + params.toString());
 };
 
+/**
+ * The money question: is the house key set, what does it grant, how much of the spend is the
+ * house's rather than people's own keys, and what is NOT metered here (the chat agent).
+ */
+export const getUsageHouse = (from, to) => {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const qs = params.toString();
+  return apiGet('/v1/admin/usage/house' + (qs ? '?' + qs : ''));
+};
+
 // ── Extensions & Instances ──
 export const getAvailableExtensions   = ()              => apiGet('/v1/admin/extensions/available');
 export const installBundledExtension  = (name)          => apiPost(`/v1/admin/extensions/available/${encodeURIComponent(name)}/install`);

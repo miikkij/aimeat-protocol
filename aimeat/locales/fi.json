@@ -2416,7 +2416,39 @@
     "sharingGroupsCreated": "Luotu",
     "sharingGroupsTotalCount": "Jakoryhmät",
     "overviewActiveTasks": "Aktiiviset tehtävät",
-    "overviewSharingGroups": "Jakoryhmät"
+    "overviewSharingGroups": "Jakoryhmät",
+    "cfgToc": "Osiot",
+    "cfgUnsaved": "{n} tallentamatonta muutosta",
+    "cfgUnsavedHint": "Mitään ei tallennu ennen kuin painat tallenna.",
+    "cfgEdited": "Muokattu, ei tallennettu",
+    "cfgEmpty": "(tyhjä)",
+    "cfgDomain_ai": "Tekoäly ja agentit",
+    "cfgDomain_money": "Raha",
+    "cfgDomain_identity": "Identiteetti ja pääsy",
+    "cfgDomain_node": "Node ja tallennus",
+    "cfgDomain_limits": "Rajat ja kiintiöt",
+    "cfgDomain_federation": "Federaatio",
+    "cfgDomain_integrations": "Integraatiot",
+    "cfgDomain_other": "Muut",
+    "cfgGroup_ai": "Tekoäly: avaimet, mallit ja saldo",
+    "cfgHelp_ai": "Kenen avain maksaa, mikä malli vastaa kussakin roolissa ja mitä uusi käyttäjä saa. Instanssiavainta kuluttaa jokainen joka ei ole tuonut omaansa, ja saldo mittaa sen. Chat-agentti on erikseen: jokainen chat-vuoro kuluu sen omalta avaimelta eikä sitä mitata henkilöittäin.",
+    "houseSection": "Talon rahat",
+    "houseUnavailable": "Talon lukuja ei saatu.",
+    "houseExplain": "Kenen avain maksoi tämän noden tekoälyn. Omalla avaimella kulutettu ei maksa operaattorille mitään; talon avaimella kulutettu on noden lasku, ja saldo mittaa sen henkilöittäin. Chat-agentti näkyy tässä muttei koskaan summattuna näihin: se kuluttaa omaa avaintaan mittarin ulkopuolella, joten mikään tällä sivulla ei laske sitä.",
+    "houseSpend": "Talon avaimen kulutus",
+    "housePeople": "Talon avaimella olevia",
+    "houseOwnKeySpend": "Omalla avaimella (ei sinun)",
+    "houseGrant": "Ilmainen aloitusannos",
+    "houseKey": "Talon OpenRouter-avain",
+    "houseKeySet": "Asetettu",
+    "houseKeyUnset": "Ei asetettu — jokainen tuo omansa",
+    "houseFallback": "Malli kun saldo loppuu",
+    "houseFallbackNone": "ei mitään — node kieltäytyy",
+    "houseChat": "Chat-agentti",
+    "houseChatOff": "Ei konfiguroitu",
+    "houseChatNoModel": "päällä, malli goosen omasta configista",
+    "houseChatUnmetered": "kuluttaa omaa avaintaan, ei näy näissä luvuissa",
+    "houseTopSpenders": "Kuka kuluttaa talon avainta"
   },
   "dev": {
     "title": "Yhdistä tekoälysi tähän nodeen",
@@ -8204,7 +8236,11 @@
       "pinAdd": "Kiinnitä",
       "pinRemove": "Irrota",
       "pinLimit": "Enintään 5 kiinnitettyä",
-      "menuBusiness": "Yritys"
+      "menuBusiness": "Yritys",
+      "usageAi": "Tekoälysaldo",
+      "usageAiOwnKey": "oma avaimesi — ei talon rajaa",
+      "usageAiNoGrant": "tällä nodella ei ole talon saldoa",
+      "usageAiLeftOf": "jäljellä, alkuperäinen"
     },
     "mcpConnected": "MCP kytketty",
     "openrouter": {
@@ -9222,5 +9258,6 @@
     "sendBtn": "Lähetä",
     "sent": "Tervehdys lähetetty!",
     "limit": "Yksi viesti päivässä"
-  }
+  },
+  "chat.allowanceElsewhere": "Saldoa jäljellä {n} USD, ja se on kaikkea muuta kuin tätä chattia varten."
 }

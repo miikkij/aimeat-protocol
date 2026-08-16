@@ -160,6 +160,7 @@
 /* The model sits beside the payer line, not in place of it: which model answered and whose money
    paid are two different questions and a person checking one still needs the other. */
 .chat-status-model { color: var(--text-dim); }
+.chat-status-elsewhere { color: var(--text-dim); }
 .chat-status-reset { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; }
 
 .chat-scroll {

@@ -413,6 +413,81 @@
   border: 1px solid var(--warn-border);
   border-radius: 8px;
 }
+/* The pending bar follows the viewport, because the thing it reports — work that is not saved yet —
+   happens wherever you are on a page that is many screens long.
+   FIXED rather than sticky, and that was measured: the admin content sits inside `.adm-main`, which
+   has `overflow: auto` and is as tall as its content, so it is the nearest scrollport while the
+   actual scrolling happens in `.page-content` above it. A sticky bar therefore sticks to the top of
+   a box that itself scrolls away — measured at top: -1274px after one screen of scrolling, which is
+   the exact failure this bar exists to prevent. */
+.adm-cfg-pending {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  margin-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.18);
+}
+.adm-cfg-pending-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.adm-cfg-pending-hint { font-size: .8rem; opacity: .85; }
+.adm-cfg-pending-actions { margin-left: auto; }
+.adm-cfg-pending-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: .8rem;
+  max-height: 30vh;
+  overflow-y: auto;
+}
+.adm-cfg-pending-list li { margin: 2px 0; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.adm-cfg-pending-was { text-decoration: line-through; opacity: .7; margin: 0 4px; }
+
+/* An edited row stays findable after you have scrolled past it. */
+.adm-cfg-row-edited { background: var(--warn-bg); border-radius: 6px; }
+.adm-cfg-edited-dot { color: var(--warn-fg, #eab308); font-size: .8rem; }
+
+/* Contents block */
+.adm-cfg-toc-summary { cursor: pointer; font-weight: 600; font-size: .95rem; padding: 8px 0; }
+.adm-cfg-toc-body {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  padding: 8px 0;
+}
+.adm-cfg-toc-domain-name {
+  font-size: .7rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+.adm-cfg-toc-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.adm-cfg-toc-link {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: .78rem;
+  cursor: pointer;
+  color: inherit;
+}
+.adm-cfg-toc-link:hover { border-color: var(--accent-border); }
+.adm-cfg-toc-count { color: var(--text-muted); font-size: .7rem; }
+
+.adm-cfg-domain-head {
+  margin: 20px 0 8px;
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+}
+
 .adm-config-array-edit {
   width: 360px;
   max-width: 100%;

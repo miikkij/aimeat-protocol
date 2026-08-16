@@ -206,6 +206,37 @@ export function UsageCard({ switchTab, initialUsage }) {
       </div>`;
   };
 
+  /**
+   * The AI limit, which is a limit like the others and was the only one a person could not see.
+   *
+   * Two different facts, so two different shapes. Own key: there is no house limit, and a bar
+   * would imply one. Node key: a bar, because it fills once and never refills — the grant is
+   * granted a single time per person and nothing renews it.
+   */
+  const aiLine = (ai) => {
+    if (!ai) return null;
+    if (ai.own_key) {
+      return html`
+        <div class="pf-usage-row">
+          <div class="pf-usage-head">
+            <span class="pf-usage-label">${t('profile.landing.usageAi')}</span>
+            <span class="text-meta-sm">${t('profile.landing.usageAiOwnKey')}</span>
+          </div>
+        </div>`;
+    }
+    if (!(ai.granted_usd > 0)) {
+      return html`
+        <div class="pf-usage-row">
+          <div class="pf-usage-head">
+            <span class="pf-usage-label">${t('profile.landing.usageAi')}</span>
+            <span class="text-meta-sm">${t('profile.landing.usageAiNoGrant')}</span>
+          </div>
+        </div>`;
+    }
+    return bar(t('profile.landing.usageAi'), ai,
+      `$${(ai.remaining_usd ?? 0).toFixed(2)} ${t('profile.landing.usageAiLeftOf')} $${(ai.granted_usd ?? 0).toFixed(2)}`);
+  };
+
   const chip = (label, value, tab) => html`
     <button class="pf-usage-chip" onClick=${tab ? () => switchTab(tab) : undefined} disabled=${!tab}>
       <span class="pf-usage-chip-val">${value}</span>
@@ -222,6 +253,7 @@ export function UsageCard({ switchTab, initialUsage }) {
         `${u.storage.used_files} ${t('profile.landing.usageFilesWord') || 'files'} · ${fmtBytes(u.storage.used_bytes)} / ${fmtBytes(u.storage.max_bytes)}`)}
       ${bar(t('profile.landing.usageMicro') || 'Micro-memory', u.micro_memory,
         `${u.micro_memory.used_sets}/${u.micro_memory.max_sets} ${t('profile.landing.usageSetsWord') || 'sets'} · ${fmtBytes(u.micro_memory.used_bytes)} / ${fmtBytes(u.micro_memory.max_bytes)}`)}
+      ${aiLine(u.ai)}
       <div class="pf-usage-chips">
         ${chip(t('profile.landing.usageAgents') || 'Agents', c.agents, 'agents')}
         ${chip(t('profile.landing.usageOrganisms') || 'Organisms', c.organisms, 'organisms')}

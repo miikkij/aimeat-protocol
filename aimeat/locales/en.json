@@ -2416,7 +2416,39 @@
     "sharingGroupsCreated": "Created",
     "sharingGroupsTotalCount": "Sharing Groups",
     "overviewActiveTasks": "Active Tasks",
-    "overviewSharingGroups": "Sharing Groups"
+    "overviewSharingGroups": "Sharing Groups",
+    "cfgToc": "Sections",
+    "cfgUnsaved": "{n} unsaved change(s)",
+    "cfgUnsavedHint": "Nothing is stored until you save.",
+    "cfgEdited": "Edited, not saved",
+    "cfgEmpty": "(empty)",
+    "cfgDomain_ai": "AI and agents",
+    "cfgDomain_money": "Money",
+    "cfgDomain_identity": "Identity and access",
+    "cfgDomain_node": "Node and storage",
+    "cfgDomain_limits": "Limits and quotas",
+    "cfgDomain_federation": "Federation",
+    "cfgDomain_integrations": "Integrations",
+    "cfgDomain_other": "Other",
+    "cfgGroup_ai": "AI: keys, models and the allowance",
+    "cfgHelp_ai": "Whose key pays, which model answers each role, and what a new person is granted. The instance key is spent by anyone who has not brought their own, metered by the allowance. The chat agent is separate: every chat turn is spent from its own key and is not metered per person.",
+    "houseSection": "The house's money",
+    "houseUnavailable": "House figures are not available.",
+    "houseExplain": "Whose key paid for the AI on this node. Own-key spend costs the operator nothing; house-key spend is the node's bill, metered per person by the allowance. The chat agent is listed but never summed with these: it spends its own key outside the metered path, so nothing on this page counts it.",
+    "houseSpend": "House key spend",
+    "housePeople": "People on the house key",
+    "houseOwnKeySpend": "Own-key spend (not yours)",
+    "houseGrant": "Free grant per person",
+    "houseKey": "House OpenRouter key",
+    "houseKeySet": "Configured",
+    "houseKeyUnset": "Not set — everyone brings their own",
+    "houseFallback": "Model when an allowance runs out",
+    "houseFallbackNone": "none — the node refuses instead",
+    "houseChat": "Chat agent",
+    "houseChatOff": "Not configured",
+    "houseChatNoModel": "on, model left to goose",
+    "houseChatUnmetered": "spends its own key, not counted on this page",
+    "houseTopSpenders": "Who spends the house key"
   },
   "dev": {
     "title": "Connect your AI to this node",
@@ -8204,7 +8236,11 @@
       "pinAdd": "Pin",
       "pinRemove": "Unpin",
       "pinLimit": "Max 5 pinned items",
-      "menuBusiness": "Business"
+      "menuBusiness": "Business",
+      "usageAi": "AI allowance",
+      "usageAiOwnKey": "your own key — no house limit",
+      "usageAiNoGrant": "no house allowance on this node",
+      "usageAiLeftOf": "left of"
     },
     "mcpConnected": "MCP connected",
     "openrouter": {
@@ -9222,5 +9258,6 @@
     "sendBtn": "Send",
     "sent": "Greeting posted!",
     "limit": "One message per day"
-  }
+  },
+  "chat.allowanceElsewhere": "{n} USD of your allowance left, for everything outside this chat."
 }
