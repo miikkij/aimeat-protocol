@@ -16,6 +16,10 @@
  *   connected agent, shown on an initialised home with its details in a details/summary section.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   v1.2.0 — 2026-08-16 — The card invites instead of alarming: "It has hit a snag. Shall we take
+ *     a look?" and the fleet line stops reading out the damage count — the number of problems
+ *     lives one click away, on the page that can act on it. A count of worries is not what
+ *     anyone comes home to.
  *   v1.1.0 — 2026-08-09 — The card says what the agent is actually doing, and the dot takes its
  *     colour from that. It printed "Connected and at home." unconditionally next to a dot that
  *     was green in CSS — about an agent the Agents tab could be calling a problem. It also says
@@ -228,7 +232,7 @@ const STATE_TEXT = {
   idle: ['home.agent.stateIdle', 'Here, but quiet just now.'],
   onboarding: ['home.agent.stateOnboarding', 'Settling in.'],
   new: ['home.agent.stateNew', 'Just arrived — it has not started yet.'],
-  problem: ['home.agent.stateProblem', 'Something is wrong with it.'],
+  problem: ['home.agent.stateProblem', 'It has hit a snag. Shall we take a look?'],
   system: ['home.agent.stateSystem', 'Part of the house.'],
 };
 
@@ -246,15 +250,16 @@ export function AgentCard({ agent }) {
         <div>
           <div class="koti-agent-name">${agent.name}</div>
           <div class="koti-agent-sub">${tr(subKey, subFallback)}</div>
-          ${/* V2.3: this line named a fleet and led nowhere. "70 more, 17 needing attention" is
-                either something you can act on or something you should not have been told; it is a
-                link to the agents view now. Not a new page — the one that already lists them. */''}
+          ${/* V2.3 named a fleet and led nowhere; V2.4 stopped reading out the damage. "81 more,
+                7 needing attention" is a count of worries, and a count is not what anyone comes
+                home for — the invitation to go and look is. The number of problems still exists
+                one click away, on the page that can act on it. */''}
           ${others > 0 && html`
             <a class="koti-agent-sub koti-agent-others" href="/v1/profile?tab=agents">
               ${agent.problems > 0
-                ? tr('home.agent.othersProblem', `${others} more, ${agent.problems} needing attention.`)
-                    .replace('{count}', String(others)).replace('{problems}', String(agent.problems))
-                : tr('home.agent.othersOk', `${others} more, all fine.`).replace('{count}', String(others))}
+                ? tr('home.agent.othersProblem', 'Shall we see how the other {count} are doing?')
+                    .replace('{count}', String(others))
+                : tr('home.agent.othersOk', '{count} more, all fine.').replace('{count}', String(others))}
             </a>`}
         </div>
       </div>

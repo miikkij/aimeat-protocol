@@ -18,6 +18,9 @@
  *     siteLinks so they only appear on nodes that have them.
  *   v2.1.0 — 2026-08-08 — The copy button is the shared .btn-primary with the shared common.copyPrompt label; the
  *       bespoke .hlp-copy-btn and the help.copyBtn/help.copied keys are gone.
+ *   v2.2.0 — 2026-08-16 — Questions ordered and worded by the reader's worries (cost, privacy,
+ *       what works for me, sharing, connecting, breaking) instead of by the system's vocabulary;
+ *       the terms moved inside the answers. Key ids unchanged, text lives in the locales.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -33,9 +36,11 @@ import { siteLink, hasSite, contactHref } from '/js/site.js';
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-// The questions people actually arrive with. Each answer is a few sentences, not a link list —
-// a link list is what sends someone back to the search box.
-const QUESTIONS = ['agent', 'organism', 'privacy', 'cost', 'connect', 'broken'];
+// The questions people actually arrive with, in the order of their worries: money, privacy,
+// what works for me, sharing, connecting, breaking. The system's own words (agent, organism,
+// morsel) live inside the answers, never in the question. Each answer is a few sentences, not
+// a link list — a link list is what sends someone back to the search box.
+const QUESTIONS = ['cost', 'privacy', 'agent', 'organism', 'connect', 'broken'];
 
 /* Canonical Collapsible is controlled; each question owns its own open state. */
 function Question({ id }) {

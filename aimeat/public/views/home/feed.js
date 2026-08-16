@@ -15,6 +15,9 @@
  * @structure HomeFeed({ items }) · Rooms({ rooms, onEnter })
  * @usage import { HomeFeed, Rooms } from './feed.js';
  * @version-history
+ *   v1.1.0 — 2026-08-16 — Quiet is information too: when nothing has happened for a few days the
+ *     feed says so and offers the next move (the chat), because an empty stretch is the strongest
+ *     hint to go make an event rather than wait for one.
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 6–7).
  */
 import { h } from 'preact';
@@ -66,11 +69,22 @@ function line(item) {
   }
 }
 
+/** After this many days without an event, the feed stops pretending silence is neutral. */
+const QUIET_AFTER_DAYS = 3;
+
 export function HomeFeed({ items }) {
   if (!items || !items.length) return null;
+  // Quiet is information too. The newest event's age decides: past the threshold, the feed opens
+  // with an invitation to go make an event instead of a list that ends three days ago.
+  const newestAt = items.reduce((m, it) => Math.max(m, Date.parse(it.at) || 0), 0);
+  const quiet = newestAt > 0 && (Date.now() - newestAt) > QUIET_AFTER_DAYS * 86400000;
   return html`
     <section class="koti-feed">
       <h2 class="koti-feed-title">${tr('home.feed.title', 'What has happened')}</h2>
+      ${quiet && html`
+        <a class="koti-feed-quiet" href="/v1/chat">
+          ${tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}
+        </a>`}
       <ul class="koti-feed-list">
         ${items.map((item, i) => html`
           <li class="koti-feed-item ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}" key=${i}>

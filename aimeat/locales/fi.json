@@ -2801,28 +2801,28 @@
     "epPrompt": "tämä kehote pelkkänä markdownina",
     "q": {
       "agent": {
-        "q": "Mikä agentti on, ja miten se eroaa tekoälystä?",
-        "a": "Tekoäly on malli. Agentti on työ jonka annat tekoälylle: sillä on nimi, keskustelun yli säilyvä muisti, jono tehtäviä jotka kirjoitat tavallisella kielellä, ja kulukatto. Vaihda tekoäly sen takaa, ja agentti pitää muistinsa ja työnsä."
+        "q": "Mikä täällä tekee töitä puolestani, kun en ole paikalla?",
+        "a": "Kytkemäsi apuri, jota täällä kutsutaan agentiksi. Sillä on nimi, keskustelun yli säilyvä muisti, jono tehtäviä, jotka kirjoitat tavallisella kielellä, ja kulukatto. Vaihda tekoäly sen takaa, ja se pitää muistinsa ja työnsä."
       },
       "organism": {
-        "q": "Mikä organismi on, ja milloin tarvitsen sellaisen?",
-        "a": "Organismi on jaettu tila jossa ihmiset ja agentit työstävät samaa asiaa. Se säilyttää historian jokaisesta muutoksesta, ja kaikki ulos lähtevä käy ihmisen kautta. Sellaisen haluat kun samaan aineistoon koskee useampi ihminen tai useampi agentti. Omiin muistiinpanoihin et tarvitse."
+        "q": "Meitä on useampi. Miten jaamme sen, mitä tiedämme?",
+        "a": "Jaetussa tilassa, jota täällä kutsutaan organismiksi. Se säilyttää historian jokaisesta muutoksesta, ja kaikki ulos lähtevä käy ensin ihmisen kautta. Sellaisen tarvitset, kun samaan aineistoon koskee useampi ihminen tai apuri. Omiin muistiinpanoihin et tarvitse."
       },
       "privacy": {
-        "q": "Kuka näkee dataani?",
-        "a": "Kaikki on aluksi yksityistä, ja sinä valitset mitä julkaiset. Agentit ja appit pääsevät täsmälleen siihen minkä annoit niille etkä mihinkään sen vierestä, jokaisessa luvussa ja kirjoituksessa on tekijänsä nimi, ja voit ottaa luvan pois milloin tahansa."
+        "q": "Kuka näkee minun juttuni?",
+        "a": "Kaikki on aluksi yksityistä, ja sinä valitset, mitä julkaiset. Apuri tai appi pääsee täsmälleen siihen, minkä sille annoit, eikä mihinkään muuhun. Jokaisessa luvussa ja kirjoituksessa on tekijänsä nimi, ja voit ottaa luvan pois milloin tahansa."
       },
       "cost": {
-        "q": "Mitä morselit ovat, ja mitä tekoäly minulle maksaa?",
-        "a": "Morselit ovat täkäläinen päiväkiintiö, ja ne täyttyvät joka päivä. Ne tahdittavat kalliita operaatioita. Oikea raha mitataan erikseen: tekoälykulu menee omaa avaintasi vasten, ja näet sen agentti- ja projektikohtaisesti."
+        "q": "Mitä tämä maksaa minulle?",
+        "a": "Kokeilu ei maksa mitään. Päivittäistä saldoa kutsutaan täällä morseleiksi; se täyttyy joka aamu ja tahdittaa raskaita toimintoja. Oikea raha mitataan erikseen: tekoälykulut menevät omalle avaimellesi, ja näet ne apuria ja projektia kohden."
       },
       "connect": {
         "q": "Tekoälyni sanoo ettei se saa yhteyttä. Mitä nyt?",
         "a": "Jos tekoälysi osaa MCP:n, lisää tämä sivusto liittimeksi: yksi komento Claude Codessa, tai liitä MCP-osoite asiakkaan omaan liitindialogiin. Kaikilla muilla tekoälyillä kopioi \"Tekoälylleni\"-välilehden ohjekehote chattiin, niin se ottaa selvää lopusta itse."
       },
       "broken": {
-        "q": "Jokin on rikki. Kenelle kerron?",
-        "a": "Kerro sille joka ylläpitää tätä sivustoa. Tekoälysi voi lähettää viestin suoraan istunnosta, tai käytä alla olevia yhteystietoja. Kerro mitä olit tekemässä ja mitä odotit tapahtuvan."
+        "q": "Entä jos rikon jotain?",
+        "a": "Useimpia asioita voi kokeilla huoletta: kaikki on aluksi yksityistä, ja apuri koskee vain siihen, minkä sallit. Kun jokin silti hajoaa, kerro sille, joka ylläpitää tätä sivustoa. Tekoälysi voi lähettää viestin suoraan istunnosta, tai käytä alla olevia yhteystietoja. Kerro, mitä olit tekemässä ja mitä odotit tapahtuvan."
       }
     }
   },
@@ -2882,6 +2882,13 @@
     "exampleExchange": "Työ jolla on hinta: EXCHANGEen listattu kyvykkyys, jonka toisen yrityksen agentti ostaa sopimuksella, ja jokainen kutsu kirjautuu ja tilitetään.",
     "exampleExchangeCta": "Katso markkina →",
     "ctaLearn": "Opi käytännössä, ilmaiseksi →"
+  },
+  "install": {
+    "title": "Laita AIMEAT.IO oman napin taakse",
+    "body": "Asennettuna se avautuu omaan ikkunaansa, näyttää lukemattomien määrän kuvakkeessa ja ottaa jaot suoraan chattiisi.",
+    "iosBody": "iPhonella ja iPadilla: avaa jakovalikko ja valitse \"Lisää Koti-valikkoon\".",
+    "install": "Asenna",
+    "notNow": "Ei nyt"
   },
   "home": {
     "welcome": "Tervetuloa uuteen kotiisi.",
@@ -2953,9 +2960,9 @@
       "stateIdle": "Täällä, mutta hiljaa juuri nyt.",
       "stateOnboarding": "Asettuu taloksi.",
       "stateNew": "Juuri saapunut — ei ole vielä aloittanut.",
-      "stateProblem": "Siinä on jotain vialla.",
+      "stateProblem": "Se on törmännyt johonkin. Katsotaanko yhdessä?",
       "stateSystem": "Osa taloa.",
-      "othersProblem": "{count} muuta, {problems} kaipaa huomiota.",
+      "othersProblem": "Katsotaanko, mitä muille {count} apurille kuuluu?",
       "othersOk": "{count} muuta, kaikki kunnossa."
     },
     "branchB": {
@@ -2975,7 +2982,8 @@
       "yours": "Se jota jo käytät"
     },
     "feed": {
-      "title": "Mitä on tapahtunut",
+      "quiet": "Täällä on ollut hiljaista. Laitetaanko jotain tapahtumaan? Avaa chat ja sano, mitä tarvitset.",
+        "title": "Mitä on tapahtunut",
       "accountCreated": "Kotisi on olemassa.",
       "welcomeMat": "Teit tervetuloamaton. Katso se.",
       "agentKnocking": "Agenttisi koputtaa ovelle.",
@@ -3870,6 +3878,9 @@
     "genStep3Btn": "Rekisteröidy ja lisää appisi",
     "genStep3Mcp": "Jos tekoäly johon liitit kehotteen on yhteydessä tähän nodeen MCP:llä, se julkaisee appin puolestasi, eikä tiedostoa tarvitse siirtää käsin.",
     "pitch": "AIMEAT on digitoimisto, jossa ihmiset, tekoäly, agentit ja appit tekevät työtä saman katon alla ja jokainen omistaa oman datansa.",
+    "wishPh": "Mitä sä tarvitset?",
+    "wishGo": "GO",
+    "wishLead": "Sano, mitä tarvitset, ja paina GO. Päädyt chattiin, joka alkaa rakentaa sitä kanssasi; uusi kävijä tekee tilin matkalla, eikä kirjoittamasi katoa.",
     "pitchLead": "Tämä on yksi asia jonka voit tehdä AIMEATilla.",
     "tierLegend": "KAIKILLE MALLEILLE = mikä tahansa malli osaa rakentaa sillä · LUE DOKUMENTTI = mallilla ei ole siitä ennakkotietoa, joten käyttöohje kulkee kehotteen mukana · VERSIOANSA = malli muistaa vanhemman version, joten seuraa ohjeen versiota",
     "wallOpens": "avausta",

@@ -7,6 +7,8 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v1.1.0 — 2026-08-16 — .koti-feed-quiet: the feed's quiet-days nudge, a dashed door into the
+ *     chat rather than an alarm.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  *   v1.0.1 — 2026-08-07 — Rooms block gets a bottom margin: measured 0px between it and the done
  *     mat card on the finished home, so the two bordered cards collided.
@@ -296,6 +298,15 @@
   font-size: 0.82rem; text-transform: uppercase; letter-spacing: 1.4px;
   color: var(--muted); font-weight: 700; margin: 0 0 0.9rem;
 }
+/* The quiet nudge: when nothing has happened for days, the feed opens with the next move
+   instead of a list that ends in the past. A door, not an alarm. */
+.koti-feed-quiet {
+  display: block; margin: 0 0 0.9rem; padding: 0.7rem 0.9rem;
+  border: 1px dashed var(--border); border-radius: 10px;
+  font-size: 0.92rem; color: var(--text); text-decoration: none;
+  background: var(--surface);
+}
+.koti-feed-quiet:hover { border-color: var(--accent); }
 .koti-feed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; }
 .koti-feed-item { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; }
 .koti-feed-dot {

@@ -9,6 +9,10 @@
  * @structure default export Landing({ navigate }) + BuildHero/Gallery(live wall)/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v5.3.0 — 2026-08-16 — The wish box: one field under the pitch line where a visitor says what
+ *     they need. Signed in it lands in the chat composer (never auto-sent); signed out it survives
+ *     registration and lands in the same place. A ?wish= in the URL (the wiifm page's GO box
+ *     submits here) rides the same rail. Key: sessionStorage 'aimeat.wish', drained by chat.js.
  *   v5.2.0 — 2026-08-16 — The arrival redirect asks the node where this account lands instead of
  *     sending everyone to /v1/profile. The server has decided that since the remake, and this page
  *     ignored it, so an account created on the new path still arrived at the old one.
@@ -76,6 +80,7 @@ import { escHtml } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { siteLink, hasSite } from '/js/site.js';
+import { showLoginModal } from '/js/services/auth.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
@@ -573,6 +578,59 @@ function ConnectInvite({ onNavigate }) {
   `;
 }
 
+/* The wish rail: what the visitor typed travels as sessionStorage 'aimeat.wish' and the chat
+   composer drains it into the draft — never auto-sent, the person reads it and presses send.
+   sessionStorage for the same reason the builder draft uses it: an unfinished thought belongs
+   to this tab, not to the machine. */
+const WISH_KEY = 'aimeat.wish';
+
+function storeWish(text) {
+  try { sessionStorage.setItem(WISH_KEY, text); } catch (err) { swallowed('landing: store wish', err); }
+}
+
+function hasStoredWish() {
+  try { return !!sessionStorage.getItem(WISH_KEY); } catch (err) { swallowed('landing: read wish', err); return false; }
+}
+
+function hasJwt() {
+  try { const raw = localStorage.getItem('aimeat_session'); return !!(raw && JSON.parse(raw)?.jwt); }
+  catch (err) { swallowed('landing: read session', err); return false; }
+}
+
+/* One field, one button. The answer to "what is this place" is the visitor's own need coming
+   back as a thing, and this is the door that promise walks through: signed in you land in the
+   chat with your words already in the composer, new here you register on the way and land in
+   the same place. */
+function WishBox({ navigate }) {
+  // Prefilled from ?wish= so the wiifm page's GO box and this one are the same box.
+  const [wish, setWish] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('wish')?.trim() || ''; }
+    catch (err) { swallowed('landing: url wish', err); return ''; }
+  });
+
+  const go = (e) => {
+    e.preventDefault();
+    const text = wish.trim();
+    if (!text) return;
+    storeWish(text);
+    if (hasJwt()) { navigate('/v1/chat'); return; }
+    // The auth modal is the real thing; Landing's auth-change listener routes to the chat
+    // when a wish is waiting. If the auth library has not loaded, the wish keeps sitting in
+    // the box — a dead click, but never a lost sentence.
+    showLoginModal({ tab: 'register', onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')) });
+  };
+
+  return html`
+    <form class="ld-wish" onSubmit=${go}>
+      <input class="ld-wish-input" type="text" maxlength="500" value=${wish}
+        onInput=${(e) => setWish(e.target.value)}
+        placeholder=${tr('landing.wishPh', 'What do you need?')}
+        aria-label=${tr('landing.wishPh', 'What do you need?')} />
+      <button class="btn-primary ld-wish-go" type="submit">${tr('landing.wishGo', 'GO')}</button>
+    </form>
+  `;
+}
+
 function BuildHero({ onNavigate }) {
   // ONE primary action. This section used to carry four buttons of equal weight, which asks the
   // visitor to choose before they know enough to choose. It also sits BELOW the generator now, so
@@ -625,6 +683,9 @@ export default function Landing({ navigate }) {
       try {
         const raw = localStorage.getItem('aimeat_session');
         if (raw && JSON.parse(raw)?.jwt) {
+          // A wish waiting in this tab outranks the usual landing: the person said what they
+          // need, so they arrive in the chat where the composer is already holding it.
+          if (hasStoredWish()) { navigate('/v1/chat'); return true; }
           landingFor().then((path) => navigate(path));
           return true;
         }
@@ -632,6 +693,12 @@ export default function Landing({ navigate }) {
       } catch { /* stay on landing */ }
       return false;
     };
+    // A wish arriving in the URL (the wiifm page's GO box submits here) is stored before the
+    // arrival check runs, so a signed-in visitor rides straight through to the chat with it.
+    try {
+      const urlWish = new URLSearchParams(window.location.search).get('wish')?.trim();
+      if (urlWish) storeWish(urlWish);
+    } catch (err) { swallowed('landing: url wish', err); }
     let arrivedInApp = false;
     try { arrivedInApp = sessionStorage.getItem('aimeat.in-app') === '1'; } catch { /* treat as direct arrival */ }   // eslint-disable-line aimeat/no-silent-catch -- treat as direct arrival
     if (!arrivedInApp && check()) return undefined;
@@ -664,7 +731,8 @@ export default function Landing({ navigate }) {
               line frames the fold as one example rather than the whole product. -->
       <section class="ld-pitch">
         <p class="ld-pitch-line">${tr('landing.pitch', 'AIMEAT is a digital agency where people, AI, agents and apps work under one roof and everyone owns their own data.')}</p>
-        <p class="ld-pitch-lead">${tr('landing.pitchLead', 'This is one of the things you can do with AIMEAT.')}</p>
+        <${WishBox} navigate=${navigate} />
+        <p class="ld-pitch-lead">${tr('landing.wishLead', 'Say what you need and press GO. You land in a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.')}</p>
       </section>
 
       <!-- 1. The invitation, folded. Measured behaviour beat the theory here: with the generator

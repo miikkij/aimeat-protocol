@@ -2801,28 +2801,28 @@
     "epPrompt": "this prompt as plain markdown",
     "q": {
       "agent": {
-        "q": "What is an agent, and how is it different from an AI?",
-        "a": "An AI is a model. An agent is a job you give an AI: it has a name, a memory that survives the conversation, a queue of tasks you write in plain language, and a spending cap. Change the AI behind it and the agent keeps its memory and its work."
+        "q": "What works for me here while I am away?",
+        "a": "A helper you connect, called an agent here. It has a name, a memory that survives the conversation, a queue of tasks you write in plain language, and a spending cap. Change the AI behind it and it keeps its memory and its work."
       },
       "organism": {
-        "q": "What is an organism, and when do I need one?",
-        "a": "An organism is a shared space where people and agents work on the same thing. It keeps a history of every change, and anything that goes out passes a person first. You want one when more than one person, or more than one agent, touches the same material. For your own notes you do not need one."
+        "q": "We are several people. How do we share what we know?",
+        "a": "In a shared space, called an organism here. It keeps a history of every change, and anything that goes out passes a person first. You want one when more than one person, or more than one helper, touches the same material. For your own notes you do not need one."
       },
       "privacy": {
-        "q": "Who can see my data?",
-        "a": "Everything starts private, and you choose what to publish. Agents and apps reach exactly what you handed them and nothing beside it, every read and write carries the name of whoever did it, and you can take a permission back at any time."
+        "q": "Who can see my things?",
+        "a": "Everything starts private, and you choose what to publish. A helper or an app reaches exactly what you handed it and nothing beside it, every read and write carries the name of whoever did it, and you can take a permission back at any time."
       },
       "cost": {
-        "q": "What are morsels, and what does AI cost me?",
-        "a": "Morsels are the daily allowance here, and they refill every day. They pace expensive operations. Real money is metered separately: AI spend goes against your own key, and you can see it per agent and per project."
+        "q": "What does this cost me?",
+        "a": "Trying it costs nothing. The daily allowance here is called morsels; it refills every morning and paces the heavy operations. Real money is metered separately: AI spend goes against your own key, and you can see it per helper and per project."
       },
       "connect": {
         "q": "My AI says it cannot connect. What now?",
         "a": "If your AI supports MCP, add this site as a connector: one command in Claude Code, or paste the MCP address into your client’s custom connector dialog. For every other AI, copy the help prompt on the \"For my AI\" tab into the chat and it will orient itself from there."
       },
       "broken": {
-        "q": "Something is broken. Who do I tell?",
-        "a": "Tell whoever runs this site. Your AI can send the message from inside the session, or use the contact details below. Say what you were doing and what you expected to happen."
+        "q": "What if I break something?",
+        "a": "Most things here are safe to try: everything starts private, and a helper only touches what you allowed. When something does go wrong, tell whoever runs this site. Your AI can send the message from inside the session, or use the contact details below. Say what you were doing and what you expected to happen."
       }
     }
   },
@@ -2882,6 +2882,13 @@
     "exampleExchange": "Work with a price: a capability listed on EXCHANGE, bought by another company’s agent under a contract, every call logged and settled.",
     "exampleExchangeCta": "See the market →",
     "ctaLearn": "Learn it hands-on, free →"
+  },
+  "install": {
+    "title": "Put AIMEAT.IO behind its own button",
+    "body": "Installed, it opens in its own window, shows unread counts on its icon, and takes shares straight into your chat.",
+    "iosBody": "On iPhone and iPad: open the Share menu and choose \"Add to Home Screen\".",
+    "install": "Install",
+    "notNow": "Not now"
   },
   "home": {
     "welcome": "Welcome to your new home.",
@@ -2953,9 +2960,9 @@
       "stateIdle": "Here, but quiet just now.",
       "stateOnboarding": "Settling in.",
       "stateNew": "Just arrived — it has not started yet.",
-      "stateProblem": "Something is wrong with it.",
+      "stateProblem": "It has hit a snag. Shall we take a look?",
       "stateSystem": "Part of the house.",
-      "othersProblem": "{count} more, {problems} needing attention.",
+      "othersProblem": "Shall we see how the other {count} are doing?",
       "othersOk": "{count} more, all fine."
     },
     "branchB": {
@@ -2975,7 +2982,8 @@
       "yours": "The one you already use"
     },
     "feed": {
-      "title": "What has happened",
+      "quiet": "Quiet here lately. Shall we make something happen? Open the chat and say what you need.",
+        "title": "What has happened",
       "accountCreated": "Your home exists.",
       "welcomeMat": "You made your welcome mat. Look at it.",
       "agentKnocking": "Your agent is knocking at the door.",
@@ -3870,6 +3878,9 @@
     "genStep3Btn": "Register and add your app",
     "genStep3Mcp": "If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.",
     "pitch": "AIMEAT is a digital agency where people, AI, agents and apps work under one roof and everyone owns their own data.",
+    "wishPh": "What do you need?",
+    "wishGo": "GO",
+    "wishLead": "Say what you need and press GO. You land in a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.",
     "pitchLead": "This is one of the things you can do with AIMEAT.",
     "tierLegend": "ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc",
     "wallOpens": "opens",

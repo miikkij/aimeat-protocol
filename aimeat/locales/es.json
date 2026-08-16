@@ -2801,28 +2801,28 @@
     "epPrompt": "este prompt en markdown plano",
     "q": {
       "agent": {
-        "q": "¿Qué es un agente, y en qué se diferencia de una IA?",
-        "a": "Una IA es un modelo. Un agente es un puesto de trabajo que le das a una IA: tiene nombre, una memoria que sobrevive a la conversación, una cola de tareas que escribes en lenguaje corriente, y un tope de gasto. Cambia la IA que hay detrás y el agente conserva su memoria y su trabajo."
+        "q": "¿Qué trabaja para mí aquí cuando no estoy?",
+        "a": "Un ayudante que conectas, que aquí se llama agente. Tiene nombre, una memoria que sobrevive a la conversación, una cola de tareas que escribes en lenguaje corriente, y un tope de gasto. Cambia la IA que hay detrás y conserva su memoria y su trabajo."
       },
       "organism": {
-        "q": "¿Qué es un organismo, y cuándo necesito uno?",
-        "a": "Un organismo es un espacio compartido donde las personas y los agentes trabajan sobre lo mismo. Guarda el historial de cada cambio, y todo lo que sale pasa antes por una persona. Lo quieres cuando más de una persona, o más de un agente, toca el mismo material. Para tus propias notas no hace falta."
+        "q": "Somos varias personas. ¿Cómo compartimos lo que sabemos?",
+        "a": "En un espacio compartido, que aquí se llama organismo. Guarda el historial de cada cambio, y todo lo que sale pasa antes por una persona. Lo quieres cuando más de una persona, o más de un ayudante, toca el mismo material. Para tus propias notas no hace falta."
       },
       "privacy": {
-        "q": "¿Quién puede ver mis datos?",
-        "a": "Todo empieza privado, y tú eliges qué publicar. Los agentes y las aplicaciones alcanzan exactamente lo que les diste y nada de al lado, cada lectura y cada escritura lleva el nombre de quien la hizo, y puedes retirar un permiso cuando quieras."
+        "q": "¿Quién puede ver mis cosas?",
+        "a": "Todo empieza privado, y tú eliges qué publicar. Un ayudante o una aplicación alcanza exactamente lo que le diste y nada más, cada lectura y cada escritura lleva el nombre de quien la hizo, y puedes retirar un permiso cuando quieras."
       },
       "cost": {
-        "q": "¿Qué son los morsels, y qué me cuesta la IA?",
-        "a": "Los morsels son la asignación diaria de aquí, y se rellenan cada día. Marcan el ritmo de las operaciones caras. El dinero de verdad se mide aparte: el gasto de IA va contra tu propia clave, y lo puedes ver por agente y por proyecto."
+        "q": "¿Cuánto me cuesta esto?",
+        "a": "Probarlo no cuesta nada. La asignación diaria de aquí se llama morsels; se recarga cada mañana y marca el ritmo de las operaciones pesadas. El dinero de verdad se mide aparte: el gasto de IA va contra tu propia clave, y lo puedes ver por ayudante y por proyecto."
       },
       "connect": {
         "q": "Mi IA dice que no puede conectarse. ¿Y ahora qué?",
         "a": "Si tu IA admite MCP, agrega este sitio como conector: un comando en Claude Code, o pega la dirección MCP en el diálogo de conector personalizado de tu cliente. Para cualquier otra IA, copia el prompt de ayuda de la pestaña \"Para mi IA\" en el chat y se orienta desde ahí."
       },
       "broken": {
-        "q": "Algo está roto. ¿A quién se lo digo?",
-        "a": "Díselo a quien lleva este sitio. Tu IA puede mandar el mensaje desde dentro de la sesión, o usa los datos de contacto de abajo. Cuenta qué estabas haciendo y qué esperabas que pasara."
+        "q": "¿Y si rompo algo?",
+        "a": "Casi todo se puede probar sin riesgo: todo empieza privado, y un ayudante solo toca lo que permitiste. Cuando algo sí se rompe, díselo a quien lleva este sitio. Tu IA puede mandar el mensaje desde dentro de la sesión, o usa los datos de contacto de abajo. Cuenta qué estabas haciendo y qué esperabas que pasara."
       }
     }
   },
@@ -2882,6 +2882,13 @@
     "exampleExchange": "Trabajo con precio: una capacidad publicada en EXCHANGE, comprada por el agente de otra empresa bajo un contrato, con cada llamada registrada y liquidada.",
     "exampleExchangeCta": "Ver el mercado →",
     "ctaLearn": "Apréndelo practicando, gratis →"
+  },
+  "install": {
+    "title": "Pon AIMEAT.IO detrás de su propio botón",
+    "body": "Instalada, se abre en su propia ventana, muestra lo no leído en su ícono y recibe lo que compartes directo en tu chat.",
+    "iosBody": "En iPhone y iPad: abre el menú de compartir y elige \"Agregar a inicio\".",
+    "install": "Instalar",
+    "notNow": "Ahora no"
   },
   "home": {
     "welcome": "Te damos la bienvenida a tu nuevo hogar.",
@@ -2953,9 +2960,9 @@
       "stateIdle": "Está aquí, pero ahora mismo callado.",
       "stateOnboarding": "Acomodándose.",
       "stateNew": "Recién llegado: todavía no ha empezado.",
-      "stateProblem": "Algo le pasa.",
+      "stateProblem": "Se topó con algo. ¿Le echamos un vistazo?",
       "stateSystem": "Forma parte de la casa.",
-      "othersProblem": "{count} más, {problems} necesitan atención.",
+      "othersProblem": "¿Vemos cómo están los otros {count}?",
       "othersOk": "{count} más, todos bien."
     },
     "branchB": {
@@ -2975,7 +2982,8 @@
       "yours": "La que ya usas"
     },
     "feed": {
-      "title": "Lo que ha pasado",
+      "quiet": "Ha estado tranquilo por aquí. ¿Hacemos que pase algo? Abre el chat y di qué necesitas.",
+        "title": "Lo que ha pasado",
       "accountCreated": "Tu hogar existe.",
       "welcomeMat": "Hiciste tu felpudo de bienvenida. Míralo.",
       "agentKnocking": "Tu agente está llamando a la puerta.",
@@ -3869,6 +3877,9 @@
     "genStep3Btn": "Regístrate y agrega tu aplicación",
     "genStep3Mcp": "Si la IA en la que pegaste el prompt está conectada a este nodo por MCP, puede publicar la aplicación por ti, sin ningún archivo que mover a mano.",
     "pitch": "AIMEAT es una agencia digital donde personas, IA, agentes y aplicaciones trabajan bajo un mismo techo y cada quien es dueño de sus propios datos.",
+    "wishPh": "¿Qué necesitas?",
+    "wishGo": "GO",
+    "wishLead": "Di qué necesitas y presiona GO. Llegas a un chat que empieza a construirlo contigo; si eres nuevo, creas la cuenta en el camino y no pierdes nada de lo que escribiste.",
     "pitchLead": "Esto es una de las cosas que puedes hacer con AIMEAT.",
     "tierLegend": "CUALQUIER MODELO = cualquier modelo puede construir con esto · LEE EL MANUAL = el modelo no lo conoce de antes, así que el manual de uso viaja dentro del prompt · TRAMPA DE VERSIÓN = el modelo recuerda una versión antigua, así que sigue la versión del manual",
     "wallOpens": "aperturas",

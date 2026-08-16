@@ -14,6 +14,8 @@
  *   v1.5.0 — 2026-08-08 — .ld-askai-copy became a container rule on .ld-askai-box. .ld-gen-copy renamed
  *       .ld-gen-action: it was never a copy class — step 3's "Register and add your app" anchor
  *       wears it too.
+ *   v1.6.0 — 2026-08-16 — .ld-wish: the wish box under the pitch line (input + GO), the front
+ *       page's primary action.
  */
 .ld { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
 
@@ -241,6 +243,20 @@
 .ld-pitch { max-width: 760px; margin: 2rem auto 1rem; text-align: left; }
 .ld-pitch-line { font-size: 1.35rem; line-height: 1.4; font-weight: 700; color: var(--text); margin: 0; }
 .ld-pitch-lead { font-size: .95rem; color: var(--text-muted); margin: .75rem 0 0; }
+
+/* The wish box: the one field the whole page funnels into. Big on purpose — it is the primary
+   action of the front page, and everything below it is evidence that pressing GO works. */
+.ld-wish { display: flex; gap: .6rem; margin: 1rem 0 0; }
+.ld-wish-input {
+  flex: 1 1 auto; min-width: 0;
+  font-size: 1.1rem; font-weight: 600;
+  padding: .8rem 1rem;
+  border: 2px solid var(--border); border-radius: 12px;
+  background: var(--card); color: var(--text);
+}
+.ld-wish-input:focus { outline: none; border-color: var(--accent); }
+.ld-wish-input::placeholder { color: var(--text-dim); font-weight: 400; }
+.ld-wish-go { flex: 0 0 auto; font-size: 1rem; padding: .8rem 1.6rem; }
 
 .ld-invite { max-width: 760px; margin: 0 auto 2rem; }
 .ld-invite .collapsible {
