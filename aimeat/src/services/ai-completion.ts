@@ -19,6 +19,12 @@
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v1.x — 2026-08-16 — Which key pays is decided in services/ai-allowance.ts: the person's own,
+ *     then the node's if they have allowance left. `apiKeyScope` stops being hardcoded to 'own' —
+ *     it was hardcoded because before the node had a key of its own there was only one possible
+ *     answer. A node-key caller whose allowance is spent gets a free model and is TOLD so
+ *     (degradedToFreeModel), rather than a dead end; an explicit model override is left alone,
+ *     because a caller that named a model is not asking the node to choose.
  *   v1.x — 2026-08-16 — Model selection asks the node as well as the owner, per role, through
  *     services/ai-model-defaults.ts. A node that pays for its own inference can now name a model
  *     for a person who has chosen none. Inert until an operator sets one: with the environment
@@ -59,6 +65,7 @@ import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
+import { resolveAiKey, debitAllowance } from './ai-allowance.js';
 import { recordUsageEvent } from './usage-metering.js';
 
 /**
@@ -213,6 +220,9 @@ export async function recordAiUsage(
     /** Ledger dimensions. Omitted only by a caller that genuinely has no model to name. */
     model?: string; provider?: string; promptTokens?: number; completionTokens?: number;
     source?: string;
+    /** Which key paid. The ledger has carried this dimension since it was written; before the node
+     *  had a key of its own there was only one possible answer, so it was hardcoded. */
+    apiKeyScope?: 'own' | 'node';
   },
 ): Promise<UsageRecord> {
   const updated: UsageRecord = {
@@ -251,8 +261,7 @@ export async function recordAiUsage(
         // reported cost or this node's estimate, and priceUsd() prefers what it is given.
         providerCostUsd: call.costUsd,
         source: call.source ?? 'ai-complete',
-        // The owner's own key, always: this endpoint decrypts THEIR key and spends THEIR budget.
-        apiKeyScope: 'own',
+        apiKeyScope: call.apiKeyScope ?? 'own',
         appId: call.appId ?? '',
         surface: 'app',
       });
@@ -304,6 +313,19 @@ export interface CompleteForOwnerResult {
    * `content`, which is what the public hash lookup is keyed on.
    */
   provenance?: AiProvenanceRecordRow;
+  /**
+   * Which pocket paid, and — on the node's key — what is left. A caller showing a person their spend
+   * has to be able to tell "you spent your own money" from "you used the node's allowance", and the
+   * two are different sentences.
+   */
+  keySource: 'own' | 'node';
+  allowanceRemainingUsd?: number;
+  /**
+   * True when the allowance was spent and the answer came from a free model instead of a refusal.
+   * Surfaced rather than hidden: a weaker answer the person was told about is an honest trade, and
+   * an unannounced one is not.
+   */
+  degradedToFreeModel?: boolean;
 }
 
 const emptyUsage = (): UsageRecord => ({
@@ -435,7 +457,11 @@ export async function completeForOwner(
 
   assertProviderAllowed(config, baseUrl);
   assertAppAllowed(prefs, opts.appId);
-  const decryptedKey = decryptOwnerKey(config, apiKeyRecord?.value, provider);
+  // Whose key pays is one decision and it lives in services/ai-allowance.ts: the person's own key,
+  // then the node's if they have allowance left. An own key is never metered here — it is their
+  // money and their provider account, which is the whole reason bringing one is recommended.
+  const keyChoice = await resolveAiKey(storage, config, gaii, provider, apiKeyRecord?.value);
+  const decryptedKey = keyChoice.key;
 
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
   const dailyBudget = assertWithinBudget(usage, prefs, opts.appId);
@@ -462,6 +488,19 @@ export async function completeForOwner(
       || roleModel('reasoning')
       // Vendor-neutral default: OpenRouter's free-models router (no specific vendor hardcoded).
       || 'openrouter/free';
+  }
+
+  // Allowance spent, on the node's key: answer on a free model rather than stopping, and say so.
+  // A refusal is a dead end; a weaker answer with an honest label is not. An explicit model override
+  // is left alone — a caller that named one is not asking the node to choose.
+  let degradedToFree = false;
+  if (keyChoice.scope === 'node' && keyChoice.exhausted && !opts.model) {
+    if (!config.modelFreeFallback) {
+      throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
+        'Your allowance on this node is used up. Add more, or set your own OpenRouter key in Settings.');
+    }
+    selectedModel = config.modelFreeFallback;
+    degradedToFree = true;
   }
 
   const options = {
@@ -492,8 +531,12 @@ export async function completeForOwner(
   const updated = await recordAiUsage(storage, gaii, usage, {
     costUsd, tokens: totalTok, appId: opts.appId,
     model: result.model, provider, promptTokens: promptTok, completionTokens: completionTok,
-    source: 'ai-complete',
+    source: 'ai-complete', apiKeyScope: keyChoice.scope,
   });
+  // Only the node's key draws down an allowance. An own key is the person's own account.
+  const allowanceAfter = keyChoice.scope === 'node'
+    ? await debitAllowance(storage, config, gaii, costUsd)
+    : null;
 
   logger.info(`[ai] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} tokens=${totalTok} cost=$${costUsd.toFixed(4)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
 
@@ -552,5 +595,10 @@ export async function completeForOwner(
       remainingUsd: Math.max(0, dailyBudget - updated.total_cost_usd),
     },
     provenance,
+    keySource: keyChoice.scope,
+    ...(keyChoice.scope === 'node'
+      ? { allowanceRemainingUsd: allowanceAfter ? Math.max(0, allowanceAfter.granted_usd - allowanceAfter.spent_usd) : keyChoice.remainingUsd }
+      : {}),
+    ...(degradedToFree ? { degradedToFreeModel: true } : {}),
   };
 }

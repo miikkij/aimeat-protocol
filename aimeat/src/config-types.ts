@@ -167,7 +167,9 @@ export interface SiteLinksConfig {
   contacts: SiteContact[];
 }
 
-export interface AimeatConfig {
+import type { AiCapabilityConfig } from './config-types-ai.js';
+
+export interface AimeatConfig extends AiCapabilityConfig {
   port: number;
   baseUrl: string;
   /**
@@ -323,29 +325,6 @@ export interface AimeatConfig {
   /** Hard cap on a browser voice-message recording, in seconds. Served to the UI so the recorder
    *  stops at the node's own number instead of a hardcoded one. */
   voiceMsgMaxSeconds: number;
-  /**
-   * Instance-level model defaults, one per role. Read only when the OWNER has not chosen a model of
-   * their own: owner setting, then this, then a refusal that names what to set. Empty (the default)
-   * means the node states no preference and behaves exactly as it did before these existed.
-   *
-   * They belong with the instance API key rather than beside it. A key alone does not let a new
-   * person speak, read an image or make one, because every model role is an owner-level setting and
-   * an unset one is an error rather than a fallback — speech-to-text is the sharpest case, where a
-   * brand-new account cannot use the microphone at all until it visits a settings page it has no
-   * reason to know about. That is the wrong order.
-   */
-  modelDefaultChat: string;
-  modelDefaultReasoning: string;
-  modelDefaultExecution: string;
-  modelDefaultVision: string;
-  modelDefaultStt: string;
-  modelDefaultImage: string;
-  /** ISO-639-1 hint for speech-to-text when the owner has set none. Empty = let the model detect. */
-  sttLanguageDefault: string;
-  /** How many on-demand app screenshots one owner may ask for per hour. Rendering is the most
-   *  expensive thing this node does per request, and an unthrottled render is a denial-of-service
-   *  shape, which is why the batch job never had a request path at all until this existed. */
-  screenshotOnDemandPerHour: number;
   microMemoryQuotaKb: number;
   microMemoryMaxSetsPerAgent: number;
   microMemoryMaxKeysPerSet: number;
