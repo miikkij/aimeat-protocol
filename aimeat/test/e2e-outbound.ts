@@ -8,6 +8,11 @@
  *   email path (PDF + Finvoice attachments composed), the public unsubscribe
  *   endpoint's no-enumeration behavior, cross-owner isolation and cross-scope 403.
  * @version-history
+ *   v1.1.0 — 2026-08-16 — E2E quality, outbound:343: the unsubscribe was only ever fetched with an
+ *     unknown token, so the opt-out it exists to perform was never measured and the route could
+ *     have stopped writing unnoticed. Test 17 reads the recipient's real token out of the database
+ *     under test (there is no HTTP path to it), uses the link, and proves the write through the API
+ *     plus a refused marketing send — with the page asserted byte-identical to the unknown-token one.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
  */
 
@@ -345,6 +350,100 @@ await test('16. the public unsubscribe answers identically for unknown tokens (n
   assert(res.status === 200, `expected 200, got ${res.status}`);
   const html = await res.text();
   assert(html.includes('Unsubscribed'), 'unsubscribe page missing');
+});
+
+/**
+ * Test 16 fetches an unknown token, so the page it reads is the page the route renders when it
+ * does nothing. Nothing here has ever carried a REAL token to that door, which means the opt-out
+ * itself — the recipient's own capability, and the one thing on this endpoint that must work
+ * without a login — was never measured. The route could have stopped writing and the suite would
+ * still be green.
+ *
+ * Owner B, not A: test 13 exhausts A's rolling daily limit on purpose, so every send under A
+ * after it answers 429. B's counter is untouched, and the three sends here stay well under the
+ * limit. Placement after test 14 matters too, since that test asserts B's contact list is empty.
+ *
+ * The token is read straight out of the database the server under test is running. There is no
+ * HTTP path to it (publicContact() strips it from every response and test 1 asserts that) and the
+ * email that would carry the link is never delivered, SMTP being pinned off. Same move as
+ * e2e-extension-secrets, which opens the same sqlite file read-only while the server holds it.
+ */
+async function readOptOutToken(contactId: string): Promise<string | null> {
+  const backend = process.env.AIMEAT_STORAGE ?? process.env.AIMEAT_DB ?? 'memory';
+  if (backend === 'sqlite') {
+    const { resolve } = await import('node:path');
+    const Database = (await import('better-sqlite3')).default;
+    const db = new Database(resolve(process.cwd(), process.env.AIMEAT_SQLITE_PATH || process.env.AIMEAT_DB_PATH || 'test/.test-e2e.db'), { readonly: true });
+    try {
+      const row = db.prepare('SELECT optOutToken FROM outbound_contacts WHERE id = ?').get(contactId) as { optOutToken?: string } | undefined;
+      return row?.optOutToken ?? null;
+    } finally { db.close(); }
+  }
+  if (backend === 'postgres-kysely') {
+    const { default: pg } = await import('pg');
+    const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+    await client.connect();
+    try {
+      // Quoted camelCase on this backend; the sqlite table is snake_case with the same columns.
+      const r = await client.query('SELECT "optOutToken" FROM "OutboundContact" WHERE "id" = $1', [contactId]);
+      return r.rows[0]?.optOutToken ?? null;
+    } finally { await client.end(); }
+  }
+  return null;
+}
+
+await test('17. a REAL unsubscribe token opts the recipient out, and the page gives nothing away', async () => {
+  const stamp = Date.now();
+  const created = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ name: 'Peruuttaja', email: `unsub${stamp}@example.com` }),
+  });
+  assert(created.status === 201, `contact: expected 201, got ${created.status} ${JSON.stringify(created.body)}`);
+  const contactId = created.body.data.contact.id as string;
+
+  // Positive control: marketing is deliverable BEFORE the unsubscribe, so the 422 further down is
+  // the opt-out and not an unknown contact. 'failed' is the transport (SMTP is off); 200 means
+  // every policy gate passed.
+  const before = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: contactId, kind: 'marketing', subject: 'Kampanja ennen', body: 'x' }),
+  });
+  assert(before.status === 200, `marketing before opt-out: expected 200, got ${before.status} ${JSON.stringify(before.body)}`);
+  assert(before.body.data.channel === 'email' && before.body.data.status === 'failed',
+    `expected email/failed, got ${before.body.data.channel}/${before.body.data.status}`);
+
+  const token = await readOptOutToken(contactId);
+  if (!token) { console.log('    (skip: no readable database for this backend)'); return; }
+
+  // The route answers text/html, so the suite's json() helper is the wrong tool here.
+  const real = await fetch(`${BASE}/v1/outbound/unsubscribe?token=${encodeURIComponent(token)}`);
+  assert(real.status === 200, `real token: expected 200, got ${real.status}`);
+  const realHtml = await real.text();
+  const unknown = await fetch(`${BASE}/v1/outbound/unsubscribe?token=definitely-not-a-token`);
+  const unknownHtml = await unknown.text();
+  assert(realHtml === unknownHtml, 'the page must be byte-identical for a real and an unknown token, or the link confirms the address exists');
+
+  // The read-back is through the API, which is where an owner would see it.
+  const list = await json('/v1/outbound/contacts', { headers: authed(B.token) });
+  assert(list.status === 200, `list: ${list.status}`);
+  const row = (list.body.data.contacts as any[]).find(c => c.id === contactId);
+  assert(!!row, 'the contact must still be there');
+  assert(row.optedOut === true, `the unsubscribe must have been written, got optedOut=${row.optedOut}`);
+  assert(typeof row.optOutAt === 'string', `and stamped, got optOutAt=${JSON.stringify(row.optOutAt)}`);
+  assert(!('optOutToken' in row), 'the token stays server-side even after it has been used');
+
+  // …and the state has teeth: marketing is refused, invoices still go.
+  const after = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: contactId, kind: 'marketing', subject: 'Kampanja jälkeen', body: 'x' }),
+  });
+  assert(after.status === 422 && after.body.error?.code === 'OPTED_OUT',
+    `marketing after opt-out: expected 422 OPTED_OUT, got ${after.status} ${JSON.stringify(after.body.error)}`);
+  const transactional = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: contactId, kind: 'transactional', subject: 'Lasku', body: 'x' }),
+  });
+  assert(transactional.status === 200, `transactional after opt-out: expected 200, got ${transactional.status} ${JSON.stringify(transactional.body)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

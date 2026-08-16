@@ -13,6 +13,11 @@
  *   - Phase 7: Auth & Validation
  *   - Phase 8: Template Moderation Lifecycle
  * @version-history
+ *   v1.5.0 — 2026-08-16 — E2E quality, packages:678: the migration test read only the migration's own
+ *     answer about itself, so a migration that announced every component and registered none would
+ *     pass it. A new case reads the four components back through the status route, which recomputes
+ *     each hash live from native storage, and reads the migrated CSM back by name through a second
+ *     door. The replace and install_new branches were covered nowhere in the tree.
  *   v1.4.0 — 2026-08-10 — The extension components in the fixture carry a real manifest. They were a
  *     bare JS snippet, which only installed because the package registrar defaulted every missing
  *     field; that registrar now uses the same builder as POST /v1/extensions.
@@ -696,6 +701,66 @@ await test('Apply migration (POST /v1/instances/:id/apply-migration)', async () 
   assert(body.data?.updatedComponents?.includes('app-ui'), 'app-ui should be updated (custom)');
   assert(body.data?.newComponents?.includes('cortex-ai'), 'cortex-ai should be new');
   assert(body.data?.newVersion === thirdVersion, `newVersion mismatch: ${body.data?.newVersion}`);
+});
+
+/**
+ * The migration test above reads only the migration's own answer about itself: which components it
+ * says it updated, skipped or added, and the version it says the instance is on. Nothing looks at
+ * native storage afterwards, so a migration that announced everything and registered nothing would
+ * pass every one of those assertions. The `replace` and `install_new` branches are covered nowhere
+ * else in the tree.
+ *
+ * The status route computes each component's hash live from storage and calls it 'missing' when the
+ * content is not there, so it is the honest second reading. currentHash === originalHash is what
+ * says the v3 bytes are the ones registered: the migration wrote originalHash as the v3 package's
+ * own contentHash, and the route recomputes from what storage actually holds.
+ */
+await test('Migrated components really exist in native storage', async () => {
+  const { status, body } = await json(`/v1/instances/${instanceId}/status`, {
+    headers: authed(ownerToken),
+  });
+  assert(status === 200, `Expected 200, got ${status}`);
+  const components = body.data?.components as any[];
+  assert(Array.isArray(components), 'Expected components array');
+  // Three before the migration (asserted above), four after: install_new added cortex-ai.
+  assert(components.length === 4, `Expected 4 components after migration, got ${components.length}`);
+  const byId = (id: string) => components.find(c => c.componentId === id);
+
+  // replace: the v3 bytes are in storage, not merely announced.
+  const csm = byId('csm-main');
+  assert(!!csm, 'csm-main must be in the status list');
+  assert(csm.status === 'active', `csm-main must be readable from storage, got status=${csm.status}`);
+  assert(csm.currentHash === csm.originalHash,
+    `csm-main must hold the v3 bytes the migration recorded: currentHash=${csm.currentHash} originalHash=${csm.originalHash}`);
+  assert(csm.customized === false, `csm-main is not customized, got ${csm.customized}`);
+
+  // install_new: the component the migration added.
+  const cortex = byId('cortex-ai');
+  assert(!!cortex, 'cortex-ai must be in the status list');
+  assert(cortex.status === 'active', `cortex-ai must be readable from storage, got status=${cortex.status}`);
+  assert(cortex.customized === false, `cortex-ai is not customized, got ${cortex.customized}`);
+
+  // custom: the body-supplied bytes are what is stored, so it reads as customized against the
+  // target's hash. That difference is the point of the branch.
+  const app = byId('app-ui');
+  assert(!!app, 'app-ui must be in the status list');
+  assert(app.status === 'active', `app-ui must be readable from storage, got status=${app.status}`);
+  assert(app.customized === true, `app-ui carries the custom content, so it must read customized, got ${app.customized}`);
+
+  // skip: nothing moved. Also the control that this route says 'active' for a live component, so a
+  // 'missing' above is the migration's doing and not the route's.
+  const ext = byId('ext-helper');
+  assert(!!ext, 'ext-helper must be in the status list');
+  assert(ext.status === 'active', `ext-helper was skipped and must be untouched, got status=${ext.status}`);
+  assert(ext.customized === false, `ext-helper is not customized, got ${ext.customized}`);
+
+  // A second, independent door onto the same fact: the CSM read back by name. v2 defined one field,
+  // v3 defines three, which separates 're-registered with the new bytes' from 'the old row survived'.
+  const read = await json(`/v1/csm/${encodeURIComponent(csm.registeredAs)}`, { headers: authed(ownerToken) });
+  assert(read.status === 200, `GET /v1/csm/${csm.registeredAs}: expected 200, got ${read.status}`);
+  const fields = read.body.data?.csm?.definition?.fields;
+  assert(JSON.stringify(fields) === JSON.stringify(['name', 'email', 'phone']),
+    `the registered definition must be v3's, got ${JSON.stringify(fields)}`);
 });
 
 await test('Instance now at v3 — check-update shows no update', async () => {
