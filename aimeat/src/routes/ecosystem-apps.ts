@@ -344,7 +344,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
 
     const invalid = scopesWithinCeiling(finalScopes, config.maxEcoScopes);
     if (invalid.length > 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
+      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
       return;
     }
 

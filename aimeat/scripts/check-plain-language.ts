@@ -58,8 +58,22 @@ const JARGON = [
     'denied', 'forbidden', 'unauthorized', 'malformed', 'unprocessable',
 ];
 
-/** Somewhere to go: an instruction, an alternative, or a question they can answer. */
-const NEXT_STEP = /\b(use |try |add |ask |run |call |pass |open |go to|read |set |choose|pick |sign in|instead|then |first,|omit )/i;
+/**
+ * Somewhere to go: an instruction, an alternative, or an explicit "nothing more is needed".
+ *
+ * The verb list is long on purpose. A first pass with twenty verbs failed messages that were already
+ * doing their job — "This app is free — no purchase needed. Download it directly." says exactly what
+ * to do, and being told otherwise by a gate is how somebody learns to ignore it. English error
+ * imperatives are a small closed set, so listing them is more honest than trying to detect mood.
+ */
+const NEXT_STEP = new RegExp([
+    '\\b(use|try|add|ask|run|call|pass|open|read|set|choose|pick|omit|provide|send|start|stop',
+    '|download|upload|remove|delete|wait|check|publish|enable|disable|accept|rename|retry|upgrade',
+    '|purchase|buy|join|invite|reconnect|refresh|reload|contact|sign|log|switch|turn|fix|edit|move)\\b',
+    '|\\bgo to\\b|\\btop up\\b|\\bsign in\\b|\\binstead\\b|\\bthen\\b|\\bfirst,',
+    // An honest full stop is also somewhere to go: it tells them there is nothing left to do.
+    '|\\bno [a-z ]+ needed\\b|\\bnothing to\\b|\\bnobody to ask\\b|\\balready\\b',
+].join(''), 'i');
 
 interface Message { file: string; line: number; code: string; text: string; audience: MessageAudience }
 

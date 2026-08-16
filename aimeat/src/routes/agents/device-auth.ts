@@ -390,7 +390,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     if (principal) {
       const invalid = scopesExceedNodeMax(config, requestedScopes);
       if (invalid.length > 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
         return;
       }
       // An AGENT approver may pass on only what it already holds. The filter used to exempt a '*'
@@ -664,7 +664,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const finalScopes = scopes ?? config.defaultAgentScopes;
     const invalid = scopesExceedNodeMax(config, finalScopes);
     if (invalid.length > 0) {
-      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
+      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
       return;
     }
 

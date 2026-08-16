@@ -203,7 +203,7 @@ export function registerRegistrationRoutes(
         return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
       });
       if (invalid.length > 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Your assistant asked for more than this node allows. Choose fewer permissions, or ask whoever runs this node.`));
         return;
       }
     }

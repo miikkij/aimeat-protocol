@@ -70,7 +70,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       if (!hasExtWritePermission(req, config)) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
-          `Extension install requires ${config.extInstallRole} role or ext:write scope`));
+          'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
         return;
       }
 
@@ -182,7 +182,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       if (!existing) {
         if (!hasExtWritePermission(req, config)) {
           res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
-            `Extension install requires ${config.extInstallRole} role or ext:write scope`));
+            'Your assistant would need your permission to install add-ons for you. You can turn this on in Profile → Agents.'));
           return;
         }
       } else if (!canManageInstalledExt(req, config, existing.installedBy)) {

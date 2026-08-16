@@ -174,7 +174,7 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
     // Namespace ownership check (operators can use any namespace)
     if (!req.auth!.roles.includes('operator') && !validateNamespaceOwnership(parsed.namespace, ownerName)) {
       res.status(403).json(error(config.nodeId, 'NAMESPACE_DENIED',
-        `You cannot install extensions in namespace "${parsed.namespace}". Use your own namespace "${ownerName}" or "community".`));
+        `This add-on is filed under "${parsed.namespace}", which belongs to somebody else. File it under "${ownerName}" or under "community" instead.`));
       return;
     }
 
