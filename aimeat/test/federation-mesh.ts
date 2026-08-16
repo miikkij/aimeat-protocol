@@ -535,6 +535,37 @@ await test('GET /v1/federation/service-summary -- includes only federated items'
     assert(!actionIds.includes(unfederatedActionId), `unfederated action ${unfederatedActionId} should NOT be in summary`);
 });
 
+// The summary has three lists and the test above reads one. Agents and boards carry the same
+// `federate` decision — who this node advertises to a peer — and nothing looked at either. The
+// summary is computed fresh on every request (no cache), so flipping a flag and re-reading is an
+// honest measurement rather than a stale one.
+await test('GET /v1/federation/service-summary -- an AGENT appears only while its federate flag is on', async () => {
+    const summary = () => json('/v1/federation/service-summary', { headers: { 'x-source-node': fakePeerNodeId } });
+
+    // The suite turned this agent's federation back off above, so it must be absent right now.
+    const off = await summary();
+    assert(off.status === 200, `status ${off.status}`);
+    assert(!(off.body.data.agents ?? []).some((a: any) => a.gaii === agentGaii),
+        `an unfederated agent must not be advertised: ${JSON.stringify((off.body.data.agents ?? []).map((a: any) => a.gaii))}`);
+
+    // POSITIVE CONTROL: turn it on and it appears — so the absence above is the flag, not an empty list.
+    const on = await json(`/v1/agents/${agentName}/federate`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ federate: true }),
+    });
+    assert(on.body.ok === true, `enable federate: ${JSON.stringify(on.body)}`);
+    const listed = await summary();
+    assert((listed.body.data.agents ?? []).some((a: any) => a.gaii === agentGaii),
+        `a federated agent must be advertised: ${JSON.stringify((listed.body.data.agents ?? []).map((a: any) => a.gaii))}`);
+
+    // …and off again, so the suite leaves the flag where it found it.
+    const back = await json(`/v1/agents/${agentName}/federate`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ federate: false }),
+    });
+    assert(back.body.ok === true, `disable federate: ${JSON.stringify(back.body)}`);
+    const gone = await summary();
+    assert(!(gone.body.data.agents ?? []).some((a: any) => a.gaii === agentGaii), 'and it stops being advertised again');
+});
+
 // This asked for a pong with `{ from_node }` and nothing else, which is the shape audit finding
 // H-14 refuses: a liveness signal used to be taken on the body's word alone and it wrote
 // status = 'active', so one unauthenticated request from anywhere cancelled a de-peering the
