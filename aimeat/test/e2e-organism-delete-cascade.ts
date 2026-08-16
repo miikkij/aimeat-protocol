@@ -50,6 +50,9 @@ let A!: Awaited<ReturnType<typeof setupOwner>>;
 let orgId = '';
 const WS = 'wsdel';
 const TOKEN = 'Qwzxytoken';   // unique needle that only lives in this organism's content
+const MEMBER_TOKEN = 'Qwzxymember'; // the same, for the CO-MEMBER's record
+let B!: Awaited<ReturnType<typeof setupOwner>>;
+const authB = () => ({ Authorization: `Bearer ${B.token}` });
 const auth = () => ({ Authorization: `Bearer ${A.token}` });
 const root = () => `organism.${orgId}.w.${WS}`;
 
@@ -76,9 +79,52 @@ await test('Before delete: the workspace content key exists', async () => {
     assert((r.body.data.items || []).some((i: any) => i.key === `${root()}.shared.notes.n1`), 'note key present');
 });
 
+await test('A CO-MEMBER writes into the workspace, under their own identity', async () => {
+    // The file's own header says the bug was that workspace content is OWNED by the member who wrote
+    // it and only KEYED organism.{id}…, so a purge scoped to the deleter's namespace misses it. Every
+    // key here was written by the SAME owner who deletes the organism — precisely the case the
+    // original bug did NOT affect — so scoping the purge back to `WHERE ownerGaii = the deleter`
+    // passes both after-delete assertions while a co-member's records survive and stay findable.
+    B = await setupOwner('b');
+    const j = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: authB(), body: JSON.stringify({}) });
+    assert(j.status === 200 || j.status === 201, `join ${j.status}: ${JSON.stringify(j.body?.error)}`);
+
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: authB(),
+        body: JSON.stringify({ key: `${root()}.shared.notes.n2`, value: { id: 'n2', title: 'Member note', body: `also contains ${MEMBER_TOKEN} inside` }, visibility: 'private' }),
+    });
+    assert(w.status === 201 || w.status === 200, `member write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+
+    const r = await json(`/v1/librarian/search?q=${MEMBER_TOKEN}&scope=own`, { headers: authB() });
+    assert((r.body.data.hits || []).some((h: any) => h.organismId === orgId),
+        `the member's record is indexed before the delete: ${JSON.stringify((r.body.data.hits || []).map((h: any) => h.key))}`);
+});
+
+await test('Deleting an organism is the CREATOR\'s act — a member cannot do it', async () => {
+    // The organism is only ever deleted by its creator here, so removing the
+    // `organism.creatorGhii !== ghii` check from routes/organisms/crud.ts leaves the suite green
+    // while any authenticated principal destroys any organism on the node, together with everything
+    // keyed under it. A joined member is the sharpest case: they are inside, and still not the owner.
+    const r = await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: authB() });
+    assert(r.status === 403 || r.status === 404, `a member deleted the organism: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const still = await json(`/v1/organisms/${orgId}`, { headers: auth() });
+    assert(still.status === 200, `the refused delete removed it anyway: ${still.status}`);
+});
+
 await test('Delete the organism', async () => {
     const r = await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: auth() });
     assert(r.status === 200, `delete ${r.status}`);
+});
+
+await test('After delete: the CO-MEMBER\'s record is gone too, and unfindable', async () => {
+    const r = await json(`/v1/librarian/search?q=${MEMBER_TOKEN}&scope=own`, { headers: authB() });
+    assert(r.status === 200, `member search ${r.status}`);
+    const hits = (r.body.data.hits || []).filter((h: any) => h.organismId === orgId);
+    assert(hits.length === 0, `the member's record survived the delete: ${JSON.stringify(hits.slice(0, 2))}`);
+
+    const m = await json(`/v1/memory?prefix=${encodeURIComponent(`organism.${orgId}.`)}`, { headers: authB() });
+    const remaining = (m.body.data.items || []).filter((i: any) => i.key.startsWith(`organism.${orgId}.`));
+    assert(remaining.length === 0, `the member still holds org keys: ${JSON.stringify(remaining.map((i: any) => i.key))}`);
 });
 
 await test('After delete: librarian search no longer finds the token (search index purged)', async () => {

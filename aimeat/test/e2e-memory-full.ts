@@ -964,6 +964,36 @@ await test('Bundle of only not-owned items returns 404', async () => {
     assert(status === 404, `expected 404, got ${status}`);
 });
 
+await test('Bundle refuses a key that EXISTS under another owner — not merely one that is missing', async () => {
+    // The test above names a GAII that holds no records, so its 404 comes from `not_found` and says
+    // nothing about the ownership guard: delete the `if (!allowed.has(owner)) { …not_owned; continue }`
+    // block from routes/memory/bulk.ts and it still passes, while any caller ZIPs another owner's
+    // memory values and storage files by naming their GAII. This asks for a key that is really there.
+    const secretKey = `bundle.owner2.secret${Date.now()}`;
+    const w = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${owner2Token}` },
+        body: JSON.stringify({ key: secretKey, value: { text: 'owner two only' }, visibility: 'private' }),
+    });
+    assert(w.status === 201, `owner2 write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+
+    const r = await json('/v1/memory/bundle', {
+        method: 'POST', headers: auth1(),
+        body: JSON.stringify({ items: [{ kind: 'memory', key: secretKey, owner_gaii: `${owner2Name}@${NODE_ID}` }] }),
+    });
+    assert(r.status === 404, `owner one bundled owner two's record: ${r.status}`);
+    // The bytes are the point: a ZIP would carry the value, so the refusal must not carry it either.
+    assert(!JSON.stringify(r.body ?? {}).includes('owner two only'),
+        `the refusal leaked the value: ${JSON.stringify(r.body).slice(0, 200)}`);
+
+    // The control: owner two bundles their own key and gets it, so the 404 above is about ownership
+    // and not about a key the bundle route cannot serve at all.
+    const mine = await json('/v1/memory/bundle', {
+        method: 'POST', headers: { Authorization: `Bearer ${owner2Token}` },
+        body: JSON.stringify({ items: [{ kind: 'memory', key: secretKey }] }),
+    });
+    assert(mine.status === 200, `the owner cannot bundle their own record: ${mine.status} ${JSON.stringify(mine.body?.error)}`);
+});
+
 await test('Bundle without auth returns 401', async () => {
     const { status } = await json('/v1/memory/bundle', { method: 'POST', body: JSON.stringify({ items: [{ kind: 'memory', key: 'bundle.note' }] }) });
     assert(status === 401, `expected 401, got ${status}`);
@@ -1034,6 +1064,55 @@ await test('Bulk write validates storage_ref integrity (dangling ref → failed,
     });
     assert(body.data.created === 1, `expected 1 created, got ${body.data.created}`);
     assert((body.data.failed || []).some((f: { key: string; reason: string }) => f.key === 'ref.bad' && /storage file not found/.test(f.reason)), 'dangling storage_ref rejected');
+});
+
+await test('Bulk and import refuse a foreign agent target, the same way the single write does', async () => {
+    // §14 claims bulk carries the same guards as the single write, and §9 claims it for import. The
+    // foreign-agent refusal is proved for the single POST only; no test in the repo passes `agent:`
+    // to either batch door. Delete the `targetAgent.owner !== req.auth!.owner` check from the agent
+    // branch of both (routes/memory/bulk.ts) and an owner session writes into ANOTHER owner's agent
+    // namespace in batches.
+    // A REAL agent of another owner. A name the node has never heard of would be refused by the
+    // `!targetAgent` half of the same line and prove nothing about ownership — which is the trap the
+    // bundle test above fell into.
+    const strangerName = `memstranger${Date.now()}`;
+    const reg = await json('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: strangerName, display_name: 'Memory Stranger', password: 'MemFull1234' }),
+    });
+    assert(reg.status === 201, `stranger ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const ts = new Date().toISOString();
+    const stok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts) }),
+    });
+    const theirAgent = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${stok.body.data.token}` },
+        body: JSON.stringify({ name: 'memstrangeragent', owner: strangerName, capabilities: ['memory'], model: 'gpt-4o' }),
+    });
+    assert(theirAgent.status === 201, `stranger agent ${theirAgent.status}: ${JSON.stringify(theirAgent.body?.error)}`);
+    const foreign = theirAgent.body.data.agent.gaii as string;
+
+    const bulk = await json('/v1/memory/bulk', {
+        method: 'POST', headers: ownerAuth(),
+        body: JSON.stringify({ agent: foreign, entries: [{ key: 'bulk.foreign.probe', value: { x: 1 } }] }),
+    });
+    assert(bulk.status === 403, `bulk wrote into a foreign agent namespace: ${bulk.status} ${JSON.stringify(bulk.body?.data ?? bulk.body?.error)}`);
+
+    const imported = await json('/v1/memory/import', {
+        method: 'POST', headers: ownerAuth(),
+        body: JSON.stringify({ agent: foreign, entries: [{ key: 'import.foreign.probe', value: { x: 1 } }] }),
+    });
+    assert(imported.status === 403, `import wrote into a foreign agent namespace: ${imported.status} ${JSON.stringify(imported.body?.data ?? imported.body?.error)}`);
+
+    // The control: the same two doors accept the owner's OWN agent, so the refusals are about whose
+    // agent it is rather than about the parameter being rejected outright.
+    const mineBulk = await json('/v1/memory/bulk', {
+        method: 'POST', headers: ownerAuth(),
+        body: JSON.stringify({ agent: agentGaii, entries: [{ key: 'bulk.own.probe', value: { x: 1 } }] }),
+    });
+    assert(mineBulk.status === 200 || mineBulk.status === 201,
+        `the owner cannot bulk-write into their own agent: ${mineBulk.status} ${JSON.stringify(mineBulk.body?.error)}`);
 });
 
 // ═══════════════════════════════════════════════════════
@@ -1144,14 +1223,69 @@ await test('PATCH without auth returns 401', async () => {
     assert(status === 401, `expected 401, got ${status}`);
 });
 
-await test('PATCH refuses a reserved key an app must not touch', async () => {
+await test('PATCH does not over-refuse: an ordinary key, an ordinary agent', async () => {
+    // Renamed. This was called "PATCH refuses a reserved key an app must not touch" and asserted
+    // SUCCESS on `patch.reserved.probe` — which is not a reserved key — with an agent token, which
+    // the guard does not apply to at all (appMayWriteKey returns true for anything that is not a
+    // role-'app' or delegated-owner write). It is a useful case, but it is the opposite of its name,
+    // and the guard it claimed to test is exercised by the case below.
     const { status } = await json(`/v1/memory/${encodeURIComponent('patch.reserved.probe')}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${agentToken}` },
         body: JSON.stringify({ patch: { ok: true } }),
     });
-    // Not a reserved key for an agent: this asserts the guard does not over-refuse.
     assert(status === 200 || status === 201, `expected success, got ${status}`);
+});
+
+await test('PATCH refuses a reserved key to a role-APP token, and allows an ordinary one', async () => {
+    // The C-2 key-exfil class on the newest write door. Delete the appMayWriteKey block from
+    // routes/memory/patch.ts and nothing anywhere fails: the case above expects success, and
+    // e2e-app-grants enumerates POST, PUT and import but never PATCH. A role-'app' grant token
+    // (sub = the owner's GHII) could then PATCH `openrouter.settings` to redirect where a decrypted
+    // AI key is sent, or `ai-usage.*` to clear the spend meter, or `commerce.psp` to repoint payouts.
+    const APP_FILE = `patchprobe-${Date.now()}.html`;
+    const ownerHdr = { Authorization: `Bearer ${ownerToken}` };
+    await json('/v1/apps', {
+        method: 'POST', headers: ownerHdr,
+        body: JSON.stringify({
+            filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>p</body></html>').toString('base64'),
+            name: 'Patch Probe', description: 'reserved-key probe', category: 'utility',
+        }),
+    });
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const REDIRECT = 'http://localhost:9/cb';
+    const q = new URLSearchParams({
+        app: `${ownerName}/${APP_FILE}`, response_type: 'code', scope: 'memory:read memory:write',
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: ownerHdr, body: JSON.stringify({ request_id: rid }) });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST',
+        body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    });
+    const appToken = tok.body.data?.access_token as string;
+    assert(typeof appToken === 'string', `app grant token: ${JSON.stringify(tok.body?.error)}`);
+
+    for (const reserved of ['openrouter.settings', 'ai-usage.today', 'commerce.psp']) {
+        const r = await json(`/v1/memory/${encodeURIComponent(reserved)}`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${appToken}` },
+            body: JSON.stringify({ patch: { baseUrl: 'https://attacker.example' } }),
+        });
+        assert(r.status === 403 && r.body?.error?.code === 'RESERVED_KEY',
+            `an app PATCHed ${reserved}: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+    }
+
+    // The control: the same token PATCHes an ordinary key, so the refusals above are about the KEY
+    // and not about an app token that can write nothing.
+    const ok = await json(`/v1/memory/${encodeURIComponent('patch.app.ordinary')}`, {
+        method: 'PATCH', headers: { Authorization: `Bearer ${appToken}` },
+        body: JSON.stringify({ patch: { ok: true } }),
+    });
+    assert(ok.status === 200 || ok.status === 201, `the app cannot write anything at all: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
 });
 
 await test('PATCH refuses a merged value over the size cap (413), counting the MERGE not the patch', async () => {
