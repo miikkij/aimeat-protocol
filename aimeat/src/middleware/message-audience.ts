@@ -81,3 +81,85 @@ export const AUDIENCE_BY_CODE: Readonly<Record<string, MessageAudience>> = Objec
 export function audienceOf(code: string): MessageAudience {
     return AUDIENCE_BY_CODE[code] ?? 'person';
 }
+
+/**
+ * WHERE SOMEBODY GOES NEXT, when the message itself does not say.
+ *
+ * THE NUMBER THAT MADE THIS. Of 855 messages a person hears and does not yet read well, 696 fail on
+ * ONE thing: they never say what to do. The English is fine — "Action \"x\" already exists for this
+ * agent" is a perfectly good sentence — it just stops. Fixing that as 696 separate edits would take
+ * weeks and drift immediately; almost all of them share a code, and a code almost always has the
+ * same answer. So the answer lives once, here, and error() reaches for it when a route has not
+ * supplied something better.
+ *
+ * A route that knows more SHOULD still pass its own: the specific fix comes first, this is the
+ * floor. And the floor is deliberately generic — a wrong specific instruction is worse than an
+ * honest general one, so nothing here claims to know which name is free or how much you need.
+ */
+export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze({
+    // Someone else's, or not yours yet
+    FORBIDDEN: 'If you need this, ask the person who owns it to share it with you.',
+    ACCESS_DENIED: 'If you need this, ask the person who owns it to share it with you.',
+    NOT_MEMBER: 'Ask to be let into this space, and whoever runs it can add you.',
+    // Permission the owner has not granted this assistant
+    SCOPE_DENIED: 'You can turn this on for your assistant in Profile → Agents.',
+    INVALID_SCOPES: 'You can choose what your assistant may do in Profile → Agents.',
+    INSUFFICIENT_ROLE: 'You can turn this on for your assistant in Profile → Agents.',
+    DATA_AREA_DENIED: 'You can widen what this app may reach in Profile → Apps.',
+    POLICY_DENIED: 'You can change this in your settings, or ask whoever runs this node.',
+    RESERVED_KEY: 'This one is managed in your own settings rather than by an assistant.',
+    // Nobody is signed in
+    AUTH_REQUIRED: 'Sign in and try again.',
+    UNAUTHORIZED: 'Sign in and try again.',
+    // Money and size
+    QUOTA_EXCEEDED: 'Remove something you no longer need, or ask for more room.',
+    PAYMENT_REQUIRED: 'Top up your balance and this will go through.',
+    INSUFFICIENT_MORSELS: 'Top up your balance, or try a smaller version of this.',
+    TOO_LARGE: 'Try a smaller file, or split it into parts.',
+    SIZE_EXCEEDED: 'Try a smaller file, or split it into parts.',
+    COMPONENT_LIMIT_EXCEEDED: 'Remove one you are not using, and this will fit.',
+    // Already there
+    CONFLICT: 'Open the existing one, or choose a different name.',
+    ALREADY_EXISTS: 'Open the existing one, or choose a different name.',
+    NAME_TAKEN: 'Choose a different name and try again.',
+    EMAIL_TAKEN: 'Sign in with this address instead, or use another one.',
+    ALREADY_RESOLVED: 'This one is finished. Start a new one if you need to.',
+    // Someone changed it underneath
+    VERSION_CONFLICT: 'Open it again to see the newer version, then make your change.',
+    WRITE_CONFLICT: 'Open it again to see the newer version, then make your change.',
+    // The moment has passed, or has not come
+    INVALID_STATE: 'Check where this is now — what you can do next depends on it.',
+    ARCHIVED: 'This one is closed. Start a new one if you still need it.',
+    DISPUTE_CLOSED: 'This one is closed. Start a new one if you still need it.',
+    EXPIRED: 'Start again and you will get a fresh one.',
+    STATE_EXPIRED: 'Start again and you will get a fresh one.',
+    INVALID_CHECKOUT: 'Start the purchase again.',
+    // Sign-in security
+    WEAK_PASSWORD: 'Choose a longer one and try again.',
+    INVALID_TOTP: 'Check the code in your app and try again.',
+    INVALID_CODE: 'Ask for a new code and try again.',
+    TOO_MANY_ATTEMPTS: 'Wait a few minutes and try again.',
+    // Switched off here
+    FEATURE_DISABLED: 'Ask whoever runs this node whether it can be turned on.',
+    EXTENSION_INACTIVE: 'Turn it on in Profile → Extensions, then try again.',
+    USAGE_TERMS_REQUIRED: 'Read the terms and accept them, then this will go through.',
+    NOT_FEDERATED: 'This node does not talk to that one yet.',
+    // Ours, and somebody else's
+    INTERNAL_ERROR: 'This one is on us. It is already reported, and trying again often works.',
+    INTERNAL: 'This one is on us. It is already reported, and trying again often works.',
+    UPDATE_FAILED: 'This one is on us. It is already reported — try again in a moment.',
+    IMPORT_FAILED: 'This one is on us. It is already reported — try again in a moment.',
+    ZIP_ERROR: 'This one is on us. It is already reported — try again in a moment.',
+    ENCRYPTION_NOT_CONFIGURED: 'This one is on us, and whoever runs this node has been told.',
+    FEDERATION_ERROR: 'The other node did not answer. Not your doing — try again shortly.',
+    FEDERATION_PROXY_ERROR: 'The other node did not answer. Not your doing — try again shortly.',
+    FEDERATION_UNREACHABLE: 'The other node is not reachable right now. Try again shortly.',
+    FEDERATION_AUTH_FAILED: 'The two nodes could not agree on who you are. Whoever runs them can fix it.',
+    PROVIDER_ERROR: 'The service behind this did not answer. Not your doing — try again shortly.',
+    OPENROUTER_ERROR: 'The AI service did not answer. Not your doing — try again shortly.',
+});
+
+/** The floor a person is given when the message itself does not say where to go. */
+export function nextStepFor(code: string): string | undefined {
+    return NEXT_STEP_BY_CODE[code];
+}

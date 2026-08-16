@@ -39,7 +39,7 @@ import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { audienceOf, type MessageAudience } from '../src/middleware/message-audience.js';
+import { audienceOf, nextStepFor, type MessageAudience } from '../src/middleware/message-audience.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..');
@@ -116,7 +116,9 @@ function score(m: Message): Finding | null {
     if (hits.length) reasons.push(`words only we understand: ${hits.join(', ')}`);
     // An identifier in the sentence, rather than in `details` where a technical reader looks.
     if (/`[^`]+`|[a-z]+_[a-z_]+|\/v1\//.test(m.text)) reasons.push('an identifier in the sentence');
-    if (!NEXT_STEP.test(m.text)) reasons.push('nowhere to go next');
+    // Somewhere to go, from EITHER the sentence itself or the floor error() gives this code. Asking
+    // for it twice would be asking 696 routes to repeat what the envelope already says.
+    if (!NEXT_STEP.test(m.text) && !nextStepFor(m.code)) reasons.push('nowhere to go next');
     if (m.text.length > 160) reasons.push(`${m.text.length} characters`);
 
     // Keyed on the CODE plus a digest of the text, not on file and line. A line number churns on

@@ -21,6 +21,8 @@
 import { generateRequestId } from '../utils/tracking-code.js';
 import type { AiProvenance } from '../models/ai-provenance-schemas.js';
 
+import { nextStepFor } from './message-audience.js';
+
 export interface HintAction {
   description: string;
   method: string;
@@ -105,7 +107,13 @@ export function error(nodeId: string, code: string, message: string, httpStatus?
     error: { code, message, details },
     hints: {
       next_actions: [
-        ...(hints ?? [{ description: 'View API documentation', method: 'GET', url: '/v1/docs' }]),
+        // The FLOOR: when a route has not said where to go, the code usually can. 696 of the 855
+        // messages a person hears failed on this one thing and nothing else — the English was fine,
+        // they just stopped. "View API documentation" is not an answer to somebody who has just been
+        // told their name is taken. A route that knows better still passes its own and comes first.
+        ...(hints ?? (nextStepFor(code)
+          ? [{ description: nextStepFor(code)!, method: 'GET', url: '/v1/docs' }]
+          : [{ description: 'View API documentation', method: 'GET', url: '/v1/docs' }])),
         SUPPORT_HINT,
       ],
       help_url: '/v1/docs',

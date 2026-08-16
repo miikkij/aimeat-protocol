@@ -11,7 +11,8 @@
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { audienceOf } from '../../src/middleware/message-audience.js';
+import { audienceOf, nextStepFor, NEXT_STEP_BY_CODE } from '../../src/middleware/message-audience.js';
+import { error } from '../../src/middleware/envelope.js';
 import { FAULT_CODES } from '../../src/services/system-fault-report.js';
 
 describe('who hears which error', () => {
@@ -46,5 +47,44 @@ describe('who hears which error', () => {
         // The safe default. Being wrong this way costs a sentence that is kinder than it needed to
         // be; being wrong the other way leaves somebody staring at a word we invented.
         expect(audienceOf('SOME_CODE_NOBODY_CLASSIFIED_YET')).toBe('person');
+    });
+});
+
+describe('where somebody goes next when the message does not say', () => {
+    it('reaches a person rather than the API documentation', () => {
+        // "View API documentation" is not an answer to somebody who has just been told their name is
+        // taken. This is the floor under 696 messages whose English was fine and which simply stopped.
+        const taken = error('n', 'NAME_TAKEN', 'That name is already in use');
+        expect(taken.hints?.next_actions?.[0]?.description).toBe('Choose a different name and try again.');
+        expect(taken.hints?.next_actions?.[0]?.description).not.toMatch(/documentation/i);
+    });
+
+    it('lets a route that knows better go first', () => {
+        // The floor is a floor. A route with a real answer still wins, which is why refusals.ts
+        // passes its own and this never overrides it.
+        const specific = error('n', 'NAME_TAKEN', 'That name is in use', 409, undefined,
+            [{ description: 'Try "starlight-2"', method: 'POST', url: '/v1/things' }]);
+        expect(specific.hints?.next_actions?.[0]?.description).toBe('Try "starlight-2"');
+    });
+
+    it('never loses the way to reach the people who run this node', () => {
+        const e = error('n', 'NAME_TAKEN', 'That name is in use');
+        expect(e.hints?.next_actions?.some(a => /message the people who run this node/i.test(a.description))).toBe(true);
+    });
+
+    it('says our faults are ours, and that nobody has to report them', () => {
+        for (const code of FAULT_CODES) {
+            const step = nextStepFor(code);
+            expect(step, `${code} needs a sentence a person can hear`).toBeTruthy();
+            expect(step, `${code} must not put the blame on the reader`).toMatch(/on us|already reported|has been told/i);
+        }
+    });
+
+    it('speaks plainly in every one of them — this is the text a person actually reads', () => {
+        const SYSTEM_WORDS = /\b(scope|namespace|principal|token|payload|schema|endpoint|gaii|ghii|denied|forbidden|unauthorized|invalid)\b/i;
+        for (const [code, step] of Object.entries(NEXT_STEP_BY_CODE)) {
+            expect(step, `${code}: "${step}" uses a word only we understand`).not.toMatch(SYSTEM_WORDS);
+            expect(step.length, `${code}: "${step}" is too long to be an instruction`).toBeLessThan(120);
+        }
     });
 });
