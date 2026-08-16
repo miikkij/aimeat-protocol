@@ -175,7 +175,36 @@ export type WorkflowStepAction =
   // human-input step — and the signal gates on that. A step must declare either this or its own
   // success_signal; with neither, the only thing left to green on is "the script returned", which is
   // the covering fallback this design exists to remove.
-  | { kind: 'extension'; extension: string; action: string; instance_id?: string; input?: Record<string, unknown>; result_to_key?: string }
+  | {
+      kind: 'extension'; extension: string; action: string; instance_id?: string;
+      input?: Record<string, unknown>; result_to_key?: string;
+      /**
+       * Call the action repeatedly and merge the pages into one result.
+       *
+       * WHY A STEP NEEDS THIS. Real registries page. `laake-fi` caps at 500 rows and the set is 718,
+       * so a single call answers `truncated: true` and a package built from it silently holds
+       * five-sevenths of the data — the exact shape of quiet loss this whole target exists to
+       * remove. Without paging the only honest options were to publish a fraction or not to bind
+       * the producer at all.
+       *
+       * The merged value keeps the LAST page's envelope, with `items_at` replaced by every row
+       * collected and two fields added: `pagesFetched`, and `complete` — false when the loop stopped
+       * at `max_pages` rather than at the end of the data. That flag is the point: "did we get all
+       * of it" becomes something a success_signal can assert instead of something nobody checks.
+       */
+      paging?: {
+        /** Input field carrying the offset. It is set on each call, overriding whatever `input` had. */
+        offset_param: string;
+        /** How many rows a page holds. Also the increment. */
+        page_size: number;
+        /** Dotted path to a page's rows. */
+        items_at: string;
+        /** Dotted path to the total the producer reports. Absent means "stop on a short page". */
+        total_at?: string;
+        /** Hard stop. A producer that never reports completion must not loop forever. */
+        max_pages: number;
+      };
+    }
   // Publish one version of a data package from what an earlier step produced.
   //
   // WHY THIS IS A STEP KIND AND NOT AN EXTENSION. The binding a repeating package needs is "call the
@@ -462,6 +491,18 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     /** Owner-namespace key the action's return value is written to, so a signal can gate on it.
      *  See the type above for why an extension step needs this and an agent step does not. */
     result_to_key: z.string().min(1).max(400).optional(),
+    /** Call the action repeatedly and merge the pages. See the type above for why a step needs it:
+     *  a producer that caps at 500 rows on a set of 718 otherwise publishes five-sevenths of the
+     *  data with nothing saying so. */
+    paging: z.object({
+      offset_param: z.string().min(1).max(64),
+      page_size: z.number().int().min(1).max(10000),
+      items_at: z.string().min(1).max(200),
+      total_at: z.string().min(1).max(200).optional(),
+      // Required, not defaulted. A producer that never reports completion must not loop forever,
+      // and the author is the one who knows how big their data can get.
+      max_pages: z.number().int().min(1).max(200),
+    }).strict().optional(),
   }),
   z.object({
     kind: z.literal('datapackage'),

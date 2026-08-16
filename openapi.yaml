@@ -4114,6 +4114,23 @@ components:
                 envelope (`{ ok, total, results }`) far more often than with a bare array, so naming
                 the path is how a workflow says which part of the answer is the table. Omit when the
                 value is the array itself.
+            paging:
+              type: object
+              description: >-
+                extension: call the action repeatedly and merge the pages. Real registries page —
+                `laake-fi` caps at 500 rows on a set of 718, so one call answers `truncated: true`
+                and a package built from it holds five-sevenths of the data with nothing saying so.
+                The merged value keeps the LAST page's envelope with `items_at` replaced by every row
+                collected, plus `pagesFetched` and `complete`. `complete` is false when the loop
+                stopped at `max_pages` rather than at the end of the data, which is what makes "did
+                we get all of it" something a success_signal can assert.
+              required: [offset_param, page_size, items_at, max_pages]
+              properties:
+                offset_param: { type: string, description: 'Input field carrying the offset; set on each call.' }
+                page_size: { type: integer, description: 'Rows per page, and the increment.' }
+                items_at: { type: string, description: 'Dotted path to a page''s rows.' }
+                total_at: { type: string, description: 'Dotted path to the reported total. Absent = stop on a short page.' }
+                max_pages: { type: integer, description: 'Hard stop. Required: a producer that never reports completion must not loop forever.' }
             columns:
               type: object
               additionalProperties: { type: string }

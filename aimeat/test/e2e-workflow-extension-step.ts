@@ -105,6 +105,16 @@ const SCRIPTS = {
         detail: { cpvLabel: 'Software', lotCount: 3 }, cpvCodes: ['48000000'] }
     ] };
   }`,
+  // A PAGING producer, the shape every real registry has: a hard cap per call, a total, and a
+  // `truncated` flag that tells the caller it did not get everything.
+  paged: `export default async function(ctx, input){
+    var TOTAL = 12, CAP = 5;
+    var offset = input.offset || 0;
+    var limit = Math.min(input.limit || CAP, CAP);
+    var out = [];
+    for (var i = offset; i < Math.min(offset + limit, TOTAL); i++) out.push({ n: i, label: 'row ' + i });
+    return { ok: true, total: TOTAL, returned: out.length, offset: offset, truncated: offset + out.length < TOTAL, results: out };
+  }`,
   // The same envelope with a word where a number belongs: the quality gate's case.
   badrows: `export default async function(){
     return { ok: true, total: 2, results: [
@@ -125,6 +135,7 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'rows', method: 'POST', path: '/rows', script: 'rows' },
     { id: 'badrows', method: 'POST', path: '/badrows', script: 'badrows' },
     { id: 'nested', method: 'POST', path: '/nested', script: 'nested' },
+    { id: 'paged', method: 'POST', path: '/paged', script: 'paged' },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 8000, max_api_calls: 4 },
@@ -546,6 +557,78 @@ await test('12d. A nested producer is flattened by the step, or nothing could pu
   assert('missing' in first && (first.missing === null || first.missing === ''), `absent path should be a gap: ${JSON.stringify(first.missing)}`);
   const fields = pkg.body.data.descriptor.resources[0].schema.fields.map((f: { name: string }) => f.name);
   assert(fields.includes('buyerName') && !fields.includes('buyer'), `the published schema is the flat one: ${fields.join(',')}`);
+});
+
+await test('12f. A paging producer is followed to the end, and the package holds all of it', async () => {
+  // The shape every real registry has, and the reason a fraction of a dataset is the worst outcome
+  // of the three: a producer caps at 5, the set is 12, and one call answers `truncated: true`.
+  const PKG = `wfpage${Date.now()}`;
+  const def = {
+    title: { en_US: 'Paged' }, description: { en_US: 'follow the pages' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [
+      { id: 'fetch', description: { en_US: 'ask, page by page' }, required_to_function: 'none',
+        // `complete` is what the loop adds and what makes "did we get all of it" assertable. Without
+        // it the only honest check would be counting rows against a total nobody wrote down.
+        success_signal: { kind: 'deterministic', key: 'page.raw', op: 'json_field', path: 'complete', equals: true },
+        action: { kind: 'extension', extension: EXT, action: 'paged', input: { limit: 5 },
+                  paging: { offset_param: 'offset', page_size: 5, items_at: 'results', total_at: 'total', max_pages: 10 },
+                  result_to_key: 'page.raw' } },
+      { id: 'publish', description: { en_US: 'publish' }, after: ['fetch'], required_to_function: 'none',
+        action: { kind: 'datapackage', name: PKG, from_key: 'page.raw', rows_at: 'results',
+                  changes: 'Every page, not the first one.',
+                  schema: { fields: [{ name: 'n', type: 'integer' }, { name: 'label', type: 'string' }] } } },
+    ],
+  };
+  const save = await json('/v1/workflows/page-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  assert(save.status === 200, `save ${save.status}: ${JSON.stringify(save.body?.data?.errors ?? save.body?.error)}`);
+  const r = await json('/v1/workflows/page-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const run = await settle('page-wf', r.body.data.run?.runId ?? r.body.data.runId, owner.token);
+  assert(run.steps.publish.state === 'green', `publish ${run.steps.publish.state}: ${JSON.stringify(run.steps.publish.outputObserved ?? {})}`);
+
+  // ALL TWELVE, not the five a single call would have given.
+  const pkg = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  assert(pkg.body.data.descriptor.resources[0].rowCount === 12,
+    `expected all 12 rows, got ${pkg.body.data.descriptor.resources[0].rowCount}`);
+  const rows = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}/rows/rows?limit=20`);
+  const ns = rows.body.data.rows.map((x: { n: number }) => Number(x.n));
+  assert(JSON.stringify(ns) === JSON.stringify([...Array(12).keys()]), `pages merged in order: ${ns.join(',')}`);
+
+  const raw = await json('/v1/memory/page.raw', { headers: auth(owner.token) });
+  assert(raw.body.data.value.pagesFetched === 3, `12 rows at 5 a page is 3 calls, got ${raw.body.data.value.pagesFetched}`);
+  assert(raw.body.data.value.complete === true, 'and the loop reached the end of the data');
+});
+
+await test('12g. A page limit that cannot hold the data says so instead of publishing a fraction', async () => {
+  // The case that matters more than the happy path. Stopping at max_pages must not look like
+  // finishing: `complete` is false, the signal fails, and NO version is published. A package quietly
+  // holding two-thirds of its rows is the exact failure this whole target exists to remove.
+  const PKG = `wfshort${Date.now()}`;
+  const def = {
+    title: { en_US: 'Too few pages' }, description: { en_US: 'short' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [
+      { id: 'fetch', description: { en_US: 'ask, but not enough' }, required_to_function: 'none',
+        success_signal: { kind: 'deterministic', key: 'short.raw', op: 'json_field', path: 'complete', equals: true },
+        action: { kind: 'extension', extension: EXT, action: 'paged', input: { limit: 5 },
+                  paging: { offset_param: 'offset', page_size: 5, items_at: 'results', total_at: 'total', max_pages: 2 },
+                  result_to_key: 'short.raw' } },
+      { id: 'publish', description: { en_US: 'publish' }, after: ['fetch'], required_to_function: 'none',
+        action: { kind: 'datapackage', name: PKG, from_key: 'short.raw', rows_at: 'results', changes: 'Should never exist.' } },
+    ],
+  };
+  await json('/v1/workflows/short-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  const r = await json('/v1/workflows/short-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const run = await settle('short-wf', r.body.data.run?.runId ?? r.body.data.runId, owner.token);
+
+  assert(run.steps.fetch.state !== 'green', `an incomplete fetch went ${run.steps.fetch.state}`);
+  assert(run.steps.publish.state === 'skipped', `publish should never run, it was ${run.steps.publish.state}`);
+  const pkg = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  assert(pkg.status === 404, `no package may exist, got ${pkg.status}`);
+  // It DID collect what it could, and says exactly how much and that it is not everything.
+  const raw = await json('/v1/memory/short.raw', { headers: auth(owner.token) });
+  assert(raw.body.data.value.complete === false, 'complete must be false');
+  assert(raw.body.data.value.results.length === 10, `10 of 12 collected, got ${raw.body.data.value.results.length}`);
 });
 
 await test('12e. An unknown field on a datapackage step is REFUSED, not stripped in silence', async () => {

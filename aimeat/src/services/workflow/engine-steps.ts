@@ -26,7 +26,7 @@ import { globToRegExp } from './signal-eval.js';
 import { collectSignalKeys, runKey, type ResolvedStep } from './store.js';
 import { listOwnerScopeMemory, getOwnerScopeMemory } from '../owner-memory.js';
 import { getActiveConnectTunnelManager } from '../connect-tunnel.js';
-import { runExtensionActionAsSystem } from '../extension-system-run.js';
+import { runExtensionActionAsSystem, type SystemRunResult } from '../extension-system-run.js';
 import { publishPackage, recordFailure } from '../datapackage/store.js';
 import { loc, template } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
@@ -177,23 +177,28 @@ export function dispatchExtensionStep(
   const { workflowId, runId } = run;
   const stepId = step.id;
   const ownerName = ownerGhii.split('@')[0];
+  const runOnce = (input: Record<string, unknown>, label: string) => runExtensionActionAsSystem(
+    { storage: deps.storage, config: deps.config, emailService: deps.emailService },
+    {
+      extensionName: action.extension,
+      actionId: action.action,
+      instanceId: action.instance_id,
+      input,
+      callerGaii: ownerGhii,
+      ownerName,
+      storageOwnerGhii: ownerGhii,
+      logLabel: label,
+      producerKind: 'workflow',
+      producerRef: `${workflowId}/${stepId}`,
+      ...(run.defSnapshot.trigger?.kind === 'schedule' ? { producerSchedule: run.defSnapshot.trigger.cron } : {}),
+    },
+  );
+
   const fire = async (): Promise<boolean> => {
-    const out = await runExtensionActionAsSystem(
-      { storage: deps.storage, config: deps.config, emailService: deps.emailService },
-      {
-        extensionName: action.extension,
-        actionId: action.action,
-        instanceId: action.instance_id,
-        input: templateInput(action.input, run.vars),
-        callerGaii: ownerGhii,
-        ownerName,
-        storageOwnerGhii: ownerGhii,
-        logLabel: `wf:${workflowId}:${stepId}`,
-        producerKind: 'workflow',
-        producerRef: `${workflowId}/${stepId}`,
-        ...(run.defSnapshot.trigger?.kind === 'schedule' ? { producerSchedule: run.defSnapshot.trigger.cron } : {}),
-      },
-    );
+    const base = templateInput(action.input, run.vars);
+    const out = action.paging
+      ? await runPaged(action.paging, base, (input, page) => runOnce(input, `wf:${workflowId}:${stepId}:p${page}`))
+      : await runOnce(base, `wf:${workflowId}:${stepId}`);
     // THE BRIDGE BETWEEN TWO NAMESPACES. An extension's own memory lives under `ext:{name}`, and a
     // workflow's signals read OWNER SCOPE (services/owner-memory.ts: the owner GHII plus their
     // agents and ecosystem apps). Those never intersect, so without this the step's result would be
@@ -224,6 +229,83 @@ export function dispatchExtensionStep(
       logger.warn(`workflow ${workflowId} run ${runId}: extension step "${stepId}" failed`, { error: String(err) });
       return onPushTerminal(ownerGhii, workflowId, runId, stepId, false);
     });
+}
+
+/**
+ * Call an action page by page and merge the pages into one result.
+ *
+ * WHY A STEP NEEDS THIS AT ALL. Real registries page. `laake-fi` caps at 500 rows on a set of 718,
+ * so one call answers `truncated: true` and a package built from it holds five-sevenths of the data
+ * with nothing anywhere saying so. Without paging the only honest choices were to publish a fraction
+ * or to leave the producer unbound.
+ *
+ * The merged value KEEPS THE LAST PAGE'S ENVELOPE, with `items_at` replaced by every row collected,
+ * plus two fields that did not exist before:
+ *   - `pagesFetched`
+ *   - `complete` — false when the loop stopped at `max_pages` rather than at the end of the data.
+ *
+ * `complete` is the point of the whole thing. "Did we get all of it" becomes something a
+ * success_signal can assert, instead of something nobody checks until a consumer notices their
+ * numbers are wrong.
+ *
+ * STOPPING is deliberately three conditions, because a producer may signal the end in any of them:
+ * a short page, reaching the reported total, or the author's hard limit. The last one is required
+ * rather than defaulted — a producer that never reports completion must not loop forever, and the
+ * person who wrote the workflow is the one who knows how big their data can get.
+ */
+async function runPaged(
+  paging: NonNullable<Extract<NonNullable<WorkflowStep['action']>, { kind: 'extension' }>['paging']>,
+  baseInput: Record<string, unknown>,
+  call: (input: Record<string, unknown>, page: number) => Promise<SystemRunResult>,
+): Promise<SystemRunResult> {
+  const items: unknown[] = [];
+  let last: SystemRunResult = { result: null, reads: [], writes: [] };
+  const reads = new Set<string>();
+  const writes = new Set<string>();
+  let complete = false;
+  let page = 0;
+
+  for (; page < paging.max_pages; page++) {
+    // A page that fails THROWS, which fails the step. Merging what arrived before it and calling
+    // that a result is the covering fallback this design refuses everywhere else: the package would
+    // be short and nothing would say why.
+    last = await call({ ...baseInput, [paging.offset_param]: page * paging.page_size }, page + 1);
+    for (const r of last.reads) reads.add(r);
+    for (const w of last.writes) writes.add(w);
+
+    const pageItems = atPath(last.result, paging.items_at);
+    if (!Array.isArray(pageItems)) {
+      throw new Error(`paging: nothing at "${paging.items_at}" on page ${page + 1} — the path is wrong, `
+        + 'or the producer changed shape');
+    }
+    items.push(...pageItems);
+
+    const total = paging.total_at ? Number(atPath(last.result, paging.total_at)) : NaN;
+    const reachedTotal = Number.isFinite(total) && items.length >= total;
+    // A short page is the end of the data for a producer that reports no total, and a harmless
+    // extra stop condition for one that does.
+    if (reachedTotal || pageItems.length < paging.page_size) { complete = true; page++; break; }
+  }
+
+  const merged = (last.result && typeof last.result === 'object')
+    ? { ...(last.result as Record<string, unknown>) }
+    : {} as Record<string, unknown>;
+  setAtPath(merged, paging.items_at, items);
+  merged.pagesFetched = page;
+  merged.complete = complete;
+  return { result: merged, reads: [...reads], writes: [...writes] };
+}
+
+/** Write into a dotted path, creating the objects on the way. Only used to put the merged rows back
+ *  where the producer had its page, so the envelope a signal reads keeps its shape. */
+function setAtPath(target: Record<string, unknown>, path: string, value: unknown): void {
+  const segments = path.split('.');
+  let cursor: Record<string, unknown> = target;
+  for (const segment of segments.slice(0, -1)) {
+    if (typeof cursor[segment] !== 'object' || cursor[segment] === null) cursor[segment] = {};
+    cursor = cursor[segment] as Record<string, unknown>;
+  }
+  cursor[segments[segments.length - 1]] = value;
 }
 
 /** Walk a dotted path into a value. Returns undefined the moment a segment is missing, so a caller
