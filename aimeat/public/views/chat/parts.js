@@ -320,6 +320,33 @@ export function AiNotice() {
     `;
 }
 
+/**
+ * The one thing that turns this from a website into an assistant: being reachable.
+ *
+ * Shown when the node says nobody's device is subscribed AND this browser is a desktop one. Both
+ * halves matter. The device count is the node's answer, not this browser's, because a desktop that
+ * has never subscribed knows nothing about the phone in somebody's pocket — and telling a person to
+ * set up something they set up last week is how a product teaches people to ignore it. The desktop
+ * test is a pointer test rather than a user-agent string: what is being asked is "is this the device
+ * you carry", and a fine pointer with no touch answers that better than a name that lies.
+ *
+ * Dismissal is permanent and stored with the person, not with the browser, for the same reason.
+ */
+export function MobileNudge({ onDismiss }) {
+    return html`
+        <div class="chat-nudge" role="note">
+            <span class="chat-nudge-text">
+                <strong>${tr('chat.nudgeMobileTitle', 'Put this on your phone')}</strong>
+                ${' '}
+                ${tr('chat.nudgeMobileBody', 'It installs as an app, and with notifications on I can tell you when something finishes instead of you coming back to check.')}
+            </span>
+            <button type="button" class="btn-ghost chat-nudge-dismiss" onClick=${onDismiss}>
+                ${tr('chat.nudgeDismiss', 'Not now')}
+            </button>
+        </div>
+    `;
+}
+
 /** A turn that could not run, with the reason and a way to try again. */
 export function TurnError({ message, onRetry }) {
     if (!message) return null;

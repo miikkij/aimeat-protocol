@@ -212,6 +212,34 @@ export async function uploadImage(file) {
     return key;
 }
 
+/**
+ * Which one-off suggestions this person has already waved away.
+ *
+ * One record, not one key per nudge: the budget is a thousand keys per principal, and a suggestion
+ * that costs a key every time somebody says "not now" is a store that fills with refusals. Stored
+ * with the person rather than in this browser, so a second desktop is not a second chance to ask.
+ */
+export async function readNudges() {
+    // A read that fails is treated as "already dismissed": the cost of a missing suggestion is
+    // nothing, and the cost of showing one to somebody who waved it away is that they stop reading
+    // anything this page says.
+    const res = await apiGet('/v1/memory/chat.nudges?soft=1').catch((err) => {
+        console.warn('[chat] the dismissals could not be read:', err.message);
+        return { data: { value: { mobile: true } } };
+    });
+    const value = res?.data?.value;
+    return value && typeof value === 'object' ? value : {};
+}
+
+/** Remember that one was dismissed, keeping whatever else the record holds. */
+export async function dismissNudge(name) {
+    const current = await readNudges();
+    return api('/v1/memory', {
+        method: 'POST',
+        body: JSON.stringify({ key: 'chat.nudges', value: { ...current, [name]: true }, tags: ['chat'] }),
+    });
+}
+
 /** The node mints an absolute upload URL. Collapse it to a path on the same origin so the PUT stays
  *  a plain request rather than a preflighted one. */
 function uploadTarget(url) {

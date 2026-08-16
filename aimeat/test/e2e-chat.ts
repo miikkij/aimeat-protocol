@@ -13,6 +13,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-chat
  * @version-history
+ *   v1.3.0 — 2026-08-16 — The status counts reachable devices (the phone nudge reads it).
  *   v1.2.0 — 2026-08-16 — A turn may carry attached pictures: the keys travel, a non-string is
  *     dropped at the door, and the record keeps what was attached.
  *   v1.1.0 — 2026-08-16 — The status names who pays, including for an owner who HAS stored a key.
@@ -149,6 +150,15 @@ await test('A turn carries attached pictures as KEYS, and drops what is not one'
     assert(Array.isArray(mine.images) && mine.images.length === 1,
         `only the string key survives the filter, got ${JSON.stringify(mine.images)}`);
     assert(mine.images[0] === 'chat-images/nope.png', `the key is kept as given, got ${mine.images[0]}`);
+});
+
+await test('Status counts the DEVICES that can be reached, which is what the phone nudge reads', async () => {
+    // Zero is what makes the page suggest setting a phone up. It has to come from the node — this
+    // browser knows nothing about a phone in somebody's pocket — and it must never read zero because
+    // a query failed, which is why the route answers 1 on an error rather than 0.
+    const { body } = await json('/v1/chat/status', aAuthed());
+    assert(typeof body.data?.push_devices === 'number', `push_devices is a number, got ${JSON.stringify(body.data?.push_devices)}`);
+    assert(body.data.push_devices === 0, `a fresh owner has no subscribed device, got ${body.data.push_devices}`);
 });
 
 await test('An unauthenticated caller sees nothing', async () => {

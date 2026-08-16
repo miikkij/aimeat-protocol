@@ -9291,5 +9291,8 @@
   "chat.attachTitle": "Adjuntar una imagen",
   "chat.attachUploading": "subiendo…",
   "chat.attachFailed": "falló",
-  "chat.attachRemove": "Quitar"
+  "chat.attachRemove": "Quitar",
+  "chat.nudgeMobileTitle": "Ponlo en tu teléfono.",
+  "chat.nudgeMobileBody": "Se instala como una app, y con las notificaciones activadas te aviso cuando algo termina en vez de que vuelvas a comprobarlo.",
+  "chat.nudgeDismiss": "Ahora no"
 }

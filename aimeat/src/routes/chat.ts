@@ -48,12 +48,30 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/chat/status', requireAuth(), requireRole('owner'), async (req, res) => {
         const gaii = identity(req);
         const enabled = chatEnabled(config);
-        const allowance = await readAllowance(storage, config, gaii);
+        const [allowance, pushDevices] = await Promise.all([
+            readAllowance(storage, config, gaii),
+            // How many of this person's DEVICES can be reached when something finishes. Zero is the
+            // whole reason the chat suggests a phone: an agent that can only be seen when a tab
+            // happens to be open is a website. The count comes from the node rather than from the
+            // browser, because a desktop that has never subscribed knows nothing about the phone in
+            // somebody's pocket — and suggesting it to a person who set it up last week is the
+            // fastest way to teach them to ignore us.
+            storage.listPushSubscriptionsByOwner(owner(req))
+                .then(list => list.length)
+                .catch((err: Error) => {
+                    // A count that could not be read is reported as "some", not as zero: zero is
+                    // what makes the page suggest setting up a phone, and suggesting it to somebody
+                    // who already did because a query failed is the one wrong answer here.
+                    logger.warn(`[chat] push device count unavailable: ${err.message}`);
+                    return 1;
+                }),
+        ]);
         res.json(success(config.nodeId, {
             enabled,
             agent_name: `chat#${owner(req)}@${config.nodeId}`,
             allowance_remaining_usd: remainingOf(allowance),
             has_own_key: !!(await storage.getMemory(gaii, 'openrouter.apikey')),
+            push_devices: pushDevices,
             // WHO ACTUALLY PAYS FOR A TURN, decided here rather than guessed on the page.
             //
             // The page used to derive it: an owner with a key stored was told "running on your own

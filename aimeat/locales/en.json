@@ -9299,5 +9299,8 @@
   "chat.attachTitle": "Attach a picture",
   "chat.attachUploading": "uploading…",
   "chat.attachFailed": "failed",
-  "chat.attachRemove": "Remove"
+  "chat.attachRemove": "Remove",
+  "chat.nudgeMobileTitle": "Put this on your phone.",
+  "chat.nudgeMobileBody": "It installs as an app, and with notifications on I can tell you when something finishes instead of you coming back to check.",
+  "chat.nudgeDismiss": "Not now"
 }

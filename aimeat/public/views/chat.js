@@ -28,7 +28,7 @@ import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
-import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice } from './chat/parts.js';
+import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice, MobileNudge } from './chat/parts.js';
 import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
@@ -88,6 +88,7 @@ export default function ChatView() {
     // Pictures picked but not yet sent. Each carries its own state, because one failing upload must
     // not take the others with it or block a message that never needed it.
     const [attachments, setAttachments] = useState([]);
+    const [nudgeDismissed, setNudgeDismissed] = useState(true);
 
     const abortRef = useRef(null);
     const bottomRef = useRef(null);
@@ -111,7 +112,10 @@ export default function ChatView() {
         if (!hasSession()) { setLoading(false); return; }
         (async () => {
             try {
-                const [st, list] = await Promise.all([chat.status(), chat.listThreads()]);
+                const [st, list, nudges] = await Promise.all([
+                    chat.status(), chat.listThreads(), chat.readNudges(),
+                ]);
+                setNudgeDismissed(!!nudges?.mobile);
                 setStatus(st?.data ?? null);
                 const found = list?.data?.threads ?? [];
                 setThreads(found);
@@ -316,6 +320,18 @@ export default function ChatView() {
 
     const stop = useCallback(() => { abortRef.current?.abort(); }, []);
 
+    /** This device, not this browser's name: is it the one you carry? */
+    const onDesktop = typeof window !== 'undefined'
+        && window.matchMedia?.('(pointer: fine)').matches
+        && (navigator.maxTouchPoints ?? 0) === 0;
+    const showMobileNudge = !nudgeDismissed && onDesktop && status && status.push_devices === 0;
+
+    const dismissNudge = useCallback(() => {
+        setNudgeDismissed(true);
+        // Stored with the PERSON: a second desktop is not a second chance to ask.
+        chat.dismissNudge('mobile').catch((err) => console.warn('[chat] the dismissal was not saved:', err.message));
+    }, []);
+
     /**
      * Attach pictures: upload each on its own, in the background, while the person keeps typing.
      *
@@ -421,6 +437,7 @@ export default function ChatView() {
 
                 <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
                 <${AiNotice} />
+                ${showMobileNudge && html`<${MobileNudge} onDismiss=${dismissNudge} />`}
 
                 <div class="chat-scroll" onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`

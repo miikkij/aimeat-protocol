@@ -405,6 +405,23 @@
 .chat-ai-notice-line { flex: 1 1 260px; }
 .chat-ai-more { font-size: 0.72rem; padding: 2px 8px; }
 
+/* One suggestion, once, with the way out on the same line as the ask. */
+.chat-nudge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 16px 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--accent-border);
+  background: var(--accent-subtle);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+.chat-nudge-text { flex: 1 1 260px; }
+.chat-nudge-dismiss { flex: 0 0 auto; font-size: 0.75rem; padding: 2px 8px; }
+
 /* Whose agent this is. Quiet, and permanently there. */
 .chat-credit {
   padding: 6px 16px 10px;
