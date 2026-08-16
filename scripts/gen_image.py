@@ -66,11 +66,19 @@ MODEL_CANDIDATES = [
 
 # The AIMEAT house style. Prepended to every prompt unless --no-style. Keep it about QUALITY and
 # palette, not a fixed background/composition, so it fits icons, banners and illustrations alike.
+#
+# BRIGHT BY DEFAULT, and this is not a preference to be quietly re-tuned. The previous version named
+# "deep near-black #0E1116" and "cool neutral slate grays", and every model obliged: a year of dark,
+# lifeless, interchangeable images, each one technically on-brand and none of them anything anybody
+# wanted to look at. A dark ground is now something a caller asks for in the subject line, never
+# something the house style supplies unasked.
 HOUSE_STYLE = (
-    "Premium, polished AIMEAT brand visual — modern, confident, tech-forward, crisp and high-detail. "
-    "Clean geometric design language, generous negative space, tasteful depth and soft lighting. "
-    "Palette anchored on a warm coral-red accent #E8564A with cool neutral slate grays and clean "
-    "whites; deep near-black #0E1116 when a dark ground suits the subject. No stock-photo cheese, "
+    "Premium, polished AIMEAT brand visual: bright, energetic, warm and alive. Light airy ground, "
+    "off-white or a soft warm tint, generous natural light. Confident modern geometry with clean "
+    "shapes and generous negative space, a sense of motion and optimism. Palette led by a vivid "
+    "coral-red #E8564A, supported by warm sunlit tones, fresh accents and clear whites; keep darks "
+    "to sparing outlines and type, never as the background. High contrast and saturation, cheerful "
+    "rather than corporate. No murky greys, no black backgrounds, no gloom, no stock-photo cheese, "
     "no clip-art, no watermark, no clutter, no gibberish text. Subject: "
 )
 
