@@ -62,6 +62,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
+import { recordAccountEvent } from '../services/account-events.js';
 import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
 import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
@@ -192,6 +193,15 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         if (!encKey) return;
         const encrypted = encrypt(apiKey, encKey);
         await upsertMemory(gaii, 'openrouter.apikey', { encrypted }, ['openrouter', 'secret']);
+        // A key is what lets this account spend money on inference. Its arrival and its removal are
+        // both worth a durable line; the key itself is never in the row.
+        void recordAccountEvent(storage, {
+          ownerGhii: gaii,
+          kind: 'ai_key_changed',
+          actorGaii: gaii,
+          link: '/v1/profile?tab=ai',
+          data: { action: 'set' },
+        }, config);
       }
 
       // Save preferences (plaintext)
@@ -326,7 +336,7 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         if (!encKey) return;
         decryptedKey = decrypt(encrypted, encKey);
       } else if (provider === 'openrouter') {
-        return res.status(400).json(error(config.nodeId, 'NO_API_KEY', 'No OpenRouter API key configured.'));
+        return res.status(400).json(error(config.nodeId, 'NO_API_KEY', 'No AI key is set up yet. Add yours in Profile → AI and this will work.'));
       }
 
       try {

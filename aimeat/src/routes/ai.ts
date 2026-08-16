@@ -55,6 +55,7 @@ import { assertAiUseAllowed } from '../auth/ai-gate.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { recordAccountEvent } from '../services/account-events.js';
 import {
   completeForOwner, AiCompletionError, getTodayUsage, getUsageHistory, getDailyBudgetUsd,
   DEFAULT_DAILY_BUDGET_USD,
@@ -414,6 +415,23 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
       if (app_quotas !== undefined) prefs.app_quotas = app_quotas;
       if (app_allowlist !== undefined) prefs.app_allowlist = app_allowlist;
       await upsertMemory(gaii, 'openrouter.settings', prefs, ['openrouter', 'settings']);
+      // Changing what the account may spend is a decision about money, and the person should be
+      // able to see later that it was made and when. The row names WHAT changed, not the values —
+      // a budget is on the settings page, and a feed row is not a diff.
+      const changed = [
+        typeof daily_budget_usd === 'number' ? 'budget' : '',
+        app_quotas !== undefined ? 'quotas' : '',
+        app_allowlist !== undefined ? 'allowlist' : '',
+      ].filter(Boolean).join(', ');
+      if (changed) {
+        void recordAccountEvent(storage, {
+          ownerGhii: gaii,
+          kind: 'ai_settings_changed',
+          actorGaii: resolveIdentity(req.auth!, config.nodeId),
+          link: '/v1/profile?tab=ai',
+          data: { changed },
+        }, config);
+      }
       res.json(success(config.nodeId, { saved: true }));
     });
 

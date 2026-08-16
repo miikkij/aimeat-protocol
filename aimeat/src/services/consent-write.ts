@@ -36,6 +36,7 @@ import type { Storage, ConsentRecord } from '../storage/interface.js';
 import { auditDataAccess } from './consent.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { recordAccountEvent } from './account-events.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -151,6 +152,17 @@ export async function grantConsent(
     if (consent.scope === 'federation' && onDirectoryChange) onDirectoryChange();
     emitChange('consent');
 
+    // Giving someone access to your data is exactly the kind of thing you want a durable record of,
+    // and the audit trail above is the operator's copy rather than the person's.
+    void recordAccountEvent(storage, {
+        ownerGhii: caller.ownerGaii,
+        kind: 'consent_granted',
+        actorGaii: caller.ownerGaii,
+        subject: consent.id,
+        link: '/v1/profile?tab=datawallet',
+        data: { who: consent.recipient, what: consent.dataPattern },
+    }, deps.config);
+
     return { ok: true, value: consent };
 }
 
@@ -179,6 +191,14 @@ export async function revokeConsent(
 
     if (consent.scope === 'federation' && onDirectoryChange) onDirectoryChange();
     emitChange('consent');
+    void recordAccountEvent(storage, {
+        ownerGhii: consent.ownerGaii,
+        kind: 'consent_revoked',
+        actorGaii: caller.ownerGaii,
+        subject: consent.id,
+        link: '/v1/profile?tab=datawallet',
+        data: { who: consent.recipient, what: consent.dataPattern },
+    }, deps.config);
 
     logger.debug('consent revoked', { consentId, owner: consent.ownerGaii });
     return { ok: true, value: { id: consentId, revokedAt: now } };

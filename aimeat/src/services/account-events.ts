@@ -21,6 +21,7 @@
  * @structure
  *   - KEEP_HOT / windowSize(config) -- how many stay in the window; the operator decides
  *   - recordAccountEvent(...)      -- record one, then trim
+ *   - recordFirstUse(...)          -- record only the first time, for high-frequency subjects
  *   - readAccountEvents(...)       -- the window
  *   - readAccountEventArchive(...) -- everything that fell out of it
  * @usage
@@ -97,6 +98,54 @@ export async function recordAccountEvent(
 
   // The home feed is a live surface: the SSE nudge is what makes a new row appear without a reload.
   emitChange('home', event.ownerGhii);
+}
+
+/**
+ * Record something only the FIRST time it happens for this owner.
+ *
+ * WHY THIS EXISTS. An app tool can be invoked hundreds of times an hour. A row each would fill the
+ * window in minutes and push everything else out, and the per-call record already lives in
+ * UsageCall. The first time an app reaches for a tool is news; the nine-hundredth free call is not.
+ *
+ * WHAT IT COSTS. One storage read per (owner, subject) per PROCESS, not per call: a miss checks the
+ * window once and the answer is remembered either way. The set is bounded by how many distinct
+ * things an owner actually touches, and a restart costs one read each, not a duplicate row —
+ * because the check is against storage, not against the set.
+ *
+ * WHAT IT DOES NOT PROMISE. A subject whose first use has aged out of the window will be recorded
+ * again after a restart. That is the honest cost of not keeping a second index for it, and a
+ * repeated "first use" a year later is a small wrong compared to a feed nobody can read.
+ */
+const firstUseSeen = new Set<string>();
+
+export async function recordFirstUse(
+  storage: Storage,
+  input: AccountEventInput & { subject: string },
+  config?: Pick<AimeatConfig, 'accountEventWindow'>,
+): Promise<void> {
+  const cacheKey = `${input.ownerGhii}\u0000${input.kind}\u0000${input.subject}`;
+  if (firstUseSeen.has(cacheKey)) return;
+
+  try {
+    const existing = await storage.listAccountEvents({
+      ownerGhii: input.ownerGhii, kind: input.kind, limit: windowSize(config),
+    });
+    firstUseSeen.add(cacheKey);
+    if (existing.some(e => e.subject === input.subject)) return;
+  } catch (err) {
+    // Could not tell whether this was the first. Recording is the safer wrong answer: a duplicate
+    // row is noise, a missing one is a fact nobody ever learns.
+    logger.warn('account-events: first-use check failed, recording anyway', {
+      kind: input.kind, error: String(err),
+    });
+  }
+
+  await recordAccountEvent(storage, input, config);
+}
+
+/** Test seam: forget what this process has seen. Not used by the running node. */
+export function resetFirstUseCache(): void {
+  firstUseSeen.clear();
 }
 
 /** The window, newest first. Always owner-scoped — there is no cross-owner read of this. */

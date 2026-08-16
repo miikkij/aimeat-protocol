@@ -41,6 +41,7 @@ import type { WorkflowEngine } from '../services/workflow/engine.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { recordAccountEvent } from '../services/account-events.js';
 import { emitChange } from '../services/event-bus.js';
 import {
   getWorkflow, listWorkflows, saveWorkflow, deleteWorkflow,
@@ -81,6 +82,18 @@ function computeHealth(def: WorkflowDef, runs: WorkflowRun[]) {
     meanDurationMs,
     steps,
   };
+}
+
+/** A workflow's own name for a feed row. `title` is localised; the row wants one string, and the id
+ *  is a better fallback than an empty label. */
+function workflowTitle(def: { title?: unknown } | undefined, fallback: string): string {
+  const t = def?.title;
+  if (typeof t === 'string' && t) return t;
+  if (t && typeof t === 'object') {
+    const first = Object.values(t as Record<string, unknown>).find(v => typeof v === 'string' && v);
+    if (typeof first === 'string') return first;
+  }
+  return fallback;
 }
 
 export function workflowsRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler, engine: WorkflowEngine): Router {
@@ -129,13 +142,25 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
   router.put('/v1/workflows/:id', requireAuth(), requireScope('workflow:write'), async (req: Request, res: Response) => {
     const id = req.params.id as string;
     const createdBy = resolveIdentity(req.auth!, config.nodeId);
+    const existed = !!(await getWorkflow(storage, ownerGhiiOf(req), id));
     const result = await saveWorkflow(storage, config, ownerGhiiOf(req), req.auth!.owner, id, req.body, createdBy);
     if (!result.ok) {
-      res.status(400).json(error(config.nodeId, 'WORKFLOW_INVALID', 'Workflow validation failed', undefined, { errors: result.errors }));
+      res.status(400).json(error(config.nodeId, 'WORKFLOW_INVALID', 'This workflow has something wrong in it and was not saved. The details below say which step.', undefined, { errors: result.errors }));
       return;
     }
     await syncWorkflowTriggers(storage, scheduler, config.nodeId, result.def!, ownerGhiiOf(req), createdBy);
     emitChange('workflows');
+    // One route saves both. `existed` is read BEFORE the save, because after it there is no way to
+    // tell a create from an update — and "you created a workflow" said about an edit is a small lie
+    // the person will notice.
+    void recordAccountEvent(storage, {
+      ownerGhii: ownerGhiiOf(req),
+      kind: existed ? 'workflow_updated' : 'workflow_created',
+      actorGaii: createdBy,
+      subject: id,
+      link: `/v1/profile?tab=workflows&id=${encodeURIComponent(id)}`,
+      data: { name: workflowTitle(result.def, id) },
+    }, config);
     res.json(success(config.nodeId, result.def, [
       { description: 'View the blueprint', method: 'GET', url: `/v1/workflows/${id}/blueprint` },
     ]));
@@ -149,6 +174,13 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     if (!ok) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Workflow "${id}" not found`)); return; }
     await removeWorkflowTriggers(storage, scheduler, config.nodeId, id);
     emitChange('workflows');
+    void recordAccountEvent(storage, {
+      ownerGhii: ownerGhiiOf(req),
+      kind: 'workflow_deleted',
+      actorGaii: resolveIdentity(req.auth!, config.nodeId),
+      subject: id,
+      data: { name: id },
+    }, config);
     res.json(success(config.nodeId, { deleted: id, runsDropped: withRuns }));
   });
 
@@ -167,6 +199,14 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       return;
     }
     emitChange('workflows');
+    void recordAccountEvent(storage, {
+      ownerGhii: ownerGhiiOf(req),
+      kind: 'workflow_run_started',
+      actorGaii: resolveIdentity(req.auth!, config.nodeId),
+      subject: result.runId,
+      link: `/v1/profile?tab=workflows&run=${encodeURIComponent(result.runId)}`,
+      data: { name: id, mode },
+    }, config);
 
     // SIGNALS-ONLY ANSWERS THE QUESTION IT WAS ASKED. The run completes synchronously, so the
     // verdicts exist by the time we reply — and the tool catalog has always described this mode as
@@ -260,7 +300,7 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
     // Re-resolve against the agents' CURRENT offers (they may have changed since save).
     const v = await validateWorkflow(storage, config, req.auth!.owner, def);
     if (!v.ok || !v.resolved) {
-      res.status(409).json(error(config.nodeId, 'WORKFLOW_STALE', 'Workflow no longer resolves against current offers', undefined, { errors: v.errors }));
+      res.status(409).json(error(config.nodeId, 'WORKFLOW_STALE', 'One of the offers this workflow uses has changed or gone. Open it and pick a replacement.', undefined, { errors: v.errors }));
       return;
     }
     res.json(success(config.nodeId, buildBlueprint(def, v.resolved)));
