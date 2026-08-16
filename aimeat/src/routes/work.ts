@@ -443,7 +443,7 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       return;
     }
     if (work.status !== 'accepted') {
-      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${work.status}", can only transition to in_progress from accepted`));
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `This work is ${work.status}. It has to be accepted before it can start.`));
       return;
     }
 

@@ -739,18 +739,18 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const owner = req.auth!.owner;
     const w = await getWork(storage, typeof req.params.id === 'string' ? req.params.id : '');
     if (!w || w.providerOwner !== owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such work of yours to deliver'));
-    if (w.state !== 'open') return res.status(409).json(error(config.nodeId, 'WORK_NOT_OPEN', `Work is ${w.state}`));
+    if (w.state !== 'open') return res.status(409).json(error(config.nodeId, 'WORK_NOT_OPEN', `This work is ${w.state}, so it cannot be changed now. Open it to see where it got to.`));
     const b = (req.body ?? {}) as Record<string, unknown>;
     // Settle the per-task price against the CONSUMER's contract (the consumer pays; the provider is credited).
     const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
     if (!before || before.state !== 'active') {
-      return res.status(402).json(error(config.nodeId, 'CONTRACT_INACTIVE', 'The consumer contract is no longer active — cannot settle this delivery'));
+      return res.status(402).json(error(config.nodeId, 'CONTRACT_INACTIVE', 'The agreement behind this work has ended, so it cannot be settled. Ask the other side to renew it.'));
     }
     const outcome = await settleMeteredCoordinate({
       config, storage, coordExt: w.ext, coordAction: w.action, label: `${w.agentGaii}:${w.taskType}`,
       callerGaii: w.consumerGaii, res,
     });
-    if (!outcome) return res.status(402).json(error(config.nodeId, 'NO_CONTRACT', 'No active contract to settle against'));
+    if (!outcome) return res.status(402).json(error(config.nodeId, 'NO_CONTRACT', 'There is no live agreement to settle against. Accept one first, then deliver.'));
     if (!outcome.ok) return; // 402/429 already sent (budget/rate) — work stays open
     const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
     const charged = after && before ? Math.max(0, (after.budget.spentUnits) - (before.budget.spentUnits)) : 0;

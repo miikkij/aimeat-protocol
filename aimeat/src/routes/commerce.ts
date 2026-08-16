@@ -259,7 +259,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     }
     if (checksumIsWrong(address)) {
       return res.status(400).json(error(config.nodeId, 'ADDRESS_CHECKSUM',
-        'This address fails its EIP-55 checksum, which almost always means a character was mistyped or lost in copying. '
+        'This wallet address does not check out, which almost always means a character was mistyped or lost in copying. Copy it again from your wallet. '
         + 'Paste it again from your wallet, or send it in all lowercase if your wallet does not use mixed case.'));
     }
     const token = settlementAssetMatch(address);
@@ -271,7 +271,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     const isContract = await probeIsContract(config.x402RpcUrl, address);
     if (isContract === true) {
       return res.status(400).json(error(config.nodeId, 'ADDRESS_IS_CONTRACT',
-        'The chain reports contract code at this address, so it is not a wallet you hold a key for. '
+        'This address belongs to a program rather than to a person, so it cannot receive your payouts. Use your own wallet address. '
         + 'If this is a smart-contract wallet you control, ask the operator to allow it.'));
     }
     // Store the canonical EIP-55 form: mixed case is what a wallet shows, so the seller can compare.

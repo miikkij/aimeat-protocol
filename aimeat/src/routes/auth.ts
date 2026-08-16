@@ -513,7 +513,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // its purest form: a token minted from a consent screen the owner ticked, handed back with the
       // human's roles and no scopes at all.
       res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-        'An app grant refreshes at POST /v1/app-grants/token, not here'));
+        "This kind of access is renewed somewhere else. Use the app's own renewal address instead."));
       return;
     } else {
       freshRoles = ownerRecord.roles ?? ['owner'];

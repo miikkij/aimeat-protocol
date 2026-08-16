@@ -253,7 +253,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
 
     const provider = findProvider(providers, providerId);
     if (!provider) {
-      return res.status(404).json(error(config.nodeId, 'UNKNOWN_PROVIDER', `no provider '${providerId}'`));
+      return res.status(404).json(error(config.nodeId, 'UNKNOWN_PROVIDER', `There is no service called "${providerId}" here. Check the name, or see which ones are available.`));
     }
     // An attach-only provider has no authorization round, so a client id means nothing to it. Taking
     // one and storing it would be accepting a secret this node can never use.
@@ -603,7 +603,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     if (provider && !provider.capabilities.includes(action)) {
       res.status(400).json(error(
         config.nodeId, 'UNKNOWN_ACTION',
-        `${conn.provider} has no action '${action}'. Available: ${provider.capabilities.join(', ')}`,
+        `${conn.provider} cannot do "${action}". Choose one of these instead: ${provider.capabilities.join(', ')}`,
       ));
       return;
     }

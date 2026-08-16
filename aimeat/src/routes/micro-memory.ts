@@ -137,7 +137,7 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
             const accessCode = req.query.access_code as string;
             const found = await storage.findMicroMemoryByAccessCode(setName, accessCode);
             if (!found) {
-                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Invalid access_code or set not found'));
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'That code does not open anything here. Check it and try again.'));
                 return;
             }
             gaii = found.gaii;
@@ -443,7 +443,7 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
         if (record.visibility === 'shared_read' || record.visibility === 'shared_write') {
             const accessCode = req.query.access_code as string;
             if (accessCode !== record.accessCode) {
-                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Invalid or missing access_code'));
+                res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'This needs an access code. Enter the one you were given and try again.'));
                 return;
             }
         }

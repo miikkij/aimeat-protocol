@@ -91,7 +91,7 @@ export function registerPackagesCoreRoutes(
     // Validate manifest structure
     const manifest = pkg as KnowledgeManifest;
     if (!validateManifest(manifest)) {
-      res.status(400).json(error(config.nodeId, 'SCHEMA_VALIDATION', 'Package manifest validation failed', validateManifest.errors));
+      res.status(400).json(error(config.nodeId, 'SCHEMA_VALIDATION', 'The description file for this package has something wrong in it. The details below say which part.', validateManifest.errors));
       return;
     }
 

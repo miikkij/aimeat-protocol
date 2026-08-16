@@ -311,7 +311,7 @@ export async function enforcePaywall(args: {
   const toll = action.tollMorsels ?? 0;
   if (toll > 0) {
     if (!isPosInt(toll)) {
-      res.status(500).json(error(config.nodeId, 'EXTENSION_CONFIG', `Invalid tollMorsels on action "${action.id}"`));
+      res.status(500).json(error(config.nodeId, 'EXTENSION_CONFIG', `The price on "${action.id}" is not a usable number. Set a whole number of morsels.`));
       return { ok: false };
     }
     if (toll > config.extensionMaxDebitPerCall) {

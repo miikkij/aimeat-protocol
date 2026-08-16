@@ -66,7 +66,7 @@ export function personalRouter(
       // Check slot availability
       const allNodes = await storage.listPersonalNodes();
       if (allNodes.length >= config.personalNodeMaxSlots) {
-        res.status(503).json(error(config.nodeId, 'CAPACITY_FULL', `This operator has reached the maximum of ${config.personalNodeMaxSlots} personal node slots`));
+        res.status(503).json(error(config.nodeId, 'CAPACITY_FULL', `This operator already runs ${config.personalNodeMaxSlots} personal nodes, which is the limit here. Ask them to free one.`));
         return;
       }
 

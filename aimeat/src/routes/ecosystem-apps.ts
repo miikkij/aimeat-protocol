@@ -332,7 +332,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     // Compatibility gate: a submitted-but-failed manifest blocks approval (the app must fix + re-hello).
     if (request.validationResult && !request.validationResult.ok) {
       const failed = request.validationResult.checks.filter(c => !c.ok).map(c => c.name).join(', ');
-      res.status(409).json(error(config.nodeId, 'VALIDATION_FAILED', `Compatibility validation failed (${failed}); the app must fix its manifest and reconnect`));
+      res.status(409).json(error(config.nodeId, 'VALIDATION_FAILED', `This app and the node do not agree on ${failed}. The app needs to correct its description file and connect again.`));
       return;
     }
 
@@ -609,7 +609,7 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     const knownNames = new Set(ownerAgents.map(a => a.name));
     const unknown = (agents as string[]).filter(a => !knownNames.has(a));
     if (unknown.length > 0) {
-      res.status(400).json(error(config.nodeId, 'UNKNOWN_AGENT', `Not your agent(s): ${unknown.join(', ')}`));
+      res.status(400).json(error(config.nodeId, 'UNKNOWN_AGENT', `These are not your agents: ${unknown.join(', ')}. Check the names, or pick from your own.`));
       return;
     }
 

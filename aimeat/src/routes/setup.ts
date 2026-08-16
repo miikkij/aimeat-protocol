@@ -54,7 +54,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
         if (allowedIps.includes(clientIp) || allowedIps.includes('127.0.0.1') && (clientIp === '::1' || clientIp === '::ffff:127.0.0.1')) {
             return true;
         }
-        res.status(403).json(error(config.nodeId, 'IP_RESTRICTED', 'Setup access is restricted by IP'));
+        res.status(403).json(error(config.nodeId, 'IP_RESTRICTED', 'Setup can only be done from an approved network. Ask whoever runs this node to let your address in.'));
         return false;
     };
 

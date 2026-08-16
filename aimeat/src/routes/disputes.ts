@@ -301,7 +301,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const escrowed = work.cost.inEscrow;
         if (typeof refund_morsels === 'number' && refund_morsels > escrowed) {
             res.status(400).json(error(config.nodeId, 'REFUND_EXCEEDS_ESCROW',
-                `A partial refund cannot exceed the ${escrowed} morsels held in escrow for this work.`));
+                `You can refund at most ${escrowed} morsels, which is what is being held for this work. Choose a smaller amount.`));
             return;
         }
 
@@ -474,7 +474,7 @@ export function disputesRouter(config: AimeatConfig, storage: Storage): Router {
         const escrowed = work.cost.inEscrow;
         if (to_requester + to_provider + burned > escrowed) {
             res.status(400).json(error(config.nodeId, 'RULING_EXCEEDS_ESCROW',
-                `A ruling distributes the ${escrowed} morsels held in escrow for this work; `
+                `A ruling shares out the ${escrowed} morsels being held for this work. Choose how they split; `
                 + `${to_requester + to_provider + burned} were named. Nothing was written.`));
             return;
         }

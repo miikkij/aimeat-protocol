@@ -156,7 +156,7 @@ export function registerMigrationRoutes(
 
     if (analyzePromptParts.length === 0) {
       res.status(400).json(error(config.nodeId, 'NO_COMPONENTS',
-        'None of the requested components exist in both versions'));
+        'None of these parts appear in both versions, so there is nothing to compare. Pick parts they share.'));
       return;
     }
 

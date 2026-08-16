@@ -38,7 +38,7 @@ export function registerFirstAgentRoutes(router: Router, ctx: HomeRouteCtx): voi
             const agents = await storage.getAgentsByOwner(owner);
             if (!agents.length) {
                 res.status(409).json(error(config.nodeId, 'NO_AGENT',
-                    'No agent has joined this account yet.'));
+                    'No assistant has connected to this account yet. Connect one from Profile → Agents.'));
                 return;
             }
 

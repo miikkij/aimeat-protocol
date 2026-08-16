@@ -202,7 +202,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         const iface = pinnedVersion ? await getInterfaceVersion(storage, providerGhii, filename, toolName, pinnedVersion) : null;
         const binding = iface?.binding ?? tool.action_id ?? null;
         if (!binding) {
-          res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool has no capability binding to invoke'));
+          res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool is not wired to anything that can run, so there is nothing to call yet.'));
           return;
         }
         const cap = await storage.getCapability(binding);

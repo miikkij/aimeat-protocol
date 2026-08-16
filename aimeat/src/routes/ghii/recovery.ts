@@ -347,7 +347,7 @@ export function registerRecoveryRoutes(
             }
             const valid = await verifyPassword(current_password, ghiiRecord.passwordHash);
             if (!valid) {
-                res.status(401).json(error(config.nodeId, 'WRONG_PASSWORD', 'Current password is incorrect'));
+                res.status(401).json(error(config.nodeId, 'WRONG_PASSWORD', 'That is not your current password. Try again, or reset it if you have forgotten it.'));
                 return;
             }
         }

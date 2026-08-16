@@ -162,7 +162,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       if (!tool) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Tool "${toolName}" not found on app "${appId}"`));
       // Gap 1 = synchronous metered calls → the tool MUST be bound to a capability. Unbound (task) tools are
       // agent-work (metered-per-task, Gap 2) and are offered through the agent-work path, not here.
-      if (!tool.action_id) return res.status(400).json(error(config.nodeId, 'TOOL_UNBOUND', `Tool "${toolName}" has no capability binding (action_id); only callable tools can be offered as a metered service today`));
+      if (!tool.action_id) return res.status(400).json(error(config.nodeId, 'TOOL_UNBOUND', `"${toolName}" is not wired to anything that can run, so it cannot be sold yet. Give it an action first. as a metered service today`));
       // LEGIBILITY GATE (same as ext-action): input + output schema + usage terms are mandatory to list.
       if (!hasSchema(tool.inputSchema) || !hasSchema(tool.outputSchema)) {
         return res.status(400).json(error(config.nodeId, 'SCHEMA_REQUIRED',
@@ -170,7 +170,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       }
       const usageTerms = parseUsageTerms(b.usage_terms);
       if (!usageTerms) return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
-        'usage_terms is required to list an offering — state { derivatives, resale, attribution, note? } so a consumer knows how they may use the output'));
+        'Say how buyers may use what they get before listing this: whether they can build on it, resell it, and whether they must credit you.'));
       // Authoritative pricing from the tool's own price/plans.
       const commercial: ActionCommercial = {
         payMorsels: tool.price && tool.price.morsels > 0 ? tool.price.morsels : undefined,
@@ -271,7 +271,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const usageTerms = parseUsageTerms(b.usage_terms);
     if (!usageTerms) {
       return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
-        'usage_terms is required to list an offering — state { derivatives, resale, attribution, note? } so a consumer knows how they may use the output'));
+        'Say how buyers may use what they get before listing this: whether they can build on it, resell it, and whether they must credit you.'));
     }
     const dupExt = await refuseDuplicate(`ext:${ext}:${action}`, 'ext-action');
     if (dupExt) return dupExt;
@@ -466,7 +466,9 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     if (!o || o.providerOwner !== req.auth!.owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering of yours'));
     if (o.auto && str(req.query.force) !== '1') {
       return res.status(409).json(error(config.nodeId, 'SOURCE_MANAGED',
-        `This listing is projected from its source (${o.ext}/${o.action}). Turn "exchange" off there (app-catalog → app details → app tools, the extension action, or the agent offer) and it is removed. Pass ?force=1 to delist until the next reconcile.`));
+        `This listing comes from ${o.ext}. Turn its sharing off there and it disappears from here too.`,
+        409,
+        { where: 'app-catalog → app details → app tools, the extension action, or the agent offer', force: 'Pass ?force=1 to delist until the next reconcile.' }));
     }
     await deleteOffering(storage, o.offeringId);
     return res.json(success(config.nodeId, { offeringId: o.offeringId, state: 'delisted' }));

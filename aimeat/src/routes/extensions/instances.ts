@@ -44,7 +44,7 @@ export function registerExtensionInstanceRoutes(router: Router, config: AimeatCo
       }
       if (!ext.instances?.supported) {
         res.status(400).json(error(config.nodeId, 'INSTANCES_NOT_SUPPORTED',
-          `Extension "${name}" does not support multi-instance mode`));
+          `"${name}" can only run as a single copy. Use the one that is already installed.`));
         return;
       }
 

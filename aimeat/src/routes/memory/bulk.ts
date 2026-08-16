@@ -44,7 +44,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
     if (req.auth!.roles.includes('ecosystem')) {
-      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Ecosystem apps write via their own data-area path, not /v1/memory/bulk'));
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', "An app of this kind writes through its own area rather than here. Use the app's own way of saving."));
       return;
     }
     const mode = body.mode === 'skip' ? 'skip' : 'overwrite';

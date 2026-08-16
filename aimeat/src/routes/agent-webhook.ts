@@ -218,7 +218,7 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     }
 
     if (!agent.webhookUrl || !agent.webhookSecret) {
-      res.status(400).json(error(config.nodeId, 'NO_WEBHOOK', 'No webhook configured for this agent'));
+      res.status(400).json(error(config.nodeId, 'NO_WEBHOOK', 'This agent has no delivery address set up yet. Add one in Profile → Agents and it will start receiving.'));
       return;
     }
 

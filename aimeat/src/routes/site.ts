@@ -34,7 +34,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     const requireNotLb: RequestHandler = (_req, res, next) => {
         if (config.siteLbEnabled) {
             res.status(409).json(error(config.nodeId, 'LB_MODE',
-                'Cannot modify portal content in load-balancer mode. Content synced from origin.'));
+                'This copy only mirrors the main site, so it cannot be edited here. Make the change on the main one.'));
             return;
         }
         next();
@@ -103,7 +103,7 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     router.post('/v1/site/template', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
         const { template } = req.body ?? {};
         if (!template || typeof template !== 'string') {
-            res.status(422).json(error(config.nodeId, 'TEMPLATE_INVALID', 'Request body must include "template" string'));
+            res.status(422).json(error(config.nodeId, 'TEMPLATE_INVALID', 'Name the template you want to use, then send it again.'));
             return;
         }
         try {
@@ -244,11 +244,11 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     router.post('/v1/site/memory', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
         const { key, value } = req.body ?? {};
         if (!key || typeof key !== 'string') {
-            res.status(422).json(error(config.nodeId, 'MEMORY_INVALID', 'Request body must include "key" string'));
+            res.status(422).json(error(config.nodeId, 'MEMORY_INVALID', 'Name the key you want to write to, then send it again.'));
             return;
         }
         if (typeof value !== 'string') {
-            res.status(422).json(error(config.nodeId, 'MEMORY_INVALID', 'Request body must include "value" string'));
+            res.status(422).json(error(config.nodeId, 'MEMORY_INVALID', 'Include the value you want to save, then send it again.'));
             return;
         }
         try {

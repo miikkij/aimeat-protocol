@@ -64,7 +64,7 @@ export function registerTaskLifecycleRoutes(
     }
     if (!isOwnerSession && !['queued', 'revision_requested', 'active'].includes(task.status)) {
       res.status(409).json(error(config.nodeId, 'INVALID_STATE',
-        `Agent can only update queued, revision_requested, or active tasks (current: ${task.status})`));
+        `This task is ${task.status}, and an agent can only change one that is waiting, being revised, or under way.`));
       return;
     }
 

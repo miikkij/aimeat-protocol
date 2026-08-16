@@ -74,7 +74,7 @@ async function resolveDeployContext(
         const bare = suppliedTarget.includes('@') ? suppliedTarget.split('@')[0] : suppliedTarget;
         if (bare !== owner) {
             res.status(403).json(error(config.nodeId, 'CROSS_OWNER_FORBIDDEN',
-                'App agents deploy onto YOUR OWN fleet only — the target owner is always the authenticated owner'));
+                'You can only deploy onto your own agents. Leave the owner out and it will use yours.'));
             return null;
         }
     }
@@ -95,7 +95,7 @@ async function resolveDeployContext(
         .find(a => (a as { agent_name?: unknown }).agent_name === agentName);
     if (!declared) {
         res.status(404).json(error(config.nodeId, 'AGENT_NOT_DECLARED',
-            `App "${app.ownerName}/${app.filename}" does not declare an agent named "${agentName}" in manifest.cortex.agents`));
+            `The app ${app.filename} does not list an agent called "${agentName}". Check the name, or add it to the app first.`));
         return null;
     }
 
@@ -178,7 +178,7 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
             .find(a => (a as { agent_name?: unknown }).agent_name === agentName);
         if (!declared) {
             res.status(404).json(error(config.nodeId, 'AGENT_NOT_DECLARED',
-                `App "${app.ownerName}/${app.filename}" does not declare an agent named "${agentName}" in manifest.cortex.agents`));
+                `The app ${app.filename} does not list an agent called "${agentName}". Check the name, or add it to the app first.`));
             return;
         }
 

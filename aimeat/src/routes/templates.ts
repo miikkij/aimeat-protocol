@@ -391,7 +391,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   // ── POST /v1/templates/:id/review — Add/update review ──────────────
   router.post('/v1/templates/:id/review', requireAuth(), async (req, res) => {
     if (!config.templateReviewsEnabled) {
-      res.status(403).json(error(config.nodeId, 'DISABLED', 'Reviews are disabled'));
+      res.status(403).json(error(config.nodeId, 'DISABLED', 'Reviews are switched off on this node. Whoever runs it can turn them on.'));
       return;
     }
 
@@ -472,7 +472,7 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
   // ── POST /v1/templates/:id/discussion — Add discussion message ─────
   router.post('/v1/templates/:id/discussion', requireAuth(), async (req, res) => {
     if (!config.templateDiscussionsEnabled) {
-      res.status(403).json(error(config.nodeId, 'DISABLED', 'Discussions are disabled'));
+      res.status(403).json(error(config.nodeId, 'DISABLED', 'Discussions are switched off on this node. Whoever runs it can turn them on.'));
       return;
     }
 

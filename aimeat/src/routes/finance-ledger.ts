@@ -214,7 +214,7 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
       const existing = await storage.listFiscalYears(owner);
       const overlap = existing.find((y) => y.startDate <= b.end_date && b.start_date <= y.endDate);
       if (overlap) {
-        res.status(409).json(error(config.nodeId, 'FISCAL_YEAR_OVERLAP', `Overlaps fiscal year ${overlap.label} (${overlap.startDate}..${overlap.endDate})`));
+        res.status(409).json(error(config.nodeId, 'FISCAL_YEAR_OVERLAP', `These dates overlap ${overlap.label}, which already runs from ${overlap.startDate} to ${overlap.endDate}. Choose dates outside it.`));
         return;
       }
       const now = new Date().toISOString();

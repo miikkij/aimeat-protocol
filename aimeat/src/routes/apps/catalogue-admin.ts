@@ -243,7 +243,7 @@ export function registerCatalogueAdminRoutes(
         }
         const decoded = decodeWatermark(token, config);
         if (!decoded) {
-            res.status(422).json(error(config.nodeId, 'UNDECODABLE', 'Could not decode this watermark. It may be tampered, from another node, or the node has no encryption key configured.'));
+            res.status(422).json(error(config.nodeId, 'UNDECODABLE', 'This mark could not be read. It may have been altered, or it may come from another node. Try the original file.'));
             return;
         }
         res.json(success(config.nodeId, {

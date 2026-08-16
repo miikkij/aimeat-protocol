@@ -366,7 +366,7 @@ export function registerRegisterLoginRoutes(
             }
             if (config.federationAuthPolicy === 'specific_peers' && !homePeer.allowFederatedAuth) {
                 res.status(403).json(error(config.nodeId, 'FEDERATION_AUTH_NOT_ALLOWED',
-                    'Federated login from this node is not permitted'));
+                    'This node does not accept sign-ins from there. Sign in on your home node instead.'));
                 return;
             }
 
@@ -591,7 +591,7 @@ export function registerRegisterLoginRoutes(
                 // If neither code was provided at all, tell the client TOTP is required
                 if (!totp_code && !backup_code) {
                     res.status(401).json(error(config.nodeId, 'TOTP_REQUIRED',
-                        'This account has two-factor authentication enabled. Provide totp_code or backup_code.'));
+                        'This account uses two-step sign-in. Enter the code from your app, or one of your backup codes.'));
                     return;
                 }
 
@@ -607,7 +607,7 @@ export function registerRegisterLoginRoutes(
 
                 if (lockUntil) {
                     res.status(429).json(error(config.nodeId, 'TOTP_LOCKED',
-                        `Too many failed TOTP attempts. Account locked until ${lockUntil}`));
+                        `Too many wrong codes, so this account is paused until ${lockUntil}. Wait until then and try again.`));
                     return;
                 }
 

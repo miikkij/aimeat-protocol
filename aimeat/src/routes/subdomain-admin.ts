@@ -40,7 +40,7 @@ export function subdomainAdminRouter(config: AimeatConfig, storage: Storage): Ro
       return false;
     }
     if (appIsRestricted(config, app)) {
-      res.status(400).json(error(config.nodeId, 'APP_RESTRICTED', 'Access-code-protected or paid apps cannot be served at a subdomain root'));
+      res.status(400).json(error(config.nodeId, 'APP_RESTRICTED', 'An app that needs a code or a payment cannot sit at its own web address. Serve it from the main site instead.'));
       return false;
     }
     return true;
@@ -66,7 +66,7 @@ export function subdomainAdminRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
     if (RESERVED_SUBDOMAINS.has(subdomain)) {
-      res.status(400).json(error(config.nodeId, 'RESERVED_SUBDOMAIN', `"${subdomain}" is a reserved subdomain`));
+      res.status(400).json(error(config.nodeId, 'RESERVED_SUBDOMAIN', `The name "${subdomain}" is kept for the node itself. Choose a different one.`));
       return;
     }
     if (kind !== 'app' && kind !== 'redirect') {

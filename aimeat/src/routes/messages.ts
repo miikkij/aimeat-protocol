@@ -213,7 +213,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         res.status(404).json(error(config.nodeId, 'RECIPIENT_NOT_FOUND', `No such recipient: ${recipientGhii}`));
         return;
       }
-      res.status(403).json(error(config.nodeId, 'BLOCKED', 'The recipient is not accepting messages from you'));
+      res.status(403).json(error(config.nodeId, 'BLOCKED', 'This person is not taking messages from you. Ask them to add you as a contact.'));
       return;
     }
 
@@ -484,7 +484,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     const file = await storage.getStorageFile(ghii, key);
     if (!file) {
-      res.status(409).json(error(config.nodeId, 'ATTACHMENT_NOT_READY', 'Attachment bytes are not available on this node.'));
+      res.status(409).json(error(config.nodeId, 'ATTACHMENT_NOT_READY', 'The file itself is not stored here, only the note about it. Ask the sender to send it again.'));
       return;
     }
 

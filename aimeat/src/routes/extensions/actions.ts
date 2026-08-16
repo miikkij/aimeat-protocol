@@ -118,7 +118,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // Instance must be active
       if (instance.status !== 'active') {
         res.status(503).json(error(config.nodeId, 'INSTANCE_INACTIVE',
-          `Instance "${instanceId}" of extension "${extName}" is not active`));
+          `This copy of "${extName}" is switched off. Turn it on in Profile → Extensions and try again.`));
         return;
       }
 
