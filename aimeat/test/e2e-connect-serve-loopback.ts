@@ -262,6 +262,43 @@ await test('POST /local/call/:tool — deliverable_key survives the CLI dispatch
   }
 });
 
+await test('POST /local/call/:tool — the app tools reach APPS, not the package system', async () => {
+  // Until 2026-08-16 every aimeat_app_* tool on this door pointed at /v1/packages while the same
+  // names on the node's MCP meant /v1/apps. Production had 50 apps and 4 packages, three of the four
+  // ::system examples, so an agent here could not touch one real app: told to list apps it got the
+  // examples, told to publish an app it made a package with no app address. This asserts the round
+  // trip an app builder actually performs.
+  const filename = `loopback-${Date.now().toString(36)}.html`;
+  const published = await json(loopbackBase, '/local/call/aimeat_app_publish', {
+    method: 'POST',
+    body: JSON.stringify({
+      filename,
+      name: 'Loopback probe app',
+      description: 'published through the CLI dispatch',
+      content: '<!doctype html><title>probe</title><h1>probe</h1>',
+    }),
+  });
+  assert(published.status === 200 && published.body.ok !== false,
+    `publish: ${published.status} ${JSON.stringify(published.body).slice(0, 300)}`);
+
+  const got = await json(loopbackBase, '/local/call/aimeat_app_get', {
+    method: 'POST', body: JSON.stringify({ owner: account.ownerName, filename }),
+  });
+  assert(JSON.stringify(got.body).includes(filename),
+    `app_get did not return the app just published — is it still reading /v1/packages? ${JSON.stringify(got.body).slice(0, 300)}`);
+
+  const listed = await json(loopbackBase, '/local/call/aimeat_app_list', {
+    method: 'POST', body: JSON.stringify({ own: true }),
+  });
+  assert(JSON.stringify(listed.body).includes(filename),
+    `app_list did not include the app: ${JSON.stringify(listed.body).slice(0, 300)}`);
+
+  // And the package system is still reachable, under the name that describes it.
+  const packages = await json(loopbackBase, '/local/call/aimeat_package_list', { method: 'POST', body: '{}' });
+  assert(packages.status === 200 && packages.body.ok !== false, `package_list: ${packages.status}`);
+  assert(!JSON.stringify(packages.body).includes(filename), 'the app must NOT appear among packages');
+});
+
 await test('POST /local/call/:tool — unknown tool returns 404 UNKNOWN_TOOL', async () => {
   const r = await json(loopbackBase, '/local/call/not_a_real_tool', { method: 'POST', body: '{}' });
   assert(r.status === 404, `status ${r.status}`);

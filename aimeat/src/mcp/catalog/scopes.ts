@@ -126,6 +126,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     // The destructive half: delete an app. Split from write because shipping an update and
     // removing the thing are different risks.
     aimeat_app_delete:                        'app:manage',
+    aimeat_package_delete:                    'app:manage',
 
     // Publish or update an app under the owner's account, including drafts.
     aimeat_app_draft_discard:                 'app:write',
@@ -139,6 +140,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_image_generate:                    'ai:use',
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
+    aimeat_package_publish:                   'app:write',
 
     // A capability is how this account offers work to others, so writing one speaks in the
     // owner's name.

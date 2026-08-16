@@ -478,9 +478,15 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         visibility: agentEverywhere,
         input: {
             ...aiProvenanceCatalogInput,
-            name: { type: 'string', required: true, description: 'App name.' },
-            description: { type: 'string', required: true, description: 'App description.' },
-            content: { type: 'string', required: true, description: 'App content. Use @file:path to load from disk with the CLI fallback.' },
+            filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
+            name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
+            content: { type: 'string', description: 'The app HTML as plain text. Omit for upload mode. Use @file:path with the CLI fallback.' },
+            content_base64: { type: 'string', description: 'Already-encoded HTML, if you did the encoding yourself.' },
+            description: { type: 'string', description: 'Short description.' },
+            category: { type: 'string', description: 'Category (default "tool").' },
+            tags: { type: 'array', description: 'Tags for search and filtering.' },
+            icon: { type: 'string', description: 'Emoji icon.' },
+            version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
         },
     },
     {
@@ -488,14 +494,22 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_versions. Publish with aimeat_app_publish.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { query: { type: 'string', description: 'Optional search query.' } },
+        input: {
+            search: { type: 'string', description: 'Free-text search over name and description.' },
+            category: { type: 'string', description: 'Filter by category.' },
+            tag: { type: 'string', description: 'Filter by tag.' },
+            own: { type: 'boolean', description: "List only your own owner's apps." },
+        },
     },
     {
         name: 'aimeat_app_get',
         description: 'Get one app\'s detail (manifest, current version number, size, mime type, whether access-protected, download count, `url` — the app\'s public web address to give a person — and the download/inline URLs) identified by its owner and filename. Find owner/filename via aimeat_app_list; for the list of prior versions use aimeat_app_versions.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },
+        input: {
+            owner: { type: 'string', required: true, description: 'Owner name of the app.' },
+            filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html".' },
+        },
     },
     {
         name: 'aimeat_app_delete',
@@ -503,8 +517,8 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            group_id: { type: 'string', required: true, description: 'App group identifier.' },
-            version: { type: 'string', required: true, description: 'Version to archive.' },
+            filename: { type: 'string', required: true, description: "App filename to archive (your own owner's)." },
+            version: { type: 'number', description: 'A specific version number. Omit to archive all versions.' },
         },
     },
     {
@@ -512,7 +526,10 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         description: 'List the version history of one app (each entry: version number, semver display version, size, created-at) identified by its owner and filename. Use to see how an app has evolved before fetching detail with aimeat_app_get or archiving a specific version with aimeat_app_delete.',
         caller: 'agent',
         visibility: agentEverywhere,
-        input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },
+        input: {
+            owner: { type: 'string', required: true, description: 'Owner name of the app.' },
+            filename: { type: 'string', required: true, description: 'App filename.' },
+        },
     },
     {
         name: 'aimeat_app_fork',

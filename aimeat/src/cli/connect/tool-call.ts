@@ -42,6 +42,8 @@ import { agentTools } from './tool-call-defs-agent.js';
 import { coreTools } from './tool-call-defs-core.js';
 import { organismTools } from './tool-call-defs-organism.js';
 import { appTools } from './tool-call-defs-apps.js';
+import { packageTools } from './tool-call-defs-packages.js';
+import { workflowTools } from './tool-call-defs-workflows.js';
 import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
@@ -58,6 +60,8 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...coreTools,
     ...organismTools,
     ...appTools,
+    ...packageTools,
+    ...workflowTools,
     ...appDraftEditTools,
     ...exchangeTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);

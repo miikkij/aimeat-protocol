@@ -43,6 +43,7 @@ import { schedulesTasksMemoryTools } from './definitions/schedules-tasks-memory.
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
+import { packagesTools } from './definitions/packages.js';
 import { commerceTools } from './definitions/commerce.js';
 import { exchangeTools } from './definitions/exchange.js';
 
@@ -52,6 +53,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,
+    ...packagesTools,
     ...commerceTools,
     ...companyTools,
     ...exchangeTools,

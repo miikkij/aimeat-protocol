@@ -233,6 +233,14 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_appdev_pitfall_delete: { title: 'Delete AppDev Pitfall', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Apps ──
+    // Component packages (/v1/packages). A different thing from an app, and named so since
+    // 2026-08-16 — these five were called aimeat_app_* on the connector doors while the node's MCP
+    // used the same names for the web apps at /v1/apps.
+    aimeat_package_list: { title: 'List Packages', readOnlyHint: true },
+    aimeat_package_get: { title: 'Get Package', readOnlyHint: true },
+    aimeat_package_versions: { title: 'List Package Versions', readOnlyHint: true },
+    aimeat_package_publish: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_package_delete: { title: 'Delete Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_app_list: { title: 'List Apps', readOnlyHint: true },
     aimeat_app_get: { title: 'Get App', readOnlyHint: true },
     aimeat_app_versions: { title: 'List App Versions', readOnlyHint: true },

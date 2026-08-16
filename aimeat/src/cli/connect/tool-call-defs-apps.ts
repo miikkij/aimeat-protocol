@@ -187,44 +187,121 @@ export const appTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_app_publish',
-        description: 'Publish an app package.',
+        description: 'Publish a single-file web app to this node. It gets a public web address a person can open.',
         input: {
-            name: { type: 'string', required: true, description: 'App name.' },
-            description: { type: 'string', required: true, description: 'App description.' },
-            content: { type: 'string', required: true, description: 'App content.' },
+            filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html". Alphanumeric, dots, hyphens, underscores.' },
+            content: { type: 'string', description: 'The app HTML as plain text — this door base64-encodes it for you. Use @file:path to load from disk.' },
+            content_base64: { type: 'string', description: 'Already-encoded HTML, if you did the encoding yourself.' },
+            name: { type: 'string', required: true, description: 'Display name shown in the catalogue.' },
+            description: { type: 'string', description: 'Short description.' },
+            category: { type: 'string', description: 'Category (default "tool").' },
+            tags: { type: 'array', description: 'Tags for search and filtering.' },
+            icon: { type: 'string', description: 'Emoji icon.' },
+            version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
+            mime_type: { type: 'string', description: 'Defaults to text/html.' },
         },
-        handler: ({ client }, input) => client.post('/v1/packages', {
-            name: requiredString(input, 'name'),
-            description: requiredString(input, 'description'),
-            content: requiredString(input, 'content'),
-        }),
+        handler: ({ client }, input) => {
+            // POST /v1/apps takes `content` BASE64-ENCODED and refuses plain text with a 400. A
+            // caller here has the HTML in hand (often via @file:), so the encoding happens on this
+            // side rather than being a rule the caller has to know and get right.
+            const raw = optionalString(input, 'content');
+            const encoded = optionalString(input, 'content_base64')
+                ?? (raw !== undefined ? Buffer.from(raw, 'utf-8').toString('base64') : undefined);
+            const body: JsonObject = {
+                filename: requiredString(input, 'filename'),
+                name: requiredString(input, 'name'),
+                ...(encoded !== undefined ? { content: encoded } : {}),
+            };
+            for (const field of ['description', 'category', 'icon', 'version', 'mime_type'] as const) {
+                const v = optionalString(input, field);
+                if (v) body[field] = v;
+            }
+            const tags = optionalArray(input, 'tags');
+            if (tags) body.tags = tags;
+            return client.post('/v1/apps', body);
+        },
     },
     {
+        // ─────────────────────────────────────────────────────────────────────────────────────────
+        // THE APP TOOLS TALK ABOUT APPS AGAIN.
+        //
+        // Until 2026-08-16 every aimeat_app_* tool on this door pointed at /v1/packages, a separate
+        // component-package system, while the same name on the node's MCP pointed at /v1/apps, the
+        // single-file web apps this node is actually built around. Measured on production the day it
+        // was found: 50 apps, 4 packages, three of the four being ::system examples.
+        //
+        // So an agent on this door could not reach a single real app. Told to "list the apps" it got
+        // four system examples; told to "publish this app" it created a package with no app address
+        // and nobody able to open it. Worse, the split ran THROUGH one flow: aimeat_app_get read a
+        // package while aimeat_app_draft_write wrote an app, so listing, choosing and editing crossed
+        // between two systems without saying so.
+        //
+        // The package system keeps its capability under its own name — aimeat_package_* below — which
+        // is what it should always have been called.
+        // ─────────────────────────────────────────────────────────────────────────────────────────
         name: 'aimeat_app_list',
-        description: 'List available apps.',
-        input: { query: { type: 'string', description: 'Search query.' } },
-        handler: ({ client }, input) => client.get(`/v1/packages${query({ q: optionalString(input, 'query') })}`),
+        description: 'List published apps on this node.',
+        input: {
+            search: { type: 'string', description: 'Free-text search over name and description.' },
+            category: { type: 'string', description: 'Filter by category.' },
+            tag: { type: 'string', description: 'Filter by tag.' },
+            own: { type: 'boolean', description: 'List only your own owner\'s apps.' },
+        },
+        handler: ({ client }, input) => client.get(`/v1/apps${query({
+            search: optionalString(input, 'search') ?? optionalString(input, 'query'),
+            category: optionalString(input, 'category'),
+            tag: optionalString(input, 'tag'),
+            own: optionalBoolean(input, 'own') ? 'true' : undefined,
+        })}`),
     },
     {
         name: 'aimeat_app_get',
-        description: 'Get app detail by group ID.',
-        input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },
-        handler: ({ client }, input) => client.get(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}`),
+        description: 'Get one app\'s detail (manifest, current version, size, download count, and the public web address to give a person), identified by its owner and filename.',
+        input: {
+            owner: { type: 'string', required: true, description: 'Owner name of the app.' },
+            filename: { type: 'string', required: true, description: 'App filename, e.g. "starwars.html".' },
+        },
+        // There is no REST route that returns ONE app's detail: GET /v1/apps/:owner/:filename serves
+        // the app's own bytes, and the node's MCP builds the detail from storage directly, which a
+        // connector cannot. So the detail comes from the catalogue listing, which already carries the
+        // manifest, version, size, download count and public url per entry, narrowed to the one app.
+        handler: async ({ client }, input) => {
+            const owner = requiredString(input, 'owner');
+            const filename = requiredString(input, 'filename');
+            const resp = await client.get(`/v1/apps${query({ search: filename })}`);
+            if (resp.ok === false) return resp;
+            const apps = ((resp.data ?? {}) as { apps?: Array<Record<string, unknown>> }).apps ?? [];
+            const app = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
+            if (!app) {
+                return { ok: false as const, error: {
+                    code: 'NOT_FOUND',
+                    message: `No app "${filename}" published by "${owner}". Use aimeat_app_list to see what exists.`,
+                } };
+            }
+            return { ok: true as const, data: { app } };
+        },
     },
     {
         name: 'aimeat_app_delete',
-        description: 'Archive an app version.',
+        description: 'Archive one of your own apps, or a single version of it. Omit `version` to archive every version.',
         input: {
-            group_id: { type: 'string', required: true, description: 'App group identifier.' },
-            version: { type: 'string', required: true, description: 'Version to archive.' },
+            filename: { type: 'string', required: true, description: 'App filename to archive (your own owner\'s).' },
+            version: { type: 'number', description: 'A specific version number. Omit to archive all versions.' },
         },
-        handler: ({ client }, input) => client.delete(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/versions/${encodeURIComponent(requiredString(input, 'version'))}`),
+        handler: ({ client }, input) => client.delete(`/v1/apps/${encodeURIComponent(requiredString(input, 'filename'))}${query({
+            version: optionalNumber(input, 'version'),
+        })}`),
     },
     {
         name: 'aimeat_app_versions',
-        description: 'List app version history.',
-        input: { group_id: { type: 'string', required: true, description: 'App group identifier.' } },
-        handler: ({ client }, input) => client.get(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/versions`),
+        description: 'List one app\'s version history (version number, semver display version, size, created-at), identified by its owner and filename.',
+        input: {
+            owner: { type: 'string', required: true, description: 'Owner name of the app.' },
+            filename: { type: 'string', required: true, description: 'App filename.' },
+        },
+        handler: ({ client }, input) => client.get(
+            `/v1/apps/${encodeURIComponent(requiredString(input, 'owner'))}/${encodeURIComponent(requiredString(input, 'filename'))}/versions`,
+        ),
     },
     {
         name: 'aimeat_extension_list',
@@ -328,78 +405,6 @@ export const appTools: ConnectCliToolDefinition[] = [
         description: 'Delete a cortex model.',
         input: { name: { type: 'string', required: true, description: 'Cortex name.' } },
         handler: ({ client }, input) => client.delete(`/v1/cortex/${encodeURIComponent(requiredString(input, 'name'))}`),
-    },
-    // ── Agent Workflows (shell-callable parity with the MCP + connector surfaces) ──
-    {
-        name: 'aimeat_workflow_save',
-        description: 'Create/update a workflow. `definition` is the full descriptor (title, description, trigger, vars[], steps[], on_step_fail, llm?); validated against the offer contract + DAG on save.',
-        input: {
-            id: { type: 'string', required: true, description: 'Workflow id (lowercase slug); existing id = update.' },
-            definition: { type: 'object', required: true, description: 'The workflow descriptor.' },
-        },
-        handler: ({ client }, input) => client.put(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}`, requiredRecord(input, 'definition')),
-    },
-    {
-        name: 'aimeat_workflow_get',
-        description: 'Inspect workflows. Omit id to list; pass an id for its definition + derived blueprint + recent runs.',
-        input: { id: { type: 'string', description: 'Omit to list; pass for one workflow.' } },
-        handler: async ({ client }, input) => {
-            const id = optionalString(input, 'id');
-            if (!id) return client.get('/v1/workflows');
-            const enc = encodeURIComponent(id);
-            const [def, bp, runs] = await Promise.all([
-                client.get(`/v1/workflows/${enc}`),
-                client.get(`/v1/workflows/${enc}/blueprint`),
-                client.get(`/v1/workflows/${enc}/runs`),
-            ]);
-            const recentRuns = (((runs.data as { runs?: unknown[] } | undefined)?.runs) ?? []).slice(0, 5);
-            return { ok: def.ok, data: { definition: def.data ?? def, blueprint: bp.ok === false ? null : (bp.data ?? null), recentRuns } } as ApiResponse;
-        },
-    },
-    {
-        name: 'aimeat_workflow_run',
-        description: 'Run a workflow. mode="signals-only" evaluates signals against memory (no dispatch — instant health check); mode="full" executes the steps.',
-        input: {
-            id: { type: 'string', required: true, description: 'The workflow id.' },
-            mode: { type: 'string', required: true, description: 'signals-only | full' },
-        },
-        handler: ({ client }, input) => client.post(`/v1/workflows/${encodeURIComponent(requiredString(input, 'id'))}/run`, { mode: requiredString(input, 'mode') }),
-    },
-    {
-        // → POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer — answer a paused human-input step.
-        name: 'aimeat_workflow_answer',
-        description: 'Answer a paused human-input step of a workflow run (resumes the run).',
-        input: {
-            workflow_id: { type: 'string', description: 'The workflow id. (`id` is accepted as the older spelling this door used.)' },
-            id: { type: 'string', description: 'Older spelling of workflow_id.' },
-            run_id: { type: 'string', required: true, description: 'The run id (from aimeat_workflow_pending_inputs).' },
-            step_id: { type: 'string', required: true, description: 'The paused step id awaiting input.' },
-            picks: { type: 'array', description: 'Option ids from the pinned question (may be empty when answering with `other` alone).' },
-            other: { type: 'string', description: 'Free-text answer; only when the question allows it.' },
-        },
-        // NOT A DROPPED PARAMETER — A BROKEN TOOL. The route reads { picks, other } and this door
-        // sent { answer: {...} }, so every human-input answer from /local/call was accepted as an
-        // empty body and the run stayed parked. `answer` is still read, as an object carrying picks
-        // and other, so a caller written against the old shape keeps working.
-        handler: ({ client }, input) => {
-            const workflowId = optionalString(input, 'workflow_id') ?? requiredString(input, 'id');
-            const legacy = optionalRecord(input, 'answer') ?? {};
-            const picks = optionalArray(input, 'picks') ?? (Array.isArray(legacy.picks) ? legacy.picks : []);
-            const other = optionalString(input, 'other') ?? (typeof legacy.other === 'string' ? legacy.other : undefined);
-            const body: JsonObject = { picks };
-            if (other !== undefined) body.other = other;
-            return client.post(
-                `/v1/workflows/${encodeURIComponent(workflowId)}/runs/${encodeURIComponent(requiredString(input, 'run_id'))}/steps/${encodeURIComponent(requiredString(input, 'step_id'))}/answer`,
-                body,
-            );
-        },
-    },
-    {
-        // → GET /v1/workflows/pending-inputs — every run of the caller's workflows awaiting human input.
-        name: 'aimeat_workflow_pending_inputs',
-        description: 'List workflow runs paused awaiting human input (answer them with aimeat_workflow_answer).',
-        input: {},
-        handler: ({ client }) => client.get('/v1/workflows/pending-inputs'),
     },
     // ── App drafts (staging): edit + test the next version without touching the live app ──
     {

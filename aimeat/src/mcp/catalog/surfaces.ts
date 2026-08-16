@@ -66,6 +66,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
         'aimeat_discover',
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
+        // Component packages — a different backend from the apps above, named so since 2026-08-16.
+        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_versions', 'aimeat_package_publish', 'aimeat_package_delete',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
         'aimeat_image_generate',

@@ -147,11 +147,18 @@ const CONNECTOR_EXTRA = new Set(['agent_name']);
  * known debt. Prune names from this set as each tool's two surfaces are reconciled.
  */
 const KNOWN_INPUT_DRIFT = new Set<string>([
-    // intentional: server MCP app_* tools manage HTML apps via /v1/apps (owner/filename, content_base64),
-    // connector app_* tools manage component packages via /v1/packages (group_id, content). These are two
-    // different backends sharing the app_* name; unifying them is tool-consolidation (audit Phase 5), not
-    // input-schema reconciliation — switching the connector's target route would change behavior.
-    'aimeat_app_delete', 'aimeat_app_get', 'aimeat_app_list', 'aimeat_app_publish', 'aimeat_app_versions',
+    // RESOLVED 2026-08-16, and the note this replaces was the reason it took so long. It called the
+    // split "intentional" — server app_* tools manage HTML apps at /v1/apps, connector app_* tools
+    // manage component packages at /v1/packages — and said repointing the connector "would change
+    // behavior", which was true and was exactly the point. Production had 50 apps and 4 packages,
+    // three of the four ::system examples, so an agent on a connector door could not reach one real
+    // app. The packages moved to aimeat_package_*, the app tools point at apps on every door, and
+    // app_delete / app_get / app_list / app_versions are off this list.
+    //
+    // aimeat_app_publish stays, for a different and smaller reason: it takes `content_base64` plus
+    // the spec-token pair on the node and plain `content` on the connector. Same backend now, same
+    // meaning, different upload vocabulary.
+    'aimeat_app_publish',
     // intentional: server MCP handbook_get returns managed system prompts by `tier` (/v1/prompts/:tier),
     // connector handbook_get returns the agent operating handbook by `module` (/v1/agents/me/handbook/:module).
     // Two different resources sharing the tool name; unifying them is a semantic decision for consolidation.

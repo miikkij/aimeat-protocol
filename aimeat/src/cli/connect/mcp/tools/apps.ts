@@ -26,46 +26,125 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
   mcp.tool('aimeat_app_publish', descriptionFor('aimeat_app_publish'), {
-    name: z.string().describe('App name'),
-    description: z.string().describe('App description'),
-    content: z.string().describe('App content'),
+    filename: z.string().describe('App filename, e.g. "starwars.html"'),
+    content: z.string().optional().describe('The app HTML as plain text — this door base64-encodes it for you'),
+    content_base64: z.string().optional().describe('Already-encoded HTML, if you did the encoding yourself'),
+    name: z.string().describe('Display name shown in the catalogue'),
+    description: z.string().optional().describe('Short description'),
+    category: z.string().optional().describe('Category (default "tool")'),
+    tags: z.array(z.string()).optional().describe('Tags for search and filtering'),
+    icon: z.string().optional().describe('Emoji icon'),
+    version: z.string().optional().describe('Semver display version. Generated if omitted.'),
     ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_app_publish'), async ({ name, description, content, ai_provenance, ai_provenance_id }) => {
-    const resp = await client.post('/v1/packages', { name, description, content });
+  }, annotationsFor('aimeat_app_publish'), async (a) => {
+    // POST /v1/apps takes `content` base64-encoded and 400s on plain text; encode here so the
+    // caller does not have to know the rule.
+    const encoded = a.content_base64 ?? (a.content !== undefined ? Buffer.from(a.content, 'utf-8').toString('base64') : undefined);
+    const body: Record<string, unknown> = { filename: a.filename, name: a.name, ...(encoded !== undefined ? { content: encoded } : {}) };
+    for (const f of ['description', 'category', 'icon', 'version'] as const) if (a[f]) body[f] = a[f];
+    if (a.tags) body.tags = a.tags;
+    if (a.ai_provenance_id) body.ai_provenance_id = a.ai_provenance_id;
+    const resp = await client.post('/v1/apps', body);
     return provenanceEchoedResult(client,
-      { tool: 'aimeat_app_publish', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
+      { tool: 'aimeat_app_publish', declared: a.ai_provenance, declaredId: a.ai_provenance_id }, resp);
   });
 
+  mcp.tool('aimeat_package_publish', descriptionFor('aimeat_package_publish'), {
+    name: z.string().describe('Package name'),
+    description: z.string().describe('Package description'),
+    content: z.string().describe('Package content'),
+  }, annotationsFor('aimeat_package_publish'), async ({ name, description, content }) =>
+    out(await client.post('/v1/packages', { name, description, content })));
+
+  // ───────────────────────────────────────────────────────────────────────────────────────────────
+  // THE APP TOOLS TALK ABOUT APPS. Until 2026-08-16 the four below pointed at /v1/packages, a
+  // separate component-package system, while the same names on the node's MCP meant the single-file
+  // web apps at /v1/apps. Measured on production the day it was found: 50 apps, 4 packages, three of
+  // the four being ::system examples. The split ran through this very file — aimeat_app_get read a
+  // package while aimeat_app_draft_write, twenty lines down, wrote an app — so an agent that listed,
+  // chose and edited crossed between two systems with nothing saying so.
+  // Packages keep the capability under aimeat_package_* below.
+  // ───────────────────────────────────────────────────────────────────────────────────────────────
   mcp.tool('aimeat_app_list', descriptionFor('aimeat_app_list'), {
+    search: z.string().optional().describe('Free-text search over name and description'),
+    category: z.string().optional().describe('Filter by category'),
+    tag: z.string().optional().describe('Filter by tag'),
+    own: z.boolean().optional().describe("List only your own owner's apps"),
+  }, annotationsFor('aimeat_app_list'), async ({ search, category, tag, own }) => {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (category) params.set('category', category);
+    if (tag) params.set('tag', tag);
+    if (own) params.set('own', 'true');
+    const qs = params.toString() ? `?${params.toString()}` : '';
+    const resp = await client.get(`/v1/apps${qs}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_app_get', descriptionFor('aimeat_app_get'), {
+    owner: z.string().describe('Owner name of the app'),
+    filename: z.string().describe('App filename, e.g. "starwars.html"'),
+  }, annotationsFor('aimeat_app_get'), async ({ owner, filename }) => {
+    // No REST route returns one app's DETAIL — GET /v1/apps/:owner/:filename serves the app's own
+    // bytes — so it comes from the catalogue listing, which already carries manifest, version, size,
+    // download count and public url per entry.
+    const resp = await client.get(`/v1/apps?search=${encodeURIComponent(filename)}`);
+    if (resp.ok === false) return out(resp);
+    const apps = ((resp.data ?? {}) as { apps?: Array<Record<string, unknown>> }).apps ?? [];
+    const app = apps.find(a => a.filename === filename && (a.owner === owner || a.ownerName === owner));
+    if (!app) {
+      return out({ ok: false, data: { error: { code: 'NOT_FOUND', message: `No app "${filename}" published by "${owner}".` } } });
+    }
+    return { content: [{ type: 'text' as const, text: JSON.stringify(readPayloadWithProvenance({ ...resp, data: { app } }), null, 2) }] };
+  });
+
+  mcp.tool('aimeat_app_delete', descriptionFor('aimeat_app_delete'), {
+    filename: z.string().describe("App filename to archive (your own owner's)"),
+    version: z.number().optional().describe('A specific version number. Omit to archive all versions.'),
+  }, annotationsFor('aimeat_app_delete'), async ({ filename, version }) => {
+    const qs = version !== undefined ? `?version=${encodeURIComponent(String(version))}` : '';
+    const resp = await client.delete(`/v1/apps/${encodeURIComponent(filename)}${qs}`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_app_versions', descriptionFor('aimeat_app_versions'), {
+    owner: z.string().describe('Owner name of the app'),
+    filename: z.string().describe('App filename'),
+  }, annotationsFor('aimeat_app_versions'), async ({ owner, filename }) => {
+    const resp = await client.get(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/versions`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  // ── Component packages: the capability the app_* tools above used to be ──
+  mcp.tool('aimeat_package_list', descriptionFor('aimeat_package_list'), {
     query: z.string().optional().describe('Search query'),
-  }, annotationsFor('aimeat_app_list'), async ({ query }) => {
+  }, annotationsFor('aimeat_package_list'), async ({ query }) => {
     const qs = query ? `?q=${encodeURIComponent(query)}` : '';
     const resp = await client.get(`/v1/packages${qs}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_app_get', descriptionFor('aimeat_app_get'), {
-    group_id: z.string().describe('App group identifier'),
-  }, annotationsFor('aimeat_app_get'), async ({ group_id }) => {
+  mcp.tool('aimeat_package_get', descriptionFor('aimeat_package_get'), {
+    group_id: z.string().describe('Package group identifier'),
+  }, annotationsFor('aimeat_package_get'), async ({ group_id }) => {
     const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}`);
-    // The app detail read serves its record on meta.provenance — see core.ts memory_read.
     return { content: [{ type: 'text' as const, text: JSON.stringify(readPayloadWithProvenance(resp), null, 2) }] };
   });
 
-  mcp.tool('aimeat_app_delete', descriptionFor('aimeat_app_delete'), {
-    group_id: z.string().describe('App group identifier'),
-    version: z.string().describe('Version to archive'),
-  }, annotationsFor('aimeat_app_delete'), async ({ group_id, version }) => {
-    const resp = await client.delete(
-      `/v1/packages/${encodeURIComponent(group_id)}/versions/${encodeURIComponent(version)}`,
-    );
+  mcp.tool('aimeat_package_versions', descriptionFor('aimeat_package_versions'), {
+    group_id: z.string().describe('Package group identifier'),
+  }, annotationsFor('aimeat_package_versions'), async ({ group_id }) => {
+    const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}/versions`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
-  mcp.tool('aimeat_app_versions', descriptionFor('aimeat_app_versions'), {
-    group_id: z.string().describe('App group identifier'),
-  }, annotationsFor('aimeat_app_versions'), async ({ group_id }) => {
-    const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}/versions`);
+  mcp.tool('aimeat_package_delete', descriptionFor('aimeat_package_delete'), {
+    group_id: z.string().describe('Package group identifier'),
+    version: z.string().describe('Version to archive'),
+  }, annotationsFor('aimeat_package_delete'), async ({ group_id, version }) => {
+    const resp = await client.delete(
+      `/v1/packages/${encodeURIComponent(group_id)}/versions/${encodeURIComponent(version)}`,
+    );
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
 
