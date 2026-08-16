@@ -793,6 +793,59 @@ async function run() {
     assert(fetch.green >= 1, 'fetch has at least one green run');
   });
 
+  // ── the scope words on the workflow doors ──
+  // Every call above is the owner's, and an owner session bypasses requireScope entirely, so the
+  // four scope gates on these routes have never been exercised. A workflow is a rule that dispatches
+  // agents and writes memory on the owner's behalf; workflow:write is what stops an agent from
+  // authoring or deleting one. Scopes are baked into a token at mint time, so this registers two
+  // fresh agents rather than widening one.
+  await test('workflow:write is what an agent needs to author or delete a workflow', async () => {
+    const mint = async (name: string, scopes: string[]) => {
+      const reg = await json('/v1/agents', {
+        method: 'POST', headers: auth,
+        body: JSON.stringify({ name, owner: ownerName, capabilities: ['memory'], scopes }),
+      });
+      assert(reg.status === 201, `create ${name}: ${reg.status} ${JSON.stringify(reg.body)}`);
+      const token = await getToken(reg.body.data.agent.gaii, reg.body.data.private_key, true);
+      return { Authorization: `Bearer ${token}` };
+    };
+    const narrow = await mint('wf-narrow', ['memory:read']);
+    const scoped = await mint('wf-scoped', ['workflow:read', 'workflow:write', 'memory:read']);
+
+    // WRITE: refused for the narrow agent, and nothing is written.
+    const denied = await json('/v1/workflows/agent-denied-wf', {
+      method: 'PUT', headers: narrow, body: JSON.stringify(WORKFLOW),
+    });
+    assert(denied.status === 403, `PUT without workflow:write: expected 403, got ${denied.status}: ${JSON.stringify(denied.body.error)}`);
+    assert(denied.body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${denied.body.error?.code}`);
+    const absent = await json('/v1/workflows/agent-denied-wf', { headers: auth });
+    assert(absent.status === 404, `the refused PUT must have written nothing, got ${absent.status}`);
+
+    // POSITIVE CONTROL: same door, same body, one scope word more.
+    const allowed = await json('/v1/workflows/agent-denied-wf', {
+      method: 'PUT', headers: scoped, body: JSON.stringify(WORKFLOW),
+    });
+    assert(allowed.status === 200, `PUT with workflow:write: expected 200, got ${allowed.status}: ${JSON.stringify(allowed.body.error)}`);
+    const present = await json('/v1/workflows/agent-denied-wf', { headers: auth });
+    assert(present.status === 200, `the allowed PUT must have written it, got ${present.status}`);
+
+    // READ: workflow:read is its own word.
+    const readDenied = await json('/v1/workflows/agent-denied-wf', { headers: narrow });
+    assert(readDenied.status === 403 && readDenied.body.error?.code === 'SCOPE_DENIED',
+      `GET without workflow:read: ${readDenied.status} ${JSON.stringify(readDenied.body.error)}`);
+
+    // DELETE: refused for the narrow agent, and the workflow survives.
+    const delDenied = await json('/v1/workflows/agent-denied-wf', { method: 'DELETE', headers: narrow });
+    assert(delDenied.status === 403 && delDenied.body.error?.code === 'SCOPE_DENIED',
+      `DELETE without workflow:write: ${delDenied.status} ${JSON.stringify(delDenied.body.error)}`);
+    const survived = await json('/v1/workflows/agent-denied-wf', { headers: auth });
+    assert(survived.status === 200, `the refused DELETE must leave it standing, got ${survived.status}`);
+
+    // …and the scoped agent may remove it, so the refusal was the word and not the door.
+    const delOk = await json('/v1/workflows/agent-denied-wf', { method: 'DELETE', headers: scoped });
+    assert(delOk.status === 200, `DELETE with workflow:write: ${delOk.status} ${JSON.stringify(delOk.body.error)}`);
+  });
+
   console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed > 0) process.exit(1);
 }
