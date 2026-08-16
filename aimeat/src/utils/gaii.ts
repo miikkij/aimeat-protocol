@@ -130,6 +130,24 @@ export function isValidGAII(gaii: string): boolean {
 }
 
 /**
+ * Is this a well-formed HUMAN identity, `owner@node`, on any node?
+ *
+ * Shape only, and deliberately NOT `validateOwnerName`: that one also refuses the reserved words,
+ * which is a registration policy. An account that exists under a name the reserved list gained
+ * later is still a real person, and a shape test that refuses them would make them unaddressable.
+ *
+ * The node half is what does the work. It has a grammar (`aimeat-{region}-{nnn}-{name}`) and a mail
+ * host does not fit it, so this is what separates a federated identity from an email address that
+ * merely contains an `@`.
+ */
+export function isValidGHII(id: string): boolean {
+  if (id.startsWith(ECO_PREFIX) || id.includes('#')) return false;
+  const at = id.lastIndexOf('@');
+  if (at <= 0) return false;
+  return OWNER_RE.test(id.slice(0, at)) && NODE_RE.test(id.slice(at + 1));
+}
+
+/**
  * Resolve the effective storage identity from a request's auth context.
  * - Owner sessions (GHII): JWT sub is bare username → returns `owner@nodeId` (GHII format)
  * - Agent sessions (GAII): JWT sub is already full GAII → returns it as-is

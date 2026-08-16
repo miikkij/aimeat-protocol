@@ -11,6 +11,10 @@
  * @usage import { ContactPicker } from '/components/ContactPicker.js';
  *   <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} />
  * @version-history
+ *   v1.2.0 — 2026-08-17 — TARGET-063: saved PEOPLE (kind 'mail') are excluded by DEFAULT and only
+ *     suggested where a host asks for them by name. Every surface this picker feeds grants access
+ *     or sends a message, and a person with no account here can receive neither — suggesting them
+ *     would offer a choice that cannot work, on five of the six surfaces at once.
  *   v1.1.0 — 2026-07-16 — `kinds` prop: hosts narrow suggestions to accepted identity classes
  *     (member/grant surfaces pass ['ghii'] so agents are never suggested where only owners are valid).
  *   v1.0.0 — 2026-07-16 — Initial: contacts + directory suggestions, email resolve, freeform passthrough.
@@ -24,7 +28,7 @@ import * as contactsService from '/js/services/contacts.js';
 import { swallowed } from '/js/swallowed.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const KIND_ICON = { ghii: '👤', gaii: '🤖', geai: '🧩' };
+const KIND_ICON = { ghii: '👤', gaii: '🤖', geai: '🧩', mail: '✉' };
 
 /**
  * Identity picker input. Controlled: `value`/`onChange(text)` mirror a plain input, so hosts keep
@@ -75,7 +79,9 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
 
   const q = value.trim().toLowerCase();
   const excluded = new Set((excludeIds || []).map(x => bare(x)));
-  const kindOk = (k) => !kinds || kinds.includes(k);
+  // 'mail' is opt-in, never a default suggestion: every host of this picker either grants access
+  // or addresses a message, and a person with no account here can be given neither.
+  const kindOk = (k) => kinds ? kinds.includes(k) : k !== 'mail';
   const fromContacts = (contacts || [])
     .filter(c => kindOk(c.kind))
     .filter(c => !excluded.has(bare(c.contact_id)))

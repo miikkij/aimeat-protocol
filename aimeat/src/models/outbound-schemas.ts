@@ -11,25 +11,54 @@
  *   privacy-preserving email hash), delivery prefers their AIMEAT inbox+push and email
  *   becomes the fallback.
  *
- * @structure OutboundContactRecord · OutboundMessageRecord (send log) · query types
+ * @structure OutboundContactRecord · OutboundContactLink · OutboundMessageRecord (send log) · query types
  * @usage import type { OutboundContactRecord, ... } from '../models/outbound-schemas.js';
  * @version-history
+ *   v1.1.0 — 2026-08-17 — TARGET-063. The record is now also the ADDRESS-BOOK entry for a person
+ *     the node does not have: `emailHash` (the join key promotion uses — same hash as
+ *     GHIIRecord.emailHash, so a person who registers later is found without storing a second
+ *     copy of the address anywhere it could be enumerated), `links` (where else this person is)
+ *     and `relation` (the owner's own word for the relationship). Send semantics are untouched.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2: outbound door.
  */
 
+/** Somewhere else this person can be found. `label` is the owner's own word for the place. */
+export interface OutboundContactLink {
+  label: string;
+  url: string;
+}
+
 /**
- * A saved outbound recipient. Opt-out blocks marketing sends (transactional and
- * invoice sends still go through — a customer cannot opt out of their own invoice).
- * Three bounces suppress the address entirely until the owner clears it.
+ * A saved recipient AND the address-book entry for a person who may have no AIMEAT identity.
+ *
+ * Two readings of the same row, deliberately one record rather than two: the sending fields
+ * (opt-out, bounce, suppression) are meaningless for a person nobody ever mails, and stay empty;
+ * the address-book fields (links, relation, notes) are meaningless to the send path, and it
+ * ignores them. A second table would have meant the same person under two names.
+ *
+ * Opt-out blocks marketing sends (transactional and invoice sends still go through — a customer
+ * cannot opt out of their own invoice). Three bounces suppress the address entirely until the
+ * owner clears it.
  */
 export interface OutboundContactRecord {
   id: string;
   ownerGhii: string;
   name: string;
   email: string;
+  /**
+   * SHA-256 of the lower-cased, trimmed address — the same hash `GHIIRecord.emailHash` carries
+   * (services/invitations.ts inviteEmailHash). It exists so promotion can ask "did anyone just
+   * verify this address" with a value the node already holds, instead of scanning addresses.
+   * Server-internal: no route accepts it as input and no response returns it.
+   */
+  emailHash: string;
   /** Resolved AIMEAT identity (GHII) when the email belongs to a registered user here. */
   ghii: string | null;
   tags: string[];
+  /** Where else this person is (LinkedIn, a site, a profile). The owner's own knowledge. */
+  links: OutboundContactLink[];
+  /** The owner's own word for the relationship. Free text, no vocabulary imposed. */
+  relation: string | null;
   optedOut: boolean;
   optOutAt: string | null;
   /** Unguessable token for the public unsubscribe link. */

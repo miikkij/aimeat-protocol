@@ -60,6 +60,7 @@ import { financeMethods } from './methods/finance.js';
 import { outboundMethods } from './methods/outbound.js';
 import { companyMethods } from './methods/companies.js';
 import { usageMethods } from './methods/usage.js';
+import { accountEventMethods } from './methods/account-events.js';
 
 /**
  * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
@@ -200,6 +201,7 @@ Object.assign(
   outboundMethods,
   companyMethods,
   usageMethods,
+  accountEventMethods,
 );
 
 // Applied after the merge so it wraps every method group, including any added later.

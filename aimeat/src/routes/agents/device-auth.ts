@@ -47,6 +47,7 @@ import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { validateAgentName, buildGAII, generateUserCode } from '../../utils/gaii.js';
 import { executeHooks } from '../../services/hooks.js';
+import { recordAccountEvent } from '../../services/account-events.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { verifyJWT, issueJWT, generateSessionId } from '../../auth/jwt.js';
 import { optionalAuth } from '../../auth/middleware.js';
@@ -268,6 +269,21 @@ async function approveDeviceAuth(
       detectedPlatform: detectedPlatform?.id,
     });
     emitChange('agent-onboarding');
+  }
+
+  // The owner's own "what has happened". Approving an agent is a permission decision they made, and
+  // one of the few things they would want a durable record of without going looking for it. A
+  // RE-approval is not news — the same agent reconnecting after a token expiry is routine — so only
+  // a genuinely new agent gets a row.
+  if (!existing) {
+    void recordAccountEvent(storage, {
+      ownerGhii: `${request.ownerName}@${config.nodeId}`,
+      kind: 'agent_connected',
+      actorGaii: approvedBy,
+      subject: gaii,
+      link: '/v1/profile?tab=agents',
+      data: { name: request.agentName },
+    }, config);
   }
 
   return { ok: true, gaii, existing: !!existing };

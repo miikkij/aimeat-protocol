@@ -56,6 +56,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest, AppManifestCortex, AppProtection } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { recordPublicActivity } from './public-activity.js';
+import { recordAccountEvent } from './account-events.js';
 import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
 import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
@@ -384,6 +385,18 @@ export async function publishApp(
     detail: manifest.description || '',
     link: `${downloadUrl}?mode=inline`,
   }).catch(err => { logger.warn('publishApp: feed is best-effort', { error: String(err) }); });
+
+  // The owner's own "what has happened". The public feed above tells the NODE; this tells the
+  // person, and the two are different audiences with different privacy — a private app publishes
+  // nothing publicly and still belongs in its owner's history.
+  void recordAccountEvent(storage, {
+    ownerGhii: `${ownerName}@${config.nodeId}`,
+    kind: isUpdate ? 'app_updated' : 'app_published',
+    actorGaii: callerGaii,
+    subject: `${ownerName}/${filename}`,
+    link: `${downloadUrl}?mode=inline`,
+    data: { name: manifest.name || filename, version: String(newVersion) },
+  }, config);
 
   // Activation (05-mittaus.md): a published app is one of the three ways an account first
   // produces something durable of its own. Write-once and fire-and-forget — measuring a publish

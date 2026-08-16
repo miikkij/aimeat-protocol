@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choose a contact — AIMEAT</title>
+  <!--
+    @file public/contact-picker.html
+    @description The apex page an app opens (as a POPUP, never an iframe) when it needs to write to
+      ONE person from the owner's address book. The app never sees this page's contents and never
+      receives the list: the owner picks here, the node mints a handle bound to (this owner, this
+      app, that contact), and only the handle plus a label goes back to the opener.
+
+      A popup rather than an embedded frame on purpose. The page reads the owner's session, and a
+      frame the app controls is a frame the app can position, resize and overlay — the choice has to
+      happen somewhere the app cannot dress up.
+    @version-history
+      v1.0.0 — 2026-08-17 — TARGET-063 phase 3.
+  -->
+  <style>
+    :root { --bg:#0d0d12; --card:#16161f; --border:#2a2a3a; --text:#e8e8f0;
+      --muted:#8888aa; --accent:#a78bfa; --danger:#ff6b6b; }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif;
+      min-height:100vh; padding:1rem; }
+    .wrap { max-width:520px; margin:0 auto; }
+    h1 { font-size:1.15rem; margin-bottom:.25rem; }
+    .subtitle { color:var(--muted); font-size:.85rem; margin-bottom:1rem; line-height:1.45; }
+    .app-name { color:var(--text); font-weight:600; }
+    input { width:100%; padding:.55rem .7rem; background:var(--card); border:1px solid var(--border);
+      border-radius:.5rem; color:var(--text); font-size:.9rem; margin-bottom:.6rem; }
+    input:focus { outline:none; border-color:var(--accent); }
+    .list { border:1px solid var(--border); border-radius:.65rem; overflow:hidden; background:var(--card); }
+    .item { display:flex; align-items:center; gap:.6rem; width:100%; padding:.6rem .75rem;
+      background:transparent; border:0; border-bottom:1px solid var(--border); color:var(--text);
+      font-size:.9rem; text-align:left; cursor:pointer; }
+    .item:last-child { border-bottom:0; }
+    .item:hover, .item:focus-visible { background:rgba(167,139,250,.12); outline:none; }
+    .item-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .item-via { color:var(--muted); font-size:.75rem; }
+    .empty, .error-msg { color:var(--muted); font-size:.85rem; padding:.75rem 0; line-height:1.45; }
+    .error-msg { color:var(--danger); }
+    .foot { color:var(--muted); font-size:.75rem; margin-top:.9rem; line-height:1.45; }
+    button.link { background:none; border:0; color:var(--accent); cursor:pointer; font-size:.8rem; padding:0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1 id="title">Choose a contact</h1>
+    <p class="subtitle" id="subtitle"></p>
+    <input id="filter" type="search" placeholder="Filter…" autocomplete="off">
+    <div id="body"></div>
+    <p class="foot" id="foot"></p>
+  </div>
+  <script src="/contact-picker.js"></script>
+</body>
+</html>

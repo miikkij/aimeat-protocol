@@ -8,6 +8,9 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   v1.7.0 — 2026-08-17 — Delete deletes: the Actions button routes an own published app to the
+ *     node delete (it only emptied a page-session record before, so the app came back), is hidden
+ *     on an app that is not ours, and the duplicate "Remove from server" leaves the manage row.
  *   v1.6.0 — 2026-08-01 — TARGET-058 Phase 3: the Art. 50(1) disclosure above the Edit-with-AI
  *     panel. A person is in a two-way exchange with a model here, so they are told before the first
  *     exchange rather than after it.
@@ -41,9 +44,9 @@ import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, delet
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
-let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession;
+let refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp;
 export function initDetail(deps) {
-  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
+  ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken, launchApp, viewPublished, viewSource, generateId, generateSharePrompt, openPromptBuilder, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp } = deps);
 }
 
 // ── App Detail View ───────────────────────────────
@@ -162,7 +165,9 @@ function serverMgmtInner(app) {
         ((isOperatorSession && isOperatorSession())
           ? dtlBtn(t('card.subdomain'), 'window._launcher.showSubdomainModal(\'' + ownerArg2 + '\', \'' + fnArg + '\')', {title: t('card.subdomainHint')})
           : '') +
-        dtlBtn(t('card.removeServer'), 'window._launcher.deleteServerApp(\'' + fnArg + '\')', {variant:'danger'}) +
+        // "Remove from server" used to sit here next to a local-only Delete in Actions. Since the
+        // server-only cutover both mean the same thing, so this row keeps the park/protect/versions
+        // controls and Delete under Actions is the single door out.
       '</div>' +
       acEditor +
     '</div>';
@@ -553,7 +558,12 @@ function renderDetailView() {
         (isUrlApp ? '' : dtlBtn(escapeHtml(publishLabel), 'window._launcher.detailPublish()', {variant:'primary'})) +
         (app.published && !isUrlApp ? dtlBtn('📷 ' + t('detail.setScreenshot'), 'window._launcher.detailSetScreenshot()', {title:'Upload a custom thumbnail for this app'}) : '') +
         (app.published && !isUrlApp ? dtlBtn('🔄 ' + t('detail.refreshScreenshot'), 'window._launcher.detailRefreshScreenshot()', {title:'Clear the screenshot; the node re-takes it on its next scheduled run'}) : '') +
-        dtlBtn(t('ctx.delete'), 'window._launcher.detailDelete()', {variant:'danger'}) +
+        // Offered only where it can do something: our own published app (deleted on the node) or a
+        // record that was never published. Someone else's published app is not ours to delete, and
+        // the button used to appear there and close the view having changed nothing.
+        ((detailIsOwnPublished(app) || !app.published)
+          ? dtlBtn(t('ctx.delete'), 'window._launcher.detailDelete()', {variant:'danger', title: t('detail.deleteHint')})
+          : '') +
       '</div>' +
     '</div>';
 
@@ -1816,16 +1826,28 @@ function detailEditSource() { var app = detailGetApp(); if (app) viewSource(app)
 function detailImproveExternal() { var app = detailGetApp(); if (app) openPromptBuilder(app); }
 function detailSharePrompt() { var app = detailGetApp(); if (app) generateSharePrompt(app); }
 function detailPublish() { if (detailAppId) showPublishModal(detailAppId); }
+// Delete this app. A published app of ours lives ON THE NODE, so the delete has to go there: before
+// the server-only cutover the catalog also held a browser copy and dropping that copy WAS the
+// delete, which since then only emptied a page-session record — the app stayed published and came
+// back with the next list, so the view just closed and nothing was gone. The server-delete owns the
+// confirmation (server-io), and the local record goes only after the node confirms.
 async function detailDelete() {
   var app = detailGetApp();
   if (!app) return;
-  if (!(await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; })))) return;
   var id = app.id;
-  deleteApp(id).then(function() {
+  if (detailIsOwnPublished(app)) {
+    var removed = await deleteServerApp(app.publishedFilename, app.name || app.publishedFilename);
+    if (!removed) return; // declined at the prompt, or the node refused — leave the detail open
+    await deleteApp(id);
     closeDetailView();
     renderApps();
-    loadPublishedApps();
-  });
+    return;
+  }
+  if (!(await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; })))) return;
+  await deleteApp(id);
+  closeDetailView();
+  renderApps();
+  loadPublishedApps();
 }
 
 // Open Details for an OWN published card. If a local copy exists, open it

@@ -64,7 +64,50 @@ function line(item) {
       return tr('home.feed.homeReady', 'Your home is up and running.');
     case 'room_entered':
       return tr(`home.rooms.${d.room}.entered`, 'You started something new.');
+
+    // ── Recorded events (services/account-events.ts). Same contract as the derived rows above:
+    // the server sends a key, the sentence is built here, so the node never decides which
+    // language the person reads.
+    case 'agent_removed':
+      return tr('home.feed.agentRemoved', '{name} is no longer connected.').replace('{name}', d.agent || d.name || '');
+    case 'agent_task_done':
+      return d.title
+        ? tr('home.feed.taskDoneTitled', '{agent} finished: {title}').replace('{agent}', d.agent || '').replace('{title}', d.title)
+        : tr('home.feed.taskDone', '{agent} finished a task.').replace('{agent}', d.agent || '');
+    case 'agent_task_failed':
+      return d.title
+        ? tr('home.feed.taskFailedTitled', '{agent} could not finish: {title}').replace('{agent}', d.agent || '').replace('{title}', d.title)
+        : tr('home.feed.taskFailed', '{agent} could not finish a task.').replace('{agent}', d.agent || '');
+    case 'app_published':
+      return tr('home.feed.appPublished', 'You published {name}.').replace('{name}', d.name || '');
+    case 'app_updated':
+      return tr('home.feed.appUpdated', 'You updated {name}.').replace('{name}', d.name || '');
+    case 'workspace_record_published':
+      return tr('home.feed.recordPublished', 'You published {name}.').replace('{name}', d.name || '');
+    case 'organism_joined':
+      return tr('home.feed.organismJoined', 'You joined {name}.').replace('{name}', d.name || '');
+    case 'organism_left':
+      return tr('home.feed.organismLeft', 'You left {name}.').replace('{name}', d.name || '');
+    case 'organism_member_joined':
+      return tr('home.feed.memberJoined', '{who} joined {name}.').replace('{who}', d.who || '').replace('{name}', d.name || '');
+    case 'payment_received':
+      return tr('home.feed.paymentReceived', 'You were paid {amount}.').replace('{amount}', d.amount || '');
+    case 'payment_sent':
+      return tr('home.feed.paymentSent', 'You paid {amount}.').replace('{amount}', d.amount || '');
+    case 'contract_started':
+      return tr('home.feed.contractStarted', 'A contract started: {name}.').replace('{name}', d.name || '');
+    case 'contract_ended':
+      return tr('home.feed.contractEnded', 'A contract ended: {name}.').replace('{name}', d.name || '');
+    case 'app_granted':
+      return tr('home.feed.appGranted', 'You gave {name} access.').replace('{name}', d.name || '');
+    case 'app_revoked':
+      return tr('home.feed.appRevoked', 'You took {name} access away.').replace('{name}', d.name || '');
+    case 'ai_budget_reached':
+      return tr('home.feed.aiBudgetReached', 'Your AI budget for the day is used up.');
     default:
+      // A kind this build does not know renders nothing rather than a blank bullet — a row with no
+      // sentence reads as a broken feed, and an older client meeting a newer server should degrade
+      // to silence, not to damage.
       return '';
   }
 }
@@ -86,7 +129,7 @@ export function HomeFeed({ items }) {
           ${tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}
         </a>`}
       <ul class="koti-feed-list">
-        ${items.map((item, i) => html`
+        ${items.filter(it => line(it)).map((item, i) => html`
           <li class="koti-feed-item ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}" key=${i}>
             <span class="koti-feed-dot" aria-hidden="true"></span>
             <div class="koti-feed-body">

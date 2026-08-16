@@ -238,7 +238,8 @@ import { toggleFavorite } from './favorites.js';
       getServerState: function () { return serverStateByFilename; },
       getServerManifests: function () { return serverAppManifests; },
       getOwnProtection: function () { return ownAppProtection; },
-      setIframeUrl: setIframeUrl, isOperatorSession: isOperatorSession
+      setIframeUrl: setIframeUrl, isOperatorSession: isOperatorSession,
+      deleteServerApp: deleteServerApp
     });
     initAppAgents({ getServerManifests: function () { return serverAppManifests; } });
     initSettings({ generateId: generateId, renderApps: renderApps, loadPublishedApps: loadPublishedApps });

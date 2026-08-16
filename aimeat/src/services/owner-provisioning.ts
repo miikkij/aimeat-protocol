@@ -19,6 +19,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { logger } from '../utils/logger.js';
+import { promoteContactsForVerifiedEmail } from './contacts.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
 function emailHashOf(email: string): string {
@@ -120,6 +121,14 @@ export async function provisionOwner(
     createdAt: now,
     updatedAt: now,
   });
+
+  // An account created with an ALREADY-proven address is the third way a verified binding comes
+  // into being, so it links address-book entries exactly as the two verification routes do
+  // (TARGET-063). Best-effort: provisioning must not fail because a contact could not be linked.
+  if (verified) {
+    await promoteContactsForVerifiedEmail(storage, emailHashOf(verified), ghii)
+      .catch(err => { logger.warn('provisionOwner: contact promotion is best-effort', { error: String(err) }); });
+  }
 
   if (config.welcomeBonus > 0) {
     await storage.addTransaction({

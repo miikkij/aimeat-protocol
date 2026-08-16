@@ -48,10 +48,20 @@ const SendSchema = z.object({
   company_id: z.string().max(80).optional(),
 }).strict();
 
-/** optOutToken is the RECIPIENT's capability (the unsubscribe link) — never shown to the owner. */
+/**
+ * What may leave this route. Two fields never do, for two different reasons:
+ *   optOutToken is the RECIPIENT's capability (the unsubscribe link) — anyone holding it can
+ *     unsubscribe that person, so it is theirs and not the owner's to see.
+ *   emailHash is the server-internal join key promotion uses. It says nothing the caller does not
+ *     already have (they sent the address), and publishing it would hand out a precomputed
+ *     rainbow-table entry for an address on every read.
+ * Written as a deny-list on a spread, which is the pattern that let emailHash out the moment the
+ * column existed; the fields are named here so the next one added is a deliberate choice.
+ */
 function publicContact(c: import('../models/outbound-schemas.js').OutboundContactRecord): Record<string, unknown> {
   const safe: Record<string, unknown> = { ...c };
   delete safe.optOutToken;
+  delete safe.emailHash;
   return safe;
 }
 

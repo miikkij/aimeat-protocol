@@ -5,8 +5,12 @@
  * @version-history
  *   v1.0.0 — 2026-07-16 — Initial.
  */
-.cp-root { position: relative; display: inline-block; min-width: 240px; }
-.cp-input { width: 100%; }
+/* The input is `width: 100%` of the root, so its padding and border have to be INSIDE that width
+   or it grows past the element positioning the dropdown. On a 390 px viewport it did, by 21 px,
+   and slid under the button beside it — visible only once the row held more than one button.
+   `max-width` is the other half: a 240 px floor on a narrow screen must still yield to the row. */
+.cp-root { position: relative; display: inline-block; min-width: 240px; max-width: 100%; }
+.cp-input { width: 100%; max-width: 100%; box-sizing: border-box; }
 .cp-drop {
   position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 60;
   background: var(--card); border: 1px solid var(--border); border-radius: 8px;

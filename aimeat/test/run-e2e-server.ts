@@ -7,8 +7,6 @@
  *   process/port waiting, server start and stop.
  * @usage Imported by test/run-e2e-ci.ts. Not a suite; it runs nothing on its own.
  * @version-history
- *   v1.1.0 -- 2026-08-17 -- Pin AIMEAT_METRICS_ENABLED=true: the metrics middleware runs under
- *            every suite and e2e-metrics does not depend on a gitignored .env.test.* line.
  *   v1.0.0 -- 2026-08-14 -- Pure extraction from run-e2e-ci.ts (789 lines, cap 800) carrying the
  *            three August 2026 audit fixes to the runner itself: empty the database before the
  *            FIRST suite and not only between suites, wait for the old server to actually be gone
@@ -239,13 +237,6 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         AIMEAT_OPERATOR_POLICY_VERSION: process.env.AIMEAT_OPERATOR_POLICY_VERSION ?? '1.0',
         AIMEAT_AI_COP_SECTIONS: process.env.AIMEAT_AI_COP_SECTIONS ?? '',
         AIMEAT_AI_COP_SIGNED_ON: process.env.AIMEAT_AI_COP_SIGNED_ON ?? '',
-
-        // ── Prometheus metrics ──
-        // Pinned ON so the per-request metrics middleware runs under every suite and
-        // e2e-metrics can assert aimeat_http_requests_total actually grows. The flag is
-        // off by default and .env.test.* files are gitignored, so without this pin the
-        // suite would pass only on machines whose local env file happens to set it.
-        AIMEAT_METRICS_ENABLED: process.env.AIMEAT_METRICS_ENABLED ?? 'true',
 
         // ── The money rails ──
         // x402 settlement: pin the rail ON and settle against the OFF-CHAIN double. e2e-x402 needs

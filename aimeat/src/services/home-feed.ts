@@ -20,19 +20,30 @@
  * @usage
  *   import { readHomeFeed } from '../services/home-feed.js';
  * @version-history
+ *   v1.1.0 — 2026-08-17 — The feed is derived rows PLUS recorded ones. The six onboarding rows stay
+ *     derived for the reason above; everything that happens after onboarding leaves no marker, which
+ *     is why this went permanently quiet once an account was set up. Those events now have their own
+ *     store (services/account-events.ts) and are merged here, newest first.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 6).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
+import { readAccountEvents } from './account-events.js';
+import type { AccountEventKind } from '../storage/interface.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
  * because the node has no business deciding which language the person reads.
  */
 export interface FeedItem {
+    /**
+     * Either one of the six DERIVED rows below, or a recorded AccountEventKind. Both are stable keys
+     * the UI translates, so the two sources are indistinguishable to a reader — which is the point.
+     */
     kind: 'account_created' | 'welcome_mat' | 'agent_knocking' | 'agent_connected'
-        | 'home_initialized' | 'room_entered';
+        | 'home_initialized' | 'room_entered' | AccountEventKind;
     at: string;
     /** Where this row goes when clicked. The return email links straight to it. */
     link: string | null;
@@ -49,8 +60,9 @@ export interface FeedItem {
  */
 export async function readHomeFeed(
     storage: Storage, config: AimeatConfig, owner: string,
-    opts: { pendingAgents?: number } = {},
+    opts: { pendingAgents?: number; limit?: number } = {},
 ): Promise<FeedItem[]> {
+    const limit = Math.min(Math.max(opts.limit ?? 100, 1), 200);
     const ghii = `${owner}@${config.nodeId}`;
     const [ghiiRecord, markers] = await Promise.all([
         storage.getGHIIByOwner(owner),
@@ -108,5 +120,38 @@ export async function readHomeFeed(
         items.push({ kind: 'room_entered', at: room.at, link: '/v1/home', data: { room: room.room } });
     }
 
-    return items.sort((a, b) => b.at.localeCompare(a.at));
+    // ── The recorded half ──
+    // The six rows above are DERIVED from the onboarding markers, and stay that way: the funnel and
+    // the screen must not be able to tell different stories about the same account. Everything after
+    // onboarding leaves no marker, which is why this feed went quiet forever once the account was
+    // set up — so those events are recorded in their own system (services/account-events.ts) and
+    // merged here. Best-effort: the derived rows are worth showing even if this read fails.
+    let recorded: FeedItem[] = [];
+    try {
+        recorded = (await readAccountEvents(storage, ghii, { limit })).map(e => ({
+            kind: e.kind,
+            at: e.at,
+            link: e.link || null,
+            ...(Object.keys(e.data).length ? { data: e.data } : {}),
+        }));
+    } catch (err) {
+        logger.warn('home-feed: recorded events unavailable, showing derived rows only', {
+            error: String(err),
+        });
+    }
+
+    // `agent_connected` exists in BOTH halves: the derived row is the onboarding marker for the
+    // FIRST agent, and the recorded one fires for every new agent including that first. Showing both
+    // would tell the same person the same thing twice. The recorded row wins — it names the agent
+    // and carries a link — and the derived one survives only for accounts that connected an agent
+    // before this system existed and therefore have a marker and no event.
+    const recordedAgentNames = new Set(
+        recorded.filter(r => r.kind === 'agent_connected').map(r => r.data?.name ?? ''),
+    );
+    const derived = items.filter(it =>
+        !(it.kind === 'agent_connected' && recordedAgentNames.has(it.data?.name ?? '')));
+
+    return [...derived, ...recorded]
+        .sort((a, b) => b.at.localeCompare(a.at))
+        .slice(0, limit);
 }

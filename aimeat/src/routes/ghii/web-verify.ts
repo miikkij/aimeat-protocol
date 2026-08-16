@@ -30,6 +30,7 @@ import { validateOwnerName, buildGAII } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js';
+import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 
 export function registerWebVerifyRoutes(
     router: Router,
@@ -314,6 +315,11 @@ export function registerWebVerifyRoutes(
             lastLoginAt: now,
             loginCount: (ghiiBeforeUpdate?.loginCount ?? 0) + 1,
         });
+        // Anyone who wrote this person into their address book before the account existed now has
+        // the person, not just the address (TARGET-063). Best-effort: a contact that fails to link
+        // is cosmetic, and a verification that fails to finish is an account nobody can get into.
+        await promoteContactsForVerifiedEmail(storage, record.emailHash, ghii)
+            .catch(err => { logger.warn('verify-email: contact promotion is best-effort', { error: String(err) }); });
 
         // Create an agent if not exists, then issue JWT
         const agents = await storage.getAgentsByOwner(record.ownerName);

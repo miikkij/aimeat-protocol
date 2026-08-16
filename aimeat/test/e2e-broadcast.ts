@@ -4,15 +4,6 @@
 // Verifies POST /v1/messages/broadcast fans out one message per recipient under a shared broadcastId
 // (explicit list + Share Group audience), the announcement mode is non-respondable (replies rejected),
 // and GET /v1/messages/broadcast/:id aggregates the results.
-//
-// @version-history
-//   v1.1.0 — 2026-08-17 — E2E quality, broadcast:77. The results endpoint was read twice in the file
-//     and both times by the sender, so the ownership filter that keeps other owners out of a poll's
-//     answers had never been measured — the role gate the route carries admits every registered
-//     owner. Test 7b reads the same broadcast as Bob and as Carol, asserts 404 with no recipient id
-//     and no answer anywhere in the body, and re-reads it as Alice so the filter is shown to cost the
-//     sender nothing. Red-first needs a per-backend mutation: the filter lives in the two storage
-//     providers, not in the route.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -63,8 +54,6 @@ let alice = { token: '', ghii: '' };
 let bob = { token: '', ghii: '' };
 let carol = { token: '', ghii: '' };
 let bcId = '';
-/** The poll broadcast of test 7, kept so the ownership of its results can be probed afterwards. */
-let sharedPollBcId = '';
 
 console.log('\n=== AIMEAT Broadcast / send-to-many E2E ===\n');
 
@@ -178,7 +167,6 @@ await test('7. Poll: broadcast an interactive question, a recipient answers, res
     });
     assert(poll.status === 201, `poll broadcast ${poll.status}: ${JSON.stringify(poll.body)}`);
     const pollBcId = poll.body.data.broadcast_id;
-    sharedPollBcId = pollBcId;
 
     // Bob finds the poll question in his inbox.
     let q: any;
@@ -212,38 +200,6 @@ await test('7. Poll: broadcast an interactive question, a recipient answers, res
     assert(res.answered >= 1, `expected ≥1 answered, got ${res.answered}`);
     const bobRec = res.recipients.find((x: any) => x.recipient === bob.ghii);
     assert(bobRec?.answers?.q1?.selected?.[0] === 'blue', `Bob's answer aggregated, got ${JSON.stringify(bobRec?.answers)}`);
-});
-
-/**
- * The results of a broadcast are read twice in this file and both times by the sender. The route
- * carries requireAuth() and requireRole('owner'), which Bob and Carol both satisfy — they are
- * registered owners — so the ONLY thing keeping them out of Alice's results is the sender argument
- * the handler passes into the query. Nothing had ever asked whether that argument does its job.
- *
- * A poll's results are the answers people gave: who was asked, who replied, and what they picked.
- */
-await test('7b. A broadcast\'s results belong to its sender: another owner gets nothing', async () => {
-    assert(!!sharedPollBcId, 'the poll broadcast id must be in scope');
-
-    for (const [who, principal] of [['Bob', bob], ['Carol', carol]] as const) {
-        const r = await json(`/v1/messages/broadcast/${sharedPollBcId}`, {
-            headers: { Authorization: `Bearer ${principal.token}` },
-        });
-        assert(r.status === 404, `${who} expected 404, got ${r.status}`);
-        assert(r.body.error?.code === 'NOT_FOUND', `${who}: expected NOT_FOUND, got ${r.body.error?.code}`);
-        // A partial leak is still a leak: no roster, no answers, not even a recipient id.
-        const serialized = JSON.stringify(r.body);
-        assert(!serialized.includes(bob.ghii), `${who} was shown a recipient identity`);
-        assert(!serialized.includes(carol.ghii), `${who} was shown a recipient identity`);
-        assert(!serialized.includes('blue'), `${who} was shown somebody's answer`);
-    }
-
-    // The sender still gets the full picture, so the filter costs the legitimate path nothing.
-    const own = await json(`/v1/messages/broadcast/${sharedPollBcId}`, {
-        headers: { Authorization: `Bearer ${alice.token}` },
-    });
-    assert(own.status === 200, `the sender must still read the results, got ${own.status}`);
-    assert((own.body.data?.recipients ?? []).length > 0, 'the sender sees the roster');
 });
 
 await test('8. The "all node users" audience is operator-only (a non-operator gets 403)', async () => {

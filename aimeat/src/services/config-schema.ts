@@ -125,6 +125,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Consent (Phase 0.3, mutable) ──
   { key: 'consentEnabled', dotPath: 'consent.enabled', envVar: 'AIMEAT_CONSENT_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Consent layer enabled' },
+  { key: 'accountEventWindow', dotPath: 'account_events.window', envVar: 'AIMEAT_ACCOUNT_EVENT_WINDOW', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 10 && (v as number) <= 10000, immutable: false, description: 'Events kept in an account live "what has happened" window before the oldest are archived', range: '10-10000' },
   { key: 'consentAuditRetentionDays', dotPath: 'consent.audit_retention_days', envVar: 'AIMEAT_CONSENT_AUDIT_RETENTION_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 3650, immutable: false, description: 'Consent audit log retention in days', range: '1-3650' },
   { key: 'consentMaxPerUser', dotPath: 'consent.max_per_user', envVar: 'AIMEAT_CONSENT_MAX_PER_USER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 10000, immutable: false, description: 'Max consent records per user', range: '1-10000' },
 

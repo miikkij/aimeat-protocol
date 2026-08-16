@@ -76,7 +76,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { readRefreshCookie } from '../services/owner-session.js';
-import { resolvePublishedPortfolio } from './portfolio.js';
+import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget } from '../services/app-origin-target.js';
 
 /**
  * Scopes an app may request, each with a short description key for the consent UI. Drawn from the
@@ -177,13 +177,6 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // the principal the gate is actually for, which is why it has to ask first.
   'app:write': 'Publish and update apps in your name (each one gets a public address anyone with the link can open)',
 };
-
-/**
- * A grant target for a portfolio origin reads `portfolio:<username>`. An app target reads
- * `owner/filename` and an owner name carries no colon, so the prefix tells the two families apart
- * with no ambiguity. It is minted in exactly one place (the silent bridge, below).
- */
-const PORTFOLIO_TARGET_PREFIX = 'portfolio:';
 
 /**
  * The most a token minted for a PORTFOLIO origin may carry.
@@ -552,44 +545,16 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const callerOrigin = String(req.headers.origin ?? '').toLowerCase();
     if (callerOrigin && callerOrigin !== apexOrigin(config)) return reply({ ok: false, error: 'bad_caller' });
 
-    const appHost = (config.appHost || '').toLowerCase();
-    const portfolioHost = (config.portfolioOriginEnabled ? (config.portfolioHost || '') : '').toLowerCase();
-    if (!appHost && !portfolioHost) return reply({ ok: false, error: 'app_origin_disabled' });
-
-    // The app's real origin (the apex bridge passes it from window.location.ancestorOrigins).
-    let host: string;
-    try { host = new URL(String(req.query.origin ?? '')).hostname.toLowerCase(); } catch { return reply({ ok: false, error: 'bad_origin' }); }
-
-    // Origin → grant target. Two origin families are eligible:
-    //   • <sub>.apps.<apex>       → the mapped published app (subdomain_sites binding)
-    //   • <username>.portfolio.<apex> → that user's published portfolio (label IS the username)
-    // The single-label rule keeps a token bound to exactly one origin in both families.
-    let grantTarget: string;   // app grant identity ("owner/file.html" or "portfolio:<username>")
-    let grantName: string;     // human label for consent surfaces
-    let grantOwner: string;    // bare owner whose own visit auto-approves
-    if (appHost && host !== appHost && host.endsWith('.' + appHost)) {
-      const sub = host.slice(0, -(appHost.length + 1));
-      if (!sub || sub.includes('.')) return reply({ ok: false, error: 'bad_origin' }); // single-label per-app subdomain only
-
-      // Subdomain → the app it serves. This binding is what ties a token to one app's origin.
-      const site = await storage.getSubdomainSite(sub);
-      if (!site || !site.enabled || site.kind !== 'app') return reply({ ok: false, error: 'unknown_app' });
-      const slash = site.target.indexOf('/');
-      if (slash <= 0) return reply({ ok: false, error: 'unknown_app' });
-      grantTarget = site.target;
-      grantName = site.target.slice(slash + 1);
-      grantOwner = site.target.slice(0, slash);
-    } else if (portfolioHost && host !== portfolioHost && host.endsWith('.' + portfolioHost)) {
-      const sub = host.slice(0, -(portfolioHost.length + 1));
-      if (!sub || sub.includes('.')) return reply({ ok: false, error: 'bad_origin' });
-      const resolved = await resolvePublishedPortfolio(storage, sub);
-      if (!resolved.ok || !resolved.html) return reply({ ok: false, error: 'unknown_app' });
-      grantTarget = `${PORTFOLIO_TARGET_PREFIX}${sub}`;
-      grantName = `${sub}'s portfolio`;
-      grantOwner = sub;
-    } else {
-      return reply({ ok: false, error: 'bad_origin' });
-    }
+    // Origin → grant target, resolved by the one function that knows the binding
+    // (services/app-origin-target.ts). The origin is a value the CALLER writes; nothing downstream
+    // trusts it beyond what this node actually publishes at that hostname.
+    const resolvedOrigin = await resolveAppOriginTarget(config, storage, String(req.query.origin ?? ''));
+    if (!resolvedOrigin.ok) return reply({ ok: false, error: resolvedOrigin.error });
+    const grantTarget = resolvedOrigin.target;   // "owner/file.html" or "portfolio:<username>"
+    const grantName = resolvedOrigin.name;       // human label for consent surfaces
+    const grantOwner = resolvedOrigin.owner;     // bare owner whose own visit auto-approves
+    // The origin as the resolver accepted it, for the grant row's display/redirect field.
+    const grantOriginHost = new URL(String(req.query.origin ?? '')).hostname.toLowerCase();
 
     // Who is logged in on the apex (refresh cookie → session). Read-only; no rotation.
     const raw = readRefreshCookie(req);
@@ -630,7 +595,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // Mint: reuse this owner's live grant for the app, else create one (one live grant per app).
     const ownerGhii = `${owner}@${config.nodeId}`;
     const { grantId, rawRefresh } = await upsertGrant(
-      { app: grantTarget, appName: grantName, appOrigin: `https://${host}`, owner, gaii: ownerGhii, scopes },
+      { app: grantTarget, appName: grantName, appOrigin: `https://${grantOriginHost}`, owner, gaii: ownerGhii, scopes },
       existing,
     );
     const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId, app: grantTarget });

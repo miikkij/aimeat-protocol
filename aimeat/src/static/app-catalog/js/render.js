@@ -15,6 +15,8 @@
  *     Add a Staging pill + split Open into "Open released" / "Open staging" when has_draft.
  *   v2.0.0 — 2026-07-20 — Server-only cutover: grid renders the owner's server apps only (no local
  *     merge), drop drag-reorder + Recently-Opened + the local-only card affordances + byte stats.
+ *   v2.1.0 — 2026-08-17 — The card menu's Delete goes to the node for a published app instead of
+ *     emptying the page-session record, which left the app published and the card in place.
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
@@ -25,7 +27,7 @@ import { favStarHtml } from './favorites.js';
 import { setEditingAppId, switchTab } from './apps-io.js';
 import { openPromptBuilder } from './cortex.js';
 import { openDetailView, openPublishedDetail } from './detail.js';
-import { loadPublishedApps, showPublishModal, applyServerFilter } from './server-io.js';
+import { loadPublishedApps, showPublishModal, applyServerFilter, deleteServerApp } from './server-io.js';
 
 // browser-local list + filter state stay main-owned; injected once via initRender at bootstrap.
 let getMainApps, setAllApps, getActiveTag, setActiveTag, getSearchQuery;
@@ -584,6 +586,16 @@ async function handleContextAction(action) {
       break;
 
     case 'delete':
+      // Same rule as the detail view: our own published app is deleted ON THE NODE (deleteServerApp
+      // asks its own confirmation and reports whether the node agreed); a record that was never
+      // published is only dropped from the page-session set.
+      if (app.published && app.publishedFilename && serverStateByFilename[app.publishedFilename]) {
+        if (await deleteServerApp(app.publishedFilename, app.name || app.publishedFilename)) {
+          await deleteApp(appId);
+          renderApps();
+        }
+        break;
+      }
       if (await showConfirm(t('confirm.deleteApp').replace('{name}', function () { return app.name || 'this app'; }))) {
         deleteApp(appId).then(function () {
           renderApps();

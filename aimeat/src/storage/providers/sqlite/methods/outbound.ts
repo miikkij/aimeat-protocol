@@ -6,11 +6,13 @@
  * @structure outboundMethods — contacts · send log
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-08-17 — TARGET-063: emailHash/links/relation (safeAddColumn in schema.ts) and
+ *     the cross-owner promotion lookup findUnresolvedOutboundContactsByEmailHash.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
  */
 import type { OutboundRepository } from '../../../repositories/outbound.repository.js';
 import type {
-  OutboundContactRecord, OutboundContactQuery,
+  OutboundContactRecord, OutboundContactQuery, OutboundContactLink,
   OutboundMessageRecord, OutboundLogQuery, OutboundChannel, OutboundKind, OutboundStatus,
 } from '../../../../models/outbound-schemas.js';
 import type { SqliteStorage } from '../index.js';
@@ -23,8 +25,11 @@ function toContact(r: Row): OutboundContactRecord {
     ownerGhii: r.ownerGhii as string,
     name: r.name as string,
     email: r.email as string,
+    emailHash: (r.emailHash as string | null) ?? '',
     ghii: (r.ghii as string | null) ?? null,
     tags: JSON.parse((r.tags as string) || '[]') as string[],
+    links: JSON.parse((r.links as string) || '[]') as OutboundContactLink[],
+    relation: (r.relation as string | null) ?? null,
     optedOut: Number(r.optedOut) === 1,
     optOutAt: (r.optOutAt as string | null) ?? null,
     optOutToken: r.optOutToken as string,
@@ -77,11 +82,13 @@ export const outboundMethods: OutboundRepository & ThisType<SqliteStorage> = {
   async createOutboundContact(this: SqliteStorage, row: OutboundContactRecord): Promise<void> {
     this.db.prepare(`
       INSERT INTO outbound_contacts (
-        id, ownerGhii, name, email, ghii, tags, optedOut, optOutAt, optOutToken,
+        id, ownerGhii, name, email, emailHash, ghii, tags, links, relation,
+        optedOut, optOutAt, optOutToken,
         bounceCount, suppressedAt, notes, createdAt, updatedAt
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
-      row.id, row.ownerGhii, row.name, row.email, row.ghii, JSON.stringify(row.tags),
+      row.id, row.ownerGhii, row.name, row.email, row.emailHash, row.ghii,
+      JSON.stringify(row.tags), JSON.stringify(row.links), row.relation,
       row.optedOut ? 1 : 0, row.optOutAt, row.optOutToken, row.bounceCount,
       row.suppressedAt, row.notes, row.createdAt, row.updatedAt,
     );
@@ -103,6 +110,15 @@ export const outboundMethods: OutboundRepository & ThisType<SqliteStorage> = {
     return r ? toContact(r) : undefined;
   },
 
+  async findUnresolvedOutboundContactsByEmailHash(this: SqliteStorage, emailHash: string): Promise<OutboundContactRecord[]> {
+    // An empty hash is what a row written before the column existed carries. Matching on it would
+    // return every legacy row for every verification, so it is refused rather than queried.
+    if (!emailHash) return [];
+    const rows = this.db.prepare('SELECT * FROM outbound_contacts WHERE emailHash = ? AND ghii IS NULL')
+      .all(emailHash) as Row[];
+    return rows.map(toContact);
+  },
+
   async listOutboundContacts(this: SqliteStorage, query: OutboundContactQuery): Promise<OutboundContactRecord[]> {
     const { sql, params } = contactWhere(query);
     let stmt = `SELECT * FROM outbound_contacts WHERE ${sql} ORDER BY createdAt DESC`;
@@ -121,11 +137,13 @@ export const outboundMethods: OutboundRepository & ThisType<SqliteStorage> = {
   async updateOutboundContact(this: SqliteStorage, row: OutboundContactRecord): Promise<void> {
     this.db.prepare(`
       UPDATE outbound_contacts SET
-        name = ?, email = ?, ghii = ?, tags = ?, optedOut = ?, optOutAt = ?,
+        name = ?, email = ?, emailHash = ?, ghii = ?, tags = ?, links = ?, relation = ?,
+        optedOut = ?, optOutAt = ?,
         bounceCount = ?, suppressedAt = ?, notes = ?, updatedAt = ?
       WHERE id = ?
     `).run(
-      row.name, row.email, row.ghii, JSON.stringify(row.tags), row.optedOut ? 1 : 0,
+      row.name, row.email, row.emailHash, row.ghii, JSON.stringify(row.tags),
+      JSON.stringify(row.links), row.relation, row.optedOut ? 1 : 0,
       row.optOutAt, row.bounceCount, row.suppressedAt, row.notes, row.updatedAt, row.id,
     );
   },

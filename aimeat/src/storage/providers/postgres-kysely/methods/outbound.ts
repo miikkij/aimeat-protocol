@@ -6,12 +6,14 @@
  * @structure outboundMethods — contacts · send log
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-08-17 — TARGET-063: emailHash/links/relation (migration 0041) and the
+ *     cross-owner promotion lookup findUnresolvedOutboundContactsByEmailHash.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
  */
 import { sql, type Selectable } from 'kysely';
 import type { OutboundRepository } from '../../../repositories/outbound.repository.js';
 import type {
-  OutboundContactRecord, OutboundContactQuery,
+  OutboundContactRecord, OutboundContactQuery, OutboundContactLink,
   OutboundMessageRecord, OutboundLogQuery, OutboundChannel, OutboundKind, OutboundStatus,
 } from '../../../../models/outbound-schemas.js';
 import type { OutboundContact as ContactRow, OutboundMessage as MessageRow, Json } from '../db-types.js';
@@ -24,8 +26,11 @@ function toContact(r: Selectable<ContactRow>): OutboundContactRecord {
     ownerGhii: r.ownerGhii,
     name: r.name,
     email: r.email,
+    emailHash: r.emailHash ?? '',
     ghii: r.ghii ?? null,
     tags: (r.tags as string[] | null) ?? [],
+    links: (r.links as OutboundContactLink[] | null) ?? [],
+    relation: r.relation ?? null,
     optedOut: r.optedOut,
     optOutAt: r.optOutAt ?? null,
     optOutToken: r.optOutToken,
@@ -57,7 +62,9 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
   async createOutboundContact(this: PostgresKyselyStorage, row: OutboundContactRecord): Promise<void> {
     await this.db.insertInto('OutboundContact').values({
       id: row.id, ownerGhii: row.ownerGhii, name: row.name, email: row.email,
+      emailHash: row.emailHash,
       ghii: row.ghii, tags: jsonb(row.tags) as unknown as Json,
+      links: jsonb(row.links) as unknown as Json, relation: row.relation,
       optedOut: row.optedOut, optOutAt: row.optOutAt, optOutToken: row.optOutToken,
       bounceCount: row.bounceCount, suppressedAt: row.suppressedAt, notes: row.notes,
       createdAt: row.createdAt, updatedAt: row.updatedAt,
@@ -84,6 +91,17 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
     return r ? toContact(r) : undefined;
   },
 
+  async findUnresolvedOutboundContactsByEmailHash(this: PostgresKyselyStorage, emailHash: string): Promise<OutboundContactRecord[]> {
+    // An empty hash is what a row written before migration 0041 carries. Matching on it would
+    // return every legacy row for every verification, so it is refused rather than queried.
+    if (!emailHash) return [];
+    const rows = await this.db.selectFrom('OutboundContact').selectAll()
+      .where('emailHash', '=', emailHash)
+      .where('ghii', 'is', null)
+      .execute();
+    return rows.map(toContact);
+  },
+
   async listOutboundContacts(this: PostgresKyselyStorage, query: OutboundContactQuery): Promise<OutboundContactRecord[]> {
     let q = this.db.selectFrom('OutboundContact').selectAll().where('ownerGhii', '=', query.ownerGhii);
     if (query.optedOut !== undefined) q = q.where('optedOut', '=', query.optedOut);
@@ -107,8 +125,9 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
 
   async updateOutboundContact(this: PostgresKyselyStorage, row: OutboundContactRecord): Promise<void> {
     await this.db.updateTable('OutboundContact').set({
-      name: row.name, email: row.email, ghii: row.ghii,
+      name: row.name, email: row.email, emailHash: row.emailHash, ghii: row.ghii,
       tags: jsonb(row.tags) as unknown as Json,
+      links: jsonb(row.links) as unknown as Json, relation: row.relation,
       optedOut: row.optedOut, optOutAt: row.optOutAt,
       bounceCount: row.bounceCount, suppressedAt: row.suppressedAt, notes: row.notes,
       updatedAt: row.updatedAt,

@@ -28,6 +28,7 @@ import { hashPassword, verifyPassword } from '../../services/password.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
+import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 
 export function registerRecoveryRoutes(
     router: Router,
@@ -181,6 +182,10 @@ export function registerRecoveryRoutes(
             verificationLevel: 1,
             verificationMethod: 'email',
         });
+        // Same binding, same consequence as the signup path: address-book entries that named this
+        // address become this person (TARGET-063). Best-effort — recovery must never fail on it.
+        await promoteContactsForVerifiedEmail(storage, record.emailHash, ghii)
+            .catch(err => { logger.warn('recovery: contact promotion is best-effort', { error: String(err) }); });
 
         res.json(success(config.nodeId, {
             ok: true,

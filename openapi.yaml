@@ -3757,6 +3757,36 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    AddressBookPerson:
+      type: object
+      description: >-
+        A person in the owner's address book, as the address book shows them. The stored record
+        also carries an unsubscribe token, an email hash and delivery counters; none of the three
+        appear here. The token is the recipient's own capability, the hash is a server-internal
+        join key, and bounce/suppression are delivery state that belongs to the outbound surface.
+      properties:
+        contact_id:
+          type: string
+          description: "`mail:{id}` while they have no account here, their GHII once they do."
+        name: { type: string }
+        email: { type: string, format: email }
+        ghii:
+          type: string
+          nullable: true
+          description: The identity this person turned out to be, once they proved the address here.
+        note: { type: string, nullable: true }
+        tags: { type: array, items: { type: string } }
+        links:
+          type: array
+          items:
+            type: object
+            properties:
+              label: { type: string }
+              url: { type: string }
+        relation: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
     AgentOnboardingRecord:
       type: object
       properties:
@@ -34961,10 +34991,15 @@ paths:
       operationId: listAddressBook
       summary: The owner's merged contact list (address book)
       description: >-
-        Explicitly saved contacts ∪ everyone the owner has exchanged direct messages with, each
-        with kind (ghii/gaii/geai), display name (resolved at read time), consent state, and
-        origin ('saved' vs 'message'). Blocked contacts are hidden unless ?state=blocked. Feeds
-        identity pickers on every grant surface (organism invites, workspace grants, app grants).
+        A PROJECTION over three sources, never a table of its own: saved identities, everyone the
+        owner has exchanged direct messages with, and saved PEOPLE (someone with no account on
+        this node). Each entry carries kind (ghii/gaii/geai/mail), the name to show (resolved at
+        read time for an identity, so it cannot go stale), the owner's own saved name and email
+        where a person record backs the row, consent state and origin ('saved' vs 'message').
+        Blocked contacts are hidden unless ?state=blocked, and a blocked identity is never
+        reinstated by the person source. Feeds identity pickers on every grant surface (organism
+        invites, workspace grants, app grants); a 'mail' contact cannot be granted anything until
+        that person joins.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -34972,11 +35007,13 @@ paths:
         - name: q
           in: query
           schema: { type: string }
-          description: Filter by id/display name (case-insensitive substring)
+          description: Filter by id, display name, saved name or email (case-insensitive substring)
         - name: state
           in: query
           schema: { type: string, enum: [pending, accepted, blocked] }
-          description: Narrow to one consent state (default hides blocked)
+          description: >-
+            Narrow to one consent state (default hides blocked). Only identities have one, so
+            passing it excludes saved people.
       responses:
         '200':
           description: Contacts
@@ -34995,24 +35032,62 @@ paths:
                             items:
                               type: object
                               properties:
-                                contact_id: { type: string }
-                                kind: { type: string, enum: [ghii, gaii, geai] }
-                                display_name: { type: string, nullable: true }
+                                contact_id:
+                                  type: string
+                                  description: An identity, or `mail:{id}` for a person with no account here.
+                                kind: { type: string, enum: [ghii, gaii, geai, mail] }
+                                display_name:
+                                  type: string
+                                  nullable: true
+                                  description: >-
+                                    The name to show. An identity's own profile name wins; a
+                                    person's is what the owner wrote.
+                                saved_name:
+                                  type: string
+                                  nullable: true
+                                  description: What the owner wrote, kept beside the profile name rather than replaced by it.
+                                email: { type: string, nullable: true }
+                                note: { type: string, nullable: true }
+                                tags: { type: array, items: { type: string } }
+                                links:
+                                  type: array
+                                  items:
+                                    type: object
+                                    properties:
+                                      label: { type: string }
+                                      url: { type: string }
+                                relation:
+                                  type: string
+                                  nullable: true
+                                  description: The owner's own word for the relationship. No vocabulary is imposed.
                                 state: { type: string, nullable: true, enum: [pending, accepted, blocked, null] }
                                 origin: { type: string, enum: [message, saved] }
                                 has_messages: { type: boolean }
                                 created_at: { type: string, nullable: true }
                                 updated_at: { type: string, nullable: true }
                           total: { type: integer }
+                          truncated:
+                            type: boolean
+                            description: >-
+                              True when saved people were left out because there are more than the
+                              projection folds. Reported rather than applied silently.
         '401':
           $ref: '#/components/responses/Unauthorized'
     post:
       operationId: addContact
       summary: Save a contact to the address book
       description: >-
-        Save an identity to the owner's contact list (state accepted, origin 'saved'). Accepts a
-        bare local owner name, a GHII, a GAII, or a GEAI. 409 BLOCKED when the contact is blocked
-        (lift the block via the Messages flow first); 404 OWNER_NOT_FOUND for an unknown local owner.
+        Save a contact in one of two shapes. An IDENTITY: pass `contact_id` (a bare local owner
+        name, a GHII, a GAII or a GEAI) and the row is saved with state accepted, origin 'saved'.
+        A PERSON with no account on this node: pass `name` + `email`, plus anything else the owner
+        knows. If that address already belongs to a verified account here, the entry IS that
+        identity from the start; if it comes to belong to one later, the entry becomes that person
+        automatically and nothing the owner wrote is lost.
+
+        400 INVALID_INPUT for a malformed identity (an email address given as `contact_id` says so
+        and points at the person shape), 404 for a local identity that does not exist, 409 BLOCKED
+        when the contact — or the account behind the address — is blocked. The block is checked
+        before anything is written.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -35022,16 +35097,99 @@ paths:
           application/json:
             schema:
               type: object
-              required: [contact_id]
               properties:
-                contact_id: { type: string, description: Bare local owner name, owner@node, agent#owner@node, or eco:app#owner@node }
+                contact_id: { type: string, description: "An identity: bare local owner name, owner@node, agent#owner@node, or eco:app#owner@node. Omit when saving a person." }
+                name: { type: string, maxLength: 140, description: "A person's name, as the owner would write it. Required with email." }
+                email: { type: string, format: email, description: "A person's email address. Required with name, and what links them to an account if they join later." }
+                note: { type: string, maxLength: 1000 }
+                tags: { type: array, items: { type: string } }
+                links:
+                  type: array
+                  description: Where else this person is. Non-http(s) entries are dropped.
+                  items:
+                    type: object
+                    required: [url]
+                    properties:
+                      label: { type: string }
+                      url: { type: string }
+                relation: { type: string, maxLength: 40, description: "The owner's own word for the relationship." }
       responses:
-        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '201':
+          description: Saved
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          contact_id: { type: string }
+                          kind: { type: string, enum: [ghii, gaii, geai, mail] }
+                          contact:
+                            allOf: [{ $ref: '#/components/schemas/ContactConsentRecord' }]
+                            nullable: true
+                            description: The consent row, when the contact is an identity.
+                          person:
+                            allOf: [{ $ref: '#/components/schemas/AddressBookPerson' }]
+                            nullable: true
+                            description: The saved person, when the contact is one.
         '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
   /v1/contacts/{contactId}:
+    patch:
+      operationId: updateAddressBookPerson
+      summary: Edit what the owner knows about a saved person
+      description: >-
+        Updates the owner's own card: name, note, tags, links and relation. Reached by the
+        person's contact id, whether that is a `mail:` id or the identity they have since been
+        linked to. Never touches opt-out, bounce or suppression — that is the recipient's
+        delivery state, and a card edit that could clear an opt-out would turn fixing a typo into
+        a way to resume mailing someone who asked you to stop. The address is not editable here.
+        Absent and not-yours answer identically (404).
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 140 }
+                note: { type: string, nullable: true, maxLength: 1000 }
+                tags: { type: array, items: { type: string } }
+                links:
+                  type: array
+                  items:
+                    type: object
+                    required: [url]
+                    properties:
+                      label: { type: string }
+                      url: { type: string }
+                relation: { type: string, nullable: true, maxLength: 40 }
+      responses:
+        '200':
+          description: The updated person
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          person: { $ref: '#/components/schemas/AddressBookPerson' }
+        '404': { $ref: '#/components/responses/NotFound' }
     delete:
       operationId: removeContact
       summary: Remove a contact from the address book
@@ -35039,6 +35197,8 @@ paths:
         Removes the 'saved' mark WITHOUT resetting the direct-message first-contact gate — a
         contact with message history keeps its messaging state (origin flips back to 'message');
         a pure saved contact with no history is deleted. Blocked contacts are managed in Messages (409).
+        Removing a saved person deletes what the owner wrote about them; the append-only outbound
+        send log is untouched, so what already left the node stays answerable.
       tags: [Contacts]
       security:
         - BearerAuth: []
@@ -35048,6 +35208,119 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/contacts/handles:
+    post:
+      operationId: mintContactHandle
+      summary: Hand an app ONE contact, without handing it the address book
+      description: >-
+        The picker's half of "an app may write to one person". Called by the apex picker page
+        (`/contact-picker.html`) after the OWNER chose somebody, with the origin of the app that
+        opened it. That origin is resolved to a published app by the same binding the silent SSO
+        bridge uses, so an app cannot name a different one, and the chosen contact is re-read from
+        this owner's own address book, so a handle cannot be minted for a contact they do not have.
+
+        What comes back is a handle plus a label and how the node would reach them. The address,
+        the contact id and the owner's own notes stay on this side — the projection is the gate, not
+        the scope. A contact with no saved address is refused (422) rather than offered, because the
+        spend would refuse it.
+
+        The handle lasts ten minutes, is reusable within that window, and is cancelled by removing
+        the contact. It is held in the node's memory and does not survive a restart: it is a choice,
+        not a credential. Anything an app must hold across restarts is a grant.
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_id, app_origin]
+              properties:
+                contact_id: { type: string, description: The contact the owner chose, from GET /v1/contacts. }
+                app_origin: { type: string, description: The origin of the app that opened the picker. }
+      responses:
+        '201':
+          description: The handle
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          handle: { type: string }
+                          app: { type: string, description: The app grant target the handle is bound to. }
+                          contact:
+                            type: object
+                            properties:
+                              label: { type: string }
+                              kind: { type: string, enum: [ghii, gaii, geai, mail] }
+                              reachable:
+                                type: array
+                                items: { type: string, enum: [inbox, email] }
+                                description: How the NODE would reach them, not what the record holds.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /v1/contacts/handle/send:
+    post:
+      operationId: sendToContactHandle
+      summary: Spend a contact handle — the node sends, the app never sees the address
+      description: >-
+        The app's half. This is the outbound door with a handle in front of it rather than a second
+        way out: opt-out, suppression, the rolling daily ceiling and the append-only send log all
+        apply unchanged, and the channel is chosen the same way (an AIMEAT inbox when the person has
+        an identity here, email otherwise).
+
+        Both bindings on the handle are proven, not just its existence: it must have been minted for
+        THIS owner and for THIS app. A handle that fails either answers 403 the same way an unknown
+        one does. Requires `outbound:send` — sending on someone's behalf is exactly that favour.
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [handle, subject, body]
+              properties:
+                handle: { type: string }
+                subject: { type: string, maxLength: 300 }
+                body: { type: string, maxLength: 20000 }
+                kind:
+                  type: string
+                  enum: [transactional, marketing]
+                  description: >-
+                    Defaults to transactional. Marketing carries the unsubscribe link and is
+                    refused for a recipient who has opted out.
+      responses:
+        '200':
+          description: Sent (or logged with the outcome)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          channel: { type: string, enum: [inbox, email] }
+                          status: { type: string, enum: [sent, failed, suppressed, skipped] }
+                          message_id: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
 
   /v1/contacts/resolve:
     post:

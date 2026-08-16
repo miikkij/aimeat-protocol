@@ -610,7 +610,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     }
     const membership = await storage.getMembership(id, callerGhii);
     if (!membership || membership.status !== 'invited') {
-      res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have no pending invitation to this organism'));
+      res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have not been invited to this space. Ask somebody who is already in it to invite you.'));
       return;
     }
     // Shared accept core: activates the row, syncs members/admins, applies invite-time ws grants.

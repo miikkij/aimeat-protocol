@@ -10,6 +10,9 @@
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 11).
  *   v2.0.0 — 2026-07-20 — Server-only cutover: drop "Import from AIMEAT" (offline server→local import);
  *     the create flow publishes then parks so a new app lands unlisted.
+ *   v2.1.0 — 2026-08-17 — deleteServerApp reports its outcome (true only when the node confirmed)
+ *     and names the app rather than the file when the caller knows the name, so the detail view and
+ *     the card menu can route their Delete here instead of dropping a page-session record.
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
@@ -1089,25 +1092,31 @@ function toggleForkApp(filename, forkable) {
     .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
 }
 
-async function deleteServerApp(filename) {
-  if (!(await showConfirm(t('confirm.deleteFromServer').replace('{file}', function () { return filename; })))) return;
+// The ONE place an app is deleted from the node. `label` is what the confirmation names — the detail
+// view knows the app's name, a card knows only its filename. Resolves true only when the server
+// confirmed the delete, so a caller can close its view on success and keep it open on failure.
+async function deleteServerApp(filename, label) {
+  if (!(await showConfirm(t('confirm.deleteFromServer').replace('{file}', function () { return label || filename; })))) return false;
   var config = loadConfig();
   var aimeatUrl = config.aimeatUrl.replace(/\/+$/, '');
   var token = getCortexOwnerToken();
-  if (!token) { showNotice('You must be logged in to delete apps. Sign in first.'); return; }
-  fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
-    method: 'DELETE',
-    headers: { 'Authorization': 'Bearer ' + token }
-  })
-    .then(function(resp) { return resp.json(); })
-    .then(function(json) {
-      if (json.ok) {
-        loadPublishedApps();
-      } else {
-        showNotice('Failed to delete: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
-      }
-    })
-    .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
+  if (!token) { showNotice('You must be logged in to delete apps. Sign in first.'); return false; }
+  try {
+    var resp = await fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
+      method: 'DELETE',
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    var json = await resp.json();
+    if (!json.ok) {
+      showNotice('Failed to delete: ' + (json.error && json.error.message ? json.error.message : 'Unknown error'));
+      return false;
+    }
+    loadPublishedApps();
+    return true;
+  } catch (err) {
+    showNotice('Error: ' + (err.message || err));
+    return false;
+  }
 }
 
 export {

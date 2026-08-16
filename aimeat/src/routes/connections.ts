@@ -269,7 +269,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     const key = requireEncryptionKey(config);
     if (!key) {
       return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY',
-        'this node cannot store secrets: no encryption key is configured'));
+        'This node is not set up to keep secrets safely yet. Whoever runs it can switch that on.'));
     }
 
     const stored = await storage.upsertPrincipalProviderClient({
@@ -513,7 +513,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     if (storageKey) {
       const stored = await storage.getStorageFile(principal, storageKey);
       if (!stored) {
-        res.status(404).json(error(config.nodeId, 'NO_SUCH_FILE', `you have no stored file named '${storageKey}'`));
+        res.status(404).json(error(config.nodeId, 'NO_SUCH_FILE', `You have no file saved under "${storageKey}". Check the name, or upload it first.`));
         return;
       }
       file = { bytes: stored.data, mimeType: stored.mimeType, name: storageKey.split('/').pop() ?? storageKey };

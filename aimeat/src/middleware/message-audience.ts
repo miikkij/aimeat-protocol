@@ -88,6 +88,10 @@ const AUDIENCE_PATTERNS: ReadonlyArray<readonly [RegExp, MessageAudience]> = [
     // The caller named something that is not there, or sent something the parser cannot use.
     [/_NOT_FOUND$|^NOT_FOUND_|_MISMATCH$|^MISSING_|_MALFORMED$|^MALFORMED_/, 'machine'],
     [/^INVALID_/, 'machine'],
+    // OAuth answers a CLIENT PROGRAM, and the spec names these words. "response_type must be code"
+    // is addressed to whatever is implementing the flow; a person never sees it and never could act
+    // on it.
+    [/^UNSUPPORTED_/, 'machine'],
     // Something broke rather than refused.
     [/_FAILED$|_ERROR$|_TIMEOUT$|^NO_ENCRYPTION|_UNAVAILABLE$/, 'ours'],
 ];

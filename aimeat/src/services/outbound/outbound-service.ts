@@ -19,6 +19,11 @@
  * @structure OutboundError · ensureContact · recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   v1.2.0 — 2026-08-17 — TARGET-063. ensureContact stamps `emailHash` (so a person who verifies
+ *     this address later can be found) and accepts the address-book fields links/relation. The
+ *     identity lookup now calls storage.getGHIIByEmailHash directly instead of going through
+ *     services/contacts.ts: the address book has to be able to CREATE a contact, and an edge in
+ *     both directions between those two modules is an import cycle.
  *   v1.1.0 — 2026-08-07 — A company's own SMTP sender is resolved BEFORE the email-enabled
  *     guard, so a company that brings its own server is not blocked by the node's being off.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
@@ -26,9 +31,9 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
-import type { OutboundContactRecord, OutboundKind, OutboundMessageRecord, OutboundStatus, OutboundChannel } from '../../models/outbound-schemas.js';
+import type { OutboundContactRecord, OutboundContactLink, OutboundKind, OutboundMessageRecord, OutboundStatus, OutboundChannel } from '../../models/outbound-schemas.js';
 import { getActiveEmailService, type EmailAttachment } from '../email.js';
-import { resolveContactEmail } from '../contacts.js';
+import { inviteEmailHash } from '../invitations.js';
 import { sendDirectMessage } from '../message-send.js';
 import { outboundEmailHtml } from '../email-templates.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -52,6 +57,42 @@ export interface ContactInput {
   email: string;
   tags?: string[];
   notes?: string | null;
+  /** Address-book only: where else this person is. Ignored by every send path. */
+  links?: OutboundContactLink[];
+  /** Address-book only: the owner's own word for the relationship. */
+  relation?: string | null;
+}
+
+/** A contact is a card, not a document. An unbounded field on a row a granted app can write is a
+ *  storage hole, so the caps live here rather than in whichever caller happened to think of them. */
+const MAX_LINKS = 12;
+const MAX_LINK_LABEL = 60;
+const MAX_LINK_URL = 500;
+const MAX_RELATION = 40;
+
+/** Keep only links that are actually addressable, and cap what a caller can store. */
+function normalizeLinks(raw: OutboundContactLink[] | undefined): OutboundContactLink[] {
+  if (!Array.isArray(raw)) return [];
+  const out: OutboundContactLink[] = [];
+  for (const l of raw) {
+    if (!l || typeof l.url !== 'string') continue;
+    const url = l.url.trim();
+    // http(s) only. A contact link is rendered as an anchor on every surface that shows the
+    // address book, so javascript: and data: would be an XSS vector on all of them at once.
+    if (!/^https?:\/\//i.test(url)) continue;
+    out.push({
+      label: (typeof l.label === 'string' && l.label.trim() ? l.label.trim() : url).slice(0, MAX_LINK_LABEL),
+      url: url.slice(0, MAX_LINK_URL),
+    });
+    if (out.length >= MAX_LINKS) break;
+  }
+  return out;
+}
+
+/** Trim the owner's own word for a relationship, or drop it. */
+function normalizeRelation(raw: string | null | undefined): string | null {
+  if (raw === null || raw === undefined) return null;
+  return String(raw).trim().slice(0, MAX_RELATION) || null;
 }
 
 /** Creates or returns the owner's contact for an email (one entry per owner per address). */
@@ -64,19 +105,23 @@ export async function ensureContact(storage: Storage, ownerGhii: string, input: 
   const existing = await storage.findOutboundContactByEmail(ownerGhii, email);
   if (existing) return existing;
 
-  // Does this address belong to a registered AIMEAT identity here? (privacy-preserving hash)
-  let ghii: string | null = null;
-  try {
-    const resolved = await resolveContactEmail(storage, email);
-    if (resolved.found) ghii = resolved.ghii;
-    // eslint-disable-next-line aimeat/no-silent-catch -- resolveContactEmail throws on its stricter email regex; unresolvable just means "no AIMEAT identity" (a normal outcome: plain email contact)
-  } catch { /* no AIMEAT identity for this address */ }
+  // Does this address belong to a registered AIMEAT identity here? Same privacy-preserving hash
+  // the invite flow and /v1/contacts/resolve use, and it is STORED on the row so the reverse
+  // question ("has anyone just proven this address") can be asked later without the address
+  // itself sitting anywhere that could be scanned.
+  const emailHash = inviteEmailHash(email);
+  const identity = await storage.getGHIIByEmailHash(emailHash);
+  // Only a PROVEN address resolves. An account that merely claimed one must not start receiving
+  // another person's mail in its AIMEAT inbox.
+  const ghii = identity?.emailVerifiedAt ? identity.ghii : null;
 
   const now = new Date().toISOString();
   const record: OutboundContactRecord = {
     id: randomUUID(), ownerGhii,
-    name: input.name.trim().slice(0, 140), email,
+    name: input.name.trim().slice(0, 140), email, emailHash,
     ghii, tags: (input.tags ?? []).slice(0, 20),
+    links: normalizeLinks(input.links),
+    relation: normalizeRelation(input.relation),
     optedOut: false, optOutAt: null,
     optOutToken: randomBytes(24).toString('base64url'),
     bounceCount: 0, suppressedAt: null,
@@ -85,6 +130,31 @@ export async function ensureContact(storage: Storage, ownerGhii: string, input: 
   };
   await storage.createOutboundContact(record);
   return record;
+}
+
+/**
+ * Update the address-book half of a contact: what the OWNER knows about this person.
+ *
+ * The send half (opt-out, bounce count, suppression) is deliberately unreachable from here. That
+ * state belongs to the recipient, not to the owner's note about them, and a card edit that could
+ * clear an opt-out would turn "fix a typo in a name" into a way to resume mailing someone who
+ * asked you to stop.
+ */
+export async function updateContactCard(
+  storage: Storage, contact: OutboundContactRecord,
+  patch: { name?: string; notes?: string | null; tags?: string[]; links?: OutboundContactLink[]; relation?: string | null },
+): Promise<OutboundContactRecord> {
+  const updated: OutboundContactRecord = {
+    ...contact,
+    name: patch.name && patch.name.trim() ? patch.name.trim().slice(0, 140) : contact.name,
+    notes: patch.notes === undefined ? contact.notes : (patch.notes ?? null),
+    tags: patch.tags === undefined ? contact.tags : patch.tags.slice(0, 20),
+    links: patch.links === undefined ? contact.links : normalizeLinks(patch.links),
+    relation: patch.relation === undefined ? contact.relation : normalizeRelation(patch.relation),
+    updatedAt: new Date().toISOString(),
+  };
+  await storage.updateOutboundContact(updated);
+  return updated;
 }
 
 /** Owner asserts ownership; absent and not-yours answer identically (404). */

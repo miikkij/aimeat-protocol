@@ -330,6 +330,31 @@ export interface UsageRollupState {
   updatedAt: string;
 }
 
+/** Per-owner "what has happened" window. Its own system, not a memory record. */
+export interface AccountEvent {
+  id: string;
+  ownerGhii: string;
+  at: string;
+  kind: string;
+  actorGaii: Generated<string>;
+  data: Generated<unknown>;
+  link: Generated<string>;
+  subject: Generated<string>;
+}
+
+/** Column-identical plus when it left the window. */
+export interface AccountEventArchive {
+  id: string;
+  ownerGhii: string;
+  at: string;
+  kind: string;
+  actorGaii: Generated<string>;
+  data: Generated<unknown>;
+  link: Generated<string>;
+  subject: Generated<string>;
+  archivedAt: string;
+}
+
 export interface AiProvenance {
   contentHash: string | null;
   createdAt: string;
@@ -567,14 +592,17 @@ export interface OutboundContact {
   bounceCount: Generated<number>;
   createdAt: string;
   email: string;
+  emailHash: Generated<string>;
   ghii: string | null;
   id: string;
+  links: Generated<Json>;
   name: string;
   notes: string | null;
   optOutAt: string | null;
   optOutToken: string;
   optedOut: Generated<boolean>;
   ownerGhii: string;
+  relation: string | null;
   suppressedAt: string | null;
   tags: Generated<Json>;
   updatedAt: string;
@@ -1977,6 +2005,8 @@ export interface DB {
   UsageCallArchive: UsageCallArchive;
   UsageRollup: UsageRollup;
   UsageRollupState: UsageRollupState;
+  AccountEvent: AccountEvent;
+  AccountEventArchive: AccountEventArchive;
   AiProvenance: AiProvenance;
   App: App;
   AppDownload: AppDownload;

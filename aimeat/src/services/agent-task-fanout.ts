@@ -56,6 +56,8 @@ import { recordPublicActivity } from './public-activity.js';
 import { emitChange } from './event-bus.js';
 import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
 import { logger } from '../utils/logger.js';
+import { recordAccountEvent } from './account-events.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 
 interface Deps { storage: Storage; config: AimeatConfig }
 
@@ -94,6 +96,17 @@ export async function afterTaskCompleted(
         .catch(e => logger.error('switching off the open item behind a task failed', { taskId: id, error: String(e) }));
 
     emitChange('agent-tasks', actor);
+
+    // The owner's own "what has happened". Their agent finishing work is the single most ordinary
+    // thing they would want told without asking for it.
+    void recordAccountEvent(storage, {
+        ownerGhii: ownerGhiiOf(task.agentGaii),
+        kind: 'agent_task_done',
+        actorGaii: task.agentGaii,
+        subject: id,
+        link: `/v1/profile?tab=agents&task=${encodeURIComponent(id)}`,
+        data: { agent: task.agentGaii.split('#')[0], title: task.title ?? '' },
+    }, config);
 
     // Public landing feed — only when the agent published a PUBLIC deliverable (a real material).
     if (deliverableKey) {
@@ -139,6 +152,14 @@ export async function afterTaskFailed(
 ): Promise<void> {
     await recordTaskFailed(deps.storage, task.agentGaii);
     emitChange('agent-tasks', actor);
+    void recordAccountEvent(deps.storage, {
+        ownerGhii: ownerGhiiOf(task.agentGaii),
+        kind: 'agent_task_failed',
+        actorGaii: task.agentGaii,
+        subject: task.id,
+        link: `/v1/profile?tab=agents&task=${encodeURIComponent(task.id)}`,
+        data: { agent: task.agentGaii.split('#')[0], title: task.title ?? '' },
+    }, deps.config);
     getActiveWorkflowEngine()?.onTaskTerminal(task, 'failed')
         .catch(e => logger.error('workflow advance on task fail failed', { taskId: task.id, error: String(e) }));
 }

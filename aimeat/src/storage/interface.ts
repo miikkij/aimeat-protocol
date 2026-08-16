@@ -29,6 +29,7 @@ export * from './types/organisms-federation.js';
 export * from './types/agents-messaging.js';
 export * from './types/ai-provenance.js';
 export * from './types/usage.js';
+export * from './types/account-events.js';
 
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
@@ -81,6 +82,7 @@ import type { SharingGroupRepository } from './repositories/sharing-group.reposi
 import type { AgentActivityRepository } from './repositories/agent-activity.repository.js';
 import type { AgentUsageRepository } from './repositories/agent-usage.repository.js';
 import type { UsageRepository } from './repositories/usage.repository.js';
+import type { AccountEventRepository } from './repositories/account-event.repository.js';
 export type { UsageFoldCursor } from './repositories/usage.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
 import type { DirectMessageRepository } from './repositories/direct-message.repository.js';
@@ -114,6 +116,7 @@ export interface Storage extends
   AgentTaskRepository, AgentDirectivesRepository, SharingGroupRepository, AgentActivityRepository,
   AgentUsageRepository,
   UsageRepository,
+  AccountEventRepository,
   AgentMessageRepository,
   DirectMessageRepository,
   AgentTelemetryRepository, AgentWebhookRepository,

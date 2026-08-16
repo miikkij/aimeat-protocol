@@ -403,6 +403,15 @@ export interface AimeatConfig extends AiCapabilityConfig {
   // Consent Layer (Phase 0.3)
   consentEnabled: boolean;
   consentAuditRetentionDays: number;
+  /**
+   * How many events stay in an account's "what has happened" window before the oldest move to the
+   * archive. A COUNT rather than a number of days: recency is relative to how much happens to
+   * someone, so a quiet account keeps a year and a busy one keeps a week — which is what the word
+   * means to the person reading it. Nothing is lost either way; the overflow is archived, not
+   * deleted. Operator-settable because a personal node and a busy multi-tenant one want different
+   * answers, and the cost is a row count per owner that an operator can see.
+   */
+  accountEventWindow: number;
   executionLogRetentionDays: number;
   consentMaxPerUser: number;
 

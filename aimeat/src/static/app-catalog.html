@@ -3352,6 +3352,7 @@
       "detail.aiUsage": "AI spend today",
       "detail.aiTruncated": "App is large; only part of it was sent to the AI.",
       "detail.actions": "Actions",
+      "detail.deleteHint": "Removes the app and all its versions from the server. You cannot undo this.",
       "detail.setScreenshot": "Set screenshot",
       "detail.refreshScreenshot": "New screenshot",
       "detail.publish": "🚀 Publish",
@@ -3964,6 +3965,7 @@
       "detail.aiUsage": "Tekoälykulutus tänään",
       "detail.aiTruncated": "Sovellus on suuri; vain osa siitä lähetettiin tekoälylle.",
       "detail.actions": "Toiminnot",
+      "detail.deleteHint": "Poistaa sovelluksen ja kaikki sen versiot palvelimelta. Tätä ei voi perua.",
       "detail.setScreenshot": "Aseta kuvakaappaus",
       "detail.refreshScreenshot": "Ota uusi kuvakaappaus",
       "detail.publish": "🚀 Julkaise",
@@ -6330,8 +6332,9 @@
   var getOwnProtection;
   var setIframeUrl;
   var isOperatorSession;
+  var deleteServerApp;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder: openPromptBuilder2, showPublishModal, getMainApps, getServerState, getServerManifests: getServerManifests2, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder: openPromptBuilder2, showPublishModal, getMainApps, getServerState, getServerManifests: getServerManifests2, getOwnProtection, setIframeUrl, isOperatorSession, deleteServerApp } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -6395,7 +6398,10 @@
     return '<div class="dtl-section"><h3>' + t("detail.serverMgmt") + '</h3><div class="dtl-btn-row">' + (svrState.parked ? dtlBtn(t("card.unpark"), "window._launcher.toggleParkApp('" + fnArg + "', false)", { title: t("card.unparkHint") }) : dtlBtn(t("card.park"), "window._launcher.toggleParkApp('" + fnArg + "', true)", { title: t("card.parkHint") })) + dtlBtn(t(svrState.forkable ? "card.forkableOn" : "card.forkableOff"), "window._launcher.toggleForkApp('" + fnArg + "', " + (svrState.forkable ? "false" : "true") + ")", { title: t(svrState.forkable ? "card.forkableOnHint" : "card.forkableOffHint") }) + dtlBtn(acLabel, "window._launcher.detailAccessCodeEdit()", { title: t("detail.accessCodeHint") }) + dtlBtn(anyProt ? "🛡✓ " + t("card.protect") : t("card.protect"), "window._launcher.showProtectionModal('" + fnArg + "')", { title: t("card.protectHint") }) + dtlBtn(t("card.versions"), "window._launcher.showVersionsModal('" + ownerArg2 + "', '" + fnArg + "')") + // Who did I grant access to this app (H-2 app-grant consents): owner-level, any owner.
     dtlBtn(t("card.consents"), "window._launcher.openConsents('" + ownerArg2 + "', '" + fnArg + "', '" + jsArg(app.name || app.publishedFilename) + "')", { title: t("card.consentsHint") }) + // Manual subdomain assignment is operator-only (/v1/admin/subdomains); auto-assign covers
     // everyone else, so only show this to operators.
-    (isOperatorSession && isOperatorSession() ? dtlBtn(t("card.subdomain"), "window._launcher.showSubdomainModal('" + ownerArg2 + "', '" + fnArg + "')", { title: t("card.subdomainHint") }) : "") + dtlBtn(t("card.removeServer"), "window._launcher.deleteServerApp('" + fnArg + "')", { variant: "danger" }) + "</div>" + acEditor + "</div>";
+    (isOperatorSession && isOperatorSession() ? dtlBtn(t("card.subdomain"), "window._launcher.showSubdomainModal('" + ownerArg2 + "', '" + fnArg + "')", { title: t("card.subdomainHint") }) : "") + // "Remove from server" used to sit here next to a local-only Delete in Actions. Since the
+    // server-only cutover both mean the same thing, so this row keeps the park/protect/versions
+    // controls and Delete under Actions is the single door out.
+    "</div>" + acEditor + "</div>";
   }
   function refreshServerMgmt() {
     var c = document.getElementById("detail-server-mgmt");
@@ -6589,7 +6595,10 @@
     }
     var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><p class="dtl-desc">' + t("versions.publishedHint") + '</p><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
     var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
-    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger" }) + "</div></div>";
+    var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + // Offered only where it can do something: our own published app (deleted on the node) or a
+    // record that was never published. Someone else's published app is not ours to delete, and
+    // the button used to appear there and close the view having changed nothing.
+    (detailIsOwnPublished(app) || !app.published ? dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger", title: t("detail.deleteHint") }) : "") + "</div></div>";
     var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
     var skillsHtml = "";
     if (app.published) {
@@ -7798,15 +7807,22 @@
   async function detailDelete() {
     var app = detailGetApp();
     if (!app) return;
+    var id = app.id;
+    if (detailIsOwnPublished(app)) {
+      var removed = await deleteServerApp(app.publishedFilename, app.name || app.publishedFilename);
+      if (!removed) return;
+      await deleteApp(id);
+      closeDetailView();
+      renderApps();
+      return;
+    }
     if (!await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
       return app.name || "this app";
     }))) return;
-    var id = app.id;
-    deleteApp(id).then(function() {
-      closeDetailView();
-      renderApps();
-      loadPublishedApps();
-    });
+    await deleteApp(id);
+    closeDetailView();
+    renderApps();
+    loadPublishedApps();
   }
   function openPublishedDetail(owner, filename, localId, versionNumber) {
     if (localId) {
@@ -9499,31 +9515,33 @@
       showNotice("Error: " + (err.message || err));
     });
   }
-  async function deleteServerApp(filename) {
+  async function deleteServerApp2(filename, label) {
     if (!await showConfirm(t("confirm.deleteFromServer").replace("{file}", function() {
-      return filename;
-    }))) return;
+      return label || filename;
+    }))) return false;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
     var token = getCortexOwnerToken();
     if (!token) {
       showNotice("You must be logged in to delete apps. Sign in first.");
-      return;
+      return false;
     }
-    fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
-      method: "DELETE",
-      headers: { "Authorization": "Bearer " + token }
-    }).then(function(resp) {
-      return resp.json();
-    }).then(function(json) {
-      if (json.ok) {
-        loadPublishedApps2();
-      } else {
+    try {
+      var resp = await fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
+        method: "DELETE",
+        headers: { "Authorization": "Bearer " + token }
+      });
+      var json = await resp.json();
+      if (!json.ok) {
         showNotice("Failed to delete: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
+        return false;
       }
-    }).catch(function(err) {
+      loadPublishedApps2();
+      return true;
+    } catch (err) {
       showNotice("Error: " + (err.message || err));
-    });
+      return false;
+    }
   }
 
   // src/static/app-catalog/js/render.js
@@ -9933,6 +9951,13 @@
         viewSource2(app);
         break;
       case "delete":
+        if (app.published && app.publishedFilename && serverStateByFilename[app.publishedFilename]) {
+          if (await deleteServerApp2(app.publishedFilename, app.name || app.publishedFilename)) {
+            await deleteApp(appId);
+            renderApps4();
+          }
+          break;
+        }
         if (await showConfirm(t("confirm.deleteApp").replace("{name}", function() {
           return app.name || "this app";
         }))) {
@@ -10220,7 +10245,7 @@
     toggleCommunity,
     switchView,
     unpublishApp,
-    deleteServerApp,
+    deleteServerApp: deleteServerApp2,
     toggleParkApp,
     toggleForkApp,
     detailAboutEdit,
@@ -10346,7 +10371,8 @@
         return ownAppProtection;
       },
       setIframeUrl: setIframeUrl2,
-      isOperatorSession: isOperatorSession2
+      isOperatorSession: isOperatorSession2,
+      deleteServerApp: deleteServerApp2
     });
     initAppAgents({ getServerManifests: function() {
       return serverAppManifests;

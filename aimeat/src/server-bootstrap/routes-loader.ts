@@ -9,9 +9,6 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
- *   v1.9.0 — 2026-08-17 — Mount metricsMiddleware when the registry exists: the per-request
- *     HTTP counter/histogram middleware had been written and exported but never wired, so
- *     aimeat_http_requests_total stayed at zero samples on every metrics-enabled node.
  *   v1.8.0 — 2026-08-16 — backfillExtensionJobOwnerScope() runs before scheduler.start(), so a job
  *     stored before its owner scope was stamped is repaired before the @activate wave reads it.
  *   v1.7.0 — 2026-07-28 — Drop the enterprise-edition seam (single edition): the Stripe and invoice
@@ -222,7 +219,6 @@ import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
-import { metricsMiddleware } from '../middleware/metrics.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
 import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.js';
 
@@ -294,14 +290,10 @@ export async function mountRoutes(
     }
   });
 
-  // Prometheus metrics registry (opt-in). The per-request middleware mounts HERE,
-  // before any route, or the aimeat_http_requests_total counter and the duration
-  // histogram never increment: metricsMiddleware existed unmounted from 2026-07-13
-  // to 2026-08-17, so /v1/metrics served zero HTTP samples on every node.
+  // Prometheus metrics registry (opt-in)
   const metricsRegistry = config.metricsEnabled
     ? createMetricsRegistry(config)
     : undefined;
-  if (metricsRegistry) app.use(metricsMiddleware(metricsRegistry));
 
   // Presigned upload endpoint (raw body — no JSON parsing needed)
   app.use(uploadRouter(config, storage));

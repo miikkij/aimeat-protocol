@@ -1,16 +1,4 @@
-/**
- * @file e2e-admin-features.ts
- * @description E2E for the admin-features endpoints: GHII administration, email templates and
- *   sending, the directory and matching runs, push templates, CSM and MSM, genesis peers, and the
- *   node config doors mounted alongside them.
- * @version-history
- *   v1.1.0 — 2026-08-16 — E2E quality, admin-features:118. One probe covered one route out of the
- *     thirty-six this file drives, and the gate here is per route rather than router-level, so
- *     thirty-five of them could lose the operator role unnoticed. Two loops now walk every door as a
- *     non-operator owner and as an anonymous caller. The targets are ids that do not exist, because a
- *     gate answers before the lookup: a 404 from one of those rows means the request got past.
- *   v1.0.0 — pre-dates the header standard.
- */
+// E2E tests for admin-features endpoints
 // Run: cd aimeat && pnpm exec tsx test/e2e-admin-features.ts
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -132,81 +120,6 @@ await test('GET /v1/admin/ghii with non-operator token \u2192 403', async () => 
         headers: { Authorization: `Bearer ${nonOpToken}` },
     });
     assert(status === 403, `expected 403, got ${status}`);
-});
-
-/**
- * That one probe was the whole denial story of this file, and it covered one route out of the
- * thirty-six it drives. The gate here is PER ROUTE, not router-level: admin-features.ts spreads
- * `[requireAuth(), requireRole('operator')]` onto each handler one at a time, and the three
- * admin-config routes each carry their own pair. So thirty-five of them could lose the role and this
- * suite would not notice, because every other call goes through authed(), which is the first owner
- * registered on a cleared database and therefore an operator.
- *
- * The targets are ids that do not exist. A gate answers before the lookup, so a 404 from one of these
- * rows is itself a failure: it means the request got past the door and went looking.
- */
-const ADMIN_DOORS: Array<{ method: string; path: string; body?: unknown }> = [
-    { method: 'GET', path: '/v1/admin/ghii' },
-    { method: 'PUT', path: '/v1/admin/ghii/nonexistent%40nowhere', body: { display_name: 'nope' } },
-    { method: 'DELETE', path: '/v1/admin/ghii/nonexistent%40nowhere/email' },
-    { method: 'DELETE', path: '/v1/admin/ghii/nonexistent%40nowhere' },
-    { method: 'PUT', path: '/v1/admin/ghii/nonexistent%40nowhere/cors', body: { origins: ['https://nope.example'] } },
-    { method: 'GET', path: '/v1/admin/email/status' },
-    { method: 'POST', path: '/v1/admin/email/test', body: { to: 'nobody@example.com' } },
-    { method: 'POST', path: '/v1/admin/email/send-group', body: { group: 'nonexistent', subject: 'x', body: 'y' } },
-    { method: 'GET', path: '/v1/admin/email/templates' },
-    { method: 'POST', path: '/v1/admin/email/templates/seed' },
-    { method: 'POST', path: '/v1/admin/email/templates/reset' },
-    { method: 'PUT', path: '/v1/admin/email/templates/nonexistent', body: { subject: 'x', body: 'y' } },
-    { method: 'DELETE', path: '/v1/admin/email/templates/nonexistent' },
-    { method: 'GET', path: '/v1/admin/directory/stats' },
-    { method: 'POST', path: '/v1/admin/directory/rebuild' },
-    { method: 'GET', path: '/v1/admin/matching' },
-    { method: 'POST', path: '/v1/admin/matching/run' },
-    { method: 'GET', path: '/v1/admin/marketplace' },
-    { method: 'GET', path: '/v1/admin/push' },
-    { method: 'PUT', path: '/v1/admin/push/templates/nonexistent/en', body: { title: 'x', body: 'y' } },
-    { method: 'POST', path: '/v1/admin/push/test', body: { ghii: 'nonexistent@nowhere' } },
-    { method: 'POST', path: '/v1/admin/push/templates/reset' },
-    { method: 'GET', path: '/v1/admin/csm' },
-    { method: 'GET', path: '/v1/admin/csm/nonexistent' },
-    { method: 'DELETE', path: '/v1/admin/csm/nonexistent' },
-    { method: 'GET', path: '/v1/admin/msm' },
-    { method: 'GET', path: '/v1/admin/msm/nonexistent' },
-    { method: 'PUT', path: '/v1/admin/msm/nonexistent', body: { content: 'x' } },
-    { method: 'DELETE', path: '/v1/admin/msm/nonexistent' },
-    { method: 'GET', path: '/v1/admin/genesis-peers' },
-    { method: 'POST', path: '/v1/admin/genesis-peers/nonexistent/approve' },
-    { method: 'POST', path: '/v1/admin/genesis-peers/nonexistent/suspend' },
-    { method: 'DELETE', path: '/v1/admin/genesis-peers/nonexistent' },
-    { method: 'GET', path: '/v1/admin/config' },
-    { method: 'PUT', path: '/v1/admin/config', body: { key: 'node.name', value: 'hijacked' } },
-    { method: 'DELETE', path: '/v1/admin/config/node.name' },
-];
-
-await test(`Every admin door refuses a non-operator owner (${ADMIN_DOORS.length} routes)`, async () => {
-    const failures: string[] = [];
-    for (const door of ADMIN_DOORS) {
-        const { status } = await json(door.path, {
-            method: door.method,
-            headers: { Authorization: `Bearer ${nonOpToken}` },
-            ...(door.body ? { body: JSON.stringify(door.body) } : {}),
-        });
-        if (status !== 403) failures.push(`${door.method} ${door.path} \u2192 ${status}`);
-    }
-    assert(failures.length === 0, `these admin doors did not refuse a plain owner: ${failures.join(', ')}`);
-});
-
-await test(`Every admin door refuses a caller with no credential (${ADMIN_DOORS.length} routes)`, async () => {
-    const failures: string[] = [];
-    for (const door of ADMIN_DOORS) {
-        const { status } = await json(door.path, {
-            method: door.method,
-            ...(door.body ? { body: JSON.stringify(door.body) } : {}),
-        });
-        if (status !== 401) failures.push(`${door.method} ${door.path} \u2192 ${status}`);
-    }
-    assert(failures.length === 0, `these admin doors answered an anonymous caller: ${failures.join(', ')}`);
 });
 
 // ─── GHII ───

@@ -4,6 +4,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.2.0 — 2026-08-17 — Account events: the per-owner "what has happened" window and its archive.
+ *     Mirrors Postgres 0042.
  *   v1.1.0 — 2026-08-14 — Usage telemetry: the hot call stream, the two archive tables, the
  *     discriminated serving rollup and its watermark. Mirrors Postgres 0036.
  *   v1.0.0 — 2026-08-06 — Finance (invoices/vouchers/VAT/fiscal years/counters) + outbound
@@ -143,8 +145,11 @@ export function applySchemaTables4(db: Database.Database): void {
       ownerGhii    TEXT NOT NULL,
       name         TEXT NOT NULL,
       email        TEXT NOT NULL,
+      emailHash    TEXT NOT NULL DEFAULT '',
       ghii         TEXT,
       tags         TEXT NOT NULL DEFAULT '[]',
+      links        TEXT NOT NULL DEFAULT '[]',
+      relation     TEXT,
       optedOut     INTEGER NOT NULL DEFAULT 0,
       optOutAt     TEXT,
       optOutToken  TEXT NOT NULL,
@@ -158,6 +163,11 @@ export function applySchemaTables4(db: Database.Database): void {
       ON outbound_contacts(ownerGhii, lower(email));
     CREATE UNIQUE INDEX IF NOT EXISTS idx_outbound_contacts_token ON outbound_contacts(optOutToken);
     CREATE INDEX IF NOT EXISTS idx_outbound_contacts_owner ON outbound_contacts(ownerGhii, createdAt);
+    -- NOTE: the index over emailHash (TARGET-063) is NOT here, and must not be. This block runs
+    -- BEFORE schema.ts adds columns to existing tables, and on an upgraded database CREATE TABLE
+    -- IF NOT EXISTS is a no-op — so an index naming a new column would reference one that does not
+    -- exist yet and kill the boot. It lives beside its safeAddColumn call instead, which is
+    -- idempotent and therefore also correct on a fresh database.
 
     -- Append-only send log (the GDPR-answerable record of what left the node). The daily
     -- limit counts rows here in SQL — a gate and a display must not drift.
@@ -233,6 +243,43 @@ export function applySchemaTables4(db: Database.Database): void {
       updatedAt   TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_company_smtp_owner ON company_smtp(ownerGhii);
+
+    -- ── Account events ────────────────────────────────────────────────────────
+    -- What has happened on one person's account, as its own system rather than as
+    -- memory records. Memory is the person's own refined knowledge; these are events
+    -- the node generated about them, and mixing the two spends their key budget on
+    -- rows they never wrote and puts machine chatter in front of their librarian.
+    -- Mirrors Postgres 0042.
+    --
+    -- The hot table holds the last 100 per owner so "what happened lately" is always
+    -- one indexed read. Overflow moves to the archive: browsable, slower by design,
+    -- and never deleted by this mechanism.
+    CREATE TABLE IF NOT EXISTS account_events (
+      id        TEXT PRIMARY KEY,
+      ownerGhii TEXT NOT NULL,
+      at        TEXT NOT NULL,
+      -- A stable key the UI translates, never a sentence: the node does not decide
+      -- which language the person reads.
+      kind      TEXT NOT NULL,
+      actorGaii TEXT NOT NULL DEFAULT '',
+      data      TEXT NOT NULL DEFAULT '{}',
+      link      TEXT NOT NULL DEFAULT '',
+      subject   TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_account_events_owner ON account_events(ownerGhii, at DESC);
+
+    CREATE TABLE IF NOT EXISTS account_events_archive (
+      id         TEXT PRIMARY KEY,
+      ownerGhii  TEXT NOT NULL,
+      at         TEXT NOT NULL,
+      kind       TEXT NOT NULL,
+      actorGaii  TEXT NOT NULL DEFAULT '',
+      data       TEXT NOT NULL DEFAULT '{}',
+      link       TEXT NOT NULL DEFAULT '',
+      subject    TEXT NOT NULL DEFAULT '',
+      archivedAt TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_account_events_archive_owner ON account_events_archive(ownerGhii, at DESC);
 
     -- ── Usage telemetry ───────────────────────────────────────────────────────
     -- Three layers, mirroring Postgres 0036. Full rationale:

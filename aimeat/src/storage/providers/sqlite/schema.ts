@@ -457,6 +457,18 @@ export function initializeSchema(db: Database.Database): void {
   // back as 'message' (they all came from the gate).
   safeAddColumn('contact_consents', 'origin', "TEXT NOT NULL DEFAULT 'message'");
 
+  // The outbound recipient registry is also the ADDRESS-BOOK entry for a person the node does not
+  // have (TARGET-063, mirrors Postgres 0041). emailHash is the promotion join key — the same hash
+  // GHII carries, so someone who verifies that address later is found without a second copy of the
+  // address existing anywhere queryable. links/relation are the owner's own knowledge of the
+  // person and mean nothing to the send path. Existing rows read back with an EMPTY hash, and an
+  // empty hash never promotes (the lookup refuses it) — the pre-existing behaviour, not a
+  // regression. The index comes after the column, or it indexes something that does not exist yet.
+  safeAddColumn('outbound_contacts', 'emailHash', "TEXT NOT NULL DEFAULT ''");
+  safeAddColumn('outbound_contacts', 'links', "TEXT NOT NULL DEFAULT '[]'");
+  safeAddColumn('outbound_contacts', 'relation', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_outbound_contacts_emailhash ON outbound_contacts(emailHash) WHERE ghii IS NULL');
+
   // ── Outbound connections: a principal may bring their OWN app (TARGET-057) ──
   //
   // Which client minted a token. A token can only be renewed by the client that issued it, so a

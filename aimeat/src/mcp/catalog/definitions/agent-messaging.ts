@@ -253,26 +253,32 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     {
         // ── Contacts (address book) — server MCP only, like the email-invite tools. ──
         name: 'aimeat_contact_list',
-        description: "The owner's merged contact list (address book): explicitly saved contacts ∪ everyone they have exchanged direct messages with, each with kind (ghii/gaii/geai), display name, consent state, and origin ('saved' vs 'message'). Use it as the identity source when granting access — pair a contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant.",
+        description: "The owner's address book: everyone they saved, everyone they have exchanged direct messages with, and every PERSON they wrote down who has no account on this node. Each entry carries kind (ghii = a person here, gaii = an agent, geai = an app, mail = a person with no account here), the name to show, their email when one is known, and origin ('saved' vs 'message'). Use it as the identity source when granting access — pair a ghii contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant. A 'mail' contact cannot be granted anything until they join; invite them with aimeat_organism_invite_email.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {
-            q: { type: 'string', description: 'Filter by id/display name (case-insensitive substring).' },
-            state: { type: 'string', enum: ['pending', 'accepted', 'blocked'], description: 'Narrow to one consent state (default hides blocked).' },
+            q: { type: 'string', description: 'Filter by id, name or email (case-insensitive substring).' },
+            state: { type: 'string', enum: ['pending', 'accepted', 'blocked'], description: 'Narrow to one consent state (default hides blocked). Only identities have one, so this excludes saved people.' },
         },
     },
     {
         name: 'aimeat_contact_add',
-        description: "Save an identity to the owner's contact list (address book). Accepts a bare local owner name, a GHII, a GAII, or a GEAI. A blocked contact stays blocked (unblock via the Messages flow first).",
+        description: "Save someone to the owner's address book, in one of two ways. An IDENTITY on some node: pass contact_id (a bare local owner name, a GHII, a GAII or a GEAI); a local one that does not exist is refused. A PERSON who has no account here: pass name + email, plus anything else the owner knows (note, tags, links, relation) — that is how you record someone they follow, someone they mean to invite, or a plain email contact. If that address later belongs to a verified account here, the entry becomes that person automatically and nothing the owner wrote is lost. A blocked contact stays blocked (unblock via the Messages flow first).",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {
-            contact_id: { type: 'string', required: true, description: 'Bare local owner name, owner@node, agent#owner@node, or eco:app#owner@node.' },
+            contact_id: { type: 'string', description: 'An identity: bare local owner name, owner@node, agent#owner@node, or eco:app#owner@node. Omit when saving a person by name + email.' },
+            name: { type: 'string', description: "A person's name, as the owner would write it. Required with email." },
+            email: { type: 'string', description: "A person's email address. Required with name. This is what links them to an account if they join later." },
+            note: { type: 'string', description: 'Anything the owner wants to remember about this person.' },
+            tags: { type: 'array', description: "The owner's own labels for this person: an array of strings." },
+            links: { type: 'array', description: 'Where else this person is: an array of { label, url }. http(s) addresses only.' },
+            relation: { type: 'string', description: "The owner's own word for the relationship (for example: following, to invite, colleague)." },
         },
     },
     {
         name: 'aimeat_contact_remove',
-        description: "Remove a contact from the owner's address book WITHOUT disturbing the direct-message first-contact gate: a contact with message history keeps its messaging state (only the 'saved' mark is dropped); a pure saved contact is deleted.",
+        description: "Remove a contact from the owner's address book WITHOUT disturbing the direct-message first-contact gate: a contact with message history keeps its messaging state (only the 'saved' mark is dropped); a pure saved contact is deleted. Removing a saved person deletes what the owner wrote about them; anything already sent to them stays in the send log.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
         input: {
