@@ -1,5 +1,7 @@
 {
   "$schema": "https://context7.com/schema/context7.json",
+  "url": "https://context7.com/miikkij/aimeat-protocol",
+  "public_key": "pk_3NQYAMkNG4423mPQKpu0K",
   "projectTitle": "AIMEAT Protocol",
   "description": "Open protocol and reference node giving AI agents persistent memory, identity, shared workspaces, skills and a usage meter over REST and MCP",
   "folders": [
