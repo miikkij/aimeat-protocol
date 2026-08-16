@@ -8782,9 +8782,14 @@ paths:
         follows them to another device; a per-tab choice would mean landing on whichever side
         happened to be the default every morning.
 
+        There are three sides: the chat, the new home, and the old profile.
+
         When nothing has been chosen, `defaulted` is true and the answer comes from the account's
-        cohort (K3): an account created on the remake lands on the home, one created before it lands
-        where it always did. Nobody's workflow changes under them.
+        cohort (K3): an account created before the remake lands where it always did, so nobody's
+        workflow changes under them. A newer account lands in the chat, which is the one place a
+        person who has connected no AI tool of their own can do something on their first visit — but
+        only on a node that HAS a chat agent. Where there is none, the new home is the answer, since
+        landing somebody in a box that can only say "no agent configured" is worse.
 
         `track` and `switched` are returned read-only, for transparency — no route here changes
         `track`.
@@ -8825,12 +8830,12 @@ paths:
               type: object
               required: [ui]
               properties:
-                ui: { type: string, enum: [home, profile] }
+                ui: { type: string, enum: [home, profile, chat] }
       responses:
         '200':
           description: The new side, where it lands, the switch count, and the UNCHANGED track
         '400':
-          description: ui must be "home" or "profile"
+          description: ui must be "home", "profile" or "chat"
         '403':
           description: Not the account holder's own session
 

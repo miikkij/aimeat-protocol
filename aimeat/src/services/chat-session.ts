@@ -20,6 +20,9 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.0.1 — 2026-08-16 — The work log keys tool calls by id rather than title. Only the opening
+ *     event carries a title, so every call stayed at "starting" no matter how it ended. Seen in a
+ *     browser against a real agent, where one completed call read as still running.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -138,16 +141,24 @@ export async function* runChatTurn(
     }
 
     const acp = await agent(config);
-    const tools: Array<{ title: string; status: string }> = [];
+    // Keyed by the call's OWN id, not its title. A tool call arrives twice — once as it starts and
+    // once as it finishes — and only the first carries a title, so matching on the title leaves
+    // every call in the log reading "starting" forever, whatever actually happened to it.
+    const tools = new Map<string, { title: string; status: string }>();
     let answer = '';
 
     try {
         for await (const update of acp.prompt(sessionId, text)) {
             if (update.kind === 'text') answer += update.text;
-            if (update.kind === 'tool_call' && update.title) {
-                const seen = tools.find((t) => t.title === update.title);
-                if (seen) seen.status = update.status;
-                else tools.push({ title: update.title, status: update.status });
+            if (update.kind === 'tool_call') {
+                const key = update.id || update.title;
+                const seen = tools.get(key);
+                if (seen) {
+                    seen.status = update.status;
+                    if (update.title) seen.title = update.title;
+                } else {
+                    tools.set(key, { title: update.title, status: update.status });
+                }
             }
             yield update;
         }
@@ -158,7 +169,7 @@ export async function* runChatTurn(
             role: 'agent',
             text: answer,
             at: new Date().toISOString(),
-            ...(tools.length ? { tools } : {}),
+            ...(tools.size ? { tools: [...tools.values()] } : {}),
         };
         await appendTurn(storage, gaii, threadId, turn).catch((e: Error) => {
             logger.warn(`[chat] could not save the agent turn: ${e.message}`);

@@ -16,6 +16,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-remake-funnel
  * @version-history
+ *   v1.1.0 — 2026-08-16 — The chat as a third side: choosing it is remembered and lands there, and
+ *     a node with no chat agent does not send a new account to one.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 0).
  */
 
@@ -297,6 +299,40 @@ await test('The funnel counts this account in the switched column', async () => 
     const remakeCohort = (body.data?.cohorts ?? []).find((c: any) => c.track === 'remake');
     assert(remakeCohort.switched >= 1,
         `the cohort's switched column counts them: ${JSON.stringify(remakeCohort.switched)}`);
+});
+
+await test('The chat is a third side, and choosing it is remembered', async () => {
+    // A person who works through the built-in agent should land there, not at the profile they only
+    // pass through. The counter treats it like any other flip.
+    const put = await json('/v1/home/ui-track', auth(tokenOp, {
+        method: 'PUT', body: JSON.stringify({ ui: 'chat' }),
+    }));
+    assert(put.status === 200, `choosing the chat ${put.status}: ${JSON.stringify(put.body.error)}`);
+    assert(put.body.data.landing === '/v1/chat', `it goes to the chat, got ${put.body.data.landing}`);
+
+    const read = await json('/v1/home/ui-track', auth(tokenOp));
+    assert(read.body.data.ui === 'chat', `and it stuck, got ${read.body.data.ui}`);
+    assert(read.body.data.defaulted === false, 'a choice is not a default');
+    assert(read.body.data.landing === '/v1/chat', `the GET agrees, got ${read.body.data.landing}`);
+
+    const after = await readTrack(tokenOp);
+    assert(after?.track === 'remake', `the cohort is still untouched, got ${after?.track}`);
+});
+
+await test('A node with no chat agent does not send a new account to one', async () => {
+    // This suite runs against a node with no agent configured, which is the point: landing somebody
+    // in a box that can only say "no agent configured" is worse than the home they would have seen.
+    // Put the operator back where the earlier tests left them first.
+    await json('/v1/home/ui-track', auth(tokenOp, { method: 'PUT', body: JSON.stringify({ ui: 'home' }) }));
+
+    const status = await json('/v1/chat/status', auth(tokenOp));
+    assert(status.body.data.enabled === false, 'setup: this node has no chat agent');
+
+    const tokenFresh = await registerOwner(`rmkfr${stamp}`);
+    const fresh = await json('/v1/home/ui-track', auth(tokenFresh));
+    assert(fresh.body.data.defaulted === true, 'setup: this account has chosen nothing');
+    assert(fresh.body.data.ui === 'home',
+        `a new account falls back to the home while there is no agent, got ${fresh.body.data.ui}`);
 });
 
 await test('FAILURE MODE: an invalid side is refused', async () => {

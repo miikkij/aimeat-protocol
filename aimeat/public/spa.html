@@ -116,6 +116,7 @@
   <link rel="stylesheet" href="/css/views/portfolio.css">
   <link rel="stylesheet" href="/css/views/members.css">
   <link rel="stylesheet" href="/css/views/inbox.css">
+  <link rel="stylesheet" href="/css/views/chat.css">
   <link rel="stylesheet" href="/css/views/glossary.css">
   <link rel="stylesheet" href="/css/components/tags.css">
   <link rel="stylesheet" href="/css/components/image-deliverable.css">
@@ -158,6 +159,7 @@
       "/js/use-session.js": "/js/use-session.js",
       "/js/services/boards.js": "/js/services/boards.js",
       "/js/services/catalogue.js": "/js/services/catalogue.js",
+      "/js/services/chat.js": "/js/services/chat.js",
       "/js/services/consent.js": "/js/services/consent.js",
       "/js/services/cortex.js": "/js/services/cortex.js",
       "/js/services/extensions.js": "/js/services/extensions.js",
@@ -430,6 +432,7 @@
       '/v1/glossary':    () => import('/views/glossary.js' + B),
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/transparency': () => import('/views/transparency.js' + B),
+      '/v1/chat':        () => import('/views/chat.js' + B),
       '/v1/profile':     () => import('/views/profile.js' + B),
       '/v1/home':        () => import('/views/home/index.js' + B),
       '/v1/app-grant':   () => import('/views/app-grant.js' + B),
@@ -810,6 +813,8 @@
                    only existed because the bar was carrying the marketing links at the same
                    time. Those links are anon-only now, so these three fit on the row. -->
               ${session && html`
+                <a href="/v1/chat" class="${currentPath === '/v1/chat' ? 'active' : ''}"
+                  onClick=${(e) => { handleNav(e, '/v1/chat'); setMenuOpen(false); }}>${t('nav.chat') || 'Chat'}</a>
                 <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)}
                   class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
                 <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}"

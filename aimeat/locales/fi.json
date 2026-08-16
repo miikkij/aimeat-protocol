@@ -687,6 +687,36 @@
     "openBtn": "Avaa sovelluskatalogi",
     "downloadBtn": "Lataa HTML"
   },
+  "chat.allowance": "Saldoa jäljellä {n} USD.",
+  "chat.backToChat": "Takaisin keskusteluun",
+  "chat.closeList": "Sulje",
+  "chat.delete": "Poista keskustelu",
+  "chat.disabledPlaceholder": "Tällä nodella ei ole vielä chat-agenttia.",
+  "chat.loadFailed": "Chatin lataaminen ei onnistunut.",
+  "chat.modelTitle": "Malli, joka vastasi tähän vuoroon",
+  "chat.new": "Uusi keskustelu",
+  "chat.noThreads": "Täällä ei ole vielä mitään. Sano jotain, niin keskustelu ilmestyy tähän.",
+  "chat.openList": "Keskustelut",
+  "chat.ownKey": "Käytössä on oma OpenRouter-avaimesi.",
+  "chat.placeholder": "Pyydä jotain tai kerro, mitä haluat rakennettavan.",
+  "chat.reset": "Nollaa sessio",
+  "chat.resetTitle": "Aloita tälle keskustelulle uusi agenttisessio. Sitä tarvitaan, kun olet muuttanut sitä, mitä agentti saa tehdä.",
+  "chat.retry": "Yritä uudelleen",
+  "chat.send": "Lähetä",
+  "chat.signIn": "Kirjaudu sisään, niin ensimmäinen agenttisi odottaa täällä.",
+  "chat.stop": "Pysäytä",
+  "chat.title": "Chat",
+  "chat.turnCount": "{n} viestiä",
+  "chat.turnFailed": "Vuoroa ei saatu vietyä loppuun.",
+  "chat.welcomeBody": "Se toimii täällä samalla tavalla kuin oma tekoälytyökalusi: samat oikeudet ja sama kirjaus siitä, mitä se teki. Pyydä siltä jotain.",
+  "chat.welcomeTitle": "Ensimmäinen agenttisi",
+  "chat.work.completed": "valmis",
+  "chat.work.failed": "epäonnistui",
+  "chat.work.in_progress": "käynnissä",
+  "chat.work.pending": "alkaa",
+  "chat.work.title": "Mitä tehtiin",
+  "chat.work.untitled": "työkalukutsu",
+  "chat.working": "Työn alla…",
   "classic": {
     "nav": {
       "devView": "Kehittäjille"
@@ -4053,6 +4083,7 @@
     "exchange": "EXCHANGE",
     "members": "Jäsenet"
   },
+  "nav.chat": "Chat",
   "nav.glossary": "Sanasto",
   "nav.members": "Jäsenet",
   "notif": {
@@ -6417,8 +6448,8 @@
             "telemetryEvents": "Telemetriatapahtumia tänään",
             "deliveryHealth": "Toimituksen tila",
             "connected": "Yhdistetty",
-            "mcpLabel": "MCP",
-            "notConfigured": "Ei määritetty"
+            "notConfigured": "Ei määritetty",
+            "mcpLabel": "MCP"
           },
           "notReported": "ei raportoitu",
           "deliveryPollingLine": "Toimitus: polling"

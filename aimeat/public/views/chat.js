@@ -1,0 +1,298 @@
+/**
+ * @file public/views/chat.js
+ * @description The chat page: the person's first agent, reachable without connecting anything.
+ *
+ *   Everything else on this node assumes a person has already wired their own AI tool to it over
+ *   MCP. This page is the door for the ones who have not, and for the ones who never will. The agent
+ *   it talks to is a real GAII principal with real scopes, so what happens here is the same work
+ *   that happens through any other client, under the same permissions, visible in the same places.
+ *
+ *   The tool calls are on screen for every turn. A chat that reports success without showing what it
+ *   did asks to be believed; this one can be checked, and that is what makes it credible as a first
+ *   agent rather than a demo.
+ * @structure
+ *   - ChatView — the page: status, conversations, one live turn
+ * @usage import ChatView from '/views/chat.js'
+ * @version-history
+ *   v1.0.1 — 2026-08-16 — The work log keys tool calls by id rather than title, so a finished call
+ *     stops reading as "starting".
+ *   v1.0.0 — 2026-08-16 — Initial.
+ */
+import { h } from 'preact';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import htm from 'htm';
+import { t } from '/js/i18n.js';
+import { hasSession } from '/js/services/auth.js';
+import { Spinner } from '/components/Spinner.js';
+import * as chat from '/js/services/chat.js';
+import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar } from './chat/parts.js';
+
+const html = htm.bind(h);
+const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+export default function ChatView() {
+    const [status, setStatus] = useState(null);
+    const [threads, setThreads] = useState([]);
+    const [thread, setThread] = useState(null);
+    const [draft, setDraft] = useState('');
+    const [busy, setBusy] = useState(false);
+    const [live, setLive] = useState({ text: '', thought: '', tools: [] });
+    const [failure, setFailure] = useState('');
+    const [loading, setLoading] = useState(true);
+    // On a phone the conversation takes the whole screen, so the list is a separate place rather
+    // than a column that would leave neither readable.
+    const [listOpen, setListOpen] = useState(false);
+
+    const abortRef = useRef(null);
+    const bottomRef = useRef(null);
+    const lastAskRef = useRef('');
+
+    const loadThreads = useCallback(async () => {
+        const res = await chat.listThreads();
+        setThreads(res?.data?.threads ?? []);
+    }, []);
+
+    const openThread = useCallback(async (id) => {
+        const res = await chat.getThread(id);
+        setThread(res?.data?.thread ?? null);
+        setFailure('');
+        setLive({ text: '', thought: '', tools: [] });
+        setListOpen(false);
+    }, []);
+
+    // First load: what this node offers, and where the person left off.
+    useEffect(() => {
+        if (!hasSession()) { setLoading(false); return; }
+        (async () => {
+            try {
+                const [st, list] = await Promise.all([chat.status(), chat.listThreads()]);
+                setStatus(st?.data ?? null);
+                const found = list?.data?.threads ?? [];
+                setThreads(found);
+                if (found.length > 0) await openThread(found[0].id);
+            } catch (err) {
+                setFailure(err.message || tr('chat.loadFailed', 'The chat could not be loaded.'));
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }, [openThread]);
+
+    // Keep the newest turn in view, the way a conversation is read.
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView({ block: 'end' });
+    }, [thread?.turns?.length, live.text, live.tools.length]);
+
+    // The on-screen keyboard, measured rather than calculated.
+    //
+    // `100dvh − keyboard` double-counts on Android Chrome, where dvh already shrinks for the
+    // keyboard, and the composer ends up floating above a dead gap. The visual viewport excludes the
+    // keyboard on every platform, so the distance from the top of the page to the bottom of it is
+    // the space there actually is. Same approach as the inbox, for the same reason.
+    useEffect(() => {
+        const vv = window.visualViewport;
+        const root = document.documentElement;
+        if (!vv) return undefined;
+        const sync = () => {
+            if (!window.matchMedia('(max-width: 760px)').matches) {
+                root.style.removeProperty('--chat-avail');
+                return;
+            }
+            root.style.setProperty('--chat-avail', `${Math.max(220, Math.round(vv.height))}px`);
+        };
+        sync();
+        vv.addEventListener('resize', sync);
+        vv.addEventListener('scroll', sync);
+        window.addEventListener('orientationchange', sync);
+        return () => {
+            vv.removeEventListener('resize', sync);
+            vv.removeEventListener('scroll', sync);
+            window.removeEventListener('orientationchange', sync);
+            root.style.removeProperty('--chat-avail');
+        };
+    }, []);
+
+    // A change to the agent's permissions is made elsewhere, so the status line refreshes with the
+    // rest of the page rather than going stale until a reload.
+    useEffect(() => {
+        const handler = async () => {
+            try {
+                setStatus((await chat.status())?.data ?? null);
+            } catch (err) {
+                // A stale allowance line is not worth interrupting a conversation over, and the
+                // next update will correct it. Said out loud so it is not invisible either.
+                console.warn('[chat] the status line could not be refreshed:', err.message);
+            }
+        };
+        window.addEventListener('aimeat-live-update', handler);
+        return () => window.removeEventListener('aimeat-live-update', handler);
+    }, []);
+
+    const startThread = useCallback(async () => {
+        const res = await chat.createThread();
+        const created = res?.data?.thread;
+        if (!created) return null;
+        setThread(created);
+        setFailure('');
+        setListOpen(false);
+        await loadThreads();
+        return created;
+    }, [loadThreads]);
+
+    /**
+     * Send one message and read the answer as it is written.
+     *
+     * The person's words appear immediately rather than after the round trip: the node has already
+     * written them down by the time the first event arrives, and waiting to show them would make a
+     * slow turn look like a lost one.
+     */
+    const send = useCallback(async (retryText) => {
+        const text = (retryText ?? draft).trim();
+        if (!text || busy) return;
+
+        let target = thread;
+        if (!target) {
+            target = await startThread();
+            if (!target) return;
+        }
+
+        lastAskRef.current = text;
+        setDraft('');
+        setFailure('');
+        setBusy(true);
+        setLive({ text: '', thought: '', tools: [] });
+        setThread((prev) => (prev ? {
+            ...prev,
+            turns: [...(prev.turns ?? []), { role: 'user', text, at: new Date().toISOString() }],
+        } : prev));
+
+        const controller = new AbortController();
+        abortRef.current = controller;
+
+        let answer = '';
+        const tools = new Map();
+        try {
+            for await (const update of chat.streamTurn(target.id, text, controller.signal)) {
+                if (update.kind === 'text') {
+                    answer += update.text;
+                    setLive((l) => ({ ...l, text: answer }));
+                } else if (update.kind === 'thought') {
+                    setLive((l) => ({ ...l, thought: update.text }));
+                } else if (update.kind === 'tool_call') {
+                    // By id, not title: a call arrives once as it starts and once as it finishes,
+                    // and only the first carries a title.
+                    const key = update.id || update.title;
+                    const seen = tools.get(key);
+                    if (seen) {
+                        seen.status = update.status;
+                        if (update.title) seen.title = update.title;
+                    } else {
+                        tools.set(key, { title: update.title, status: update.status });
+                    }
+                    setLive((l) => ({ ...l, tools: [...tools.values()] }));
+                } else if (update.kind === 'error') {
+                    setFailure(update.message || tr('chat.turnFailed', 'The turn could not be completed.'));
+                }
+            }
+        } catch (err) {
+            // An abort is the person's own decision, and half an answer is still an answer.
+            if (err.name !== 'AbortError') {
+                setFailure(err.message || tr('chat.turnFailed', 'The turn could not be completed.'));
+            }
+        } finally {
+            abortRef.current = null;
+            setBusy(false);
+            setLive({ text: '', thought: '', tools: [] });
+            // Read the conversation back from the node: it is the record, and what it holds is what
+            // was actually saved rather than what this page happened to see.
+            try {
+                const fresh = await chat.getThread(target.id);
+                if (fresh?.data?.thread) setThread(fresh.data.thread);
+                await loadThreads();
+            } catch (err) {
+                // The turn ran; a failed re-read leaves the optimistic copy on screen, which is the
+                // same text, and the next open corrects it.
+                console.warn('[chat] the conversation could not be re-read:', err.message);
+                if (answer) {
+                    setThread((prev) => (prev ? {
+                        ...prev,
+                        turns: [...(prev.turns ?? []), { role: 'agent', text: answer, at: new Date().toISOString(), tools: [...tools.values()] }],
+                    } : prev));
+                }
+            }
+        }
+    }, [draft, busy, thread, startThread, loadThreads]);
+
+    const stop = useCallback(() => { abortRef.current?.abort(); }, []);
+
+    const removeThread = useCallback(async (id) => {
+        await chat.deleteThread(id);
+        if (thread?.id === id) setThread(null);
+        await loadThreads();
+    }, [thread, loadThreads]);
+
+    const resetSession = useCallback(async () => {
+        if (!thread) return;
+        await chat.resetThread(thread.id);
+    }, [thread]);
+
+    if (!hasSession()) {
+        return html`
+            <div class="chat-view chat-view--signin">
+                <h1>${tr('chat.title', 'Chat')}</h1>
+                <p>${tr('chat.signIn', 'Sign in and your first agent is waiting here.')}</p>
+            </div>`;
+    }
+
+    if (loading) return html`<div class="chat-view"><${Spinner} /></div>`;
+
+    const turns = thread?.turns ?? [];
+    const disabled = status ? !status.enabled : false;
+
+    return html`
+        <div class="chat-view ${listOpen ? 'chat-view--list' : ''}">
+            <${ThreadList}
+                threads=${threads}
+                activeId=${thread?.id}
+                onOpen=${openThread}
+                onNew=${startThread}
+                onDelete=${removeThread}
+                onClose=${() => setListOpen(false)} />
+
+            <section class="chat-main">
+                <header class="chat-head">
+                    <button type="button" class="btn-ghost chat-list-toggle"
+                        onClick=${() => setListOpen((o) => !o)}>
+                        ${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
+                    </button>
+                    <h1 class="chat-title">${thread?.title ?? tr('chat.title', 'Chat')}</h1>
+                </header>
+
+                <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
+
+                <div class="chat-scroll">
+                    ${turns.length === 0 && !busy ? html`
+                        <div class="chat-welcome">
+                            <h2>${tr('chat.welcomeTitle', 'Your first agent')}</h2>
+                            <p>${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}</p>
+                        </div>` : ''}
+
+                    ${turns.map((turn, i) => html`<${Turn} key=${i} turn=${turn} />`)}
+                    <${LiveTurn} text=${live.text} thought=${live.thought} tools=${live.tools} busy=${busy} />
+                    <${TurnError} message=${failure}
+                        onRetry=${lastAskRef.current && !busy ? () => send(lastAskRef.current) : null} />
+                    <div ref=${bottomRef}></div>
+                </div>
+
+                <${Composer}
+                    value=${draft}
+                    onInput=${setDraft}
+                    onSend=${() => send()}
+                    onStop=${stop}
+                    busy=${busy}
+                    disabled=${disabled}
+                    note=${disabled ? (status?.note ?? '') : ''} />
+            </section>
+        </div>
+    `;
+}

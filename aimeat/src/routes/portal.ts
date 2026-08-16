@@ -45,6 +45,7 @@
  *   v1.11.0 — 2026-08-01 — Add /v1/transparency, the public human page for TARGET-058: what this
  *     node marks, what it cannot do, who operates and supervises it. Distinct from the JSON
  *     statement at /v1/ai-transparency, which is mounted ahead of this router.
+ *   v1.13.0 — 2026-08-16 — /v1/chat serves the SPA, so the page survives a refresh.
  *   v1.12.0 — 2026-08-12 — The privacy/terms/connect language routes are generated from LOCALES
  *     rather than written out per language, and a page with no file in the language asked for is
  *     served in English instead of 404. Spanish added.
@@ -583,6 +584,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
 
   const spaRoutes = [
     '/v1/profile',
+    // The built-in chat. Registered here AND in spa.html's ROUTES, or F5 is a 404.
+    '/v1/chat',
     // KOTI — the remake's home path. Registered here AND in spa.html's ROUTES: without both,
     // the view works on a client-side click and 404s on a refresh.
     '/v1/home',

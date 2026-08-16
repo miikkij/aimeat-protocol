@@ -9,6 +9,9 @@
  * @structure default export Landing({ navigate }) + BuildHero/Gallery(live wall)/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v5.2.0 — 2026-08-16 — The arrival redirect asks the node where this account lands instead of
+ *     sending everyone to /v1/profile. The server has decided that since the remake, and this page
+ *     ignored it, so an account created on the new path still arrived at the old one.
  *   v5.1.0 — 2026-08-01 — One line above the footer about how this node marks AI-generated
  *     content, linking /v1/transparency (TARGET-058 Phase 10). One line and no more: the page
  *     that states the limits properly is the one it links to.
@@ -70,6 +73,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import { apiGet } from '/js/api.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { siteLink, hasSite } from '/js/site.js';
 import { Collapsible } from '/components/Collapsible.js';
@@ -600,11 +604,30 @@ export default function Landing({ navigate }) {
   // The flag suppresses ONLY the arrival redirect. Signing in while standing on this page
   // always moves on to Home: without that, the sign-in modal closed and the visitor was left
   // looking at the same marketing page with no sign that anything had happened.
+  //
+  // WHERE it forwards to is the node's answer, not this file's. The server has decided since the
+  // remake which side an account lands on, and this page sent everyone to /v1/profile regardless —
+  // so a new account created on the new path still arrived at the old one. It asks now, and falls
+  // back to the profile only when the answer does not arrive.
   useEffect(() => {
+    const landingFor = async () => {
+      try {
+        const res = await apiGet('/v1/home/ui-track');
+        return res?.data?.landing || '/v1/profile';
+      } catch (err) {
+        // Not knowing where to send someone is not a reason to leave them on the marketing page.
+        // The old landing is where everyone went until now, so it is the safe answer.
+        console.warn('[landing] could not read where this account lands:', err.message);
+        return '/v1/profile';
+      }
+    };
     const check = () => {
       try {
         const raw = localStorage.getItem('aimeat_session');
-        if (raw && JSON.parse(raw)?.jwt) { navigate('/v1/profile'); return true; }
+        if (raw && JSON.parse(raw)?.jwt) {
+          landingFor().then((path) => navigate(path));
+          return true;
+        }
       // eslint-disable-next-line aimeat/no-silent-catch -- stay on landing
       } catch { /* stay on landing */ }
       return false;
