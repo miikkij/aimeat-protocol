@@ -542,6 +542,25 @@ await test('23. Accept all in parallel', async () => {
     assert(results.every(r => r.status === 200), `not all accepted: ${results.map(r => r.status)}`);
 });
 
+// Test 25 asserts the balance is a non-negative number, which is true of every wrong answer too —
+// including the one this whole suite exists to catch, a lost update under concurrent settlement.
+// The numbers are captured rather than hardcoded: five items at base_morsels 1 each, and the
+// requester was already charged at request time, so the delivery round moves only the provider.
+const walletBalance = async (token: string) => {
+    const { body } = await json('/v1/wallet', { headers: { Authorization: `Bearer ${token}` } });
+    assert(body.ok === true, `wallet: ${JSON.stringify(body.error)}`);
+    return Number(body.data.balance);
+};
+let provBefore = 0;
+let reqBefore = 0;
+
+await test('23b. Capture both wallets before the parallel delivery round', async () => {
+    provBefore = await walletBalance(providerToken);
+    reqBefore = await walletBalance(requester2Token);
+    assert(Number.isFinite(provBefore) && Number.isFinite(reqBefore),
+        `both balances must read as numbers: ${provBefore} / ${reqBefore}`);
+});
+
 await test('24. Deliver all in parallel', async () => {
     const deliver = (tc: string) => json(`/v1/work/${tc}/deliver`, {
         method: 'POST',
@@ -561,6 +580,19 @@ await test('25. Wallet balances consistent after parallel settlement', async () 
     assert(body.ok, 'wallet ok');
     assert(typeof body.data.balance === 'number' && body.data.balance >= 0,
         `balance should be non-negative, got ${body.data.balance}`);
+
+    // The assertion that makes this test about CONCURRENCY. Five deliveries settled in parallel must
+    // pay the provider five times, not once: a read-modify-write credit loses four of them and still
+    // leaves a non-negative number, which is all the check above ever asked for.
+    const provAfter = await walletBalance(providerToken);
+    const paid = provAfter - provBefore;
+    assert(paid === lifeCycleTcs.length,
+        `the provider must be paid once per delivery: expected +${lifeCycleTcs.length}, got +${paid} (${provBefore} → ${provAfter})`);
+
+    // The requester was charged at REQUEST time, so the delivery round must not move them again.
+    const reqAfter = Number(body.data.balance);
+    assert(reqAfter === reqBefore,
+        `the requester was already charged at request time: ${reqBefore} → ${reqAfter}`);
 });
 
 // ─── Phase 7: Board Post Flood ───
