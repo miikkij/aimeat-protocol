@@ -5,11 +5,17 @@ WORKDIR /app
 # Build: install all deps, then compile TypeScript.
 FROM base AS build
 COPY package.json pnpm-lock.yaml ./
+# postinstall runs scripts/vendor-libs.mjs, so scripts/ must be present before install.
+COPY scripts/ scripts/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src/ src/
 COPY bin/ bin/
-COPY scripts/ scripts/
+# pnpm run build cpSyncs locales/, public/, docs/ and .env.example into dist/.
+COPY locales/ locales/
+COPY public/ public/
+COPY docs/ docs/
+COPY .env.example ./
 RUN pnpm run build
 
 # Production image. Carries the full node_modules from the build stage (better-sqlite3
@@ -18,6 +24,9 @@ FROM node:24-alpine
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+# bootstrap.ts and msm.ts resolve ../../../docs from dist/src/, which is /app/docs here;
+# the dist/docs copy inside dist serves csm.ts, csm-seed.ts and template-bundles.ts.
+COPY --from=build /app/docs ./docs
 COPY package.json pnpm-lock.yaml ./
 
 # Default SQLite data dir, owned by the runtime user so a mounted named volume
@@ -29,4 +38,4 @@ ENV AIMEAT_PORT=40050
 EXPOSE 40050
 
 USER node
-CMD ["node", "dist/src/index.js"]
+CMD ["node", "dist/src/index.js", "start"]
