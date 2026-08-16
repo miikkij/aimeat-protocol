@@ -11,6 +11,10 @@
  *   res.setHeader('Content-Security-Policy', appCsp(apexOrigin));   // app origin
  *   res.setHeader('Content-Security-Policy', appCsp());             // inline / draft preview
  * @version-history
+ *   v1.1.0 — 2026-08-16 — manifest-src 'self': the per-app web-app manifest (installable apps) is
+ *     fetched under this directive, which has no entry of its own and therefore fell back to
+ *     default-src 'none' — the browser refused /manifest.webmanifest on every app origin and
+ *     logged a CSP violation on every load. Found on a live app the day the manifest shipped.
  *   v1.0.0 — 2026-07-30 — Extracted from subdomains.ts appCsp() + the two literals in
  *     routes/apps/read.ts; script-src gains 'wasm-unsafe-eval' so apps can compile WebAssembly.
  */
@@ -57,6 +61,7 @@ export function appCsp(apexOrigin = '', grantedOrigin = ''): string {
     + "font-src 'self' data: https:; "
     + `connect-src 'self' https: http://localhost:* wss: ws: data: blob:${apexAllow}; `
     + 'worker-src blob:; '
+    + "manifest-src 'self'; "
     + "object-src 'none'; "
     + `frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; `
     + `frame-ancestors ${ancestors}`;

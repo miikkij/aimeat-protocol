@@ -251,6 +251,11 @@ async function main() {
                 'the manifest link is in the served head');
             assert(res.body.includes('/js/install-chip.js'),
                 'the install-suggestion chip rides the same injection');
+            // The directive the manifest is FETCHED under. It has no default of its own: absent,
+            // it falls back to default-src 'none' and the browser refuses the manifest on every
+            // load — which is how this shipped broken the first time.
+            assert((res.header('content-security-policy') ?? '').includes("manifest-src 'self'"),
+                'the app CSP allows fetching the manifest');
         });
 
         await test('an icon with markup in it comes out as text, not as elements', async () => {
