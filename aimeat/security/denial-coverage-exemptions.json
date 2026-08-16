@@ -85,17 +85,9 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "1fbf0b7998c86338"
     },
-    "test/e2e-library-packs.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "0e7291d69a964e2e"
-    },
     "test/e2e-appdev-pitfalls.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "3fd5b45ba2427af2"
-    },
-    "test/e2e-appdev-flow.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "9dd582c6b6603ea1"
     },
     "test/e2e-mcp-scopes.ts": {
       "reason": "Reviewed 2026-08-15. This suite is ALL refusal, and none of it is status-shaped: the MCP tool surface refuses by not registering the tool (assert(!tools.includes(...))) and a filtered call comes back through a local {ok} wrapper rather than isError. Kept exempt because the detector cannot see those two shapes, not because the fence is untested — it now also asserts that a '*' agent is refused every tool riding a SCOPES_OUTSIDE_WILDCARD word, list derived from the vocabulary.",
@@ -118,8 +110,8 @@
       "sha": "8fbcdad33d2fc6cd"
     },
     "test/e2e-agent-readiness.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "cdd937f63335b84d"
+      "reason": "Reviewed 2026-08-16. Every surface this suite drives is a document served to an unauthenticated crawler on purpose: sitemap.xml, sitemap.md, AGENTS.md, llms.txt, llms-full.txt, the glossary, robots.txt, agents.txt, openapi.json, skill.md and the .well-known set. There is no second principal, because there is no first one. The refusal this surface DOES have is apex-only: the node's discovery documents must not answer on an app or portfolio origin, where they would describe the wrong thing. That case is not absent, it lives in test/e2e-app-origin.ts, and it was moved there deliberately (see this file's v0.2.0 history): the shared CI server has no app host, so the only thing that ever made it behave as an app origin was a header any client could send. It is proven where the origin is real. Add a denial case here only if this suite gains a gated surface.",
+      "sha": "708b3d98393ae402"
     },
     "test/e2e-transparency-page.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",

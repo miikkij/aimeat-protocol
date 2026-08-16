@@ -414,6 +414,18 @@ await test('community pack: a stranger cannot publish proofs onto another owner\
   await json(`/v1/cortex/${extName}`, { method: 'DELETE', headers: aAuth });
 });
 
+await test('installing a community pack refuses an anonymous caller', async () => {
+  // The pack index and /v1/libs are public reads, and this suite proves that. The write door that
+  // PUTS a pack into that index is not public: a community pack is a user cortex installed under
+  // an owner's namespace, and the suite above reaches it with a token. Nothing here asked what
+  // happens without one, so an index anyone could write to would have passed every assertion.
+  const { status } = await json('/v1/cortex', {
+    method: 'POST',
+    body: JSON.stringify({ manifest: 'apiVersion: cortex.aimeat.org/v1\nkind: Extension\n', libs: {} }),
+  });
+  assert(status === 401 || status === 403, `anonymous cortex install answered ${status}`);
+});
+
 console.log('\n' + '─'.repeat(40));
 console.log(`Library packs E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);

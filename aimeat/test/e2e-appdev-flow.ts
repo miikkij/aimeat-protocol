@@ -104,6 +104,17 @@ await test('unknown prompt id still rejects (route ordering intact)', async () =
     assert(res.status === 400 || res.status === 404, `expected 400/404, got ${res.status}`);
 });
 
+await test('a gated prompt on the same router refuses an anonymous caller', async () => {
+    // This suite's subject is which prompts answer anyone: build-app, appdev-flow and the rest are
+    // public on purpose. That claim is only worth something if the router can also say no, and two
+    // of its routes are behind requireAuth(). Without this, "the prompt returned 200" proves the
+    // route exists and nothing about whether the public/gated split is real.
+    for (const p of ['/v1/prompts/draft-offer', '/v1/prompts/agent-connect']) {
+        const res = await fetch(`${BASE}${p}`);
+        assert(res.status === 401 || res.status === 403, `${p} answered ${res.status} with no credentials`);
+    }
+});
+
 console.log('\n' + '─'.repeat(40));
 console.log(`AppDev flow E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);
