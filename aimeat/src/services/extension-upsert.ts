@@ -17,12 +17,15 @@
  *     { ownerName, actor, wasActive });
  *   if (!out.record) return refuse('the write did not apply');
  * @version-history
+ *   v1.1.0 — 2026-08-16 — Schedule re-registration goes through services/extension-schedules.ts, so a
+ *     redeployed extension's jobs carry the installer's `ownerScope` like every other road's.
  *   v1.0.0 — 2026-08-11 — Extracted after the copied-logic check found the pair.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { reconcileAfterExtensionWrite } from './exchange-projection.js';
+import { registerExtensionSchedules } from './extension-schedules.js';
 import { logger } from '../utils/logger.js';
 
 export interface UpsertDeps {
@@ -79,30 +82,11 @@ export async function upsertExtensionInPlace(
     // is already live — each call reads scriptContent fresh from storage.
     if (!(ctx.wasActive && scheduler)) return { record: updated, reinitialized: false };
 
-    const jobs = await storage.listScheduledJobs({ extensionName: name });
-    for (const job of jobs) {
-        scheduler.removeJob(job.id);
-        await storage.deleteScheduledJob(job.id);
-    }
-    const schedules = (record.config.__schedules as Array<Record<string, unknown>> | undefined) ?? [];
-    for (const sched of schedules) {
-        const now = new Date().toISOString();
-        const jobRecord: ScheduledJobRecord = {
-            id: `ext:${name}:${sched.id as string}`,
-            name: (sched.description as string) ?? `${name}/${sched.id as string}`,
-            type: 'extension',
-            extensionName: name,
-            actionId: sched.action as string,
-            cron: sched.cron as string,
-            enabled: true,
-            input: (sched.input as Record<string, unknown>) ?? undefined,
-            createdBy: ctx.actor,
-            createdAt: now,
-            updatedAt: now,
-        };
-        await storage.createScheduledJob(jobRecord);
-        scheduler.addJob(jobRecord);
-    }
+    // `replace: true`: the new manifest's schedules are the whole truth about this extension's clock,
+    // so the old ones go first. The jobs are stamped with the INSTALLER's owner scope, which is
+    // `updated.installedBy` and not the redeployer — an operator may write on somebody else's behalf,
+    // and the schedule still belongs to the person whose extension it is.
+    await registerExtensionSchedules({ storage, config, scheduler }, updated, ctx.actor, { replace: true });
     scheduler.runActivateJobs(name).catch(err =>
         logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
 

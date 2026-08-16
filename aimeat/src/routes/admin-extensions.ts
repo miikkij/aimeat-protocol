@@ -11,6 +11,10 @@
  *   - /scaffold, /:name/actions, GET|PUT /:name/scripts/:actionId: authoring endpoints
  *
  * @version-history
+ *   v1.1.0 — 2026-08-16 — Bundled install registers its schedules through
+ *     services/extension-schedules.ts. Its own copy produced a second id shape (`ext.name.id`) for
+ *     the same schedule, left out the `ownerScope` the executor needs, and picked the jobs up by
+ *     restarting the whole scheduler — which re-ran every @activate job on the node.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -24,6 +28,7 @@ import type { Scheduler } from '../services/scheduler.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { registerExtensionSchedules } from '../services/extension-schedules.js';
 import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -264,32 +269,21 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
 
       const created = await storage.createExtension(record);
 
-      // Register scheduled jobs if any
+      // Register the schedules the manifest declares. Through the same builder every other install
+      // door uses: this route had its own copy, which produced a second id shape (`ext.name.id`) for
+      // the same schedule and left out the owner scope the executor needs at run time. It also
+      // restarted the whole scheduler to pick the jobs up, which re-ran every @activate job on the
+      // node; addJob inside the builder does it for these jobs alone.
       if (manifestSchedules && scheduler) {
-        const now = new Date().toISOString();
-        for (const sched of manifestSchedules) {
-          try {
-            await storage.createScheduledJob({
-              id: `ext.${name}.${sched.id as string}`,
-              name: `${name}: ${sched.description || sched.id}`,
-              type: 'extension',
-              cron: sched.cron as string,
-              enabled: true,
-              extensionName: name,
-              actionId: sched.action as string,
-              createdBy: req.auth!.sub,
-              createdAt: now,
-              updatedAt: now,
-            });
-          } catch (schedErr) {
-            logger.warn(`Failed to register schedule ${sched.id as string} for ${name}`, {
-              error: (schedErr as Error).message,
-            });
-          }
+        try {
+          await registerExtensionSchedules({ storage, config, scheduler }, created, req.auth!.sub);
+          // A bundled extension installs ACTIVE, so its @activate jobs are due now. The restart used
+          // to do this as a side effect, for every extension on the node rather than for this one.
+          scheduler.runActivateJobs(name).catch(err =>
+            logger.error(`Failed to run @activate jobs for ${name}`, { error: String(err) }));
+        } catch (schedErr) {
+          logger.warn(`Failed to register schedules for ${name}`, { error: (schedErr as Error).message });
         }
-        // Restart scheduler to pick up new jobs
-        scheduler.stop();
-        await scheduler.start();
       }
 
       logger.info(`Bundled extension installed: ${created.name}`, { version: created.version, by: req.auth!.sub });

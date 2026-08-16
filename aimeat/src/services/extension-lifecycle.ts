@@ -37,13 +37,17 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.1.0 — 2026-08-16 — Schedule registration moved to services/extension-schedules.ts, shared with
+ *     the redeploy and the two install routes. The copy here stamped no `ownerScope`, and since
+ *     2026-08-15 the executor reads the owner off the job.
  *   v1.0.0 — 2026-08-11 — Extracted in the August 2026 one-capability-one-implementation audit,
  *     after the MCP tools were found writing extensions through storage directly.
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage, ExtensionRecord, ScheduledJobRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { upsertExtensionInPlace } from './extension-upsert.js';
+import { registerExtensionSchedules } from './extension-schedules.js';
 import { reconcileAfterExtensionWrite } from './exchange-projection.js';
 import { extensionInstallRefusal } from './install-quotas.js';
 import { prepareSecretConfigForWrite, decryptSecretFields, getExtSecretKeys } from './extension-secrets.js';
@@ -198,31 +202,7 @@ export async function activateExtension(
         activatedAt: new Date().toISOString(),
     });
 
-    if (scheduler && ext.config.__schedules) {
-        const schedules = ext.config.__schedules as Array<Record<string, unknown>>;
-        for (const sched of schedules) {
-            const jobId = `ext:${name}:${sched.id as string}`;
-            const existingJob = await storage.getScheduledJob(jobId);
-            if (existingJob) continue;
-            const now = new Date().toISOString();
-            const jobRecord: ScheduledJobRecord = {
-                id: jobId,
-                name: (sched.description as string) ?? `${name}/${sched.id as string}`,
-                type: 'extension',
-                extensionName: name,
-                actionId: sched.action as string,
-                cron: sched.cron as string,
-                enabled: true,
-                input: (sched.input as Record<string, unknown>) ?? undefined,
-                createdBy: actor,
-                createdAt: now,
-                updatedAt: now,
-            };
-            await storage.createScheduledJob(jobRecord);
-            scheduler.addJob(jobRecord);
-            logger.info(`Registered scheduled job: ${jobId}`, { cron: sched.cron });
-        }
-    }
+    await registerExtensionSchedules({ storage, config: deps.config, scheduler }, ext, actor);
 
     // The extension's first run, once it is on. Deliberately not awaited: an @activate job may be
     // long, and activation has already happened.

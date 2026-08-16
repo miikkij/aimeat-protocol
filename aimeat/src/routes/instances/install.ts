@@ -4,6 +4,9 @@
  *   real component registration via native storage APIs, @activate-cron firing, rollback on failure).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-16 — Manifest schedules go through services/extension-schedules.ts, the one
+ *     builder every install door now shares. The hand-built copy here left out `ownerScope`, without
+ *     which the job refuses at run time.
  *   v1.2.0 — 2026-08-15 — A PRIVATE package is refused here the way it already was on every read
  *     door. Install asked only "is it published", so any registered owner could install another
  *     owner's private package and have its components registered under their own identity, while
@@ -21,7 +24,6 @@ import type {
   PackageInstanceRecord,
   InstalledComponent,
   PackageComponentType,
-  ScheduledJobRecord,
   ExtensionRecord,
 } from '../../storage/interface.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
@@ -34,6 +36,7 @@ import {
   computeHash,
 } from '../../services/component-registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
+import { registerExtensionSchedules } from '../../services/extension-schedules.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { logger } from '../../utils/logger.js';
 
@@ -221,27 +224,8 @@ export function registerInstallRoutes(
         if (comp.type === 'extension' && scheduler) {
           try {
             const ext = await storage.getExtension(registeredAs) as ExtensionRecord | null;
-            const schedules = (ext?.config?.__schedules as Array<Record<string, unknown>> | undefined) ?? [];
-            for (const sched of schedules) {
-              const jobId = `ext:${registeredAs}:${sched.id as string}`;
-              const existing = await storage.getScheduledJob(jobId);
-              if (!existing) {
-                const jobRecord: ScheduledJobRecord = {
-                  id: jobId,
-                  name: (sched.description as string) ?? `${registeredAs}/${sched.id as string}`,
-                  type: 'extension',
-                  extensionName: registeredAs,
-                  actionId: sched.action as string,
-                  cron: sched.cron as string,
-                  enabled: true,
-                  input: (sched.input as Record<string, unknown>) ?? undefined,
-                  createdBy: req.auth!.sub,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString(),
-                };
-                await storage.createScheduledJob(jobRecord);
-                scheduler.addJob(jobRecord);
-              }
+            if (ext) {
+              await registerExtensionSchedules({ storage, config, scheduler }, ext, req.auth!.sub);
             }
             await scheduler.runActivateJobs(registeredAs);
           } catch (err) {

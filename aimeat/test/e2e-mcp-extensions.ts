@@ -10,6 +10,9 @@
  *     MCP, which the HTTP door has always had and this one did not. Activating registers the
  *     manifest's schedules, deactivating removes them, an identical redeploy answers "unchanged",
  *     and deleting takes the extension's ext: memory with it.
+ *   v1.3.0 — 2026-08-16 — Test 19: a manifest-declared schedule carries the installer's owner scope,
+ *     and the owner can trigger it. Test 15 proved the job EXISTS, which stayed true while every one
+ *     of its runs refused with "has no owner scope" and "Run now" answered 403.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-extensions.ts
@@ -675,7 +678,31 @@ await test('18. Deactivating over MCP removes the scheduled jobs, activating put
     assert((await extensionJobIds()).includes(lifeJobId), `schedule "${lifeJobId}" should be registered again after activate`);
 });
 
-await test('19. aimeat_extension_delete takes the ext: namespace memory with it', async () => {
+await test('19. A manifest-declared schedule names its owner, and the owner can run it', async () => {
+    // The job the manifest declares must carry the INSTALLER's owner scope. It did not: all four
+    // install doors built the record by hand and none stamped it, and from 2026-08-15 the executor
+    // reads the owner off the job rather than off the extension record. Two things broke at once —
+    // every run refused with "has no owner scope", and "Run now" answered 403, because managing a
+    // schedule compares the same field.
+    const { body } = await json('/v1/schedules', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const job = ((body.data?.extensions ?? []) as any[]).find(j => j.id === lifeJobId);
+    assert(!!job, `schedule "${lifeJobId}" should be listed`);
+    assert(job.ownerScope === `${ownerName}@${NODE_ID}`,
+        `owner scope should be the installer's GHII, got ${JSON.stringify(job.ownerScope)}`);
+
+    const trig = await json(`/v1/schedules/${encodeURIComponent(lifeJobId)}/trigger`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: '{}',
+    });
+    assert(trig.status === 200, `trigger ${trig.status}: ${JSON.stringify(trig.body?.error)}`);
+    assert(trig.body.data.schedule.lastRunResult === 'success',
+        `run result ${trig.body.data.schedule.lastRunResult}: ${trig.body.data.schedule.lastRunError ?? ''}`);
+
+    // …and it really ran: the scheduled call takes no input, so the note goes back to the default.
+    const mem = await json(lifeMemoryUrl);
+    assert(mem.body.data?.value?.note === 'stored', `scheduled run should have rewritten the note, got ${JSON.stringify(mem.body.data?.value)}`);
+});
+
+await test('20. aimeat_extension_delete takes the ext: namespace memory with it', async () => {
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_extension_delete',
         arguments: { name: lifeName },

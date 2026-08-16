@@ -25,6 +25,11 @@
  *                         the sandbox limits go through sandboxLimits() like every other road — the
  *                         ceiling was already applied at install (routes/extensions/manifest.ts), so
  *                         this only adds the small floors that keep a sandbox large enough to start.
+ *   v1.3.1 — 2026-08-16 — The owner scope reading it needs is now WRITTEN: no install door stamped it
+ *                         on a manifest-declared job, so from v1.3.0 every scheduled extension on the
+ *                         node refused before it started. See services/extension-schedules.ts, which
+ *                         also backfills the jobs stored before the stamp existed. The refusal names
+ *                         the repair rather than only the missing field.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
@@ -53,7 +58,9 @@ export async function runExtensionJob(
   // own installer would make the fence compare a value against itself, so it is not done.
   const ownerScope = job.ownerScope ?? '';
   const ownerName = ownerScope.split('@')[0];
-  if (!ownerName) throw new Error(`Extension job "${job.id}" has no owner scope`);
+  if (!ownerName) {
+    throw new Error(`Extension job "${job.id}" has no owner scope — reinstall or reactivate extension "${job.extensionName}" to re-register it`);
+  }
   const ownerGhii = ownerScope.includes('@') ? ownerScope : `${ownerName}@${config.nodeId}`;
 
   const out = await runExtensionActionAsSystem({ storage, config, emailService }, {

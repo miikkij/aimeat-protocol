@@ -9,6 +9,8 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.8.0 — 2026-08-16 — backfillExtensionJobOwnerScope() runs before scheduler.start(), so a job
+ *     stored before its owner scope was stamped is repaired before the @activate wave reads it.
  *   v1.7.0 — 2026-07-28 — Drop the enterprise-edition seam (single edition): the Stripe and invoice
  *     money handlers register here as core rails instead of arriving from a loaded ee/ module
  *   v1.6.0 — 2026-07-21 — Mount unfurlRouter (GET /v1/unfurl(/image) — link-preview cards)
@@ -217,6 +219,7 @@ import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { seedCoreScheduledJobs } from '../services/job-seeding.js';
+import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.js';
 
 export interface MountRoutesOptions {
   rejectForRelay: express.RequestHandler;
@@ -722,8 +725,13 @@ export async function mountRoutes(
   workflowEngine.setEmailService(emailService);
   workflowEngine.start().catch(err => logger.error('WorkflowEngine start failed', { error: String(err) }));
 
-  // Start the scheduler (loads enabled jobs from storage)
-  scheduler.start().catch(err => logger.error('Scheduler start failed', { error: String(err) }));
+  // Start the scheduler (loads enabled jobs from storage). The backfill runs FIRST and is awaited:
+  // an extension job stored before its owner scope was stamped refuses at run time, and the first
+  // thing start() does is fire every @activate job on the node.
+  backfillExtensionJobOwnerScope(config, storage)
+    .catch(err => logger.error('Extension job owner-scope backfill failed', { error: String(err) }))
+    .then(() => scheduler.start())
+    .catch(err => logger.error('Scheduler start failed', { error: String(err) }));
 
   // Genesis Sync Scheduler (Phase 3.4)
   const genesisSyncService = createGenesisSyncService(config, storage);

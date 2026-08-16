@@ -29,6 +29,10 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   v1.8.0 — 2026-08-16 — The aggregate tells a manifest-declared extension job from the owner's own
+ *     schedule by its id, not by whether it has an owner scope. Those jobs now carry the installer's
+ *     scope (the executor refuses without it), which would otherwise have moved every one of them out
+ *     of the read-only extension table and into the editable managed list.
  *   v1.7.0 — 2026-08-13 — "Run now" moved to services/schedule-write.ts alongside create, edit and
  *     cancel, and this route calls it. It was the last schedule operation that existed on HTTP only,
  *     which is why an agent could set up a morning job and had no way to prove it worked.
@@ -78,6 +82,7 @@ import { buildGAII, resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { createScheduleRecord, updateScheduleRecord, deleteScheduleRecord, triggerScheduleRecord } from '../services/schedule-write.js';
 import type { ScheduleWriteCaller } from '../services/schedule-write.js';
+import { isManifestDeclaredJob } from '../services/extension-schedules.js';
 
 // The record build, the per-kind input checks and the write moved to services/schedule-write.ts on
 // 2026-08-11, so the MCP tools that create, edit and cancel schedules produce the same record this
@@ -130,7 +135,10 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
   // self-reported internal scheduler. Also returns the resolved agents so a caller can reuse them without
   // a second getAgentsByOwner. Shared by GET /v1/schedules and the /v1/scheduler/tab composite.
   async function aggregateSchedules(owner: string, ownerName: string) {
-    const managed = await storage.listScheduledJobs({ ownerScope: owner });
+    // A manifest-declared job is the extension's, not the owner's own schedule, so it stays out of
+    // `managed` and is reported below. It carries the installer's ownerScope since 2026-08-16 (the
+    // executor needs it), which put it in both buckets until this filter was added.
+    const managed = (await storage.listScheduledJobs({ ownerScope: owner })).filter(j => !isManifestDeclaredJob(j));
     const managedIds = new Set(managed.map(j => j.id));
 
     // Owner's extension cron jobs not already captured as managed schedules.
