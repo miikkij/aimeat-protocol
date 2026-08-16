@@ -204,6 +204,26 @@ export type WorkflowStepAction =
         /** Hard stop. A producer that never reports completion must not loop forever. */
         max_pages: number;
       };
+      /**
+       * Call the action once per value and merge the answers — the other shape a real producer has.
+       *
+       * `kumppani` answers about ONE company per call, so a package covering ten companies is ten
+       * calls. Paging varies an offset over one query; this varies a parameter over a list. Both
+       * merge `items_at`, and both add `complete` so "did every call land" is assertable rather than
+       * assumed.
+       *
+       * A call that fails fails the STEP, exactly as a page does. Ten companies of which one could
+       * not be read is not a package about ten companies, and quietly publishing nine is the shape
+       * of loss this design refuses.
+       */
+      for_each?: {
+        /** The values to iterate. Each is templated, so `{var}` works. */
+        values: string[];
+        /** Input field each value is set on. */
+        param: string;
+        /** Dotted path to the rows in ONE answer. */
+        items_at: string;
+      };
     }
   // Publish one version of a data package from what an earlier step produced.
   //
@@ -249,6 +269,24 @@ export type WorkflowStepAction =
        * that says so beats a column that keeps the first.
        */
       columns?: Record<string, string>;
+      /**
+       * Several lists in one answer, published as ONE table with a discriminator.
+       *
+       * `aiuutiset` answers with `topics`, `actors` and `sources` — three lists with the same
+       * numbers and a differently-named label in each. Three near-identical packages would be worse
+       * than one table with a `kind` column, and `rows_at` names exactly one path, so without this
+       * a producer like that could only ever publish a third of what it knows.
+       *
+       * Each source gets its own `columns` (that is what reconciles `topic` / `actor` / `source`
+       * into one `name`) and its own `set` of constant columns (that is the discriminator). When
+       * `union` is present, the step's top-level `rows_at` and `columns` are not used.
+       */
+      union?: Array<{
+        rows_at: string;
+        columns?: Record<string, string>;
+        /** Constant columns added to every row from this source — the discriminator lives here. */
+        set?: Record<string, string>;
+      }>;
       /**
        * The Table Schema this package's rows must satisfy. Omitting it INFERS from the rows, and for
        * a repeating producer that is the wrong default even though it is the convenient one:
@@ -503,6 +541,12 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
       // and the author is the one who knows how big their data can get.
       max_pages: z.number().int().min(1).max(200),
     }).strict().optional(),
+    /** Call once per value and merge — the other shape a real producer has. See the type above. */
+    for_each: z.object({
+      values: z.array(z.string().min(1).max(200)).min(1).max(200),
+      param: z.string().min(1).max(64),
+      items_at: z.string().min(1).max(200),
+    }).strict().optional(),
   }),
   z.object({
     kind: z.literal('datapackage'),
@@ -517,6 +561,12 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     /** Column name -> dotted path inside each row. See the type above for why this is a mapping
      *  and not a script. */
     columns: z.record(z.string().min(1).max(64), z.string().min(1).max(200)).optional(),
+    /** Several lists in one answer as ONE table with a discriminator. See the type above. */
+    union: z.array(z.object({
+      rows_at: z.string().min(1).max(200),
+      columns: z.record(z.string().min(1).max(64), z.string().min(1).max(200)).optional(),
+      set: z.record(z.string().min(1).max(64), z.string().max(200)).optional(),
+    }).strict()).min(1).max(20).optional(),
     /** A declared Table Schema. Shape-checked by the publish service, which owns that contract;
      *  validating it twice, in two places, is how the two definitions drift apart. */
     schema: z.object({ fields: z.array(z.object({ name: z.string().min(1), type: z.string().min(1) }).loose()).min(1) }).loose().optional(),

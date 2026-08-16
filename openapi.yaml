@@ -4131,6 +4131,40 @@ components:
                 items_at: { type: string, description: 'Dotted path to a page''s rows.' }
                 total_at: { type: string, description: 'Dotted path to the reported total. Absent = stop on a short page.' }
                 max_pages: { type: integer, description: 'Hard stop. Required: a producer that never reports completion must not loop forever.' }
+            for_each:
+              type: object
+              description: >-
+                extension: call the action once per value and merge the answers — the other shape a
+                real producer has. `kumppani` answers about ONE company per call, so a package
+                covering ten companies is ten calls. Paging varies an offset over one query; this
+                varies a parameter over a list. Both merge `items_at` and both add `complete`. A call
+                that fails fails the STEP: ten companies of which one could not be read is not a
+                package about ten companies.
+              required: [values, param, items_at]
+              properties:
+                values: { type: array, items: { type: string }, description: 'The values to iterate; each is {var}-templated.' }
+                param: { type: string, description: 'Input field each value is set on.' }
+                items_at: { type: string, description: 'Dotted path to the rows in ONE answer.' }
+            union:
+              type: array
+              description: >-
+                datapackage: several lists in one answer, published as ONE table with a
+                discriminator. `aiuutiset` answers with topics, actors and sources — the same numbers
+                under a differently-named label each — and `rows_at` names exactly one path, so
+                without this such a producer could only publish a third of what it knows. Each source
+                gets its own `columns` (that is what reconciles topic/actor/source into one `name`)
+                and its own `set` of constant columns (that is the discriminator). When `union` is
+                present the top-level `rows_at` and `columns` are not used.
+              items:
+                type: object
+                required: [rows_at]
+                properties:
+                  rows_at: { type: string }
+                  columns: { type: object, additionalProperties: { type: string } }
+                  set:
+                    type: object
+                    additionalProperties: { type: string }
+                    description: 'Constant columns added to every row from this source.'
             columns:
               type: object
               additionalProperties: { type: string }

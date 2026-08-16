@@ -115,6 +115,20 @@ const SCRIPTS = {
     for (var i = offset; i < Math.min(offset + limit, TOTAL); i++) out.push({ n: i, label: 'row ' + i });
     return { ok: true, total: TOTAL, returned: out.length, offset: offset, truncated: offset + out.length < TOTAL, results: out };
   }`,
+  // ONE SUBJECT PER CALL, which is how kumppani answers: ask about a company, get that company.
+  one: `export default async function(ctx, input){
+    // 'gone' stands for the subject a register cannot answer about — the case a fan-in must fail on
+    // rather than skip.
+    if (!input.id || input.id === 'gone') throw new Error('NOT_IN_REGISTER: ' + input.id);
+    return { ok: true, companies: [{ id: input.id, name: 'Firma ' + input.id, ok: true }] };
+  }`,
+  // THREE LISTS in one answer, each with its own label field — the aiuutiset shape.
+  three: `export default async function(){
+    return { ok: true,
+      topics:  [{ topic: 'Mallit', total: 63 }, { topic: 'Agentit', total: 25 }],
+      actors:  [{ actor: 'OpenAI', total: 15 }],
+      sources: [{ source: 'arXiv', total: 30 }] };
+  }`,
   // The same envelope with a word where a number belongs: the quality gate's case.
   badrows: `export default async function(){
     return { ok: true, total: 2, results: [
@@ -136,6 +150,8 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'badrows', method: 'POST', path: '/badrows', script: 'badrows' },
     { id: 'nested', method: 'POST', path: '/nested', script: 'nested' },
     { id: 'paged', method: 'POST', path: '/paged', script: 'paged' },
+    { id: 'one', method: 'POST', path: '/one', script: 'one' },
+    { id: 'three', method: 'POST', path: '/three', script: 'three' },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 8000, max_api_calls: 4 },
@@ -629,6 +645,105 @@ await test('12g. A page limit that cannot hold the data says so instead of publi
   const raw = await json('/v1/memory/short.raw', { headers: auth(owner.token) });
   assert(raw.body.data.value.complete === false, 'complete must be false');
   assert(raw.body.data.value.results.length === 10, `10 of 12 collected, got ${raw.body.data.value.results.length}`);
+});
+
+await test('12h. A producer that answers about ONE subject per call still makes one package', async () => {
+  // kumppani's shape: ask about a company, get that company. Ten companies is ten calls, and a
+  // package about ten companies must contain ten or fail — nine published quietly is the loss.
+  const PKG = `wffan${Date.now()}`;
+  const def = {
+    title: { en_US: 'Fan in' }, description: { en_US: 'one call per subject' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [
+      { id: 'fetch', description: { en_US: 'ask about each' }, required_to_function: 'none',
+        success_signal: { kind: 'deterministic', key: 'fan.raw', op: 'json_field', path: 'complete', equals: true },
+        action: { kind: 'extension', extension: EXT, action: 'one',
+                  for_each: { values: ['a1', 'b2', 'c3'], param: 'id', items_at: 'companies' },
+                  result_to_key: 'fan.raw' } },
+      { id: 'publish', description: { en_US: 'publish' }, after: ['fetch'], required_to_function: 'none',
+        action: { kind: 'datapackage', name: PKG, from_key: 'fan.raw', rows_at: 'companies',
+                  changes: 'One row per subject, from three calls.',
+                  schema: { fields: [{ name: 'id', type: 'string' }, { name: 'name', type: 'string' }, { name: 'ok', type: 'boolean' }] } } },
+    ],
+  };
+  const save = await json('/v1/workflows/fan-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  assert(save.status === 200, `save ${save.status}: ${JSON.stringify(save.body?.data?.errors ?? save.body?.error)}`);
+  const r = await json('/v1/workflows/fan-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const run = await settle('fan-wf', r.body.data.run?.runId ?? r.body.data.runId, owner.token);
+  assert(run.steps.publish.state === 'green', `publish ${run.steps.publish.state}: ${JSON.stringify(run.steps.publish.outputObserved ?? {})}`);
+
+  const rows = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}/rows/rows`);
+  const ids = rows.body.data.rows.map((x: { id: string }) => x.id);
+  assert(JSON.stringify(ids) === JSON.stringify(['a1', 'b2', 'c3']), `three subjects, in order: ${ids.join(',')}`);
+  const raw = await json('/v1/memory/fan.raw', { headers: auth(owner.token) });
+  assert(raw.body.data.value.callsMade === 3, `three calls, got ${raw.body.data.value.callsMade}`);
+});
+
+await test('12i. One subject that cannot be read fails the STEP, it does not publish the rest', async () => {
+  // The producer throws on a missing id. A package about three subjects of which one could not be
+  // read is not a package about three subjects.
+  const PKG = `wffanbad${Date.now()}`;
+  const def = {
+    title: { en_US: 'Fan in, one broken' }, description: { en_US: 'x' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [
+      { id: 'fetch', description: { en_US: 'ask' }, required_to_function: 'none',
+        success_signal: { kind: 'deterministic', key: 'fanbad.raw', op: 'json_field', path: 'complete', equals: true },
+        // 'gone' is the one the producer refuses.
+        action: { kind: 'extension', extension: EXT, action: 'one',
+                  for_each: { values: ['a1', 'gone', 'c3'], param: 'id', items_at: 'companies' },
+                  result_to_key: 'fanbad.raw' } },
+      { id: 'publish', description: { en_US: 'publish' }, after: ['fetch'], required_to_function: 'none',
+        action: { kind: 'datapackage', name: PKG, from_key: 'fanbad.raw', rows_at: 'companies', changes: 'Should never exist.' } },
+    ],
+  };
+  await json('/v1/workflows/fanbad-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  const r = await json('/v1/workflows/fanbad-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const run = await settle('fanbad-wf', r.body.data.run?.runId ?? r.body.data.runId, owner.token);
+  assert(run.steps.fetch.state !== 'green', `a failed subject went ${run.steps.fetch.state}`);
+  assert(run.steps.publish.state === 'skipped', `publish should never run, it was ${run.steps.publish.state}`);
+  const pkg = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}`);
+  assert(pkg.status === 404, `no package may exist, got ${pkg.status}`);
+});
+
+await test('12j. Three lists in one answer become ONE table with a discriminator', async () => {
+  // aiuutiset's shape: topics, actors and sources carry the same numbers under a differently-named
+  // label. Three near-identical packages would be worse than one table with a `kind` column, and
+  // `rows_at` names exactly one path — so without a union a producer like this publishes a third.
+  const PKG = `wfunion${Date.now()}`;
+  const def = {
+    title: { en_US: 'Union' }, description: { en_US: 'three lists, one table' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [
+      { id: 'fetch', description: { en_US: 'ask' }, required_to_function: 'none',
+        action: { kind: 'extension', extension: EXT, action: 'three', result_to_key: 'union.raw' } },
+      { id: 'publish', description: { en_US: 'publish' }, after: ['fetch'], required_to_function: 'none',
+        action: {
+          kind: 'datapackage', name: PKG, from_key: 'union.raw',
+          changes: 'Topics, actors and sources as one table.',
+          union: [
+            { rows_at: 'topics', set: { kind: 'topic' }, columns: { name: 'topic', total: 'total' } },
+            { rows_at: 'actors', set: { kind: 'actor' }, columns: { name: 'actor', total: 'total' } },
+            { rows_at: 'sources', set: { kind: 'source' }, columns: { name: 'source', total: 'total' } },
+          ],
+          schema: { fields: [{ name: 'kind', type: 'string' }, { name: 'name', type: 'string' }, { name: 'total', type: 'integer' }] },
+        } },
+    ],
+  };
+  const save = await json('/v1/workflows/union-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  assert(save.status === 200, `save ${save.status}: ${JSON.stringify(save.body?.data?.errors ?? save.body?.error)}`);
+  const r = await json('/v1/workflows/union-wf/run', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ mode: 'full' }) });
+  const run = await settle('union-wf', r.body.data.run?.runId ?? r.body.data.runId, owner.token);
+  assert(run.steps.publish.state === 'green', `publish ${run.steps.publish.state}: ${JSON.stringify(run.steps.publish.outputObserved ?? {})}`);
+
+  const rows = await json(`/v1/datapackages/${encodeURIComponent(owner.name)}/${PKG}/rows/rows`);
+  const all = rows.body.data.rows;
+  assert(all.length === 4, `2 topics + 1 actor + 1 source = 4, got ${all.length}`);
+  // The discriminator is what makes one table readable, and each list's own label reconciled to one
+  // column is what makes it possible at all.
+  assert(all.filter((x: { kind: string }) => x.kind === 'topic').length === 2, 'topics carry their kind');
+  assert(all.find((x: { kind: string }) => x.kind === 'actor').name === 'OpenAI', 'actor.actor became name');
+  assert(all.find((x: { kind: string }) => x.kind === 'source').name === 'arXiv', 'source.source became name');
 });
 
 await test('12e. An unknown field on a datapackage step is REFUSED, not stripped in silence', async () => {

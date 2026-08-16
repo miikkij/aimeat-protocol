@@ -198,7 +198,9 @@ export function dispatchExtensionStep(
     const base = templateInput(action.input, run.vars);
     const out = action.paging
       ? await runPaged(action.paging, base, (input, page) => runOnce(input, `wf:${workflowId}:${stepId}:p${page}`))
-      : await runOnce(base, `wf:${workflowId}:${stepId}`);
+      : action.for_each
+        ? await runForEach(action.for_each, base, run.vars, (input, n) => runOnce(input, `wf:${workflowId}:${stepId}:i${n}`))
+        : await runOnce(base, `wf:${workflowId}:${stepId}`);
     // THE BRIDGE BETWEEN TWO NAMESPACES. An extension's own memory lives under `ext:{name}`, and a
     // workflow's signals read OWNER SCOPE (services/owner-memory.ts: the owner GHII plus their
     // agents and ecosystem apps). Those never intersect, so without this the step's result would be
@@ -296,6 +298,73 @@ async function runPaged(
   return { result: merged, reads: [...reads], writes: [...writes] };
 }
 
+/**
+ * One row through a column mapping. No mapping means the row as it is.
+ *
+ * A path that is missing yields NULL rather than dropping the column: a row that lost a field is a
+ * visible gap, not a table that changed shape between runs. An array at the end of a path becomes
+ * one delimited cell rather than its first element — a notice carries several CPV codes, and a
+ * column that says so beats one that hides the rest.
+ */
+function mapColumns(row: Record<string, unknown>, columns: Record<string, string> | undefined): Record<string, unknown> {
+  if (!columns) return row;
+  const flat: Record<string, unknown> = {};
+  for (const [column, path] of Object.entries(columns)) {
+    const value = atPath(row, path);
+    flat[column] = Array.isArray(value) ? value.join(';') : (value === undefined ? null : value);
+  }
+  return flat;
+}
+
+/**
+ * Call an action once per value and merge the answers.
+ *
+ * THE OTHER SHAPE A REAL PRODUCER HAS. `kumppani` answers about ONE company per call, so a package
+ * covering ten companies is ten calls. Paging varies an offset over one query; this varies a
+ * parameter over a list. They share everything else, including the field that matters: `complete`,
+ * so "did every call land" is assertable rather than assumed.
+ *
+ * A call that fails throws, which fails the step. Ten companies of which one could not be read is
+ * not a package about ten companies, and quietly publishing nine is the loss this refuses.
+ */
+async function runForEach(
+  forEach: NonNullable<Extract<NonNullable<WorkflowStep['action']>, { kind: 'extension' }>['for_each']>,
+  baseInput: Record<string, unknown>,
+  vars: Record<string, string>,
+  call: (input: Record<string, unknown>, n: number) => Promise<SystemRunResult>,
+): Promise<SystemRunResult> {
+  const items: unknown[] = [];
+  const reads = new Set<string>();
+  const writes = new Set<string>();
+  let last: SystemRunResult = { result: null, reads: [], writes: [] };
+  let done = 0;
+
+  for (const raw of forEach.values) {
+    const value = template(raw, vars);
+    last = await call({ ...baseInput, [forEach.param]: value }, done + 1);
+    for (const r of last.reads) reads.add(r);
+    for (const w of last.writes) writes.add(w);
+
+    const answerItems = atPath(last.result, forEach.items_at);
+    if (!Array.isArray(answerItems)) {
+      throw new Error(`for_each: nothing at "${forEach.items_at}" for ${forEach.param}=${value} — the path is `
+        + 'wrong, or the producer changed shape');
+    }
+    items.push(...answerItems);
+    done++;
+  }
+
+  const merged = (last.result && typeof last.result === 'object')
+    ? { ...(last.result as Record<string, unknown>) }
+    : {} as Record<string, unknown>;
+  setAtPath(merged, forEach.items_at, items);
+  merged.callsMade = done;
+  // Every value was called or the loop threw, so reaching here IS completeness. It is written down
+  // anyway, because a signal should be able to assert the same thing for paging and for this.
+  merged.complete = done === forEach.values.length;
+  return { result: merged, reads: [...reads], writes: [...writes] };
+}
+
 /** Write into a dotted path, creating the objects on the way. Only used to put the merged rows back
  *  where the producer had its page, so the envelope a signal reads keeps its shape. */
 function setAtPath(target: Record<string, unknown>, path: string, value: unknown): void {
@@ -356,6 +425,25 @@ export function dispatchDataPackageStep(
     if (!record) {
       throw new Error(`no value at "${key}" — the step that produces it either did not run or wrote somewhere else`);
     }
+    // A UNION publishes several lists as one table. `aiuutiset` answers with topics, actors and
+    // sources — the same numbers under a differently-named label each time — and three near-identical
+    // packages would be worse than one table with a `kind` column.
+    if (action.union) {
+      const united: Array<Record<string, unknown>> = [];
+      for (const source of action.union) {
+        const list = atPath(record.value, source.rows_at);
+        if (!Array.isArray(list)) {
+          throw new Error(`"${key}" has no array at "${source.rows_at}" — a union names one path per list, `
+            + 'and this one is not there');
+        }
+        for (const row of list as Array<Record<string, unknown>>) {
+          united.push({ ...(source.set ?? {}), ...mapColumns(row, source.columns) });
+        }
+      }
+      await publishRows(united);
+      return;
+    }
+
     const found = atPath(record.value, action.rows_at);
     if (found === undefined) {
       throw new Error(`"${key}" has nothing at path "${action.rows_at}". A producer usually answers with an `
@@ -367,18 +455,11 @@ export function dispatchDataPackageStep(
     // Flatten, when the step says how. A Table Schema describes scalars and a real producer answers
     // with nested objects, so this is the transformation these bindings actually need — declarative,
     // recorded in the descriptor, and with no scripting language in a workflow descriptor.
-    const rows = action.columns
-      ? (found as Array<Record<string, unknown>>).map(row => {
-          const flat: Record<string, unknown> = {};
-          for (const [column, path] of Object.entries(action.columns!)) {
-            const value = atPath(row, path);
-            // An array at the end of a path becomes one delimited cell rather than the first element:
-            // a notice can carry several codes, and a column that says so beats one that hides it.
-            flat[column] = Array.isArray(value) ? value.join(';') : (value === undefined ? null : value);
-          }
-          return flat;
-        })
-      : (found as Array<Record<string, unknown>>);
+    await publishRows((found as Array<Record<string, unknown>>).map(row => mapColumns(row, action.columns)));
+  };
+
+  /** Publish one version from rows that are already flat, and turn a refusal into a red step. */
+  const publishRows = async (rows: Array<Record<string, unknown>>): Promise<void> => {
     const out = await publishPackage(
       { storage: deps.storage, config: deps.config },
       ownerGhii,
