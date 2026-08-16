@@ -90,8 +90,8 @@
       "sha": "5e467aad8068349d"
     },
     "test/e2e-mcp-v2.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "e05b4682d29bba74"
+      "reason": "REVIEWED 2026-08-16 (E2E test-quality audit, finding e2e-mcp-v2:92). This surface does not refuse with a status code: a tool outside the caller's surface or scopes is never REGISTERED on the session, so the refusal is an ABSENCE from tools/list — src/mcp/index.ts calls it a hard skip, silent, not a scope denial. The suite now drives that refusal with a second agent holding only memory:read, asserting its agent-surface listing is a strict subset with no memory_write while the broad agent keeps it. There is no 401 or 403 on this door to assert.",
+      "sha": "e3dca6fe2c37cc12"
     },
     "test/e2e-write-guards.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",

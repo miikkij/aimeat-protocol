@@ -8,6 +8,16 @@
  *   not. Plus scope enforcement (events:emit) on the inbound route.
  *   Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-events
  * @version-history
+ *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-ecosystem-events:116): one owner in the
+ *     suite, so nothing distinguished "my connector fired my workflow" from "any connector fires
+ *     every matching workflow on the node". A second owner now holds a WORD-FOR-WORD identical
+ *     trigger; A's connector emits; A's workflow runs and B's does not, checked from both sides
+ *     (B's run list, and A's run list for B's workflow id).
+ *     NOT PROVED RED-FIRST, and the reason is worth the line: with the owner term deleted from the
+ *     trigger filter (services/workflow/engine.ts:530) the suite stays green, because startRun
+ *     resolves the workflow DEFINITION under the emitter's owner — B's definition is not there, so
+ *     the run never starts. The isolation has a second, independent guard, which the audit's
+ *     "would fire every other owner's workflow" did not account for.
  *   v1.0.0 — 2026-06-14 — Initial creation (ecosystem events & triggers, chunk 2).
  */
 import { TunnelClient } from './helpers/tunnel-harness.js';
@@ -127,6 +137,55 @@ async function run() {
     assert(r.status === 200 && r.body.data?.accepted === true, `emit: ${r.status} ${JSON.stringify(r.body)}`);
     await sleep(900);
     assert((await runCount('eco-wf')) >= 1, 'expected a run after the matching event');
+  });
+
+  // The trigger filter matches on app + event + version, and the OWNER is the fourth term. With one
+  // owner in the suite nothing distinguished "my zendesk fired my workflow" from "any zendesk fires
+  // every matching workflow on the node" — which would run a stranger's agents and spend their
+  // morsels on a payload they never saw.
+  await test('A SECOND owner\'s identically-triggered workflow does NOT fire on A\'s event', async () => {
+    const otherName = `ecoevother${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register second owner: ${reg.status} ${JSON.stringify(reg.body)}`);
+    const otherAuth = { Authorization: `Bearer ${await getOwnerToken(otherName, reg.body.data.private_key)}` };
+
+    // B needs their own agent + offer, because the workflow step names one.
+    const ag = await json('/v1/agents', { method: 'POST', headers: otherAuth, body: JSON.stringify({ name: agentName, owner: otherName, capabilities: ['memory'] }) });
+    assert(ag.status === 201, `B's agent: ${ag.status}`);
+    const off = await json(`/v1/agents/${agentName}/offers`, { method: 'PUT', headers: otherAuth, body: JSON.stringify({ offers: [OFFER] }) });
+    assert(off.status === 200, `B's offers: ${off.status}`);
+
+    // The SAME trigger, word for word, under a different account.
+    const wf = {
+      title: { en_US: 'Distill tickets (B)' }, description: { en_US: 'same trigger, other owner' },
+      trigger: { kind: 'ecosystem.event', app: 'zendesk', on: 'ticket.crossed', version: 1, match: { status: 'closed' } },
+      vars: [], on_step_fail: 'inspect', steps: [stepFetch],
+    };
+    const put = await json('/v1/workflows/eco-wf-b', { method: 'PUT', headers: otherAuth, body: JSON.stringify(wf) });
+    assert(put.status === 200, `put eco-wf-b ${put.status}: ${JSON.stringify(put.body)}`);
+
+    // A holds the same rule under their own account: the positive control for this event name.
+    const wfA = { ...wf, title: { en_US: 'Distill tickets (A)' } };
+    const putA = await json('/v1/workflows/eco-wf-x', { method: 'PUT', headers: auth, body: JSON.stringify(wfA) });
+    assert(putA.status === 200, `put eco-wf-x ${putA.status}: ${JSON.stringify(putA.body)}`);
+
+    const countB = async () => {
+      const r = await json('/v1/workflows/eco-wf-b/runs', { headers: otherAuth });
+      return r.body.data?.count ?? 0;
+    };
+    assert((await countB()) === 0, 'B has no runs before the event');
+    assert((await runCount('eco-wf-x')) === 0, 'A has no runs before the event either');
+
+    // A's connector emits. A's own workflow must fire; B's identical one must not.
+    const r = await emitEvent(geaiToken, 'ticket.crossed', 1, { ticket_id: 't-cross', status: 'closed' });
+    assert(r.status === 200 && r.body.data?.accepted === true, `emit: ${r.status} ${JSON.stringify(r.body)}`);
+    await sleep(1200);
+    assert((await runCount('eco-wf-x')) >= 1, 'A\'s own workflow must fire (the positive control)');
+    assert((await countB()) === 0, 'a stranger\'s workflow must not run on somebody else\'s connector event');
+    // …and it must not run under A's account either: startRun takes the EMITTER's owner, so a trigger
+    // list that forgot the owner term would start B's workflow filed under A — B's own run list would
+    // stay at zero and the leak would be invisible from B's side.
+    assert((await runCount('eco-wf-b')) === 0, 'B\'s workflow must not have been started under A\'s account');
   });
 
   await test('Inbound event is recorded in the GEAI audit log', async () => {

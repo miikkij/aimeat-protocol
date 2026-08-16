@@ -1,5 +1,15 @@
 // v2 MCP purpose-scoped surfaces E2E. Verifies /v2/mcp/:role exposes exactly its surface allowlist
 // (role filter), that scope-filtering still applies on top, and unknown roles 400.
+//
+// 2026-08-16 (August 2026 test-quality audit, e2e-mcp-v2:92): the header claimed the scope half was
+// covered, but the only agent in the file held '*' plus every word outside the wildcard, so
+// scopeAllowsTool was never allowed to remove anything on a /v2 surface. A second agent holding only
+// memory:read now lists the same surface and must get a STRICT SUBSET of it — no memory_write, its
+// reading tools intact, nothing off-surface — while the broad agent still has the write tools.
+// Measured with the gate returning the surface membership directly instead of falling through to the
+// scope check: the narrow agent is handed all 148 tools of the agent surface, and e2e-mcp-scopes
+// stays green — that suite only drives /v1/mcp, where role is 'all' and there is no surface list to
+// short-circuit on.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
 import { MCP_SURFACES } from '../src/mcp/catalog/surfaces.js';
@@ -69,11 +79,13 @@ console.log('\n=== AIMEAT v2 MCP Surfaces E2E ===\n');
 
 const ownerName = `v2owner${Date.now()}`;
 let agent = { gaii: '', key: '' };
+let ownerKeyForTests = '';
 
 await test('Setup: owner + broad-scoped agent', async () => {
     const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: ownerName, display_name: 'V2 Test', password: 'V2Test1234' }) });
     assert(ghii.status === 201, `ghii ${ghii.status}`);
     const ownerKey = ghii.body.data.private_key as string;
+    ownerKeyForTests = ownerKey;
     const ts = new Date().toISOString();
     const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerKey, ownerName + NODE_ID + ts) }) });
     const ownerToken = tk.body.data.token;
@@ -99,6 +111,41 @@ for (const role of ['appdev', 'agent', 'service', 'admin'] as const) {
         assert(extra.length === 0, `unexpected in ${role}: ${extra.join(', ')}`);
     });
 }
+
+// The surface allowlist is one half of the gate; the agent's own scopes are the other. Every session
+// above belongs to an agent holding '*' plus every word outside it, so scopeAllowsTool has never been
+// allowed to remove anything on a /v2 surface. A narrow agent is the only way to see that half.
+let narrow = { gaii: '', key: '' };
+
+await test('Setup: a second agent holding only memory:read', async () => {
+    const ts = new Date().toISOString();
+    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: ownerName, timestamp: ts, signature: await signMsg(ownerKeyForTests, ownerName + NODE_ID + ts) }) });
+    const r = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}` },
+        body: JSON.stringify({ name: 'v2narrow', owner: ownerName, capabilities: ['memory'], model: 'gpt-4o', scopes: ['memory:read'] }),
+    });
+    assert(r.status === 201, `narrow agent ${r.status}: ${JSON.stringify(r.body)}`);
+    narrow = { gaii: r.body.data.agent.gaii, key: r.body.data.private_key };
+});
+
+await test('A memory:read agent gets a STRICT SUBSET of the agent surface — no write tools', async () => {
+    const got = new Set(await listToolsForRole(narrow.gaii, narrow.key, 'agent'));
+    const surface = new Set(MCP_SURFACES.agent);
+
+    // Everything it does get must still be on the surface allowlist: scopes narrow, never widen.
+    const offSurface = [...got].filter(t => !surface.has(t));
+    assert(offSurface.length === 0, `scopes must not add tools outside the surface: ${offSurface.join(', ')}`);
+    assert(got.size < surface.size, `a memory:read agent must see fewer than the ${surface.size} tools of the full surface, saw ${got.size}`);
+
+    // The write tools of this surface are exactly what memory:read does not buy.
+    assert(!got.has('aimeat_memory_write'), 'memory_write must be absent for a memory:read agent');
+    assert(got.has('aimeat_memory_read') || got.has('aimeat_memory_list'),
+        `…while its reading tools remain: ${[...got].slice(0, 8).join(', ')}`);
+
+    // And the broad agent still has them, so the difference is the scope list and not the surface.
+    const broad = new Set(await listToolsForRole(agent.gaii, agent.key, 'agent'));
+    assert(broad.has('aimeat_memory_write'), 'the broad agent must still hold memory_write');
+});
 
 await test('cross-surface isolation: agent has no marketplace/admin; appdev no memory; instance_* nowhere', async () => {
     const agentTools = new Set(await listToolsForRole(agent.gaii, agent.key, 'agent'));
