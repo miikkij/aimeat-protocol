@@ -7,6 +7,12 @@
  *
  *   Nodes: A 40275 aimeat-test-001-pola; P 40276 aimeat-test-001-polp.
  * @version-history
+ *   v1.1.0 — 2026-08-16 — August 2026 test-quality audit (e2e-federation-policy:168): test 7 pulls A's
+ *     GENUINE policy, so the signature check had never refused anything. A policy decides what a
+ *     visiting node may do here, so an unverified one is a stranger writing our permissions. Test 8
+ *     serves the document from a local stub — the only way to present one A never signed — with the
+ *     genuine doc as the positive control first (it reaches the version gate, which sits BELOW the
+ *     signature check). Measured with the sigOk gate removed: a tampered policy applies at version 7.
  *   v1.0.0 — 2026-06-19 — Initial Phase B tests (uptime, policy distribution, promotion, demotion).
  */
 
@@ -14,6 +20,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
+import * as http from 'node:http';
 import { createServer } from '../src/server.js';
 import { loadConfig } from '../src/config.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
@@ -169,6 +176,63 @@ await test('7. peer A↔P, then P pulls + applies A\'s signed policy', async () 
   assert(pull.body.ok && pull.body.data.applied === true, `pull applied: ${JSON.stringify(pull.body)}`);
   const again = await P.json('/v1/federation/network-policy/pull', { method: 'POST', headers: auth(P.ownerToken), body: JSON.stringify({ source_url: A.baseUrl }) });
   assert(again.body.data.applied === false && again.body.data.reason === 'not_newer', `second pull not_newer: ${JSON.stringify(again.body)}`);
+});
+
+// Test 7 pulls A's GENUINE policy, so the signature check has never been asked to refuse anything.
+// A policy document decides what a visiting node may do here — replicate memory, route through us —
+// so an unverified one is a stranger writing our own permissions. The pull is driven from a stub
+// that serves whatever we hand it, which is the only way to present a document A never signed.
+await test('8. a policy that is unsigned or tampered is refused, and the local caps do not move', async () => {
+  const genuine = (await A.json('/v1/federation/network-policy')).body.data.policy;
+  assert(typeof genuine?.policy_version === 'number', `A must serve a policy: ${JSON.stringify(genuine)}`);
+
+  let served: unknown = genuine;
+  const stub = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true, node_id: 'stub', data: { policy: served } }));
+  });
+  await new Promise<void>(r => stub.listen(40284, r));
+  const STUB = 'http://localhost:40284';
+  const pullFromStub = () => P.json('/v1/federation/network-policy/pull', {
+    method: 'POST', headers: auth(P.ownerToken), body: JSON.stringify({ source_url: STUB }),
+  });
+  const capsNow = async () => (await P.json('/v1/federation/network-policy')).body.data.policy?.visiting_permission_caps ?? {};
+
+  try {
+    // POSITIVE CONTROL FIRST: the genuine document reaches the version gate, which proves the stub is
+    // reachable, the issuer is known and the SIGNATURE VERIFIED — the signature check runs before it.
+    served = genuine;
+    const ok = await pullFromStub();
+    assert(ok.status === 200, `control status ${ok.status}: ${JSON.stringify(ok.body)}`);
+    assert(ok.body.data?.reason === 'not_newer',
+      `the genuine doc must reach the version gate, got ${JSON.stringify(ok.body.data)}`);
+
+    const before = await capsNow();
+
+    // TAMPERED: newer version, widened caps, A's original signature still attached.
+    served = {
+      ...genuine,
+      policy_version: genuine.policy_version + 5,
+      visiting_permission_caps: { ...(genuine.visiting_permission_caps ?? {}), replicate_memory: true, allow_routing: true },
+    };
+    const tampered = await pullFromStub();
+    assert(tampered.body?.data?.applied !== true,
+      `a tampered policy must not apply: ${JSON.stringify(tampered.body?.data ?? tampered.body)}`);
+
+    // UNSIGNED: same widened document with the signature stripped.
+    const { signature: _drop, ...bare } = served as Record<string, unknown>;
+    served = bare;
+    const unsigned = await pullFromStub();
+    assert(unsigned.body?.data?.applied !== true,
+      `an unsigned policy must not apply: ${JSON.stringify(unsigned.body?.data ?? unsigned.body)}`);
+
+    // The caps this node grants a visitor are exactly what they were.
+    const after = await capsNow();
+    assert(JSON.stringify(after) === JSON.stringify(before),
+      `the refused pulls must not widen our caps: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+  } finally {
+    stub.close();
+  }
 });
 
 console.log(`\n${'═'.repeat(50)}`);
