@@ -8,6 +8,18 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=profile-tabs
  * @version-history
+ *   v1.2.0 — 2026-08-16 — August 2026 test-quality audit, five findings in this file, all of the same
+ *     family: a status range or an echo accepted as proof. The work lifecycle asserted `status < 500`
+ *     on all four transitions and read nothing back — the rating call had been answering 400 since
+ *     the suite was written (it sent `rating: 5` against a positive/negative enum) and DELIVER had
+ *     been answering 400 too (no `output` field), so the second half of the lifecycle never ran once.
+ *     Transitions are now read back from GET /v1/work/:tc, the escrow settlement is read from the
+ *     provider's wallet, and a requester, a provider and an uninvolved third agent are each refused
+ *     the doors that are not theirs. The GDPR export asserted nothing about its content and was never
+ *     requested by a stranger. The agent-scope PATCH accepted a 500 as success, so a no-op that
+ *     echoed the requested scopes would have passed; it now re-reads the record and mints a fresh
+ *     token to prove the narrowing bites. The app access code was set and cleared without ever
+ *     fetching the app to see whether protection was in force.
  *   v1.1.0 — 2026-08-12 — Audit H-2 fallout in two tabs. Boards: the agent token created a PUBLIC
  *     board, which only an operator may do, and it worked because the token mint copied the owner's
  *     roles; it now asserts the refusal and creates the shared board a normal principal gets.
@@ -374,28 +386,89 @@ await test('POST /v1/work/request — create work item (agent1 → agent2)', asy
     assert(typeof workTrackingCode === 'string' && workTrackingCode.length > 0, 'got tracking code');
 });
 
-await test('POST /v1/work/:tc/accept — accept work (provider)', async () => {
+// The four transitions used to assert only `status < 500`, which a 400, a 403 and a 409 all pass.
+// The rating call had in fact been failing since the suite was written: it sent `rating: 5` while
+// WorkRatingSchema is z.enum(['positive','negative']), so the route answered 400 VALIDATION_ERROR
+// and the test reported green. Each transition is now read back from GET /v1/work/:tc, and the
+// escrow the delivery settles is read from the provider's wallet.
+async function workStatus(): Promise<string> {
+    const { body } = await authJson(`/v1/work/${workTrackingCode}`, agent2Token);
+    return body.data?.status ?? body.data?.work?.status ?? '';
+}
+async function balanceOf(token: string): Promise<number> {
+    const { body } = await authJson('/v1/wallet', token);
+    return Number(body.data?.balance ?? -1);
+}
+
+// A tracking code is the only thing these routes take, so who is holding it is the whole gate.
+// Every call in this suite was made by the correct party; no third principal had ever been tried.
+let agent3Token = '';
+
+await test('Setup — a third agent, party to nothing', async () => {
+    const reg = await authJson('/v1/agents', ownerToken, {
+        method: 'POST', body: JSON.stringify({ name: 'bystander', owner: ownerName, capabilities: ['actions'] }),
+    });
+    assert(reg.body.ok === true, `create the third agent: ${JSON.stringify(reg.body.error)}`);
+    const gaii = reg.body.data.agent.gaii as string;
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(reg.body.data.private_key, gaii + timestamp);
+    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature }) });
+    assert(body.ok === true, `third agent token: ${JSON.stringify(body.error)}`);
+    agent3Token = body.data.token;
+});
+
+await test('Only the PROVIDER can accept, deliver or reject → everyone else 403', async () => {
+    if (!workTrackingCode) { assert(false, 'no tracking code'); return; }
+    for (const [who, token] of [['the requester', agentToken], ['a bystander', agent3Token]] as const) {
+        for (const door of ['accept', 'deliver', 'reject']) {
+            const { status, body } = await authJson(`/v1/work/${workTrackingCode}/${door}`, token, {
+                method: 'POST', body: JSON.stringify(door === 'deliver' ? { output: { result: 'stolen' } } : {}),
+            });
+            assert(status === 403, `${who} on ${door}: expected 403, got ${status}: ${JSON.stringify(body.error)}`);
+        }
+    }
+    assert(await workStatus() === 'pending', 'the work item is untouched by the refusals');
+});
+
+await test('POST /v1/work/:tc/accept — accept work (provider) → 200 and the item says accepted', async () => {
     if (!workTrackingCode) { assert(false, 'no tracking code'); return; }
     const { status, body } = await authJson(`/v1/work/${workTrackingCode}/accept`, agent2Token, { method: 'POST' });
-    assert(status < 500, `accept: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(status === 200, `accept: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(await workStatus() === 'accepted', 'the work item moved to accepted');
 });
 
-await test('POST /v1/work/:tc/deliver — deliver work (provider)', async () => {
+await test('POST /v1/work/:tc/deliver — deliver work (provider) → 200, delivered, and the escrow settles', async () => {
     if (!workTrackingCode) { assert(false, 'no tracking code'); return; }
+    const before = await balanceOf(agent2Token);
     const { status, body } = await authJson(`/v1/work/${workTrackingCode}/deliver`, agent2Token, {
         method: 'POST',
-        body: JSON.stringify({ result: 'E2E delivery result', notes: 'Completed by test' }),
+        body: JSON.stringify({ output: { result: 'E2E delivery result', notes: 'Completed by test' } }),
     });
-    assert(status < 500, `deliver: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(status === 200, `deliver: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(await workStatus() === 'delivered', 'the work item moved to delivered');
+    const after = await balanceOf(agent2Token);
+    assert(after > before, `the provider must be paid on delivery: ${before} → ${after}`);
 });
 
-await test('POST /v1/work/:tc/rate — rate work (requester)', async () => {
+await test('Only the REQUESTER can rate → the provider and a bystander 403', async () => {
+    if (!workTrackingCode) { assert(false, 'no tracking code'); return; }
+    for (const [who, token] of [['the provider', agent2Token], ['a bystander', agent3Token]] as const) {
+        const { status, body } = await authJson(`/v1/work/${workTrackingCode}/rate`, token, {
+            method: 'POST', body: JSON.stringify({ rating: 'positive', comment: 'not mine to give' }),
+        });
+        assert(status === 403, `${who} rating: expected 403, got ${status}: ${JSON.stringify(body.error)}`);
+    }
+    assert(await workStatus() === 'delivered', 'the work item is still awaiting its own requester');
+});
+
+await test('POST /v1/work/:tc/rate — rate work (requester) → 200 and the item says rated', async () => {
     if (!workTrackingCode) { assert(false, 'no tracking code'); return; }
     const { status, body } = await authJson(`/v1/work/${workTrackingCode}/rate`, agentToken, {
         method: 'POST',
-        body: JSON.stringify({ rating: 5, comment: 'Great work' }),
+        body: JSON.stringify({ rating: 'positive', comment: 'Great work' }),
     });
-    assert(status < 500, `rate: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(status === 200, `rate: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(await workStatus() === 'rated', 'the work item moved to rated');
 });
 
 // Work rejection test (create another work item)
@@ -660,22 +733,72 @@ await test('GET /v1/agents — list agents', async () => {
     assert(agents.length >= 1, 'has at least 1 agent');
 });
 
-await test('PATCH /v1/agents/:name/scopes — update agent scopes (readonly)', async () => {
+// Both tests used to accept `ok === true || status === 500` — an internal error read as success —
+// and neither re-read the agent nor minted a token to see whether the narrowing had taken effect.
+// A no-op updateAgent that still echoed the requested scopes would have passed both: the owner is
+// told the agent is read-only while it keeps everything it had.
+const READONLY_SCOPES = ['memory:read', 'wallet:read', 'work:read'];
+const STANDARD_SCOPES = ['memory:read', 'memory:write', 'memory:delete', 'wallet:read', 'work:read', 'work:request', 'work:accept', 'consent:manage'];
+
+/** A FRESH agent JWT — scopes are copied from the record at mint time, so an old token proves nothing. */
+async function mintProfileAgentToken(): Promise<string> {
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(agentPrivKey, agentGaii + timestamp);
+    const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii: agentGaii, timestamp, signature }) });
+    assert(body.ok === true, `re-mint: ${JSON.stringify(body.error)}`);
+    return body.data.token;
+}
+async function storedScopes(): Promise<string[]> {
+    const { body } = await authJson('/v1/agents', ownerToken);
+    const agents = body.data?.agents || body.data;
+    const mine = (agents as any[]).find(a => a.gaii === agentGaii);
+    assert(!!mine, 'the agent is in the owner\'s list');
+    return (mine.default_scopes ?? mine.defaultScopes ?? mine.scopes ?? []) as string[];
+}
+
+await test('PATCH /v1/agents/:name/scopes — narrowing to read-only takes effect on a fresh token', async () => {
     const { status, body } = await authJson('/v1/agents/profileagent/scopes', ownerToken, {
         method: 'PATCH',
-        body: JSON.stringify({ scopes: ['memory:read', 'wallet:read', 'work:read'] }),
+        body: JSON.stringify({ scopes: READONLY_SCOPES }),
     });
-    // May return 500 INTERNAL if storage provider doesn't implement updateAgent fully
-    assert(body.ok === true || status === 500, `scopes readonly: ${JSON.stringify(body.error)}`);
-    if (status === 500) console.log('    (KNOWN BUG: storage.updateAgent returns null — needs fix)');
+    assert(status === 200, `scopes readonly: status ${status}: ${JSON.stringify(body.error)}`);
+    const stored = await storedScopes();
+    assert(JSON.stringify([...stored].sort()) === JSON.stringify([...READONLY_SCOPES].sort()),
+        `the record must hold exactly what was sent, got ${JSON.stringify(stored)}`);
+
+    // The proof the echo cannot give: a token minted now must be refused where it could write before.
+    const narrowToken = await mintProfileAgentToken();
+    const write = await authJson('/v1/memory', narrowToken, {
+        method: 'POST', body: JSON.stringify({ key: 'profiletabs.scope.probe', value: { ok: true }, visibility: 'owner' }),
+    });
+    assert(write.status === 403, `a read-only agent must be refused a write, got ${write.status}: ${JSON.stringify(write.body.error)}`);
+    const read = await authJson('/v1/memory?limit=1', narrowToken);
+    assert(read.status === 200, `…while its reading still works: ${read.status}`);
 });
 
-await test('PATCH /v1/agents/:name/scopes — update agent scopes (standard)', async () => {
+await test('A DIFFERENT owner cannot narrow this agent → 403/404', async () => {
+    const { status, body } = await authJson('/v1/agents/profileagent/scopes', owner2Token, {
+        method: 'PATCH', body: JSON.stringify({ scopes: ['*'] }),
+    });
+    assert(status === 403 || status === 404, `cross-owner scope PATCH must 403/404, got ${status}: ${JSON.stringify(body).slice(0, 160)}`);
+    const stored = await storedScopes();
+    assert(!stored.includes('*'), `the agent must still be read-only: ${JSON.stringify(stored)}`);
+});
+
+await test('PATCH /v1/agents/:name/scopes — widening back to standard is stored', async () => {
     const { status, body } = await authJson('/v1/agents/profileagent/scopes', ownerToken, {
         method: 'PATCH',
-        body: JSON.stringify({ scopes: ['memory:read', 'memory:write', 'memory:delete', 'wallet:read', 'work:read', 'work:request', 'work:accept', 'consent:manage'] }),
+        body: JSON.stringify({ scopes: STANDARD_SCOPES }),
     });
-    assert(body.ok === true || status === 500, `scopes standard: ${JSON.stringify(body.error)}`);
+    assert(status === 200, `scopes standard: status ${status}: ${JSON.stringify(body.error)}`);
+    const stored = await storedScopes();
+    assert(JSON.stringify([...stored].sort()) === JSON.stringify([...STANDARD_SCOPES].sort()),
+        `the record must hold exactly what was sent, got ${JSON.stringify(stored)}`);
+    const wideToken = await mintProfileAgentToken();
+    const write = await authJson('/v1/memory', wideToken, {
+        method: 'POST', body: JSON.stringify({ key: 'profiletabs.scope.probe', value: { ok: true }, visibility: 'owner' }),
+    });
+    assert(write.status === 200 || write.status === 201, `the widened agent may write again, got ${write.status}: ${JSON.stringify(write.body.error)}`);
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -756,9 +879,22 @@ await test('DELETE bulk consents — revoke multiple', async () => {
     }
 });
 
-await test('GET /v1/owners/:name/export — GDPR export', async () => {
+// The export is the whole account in one response: identity, agents, balance, memberships. It used
+// to assert `ok === true || status === 200` and nothing about the content, so an empty body passed —
+// and it was never requested by anyone but its own owner.
+await test('GET /v1/owners/:name/export — GDPR export carries the account, not an empty envelope', async () => {
     const { status, body } = await authJson(`/v1/owners/${encodeURIComponent(ownerName)}/export`, ownerToken);
-    assert(body.ok === true || status === 200, `export: ${JSON.stringify(body.error)}`);
+    assert(status === 200, `export: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(body.data?.owner?.name === ownerName, `the export names its owner: ${JSON.stringify(body.data?.owner)}`);
+    assert(body.data?.ghii?.ghii?.startsWith(`${ownerName}@`), `the GHII record is present: ${JSON.stringify(body.data?.ghii?.ghii)}`);
+    assert(Array.isArray(body.data?.agents) && body.data.agents.length >= 1, `the owner's agents are in the export: ${JSON.stringify(body.data?.agents?.length)}`);
+    assert(typeof body.data?.exported_at === 'string', 'the export is stamped');
+});
+
+await test('A DIFFERENT owner cannot export this account → 403', async () => {
+    const { status, body } = await authJson(`/v1/owners/${encodeURIComponent(ownerName)}/export`, owner2Token);
+    assert(status === 403, `cross-owner export must 403, got ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    assert(body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${body.error?.code}`);
 });
 
 // ══════════════════════════════════════════════════════════════════
@@ -788,12 +924,24 @@ await test('GET /v1/apps — list apps', async () => {
     assert(Array.isArray(apps), 'apps is array');
 });
 
-await test('PATCH /v1/apps/:filename — set access code', async () => {
+// Both PATCH tests used to assert only `status < 500`, which a 403 SCOPE_DENIED also passes, and
+// the app was never fetched afterwards — so the owner could be told the app was protected while it
+// kept serving to anyone. The code gates OTHER people, so the probe is an anonymous fetch.
+await test('PATCH /v1/apps/:filename — set access code, and the app stops serving to strangers', async () => {
+    const before = await json(`/v1/apps/${ownerName}/e2e-test.html`);
+    assert(before.status === 200, `the app serves anonymously before protection, got ${before.status}`);
+
     const { status, body } = await authJson('/v1/apps/e2e-test.html', agentToken, {
         method: 'PATCH',
         body: JSON.stringify({ access_code: 'secret123' }),
     });
-    assert(status < 500, `set access code: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(status === 200, `set access code: status ${status}: ${JSON.stringify(body.error)}`);
+
+    const locked = await json(`/v1/apps/${ownerName}/e2e-test.html`);
+    assert(locked.status === 403, `a protected app must refuse an anonymous fetch, got ${locked.status}`);
+    assert(locked.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${JSON.stringify(locked.body.error)}`);
+    const withCode = await json(`/v1/apps/${ownerName}/e2e-test.html?code=secret123`);
+    assert(withCode.status === 200, `the right code opens it, got ${withCode.status}`);
 });
 
 await test('PATCH /v1/apps/:filename — remove access code', async () => {
@@ -801,7 +949,9 @@ await test('PATCH /v1/apps/:filename — remove access code', async () => {
         method: 'PATCH',
         body: JSON.stringify({ access_code: '' }),
     });
-    assert(status < 500, `remove access code: status ${status}: ${JSON.stringify(body.error)}`);
+    assert(status === 200, `remove access code: status ${status}: ${JSON.stringify(body.error)}`);
+    const open = await json(`/v1/apps/${ownerName}/e2e-test.html`);
+    assert(open.status === 200, `after clearing the code the app serves anonymously again, got ${open.status}`);
 });
 
 await test('DELETE /v1/apps/:filename — delete app', async () => {
