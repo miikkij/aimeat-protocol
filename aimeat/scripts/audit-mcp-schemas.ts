@@ -166,9 +166,10 @@ const KNOWN_INPUT_DRIFT = new Set<string>([
     //
     // This list is a DEBT REGISTER, not an approval. Each entry names what a connector caller
     // cannot currently reach.
-    'aimeat_memory_read',        // owner_scope — cannot read the owner's or a sibling agent's record
-    'aimeat_memory_write',       // owner_scope (write lands in the agent's namespace, never the owner's), expected_version (no optimistic lock)
-    'aimeat_memory_search',      // include_versions, limit
+    // memory_read is RECONCILED and off this list. The other two keep one parameter each, and both
+    // need a REST change first rather than a connector line:
+    'aimeat_memory_write',       // expected_version — POST /v1/memory has no optimistic lock at all; the server MCP calls the write service directly and the PUT route spells it `version`
+    'aimeat_memory_search',      // include_versions — GET /v1/memory/search does not read it; the server MCP applies the filter itself
     'aimeat_extension_install',  // activate, update
     'aimeat_knowledge_contribute', // model
     'aimeat_capabilities_create',  // status

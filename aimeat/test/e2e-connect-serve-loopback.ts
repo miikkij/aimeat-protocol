@@ -232,6 +232,76 @@ await test('MCP initialize + tools/list works on the loopback /v1/mcp', async ()
   }
 });
 
+await test('owner_scope survives the connector — a dropped permission flag looks exactly like a missing key', async () => {
+  // MEASURED IN PRODUCTION BEFORE THIS TEST EXISTED. A crew's public mirror, whose job was to copy
+  // six agents' writes, had only ever seen its own namespace: aimeat_memory_read answered NOT_FOUND
+  // through the connector while GET /v1/memory/<key>?owner_scope=true returned the record. The route
+  // had honoured the flag all along and this surface had no way to send it, so zod dropped it and
+  // the answer came back as absence. That is the worst shape a stripped parameter can take — nobody
+  // debugging a 404 goes looking for a permission word.
+  const key = `loopback.ownerscope.${Date.now().toString(36)}`;
+  const written = await json(BASE, '/v1/memory', {
+    method: 'POST', headers: { Authorization: `Bearer ${account.ownerToken}` },
+    body: JSON.stringify({ key, value: { written_by: 'the owner' }, visibility: 'private' }),
+  });
+  assert(written.status === 200 || written.status === 201, `owner write: ${written.status} ${JSON.stringify(written.body)}`);
+
+  const client = new Client({ name: 'loopback-e2e-scope', version: '1.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`));
+  await client.connect(transport);
+  try {
+    const plain = await client.callTool({ name: 'aimeat_memory_read', arguments: { key } });
+    const plainText = JSON.stringify(plain.content ?? plain);
+    assert(!plainText.includes('the owner'),
+      `without the flag the agent must NOT see the owner's record: ${plainText.slice(0, 200)}`);
+
+    const scoped = await client.callTool({ name: 'aimeat_memory_read', arguments: { key, owner_scope: true } });
+    const scopedText = JSON.stringify(scoped.content ?? scoped);
+    assert(scopedText.includes('the owner'),
+      `owner_scope did not reach the node — this is the drift, not a missing key: ${scopedText.slice(0, 300)}`);
+  } finally {
+    await client.close();
+  }
+});
+
+await test('REFUSAL — owner_scope now reaches the node, and it must NOT become a way into the reserved keys', async () => {
+  // The denial case that belongs with the fix above. Giving this surface the ability to ASK for the
+  // owner's namespace is only safe because the node still decides, and the sharpest test of that is
+  // a key the server itself trusts. `memory:write-reserved` sits in SCOPES_OUTSIDE_WILDCARD, so this
+  // agent — which holds '*' — is exactly the principal that must still be refused: full access is
+  // not the reserved grant, and openrouter.* is where a decrypted AI key's destination URL lives.
+  const client = new Client({ name: 'loopback-e2e-reserved', version: '1.0.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(`${loopbackBase}/v1/mcp`));
+  await client.connect(transport);
+  try {
+    const r = await client.callTool({
+      name: 'aimeat_memory_write',
+      arguments: { key: 'openrouter.settings', value: { base_url: 'https://attacker.example' }, owner_scope: true },
+    });
+    const said = JSON.stringify(r.content ?? r);
+    assert(said.includes('RESERVED_KEY'),
+      `a '*' agent must still be refused the reserved keys on the owner's behalf: ${said.slice(0, 300)}`);
+  } finally {
+    await client.close();
+  }
+
+  // The same refusal at HTTP level, through the loopback proxy, which carries the pinned agent
+  // identity. The MCP tool answers 200 with the refusal in its body — that is the MCP contract — so
+  // the STATUS has to be asserted on the door that has one.
+  const direct = await json(loopbackBase, '/v1/memory', {
+    method: 'POST',
+    body: JSON.stringify({ key: 'openrouter.settings', value: { base_url: 'https://attacker.example' }, owner_scope: true }),
+  });
+  assert(direct.status === 403, `expected 403 RESERVED_KEY, got ${direct.status}: ${JSON.stringify(direct.body).slice(0, 200)}`);
+
+  // And the refusal is a refusal, not a message: nothing was written.
+  const after = await json(BASE, '/v1/memory/openrouter.settings', {
+    headers: { Authorization: `Bearer ${account.ownerToken}` },
+  });
+  assert(after.status === 404 || !JSON.stringify(after.body).includes('attacker.example'),
+    `the refused write reached the owner's namespace anyway: ${JSON.stringify(after.body).slice(0, 200)}`);
+});
+
 // ─── Realtime delivery ───
 console.log('\nPhase 3 — Realtime push to the loopback long-poll');
 

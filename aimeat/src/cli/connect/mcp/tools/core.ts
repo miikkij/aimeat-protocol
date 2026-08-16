@@ -6,6 +6,12 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.10.0 -- 2026-08-16 -- owner_scope on memory_read and memory_write, limit on memory_search.
+ *     All three existed on the server MCP tool and on the REST route and were undeclared here, so
+ *     zod dropped them. Measured cost: a crew's public mirror read only its own namespace for weeks
+ *     while its job was to copy six agents' writes, and every connector write landed under the agent
+ *     however the caller meant it. A dropped permission flag comes back as NOT_FOUND, which is the
+ *     one shape nobody debugs by looking for a missing scope.
  *   v1.9.0 -- 2026-08-15 -- aimeat_storage_delete, so the connector surface does not lag the node.
  *   v1.0.0 -- 2026-05-28 -- Initial connector MCP core tools
  *   v1.1.0 -- 2026-05-28 -- Add memory tags and owner-scope listing support
@@ -42,10 +48,16 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   mcp.tool('aimeat_memory_read', descriptionFor('aimeat_memory_read'), {
     agent_name: agentNameSchema,
     key: z.string().describe('Memory entry key'),
+    // MEASURED IN PRODUCTION BEFORE THIS EXISTED. A crew's public mirror, whose whole job was to
+    // copy six agents' writes, had only ever seen its own namespace: aimeat_memory_read came back
+    // NOT_FOUND while GET /v1/memory/<key>?owner_scope=true returned 455 kB of the same record. The
+    // route had honoured the flag all along; this surface had no way to send it, and a dropped
+    // permission parameter looks exactly like a missing key, so nobody thinks to check a scope.
+    owner_scope: z.boolean().optional().describe("Also look in the OWNER's namespace and your sibling agents', not only your own. The node decides whether you may: this only asks."),
     response_format: responseFormatSchema,
-  }, annotationsFor('aimeat_memory_read'), async ({ agent_name, key, response_format }) => {
+  }, annotationsFor('aimeat_memory_read'), async ({ agent_name, key, owner_scope, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
-    const resp = await client.get(`/v1/memory/${encodeURIComponent(key)}`);
+    const resp = await client.get(`/v1/memory/${encodeURIComponent(key)}${owner_scope ? '?owner_scope=true' : ''}`);
     // readPayloadWithProvenance, not `resp.data ?? resp`: this route serves the record on the
     // ENVELOPE carrier (meta.provenance), and the plain unwrap threw the envelope away — so a crew
     // reading its own content back got the id and no statement. TARGET-058 Phase 11b.
@@ -60,14 +72,20 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     group_id: z.string().optional().describe('ID of sharing group (required for group visibility)'),
     tags: z.array(z.string()).optional().describe('Optional tags for filtering/shared areas'),
     ttl_hours: z.number().optional().describe('Time-to-live in hours'),
+    // The write half of the same hole. Without this every write through the connector landed in the
+    // AGENT's namespace, whatever the caller meant, and the owner's own tools then could not see it.
+    // Requires the memory:write-as-owner scope, which the owner grants per agent and the ROUTE
+    // enforces — resolveWriteTarget() refuses without it, so sending the flag can only ask.
+    owner_scope: z.boolean().optional().describe("Write under the OWNER instead of yourself, so the owner's own tools read it as theirs. Needs the memory:write-as-owner scope. Without this the write lands in your own namespace, as before. Separate from `visibility`: where a record lives and who may read it are different questions."),
     ...aiProvenanceInputs,
-  }, annotationsFor('aimeat_memory_write'), async ({ agent_name, key, value, visibility, group_id, tags, ttl_hours, ai_provenance, ai_provenance_id }) => {
+  }, annotationsFor('aimeat_memory_write'), async ({ agent_name, key, value, visibility, group_id, tags, ttl_hours, owner_scope, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const body: Record<string, unknown> = { key, value };
     if (visibility) body.visibility = visibility;
     if (group_id) body.group_id = group_id;
     if (tags) body.tags = tags;
     if (ttl_hours !== undefined) body.ttl_hours = ttl_hours;
+    if (owner_scope) body.owner_scope = true;
     // An id the node already minted travels in the write body itself — POST /v1/memory takes
     // `ai_provenance_id` and checks it belongs to this owner. An inline DECLARATION cannot: the
     // route has no field for it, so it is recorded after the write, against this key, by
@@ -108,10 +126,12 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     agent_name: agentNameSchema,
     query: z.string().describe('Search query'),
     visibility: z.string().optional().describe('Optional visibility filter'),
-  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, visibility }) => {
+    limit: z.number().optional().describe('Max hits to return (default 50, cap 200).'),
+  }, annotationsFor('aimeat_memory_search'), async ({ agent_name, query, visibility, limit }) => {
     const { client } = pickAgent(registry, agent_name);
     const params = new URLSearchParams({ q: query });
     if (visibility) params.set('visibility', visibility);
+    if (limit !== undefined) params.set('limit', String(limit));
     const resp = await client.get(`/v1/memory/search?${params.toString()}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
