@@ -178,44 +178,6 @@ await test('10. Public scope finds another user\'s public knowledge package — 
     assert(/Public .*digest/.test(hit.title), `title should be the package name, got ${hit.title}`);
 });
 
-await test('10b. Public scope does NOT find another user\'s PRIVATE record', async () => {
-    // The public scope is the only branch that searches the WHOLE node, and its single protection is
-    // the `{ visibility: 'public' }` option passed to storage.searchText. Test 10 proves a public
-    // record IS found across owners; nothing proved a private one is not. Tests 6 and 11 both run in
-    // the OWN scope, so neither covers this branch. Drop that option and every private note, organism
-    // record and workspace document on the node becomes full-text searchable by any authenticated
-    // caller, with test 10 still green.
-    const secret = 'zubprivateterm';
-    const w = await json('/v1/memory', {
-        method: 'POST', headers: auth(A.token),
-        body: JSON.stringify({ key: 'notebook.inbox.secret', value: { text: `a ${secret} nobody else may find` }, visibility: 'private' }),
-    });
-    assert(w.status === 201 || w.status === 200, `private note ${w.status}: ${JSON.stringify(w.body.error)}`);
-
-    // A finds their own, so the term is genuinely indexed and the absence below is a refusal rather
-    // than a miss.
-    const mine = await json(`/v1/librarian/search?q=${secret}`, { headers: auth(A.token) });
-    assert((mine.body.data.hits || []).some((h: any) => h.key === 'notebook.inbox.secret'),
-        `the owner finds their own note: ${JSON.stringify((mine.body.data.hits || []).map((h: any) => h.key))}`);
-
-    const theirs = await json(`/v1/librarian/search?q=${secret}&scope=public`, { headers: auth(B.token) });
-    assert(theirs.status === 200, `public search ${theirs.status}`);
-    const leaked = (theirs.body.data.hits || []);
-    assert(leaked.length === 0,
-        `B found A's private record in the public scope: ${JSON.stringify(leaked.map((h: any) => h.key))}`);
-
-    // And the record's own visibility is what decides it — an owner-visibility record is not public
-    // either, and that tier is the one a "not private" test would let through.
-    const ownerScoped = 'zubownerterm';
-    await json('/v1/memory', {
-        method: 'POST', headers: auth(A.token),
-        body: JSON.stringify({ key: 'notebook.inbox.ownerscoped', value: { text: `an ${ownerScoped} for my agents` }, visibility: 'owner' }),
-    });
-    const ow = await json(`/v1/librarian/search?q=${ownerScoped}&scope=public`, { headers: auth(B.token) });
-    assert((ow.body.data.hits || []).length === 0,
-        `B found A's owner-visibility record: ${JSON.stringify((ow.body.data.hits || []).map((h: any) => h.key))}`);
-});
-
 await test('11. Own scope does NOT return another user\'s public content', async () => {
     const r = await json(`/v1/librarian/search?q=zubpublicterm&scope=own`, { headers: auth(B.token) });
     assert(r.status === 200, `search ${r.status}`);

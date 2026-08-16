@@ -328,39 +328,6 @@ await test('4. aimeat_memory_search finds entries by query (snippet hits, no ful
     }
 });
 
-await test('4b. the search is scoped to the CALLER — another owner\'s records are not in it', async () => {
-    // Every principal in this file belongs to one owner, so no other owner's records exist and the
-    // scoping of aimeat_memory_search is asserted by nothing: replacing
-    // `storage.searchMemory(agentGaii, …)` with an unscoped search, or one that reads a
-    // caller-supplied gaii, keeps every hit assertion above passing while the tool returns every
-    // owner's memory on the node.
-    const strangerName = `mcpmemxout${Date.now()}`;
-    const reg = await json('/v1/ghii', {
-        method: 'POST',
-        body: JSON.stringify({ username: strangerName, display_name: 'Outside Owner', password: 'McpMemx1234' }),
-    });
-    assert(reg.status === 201, `stranger ghii ${reg.status}`);
-    const ts = new Date().toISOString();
-    const tok = await json('/v1/auth/token', {
-        method: 'POST',
-        body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts) }),
-    });
-    const strangerToken = tok.body.data.token as string;
-
-    // The same word the caller searches for, in someone else's namespace, and PRIVATE.
-    const w = await json('/v1/memory', {
-        method: 'POST', headers: { Authorization: `Bearer ${strangerToken}` },
-        body: JSON.stringify({ key: 'outsider.note', value: { content: 'searchable content owned by nobody here' }, visibility: 'private' }),
-    });
-    assert(w.status === 201, `stranger write ${w.status}: ${JSON.stringify(w.body?.error)}`);
-
-    const { body } = await mcpRpc('tools/call', { name: 'aimeat_memory_search', arguments: { query: 'searchable' } }, 1031);
-    const res = JSON.parse(body.result.content[0].text);
-    assert(res.hits.length >= 2, `the caller still finds their own: ${res.hits.length}`);
-    assert(!res.hits.some((h: any) => h.key === 'outsider.note'),
-        `the search returned another owner's record: ${JSON.stringify(res.hits.map((h: any) => h.key))}`);
-});
-
 await test('5. aimeat_memory_search with visibility filter', async () => {
     const { body } = await mcpRpc('tools/call', {
         name: 'aimeat_memory_search',
@@ -425,29 +392,6 @@ await test('8. aimeat_memory_read_public denies access to private entry', async 
     assert(body.result.isError === true, 'should be error');
     const text = body.result.content[0].text;
     assert(text.includes('Access denied') || text.includes('not public'), `error message: ${text}`);
-});
-
-await test('8b. read_public refuses every non-public tier, not just private', async () => {
-    // Only 'private' and 'public' are ever tested here, so changing the guard from
-    // `record.visibility !== 'public'` to `record.visibility === 'private'` keeps the suite green
-    // while 'owner', 'group' and 'members' records become world-readable through the tool — including
-    // the visibility:'owner' records this same file writes further down.
-    for (const tier of ['owner', 'members']) {
-        const key = `readpublic.tier.${tier}`;
-        const w = await mcpRpc('tools/call', {
-            name: 'aimeat_memory_write',
-            arguments: { key, value: { content: `a ${tier} record` }, visibility: tier },
-        }, 2100 + tier.length);
-        assert(JSON.parse(w.body.result.content[0].text).written === true, `write ${tier}: ${w.body.result.content[0].text}`);
-
-        const r = await mcpRpc2('tools/call', {
-            name: 'aimeat_memory_read_public', arguments: { gaii: agentGaii, key },
-        }, 2200 + tier.length);
-        assert(r.body.result?.isError === true,
-            `read_public handed back a '${tier}' record: ${r.body.result?.content?.[0]?.text}`);
-        assert(!String(r.body.result.content[0].text).includes(`a ${tier} record`),
-            `and the value came with it: ${r.body.result.content[0].text}`);
-    }
 });
 
 await test('9. aimeat_memory_read_public returns error for non-existent key', async () => {

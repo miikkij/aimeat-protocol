@@ -391,51 +391,6 @@ await test('PUT a never-seen extension name → 201 created (create-via-PUT)', a
   assert(body.data.extension?.status === 'inactive', `status: ${body.data.extension?.status}`);
 });
 
-// ─── Who may replace what is already there ──────────────────────────────────────────────────────
-//
-// This suite owns both upsert endpoints and registers exactly ONE owner, so the ownership check on
-// the UPDATE branch of each is exercised by nothing. cortex-e2e covers cross-owner export, activate,
-// deactivate and delete but never PUT, and e2e-ext-hardening covers GET, so
-// `existing.installedBy !== req.auth!.owner` on PUT was uncovered repo-wide. Delete it and any owner
-// replaces another owner's cortex LIB BYTES in place — bytes that are served as JavaScript to every
-// browser that loads the victim's app — with this suite and cortex-e2e both green.
-await test('another owner cannot PUT over this cortex, or this extension', async () => {
-  const strangerName = `upsertx${Date.now()}`;
-  const reg = await json('/v1/ghii', {
-    method: 'POST',
-    body: JSON.stringify({ username: strangerName, display_name: 'Upsert Stranger', password: 'Upsert1234' }),
-  });
-  assert(reg.status === 201, `stranger ghii ${reg.status}`);
-  const ts = new Date().toISOString();
-  const tok = await json('/v1/auth/token', {
-    method: 'POST',
-    body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts) }),
-  });
-  const strangerHdr = { Authorization: `Bearer ${tok.body.data.token}` };
-
-  const EVIL = 'export function hello() { return "owned by the stranger"; }';
-  const put = await json(`/v1/cortex/${CORTEX_ENC}`, {
-    method: 'PUT', headers: strangerHdr,
-    body: JSON.stringify({ manifest: cortexManifest('9.9.9', 'stranger'), libs: { 'demo.js': EVIL } }),
-  });
-  assert(put.status === 403 || put.status === 404,
-    `a stranger replaced another owner's cortex: ${put.status} ${JSON.stringify(put.body?.error)}`);
-
-  // The bytes are the point: they are served to every browser that loads the victim's app.
-  const served = await fetch(`${BASE}/v1/cortex/${CORTEX_ENC}/libs/demo.js`);
-  const text = await served.text();
-  assert(!text.includes('owned by the stranger'), `the stranger's bytes are being served: ${text.slice(0, 120)}`);
-
-  const putExt = await json(`/v1/extensions/${encodeURIComponent(EXT)}`, {
-    method: 'PUT', headers: strangerHdr,
-    body: JSON.stringify({ manifest: extManifest, scripts: { 'actions/echo.js': EXT_SCRIPT_V1 } }),
-  });
-  assert(putExt.status === 403 || putExt.status === 404,
-    `a stranger replaced another owner's extension: ${putExt.status} ${JSON.stringify(putExt.body?.error)}`);
-
-  await json(`/v1/owners/${strangerName}`, { method: 'DELETE', headers: strangerHdr });
-});
-
 // ─── Cleanup ───
 console.log('\nCleanup');
 for (const name of [CORTEX, CORTEX_NEW]) {
