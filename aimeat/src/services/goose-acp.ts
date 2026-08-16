@@ -1,39 +1,35 @@
 /**
  * @file goose-acp.ts
- * @description A real ACP client for a `goose serve` agent: two channels, bidirectional, and it
- *   answers the agent's callbacks.
+ * @description An ACP client for a goose agent, over stdio, that answers the agent's callbacks.
  *
- *   The last part is the whole reason this file is not thirty lines. ACP is not request/response —
- *   the agent calls BACK to the client mid-turn to ask permission for a tool call or to read a file,
- *   and a client that never answers leaves the turn hanging forever with no error and no output.
- *   That is exactly what a shell probe produces, which is why the transport was verified with curl
- *   and the prompt path could not be: curl is half a client, and half a client and a broken server
- *   look identical from outside.
+ *   The callbacks are why this is not thirty lines. ACP is bidirectional: the agent calls BACK
+ *   mid-turn to ask permission for a tool call or to read a file, and a client that never answers
+ *   leaves the turn hanging forever with no error and no output.
  *
- *   Transport, measured against goose 1.45.0 rather than read from a spec:
- *     - POST /acp  — send a JSON-RPC request. Answers with an empty body; the reply arrives elsewhere.
- *     - GET  /acp  — Accept: text/event-stream. EVERY response and notification arrives here.
- *     - `initialize` is the exception: it answers inline and returns the connection id in the
- *       `acp-connection-id` header, which every later call must carry.
- *     - Auth is the header `X-Secret-Key`, not `Authorization: Bearer`.
+ *   STDIO, NOT HTTP, and that was measured rather than chosen for taste. `goose serve` exposes the
+ *   same protocol over HTTP and its transport works for requests — initialize, session/new, even a
+ *   clean -32601 for an unknown method — but it never delivers a single `session/update`
+ *   notification, so a turn produces nothing and hangs. The identical prompt over `goose acp` on
+ *   stdio answers in 5.2 s with agent_message_chunk and a stopReason. Measured on goose 1.45.0 and
+ *   1.46.0, with the model call visible on the provider's side in both cases.
+ *
+ *   Stdio is also the better fit here: no port, no shared secret, no loopback surface to protect,
+ *   and the lifetime of the agent is a plain child process.
  * @structure
- *   - GooseAcpClient — connect(), newSession(), prompt(), cancel(), close()
+ *   - GooseAcpClient — start(), newSession(), prompt(), cancel(), close()
  *   - SessionUpdate — what a turn emits, normalised for the chat surface
  * @usage
- *   const acp = await GooseAcpClient.connect(config);
- *   const sessionId = await acp.newSession({ mcpServers: [aimeatServer(token)] });
+ *   const acp = await GooseAcpClient.start(config);
+ *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
- *   v1.0.0 — 2026-08-16 — Initial. The transport below is MEASURED against goose 1.45.0 and works:
- *     initialize, the connection id, the event stream, session/new with per-session MCP servers, and
- *     the error channel all behave as written. `session/prompt` does NOT: goose accepts it and never
- *     answers — no result, no error, not even a validation error for empty params, while an unknown
- *     method errors immediately. Excluded by measurement: a slow model (7 min), a broken MCP
- *     extension (clean profile), the provider (`goose run` answers in 5 s on the same profile), and
- *     a client that ignores the agent's callbacks, which was the strongest hypothesis and the reason
- *     this file answers them. So this client is finished and blocked upstream rather than unfinished.
- *     See docs/internal/owncustomchatinterface/04 §3c for the reproduction and the next three moves.
+ *   v2.0.0 — 2026-08-16 — Stdio replaces HTTP. `goose serve` delivers no session/update over its
+ *     HTTP transport, which makes every turn silent; `goose acp` on stdio delivers them and the
+ *     same turn completes in seconds. The dispatch, the callback answers and the update
+ *     normalisation are unchanged — only the pipe moved.
+ *   v1.0.0 — 2026-08-16 — Initial, over `goose serve` HTTP.
  */
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -52,7 +48,7 @@ export type SessionUpdate =
     | { kind: 'thought'; text: string }
     | { kind: 'tool_call'; id: string; title: string; status: string; raw: unknown }
     | { kind: 'other'; type: string; raw: unknown }
-    | { kind: 'done'; stopReason: string }
+    | { kind: 'done'; stopReason: string; tokens?: number }
     | { kind: 'error'; message: string };
 
 interface JsonRpcMessage {
@@ -61,11 +57,13 @@ interface JsonRpcMessage {
     method?: string;
     params?: Record<string, unknown>;
     result?: unknown;
-    error?: { code: number; message: string };
+    error?: { code: number; message: string; data?: unknown };
 }
 
-/** How long a single turn may run before the client gives up on it. Turns take minutes, not seconds. */
+/** How long one turn may run. Turns take minutes when an agent is building something. */
 const TURN_TIMEOUT_MS = 15 * 60_000;
+/** How long the handshake may take before the child is considered broken. */
+const HANDSHAKE_TIMEOUT_MS = 30_000;
 
 export class GooseAcpClient {
     private nextId = 100;
@@ -73,135 +71,92 @@ export class GooseAcpClient {
         resolve: (v: unknown) => void; reject: (e: Error) => void;
     }>();
     private readonly bus = new EventEmitter();
-    private abort: AbortController | null = null;
+    private buffer = '';
     private closed = false;
 
-    private constructor(
-        private readonly baseUrl: string,
-        private readonly secret: string,
-        private readonly connectionId: string,
-    ) {
-        // One listener per in-flight turn plus the stream itself; the default of 10 is too few once a
-        // handful of people are talking at once, and the warning it prints is not a real leak.
+    private constructor(private readonly child: ChildProcessWithoutNullStreams) {
+        // One listener per in-flight turn; the default of 10 is too few once a handful of people are
+        // talking at once, and the warning it prints is not a real leak.
         this.bus.setMaxListeners(256);
-    }
 
-    private headers(extra: Record<string, string> = {}): Record<string, string> {
-        return {
-            'X-Secret-Key': this.secret,
-            'acp-connection-id': this.connectionId,
-            ...extra,
-        };
+        child.stdout.setEncoding('utf8');
+        child.stdout.on('data', (chunk: string) => this.onData(chunk));
+        child.stderr.setEncoding('utf8');
+        child.stderr.on('data', (d: string) => {
+            const line = d.trim();
+            if (line) logger.warn(`[goose] ${line.slice(0, 500)}`);
+        });
+        child.on('exit', (code, signal) => {
+            this.closed = true;
+            this.failAllPending(new Error(`goose exited (code ${code}, signal ${signal})`));
+            logger.warn(`[goose] agent process exited: code ${code}, signal ${signal}`);
+        });
     }
 
     /**
-     * Handshake, then open the event stream.
+     * Start the agent and shake hands.
      *
-     * The client capabilities are declared HONESTLY: this client has no filesystem and no terminal,
-     * because the node it runs in has neither to offer a hosted agent. Claiming otherwise and then
-     * failing the callback is worse than saying no up front — the agent plans around what the client
-     * says it can do.
+     * Client capabilities are declared HONESTLY: no filesystem, no terminal. The node has neither to
+     * offer a hosted agent, and claiming otherwise then failing the callback is worse than saying no
+     * up front — the agent plans around what the client says it can do.
      */
-    static async connect(config: AimeatConfig): Promise<GooseAcpClient> {
-        const baseUrl = config.gooseUrl.replace(/\/+$/, '');
-        const secret = config.gooseSecret;
-        if (!baseUrl) throw new Error('AIMEAT_GOOSE_URL is not set; the chat agent is disabled.');
+    static async start(config: AimeatConfig): Promise<GooseAcpClient> {
+        const bin = config.gooseBin || 'goose';
+        const env: NodeJS.ProcessEnv = { ...process.env };
+        if (config.goosePathRoot) env.GOOSE_PATH_ROOT = config.goosePathRoot;
+        // Every model call this agent makes is billed to whoever owns this key. The node decides who
+        // may spend it before a turn is ever started; goose only sees the key.
+        if (config.gooseProviderApiKey) env.OPENROUTER_API_KEY = config.gooseProviderApiKey;
 
-        const resp = await fetch(`${baseUrl}/acp`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Secret-Key': secret },
-            body: JSON.stringify({
-                jsonrpc: '2.0', id: 1, method: 'initialize',
-                params: {
-                    protocolVersion: 1,
-                    clientCapabilities: {
-                        fs: { readTextFile: false, writeTextFile: false },
-                        terminal: false,
-                    },
-                },
-            }),
-        });
-        if (!resp.ok) throw new Error(`goose initialize: HTTP ${resp.status}`);
-        const connectionId = resp.headers.get('acp-connection-id');
-        if (!connectionId) throw new Error('goose initialize returned no acp-connection-id');
-        const body = await resp.json() as JsonRpcMessage;
-        if (body.error) throw new Error(`goose initialize: ${body.error.message}`);
+        const child = spawn(bin, ['acp'], { stdio: ['pipe', 'pipe', 'pipe'], env });
+        const client = new GooseAcpClient(child);
 
-        const client = new GooseAcpClient(baseUrl, secret, connectionId);
-        await client.openStream();
-        logger.info(`[goose] ACP connected (${connectionId})`);
+        const info = await client.call('initialize', {
+            protocolVersion: 1,
+            clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
+        }, HANDSHAKE_TIMEOUT_MS) as { agentInfo?: { name?: string; version?: string } };
+
+        logger.info(`[goose] agent ready: ${info.agentInfo?.name ?? 'goose'} ${info.agentInfo?.version ?? ''}`);
         return client;
     }
 
-    /** Open the SSE channel and pump it. Every reply and notification comes through here. */
-    private async openStream(): Promise<void> {
-        this.abort = new AbortController();
-        const resp = await fetch(`${this.baseUrl}/acp`, {
-            method: 'GET',
-            headers: this.headers({ Accept: 'text/event-stream' }),
-            signal: this.abort.signal,
-        });
-        if (!resp.ok || !resp.body) throw new Error(`goose stream: HTTP ${resp.status}`);
-
-        void (async () => {
-            const reader = resp.body!.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
+    /** Split the stream into lines; every line is one JSON-RPC message. */
+    private onData(chunk: string): void {
+        this.buffer += chunk;
+        let cut: number;
+        while ((cut = this.buffer.indexOf('\n')) !== -1) {
+            const line = this.buffer.slice(0, cut).trim();
+            this.buffer = this.buffer.slice(cut + 1);
+            if (!line) continue;
             try {
-                for (;;) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    buffer += decoder.decode(value, { stream: true });
-                    // SSE frames are separated by a blank line. A line starting with ':' is a
-                    // keep-alive comment and carries nothing.
-                    let cut: number;
-                    while ((cut = buffer.indexOf('\n\n')) !== -1) {
-                        const frame = buffer.slice(0, cut);
-                        buffer = buffer.slice(cut + 2);
-                        for (const line of frame.split('\n')) {
-                            if (!line.startsWith('data:')) continue;
-                            const payload = line.slice(5).trim();
-                            if (!payload) continue;
-                            try {
-                                this.dispatch(JSON.parse(payload) as JsonRpcMessage);
-                            } catch (err) {
-                                logger.warn(`[goose] unparseable frame: ${String(err)}`);
-                            }
-                        }
-                    }
-                }
-            } catch (err) {
-                if (!this.closed) logger.warn(`[goose] stream ended: ${String(err)}`);
-            } finally {
-                this.failAllPending(new Error('goose stream closed'));
+                this.dispatch(JSON.parse(line) as JsonRpcMessage);
+            } catch {
+                // goose writes the occasional human line to stdout; it is not a protocol error.
+                logger.info(`[goose] ${line.slice(0, 300)}`);
             }
-        })();
+        }
     }
 
-    /**
-     * Route one message: a reply to something we asked, a REQUEST from the agent that we must answer,
-     * or a notification.
-     */
+    /** A reply to us, a request FROM the agent that must be answered, or a notification. */
     private dispatch(msg: JsonRpcMessage): void {
-        // A reply to us.
         if (msg.id !== undefined && !msg.method) {
             const waiter = this.pending.get(msg.id);
-            if (waiter) {
-                this.pending.delete(msg.id);
-                if (msg.error) waiter.reject(new Error(`${msg.error.code}: ${msg.error.message}`));
-                else waiter.resolve(msg.result);
+            if (!waiter) return;
+            this.pending.delete(msg.id);
+            if (msg.error) {
+                const detail = msg.error.data ? ` (${JSON.stringify(msg.error.data)})` : '';
+                waiter.reject(new Error(`${msg.error.code}: ${msg.error.message}${detail}`));
+            } else {
+                waiter.resolve(msg.result);
             }
             return;
         }
 
-        // A request FROM the agent. Answering these is what keeps a turn moving; ignoring one hangs
-        // it silently and forever, which is the failure this client exists to avoid.
         if (msg.method && msg.id !== undefined) {
-            void this.answerAgentRequest(msg);
+            this.answerAgentRequest(msg);
             return;
         }
 
-        // A notification. session/update carries the turn's contents.
         if (msg.method === 'session/update') {
             const params = msg.params as { sessionId?: string; update?: Record<string, unknown> } | undefined;
             if (params?.sessionId) this.bus.emit(`update:${params.sessionId}`, params.update ?? {});
@@ -211,41 +166,34 @@ export class GooseAcpClient {
     /**
      * Answer the agent's callbacks.
      *
-     * Permission is granted, because the node has already decided what this session may do: the
-     * session's MCP token carries the owner's scopes, and the tool surface refuses what it must. A
-     * second yes/no here would be a permission model in a place that cannot see the identity.
+     * Permission is granted, because the node already decided what this session may do: the session's
+     * MCP token carries the owner's scopes and the tool surface refuses what it must. A second
+     * yes/no here would be a permission model in a place that cannot see the identity.
      *
-     * Filesystem and terminal are refused, matching what connect() declared. A hosted agent has no
-     * machine, and the draft tools are how it writes.
+     * Filesystem and terminal are refused, matching what start() declared.
      */
-    private async answerAgentRequest(msg: JsonRpcMessage): Promise<void> {
+    private answerAgentRequest(msg: JsonRpcMessage): void {
         const method = msg.method!;
-        let result: unknown;
-        let error: { code: number; message: string } | undefined;
-
         if (method === 'session/request_permission') {
             const opts = (msg.params as { options?: Array<{ optionId?: string; kind?: string }> } | undefined)?.options ?? [];
             const allow = opts.find((o) => o.kind === 'allow_always')
                 ?? opts.find((o) => o.kind === 'allow_once')
                 ?? opts[0];
-            result = { outcome: { outcome: 'selected', optionId: allow?.optionId ?? 'allow' } };
-        } else if (method.startsWith('fs/') || method.startsWith('terminal/')) {
-            error = { code: -32601, message: 'This client has no filesystem or terminal.' };
-        } else {
-            error = { code: -32601, message: `Unsupported client method: ${method}` };
-        }
-
-        try {
-            await fetch(`${this.baseUrl}/acp`, {
-                method: 'POST',
-                headers: this.headers({ 'Content-Type': 'application/json' }),
-                body: JSON.stringify(error
-                    ? { jsonrpc: '2.0', id: msg.id, error }
-                    : { jsonrpc: '2.0', id: msg.id, result }),
+            this.write({
+                jsonrpc: '2.0', id: msg.id,
+                result: { outcome: { outcome: 'selected', optionId: allow?.optionId ?? 'allow' } },
             });
-        } catch (err) {
-            logger.warn(`[goose] failed to answer ${method}: ${String(err)}`);
+            return;
         }
+        this.write({
+            jsonrpc: '2.0', id: msg.id,
+            error: { code: -32601, message: 'This client has no filesystem or terminal.' },
+        });
+    }
+
+    private write(msg: unknown): void {
+        if (this.closed) return;
+        this.child.stdin.write(`${JSON.stringify(msg)}\n`);
     }
 
     private failAllPending(err: Error): void {
@@ -253,9 +201,8 @@ export class GooseAcpClient {
         this.pending.clear();
     }
 
-    /** Send a request and wait for its reply on the stream. */
-    private async call(method: string, params: Record<string, unknown>, timeoutMs = 60_000): Promise<unknown> {
-        if (this.closed) throw new Error('goose client is closed');
+    private call(method: string, params: Record<string, unknown>, timeoutMs = 60_000): Promise<unknown> {
+        if (this.closed) return Promise.reject(new Error('goose agent is not running'));
         const id = this.nextId++;
         const done = new Promise<unknown>((resolve, reject) => {
             this.pending.set(id, { resolve, reject });
@@ -263,16 +210,7 @@ export class GooseAcpClient {
                 if (this.pending.delete(id)) reject(new Error(`goose ${method} timed out after ${timeoutMs}ms`));
             }, timeoutMs).unref?.();
         });
-
-        const resp = await fetch(`${this.baseUrl}/acp`, {
-            method: 'POST',
-            headers: this.headers({ 'Content-Type': 'application/json' }),
-            body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        });
-        if (!resp.ok) {
-            this.pending.delete(id);
-            throw new Error(`goose ${method}: HTTP ${resp.status}`);
-        }
+        this.write({ jsonrpc: '2.0', id, method, params });
         return done;
     }
 
@@ -283,9 +221,9 @@ export class GooseAcpClient {
             mcpServers: opts.mcpServers,
         }) as { sessionId?: string; extensionLoadResults?: Array<{ name: string; success: boolean; error?: string }> };
 
-        // A session is created even when an MCP server failed to load, so the failure only shows in
+        // A session is created even when an MCP server failed to load, so the failure shows only in
         // this list. Reading it is the difference between "the chat has its tools" and "the chat
-        // exists"; measured on a node that was down, where the session came back fine and empty.
+        // exists"; measured against a node that was down, where the session came back fine and empty.
         for (const ext of result.extensionLoadResults ?? []) {
             if (!ext.success) logger.warn(`[goose] extension "${ext.name}" failed to load: ${ext.error ?? 'unknown'}`);
         }
@@ -302,18 +240,16 @@ export class GooseAcpClient {
         const onUpdate = (update: Record<string, unknown>) => push(normalise(update));
         this.bus.on(`update:${sessionId}`, onUpdate);
 
-        const turn = this.call('session/prompt', {
-            sessionId,
-            prompt: [{ type: 'text', text }],
-        }, TURN_TIMEOUT_MS)
-            .then((r) => push({ kind: 'done', stopReason: String((r as { stopReason?: string })?.stopReason ?? 'end_turn') }))
+        void this.call('session/prompt', { sessionId, prompt: [{ type: 'text', text }] }, TURN_TIMEOUT_MS)
+            .then((r) => {
+                const res = r as { stopReason?: string; usage?: { totalTokens?: number } };
+                push({ kind: 'done', stopReason: String(res?.stopReason ?? 'end_turn'), tokens: res?.usage?.totalTokens });
+            })
             .catch((e: Error) => push({ kind: 'error', message: e.message }));
 
         try {
             for (;;) {
-                if (queue.length === 0) {
-                    await new Promise<void>((resolve) => { wake = resolve; });
-                }
+                if (queue.length === 0) await new Promise<void>((resolve) => { wake = resolve; });
                 const next = queue.shift();
                 if (!next) continue;
                 yield next;
@@ -321,7 +257,6 @@ export class GooseAcpClient {
             }
         } finally {
             this.bus.off(`update:${sessionId}`, onUpdate);
-            void turn;
         }
     }
 
@@ -332,10 +267,20 @@ export class GooseAcpClient {
         });
     }
 
+    /** Stop the agent. SIGTERM first; a child that ignores it is killed after a grace period. */
     close(): void {
+        if (this.closed) return;
         this.closed = true;
-        this.abort?.abort();
         this.failAllPending(new Error('goose client closed'));
+        try {
+            this.child.kill('SIGTERM');
+            setTimeout(() => {
+                // eslint-disable-next-line aimeat/no-silent-catch -- the child is already gone, which is the outcome this line wanted
+                try { this.child.kill('SIGKILL'); } catch { /* exited on SIGTERM */ }
+            }, 5_000).unref?.();
+        } catch (err) {
+            logger.warn(`[goose] could not stop the agent: ${String(err)}`);
+        }
     }
 }
 
@@ -358,6 +303,8 @@ function normalise(update: Record<string, unknown>): SessionUpdate {
                 raw: update,
             };
         default:
+            // usage_update, session_info_update, available_commands_update and whatever goose adds
+            // next. Kept rather than dropped: the chat shows spend and the work log from these.
             return { kind: 'other', type: kind, raw: update };
     }
 }

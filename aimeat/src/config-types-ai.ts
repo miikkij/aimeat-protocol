@@ -14,12 +14,19 @@
 
 export interface AiCapabilityConfig {
   /**
-   * Where a `goose serve` ACP agent is listening. Empty (the default) disables the chat entirely,
-   * which is what every node does until an operator runs one.
+   * The goose binary the chat agent runs as a child process (`goose acp`, ACP over stdio). Empty
+   * (the default) disables the chat entirely, which is what every node does until an operator
+   * installs one.
+   *
+   * Stdio rather than `goose serve` over HTTP, and that was measured: the HTTP transport accepts
+   * requests but delivers no session/update notifications, so every turn is silent. Stdio also
+   * needs no port, no shared secret and no loopback surface to protect.
    */
-  gooseUrl: string;
-  /** Its GOOSE_SERVER__SECRET_KEY. The ACP port authenticates with the header X-Secret-Key. */
-  gooseSecret: string;
+  gooseBin: string;
+  /** GOOSE_PATH_ROOT for the child: its own config and session store, away from any human's. */
+  goosePathRoot: string;
+  /** The provider key the agent calls with. Who may spend it is decided before a turn starts. */
+  gooseProviderApiKey: string;
   /**
    * This node's own OpenRouter key, used for a person who has not brought one. Empty (the default)
    * means the node pays for nothing and everyone brings their own, which is how every node behaved
