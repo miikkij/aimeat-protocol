@@ -904,6 +904,81 @@ await test('23c. A plain owner cannot decide a peering request or file a trust a
     assert(advisory.status === 403, `trust advisory expected 403, got ${advisory.status}: ${JSON.stringify(advisory.body.error)}`);
 });
 
+// ─── Phase 7: the genesis memory-read door ───
+// GET /v1/federation/genesis-memory-read is registered with NO auth middleware (federation-genesis.ts
+// :518) while its POST twin (:382) carries requireAuth() and every genesis-peer admin route carries
+// requireAuth + requireRole('operator'). Its handler never consults the peers map, the genesis peer
+// list or the per-peer subscriptions: what it reads is `visibility: 'public'` plus an active
+// `federation`-scope consent on the agent, and the prefix-only branch walks storage.listAgents()
+// across every owner on the node. Nothing in the corpus called either door.
+//
+// THESE TESTS PIN THE CURRENT CONTRACT, THEY DO NOT ENDORSE IT. If a peer gate is added here, this
+// phase is what tells you exactly what changed and for whom — which is the reason to write it before
+// touching the route rather than after.
+console.log('\nPhase 7 — The genesis memory-read door, as it stands today');
+
+const GEN_PREFIX = `genesisprobe${Date.now()}`;
+
+await test('23. Setup: the agent writes one public and one private key under the same prefix', async () => {
+    const pub = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: `${GEN_PREFIX}.open`, value: { note: 'meant to be shared' }, visibility: 'public' }),
+    });
+    assert(pub.status === 200 || pub.status === 201, `public write: ${pub.status} ${JSON.stringify(pub.body)}`);
+    const priv = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: `${GEN_PREFIX}.closed`, value: { note: 'never' }, visibility: 'private' }),
+    });
+    assert(priv.status === 200 || priv.status === 201, `private write: ${priv.status} ${JSON.stringify(priv.body)}`);
+});
+
+await test('24. WITHOUT a federation consent the door returns nothing — the consent is the gate', async () => {
+    const r = await json(`/v1/federation/genesis-memory-read?prefix=${GEN_PREFIX}`);
+    assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body)}`);
+    assert(r.body.data.total === 0, `expected nothing before the consent, got ${JSON.stringify(r.body.data.results)}`);
+});
+
+await test('25. WITH the consent the public key is served — to a caller carrying no credential at all', async () => {
+    const consent = await json('/v1/consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({
+            data_pattern: `${GEN_PREFIX}.*`, recipient: '*', purpose: 'federation read probe', scope: 'federation',
+        }),
+    });
+    assert(consent.status === 200 || consent.status === 201, `consent: ${consent.status} ${JSON.stringify(consent.body)}`);
+
+    // No Authorization header, no signature, no peer id. That IS the current contract.
+    const r = await json(`/v1/federation/genesis-memory-read?prefix=${GEN_PREFIX}`);
+    assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body)}`);
+    const keys = (r.body.data.results as any[]).map(x => x.key);
+    assert(keys.includes(`${GEN_PREFIX}.open`), `the public key must be served: ${JSON.stringify(keys)}`);
+    assert(!keys.includes(`${GEN_PREFIX}.closed`), `the private key must never be served: ${JSON.stringify(keys)}`);
+});
+
+await test('26. A direct lookup of the PRIVATE key returns nothing even with the consent in place', async () => {
+    const r = await json(`/v1/federation/genesis-memory-read?gaii=${encodeURIComponent(agentGaii)}&key=${GEN_PREFIX}.closed`);
+    assert(r.status === 200, `status ${r.status}`);
+    assert(r.body.data.total === 0, `private direct read must be empty: ${JSON.stringify(r.body.data.results)}`);
+});
+
+await test('27. replica:, genesis: and expiring: keys are excluded even when public and consented', async () => {
+    for (const reserved of ['replica', 'genesis', 'expiring']) {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: `${reserved}:${GEN_PREFIX}.leak`, value: { note: 'reserved' }, visibility: 'public' }),
+        });
+        assert(w.status === 200 || w.status === 201, `${reserved} write: ${w.status}`);
+        const c = await json('/v1/consent', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ data_pattern: `${reserved}:*`, recipient: '*', purpose: 'reserved probe', scope: 'federation' }),
+        });
+        assert(c.status === 200 || c.status === 201, `${reserved} consent: ${c.status}`);
+        const r = await json(`/v1/federation/genesis-memory-read?prefix=${reserved}:`);
+        const keys = (r.body.data.results as any[]).map(x => x.key);
+        assert(!keys.some(k => k.startsWith(`${reserved}:`)), `${reserved}: keys must be excluded: ${JSON.stringify(keys)}`);
+    }
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 
