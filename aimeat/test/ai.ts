@@ -292,6 +292,49 @@ await test('GET /v1/libs lists aimeat-ai', async () => {
   assert(!!found, 'aimeat-ai listed in /v1/libs');
 });
 
+await test('POST /v1/ai/complete needs ai:use — an agent without it is refused, one with it is not', async () => {
+  // This is the endpoint that spends the owner's OpenRouter key against their daily budget, and the
+  // gate is "an owner session OR a token carrying ai:use". Only a human owner session is ever used
+  // here — no agent JWT, no app-grant token, no ecosystem token — so the scope half of
+  // gateOwnerOrAiUseAgent is never reached. Weaken routes/ai.ts to `if (roles.includes('owner'))
+  // return true;` — literally the H-2 defect the code comment above it records, where a mirrored
+  // agent token spent the owner's AI budget without the word the owner would have had to grant — and
+  // all 21 tests stay green. (e2e-librarian covers routes/librarian.ts, which is a SECOND copy of
+  // this gate; nothing covered this one.)
+  const mkAgent = async (name: string, scopes: string[]) => {
+    const reg = await json('/v1/agents', {
+      method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+      body: JSON.stringify({ name, owner: ownerName, capabilities: ['memory'], model: 'gpt-4o', scopes }),
+    });
+    assert(reg.status === 201, `agent ${name} ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const gaii = (reg.body.data as any).agent.gaii as string;
+    const ts = new Date().toISOString();
+    const t = await json('/v1/auth/token', {
+      method: 'POST',
+      body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg((reg.body.data as any).private_key, gaii + ts) }),
+    });
+    return (t.body.data as any).token as string;
+  };
+
+  const narrow = await mkAgent('ai-narrow', ['memory:read']);
+  const refused = await json('/v1/ai/complete', {
+    method: 'POST', headers: { Authorization: `Bearer ${narrow}` }, body: JSON.stringify({ prompt: 'hello' }),
+  });
+  assert(refused.status === 403,
+    `an agent without ai:use reached the AI door: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+  assert(/ai:use/.test(JSON.stringify(refused.body?.error ?? {})),
+    `the refusal must name the missing word: ${JSON.stringify(refused.body?.error)}`);
+
+  // The positive control: with the word, the same agent gets PAST the gate and is stopped by the
+  // missing API key instead — which is how we know the 403 above was the scope and not the door.
+  const wide = await mkAgent('ai-wide', ['memory:read', 'ai:use']);
+  const allowed = await json('/v1/ai/complete', {
+    method: 'POST', headers: { Authorization: `Bearer ${wide}` }, body: JSON.stringify({ prompt: 'hello' }),
+  });
+  assert(allowed.status === 400 && (allowed.body as any).error?.code === 'NO_API_KEY',
+    `a ticked agent should reach NO_API_KEY, got ${allowed.status} ${JSON.stringify(allowed.body?.error)}`);
+});
+
 // ─── Done ───
 console.log(`\n${passed}/${passed + failed} passed${failed > 0 ? `, ${failed} failed` : ''}\n`);
 if (failed > 0) process.exit(1);
