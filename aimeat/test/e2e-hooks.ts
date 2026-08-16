@@ -1,3 +1,9 @@
+// 2026-08-16 (August 2026 test-quality audit, e2e-hooks:206): a hook runs on every work request on
+// the node, and every call to the three admin hook doors in this file was the operator. Test 4b adds
+// the second owner the suite already has — registered after the operator, so roles are exactly
+// [owner] — and asserts 403 ACCESS_DENIED on PUT, DELETE and GET, then reads the hook list back as
+// the operator. Measured with the role relaxed to owner: the refused PUT lands, clears the list, and
+// the two blocking tests downstream go red with it.
 // T-7: Hook Execution E2E Tests
 // Run: cd aimeat && pnpm exec tsx test/e2e-hooks.ts
 
@@ -211,6 +217,36 @@ await test('4. Configure pre_work_request hook', async () => {
     });
     assert(status === 200, `hook config: ${status} ${JSON.stringify(body)}`);
     assert(body.data.actions.includes(hookActionId), 'action in hook list');
+});
+
+// A hook runs on every work request on the node, so who may set one is an operator decision. Every
+// call to these three doors in this file is the suite's own operator, and no other suite touches
+// them, so the role gate was covered by nothing. providerOwnerToken is the honest second principal:
+// it is registered through POST /v1/owners AFTER the operator exists, so routes/owners.ts gives it
+// roles ['owner'] and never 'operator', whatever state the database was in.
+await test('4b. A non-operator owner is refused every hook door, and the list does not move', async () => {
+    const asProvider = { Authorization: `Bearer ${providerOwnerToken}` };
+
+    const put = await json('/v1/admin/hooks/pre_work_request', {
+        method: 'PUT', headers: asProvider, body: JSON.stringify({ actions: [] }),
+    });
+    assert(put.status === 403, `PUT: expected 403, got ${put.status}: ${JSON.stringify(put.body.error)}`);
+    assert(put.body.error?.code === 'ACCESS_DENIED', `PUT code: ${put.body.error?.code}`);
+
+    const del = await json('/v1/admin/hooks/pre_work_request', { method: 'DELETE', headers: asProvider });
+    assert(del.status === 403, `DELETE: expected 403, got ${del.status}: ${JSON.stringify(del.body.error)}`);
+    assert(del.body.error?.code === 'ACCESS_DENIED', `DELETE code: ${del.body.error?.code}`);
+
+    const list = await json('/v1/admin/hooks', { headers: asProvider });
+    assert(list.status === 403, `GET: expected 403, got ${list.status}: ${JSON.stringify(list.body.error)}`);
+    assert(list.body.error?.code === 'ACCESS_DENIED', `GET code: ${list.body.error?.code}`);
+
+    // The hook list lives in process memory as well as storage, so a landed write would show here.
+    const asOperator = await json('/v1/admin/hooks', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(asOperator.status === 200, `operator read: ${asOperator.status}`);
+    const configured = asOperator.body.data.extension_hooks?.pre_work_request ?? asOperator.body.data.hooks?.pre_work_request;
+    assert(JSON.stringify(configured) === JSON.stringify([hookActionId]),
+        `the refused calls must leave the hook list alone, got ${JSON.stringify(configured)}`);
 });
 
 // ─── Phase 2: Pre-Hook Blocking (pre_work_request) ───
