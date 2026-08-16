@@ -54,4 +54,25 @@ describe('what every connected agent is told about speaking to a person', () => 
     it('tells the agent it does not have to ask anyone to file a bug report', () => {
         expect(text()).toMatch(/reports its own faults/i);
     });
+
+    it('leads with what the person gets, not with the research', () => {
+        expect(text()).toMatch(/lead with what they get/i);
+    });
+
+    it('turns "what I could not finish" into "what happens next"', () => {
+        // The same honesty, framed forward. A list of things the assistant could not do reads as a
+        // confession, and it worries somebody with no way to judge whether it matters — which is the
+        // opposite of the reassurance the report is supposed to carry.
+        const t = text();
+        expect(t).toMatch(/say what happens next instead of what you did not finish/i);
+        expect(t).toMatch(/reads as a confession/i);
+    });
+
+    it('OFFERS the technical detail rather than waiting to be asked', () => {
+        // Withholding was never the goal. A curious person should be able to have all of it in one
+        // more sentence, and everybody else is spared it by default.
+        const t = text();
+        expect(t).toMatch(/offer the detail, do not wait to be asked/i);
+        expect(t).toMatch(/withholding is not the goal/i);
+    });
 });
