@@ -35,6 +35,12 @@
  *   v1.4.0 — 2026-06-16 — B6 report content: seed `support-advisory@1` payloads into the owner outbox
  *     before completing a task and assert the in-app report now carries advisoryCount + the advisory
  *     titles + a rendered body embedding the count/titles + the routed organism (the richer report).
+ *   v1.5.0 — 2026-08-16 — (j) WHO MAY WRITE THE RULE (August 2026 test-quality audit): the suite had one
+ *     owner and one token, so nothing here had ever been refused. Adds a second owner and an agent of
+ *     the first owner against PUT/GET/DELETE of the recipe and against the advisory pending list and
+ *     approve/reject, plus a read-back proving the refusals changed nothing. Measured with
+ *     requireRole('owner') dropped from all six routes: the agent writes `organism: 'agent-hijack'`
+ *     onto its owner's rule and approves their advisory, and all 27 original tests stay green.
  */
 
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ecosystem-automation-recipe
@@ -641,6 +647,121 @@ await test('Approve a non-existent advisory → 404', async () => {
     method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
   });
   assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
+});
+
+// ─── (j) WHO MAY WRITE THE RULE: a second owner and an agent of this owner ───
+// A recipe is the rule that materialises agent tasks and routes them into a named organism, so
+// writing one is an act with reach. Every call above is the owner's own session; nothing here had
+// ever been refused. Both principals are needed and they fail differently: a SECOND OWNER is
+// refused by the (owner, app) key — the app is not connected under their name — and an AGENT of
+// THIS owner is refused by requireRole('owner') before the key is ever read. Drop that role gate
+// and the agent case is the one that turns red.
+console.log('\n(j) A second owner and an agent may not write the rule');
+
+let otherToken = '';
+let agentToken = '';
+
+await test('Setup — a second owner and an agent of the first owner', async () => {
+  const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: `${ownerName}b`, public_key: 'placeholder' }) });
+  assert(reg.status === 201, `register second owner: ${reg.status} ${JSON.stringify(reg.body)}`);
+  otherToken = await getOwnerToken(`${ownerName}b`, reg.body.data.private_key);
+
+  const ag = await json('/v1/agents', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ name: 'recipebot', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read', 'memory:write'] }),
+  });
+  assert(ag.status === 201, `create agent: ${ag.status} ${JSON.stringify(ag.body)}`);
+  const gaii = ag.body.data.agent.gaii as string;
+  const ts = new Date().toISOString();
+  const tok = await json('/v1/auth/token', {
+    method: 'POST',
+    body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(ag.body.data.private_key, gaii + ts) }),
+  });
+  assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+  agentToken = tok.body.data.token;
+  assert(!!otherToken && !!agentToken, 'both principals hold a token');
+});
+
+await test('Neither principal may approve or reject an advisory → 403', async () => {
+  const advisoryId = `adv-denial-${Date.now()}`;
+  await seedAndDrain({ requireApproval: true, advisoryId, triggerKey: 'feedback.stats.advdenial' });
+  let pending: any[] = [];
+  for (let i = 0; i < 24; i++) {
+    await sleep(250);
+    pending = await listPendingAdvisories();
+    if (pending.some(p => p.id === advisoryId)) break;
+  }
+  assert(pending.some(p => p.id === advisoryId), `advisory parked for the denial test: ${JSON.stringify(pending.map(p => p.id))}`);
+
+  const agentApprove = await json(`/v1/ecosystem-apps/${APP}/advisories/${advisoryId}/approve`, {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+  });
+  assert(agentApprove.status === 403, `agent approve expected 403, got ${agentApprove.status}: ${JSON.stringify(agentApprove.body)}`);
+  const agentList = await json(`/v1/ecosystem-apps/${APP}/advisories/pending`, { headers: { Authorization: `Bearer ${agentToken}` } });
+  assert(agentList.status === 403, `agent pending list expected 403, got ${agentList.status}`);
+  const otherReject = await json(`/v1/ecosystem-apps/${APP}/advisories/${advisoryId}/reject`, {
+    method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
+  });
+  assert(otherReject.status === 404, `second owner reject expected 404, got ${otherReject.status}: ${JSON.stringify(otherReject.body)}`);
+
+  // The advisory is still the owner's to decide.
+  const after = await listPendingAdvisories();
+  assert(after.some(p => p.id === advisoryId), 'the advisory must still be pending for the owner');
+});
+
+// The rule as it stands right now, so the refusals below can be shown to have changed nothing.
+// Captured AFTER the advisory test, because seedAndDrain rewrites the recipe on its way through.
+let recipeBefore: any = null;
+
+await test('The owner reads their own recipe (the control for what must not change)', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}`);
+  recipeBefore = body.data.recipe;
+  assert(!!recipeBefore && !!recipeBefore.id, `a recipe must exist here: ${JSON.stringify(body.data)}`);
+});
+
+await test("An AGENT of this owner cannot WRITE the owner's recipe → 403", async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${agentToken}` },
+    body: JSON.stringify({ agents: [AGENT], trigger: { keyGlob: 'feedback.stats.*' }, organism: 'agent-hijack', email: false, require_approval: false, enabled: true }),
+  });
+  assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('An AGENT of this owner cannot READ or DELETE the recipe → 403', async () => {
+  const get = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, { headers: { Authorization: `Bearer ${agentToken}` } });
+  assert(get.status === 403, `GET expected 403, got ${get.status}: ${JSON.stringify(get.body)}`);
+  const del = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'DELETE', headers: { Authorization: `Bearer ${agentToken}` },
+  });
+  assert(del.status === 403, `DELETE expected 403, got ${del.status}: ${JSON.stringify(del.body)}`);
+});
+
+await test('A SECOND OWNER cannot write, read or delete this recipe', async () => {
+  const put = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    method: 'PUT', headers: { Authorization: `Bearer ${otherToken}` },
+    body: JSON.stringify({ agents: [], trigger: { keyGlob: 'feedback.stats.*' }, organism: 'other-owner-org', email: false, require_approval: false, enabled: true }),
+  });
+  assert(put.status === 404, `PUT expected 404 (app not connected under them), got ${put.status}: ${JSON.stringify(put.body)}`);
+  const get = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, { headers: { Authorization: `Bearer ${otherToken}` } });
+  assert(get.status === 200 && get.body.data.recipe === null, `GET must show them no recipe: ${get.status} ${JSON.stringify(get.body.data)}`);
+  const del = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, { method: 'DELETE', headers: { Authorization: `Bearer ${otherToken}` } });
+  assert(del.status === 404, `DELETE expected 404, got ${del.status}: ${JSON.stringify(del.body)}`);
+});
+
+await test('After every refusal the recipe is byte-for-byte what it was', async () => {
+  const { status, body } = await json(`/v1/ecosystem-apps/${APP}/automation/recipe`, {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status === 200, `status ${status}`);
+  const now = body.data.recipe;
+  assert(!!now, 'the recipe still exists');
+  assert(now.id === recipeBefore.id, `recipe id changed: ${recipeBefore.id} → ${now.id}`);
+  assert(now.organism === recipeBefore.organism, `organism changed: ${recipeBefore.organism} → ${now.organism}`);
+  assert(JSON.stringify(now.agents) === JSON.stringify(recipeBefore.agents), `agents changed: ${JSON.stringify(now.agents)}`);
+  assert(now.trigger.keyGlob === recipeBefore.trigger.keyGlob, `keyGlob changed: ${now.trigger.keyGlob}`);
 });
 
 // ─── (f) DELETE → GET null ───
