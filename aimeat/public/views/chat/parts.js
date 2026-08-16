@@ -299,14 +299,24 @@ export function Choices({ options, onPick, disabled }) {
  * made — the opposite of the honesty the label exists for. The icon belongs on an answer the day
  * these turns carry records, and this comment is the note to add it then.
  */
-export function AiNotice() {
+export function AiNotice({ compact = false }) {
     const [open, setOpen] = useState(false);
     return html`
-        <div class="chat-ai-notice">
-            <!-- The shared wording says "on your own API key", which is the app SDK's case and not
-                 this one: here the node's own key pays. A true sentence in the person's own context
-                 beats a shared one that is nearly right. -->
-            <${AiInteractionNotice} class="chat-ai-notice-line" bodyKey="chat.aiNoticeBody" />
+        <div class=${'chat-ai-notice' + (compact ? ' chat-ai-notice--compact' : '')}>
+            ${/* FULL the first time, one line after that. The duty is to make sure a person knows a
+                  machine is on the other end, and somebody twenty messages into their fourth
+                  conversation knows. Two lines and a button at the top of every screen from then on
+                  is not more honest, it is the best space on the page spent on something already
+                  read — and a notice people scroll past has stopped being a notice.
+
+                  It is never removed, and it stays a control: the sentence still says what this is,
+                  and the whole explanation is one press away wherever you are. */''}
+            ${compact
+                ? html`<span class="chat-ai-notice-line chat-ai-notice-short">${t('aiLabel.interactionTitle')}</span>`
+                : html`<!-- The shared wording says "on your own API key", which is the app SDK's case
+                             and not this one: here the node's own key pays. A true sentence in the
+                             person's own context beats a shared one that is nearly right. -->
+                       <${AiInteractionNotice} class="chat-ai-notice-line" bodyKey="chat.aiNoticeBody" />`}
             <button type="button" class="btn-ghost chat-ai-more" onClick=${() => setOpen(true)}>
                 ${tr('chat.aiMore', 'What does that mean?')}
             </button>

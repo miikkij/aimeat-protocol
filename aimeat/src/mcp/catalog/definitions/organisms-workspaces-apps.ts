@@ -491,7 +491,7 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_app_list',
-        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_versions. Publish with aimeat_app_publish.',
+        description: 'List published HTML apps on the node (name, description, version, category, tags, size, download count, and `url` — the app\'s public web address, which is what to give a person who wants to open it), with optional category/tag/text filters and an "own apps only" mode. Paged: the answer carries `total`, `limit`, `offset` and `has_more`, so read the whole catalogue by calling again with offset += limit while has_more is true. Use to discover apps and to show someone their own; fetch one app\'s detail with aimeat_app_get and its version history with aimeat_app_versions. Publish with aimeat_app_publish.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -499,6 +499,8 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
             category: { type: 'string', description: 'Filter by category.' },
             tag: { type: 'string', description: 'Filter by tag.' },
             own: { type: 'boolean', description: "List only your own owner's apps." },
+            limit: { type: 'number', description: 'How many to return (default 50, max 200).' },
+            offset: { type: 'number', description: 'How many to skip; with has_more this reads the whole catalogue.' },
         },
     },
     {

@@ -19,7 +19,7 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalArray, requiredRecord, optionalRecord } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalNumber, optionalBoolean, requiredArray, optionalArray, requiredRecord, optionalRecord, PAGING_INPUT, paging } from './tool-call-helpers.js';
 import type { AimeatClient, ApiResponse } from './api-client.js';
 import { defineAppIam } from '../../services/iam/define-app-iam.js';
 import type { LevelDef } from '../../services/iam/model.js';
@@ -245,13 +245,13 @@ export const appTools: ConnectCliToolDefinition[] = [
             search: { type: 'string', description: 'Free-text search over name and description.' },
             category: { type: 'string', description: 'Filter by category.' },
             tag: { type: 'string', description: 'Filter by tag.' },
-            own: { type: 'boolean', description: 'List only your own owner\'s apps.' },
+            ...PAGING_INPUT, own: { type: 'boolean', description: 'List only your own owner\'s apps.' },
         },
         handler: ({ client }, input) => client.get(`/v1/apps${query({
             search: optionalString(input, 'search') ?? optionalString(input, 'query'),
             category: optionalString(input, 'category'),
             tag: optionalString(input, 'tag'),
-            own: optionalBoolean(input, 'own') ? 'true' : undefined,
+            own: optionalBoolean(input, 'own') ? 'true' : undefined, ...paging(input),
         })}`),
     },
     {

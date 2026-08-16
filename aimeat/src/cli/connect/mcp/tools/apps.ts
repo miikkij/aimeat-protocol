@@ -70,12 +70,16 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     category: z.string().optional().describe('Filter by category'),
     tag: z.string().optional().describe('Filter by tag'),
     own: z.boolean().optional().describe("List only your own owner's apps"),
-  }, annotationsFor('aimeat_app_list'), async ({ search, category, tag, own }) => {
+    limit: z.number().int().min(1).max(200).optional().describe('How many to return (default 50, max 200)'),
+    offset: z.number().int().min(0).optional().describe('How many to skip; with has_more this reads the whole catalogue'),
+  }, annotationsFor('aimeat_app_list'), async ({ search, category, tag, own, limit, offset }) => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
     if (category) params.set('category', category);
     if (tag) params.set('tag', tag);
     if (own) params.set('own', 'true');
+    if (limit !== undefined) params.set('limit', String(limit));
+    if (offset !== undefined) params.set('offset', String(offset));
     const qs = params.toString() ? `?${params.toString()}` : '';
     const resp = await client.get(`/v1/apps${qs}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };

@@ -442,6 +442,10 @@ export function registerAppsTools(
                 search: z.string().optional().describe('Search query string'),
                 tag: z.string().optional().describe('Filter by tag'),
                 own: z.boolean().optional().describe('If true, list only apps owned by the current agent'),
+                limit: z.number().int().min(1).max(200).optional()
+                    .describe('How many to return (default 50, max 200).'),
+                offset: z.number().int().min(0).optional()
+                    .describe('How many to skip. With `total` and `has_more` in the answer, this is how the whole catalogue is read: keep calling with offset += limit while has_more is true.'),
             },
             annotations: annotationsFor('aimeat_app_list'),
             // A host that renders MCP Apps shows the card grid; one that does not ignores this
@@ -450,20 +454,27 @@ export function registerAppsTools(
             // cannot build the page, so a host is never pointed at a resource that is not there.
             ...(appUiAvailable() ? { _meta: uiToolMeta(APP_INDEX_UI_URI) } : {}),
         },
-        async ({ category, search, tag, own }) => {
+        async ({ category, search, tag, own, limit, offset }) => {
             const agentGaii = getAgentGaii();
             // The same bucket key the write tools use, so `own: true` cannot list a set the delete
             // tool then fails to find.
             const ownerGhii = (await resolveAppOwnerScope(storage, config, agentGaii))?.ownerGhii
                 ?? `${agentGaii}@${config.nodeId}`;
 
+            // PAGING, because the catalogue outgrew the page. A fixed 50 with no way to ask for the
+            // rest left the agent explaining its own instrument to the person — "there are 138, I
+            // can see 50, tell me a filter" — which is a tool making its limitation somebody else's
+            // problem. The window is the caller's, the total is the truth, and `has_more` says
+            // whether another call is worth making.
+            const take = Math.min(Math.max(limit ?? 50, 1), 200);
+            const skip = Math.max(offset ?? 0, 0);
             const opts = {
                 category,
                 q: search,
                 tag,
                 sort: 'newest' as const,
-                limit: 50,
-                offset: 0,
+                limit: take,
+                offset: skip,
                 // Browsing the full catalogue still surfaces the caller's OWN parked apps
                 // (hidden from everyone else), so an owner's agent can act on them.
                 viewerGhii: ownerGhii,
@@ -509,7 +520,13 @@ export function registerAppsTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ apps: result, total }, null, 2),
+                    text: JSON.stringify({
+                        apps: result,
+                        total,
+                        limit: take,
+                        offset: skip,
+                        has_more: skip + result.length < total,
+                    }, null, 2),
                 }],
             };
         },

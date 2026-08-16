@@ -403,6 +403,9 @@
   padding: 6px 16px;
 }
 .chat-ai-notice-line { flex: 1 1 260px; }
+/* One line once it has been read: the words stay, the block does not take the top of the page. */
+.chat-ai-notice--compact { padding: 2px 16px; }
+.chat-ai-notice-short { font-size: 0.72rem; color: var(--text-dim); }
 .chat-ai-more { font-size: 0.72rem; padding: 2px 8px; }
 
 /* One suggestion, once, with the way out on the same line as the ask. */

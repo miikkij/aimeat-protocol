@@ -31,6 +31,9 @@
  *   v1.4.0 -- 2026-07-02 -- ```aimeat-memory fenced blocks render as LIVE data embeds (MemoryEmbed):
  *     the named memory key is fetched at render time and shown as a table/props/list/value, so a
  *     document referencing agent-produced data is fresh on every open.
+ *   v1.6.0 -- 2026-08-16 -- A bare HOST autolinks too (laake.apps.aimeat.io), because an agent
+ *     listing addresses writes them the way a person says them. Gated on a short suffix list, so a
+ *     token like package.json stays text.
  *   v1.5.0 -- 2026-07-12 -- Bare http(s) URLs autolink (GFM extended autolink): a raw https://… in the
  *     source becomes a clickable link (target=_blank, scheme-sanitized), so a pasted URL in a message /
  *     document is clickable without [label](url) syntax. Trailing sentence punctuation is trimmed.
@@ -80,6 +83,29 @@ function matchAutolinkUrl(text, i) {
     else if (last === ')' && (url.split(')').length - 1) > (url.split('(').length - 1)) { url = url.slice(0, -1); trimming = true; }
   }
   return url || null;
+}
+
+/**
+ * A bare HOST that a person is meant to be able to open — `laake.apps.aimeat.io`, `aimeat.io`.
+ *
+ * An agent listing twenty apps writes their addresses as hosts, because that is how a person says
+ * an address out loud. Rendered as text they are twenty things to retype; the reason to link them
+ * is the same reason `https://…` is linked, and the only difference is a scheme nobody says either.
+ *
+ * The suffix list is what keeps this from linking `package.json` or `Array.prototype`: a token is an
+ * address when it ends in a public suffix we actually serve or link to. Kept deliberately short —
+ * a name that is not on it renders as text, which is the safe way to be wrong.
+ */
+const LINKABLE_SUFFIX = /\.(io|com|net|org|fi|dev|ai|app|sh|me)$/i;
+function matchBareHost(text, i) {
+    const m = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+/i.exec(text.slice(i));
+    if (!m) return null;
+    let host = m[0];
+    // A trailing dot is sentence punctuation rather than part of the name.
+    while (host.endsWith('.')) host = host.slice(0, -1);
+    if (!LINKABLE_SUFFIX.test(host)) return null;
+    if (host.length > 253) return null;
+    return host;
 }
 
 // ── Inline parsing: code, bold, italic, links. Returns an array of vnodes/strings.
@@ -205,6 +231,18 @@ function parseInline(text, onWikiLink) {
           ? h('a', { href, target: '_blank', rel: 'noopener noreferrer nofollow' }, url)
           : url);
         i += url.length;
+        continue;
+      }
+    }
+
+    // A bare host, at a token boundary, when nothing above claimed it. After the URL branch, so
+    // `https://x.io` is still matched as a URL with its scheme rather than as a host.
+    if (/[a-z0-9]/i.test(c) && (i === 0 || /[\s([{<>"']/.test(text[i - 1]))) {
+      const host = matchBareHost(text, i);
+      if (host) {
+        flush();
+        out.push(h('a', { href: `https://${host}`, target: '_blank', rel: 'noopener noreferrer nofollow' }, host));
+        i += host.length;
         continue;
       }
     }

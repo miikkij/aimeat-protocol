@@ -14,6 +14,11 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v1.4.0 — 2026-08-16 — The install suggestion (InstallCta, compact) sits where the mobile nudge
+ *     does, whichever of the two applies — the browser never proposes installing on its own.
+ *   v1.3.0 — 2026-08-16 — Drains the wish (sessionStorage 'aimeat.wish', stored by the landing's
+ *     wish box and the wiifm page's GO box) into the composer, same contract as the intake queue:
+ *     the person reads it and presses send themselves.
  *   v1.2.0 — 2026-08-16 — Drains the intake queue (OS share sheet + offline-page notes) into the
  *     composer: text becomes draft, shared pictures ride the existing attach path. Reviewed and
  *     sent by the person — nothing from the queue is submitted on its own.
@@ -34,6 +39,7 @@ import { primeSpeech } from '/js/services/speech-reader.js';
 import { readIntake, clearIntake, intakeText } from '/js/intake.js';
 import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice, MobileNudge } from './chat/parts.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { InstallCta } from '/components/InstallCta.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -382,6 +388,19 @@ export default function ChatView() {
         return () => { gone = true; window.removeEventListener('online', drain); };
     }, [attach]);
 
+    // The wish from the front door (or the wiifm page's GO box) becomes composer content under
+    // the same contract as the intake queue above: the person reads it and presses send
+    // themselves. Drained once, on mount — a wish is one sentence, not a subscription.
+    useEffect(() => {
+        try {
+            const wish = sessionStorage.getItem('aimeat.wish');
+            if (wish) {
+                setDraft((d) => [d.trim(), wish].filter(Boolean).join('\n\n'));
+                sessionStorage.removeItem('aimeat.wish');
+            }
+        } catch (err) { console.warn('[chat] the wish could not be read:', err.message); }
+    }, []);
+
     const dropAttachment = useCallback((id) => {
         setAttachments((prev) => {
             const gone = prev.find((a) => a.id === id);
@@ -468,8 +487,11 @@ export default function ChatView() {
                 </header>
 
                 <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
-                <${AiNotice} />
+                ${/* Full while this is the first conversation and nothing has been said yet; one
+                      line from the first answer onwards. */''}
+                <${AiNotice} compact=${turns.length > 0 || threads.length > 1} />
                 ${showMobileNudge && html`<${MobileNudge} onDismiss=${dismissNudge} />`}
+                ${!showMobileNudge && html`<${InstallCta} compact=${true} />`}
 
                 <div class="chat-scroll" onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`

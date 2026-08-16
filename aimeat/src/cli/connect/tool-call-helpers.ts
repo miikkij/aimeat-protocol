@@ -23,6 +23,23 @@ export interface ToolCallContext {
     agentPath: string;
 }
 
+/**
+ * The two parameters every paged list takes, declared once.
+ *
+ * A list tool that answers `total` and `has_more` is only usable if the caller can ask for the next
+ * window, and each tool declaring its own pair is how their descriptions drift apart. Spread it into
+ * an input map: `input: { ...PAGING_INPUT, search: … }`.
+ */
+export const PAGING_INPUT = {
+    limit: { type: 'number' as const, description: 'How many to return (default 50, max 200).' },
+    offset: { type: 'number' as const, description: 'How many to skip; with has_more this reads the whole set.' },
+};
+
+/** The same pair on the wire: `...paging(input)` inside a query object. */
+export function paging(input: JsonObject): { limit?: number; offset?: number } {
+    return { limit: optionalNumber(input, 'limit'), offset: optionalNumber(input, 'offset') };
+}
+
 export function requiredString(input: JsonObject, key: string): string {
     const value = input[key];
     if (typeof value !== 'string' || value.trim() === '') throw new Error(`Missing required string field: ${key}`);
