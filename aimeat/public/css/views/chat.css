@@ -277,6 +277,62 @@
   overflow-wrap: anywhere;
 }
 
+/* What the agent is doing right now. The dot moves so a still screen is never the only signal;
+   `prefers-reduced-motion` gets the dot without the pulse, because the words and the clock carry
+   the meaning on their own. */
+.chat-live-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+.chat-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: chat-live-pulse 1.4s ease-in-out infinite;
+}
+.chat-live-clock { font-family: var(--font-mono); }
+@keyframes chat-live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) {
+  .chat-live-dot { animation: none; }
+}
+
+/* The way back to the live edge while auto-follow is suspended. Floats over the conversation
+   rather than pushing it, so its appearance never moves the text you are reading. */
+.chat-jump-latest {
+  position: absolute;
+  right: 20px;
+  bottom: 96px;
+  z-index: 4;
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  box-shadow: var(--shadow-sm);
+}
+.chat-main { position: relative; }
+
+.chat-copy { padding: 0 4px; }
+.chat-copy-all { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; }
+
+/* Whose agent this is. Quiet, and permanently there. */
+.chat-credit {
+  padding: 6px 16px 10px;
+  text-align: center;
+  font-size: 0.72rem;
+}
+.chat-credit-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+  text-decoration: none;
+}
+.chat-credit-link:hover { color: var(--text-muted); text-decoration: underline; }
+.chat-credit-mark { font-size: 0.9rem; }
+
 /* ── A turn that could not run ── */
 .chat-error {
   align-self: stretch;

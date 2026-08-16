@@ -298,6 +298,11 @@
 .pf .mem-item--grouped{padding-left:1.4rem}
 .pf .mem-detail-key{font-family:monospace;font-size:.72rem;color:var(--muted);margin-bottom:.4rem;word-break:break-all}
 .pf .mem-detail-visrow{display:flex;align-items:center;gap:.5rem;margin-top:.5rem}
+
+/* Every share that reaches this key, each with the way to end it. A share is a rule over a pattern,
+   so the row names the pattern rather than pretending one record can be unshared on its own. */
+.mem-shares { display: flex; flex-direction: column; gap: 4px; }
+.mem-share-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pf .mem-row-check{flex:none;margin:0 .15rem 0 0;cursor:pointer}
 .pf .mem-vis-pop{display:flex;flex-wrap:wrap;gap:.35rem;padding:.5rem .75rem;margin:.25rem 0 .25rem 1.4rem;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-sm)}
 .pf .mem-vis-opt{background:var(--control-bg,var(--card));border:1px solid var(--control-border,var(--border));border-radius:999px;padding:.2rem .65rem;font-size:.76rem;color:var(--text);cursor:pointer}

@@ -13,6 +13,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.2.0 — 2026-08-16 — A closed stream aborts the turn, so Stop and "I left the page" both reach
+ *     the agent instead of only the browser.
  *   v1.1.0 — 2026-08-16 — /v1/chat/status answers who PAYS for a turn and on which model, because
  *     the page was deciding both for itself and getting the first one wrong: an owner with a key
  *     stored was told it was being used while the node's key paid for every turn.
@@ -178,11 +180,18 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
         // that is thinking. Comments carry no data and the client ignores them.
         const keepalive = setInterval(() => { res.write(':keepalive\n\n'); flush(); }, 15_000);
 
+        // A disconnect ends the TURN, not just the stream. Without this the node stops listening
+        // and goose keeps working on an answer that has nowhere to go, billed to the node's key.
+        const abort = new AbortController();
         let finished = false;
-        req.on('close', () => { finished = true; clearInterval(keepalive); });
+        req.on('close', () => {
+            finished = true;
+            clearInterval(keepalive);
+            abort.abort();
+        });
 
         try {
-            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text)) {
+            for await (const update of runChatTurn({ storage, config }, owner(req), threadId, text, abort.signal)) {
                 if (finished) break;
                 send(update);
             }

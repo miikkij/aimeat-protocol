@@ -6890,7 +6890,10 @@
       "shSharedWith": "Compartida con {names}",
       "shShareThis": "Compartir este espacio de claves",
       "shNoGroups": "Crea primero un grupo para compartir, y vuelve aquí.",
-      "shPickGroup": "Compartir con"
+      "shPickGroup": "Compartir con",
+      "shRevoke": "Dejar de compartir",
+      "shRevokeTitle": "Dejar de compartir {pattern}",
+      "shRevoked": "Se dejó de compartir {pattern}"
     },
     "files": {
       "title": "Archivos guardados",
@@ -9251,5 +9254,15 @@
     "sent": "¡Saludo publicado!",
     "limit": "Un mensaje al día"
   },
-  "chat.allowanceElsewhere": "Te quedan {n} USD de saldo, para todo lo que no sea este chat."
+  "chat.allowanceElsewhere": "Te quedan {n} USD de saldo, para todo lo que no sea este chat.",
+  "chat.poweredBy": "Con tecnología de goose",
+  "chat.busyThinking": "pensando",
+  "chat.busyWriting": "escribiendo la respuesta",
+  "chat.busyTool": "ejecutando {t}",
+  "chat.copyTurn": "Copiar este mensaje",
+  "chat.copyAll": "Copiar la conversación",
+  "chat.copyAllTitle": "Copiar toda la conversación como texto",
+  "chat.youLabel": "Tú",
+  "chat.agentLabel": "Agente",
+  "chat.jumpLatest": "Ir a lo último"
 }

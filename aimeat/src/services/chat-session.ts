@@ -20,6 +20,9 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.2.0 — 2026-08-16 — A turn takes an AbortSignal and CANCELS the agent when it fires. Stopping
+ *     used to close the stream and nothing else: goose kept answering a question nobody would read,
+ *     on the node's key. Leaving the page is the same event.
  *   v1.1.0 — 2026-08-16 — An agent turn records the model when the node is the one that chose it
  *     (AIMEAT_GOOSE_MODEL). ChatTurn.model has existed since the first version and nothing ever
  *     wrote it, so the chip naming the model never appeared.
@@ -121,7 +124,7 @@ async function sessionFor(
  * say which turn that was.
  */
 export async function* runChatTurn(
-    deps: ChatDeps, ownerName: string, threadId: string, text: string,
+    deps: ChatDeps, ownerName: string, threadId: string, text: string, signal?: AbortSignal,
 ): AsyncGenerator<SessionUpdate> {
     const { storage, config } = deps;
     if (!chatEnabled(config)) {
@@ -144,6 +147,20 @@ export async function* runChatTurn(
     }
 
     const acp = await agent(config);
+
+    // STOPPING HAS TO REACH THE AGENT. Closing the stream only stops the node LISTENING: goose is a
+    // separate process that was told to answer, and it keeps answering — spending the node's key on
+    // an answer nobody will ever read. `cancel()` existed from the first version and nothing called
+    // it, so the Stop button was a button that stopped the page. This is also what a person leaving
+    // the page means, because the route aborts on disconnect for the same reason.
+    const onAbort = () => {
+        acp.cancel(sessionId).catch((e: Error) => logger.warn(`[chat] cancel failed: ${e.message}`));
+    };
+    if (signal) {
+        if (signal.aborted) onAbort();
+        else signal.addEventListener('abort', onAbort, { once: true });
+    }
+
     // Keyed by the call's OWN id, not its title. A tool call arrives twice — once as it starts and
     // once as it finishes — and only the first carries a title, so matching on the title leaves
     // every call in the log reading "starting" forever, whatever actually happened to it.
@@ -166,6 +183,7 @@ export async function* runChatTurn(
             yield update;
         }
     } finally {
+        signal?.removeEventListener('abort', onAbort);
         // Written even when the turn ended badly: half an answer and the tools that ran is a truer
         // record than nothing, and it is what the person saw on screen.
         const turn: ChatTurn = {

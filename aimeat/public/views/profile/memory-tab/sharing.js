@@ -15,11 +15,13 @@
  *   const sharing = useKeySpaceSharing({ groups, showToast });
  *   // spread into the render ctx; call sharing.loadShares() when the tab (re)loads
  * @version-history
+ *   v1.1.0 — 2026-08-16 — sharesCovering() and revokeCoveringShare(): the hook could create a share
+ *     and had no way to end one, so a key shared from the Memory tab could not be unshared there.
  *   v1.0.0 — 2026-08-11 — Extracted from memory-tab.js (max-file-lines).
  */
 import { useState, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
-import { listOutgoing, createShare, suggestPattern, patternCoversKey } from '/js/services/shares.js';
+import { listOutgoing, createShare, revokeShare, suggestPattern, patternCoversKey } from '/js/services/shares.js';
 import { swallowed } from '/js/swallowed.js';
 
 export function useKeySpaceSharing({ groups, showToast }) {
@@ -49,6 +51,31 @@ export function useKeySpaceSharing({ groups, showToast }) {
     return groups.filter(g => ids.has(g.id));
   }, [shares, groups]);
 
+  /**
+   * The shares that reach this key, as records rather than names — the shape a person needs to take
+   * one back. `sharedWith` answers "who can read this", which is enough to DISPLAY and not enough to
+   * undo, and undoing was the half that was never built: this hook could create a share and had no
+   * way to end one, so a key could be shared from here and only unshared somewhere else.
+   */
+  const sharesCovering = useCallback((key) => shares
+    .filter(s => patternCoversKey(s.key_pattern, key))
+    .map(s => ({ ...s, group: groups.find(g => g.id === s.group_id) || null })), [shares, groups]);
+
+  /**
+   * End one share. The pattern is what is revoked, not the key: a share is a rule over a keyspace,
+   * so taking it back takes back every key it covered, and the confirmation says so rather than
+   * letting a person believe they unshared one record.
+   */
+  const revokeCoveringShare = useCallback(async (share) => {
+    try {
+      await revokeShare(share.id);
+      showToast(t('profile.memory.shRevoked').replace('{pattern}', share.key_pattern));
+      await loadShares();
+    } catch (e) {
+      showToast(e.message || t('profile.access.shRevokeError'), true);
+    }
+  }, [showToast, loadShares]);
+
   const openSharePanel = useCallback((key) => {
     setSharePanelFor(key);
     setSharePattern(suggestPattern(key));
@@ -68,7 +95,7 @@ export function useKeySpaceSharing({ groups, showToast }) {
   }, [shareGroupId, sharePattern, showToast, loadShares]);
 
   return {
-    loadShares, sharedWith, submitShare, openSharePanel,
+    loadShares, sharedWith, sharesCovering, revokeCoveringShare, submitShare, openSharePanel,
     sharePanelFor, setSharePanelFor, sharePattern, setSharePattern, shareGroupId, setShareGroupId,
   };
 }

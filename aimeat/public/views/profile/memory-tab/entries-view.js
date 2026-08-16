@@ -46,7 +46,7 @@ export function renderEntries(ctx) {
     memories, valueOf, sortBy, setSortBy, memTagFilter, setMemTagFilter, filterText, setFilterText,
     expandedMem, setExpandedMem, ensureValue, selectedKeys, toggleSelected, setSelectedKeys,
     visPopoverFor, setVisPopoverFor, keyHasRules, loadKeyPerms, fedConsents, inCart, memCartItem,
-    toggleCartItem, addCartItems, applyVis, groups, handleQuickVis, fullLoaded, loadingValueKeys,
+    toggleCartItem, addCartItems, applyVis, groups, handleQuickVis, fullLoaded,
     editingMemTags, setEditingMemTags, keyRulesPopover, setKeyRulesPopover, handleUpdateMemoryTags,
     setEditModal, valueCopyText, showToast, togglingFed, handleStopSharing, handleShareToFederation,
     session, doPull, doPush, handleDeleteMemory, memQuota, loadFullContents, handleExport, importing,
@@ -55,8 +55,8 @@ export function renderEntries(ctx) {
     searchResults, clearServerSearch, memArchived, setMemArchived, showMemForm, setShowMemForm,
     handleCreateMemory, bulkVis, setBulkVis, applyBulkVis, bulkDelete, collapsedGroups,
     toggleGroupCollapsed, groupLabel, orgNames, deleteGroup,
-    sharedWith, sharePanelFor, openSharePanel, setSharePanelFor, sharePattern, setSharePattern,
-    shareGroupId, setShareGroupId, submitShare,
+    sharedWith, sharesCovering, revokeCoveringShare, sharePanelFor, openSharePanel, setSharePanelFor,
+    sharePattern, setSharePattern, shareGroupId, setShareGroupId, submitShare,
   } = ctx;
 
   if (!memories) return html`<${Spinner} text=${t('profile.memory.loading')} />`;
@@ -140,7 +140,11 @@ export function renderEntries(ctx) {
         <div class="mem-detail">
           <div class="mem-detail-key" title=${m.key}>${escHtml(m.key)}</div>
           ${(!fullLoaded && valueOf(m) === undefined)
-            ? html`<div class="text-meta-sm">${loadingValueKeys.has(m.key) ? (t('profile.memory.loadingValue') || 'Loading value…') : '…'}</div>`
+            // Always "loading", never a bare ellipsis: the open row fetches its own value (see the
+            // effect in memory-tab.js), so a missing value is a read in flight and not a state a
+            // person is supposed to interpret. It used to render "…" for good when a background
+            // refresh replaced the list with a values-free one under an already-open row.
+            ? html`<div class="text-meta-sm">${t('profile.memory.loadingValue') || 'Loading value…'}</div>`
             : html`
               ${(() => { const v = valueOf(m); const im = detectImage(v, m.key); return im ? html`<${ImageView} desc=${im} />` : null; })()}
               <pre>${(() => { const v = valueOf(m); return typeof v === 'object' && v !== null ? JSON.stringify(v, null, 2) : String(v ?? ''); })()}</pre>
@@ -164,6 +168,23 @@ export function renderEntries(ctx) {
               ${t('profile.memory.shShareThis')}
             </button>
           </div>
+          ${(() => {
+            // Every share that reaches this key, each with the way to end it. A share is a rule over
+            // a PATTERN, so the button says what it revokes: pressing it takes the whole pattern
+            // back, not this one record.
+            const covering = sharesCovering ? sharesCovering(m.key) : [];
+            return covering.length > 0 && html`
+              <div class="mem-shares mb-half">
+                ${covering.map(sh => html`
+                  <div class="mem-share-row" key=${sh.id}>
+                    <span class="text-meta-sm">${sh.group?.name || sh.group_id} · <code>${escHtml(sh.key_pattern)}</code></span>
+                    <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); revokeCoveringShare(sh); }}
+                      title=${(t('profile.memory.shRevokeTitle') || 'Stop sharing {pattern}').replace('{pattern}', sh.key_pattern)}>
+                      ${t('profile.memory.shRevoke') || 'Stop sharing'}
+                    </button>
+                  </div>`)}
+              </div>`;
+          })()}
           ${sharePanelFor === m.key && html`
             <div class="key-rules-box" onClick=${(e) => e.stopPropagation()}>
               ${groups.length === 0 ? html`

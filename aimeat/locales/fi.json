@@ -6897,7 +6897,10 @@
       "shSharedWith": "Jaettu: {names}",
       "shShareThis": "Jaa tämä avainavaruus",
       "shNoGroups": "Luo ensin jakoryhmä, palaa sitten tänne.",
-      "shPickGroup": "Jaa ryhmälle"
+      "shPickGroup": "Jaa ryhmälle",
+      "shRevoke": "Lopeta jakaminen",
+      "shRevokeTitle": "Lopeta kuvion {pattern} jakaminen",
+      "shRevoked": "Jakaminen lopetettu: {pattern}"
     },
     "files": {
       "title": "Tallennetut tiedostot",
@@ -9259,5 +9262,15 @@
     "sent": "Tervehdys lähetetty!",
     "limit": "Yksi viesti päivässä"
   },
-  "chat.allowanceElsewhere": "Saldoa jäljellä {n} USD, ja se on kaikkea muuta kuin tätä chattia varten."
+  "chat.allowanceElsewhere": "Saldoa jäljellä {n} USD, ja se on kaikkea muuta kuin tätä chattia varten.",
+  "chat.poweredBy": "Moottorina goose",
+  "chat.busyThinking": "miettii",
+  "chat.busyWriting": "kirjoittaa vastausta",
+  "chat.busyTool": "ajaa {t}",
+  "chat.copyTurn": "Kopioi tämä viesti",
+  "chat.copyAll": "Kopioi keskustelu",
+  "chat.copyAllTitle": "Kopioi koko keskustelu tekstinä",
+  "chat.youLabel": "Sinä",
+  "chat.agentLabel": "Agentti",
+  "chat.jumpLatest": "Hyppää uusimpaan"
 }

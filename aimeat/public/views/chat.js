@@ -28,10 +28,32 @@ import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
-import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar } from './chat/parts.js';
+import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit } from './chat/parts.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/**
+ * The conversation as plain text, in the order it happened.
+ *
+ * Who said what, and nothing else: no tool log, no timestamps to the second, no markdown fences
+ * around the whole thing. This is the shape that pastes into a document or another chat and still
+ * reads as a conversation.
+ */
+function conversationAsText(title, turns) {
+    const head = title ? `# ${title}\n\n` : '';
+    const body = (turns ?? []).map((turn) => {
+        const who = turn.role === 'user' ? tr('chat.youLabel', 'You') : tr('chat.agentLabel', 'Agent');
+        return `## ${who}\n\n${(turn.text || '').trim()}`;
+    }).join('\n\n');
+    return `${head}${body}\n`;
+}
+
+/** Close enough to the bottom to count as "following the conversation". */
+const BOTTOM_SLACK_PX = 48;
+/** How long a scroll up suspends auto-follow. Long enough to read a paragraph and look back up. */
+const SCROLL_GRACE_MS = 15_000;
 
 export default function ChatView() {
     const [status, setStatus] = useState(null);
@@ -82,10 +104,40 @@ export default function ChatView() {
         })();
     }, [openThread]);
 
-    // Keep the newest turn in view, the way a conversation is read.
+    // Keep the newest turn in view — UNLESS the person has scrolled up to read something.
+    //
+    // Following the newest line is right when you are at the bottom and wrong the moment you are
+    // not: an agent that writes for four minutes yanks you back mid-sentence every time it emits a
+    // token, and reading what it did ten lines ago becomes impossible. So: pinned to the bottom
+    // means follow, as before. Scrolled up means stop following, and stay stopped for a while after
+    // the last scroll — long enough to actually read — rather than resuming on the next token.
+    // Returning to the bottom yourself re-pins it immediately, which is the gesture people already
+    // use to mean "keep up".
+    const [pinned, setPinned] = useState(true);
+    const releaseRef = useRef(0);
+    const onScrollArea = useCallback((ev) => {
+        const el = ev.currentTarget;
+        const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_SLACK_PX;
+        if (atBottom) { releaseRef.current = 0; setPinned(true); return; }
+        releaseRef.current = Date.now();
+        setPinned(false);
+    }, []);
+    // Re-pin after the quiet period, so a person who scrolled up and stopped reading is carried
+    // back to the live edge instead of being stranded there for good.
     useEffect(() => {
+        if (pinned) return undefined;
+        const id = setInterval(() => {
+            if (releaseRef.current && Date.now() - releaseRef.current >= SCROLL_GRACE_MS) {
+                setPinned(true);
+            }
+        }, 1000);
+        return () => clearInterval(id);
+    }, [pinned]);
+
+    useEffect(() => {
+        if (!pinned) return;
         bottomRef.current?.scrollIntoView({ block: 'end' });
-    }, [thread?.turns?.length, live.text, live.tools.length]);
+    }, [thread?.turns?.length, live.text, live.tools.length, pinned]);
 
     // The on-screen keyboard, measured rather than calculated.
     //
@@ -293,11 +345,21 @@ export default function ChatView() {
                         ${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}
                     </button>
                     <h1 class="chat-title">${thread?.title ?? tr('chat.title', 'Chat')}</h1>
+                    <!-- The whole conversation as plain text: what you paste into a document, an
+                         issue or another AI. Both sides, in order, with the work log left out —
+                         it is a record of the conversation, not of the machinery. -->
+                    ${turns.length > 0 && html`<${CopyButton}
+                        text=${conversationAsText(thread?.title, turns)}
+                        className="btn-ghost chat-copy-all"
+                        label=${tr('chat.copyAll', 'Copy conversation')}
+                        copiedLabel=${'✓ ' + t('common.copied')}
+                        title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
+                        ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
                 </header>
 
                 <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
 
-                <div class="chat-scroll">
+                <div class="chat-scroll" onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`
                         <div class="chat-welcome">
                             <h2>${tr('chat.welcomeTitle', 'Your first agent')}</h2>
@@ -311,6 +373,12 @@ export default function ChatView() {
                     <div ref=${bottomRef}></div>
                 </div>
 
+                ${!pinned && html`
+                    <button type="button" class="btn-outline chat-jump-latest"
+                        onClick=${() => { releaseRef.current = 0; setPinned(true); bottomRef.current?.scrollIntoView({ block: 'end', behavior: 'smooth' }); }}>
+                        ${tr('chat.jumpLatest', 'Jump to the latest')}
+                    </button>`}
+
                 <${Composer}
                     value=${draft}
                     onInput=${setDraft}
@@ -321,6 +389,8 @@ export default function ChatView() {
                     busy=${busy}
                     disabled=${disabled}
                     note=${disabled ? (status?.note ?? '') : ''} />
+
+                <${GooseCredit} />
             </section>
         </div>
     `;

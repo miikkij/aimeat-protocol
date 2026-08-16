@@ -391,6 +391,19 @@ export default function MemoryTab({ session, showToast, onStats }) {
     }
   }
 
+  // AN OPEN ROW KEEPS ITS VALUE.
+  //
+  // The click that opens an entry fetches the value once, and that was the only fetch there was. The
+  // list underneath is re-read on live updates and on filter changes, and those reads carry metadata
+  // WITHOUT values (fullLoaded goes false), so an entry a person had open — reading a long chat
+  // transcript, say — lost its text mid-read and showed a placeholder with nothing able to refill
+  // it. Tying the fetch to "what is open" rather than to the click makes the row self-healing.
+  useEffect(() => {
+    if (!expandedMem) return;
+    ensureValue(expandedMem);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ensureValue reads live state by design
+  }, [expandedMem, fullLoaded, selectedAgent]);
+
   // The effective value for a row: from the full list, the lazy cache, or undefined (still loading).
   const valueOf = (m) => (fullLoaded ? m.value : valueCache[m.key]);
 

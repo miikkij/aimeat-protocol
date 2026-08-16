@@ -25,6 +25,7 @@ import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { speak, stop as stopSpeaking, isSpeechSupported, textToParagraphs } from '/js/services/speech-reader.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -96,6 +97,12 @@ export function Turn({ turn, id }) {
             <div class="chat-meta">
                 <span>${timeShort(turn.at)}</span>
                 ${turn.model ? html`<span class="chat-model" title=${tr('chat.modelTitle', 'The model that answered this turn')}>${turn.model}</span>` : ''}
+                <!-- The RAW markdown, which is what pastes usefully into an editor or another chat.
+                     Same control and same behaviour as the message bubbles in the inbox. -->
+                ${turn.text ? html`<${CopyButton} text=${String(turn.text)} className="btn-ghost chat-copy"
+                    label="⧉" copiedLabel="✓"
+                    title=${tr('chat.copyTurn', 'Copy this message')} copiedTitle=${t('common.copied')}
+                    ariaLabel=${tr('chat.copyTurn', 'Copy this message')} />` : ''}
                 ${!mine && turn.text && isSpeechSupported() ? html`
                     <button type="button" class="btn-ghost chat-listen" onClick=${listen}>
                         ${reading ? tr('chat.stopListening', 'Stop') : tr('chat.listen', 'Listen')}
@@ -120,7 +127,63 @@ export function LiveTurn({ text, thought, tools, busy }) {
                 ${!text && thought ? html`<p class="chat-thinking">${thought}</p>` : ''}
                 ${!text && !thought && busy ? html`<p class="chat-thinking">${tr('chat.working', 'Working…')}</p>` : ''}
                 <${WorkLog} tools=${tools} />
+                ${busy && html`<${LiveStatus} tools=${tools} hasText=${!!text} />`}
             </div>
+        </div>
+    `;
+}
+
+/**
+ * Proof that the turn is still alive.
+ *
+ * A turn takes minutes when the agent is building something, and the only signals the page had were
+ * text arriving and the work log growing — both of which stop for long stretches while a model
+ * thinks. With nothing moving, a working turn and a hung one look identical, and the honest reading
+ * of a still screen is that something broke. So: what it is doing right now, and how long it has
+ * been at it, ticking. The number is the part that cannot be faked by a spinner that would keep
+ * spinning after the connection died.
+ */
+function LiveStatus({ tools, hasText }) {
+    const [seconds, setSeconds] = useState(0);
+    useEffect(() => {
+        const started = Date.now();
+        const id = setInterval(() => setSeconds(Math.floor((Date.now() - started) / 1000)), 1000);
+        return () => clearInterval(id);
+    }, []);
+
+    const running = (tools ?? []).filter(t => t.status !== 'completed' && t.status !== 'failed');
+    const what = running.length > 0
+        ? tr('chat.busyTool', 'running {t}').replace('{t}', running[running.length - 1].title)
+        : hasText
+            ? tr('chat.busyWriting', 'writing the answer')
+            : tr('chat.busyThinking', 'thinking');
+    const clock = seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+
+    return html`
+        <div class="chat-live-status" role="status" aria-live="polite">
+            <span class="chat-live-dot" aria-hidden="true"></span>
+            <span>${what}</span>
+            <span class="chat-live-clock">${clock}</span>
+        </div>
+    `;
+}
+
+/**
+ * Who actually answers here.
+ *
+ * The agent in this chat is goose (block/goose), an open-source project this node did not write and
+ * could not have shipped this page without. Attribution is not decoration on somebody else's work:
+ * a person watching an answer arrive should be able to see whose agent wrote it and go and read the
+ * source. The mark is their wordmark as a link, not a copy of their logo file, because we do not
+ * ship an asset we were not given.
+ */
+export function GooseCredit() {
+    return html`
+        <div class="chat-credit">
+            <a class="chat-credit-link" href="https://github.com/block/goose" target="_blank" rel="noopener noreferrer">
+                <span class="chat-credit-mark" aria-hidden="true">🪿</span>
+                <span>${tr('chat.poweredBy', 'Powered by goose')}</span>
+            </a>
         </div>
     `;
 }

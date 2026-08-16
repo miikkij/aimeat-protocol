@@ -6897,7 +6897,10 @@
       "shSharedWith": "Shared with {names}",
       "shShareThis": "Share this key space",
       "shNoGroups": "Create a sharing group first, then come back here.",
-      "shPickGroup": "Share with"
+      "shPickGroup": "Share with",
+      "shRevoke": "Stop sharing",
+      "shRevokeTitle": "Stop sharing {pattern}",
+      "shRevoked": "Sharing stopped for {pattern}"
     },
     "files": {
       "title": "Stored Files",
@@ -9259,5 +9262,15 @@
     "sent": "Greeting posted!",
     "limit": "One message per day"
   },
-  "chat.allowanceElsewhere": "{n} USD of your allowance left, for everything outside this chat."
+  "chat.allowanceElsewhere": "{n} USD of your allowance left, for everything outside this chat.",
+  "chat.poweredBy": "Powered by goose",
+  "chat.busyThinking": "thinking",
+  "chat.busyWriting": "writing the answer",
+  "chat.busyTool": "running {t}",
+  "chat.copyTurn": "Copy this message",
+  "chat.copyAll": "Copy conversation",
+  "chat.copyAllTitle": "Copy the whole conversation as text",
+  "chat.youLabel": "You",
+  "chat.agentLabel": "Agent",
+  "chat.jumpLatest": "Jump to the latest"
 }
