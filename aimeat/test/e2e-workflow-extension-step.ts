@@ -548,6 +548,23 @@ await test('12d. A nested producer is flattened by the step, or nothing could pu
   assert(fields.includes('buyerName') && !fields.includes('buyer'), `the published schema is the flat one: ${fields.join(',')}`);
 });
 
+await test('12e. An unknown field on a datapackage step is REFUSED, not stripped in silence', async () => {
+  // Measured on a real apply: a node one deploy behind stripped `columns` and answered 200. The
+  // workflow was then saved, scheduled, and would have refused every row at 06:00 for a week while
+  // its save had reported success. A save that keeps less than it was sent has to say so.
+  const def = {
+    title: { en_US: 'Unknown field' }, description: { en_US: 'x' }, trigger: { kind: 'manual' },
+    vars: [], on_step_fail: 'inspect',
+    steps: [{ id: 'p', description: { en_US: 'p' }, required_to_function: 'none',
+      action: { kind: 'datapackage', name: 'somepkg', from_key: 'x.y', changes: 'c',
+                thisFieldDoesNotExist: 'and must not be swallowed' } }],
+  };
+  const r = await json('/v1/workflows/unknown-field-wf', { method: 'PUT', headers: auth(owner.token), body: JSON.stringify(def) });
+  assert(r.status === 400, `expected 400, got ${r.status} — the field was accepted or stripped`);
+  const said = JSON.stringify(r.body?.error?.details?.errors ?? r.body?.error ?? {});
+  assert(said.includes('thisFieldDoesNotExist'), `the refusal must NAME the field, got ${said.slice(0, 200)}`);
+});
+
 await test('12c. A datapackage step with no changes is refused at SAVE', async () => {
   const def = {
     title: { en_US: 'No explanation' }, description: { en_US: 'x' }, trigger: { kind: 'manual' }, vars: [],

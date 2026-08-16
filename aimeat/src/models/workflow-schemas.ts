@@ -487,7 +487,16 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     resource: z.string().min(2).max(64).regex(/^[a-z0-9][a-z0-9-]*$/).optional(),
     provenance: z.record(z.string().max(60), z.unknown()).optional(),
     retention_policy: z.object({ keep: z.number().int().min(0), unit: z.string().min(1).max(20) }).optional(),
-  }),
+  // STRICT, and this one is worth the sentence. Zod strips unknown keys by default, so a workflow
+  // written for a newer node saves against an older one with a 200 and the field QUIETLY GONE — it
+  // then fails at 06:00 with nobody told. That is not hypothetical: the `columns` mapping was
+  // dropped exactly this way on the first production apply, and the workflow would have refused
+  // every row for a week while reporting a successful save.
+  //
+  // The older step kinds are deliberately left lax: they are live surfaces with existing clients,
+  // and tightening them is a behaviour change that belongs in its own decision. This one is new,
+  // so it starts honest.
+  }).strict(),
 ]);
 
 const WorkflowStepSchema = z.object({
