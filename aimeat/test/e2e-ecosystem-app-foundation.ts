@@ -7,6 +7,15 @@
  *   poll-before-approval). Also unit-asserts the gaii.ts GEAI/GAII discrimination. Additive: the
  *   agent path is unaffected (regression covered by e2e-agent-onboarding).
  * @version-history
+ *   v1.4.0 — 2026-08-17 — E2E quality, ecosystem-app-foundation :195 and :203. Every approval in the file
+ *     echoed the hello, so the suite was equally true of a node that grants whatever the app asked for
+ *     and ignores the owner entirely — which is the opposite of what the consent screen promises.
+ *     Phase 3b approves LESS than was requested and follows it through: the token carries only the
+ *     granted scope, the withheld one is refused 403 at the door, the granted one still works, and the
+ *     stored record says what the owner decided. And the device code, a one-shot that nothing in the
+ *     corpus had ever sent twice, is now redeemed twice — after waiting out the poll interval, because
+ *     a fast repeat is answered by that guard before the one-shot is reached, and the test passes
+ *     against a redeemable code if you skip the wait.
  *   v1.0.0 — 2026-06-14 — Initial creation (ecosystem-apps foundation, chunk 1).
  *   v1.1.0 — 2026-06-15 — Add Phase 5 for GET /v1/ecosystem-apps/:app/data — owner lists the memory
  *     an app wrote (happy path) + 404 for an app the owner never connected.
@@ -212,6 +221,33 @@ await test('App polls token → receives the GEAI credential (once)', async () =
   assert(Array.isArray(body.scopes) && body.scopes.includes('memory:write'), 'scopes include memory:write');
 });
 
+/**
+ * The device code is a one-shot. Nothing in the corpus had ever sent one twice: every eco suite polls
+ * exactly once, so a code that stayed live after redemption would go unnoticed — and this endpoint is
+ * unauthenticated, which makes the one-shot the only thing between a leaked device_code and a second
+ * live GEAI bearer for somebody else's app.
+ */
+await test('The same device code cannot be redeemed twice', async () => {
+  // The poll-interval guard stands in FRONT of the redemption branch and answers a fast repeat with
+  // 400 slow_down, so a second poll sent immediately never reaches the one-shot at all: measured, a
+  // node with the credential left redeemable passes that version of this test. The interval has to be
+  // waited out for the assertion to be about what it says it is.
+  const first = await json('/v1/ecosystem-apps/token', {
+    method: 'POST', body: JSON.stringify({ device_code: deviceCode, grant_type: GRANT }),
+  });
+  const wait = Number((first.body?.error_description ?? '').match(/Wait (\d+)/)?.[1] ?? 5) + 1;
+  await new Promise(r => setTimeout(r, wait * 1000));
+
+  const second = await json('/v1/ecosystem-apps/token', {
+    method: 'POST', body: JSON.stringify({ device_code: deviceCode, grant_type: GRANT }),
+  });
+  const carried = second.body?.access_token ?? second.body?.token ?? second.body?.geai;
+  assert(!carried, `a second redemption of the same device code handed out a credential: ${JSON.stringify(second.body)}`);
+  assert(second.status === 400, `a second redemption should be refused, got ${second.status}: ${JSON.stringify(second.body)}`);
+  assert(second.body?.error === 'expired_token',
+    `the refusal must be the one-shot, not the poll interval: ${JSON.stringify(second.body)}`);
+});
+
 // ─── Phase 2: GEAI writes its own namespace; owner sees it via aggregation ───
 console.log('\nPhase 2 — GEAI memory write + owner aggregation');
 
@@ -259,6 +295,76 @@ await test('Owner lists ecosystem apps → record is active with the right grant
   assert(rec.status === 'active', `expected status active, got ${rec.status}`);
   assert(rec.scopes.includes('memory:write'), 'record scopes include memory:write');
   assert(rec.public_key === APP_PUBKEY, 'record pinned the app publicKey (TOFU)');
+});
+
+// ─── Phase 3b: the owner's NARROWING is the whole consent screen ───
+console.log('\nPhase 3b — The owner grants less than the app asked for');
+
+/**
+ * Every approval in this file echoes the hello. So each one is consistent with a node that ignores
+ * the owner's list entirely and grants whatever the app requested, which is the opposite of what the
+ * consent screen promises: the app proposes, the person decides. The record assertion in Phase 3
+ * cannot separate the two either, because it checks a scope that was both asked for AND granted.
+ */
+const NARROW_APP = 'narrowdesk';
+let narrowUserCode = '';
+let narrowGeaiToken = '';
+
+await test('An app asks for read+write and the owner approves read only', async () => {
+  const hello = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({
+      owner: ownerName, app: NARROW_APP, display_name: 'Narrowdesk', public_key: APP_PUBKEY,
+      scopes: ['memory:read', 'memory:write'],
+      data_areas: [{ area: 'memory', pattern: 'service.narrowdesk.*', rights: ['read', 'write'] }],
+      bound_ref: 'narrow-acct-1',
+    }),
+  });
+  assert(hello.status === 200, `hello ${hello.status}: ${JSON.stringify(hello.body)}`);
+  narrowUserCode = hello.body.data.user_code;
+  const narrowDeviceCode = hello.body.data.device_code;
+
+  const approve = await json(`/v1/ecosystem-apps/${narrowUserCode}/approve`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ action: 'approve', scopes: ['memory:read'] }),
+  });
+  assert(approve.status === 200, `approve ${approve.status}: ${JSON.stringify(approve.body)}`);
+  assert(approve.body.data.status === 'approved', `expected approved, got ${approve.body.data.status}`);
+
+  const token = await json('/v1/ecosystem-apps/token', {
+    method: 'POST',
+    body: JSON.stringify({ device_code: narrowDeviceCode, grant_type: GRANT }),
+  });
+  assert(token.status === 200, `token ${token.status}: ${JSON.stringify(token.body)}`);
+  narrowGeaiToken = token.access_token ?? token.body.access_token;
+  assert(typeof narrowGeaiToken === 'string' && narrowGeaiToken.length > 0, 'got the narrowed GEAI token');
+  const scopes = (token.body.scopes ?? token.scopes) as string[];
+  assert(Array.isArray(scopes) && scopes.includes('memory:read'), `the granted scope is missing: ${JSON.stringify(scopes)}`);
+  assert(!scopes.includes('memory:write'), `the app was handed the scope the owner withheld: ${JSON.stringify(scopes)}`);
+});
+
+await test('…and the withheld scope is refused at the door, while the granted one works', async () => {
+  const write = await json('/v1/memory', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${narrowGeaiToken}` },
+    body: JSON.stringify({ key: `service.${NARROW_APP}.attempt`, value: { x: 1 }, visibility: 'private' }),
+  });
+  assert(write.status === 403, `the withheld scope must be refused, got ${write.status}: ${JSON.stringify(write.body)}`);
+  assert(write.body.error?.code === 'SCOPE_DENIED', `expected SCOPE_DENIED, got ${write.body.error?.code}`);
+
+  // The other half: the narrowing removed ONE scope rather than breaking the grant.
+  const read = await json('/v1/memory', { headers: { Authorization: `Bearer ${narrowGeaiToken}` } });
+  assert(read.status === 200, `the granted scope must still work, got ${read.status}`);
+});
+
+await test('…and the stored record says what the owner decided, not what the app asked', async () => {
+  const { status, body } = await json('/v1/ecosystem-apps', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(status === 200, `list ${status}`);
+  const rec = (body.data.ecosystem_apps as any[]).find(a => String(a.geai).startsWith(`eco:${NARROW_APP}#`));
+  assert(!!rec, `the narrowed app is not listed: ${JSON.stringify((body.data.ecosystem_apps as any[]).map(a => a.geai))}`);
+  assert(rec.scopes.includes('memory:read'), `record is missing the granted scope: ${JSON.stringify(rec.scopes)}`);
+  assert(!rec.scopes.includes('memory:write'), `the record kept the scope the owner withheld: ${JSON.stringify(rec.scopes)}`);
 });
 
 // ─── Phase 4: failure modes ───
