@@ -191,3 +191,11 @@ aimeat/public/lib/**/*.wasm
 
 # locale:extract working files — a slice being translated, never committed
 aimeat/locales/.todo-*.json
+
+# Start-time self-heal (autoHealAssets in src/index-start.ts) scaffolds the package's static
+# assets into the working directory so an installed `aimeat start` works in an empty dir. In a
+# repo checkout that lands as a generated copy of src/static/ at aimeat/static/ plus the
+# scaffold's own hash manifest — runtime state, not source. The manifest was tracked by accident
+# since v1.2.0 and is untracked as of this rule.
+aimeat/static/
+aimeat/.aimeat-manifest.json
