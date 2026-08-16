@@ -2,6 +2,13 @@
  * @file cortex-ui-e2e.ts
  * @description E2E tests for aimeat-ui cortex library (install, activate, serve, deactivate)
  * @version-history
+ *   v1.3.0 — 2026-08-16 — E2E quality, cortex-ui:158: every lifecycle call here was an operator call,
+ *     because the suite's owner is the first on a cleared database, so the ownership guard on
+ *     activate, deactivate and delete never had to answer for a plain owner. A second owner now gets
+ *     403 FORBIDDEN 'Not your extension' on all three, with the served bytes read back unchanged, and
+ *     the operator's own success on the same doors is the control. The packs belong to system@node,
+ *     which is nobody's name, so a guard that exempted them would hand every account on the node the
+ *     power to take the shared UI off the air.
  *   v1.2.0 — 2026-08-12 — Phase 1 waits for the pack to serve before probing it. The assertion was
  *     landing inside boot seeding, where the name is already held and nothing is served yet, and
  *     reporting that setup state as a rule violation.
@@ -25,6 +32,10 @@ let ownerGaii = '';
 async function test(name: string, fn: () => Promise<void>) {
   try { await fn(); passed++; console.log(`  ✅ ${name}`); }
   catch (err: any) { failed++; console.error(`  ❌ ${name}: ${err.message}`); }
+}
+
+function assert(cond: unknown, msg: string): asserts cond {
+  if (!cond) throw new Error(msg);
 }
 
 async function json(path: string, opts?: RequestInit) {
@@ -66,6 +77,51 @@ await test('Login owner', async () => {
   if (r.status !== 200) throw new Error(`Expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
   ownerToken = r.body.data?.token;
   if (!ownerToken) throw new Error('No token in response');
+});
+
+/**
+ * A second owner, and the point of them.
+ *
+ * The five bundled packs are seeded under `system@<nodeId>`, which is nobody's owner name, so the
+ * ONLY reason the tests below can deactivate, re-activate and delete them is that this suite's owner
+ * happens to be the node operator: they are the first real owner on a freshly cleared database. That
+ * makes every lifecycle call in this file an operator call, and the ownership guard on those three
+ * doors has never had to answer for a plain owner. A guard that exempted system-owned packs would
+ * hand every account on the node the power to take the shared UI packs off the air, and nothing here
+ * would notice.
+ *
+ * B is registered AFTER A on purpose. Register it first and B takes the operator role instead, and
+ * every refusal below turns into a 200 for the wrong reason.
+ */
+const OTHER_NAME = 'ui-test-other-' + Date.now();
+let otherToken = '';
+
+await test('A second, ordinary owner exists — and is not an operator', async () => {
+  const reg = await json('/v1/ghii', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: OTHER_NAME, display_name: 'UI Test Other', password: OWNER_PASS }),
+  });
+  if (reg.status !== 201) throw new Error(`Expected 201, got ${reg.status}: ${JSON.stringify(reg.body)}`);
+  const login = await json('/v1/ghii/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: OTHER_NAME, password: OWNER_PASS }),
+  });
+  if (login.status !== 200) throw new Error(`Expected 200, got ${login.status}`);
+  otherToken = login.body.data?.token;
+  if (!otherToken) throw new Error('No token for the second owner');
+
+  // The standing of both principals, read off a card that is not itself under test. Roles come back
+  // only to the account itself or to an operator, so each read carries its own token.
+  const b = await json(`/v1/owners/${OTHER_NAME}`, { headers: { Authorization: `Bearer ${otherToken}` } });
+  if (b.status !== 200) throw new Error(`Expected 200 reading B's own card, got ${b.status}`);
+  const bRoles: string[] = b.body.data?.roles ?? [];
+  if (bRoles.includes('operator')) throw new Error(`B must be an ordinary owner, got roles ${JSON.stringify(bRoles)}`);
+  const a = await json(`/v1/owners/${OWNER_NAME}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+  if (a.status !== 200) throw new Error(`Expected 200 reading A's own card, got ${a.status}`);
+  const aRoles: string[] = a.body.data?.roles ?? [];
+  if (!aRoles.includes('operator')) throw new Error(`the premise of this suite: A is the operator, got ${JSON.stringify(aRoles)}`);
 });
 
 // ── Phase 1: These five ship with the node, and a user cannot overwrite them ──
@@ -189,6 +245,44 @@ await test('All UI cortexes register under AIMEAT.ui', async () => {
   }
 });
 
+// ── Phase 4b: the shared packs are not any account's to switch off ──
+console.log('\n── Phase 4b: A second owner is refused the lifecycle doors ──');
+await test('A second owner cannot deactivate or delete a shared pack', async () => {
+  if (bundleSeeds === false) { console.log('    (skip: this node ships no bundled packs)'); return; }
+  const asOther = { Authorization: `Bearer ${otherToken}` };
+
+  // FORBIDDEN, not SCOPE_DENIED: requireScope('cortex:write') stands in front of these routes too,
+  // and owner sessions bypass it, so the code is what says the ownership guard is the layer that
+  // answered. A status-only check would keep passing if the guard were removed.
+  const layoutBefore = await servedLib('aimeat-ui-layout');
+  const deact = await json('/v1/cortex/aimeat-ui-layout/deactivate', { method: 'POST', headers: asOther });
+  assert(deact.status === 403, `deactivate: expected 403, got ${deact.status}: ${JSON.stringify(deact.body)}`);
+  if (deact.body.error?.code !== 'FORBIDDEN') throw new Error(`deactivate: expected FORBIDDEN, got ${deact.body.error?.code}`);
+  if (!/not your extension/i.test(String(deact.body.error?.message))) {
+    throw new Error(`deactivate: the refusal must be the ownership guard, got "${deact.body.error?.message}"`);
+  }
+  const layoutAfter = await servedLib('aimeat-ui-layout');
+  if (layoutAfter === null || layoutAfter !== layoutBefore) throw new Error('the layout pack must still serve the same bytes');
+
+  const navBefore = await servedLib('aimeat-ui-nav');
+  const del = await json('/v1/cortex/aimeat-ui-nav', { method: 'DELETE', headers: asOther });
+  assert(del.status === 403, `delete: expected 403, got ${del.status}: ${JSON.stringify(del.body)}`);
+  if (del.body.error?.code !== 'FORBIDDEN') throw new Error(`delete: expected FORBIDDEN, got ${del.body.error?.code}`);
+  if (!/not your extension/i.test(String(del.body.error?.message))) {
+    throw new Error(`delete: the refusal must be the ownership guard, got "${del.body.error?.message}"`);
+  }
+  const navAfter = await servedLib('aimeat-ui-nav');
+  if (navAfter === null || navAfter !== navBefore) throw new Error('the nav pack must still serve the same bytes');
+
+  // The premise, stated rather than assumed: nobody owns these by name.
+  const record = await json('/v1/cortex/aimeat-ui-layout', { headers: asOther });
+  if (record.status !== 200) throw new Error(`reading the record: expected 200, got ${record.status}`);
+  if (record.body.data?.status !== 'active') throw new Error(`the pack must still be active, got ${record.body.data?.status}`);
+  if (!String(record.body.data?.installed_by).startsWith('system@')) {
+    throw new Error(`the bundled packs belong to the node, got installed_by=${record.body.data?.installed_by}`);
+  }
+});
+
 // ── Phase 5: Deactivate + verify lib stops serving ───────
 console.log('\n── Phase 5: Deactivate ──');
 await test('Deactivated cortex lib returns 404', async () => {
@@ -200,24 +294,58 @@ await test('Deactivated cortex lib returns 404', async () => {
   if (r.status !== 404) throw new Error(`Expected 404, got ${r.status}`);
 });
 
+// The refusal that has something to protect: the dialogs pack is off the air right now, and a
+// second owner switching it back on would be deciding what this node serves to every browser.
+await test('...and a second owner cannot switch it back on either', async () => {
+  if (bundleSeeds === false) { console.log('    (skip: this node ships no bundled packs)'); return; }
+  const r = await json('/v1/cortex/aimeat-ui-dialogs/activate', {
+    method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
+  });
+  assert(r.status === 403, `activate: expected 403, got ${r.status}: ${JSON.stringify(r.body)}`);
+  if (r.body.error?.code !== 'FORBIDDEN') throw new Error(`activate: expected FORBIDDEN, got ${r.body.error?.code}`);
+  if (!/not your extension/i.test(String(r.body.error?.message))) {
+    throw new Error(`activate: the refusal must be the ownership guard, got "${r.body.error?.message}"`);
+  }
+  const still = await fetch(`${BASE}/v1/cortex/aimeat-ui-dialogs/libs/aimeat-ui-dialogs.js`);
+  if (still.status !== 404) throw new Error(`the pack must still be off the air, got ${still.status}`);
+});
+
 await test('Re-activate for cleanup', async () => {
   const r = await json('/v1/cortex/aimeat-ui-dialogs/activate', {
     method: 'POST',
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
   if (r.status !== 200) throw new Error(`Expected 200, got ${r.status}`);
+  // The positive control for the two refusals above: the same door, the same moment, the operator.
+  if (bundleSeeds !== false && (await servedLib('aimeat-ui-dialogs')) === null) {
+    throw new Error('the operator re-activated it, so the lib must serve again');
+  }
 });
 
 // ── Cleanup: Uninstall all ───────────────────────────────
 console.log('\n── Cleanup ──');
+let navDeleteStatus = 0;
 for (const name of UI_CORTEXES) {
-  await json(`/v1/cortex/${name}`, {
+  const r = await json(`/v1/cortex/${name}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${ownerToken}` },
   });
+  if (name === 'aimeat-ui-nav') navDeleteStatus = r.status;
 }
 
-// Delete test owner (use owner name, not GAII)
+// The delete door's positive control, on the pack B was refused a moment ago.
+await test('The operator CAN delete the pack a second owner could not', async () => {
+  if (bundleSeeds === false) { console.log('    (skip: this node ships no bundled packs)'); return; }
+  if (navDeleteStatus !== 200) throw new Error(`Expected 200 for the operator's delete, got ${navDeleteStatus}`);
+  if ((await servedLib('aimeat-ui-nav')) !== null) throw new Error('a deleted pack must stop serving');
+});
+
+// Delete both test owners. B first: deleting A while it is the node's only operator would let the
+// next login self-heal into the role, which is not something this suite should leave behind.
+await json(`/v1/owners/${OTHER_NAME}`, {
+  method: 'DELETE',
+  headers: { Authorization: `Bearer ${otherToken}` },
+});
 await json(`/v1/owners/${OWNER_NAME}`, {
   method: 'DELETE',
   headers: { Authorization: `Bearer ${ownerToken}` },

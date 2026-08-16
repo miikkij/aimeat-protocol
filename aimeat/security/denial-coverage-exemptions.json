@@ -133,10 +133,6 @@
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "a0094d954e9bf230"
     },
-    "test/cortex-ui-e2e.ts": {
-      "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
-      "sha": "9d1b81b8c99d44fc"
-    },
     "test/e2e-audio-speech.ts": {
       "reason": "Seeded 2026-08-15 from the E2E test-quality audit. NOT YET REVIEWED: this suite drives its surface with one principal and never asks what a second one gets. Either add a cross-owner or cross-scope refusal, or replace this line with why the surface has no refusal to test.",
       "sha": "f7c0ce1ae8df2766"
