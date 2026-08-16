@@ -80,6 +80,31 @@ await test('B joins the organism', async () => {
     assert(j.status === 200 || j.status === 201, `join ${j.status}`);
 });
 
+await test('0b. a NON-MEMBER is refused on every engagement door', async () => {
+    // All three routes are organism-membership gated, and the gate is never exercised: B joins in
+    // setup, so test 4's 403 comes from the agent-ownership check and test 5's from the manager check.
+    // No non-member ever touches the routes. Delete the memberRole gate from POST and GET and a
+    // complete stranger lists a private organism's contract roster and writes engagement records into
+    // it under `organism.<id>.*`, with all 15 tests green.
+    const C = await setupOwner('c');   // registered, never joined
+    const post = await json(engUrl(), {
+        method: 'POST', headers: auth(C.token),
+        body: JSON.stringify({ ws: WS, agent: agentGaii, contract: 'research' }),
+    });
+    assert(post.status === 403 || post.status === 404,
+        `a non-member adopted a contract: ${post.status} ${JSON.stringify(post.body?.data ?? post.body?.error)}`);
+
+    const retire = await json(`${engUrl()}/retire`, {
+        method: 'POST', headers: auth(C.token),
+        body: JSON.stringify({ ws: WS, agent: agentGaii, contract: 'research' }),
+    });
+    assert(retire.status === 403 || retire.status === 404, `a non-member retired one: ${retire.status}`);
+
+    const list = await json(`${engUrl()}?ws=${WS}`, { headers: auth(C.token) });
+    assert(list.status === 403 || list.status === 404,
+        `a non-member read the contract roster: ${list.status} ${JSON.stringify(list.body?.data ?? list.body?.error)}`);
+});
+
 await test('0. no engagements yet', async () => {
     const r = await json(`${engUrl()}?ws=${WS}`, { headers: auth(A.token) });
     assert(r.status === 200, `list ${r.status}`);

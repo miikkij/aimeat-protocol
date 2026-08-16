@@ -111,6 +111,28 @@ await test('7. Author deletes their comment → thread shrinks to 2', async () =
     assert((g.body.data.comments || []).length === 2, `expected 2 after delete, got ${(g.body.data.comments || []).length}`);
 });
 
+await test('7b. delete is author-or-admin, and the route has NO membership gate of its own', async () => {
+    // The header claims "author-only / admin delete", and only the author-deletes-their-own case runs:
+    // no non-author ever deletes and no admin delete is exercised. DELETE carries requireAuth plus
+    // requireRole('agent') and nothing else, so removing `if (!isAuthor && !isAdmin) return 403` lets
+    // ANY authenticated caller who knows the organism, workspace, space, instance and comment ids
+    // delete anyone's comment. B is not even a member here, which is what makes the missing
+    // membership gate visible: without the author check there is nothing else to stop them.
+    const before = await json(`/v1/organisms/${orgId}/comments?ws=${WS}&space=task&instance_id=t1`, { headers: auth(A.token) });
+    const countBefore = (before.body.data.comments || []).length;
+    const target = (before.body.data.comments || [])[0];
+    assert(!!target, 'there is a comment to protect');
+
+    const r = await json(`/v1/organisms/${orgId}/comments/${target.id}?ws=${WS}&space=task&instance_id=t1`, {
+        method: 'DELETE', headers: auth(B.token),
+    });
+    assert(r.status === 403, `a non-author deleted a comment: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+
+    const after = await json(`/v1/organisms/${orgId}/comments?ws=${WS}&space=task&instance_id=t1`, { headers: auth(A.token) });
+    assert((after.body.data.comments || []).length === countBefore,
+        `the thread shrank despite the 403: ${countBefore} -> ${(after.body.data.comments || []).length}`);
+});
+
 await test('8. Deleting a missing comment returns 404', async () => {
     const r = await json(`/v1/organisms/${orgId}/comments/nope-id?ws=${WS}&space=task&instance_id=t1`, { method: 'DELETE', headers: auth(A.token) });
     assert(r.status === 404, `expected 404, got ${r.status}`);

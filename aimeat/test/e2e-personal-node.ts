@@ -235,6 +235,34 @@ await test('Setup — a second, non-operator owner', async () => {
     assert(!rolesOf(ownerBToken).includes('operator'), `owner B must NOT be an operator, got ${JSON.stringify(rolesOf(ownerBToken))}`);
 });
 
+await test('cross-owner: owner B cannot ANCHOR a node under owner A\'s name', async () => {
+    // `owner_name` travels in the request BODY and is only ever sent equal to the caller, so the
+    // anchor's own identity check is exercised by nothing: batch 01 added the cross-owner PATCH,
+    // DELETE, mailbox and nodes denials and left this one. Delete
+    // `if (owner_name !== ownerFromAuth) return 403` from routes/personal.ts and owner B anchors a
+    // node under owner A's name — it takes a slot, gets a tunnel URL and a mailbox, and appears as
+    // A's node in the federation directory the moment it is flipped public.
+    const stolenId = `${personalNodeId}-stolen`;
+    const r = await json('/v1/personal/anchor', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerBToken}` },
+        body: JSON.stringify({
+            node_id: stolenId, owner_name: ownerName, public_key: 'test-key-base64',
+            agent_gaiis: [], visibility: 'private',
+        }),
+    });
+    assert(r.status === 403, `owner B anchored a node under owner A: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+
+    // And nothing was created: A still reports the node A anchored, and only that one.
+    const status = await json('/v1/personal/status', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status.body?.data?.node_id === personalNodeId,
+        `A's status now reports a different node: ${status.body?.data?.node_id}`);
+    const nodes = await json('/v1/personal/nodes', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const mine = ((nodes.body?.data?.nodes ?? []) as any[]).filter(n => n.owner_name === ownerName);
+    assert(!mine.some(n => n.node_id === stolenId),
+        `the refused anchor is listed under A: ${JSON.stringify(mine.map(n => n.node_id))}`);
+});
+
 await test('cross-owner: owner B cannot read, flip or destroy owner A\'s personal node', async () => {
     const bAuth = { Authorization: `Bearer ${ownerBToken}`, 'Content-Type': 'application/json' };
     const url = `/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`;
