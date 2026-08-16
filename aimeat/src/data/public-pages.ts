@@ -32,6 +32,10 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   v1.3.0 — 2026-08-16 — buildLlmsHumanPages()/buildLlmsOptionalPages(): the llms.txt index's
+ *     human-page and Optional link lists, generated here so a page added above appears in the
+ *     index without a second edit. The manual that preceded the index had no human-page list, so
+ *     a model asked what AIMEAT is was sent into the app builder's manual for the answer.
  *   v1.2.0 — 2026-08-01 — Record the standing decision that page routes and their mirrors stay out
  *     of openapi.yaml (TARGET-058 Phase 10b). Nothing here changed; the rule did.
  *   v1.1.0 — 2026-08-01 — Add /v1/transparency (TARGET-058 Phase 10), the public human page about
@@ -105,7 +109,8 @@ jargon; [For your business]({{BASE_URL}}/v1/business) covers the organisational 
 ## For agents
 
 - Machine-readable bootstrap: \`GET {{BASE_URL}}/?format=json\`
-- Full manual: [llms.txt]({{BASE_URL}}/llms.txt) · Orientation: [AGENTS.md]({{BASE_URL}}/AGENTS.md)
+- Index: [llms.txt]({{BASE_URL}}/llms.txt) · Full manual: [llms-full.txt]({{BASE_URL}}/llms-full.txt)
+- Orientation: [AGENTS.md]({{BASE_URL}}/AGENTS.md)
 - Get an identity: [auth.md]({{BASE_URL}}/auth.md) (RFC 8628 device flow, the owner approves)
 - Contract: [OpenAPI]({{BASE_URL}}/v1/spec) · MCP server: \`POST {{BASE_URL}}/v1/mcp\`
 - Vocabulary: [glossary]({{BASE_URL}}/v1/glossary)
@@ -162,7 +167,7 @@ What agents produce can carry a price, which is where a capability stops being a
 something somebody buys.
 
 The vocabulary is in the [glossary]({{BASE_URL}}/v1/glossary); the full technical account is
-[llms.txt]({{BASE_URL}}/llms.txt).
+[llms-full.txt]({{BASE_URL}}/llms-full.txt).
 `,
   },
   {
@@ -175,7 +180,7 @@ The vocabulary is in the [glossary]({{BASE_URL}}/v1/glossary); the full technica
 governs it.
 
 - The contract itself: [{{BASE_URL}}/v1/spec]({{BASE_URL}}/v1/spec)
-- Prefer prose: [llms.txt]({{BASE_URL}}/llms.txt) has the same surface with worked examples
+- Prefer prose: [llms-full.txt]({{BASE_URL}}/llms-full.txt) has the same surface with worked examples
 - Getting an identity first: [auth.md]({{BASE_URL}}/auth.md)
 `,
   },
@@ -188,8 +193,9 @@ governs it.
     markdown: `Getting started with AIMEAT, the questions that come up first, and a prompt you can paste into any
 AI chat to be walked through this node.
 
-If you are an agent rather than a person, [AGENTS.md]({{BASE_URL}}/AGENTS.md) is the shorter road, and
-[llms.txt]({{BASE_URL}}/llms.txt) is the full manual.
+If you are an agent rather than a person, [AGENTS.md]({{BASE_URL}}/AGENTS.md) is the shorter road,
+[llms.txt]({{BASE_URL}}/llms.txt) is the index, and [llms-full.txt]({{BASE_URL}}/llms-full.txt) is the
+full manual.
 `,
   },
   {
@@ -306,4 +312,43 @@ export function findPublicPage(path: string): PublicPage | undefined {
 /** The live pages that carry an authored markdown body, i.e. the ones with a `<path>.md` mirror. */
 export function mirroredPages(): PublicPage[] {
   return PUBLIC_PAGES.filter((p) => !p.planned && p.markdown);
+}
+
+/**
+ * Paths the llms.txt index already names in its Documentation section. Listing them again under
+ * "Human pages" costs an index whose whole value is being short.
+ */
+const LLMS_INDEX_DOCUMENTED = new Set(['/v1/docs', '/v1/glossary']);
+
+/**
+ * Paths that belong in the index's "Optional" section — the llmstxt.org convention for links an
+ * agent can skip when it needs a shorter context. Policy and transparency pages are that: a reader
+ * deciding what this node is does not need them, and a reader who does need them is looking.
+ */
+const LLMS_INDEX_OPTIONAL = new Set(['/v1/transparency', '/v1/privacy', '/v1/terms']);
+
+/** One llms.txt link-list line per page: `- [Title](url): description`. */
+function llmsLine(page: PublicPage, baseUrl: string): string {
+  return `- [${page.title}](${baseUrl}${page.path}): ${page.description}`;
+}
+
+/**
+ * The llms.txt index "Human pages" list — substituted for the `{{HUMAN_PAGES}}` token. Generated
+ * from this registry rather than hand-listed, so a page added above appears in the index without a
+ * second edit. The fat manual it replaced had no human-page list at all, so a model asked what
+ * AIMEAT is was sent into the app builder's manual for the answer.
+ */
+export function buildLlmsHumanPages(baseUrl: string): string {
+  return sitemapPages()
+    .filter((p) => !LLMS_INDEX_DOCUMENTED.has(p.path) && !LLMS_INDEX_OPTIONAL.has(p.path))
+    .map((p) => llmsLine(p, baseUrl))
+    .join('\n');
+}
+
+/** The llms.txt index "Optional" page lines — substituted for the `{{OPTIONAL_PAGES}}` token. */
+export function buildLlmsOptionalPages(baseUrl: string): string {
+  return sitemapPages()
+    .filter((p) => LLMS_INDEX_OPTIONAL.has(p.path))
+    .map((p) => llmsLine(p, baseUrl))
+    .join('\n');
 }

@@ -1,0 +1,60 @@
+---
+description: AIMEAT Protocol Node — index
+version: v2
+downloadedFrom: {{BASE_URL}}/llms.txt
+---
+
+# AIMEAT Protocol Node
+
+> This page is the index. The full builder's manual is at {{BASE_URL}}/llms-full.txt, and that is
+> the document to fetch when you are helping someone build an app or calling this API directly.
+> An AIMEAT node holds persistent memory, identity for humans and their AI agents (GHII/GAII),
+> shared workspaces, skills, tasks and a usage meter, reachable over REST and MCP. The person who
+> owns an account here owns what is stored under it and grants or revokes each agent's reach, one
+> scope at a time.
+
+- Node URL: {{BASE_URL}}
+- Node ID: {{NODE_ID}}
+- Protocol: AIMEAT v1
+
+## Start here
+
+- [You are a person]({{BASE_URL}}/v1/portal): register in the portal, then connect an assistant
+- [You are an assistant helping someone build]({{BASE_URL}}/llms-full.txt): the manual, with SDK libraries, app templates and worked examples
+- [You are an agent joining under your own identity]({{BASE_URL}}/auth.md): RFC 8628 device flow, the owner approves you and picks your scopes
+- [You are a coding agent meeting AIMEAT as a dependency]({{BASE_URL}}/AGENTS.md): short orientation, installation and configuration
+
+## Documentation
+
+- [Full builder's manual]({{BASE_URL}}/llms-full.txt): everything below in one document — SDK libraries, app templates, core concepts, connection flows and the complete endpoint reference
+- [Site map]({{BASE_URL}}/sitemap.md): every page and endpoint on this node, one page
+- [Glossary]({{BASE_URL}}/v1/glossary): GHII, GAII, GEAI, morsels, organisms and the rest, defined
+- [OpenAPI contract]({{BASE_URL}}/v1/spec): the canonical API contract this node is held to
+- [API documentation]({{BASE_URL}}/v1/docs): browsable endpoint reference
+- [Agent registration]({{BASE_URL}}/auth.md): RFC 8628 device flow, owner-approved
+- [App building prompt]({{BASE_URL}}/v1/prompts/build-app): the canonical single-file app spec
+- [App templates]({{BASE_URL}}/v1/app-templates): starter skeletons
+- [App-build pitfalls]({{BASE_URL}}/v1/appdev/pitfalls): what breaks app builds, curated
+
+## Discovery
+
+- [Node descriptor]({{BASE_URL}}/.well-known/aimeat): id, type, public key, capabilities
+- [MCP Server Card]({{BASE_URL}}/.well-known/mcp.json): the MCP server, its transport and auth
+- [Machine-readable bootstrap]({{BASE_URL}}/?format=json): what this node is and what to call next
+- [API catalog]({{BASE_URL}}/.well-known/api-catalog): RFC 9727 linkset
+- [Agent Skills index]({{BASE_URL}}/.well-known/agent-skills/index.json): skill packs published here
+- [Crawl policy]({{BASE_URL}}/robots.txt): the content signals this node sets
+
+## Human pages
+
+{{HUMAN_PAGES}}
+
+## Optional
+
+Secondary reading. Skip these when you need a shorter context.
+
+{{OPTIONAL_PAGES}}
+- [AI transparency]({{BASE_URL}}/v1/ai-transparency): what this node marks as AI-generated, how, and in which posture. Content generated here carries an `aimeat.provenance/v1` record on every surface; ask {{BASE_URL}}/v1/provenance/by-hash/<sha256> about bytes you hold, no account needed
+- [UCP profile]({{BASE_URL}}/.well-known/ucp): commerce transports, checkout capability, payment handlers
+- [ACP profile]({{BASE_URL}}/.well-known/acp.json): agentic-commerce discovery and the product feed
+- [Web Bot Auth directory]({{BASE_URL}}/.well-known/http-message-signatures-directory): the keys this node signs outbound requests with

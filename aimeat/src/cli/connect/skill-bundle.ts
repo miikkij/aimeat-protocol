@@ -213,7 +213,7 @@ Use \`generic\` as the installed skill platform unless your runtime has a more s
   - Commands: write \`agents.${agentName}.commands\` with the full owner-facing slash command catalogue this agent can actually handle. Use a flat array of \`{ name, description, category }\`. Do not copy examples or list internal MCP tools as message commands.
   - Config: write actual runtime/config artifacts under \`agents.config.*\`. If this setup only uses \`aimeat connect serve\`, describe that connector accurately; do not invent a watchdog file.
   - Shared memory: if the owner assigned shared tags in Data Access/directives, use \`agents.tag.<tag>.*\` with visibility \`owner\` and tags \`["<tag>"]\` for same-owner handoff notes, project state, queues, and team context. List shared areas with \`owner_scope=true\` plus prefix \`agents.tag.<tag>.\`.
-  - Knowledge: when you produce research, docs, datasets, or reusable knowledge, create or update a real knowledge package with \`POST /v1/knowledge/import\` from \`/llms.txt\`, \`aimeat_knowledge_contribute\`, and \`aimeat_storage_upload\` as appropriate. Do not use a placeholder \`research.*\` memory key as a substitute.
+  - Knowledge: when you produce research, docs, datasets, or reusable knowledge, create or update a real knowledge package with \`POST /v1/knowledge/import\` from \`/llms-full.txt\`, \`aimeat_knowledge_contribute\`, and \`aimeat_storage_upload\` as appropriate. Do not use a placeholder \`research.*\` memory key as a substitute.
 
 5. Run \`npx aimeat connect refresh\` later to download updated bundle content.
 `;

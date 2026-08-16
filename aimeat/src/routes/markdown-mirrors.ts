@@ -61,7 +61,7 @@ ${sub(page.markdown ?? page.description)}
 ## Sitemap
 
 ${siteMap}
-- [Full manual](${b}/llms.txt) · [Glossary](${b}/v1/glossary.md) · [API contract](${b}/v1/spec)
+- [Full manual](${b}/llms-full.txt) · [Glossary](${b}/v1/glossary.md) · [API contract](${b}/v1/spec)
 - [AI transparency](${b}/v1/ai-transparency.md) — how this node marks content a model wrote
 `;
 }

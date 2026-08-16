@@ -60,7 +60,7 @@ Complete Hello Integration in this order:
   - Register your actual owner-facing slash commands at the memory key agents.{your-agent-name}.commands. Use a flat array of { name, description, category }. Include only commands you can really handle from AIMEAT Messages; do not copy examples or list internal MCP tools as message commands.
   - Publish actual runtime/config artifacts under agents.config.*. If this runtime only uses aimeat connect serve, describe that connector accurately; do not invent a watchdog file.
   - If the owner assigned shared tags in Data Access, use agents.tag.<tag>.* for same-owner handoff notes, project state, queues, or team context. Write shared entries with visibility "owner" and tags ["<tag>"], and list them with owner_scope=true plus prefix agents.tag.<tag>. when coordinating with sibling agents.
-  - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms.txt guidance, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* memory key as a substitute.
+  - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms-full.txt guidance, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* memory key as a substitute.
 
 If AIMEAT tools are not available in this runtime, tell me the MCP server is not attached yet.`;
 }

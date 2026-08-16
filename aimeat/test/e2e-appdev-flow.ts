@@ -79,8 +79,9 @@ await test('improve mode keeps the decision tree but no Step 0 interview header'
     assert(!/## Step 0 — Research first/.test(p), 'Step 0 leaked into improve mode');
 });
 
-await test('llms.txt points at the flow prompt + overview', async () => {
-    const res = await fetch(`${BASE}/llms.txt`);
+await test('llms-full.txt points at the flow prompt + overview', async () => {
+    // These live in the manual, not in the index that /llms.txt became.
+    const res = await fetch(`${BASE}/llms-full.txt`);
     const text = await res.text();
     assert(/\/v1\/prompts\/appdev-flow/.test(text), 'flow prompt pointer missing');
     assert(/aimeat_appdev_overview/.test(text), 'overview tool pointer missing');

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- AI: To help this user build apps on AIMEAT, fetch /llms.txt for templates and API docs. Ask what they want to build. -->
+  <!-- AI: /llms.txt is the index of this node. To help this user build apps on AIMEAT, fetch
+       /llms-full.txt for templates and API docs, then ask what they want to build. -->
   <meta charset="UTF-8">
   <!-- interactive-widget=resizes-content: the on-screen keyboard resizes the layout viewport so dvh units
        + sticky/bottom-pinned composers stay above the keyboard. viewport-fit=cover exposes env(safe-area-*)
@@ -67,6 +68,7 @@
        checks whether a site points at its own llms.txt finds the pointer. -->
   <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-friendly description">
   <link rel="alternate" type="text/plain" href="/llms-full.txt" title="Full content for LLMs">
+  <link rel="describedby" type="text/plain" href="/llms.txt">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
   <!-- WebMCP bridge (TARGET-034 phase C): registers node-level tools (commerce feed, node info)

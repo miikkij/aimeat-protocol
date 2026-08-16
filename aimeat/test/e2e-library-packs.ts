@@ -177,12 +177,14 @@ await test('build-app prompt contains every stable pack id (no drift)', async ()
   assert(prompt.includes('/v1/library-packs'), 'prompt does not point AIs at the pack docs endpoint');
 });
 
-await test('llms.txt carries the generated library table (token substituted)', async () => {
-  const res = await fetch(`${BASE}/llms.txt`);
+await test('llms-full.txt carries the generated library table (token substituted)', async () => {
+  // The {{LIBRARY_PACKS_TABLE}} token is in the manual; the index links to it rather than
+  // reproducing it.
+  const res = await fetch(`${BASE}/llms-full.txt`);
   const text = await res.text();
   assert(!text.includes('{{LIBRARY_PACKS_TABLE}}'), 'LIBRARY_PACKS_TABLE token not substituted');
   assert(text.includes('| aimeat-auth |'), 'generated table missing aimeat-auth row');
-  assert(text.includes('/v1/library-packs'), 'llms.txt does not mention the packs endpoint');
+  assert(text.includes('/v1/library-packs'), 'llms-full.txt does not mention the packs endpoint');
 });
 
 await test('bootstrap sdk_libraries derives from the registry', async () => {

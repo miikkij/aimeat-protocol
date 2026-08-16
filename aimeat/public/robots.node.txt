@@ -23,52 +23,93 @@ User-agent: *
 Content-Signal: search=yes, ai-input=yes, ai-train=no
 Allow: /
 
-# ── OpenAI ──────────────────────────────────────────────────────────────────
-# OAI-SearchBot: powers ChatGPT search results (allow — we want to show up)
+# ── Search and retrieval ────────────────────────────────────────────────────
+# These are the bots that decide whether an AI assistant can answer a live question about this
+# node correctly. Every one of them is allowed, on every node, and that is not operator-tunable:
+# a node nobody can look up is a node nobody can join.
+#
+# Two kinds are mixed here on purpose, because blocking them has different costs. A SEARCH bot
+# feeds the index an assistant queries; blocking it removes this node from that assistant's
+# answers. A USER bot fetches one page because a human asked for it, and the vendors document
+# that those may ignore robots.txt precisely because a person asked.
+
+# OpenAI — OAI-SearchBot powers ChatGPT search results; blocking it removes this node from them.
 User-agent: OAI-SearchBot
 Allow: /
 
-# GPTBot: training data crawler (blocked — training is a separate decision)
-User-agent: GPTBot
-Disallow: /
+User-agent: ChatGPT-User
+Allow: /
 
-# ── Anthropic / Claude ───────────────────────────────────────────────────────
-# Claude-SearchBot: search indexing
+User-agent: OAI-AdsBot
+Allow: /
+
+# Anthropic — rules apply per subdomain, which is why app origins serve their own robots.txt.
 User-agent: Claude-SearchBot
 Allow: /
 
-# Claude-User: user-initiated fetches (cowork, claude.ai browsing)
 User-agent: Claude-User
 Allow: /
 
-# ClaudeBot: training crawler
-User-agent: ClaudeBot
-Disallow: /
-
-# ── Perplexity ───────────────────────────────────────────────────────────────
-# PerplexityBot: search indexing (respects robots.txt)
+# Perplexity
 User-agent: PerplexityBot
 Allow: /
 
-# Perplexity-User: user-initiated fetches (typically ignores robots.txt anyway)
 User-agent: Perplexity-User
 Allow: /
 
-# ── Google ───────────────────────────────────────────────────────────────────
-# Googlebot: standard search indexing (allow)
+# Google — Googlebot feeds Search, and therefore AI Overviews and AI Mode, which are retrieval
+# over the Search index. Google-Extended is a separate decision and sits in the training block.
 User-agent: Googlebot
 Allow: /
 
-# Google-Extended: Gemini training/grounding — does NOT affect Google Search
-User-agent: Google-Extended
-Disallow: /
-
-# ── Bing / Copilot ───────────────────────────────────────────────────────────
+# Microsoft — bingbot feeds both Bing Search and Copilot.
 User-agent: Bingbot
 Allow: /
 
+# Apple — Applebot indexes for Siri and Spotlight. Applebot-Extended does not crawl at all; it is
+# the training opt-out token, so it belongs in the block below.
+User-agent: Applebot
+Allow: /
+
+# Meta — meta-externalfetcher is the user-requested single-link fetch.
+User-agent: meta-externalfetcher
+Allow: /
+
+# xAI / Grok: deliberately absent. No vendor-documented crawler token exists — none appears in
+# x.ai/robots.txt, grok.com/robots.txt or Cloudflare's bot reference — so there is nothing to name
+# here that would not be a guess. The `User-agent: *` rule above covers Grok, and every other
+# undocumented crawler, which is the whole of the available answer.
+
+# ── AI training crawlers ────────────────────────────────────────────────────
+# A separate decision from the block above, and an operator's to make: AIMEAT_AI_TRAINING=allow
+# flips every Disallow between the markers to Allow and pairs the Content-Signal line to
+# ai-train=yes. The default is deny, because a personal node holds one person's data and a safe
+# default has to assume that case.
+#
+# The cost of denying, stated plainly so the choice is an informed one: it keeps this node out of
+# what the models know without being pointed at it, and it is a stated preference rather than an
+# enforceable control. It protects a right; it does not protect bytes.
+#AIMEAT-TRAINING-BEGIN
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+# Google-Extended controls Gemini training and grounding ONLY. Per Google's own documentation it
+# does not affect Google Search, and it does not remove this node from AI Overviews.
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+#AIMEAT-TRAINING-END
+
 # ── AI agents: machine-readable docs ────────────────────────────────────────
-# See /llms.txt for structured API documentation
+# /llms.txt is the curated index; /llms-full.txt is the full builder's manual.
 # API entry point for AI agents: GET /?format=json
 
-Sitemap: https://aimeat.io/sitemap.xml
+Sitemap: {{BASE_URL}}/sitemap.xml

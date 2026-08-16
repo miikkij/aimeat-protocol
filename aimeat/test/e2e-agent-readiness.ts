@@ -183,11 +183,27 @@ function locs(xml: string): string[] {
         }
     });
 
-    await test('llms-full.txt serves the same manual', async () => {
+    await test('llms.txt is the index, small enough to be the first fetch', async () => {
+        // llmstxt.org: llms.txt is the curated map, llms-full.txt the expanded content. Both used
+        // to be the 124 kB manual, so every reader that only wanted to know what this node is paid
+        // for the manual to find out.
+        assert(llms.body.length < 8192, `index is ${llms.body.length} bytes; it has to stay small`);
+        assert(llms.body.includes('/llms-full.txt'), 'the index does not name the full manual');
+        assert(llms.body.includes('## Human pages'), 'the index has no human-page list');
+    });
+
+    await test('llms-full.txt serves the manual, and it is a different document', async () => {
         const full = await text('/llms-full.txt');
         assert(full.status === 200, `status ${full.status}`);
         assert(full.ct.includes('text/plain'), `content-type ${full.ct}`);
-        assert(full.body === llms.body, 'llms-full.txt must match llms.txt byte for byte');
+        assert(full.body !== llms.body, 'llms-full.txt and llms.txt must not be the same document');
+        assert(full.body.length > 100_000, `manual is only ${full.body.length} bytes`);
+        for (const section of ['## What is AIMEAT', '## Building Apps on AIMEAT', '## Endpoints']) {
+            assert(full.body.includes(section), `llms-full.txt missing ${section}`);
+        }
+        // The index has to be reachable from the manual too: a reader who lands on the full
+        // document directly should not have to guess that a map exists.
+        assert(full.body.includes('/llms.txt'), 'the manual does not name its index');
     });
 
     // ── Glossary (phase 06) ─────────────────────────────────────────────────────────────────

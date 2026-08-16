@@ -26,6 +26,12 @@
  *   v1.8.0 -- 2026-07-28 -- /llms-full.txt serves the same manual as /llms.txt (llmstxt.org
  *     convention), apex-only; the manual gained a blockquote summary and link-list sections
  *     (agent-readability phase 05)
+ *   v2.0.0 -- 2026-08-16 -- /llms.txt is the curated INDEX and /llms-full.txt the full manual,
+ *     the way round llmstxt.org means it; both used to serve the 124 kB manual. Index links the
+ *     human pages from the page registry ({{HUMAN_PAGES}}/{{OPTIONAL_PAGES}}). Both bodies are
+ *     memoized (three replaceAll passes over 124 kB ran per request) and answer Cache-Control:
+ *     no-cache, and each fetch is logged with its user-agent so this node can measure who reads
+ *     them instead of trusting somebody else's sample
  *   v1.9.0 -- 2026-07-28 -- GET / answers HTML by default and JSON only when asked
  *     (?format=json or Accept: application/json). A wildcard Accept -- what every crawler, unfurler
  *     and readability scanner sends -- used to get the JSON envelope, so the front door was invisible
@@ -46,7 +52,7 @@ import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
-import { sitemapPages } from '../data/public-pages.js';
+import { sitemapPages, buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
 import { buildGettingStarted } from '../data/getting-started.js';
 import { apexOnly } from './agent-docs.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
@@ -65,8 +71,12 @@ const HELP_PROMPT_RAW = (() => {
 
 const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90" fill="red">♥</text></svg>`;
 
-/** Load llms.txt template once at startup */
-const LLMS_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-template.txt'), 'utf-8');
+/**
+ * The two llms.txt documents, loaded once at startup. `llms-index-template.txt` is the curated map
+ * served at /llms.txt; `llms-full-template.txt` is the builder's manual served at /llms-full.txt.
+ */
+const LLMS_INDEX_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-index-template.txt'), 'utf-8');
+const LLMS_FULL_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-full-template.txt'), 'utf-8');
 
 export function bootstrapRouter(
   config: AimeatConfig,
@@ -103,28 +113,45 @@ export function bootstrapRouter(
     res.type('image/svg+xml').send(FAVICON_SVG);
   });
 
-  const renderLlms = () => LLMS_TEMPLATE
-    // Library table first — generated from the library-pack registry (drift kill); its
-    // cells may carry {{BASE_URL}} placeholders, so substitute the token before BASE_URL.
+  const renderLlms = (template: string) => template
+    // Generated blocks first — the library-pack table and the two page lists come from their own
+    // registries (drift kill). Their cells may carry {{BASE_URL}} placeholders, so the tokens are
+    // substituted before BASE_URL rather than after.
     .replaceAll('{{LIBRARY_PACKS_TABLE}}', buildLlmsPacksTable())
+    .replaceAll('{{HUMAN_PAGES}}', buildLlmsHumanPages(config.baseUrl))
+    .replaceAll('{{OPTIONAL_PAGES}}', buildLlmsOptionalPages(config.baseUrl))
     .replaceAll('{{BASE_URL}}', config.baseUrl)
     .replaceAll('{{NODE_ID}}', config.nodeId);
 
-  // /llms.txt and /llms-full.txt serve the same document. The llmstxt.org convention splits an
-  // index from the full content, and ours is already the full content — 145 kB of manual that
-  // every published skill, the app-building prompt, robots.txt and the bootstrap response point
-  // at by that exact path. Swapping the two would turn the manual into a link list under a URL
-  // thousands of reads already trust, and none of them would notice they got the wrong document.
-  // So the index moved INTO the manual (the Documentation and Discovery sections at the top),
-  // and /llms-full.txt answers the conventional path with the content it promises.
-  const serveLlms = (_req: unknown, res: import('express').Response) => {
-    res.type('text/plain; charset=utf-8').send(renderLlms());
+  // /llms.txt is the curated index and /llms-full.txt is the manual, which is the way round
+  // llmstxt.org means it. Both were the manual until now, on the argument that every published
+  // skill, the app-building prompt and the bootstrap response point at /llms.txt by name and would
+  // silently receive a link list instead. What answers that is the index's own blockquote, whose
+  // first sentence names /llms-full.txt: a reader after the manual pays one extra fetch, and a
+  // reader who only wanted to know what this node is no longer pays 124 kB for the answer.
+  //
+  // Rendering is memoized because config is fixed at boot. It used to run three replaceAll passes
+  // over 124 kB on every single request.
+  let indexBody: string | undefined;
+  let fullBody: string | undefined;
+  const sendLlms = (req: import('express').Request, res: import('express').Response, body: string) => {
+    // Who actually reads these is an open question that every published measurement answers with
+    // somebody else's sample. One line per fetch and this node answers it for itself.
+    logger.info('llms document fetched', { path: req.path, userAgent: req.get('user-agent') ?? '' });
+    res.set('Cache-Control', 'no-cache');
+    res.type('text/plain; charset=utf-8').send(body);
   };
-  router.get('/llms.txt', serveLlms);
+  router.get('/llms.txt', (req, res) => {
+    indexBody ??= renderLlms(LLMS_INDEX_TEMPLATE);
+    sendLlms(req, res, indexBody);
+  });
   // An app origin serves ITS OWN agent face at /llms.txt (subdomainServeRouter, which runs first).
-  // /llms-full.txt has no such handler, so without the guard the node's 145 kB app-BUILDING manual
-  // would answer on an app's host — the wrong manual, in which the app's own name never appears.
-  router.get('/llms-full.txt', apexOnly, serveLlms);
+  // /llms-full.txt has no such handler, so without the guard the node's app-BUILDING manual would
+  // answer on an app's host — the wrong manual, in which the app's own name never appears.
+  router.get('/llms-full.txt', apexOnly, (req, res) => {
+    fullBody ??= renderLlms(LLMS_FULL_TEMPLATE);
+    sendLlms(req, res, fullBody);
+  });
 
   router.get('/', async (_req, res) => {
     // The root negotiates three ways: text/markdown (agents, Markdown for Agents convention),
@@ -272,7 +299,7 @@ export function bootstrapRouter(
               limitation: 'Memory keys limited to anonymous.* namespace',
             },
             app_building: {
-              note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder via aimeat_skill_get. Starter skeletons: GET /v1/app-templates. Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms.txt for the full SDK documentation.',
+              note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder via aimeat_skill_get. Starter skeletons: GET /v1/app-templates. Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms-full.txt for the full SDK documentation.',
               build_prompt: `${base}/v1/prompts/build-app`,
               builder_skill: 'node:aimeat-app-builder (aimeat_skill_get) — the paved-path workflow skill',
               starter_templates_endpoint: `${base}/v1/app-templates`,

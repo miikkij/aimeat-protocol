@@ -136,7 +136,7 @@ entry: index.html
       document.getElementById('ws-name').textContent = ws.manifest?.name || wsId;
       const ot = (ws.manifest?.objectTypes || []).find(o => o.contract === CONTRACT && o.mode === 'document')
         || (ws.manifest?.objectTypes || []).find(o => o.mode === 'document');
-      if (!ot) { $app().innerHTML = '<p>This workspace has no signage document space. See the setup prompt in /llms.txt.</p>'; return; }
+      if (!ot) { $app().innerHTML = '<p>This workspace has no signage document space. See the setup prompt in /llms-full.txt.</p>'; return; }
       NAMESPACE = ot.namespace;
       const space = ws.spaces.find(s => s.name === ot.name);
       const screens = (space?.items || []).map(i => ({ id: i.id || i.value?.id, value: i.value }))

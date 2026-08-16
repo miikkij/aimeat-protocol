@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-16",
+      "kind": "feature",
+      "title": {
+        "en": "An AI that meets this node reads a page, not a manual",
+        "fi": "Tekoäly joka kohtaa tämän noden lukee sivun, ei käsikirjaa"
+      },
+      "body": {
+        "en": "The document an AI fetches first to find out what this node is was the whole builder's manual: 124 kB of SDK reference and endpoint examples, for a reader who only wanted to know what they had arrived at. Now /llms.txt is a one-page map that names what is here and where each thing leads, and the manual is at /llms-full.txt, which is the convention the rest of the web follows. Anything pointed at the old address is told in the first sentence where the manual went.\n\nThe map lists this node's human pages too, generated from the node's own page registry, so a person's question gets a person's page rather than the app builder's manual.\n\nTwo related fixes you may notice if you run your own node: each page now carries structured data describing that page, which had been silently skipped on every page since it was written, and a node that is not aimeat.io no longer tells search engines and AI readers that it is.",
+        "fi": "Dokumentti jonka tekoäly hakee ensimmäisenä saadakseen selville mikä tämä node on oli koko rakentajan käsikirja: 124 kt SDK-viitettä ja endpoint-esimerkkejä lukijalle joka halusi vain tietää minne oli tullut. Nyt /llms.txt on yhden sivun kartta joka kertoo mitä täällä on ja mihin kukin asia johtaa, ja käsikirja on osoitteessa /llms-full.txt, jota muukin verkko noudattaa. Vanhaan osoitteeseen ohjatulle kerrotaan heti ensimmäisessä lauseessa minne käsikirja siirtyi.\n\nKartta listaa myös tämän noden ihmisille tarkoitetut sivut, ja ne tulevat noden omasta sivurekisteristä, joten ihmisen kysymykseen vastaa ihmisen sivu eikä sovelluskehittäjän käsikirja.\n\nKaksi liittyvää korjausta jotka saatat huomata jos ylläpidät omaa nodea: jokainen sivu kantaa nyt rakenteista tietoa itsestään, mikä oli jäänyt hiljaisesti tekemättä joka sivulla siitä asti kun se kirjoitettiin, eikä muu kuin aimeat.io enää kerro hakukoneille ja tekoälylukijoille olevansa aimeat.io."
+      }
+    },
+    {
       "date": "2026-08-12",
       "version": "2.8.0",
       "kind": "security",

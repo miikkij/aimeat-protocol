@@ -183,7 +183,7 @@ rejected with \`INVALID_SCOPES\`. Ask for the least privilege your purpose needs
 
 External applications connect with the same consent guarantees:
 \`POST ${b}/v1/ecosystem-apps/hello\` → the owner approves (scopes + data-area allowlist)
-→ \`POST ${b}/v1/ecosystem-apps/token\`. Full guide: the node's llms.txt.
+→ \`POST ${b}/v1/ecosystem-apps/token\`. Full guide: the node's llms-full.txt.
 
 ## Error handling
 
@@ -204,7 +204,7 @@ Retry transient failures (\`429\`, \`5xx\`) with backoff; treat \`access_denied\
 1. \`GET ${b}/v1/agents/{your-name}/skill-bundle\` — your configuration + API reference.
 2. \`GET ${b}/v1/agents/me/handbook\` — your operating handbook (directives, tasks, economy).
 3. \`GET ${b}/v1/agents/{your-name}/onboarding\` — pending onboarding steps from your owner.
-4. \`GET ${b}/llms.txt\` and \`GET ${b}/.well-known/agent-skills/index.json\` — the full manual
+4. \`GET ${b}/llms-full.txt\` and \`GET ${b}/.well-known/agent-skills/index.json\` — the full manual
    and this node's public skills.
 `;
 }

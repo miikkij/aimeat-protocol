@@ -5,10 +5,10 @@
  *   Both are generated from the same sources as everything else — the public-page registry, the
  *   node config — so a page added in one place appears here without a second edit.
  *
- *   These sit alongside, not instead of, the documents we already serve. `sitemap.xml` addresses a
- *   crawler, `llms.txt` is the full builder's manual, and `sitemap.md` is the one-page answer to
- *   "what is here and where do I start" that neither of those gives: 989 OpenAPI operations and a
- *   145 kB manual are both poor first reads.
+ *   These sit alongside the documents we already serve. `sitemap.xml` addresses a crawler,
+ *   `llms-full.txt` is the full builder's manual with `llms.txt` as its index, and `sitemap.md` is
+ *   the one-page answer to "what is here and where do I start" that none of those gives: 989
+ *   OpenAPI operations and a 124 kB manual are both poor first reads.
  *
  * @structure
  *   - agentDocsRouter(config) — mounts the GET endpoints
@@ -57,8 +57,8 @@ ${pages}
 
 ## Agent documentation
 
-- [llms.txt](${b}/llms.txt): the full builder's manual — SDK libraries, app templates, API reference
-- [llms-full.txt](${b}/llms-full.txt): the same manual, at the conventional full-content path
+- [llms.txt](${b}/llms.txt): the curated index over everything below
+- [llms-full.txt](${b}/llms-full.txt): the full builder's manual — SDK libraries, app templates, API reference
 - [AGENTS.md](${b}/AGENTS.md): short orientation for a coding agent meeting this node
 - [OpenAPI contract](${b}/v1/spec): the canonical API contract this node is held to
 - [API documentation](${b}/v1/docs): browsable endpoint reference
@@ -84,7 +84,7 @@ ${pages}
 ## Where to start
 
 - **You are a person.** [The portal](${b}/v1/portal) — register, then connect an assistant.
-- **You are an assistant helping a person build something.** [llms.txt](${b}/llms.txt).
+- **You are an assistant helping a person build something.** [llms-full.txt](${b}/llms-full.txt).
 - **You are an agent joining this node under your own identity.** [auth.md](${b}/auth.md) — device
   flow, the owner approves you and picks your scopes.
 - **You are a coding agent meeting AIMEAT as a dependency.** [AGENTS.md](${b}/AGENTS.md).
@@ -186,7 +186,7 @@ with request and response shapes is in the OpenAPI contract.
 
 ## Where the rest is
 
-- Full builder's manual: \`GET ${b}/llms.txt\`
+- Full builder's manual: \`GET ${b}/llms-full.txt\` (its index: \`GET ${b}/llms.txt\`)
 - OpenAPI contract: \`GET ${b}/v1/spec\`
 - Site map: \`GET ${b}/sitemap.md\`
 - Glossary: \`GET ${b}/v1/glossary.md\`

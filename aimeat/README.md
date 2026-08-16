@@ -311,7 +311,7 @@ Tell any AI what you want and get a working app. Your node serves a canonical bu
 
 For simple one-off apps, just copy the prompt from the portal landing page, paste it into any AI chat, and you get a working HTML app that uses AIMEAT memory. No registration needed.
 
-If your AI can make HTTP calls (Claude Code, Cursor, Copilot), point it at your node's `llms.txt` and describe what you want — it reads the API docs, checks `/v1/capabilities`, and builds. If your AI chat cannot make HTTP calls (ChatGPT, Gemini, free-tier Claude), copy the app-generation prompt from your node's "Try it" page at `/v1/classic`; the AI asks you what you want and produces an HTML file you paste into the App Catalogue. Add the node as an MCP server and the AI can install extensions and publish apps directly, with no UI at all: `aimeat_app_publish`, `aimeat_extension_install`, `aimeat_cortex_install`, `aimeat_memory_*`, `aimeat_storage_*` cover the whole publish/install/inspect cycle.
+If your AI can make HTTP calls (Claude Code, Cursor, Copilot), point it at your node's `llms-full.txt` and describe what you want — it reads the API docs, checks `/v1/capabilities`, and builds. If your AI chat cannot make HTTP calls (ChatGPT, Gemini, free-tier Claude), copy the app-generation prompt from your node's "Try it" page at `/v1/classic`; the AI asks you what you want and produces an HTML file you paste into the App Catalogue. Add the node as an MCP server and the AI can install extensions and publish apps directly, with no UI at all: `aimeat_app_publish`, `aimeat_extension_install`, `aimeat_cortex_install`, `aimeat_memory_*`, `aimeat_storage_*` cover the whole publish/install/inspect cycle.
 
 ### What has been built on it
 

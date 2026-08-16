@@ -55,6 +55,20 @@ function resolveServerDir(): string {
 }
 
 /**
+ * The Content Signals Policy directive (contentsignals.org) served in robots.txt, in its two
+ * shipped forms. CONTENT_SIGNAL_DEFAULT is the literal line `public/robots.node.txt` already
+ * carries, so it is the one value that needs no rewrite at boot; the other is what
+ * AIMEAT_AI_TRAINING=allow pairs to.
+ *
+ * They live here rather than in config.ts because config.ts is downstream of this module in the
+ * import graph on the test-server entry point, and importing a VALUE (rather than a type) from it
+ * turns that into a live ESM cycle: `does not provide an export named CONTENT_SIGNAL_DEFAULT`, at
+ * boot, on one entry point and not the other.
+ */
+const CONTENT_SIGNAL_DEFAULT = 'search=yes, ai-input=yes, ai-train=no';
+const CONTENT_SIGNAL_TRAINING_ALLOWED = 'search=yes, ai-input=yes, ai-train=yes';
+
+/**
  * Say so at boot when a vendored /lib/ asset the manifest promises is not on disk. These are the
  * files too large for git (see public/lib/vendored-assets.json, `pnpm vendor:libs`), so a deploy
  * that skipped the vendor step serves a 404 for them — and a 404 on a library path is exactly the
@@ -133,23 +147,30 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
   const publicDir = publicCandidates.find(p => existsSync(p));
   if (publicDir) {
     warnAboutMissingVendoredAssets(publicDir);
-    // Redirect legacy and template HTML URLs to canonical /v1/ routes.
-    // The privacy and connect pages are TEMPLATES with {{placeholder}} tokens
-    // substituted server-side at /v1/privacy and /v1/connect — direct
-    // access to the underlying .html file would serve the raw template with
-    // unresolved tokens visible to users + search engines. 301-redirect
-    // forces everyone through the substituted route.
-    const STATIC_HTML_REDIRECTS: Record<string, string> = {
-      '/wizard.html':       '/v1/setup/wizard',
-      '/privacy.html':      '/v1/privacy',
-      '/privacy.fi.html':   '/v1/privacy/fi',
-      '/terms.html':        '/v1/terms',
-      '/terms.fi.html':     '/v1/terms/fi',
-      '/connect.html':      '/v1/connect',
-      '/connect.fi.html':   '/v1/connect/fi',
+    // Redirect legacy and template URLs to the canonical route that renders them.
+    // The privacy and connect pages, and both llms documents, are TEMPLATES with {{placeholder}}
+    // tokens substituted server-side — direct access to the underlying file serves the raw
+    // template with unresolved tokens visible to users + search engines. 301-redirect forces
+    // everyone through the substituted route.
+    //
+    // The llms entries are not decorative: both templates live in public/, so express.static was
+    // serving /llms-template.txt with its {{BASE_URL}}, {{NODE_ID}} and {{LIBRARY_PACKS_TABLE}}
+    // tokens intact, under the 7-day static cache, to anyone who guessed the name.
+    const STATIC_REDIRECTS: Record<string, string> = {
+      '/wizard.html':               '/v1/setup/wizard',
+      '/privacy.html':              '/v1/privacy',
+      '/privacy.fi.html':           '/v1/privacy/fi',
+      '/terms.html':                '/v1/terms',
+      '/terms.fi.html':             '/v1/terms/fi',
+      '/connect.html':              '/v1/connect',
+      '/connect.fi.html':           '/v1/connect/fi',
+      '/llms-index-template.txt':   '/llms.txt',
+      '/llms-full-template.txt':    '/llms-full.txt',
+      '/llms-template.txt':         '/llms-full.txt',
+      '/robots.node.txt':           '/robots.txt',
     };
     app.use((req, res, next) => {
-      const target = STATIC_HTML_REDIRECTS[req.path];
+      const target = STATIC_REDIRECTS[req.path];
       if (target) {
         const qs = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
         res.redirect(301, target + qs);
@@ -204,12 +225,32 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     const robotsFile = join(publicDir, 'robots.node.txt');
     if (existsSync(robotsFile)) {
       let robotsTxt = readFileSync(robotsFile, 'utf-8');
-      const signal = config.contentSignal;
+
+      // AIMEAT_AI_TRAINING=allow opens the training crawlers: every Disallow between the markers
+      // becomes Allow, and the Content-Signal default pairs to ai-train=yes so the two cannot
+      // contradict each other. An explicit AIMEAT_CONTENT_SIGNAL still wins over the pairing.
+      const trainingAllowed = config.aiTraining === 'allow';
+      if (trainingAllowed) {
+        robotsTxt = robotsTxt.replace(
+          /#AIMEAT-TRAINING-BEGIN[\s\S]*?#AIMEAT-TRAINING-END/,
+          (block) => block.replace(/^Disallow: \/$/gm, 'Allow: /'),
+        );
+      }
+      const defaultSignal = trainingAllowed ? CONTENT_SIGNAL_TRAINING_ALLOWED : CONTENT_SIGNAL_DEFAULT;
+      const signal = config.contentSignal || defaultSignal;
       if (signal.toLowerCase() === 'off') {
         robotsTxt = robotsTxt.replace(/^Content-Signal:.*\r?\n/m, '');
-      } else if (signal && signal !== 'search=yes, ai-input=yes, ai-train=no') {
+      } else if (signal !== CONTENT_SIGNAL_DEFAULT) {
+        // CONTENT_SIGNAL_DEFAULT is what the file already carries, so it is the one value that
+        // needs no rewrite. Anything else — an operator override, or the ai-train=yes pairing
+        // above — replaces the line.
         robotsTxt = robotsTxt.replace(/^Content-Signal:.*$/m, `Content-Signal: ${signal}`);
       }
+
+      // The Sitemap line is templated. It used to hardcode aimeat.io, so every other node running
+      // this software advertised somebody else's sitemap to every crawler that read it.
+      robotsTxt = robotsTxt.replaceAll('{{BASE_URL}}', config.baseUrl.replace(/\/$/, ''));
+
       // The text is prepared here; the route is registered by routes-loader, after the subdomain
       // router, so a mapped app origin has already answered with its own.
       nodeRobotsTxt = robotsTxt;

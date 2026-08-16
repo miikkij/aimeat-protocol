@@ -57,7 +57,12 @@ L=$(body "$B/llms.txt")
 [ "$(printf '%s' "$L" | grep -c '^> ')" -ge 1 ]  && ok "L4 blockquote summary" || bad "L4 blockquote summary"
 [ "$(printf '%s' "$L" | grep -c '](')" -ge 15 ]  && ok "L6 markdown links"     || bad "L6 markdown links"
 printf '%s' "$L" | grep -A3 '^## Documentation' | grep -q '^- \[' && ok "L5 H2 link list" || bad "L5 H2 link list"
-diff <(body "$B/llms.txt") <(body "$B/llms-full.txt") >/dev/null && ok "L10 llms-full.txt matches" || bad "L10 llms-full.txt differs"
+# llms.txt is the curated index and llms-full.txt the expanded content, which is the way round
+# llmstxt.org means it. They used to be the same 124 kB manual under both names.
+diff <(body "$B/llms.txt") <(body "$B/llms-full.txt") >/dev/null && bad "L10 llms-full.txt is the same document as the index" || ok "L10 llms-full.txt is the expanded content"
+[ "$(body "$B/llms.txt" | wc -c)" -lt 8192 ] && ok "index stays small" || bad "index is $(body "$B/llms.txt" | wc -c) bytes"
+printf '%s' "$L" | grep -q '/llms-full.txt' && ok "index names the full manual" || bad "index does not name the full manual"
+body "$B/llms-full.txt" | grep -q '^## Endpoints' && ok "manual carries the endpoint reference" || bad "manual has no endpoint reference"
 echo "  -- L7: every absolute link resolves --"
 printf '%s' "$L" | grep -o '](https\?://[^)]*)' | tr -d '](' | tr -d ')' | sort -u | while read -r u; do
   c=$(code "$u"); [ "$c" -lt 400 ] 2>/dev/null || echo "    FAIL $c $u"

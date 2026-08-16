@@ -76,7 +76,7 @@ export function appLlmsTxt(
 
 - [Tool listing](${b}/v1/apps/${o}/${f}/webmcp): every tool with its input and output schema
 - [Bound skills](${b}/v1/apps/${o}/${f}/skills): what an agent can learn to use this app well
-- [Node manual](${b}/llms.txt): the AIMEAT node this app runs on
+- [Node manual](${b}/llms-full.txt): the AIMEAT node this app runs on
 - [Node glossary](${b}/v1/glossary.md): GHII, GAII, morsels and the rest
 - [Get an identity](${b}/auth.md): RFC 8628 device flow, owner-approved
 
@@ -156,7 +156,7 @@ ${face ?? appSummary(app)}
 ## Where the rest is
 
 - [llms.txt](${origin}/llms.txt) · [Site map](${origin}/sitemap.md)
-- [Node manual](${b}/llms.txt) · [Node glossary](${b}/v1/glossary.md) · [OpenAPI](${b}/v1/spec)
+- [Node manual](${b}/llms-full.txt) · [Node glossary](${b}/v1/glossary.md) · [OpenAPI](${b}/v1/spec)
 `;
 }
 
@@ -191,7 +191,7 @@ ${face ?? appSummary(app)}
 - [Application](${origin}/) · [llms.txt](${origin}/llms.txt) · [AGENTS.md](${origin}/AGENTS.md)
 - [Full site map](${origin}/sitemap.md): every document this origin serves
 - [MCP Server Card](${origin}/.well-known/mcp.json) · [Tool listing](${b}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/webmcp)
-- [AIMEAT node](${b}/) · [Node manual](${b}/llms.txt) · [Glossary](${b}/v1/glossary.md)
+- [AIMEAT node](${b}/) · [Node manual](${b}/llms-full.txt) · [Glossary](${b}/v1/glossary.md)
 `;
 }
 
@@ -221,7 +221,7 @@ export function appSitemapMd(config: AimeatConfig, app: AppRecord, origin: strin
 ## The node behind it
 
 - [AIMEAT node](${b}/): what this app is published on
-- [Node manual](${b}/llms.txt) · [Glossary](${b}/v1/glossary.md) · [OpenAPI](${b}/v1/spec)
+- [Node manual](${b}/llms-full.txt) · [Glossary](${b}/v1/glossary.md) · [OpenAPI](${b}/v1/spec)
 - [Tool listing](${b}/v1/apps/${o}/${f}/webmcp) · [Bound skills](${b}/v1/apps/${o}/${f}/skills)
 - [Register an agent](${b}/auth.md)
 `;

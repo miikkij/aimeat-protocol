@@ -8,7 +8,7 @@
  *     - GET /v1/libs catalogue — routes/libs.ts (buildLibsCatalogue)
  *     - the build-app prompt's library sections — services/build-app-prompt.ts (buildPromptLibrarySections)
  *     - bootstrap sdk_libraries — routes/bootstrap.ts (buildSdkLibrariesList)
- *     - llms.txt Client SDK Libraries table — {{LIBRARY_PACKS_TABLE}} token (buildLlmsPacksTable)
+ *     - llms-full.txt Client SDK Libraries table — {{LIBRARY_PACKS_TABLE}} token (buildLlmsPacksTable)
  *   A pack = include line(s) + version + per-library AI usage doc (aiDoc) + changelog + demo
  *   template link + interview triggers. `status:'stable'` is gated on a demo + an AEB
  *   acceleration result (Library Acceleration Program). Versioning policy: public/lib/VENDORED.md.
@@ -255,7 +255,7 @@ export function buildSdkLibrariesList(baseUrl: string): string[] {
 }
 
 /**
- * The llms.txt "Client SDK Libraries" markdown table — substituted for the
+ * The llms-full.txt "Client SDK Libraries" markdown table — substituted for the
  * {{LIBRARY_PACKS_TABLE}} token in public/llms-template.txt (routes/bootstrap.ts).
  * SDK rows carry the richer aiDoc (matching the pre-registry table cells); cortex/vendored
  * rows carry the one-line description + a pointer to the pack detail endpoint.

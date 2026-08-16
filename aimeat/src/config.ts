@@ -433,10 +433,16 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // linkability + a small risk of strict/legacy endpoints rejecting unknown headers. The key
     // DIRECTORY is always served; only outbound signing is gated.
     webBotAuthSign: process.env.AIMEAT_WEB_BOT_AUTH_SIGN === 'true',
-    // Content Signals Policy directive served in robots.txt (contentsignals.org). Default matches
-    // the per-bot stance already in the file (search bots allowed, GPTBot/ClaudeBot training
-    // crawlers disallowed, user-initiated AI fetches allowed). 'off' removes the directive.
-    contentSignal: (process.env.AIMEAT_CONTENT_SIGNAL ?? 'search=yes, ai-input=yes, ai-train=no').trim(),
+    // Content Signals Policy directive served in robots.txt (contentsignals.org). Left empty, it
+    // pairs itself to AIMEAT_AI_TRAINING so the directive and the per-bot rules cannot contradict
+    // each other; set it explicitly to override both. 'off' removes the directive.
+    contentSignal: (process.env.AIMEAT_CONTENT_SIGNAL ?? '').trim(),
+    // Whether the AI TRAINING crawlers (GPTBot, ClaudeBot, Google-Extended, Applebot-Extended,
+    // meta-externalagent) are allowed. Separate from the search and retrieval bots, which are
+    // always allowed: blocking those would make the node unfindable, while this one is a rights
+    // decision. Denied by default because a personal node holds one person's data. aimeat.io runs
+    // 'allow'. Anything other than the literal 'allow' denies.
+    aiTraining: process.env.AIMEAT_AI_TRAINING?.trim().toLowerCase() === 'allow' ? 'allow' : 'deny',
     pushEnabled: process.env.AIMEAT_PUSH_ENABLED !== 'false',
     vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
     vapidPrivateKey: process.env.AIMEAT_VAPID_PRIVATE_KEY ?? null,

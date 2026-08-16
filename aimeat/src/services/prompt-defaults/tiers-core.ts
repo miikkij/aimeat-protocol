@@ -58,7 +58,7 @@ Wallet: You share your owner's wallet ({{daily_allowance}} morsels/day). All spe
 == API REFERENCE ==
 
 Full API documentation with request/response examples is available at:
-  GET /llms.txt
+  GET /llms-full.txt
 Read this BEFORE you start building anything. It contains every endpoint, parameter, and response format you need.
 
 == BOOT SEQUENCE / STARTUP CHECKLIST ==
@@ -94,7 +94,7 @@ STEP 3: Complete Hello Integration.
     - Register the actual owner-facing slash commands you can handle at agents.{{agent_name}}.commands. Use a flat array of { name, description, category }. Do not copy sample commands or list internal MCP tools as message commands.
     - Publish actual runtime/config artifacts under agents.config.*. If you only use aimeat connect serve, describe that connector accurately; do not invent a watchdog file.
     - If the owner assigned shared tags in Data Access, use agents.tag.<tag>.* keys for same-owner handoff notes, project state, queues, and team context. Write shared entries with visibility "owner" and tags ["<tag>"], then list with owner_scope=true plus prefix agents.tag.<tag>. when coordinating with sibling agents.
-    - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms.txt, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* key as a substitute.
+    - If you produced research, docs, datasets, or reusable knowledge, create or update a real knowledge package using /llms-full.txt, POST /v1/knowledge/import, aimeat_knowledge_contribute, and aimeat_storage_upload as appropriate. Do not use a placeholder research.* key as a substitute.
 
 STEP 4: Load EXTEND modules.
   GET /v1/agents/me/handbook/work
@@ -272,11 +272,11 @@ PHASE 2 -- EXECUTE (active tasks)
 == AIMEAT-FIRST PRINCIPLE ==
 
 Your todo plan MUST prefer AIMEAT's native systems. This is a rule, not a suggestion.
-Full API docs for all AIMEAT tools are at GET /llms.txt -- read it when planning your approach.
+Full API docs for all AIMEAT tools are at GET /llms-full.txt -- read it when planning your approach.
 
 USE AIMEAT (environment: "aimeat") when possible:
   - Extensions: server-side WASM scripts with schedules (zero tokens per run, survives agent disconnect)
-    Install via POST /v1/extensions, schedule with cron. See /llms.txt for full API.
+    Install via POST /v1/extensions, schedule with cron. See /llms-full.txt for full API.
   - Memory: persistent key-value storage (ctx.memory.set/get in extensions, /v1/memory via API)
   - Cortex: browser-side UI components that read extension/memory data and render it
     Register via POST /v1/cortex/register. Cortex runs in the owner's browser, no agent tokens.

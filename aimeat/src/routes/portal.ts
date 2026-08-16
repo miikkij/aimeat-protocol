@@ -200,6 +200,17 @@ export function serveSpa(
   const v = `?v=${BUILD_ID}`;
   let html = readFileSync(spaPath, 'utf-8');
 
+  // spa.html is authored with absolute https://aimeat.io URLs in og:url, og:image and the two
+  // site-level JSON-LD blocks, because a crawler needs them absolute and the file has no way to
+  // know its own host. Unrewritten, every OTHER node running this software told every crawler,
+  // unfurler and AI reader that it was aimeat.io: wrong canonical entity, wrong image, wrong
+  // Organization url. Only aimeat.io's own URLs match, so the github.com and operator links in
+  // `sameAs` are left alone. On aimeat.io itself this is a no-op.
+  const canonicalBase = config.baseUrl.replace(/\/$/, '');
+  if (canonicalBase !== 'https://aimeat.io') {
+    html = html.replaceAll('https://aimeat.io', canonicalBase);
+  }
+
   // Inject CSP nonce into all script and style tags
   const nonce = res.locals.cspNonce as string || '';
   if (nonce) {

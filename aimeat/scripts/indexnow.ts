@@ -18,6 +18,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { sitemapPages } from '../src/data/public-pages.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -61,13 +62,14 @@ if (!baseUrl) {
 
 const customUrls = process.argv.slice(2).filter(a => a.startsWith('http'));
 
-const defaultUrls = [
-  `${baseUrl}/`,
-  `${baseUrl}/.well-known/aimeat`,
-  `${baseUrl}/v1/prompts/anonymous/share?format=text`,
-  `${baseUrl}/v1/spec`,
-  `${baseUrl}/v1/health`,
-];
+// The default set is the public-page registry — the same source sitemap.xml reads, so a page added
+// there is submitted here without a second edit.
+//
+// It used to be a hand-written list of five, and four of them were not pages: /.well-known/aimeat
+// and /v1/health answer JSON, /v1/spec answers YAML, and /v1/prompts/anonymous/share is a prompt.
+// That is the identical drift src/data/public-pages.ts was written to end in sitemap.xml, and this
+// script kept submitting those endpoints to Bing while none of the ten real pages was ever sent.
+const defaultUrls = sitemapPages().map(p => `${baseUrl}${p.path === '/' ? '/' : p.path}`);
 
 const urlsToSubmit = customUrls.length > 0 ? customUrls : defaultUrls;
 

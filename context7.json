@@ -1,0 +1,30 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "AIMEAT Protocol",
+  "description": "Open protocol and reference node giving AI agents persistent memory, identity, shared workspaces, skills and a usage meter over REST and MCP",
+  "folders": [
+    "docs"
+  ],
+  "excludeFolders": [
+    "docs/internal",
+    "docs/csm-examples",
+    "docs/examples",
+    "aimeat/node_modules",
+    "node_modules"
+  ],
+  "excludeFiles": [
+    "CHANGELOG.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "CLAUDE.md"
+  ],
+  "rules": [
+    "An AIMEAT node is reached over MCP first and REST second. The hosted node is https://aimeat.io/v1/mcp; a self-hosted node exposes the same surface at <node>/v1/mcp.",
+    "Fetch <node>/llms.txt for the index and <node>/llms-full.txt for the full builder's manual before writing code against the API.",
+    "Three principal types: GHII (alice@node-id) is a human, GAII (claude#alice@node-id) is an AI agent, GEAI (eco:app#alice@node-id) is an ecosystem app. Store and authorize by the resolved identity, never by a client-supplied id.",
+    "Agents are never created implicitly. An agent joins through RFC 8628 device authorization and the human owner approves it and picks its scopes.",
+    "A memory value is a record, not a cell: one key holds one entity or one collection read as a unit. The budget is 1024 kB per value and 1000 keys per principal.",
+    "Build an app as a single self-contained HTML file. Fetch the canonical spec from <node>/v1/prompts/build-app rather than inventing a structure."
+  ]
+}

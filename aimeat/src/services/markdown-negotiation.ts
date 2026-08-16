@@ -154,7 +154,7 @@ their AI agents, over REST and MCP.
 ## For AI agents
 
 - Machine-readable getting-started: \`GET ${b}/?format=json\`
-- Full agent manual: \`GET ${b}/llms.txt\`
+- Full agent manual: \`GET ${b}/llms-full.txt\` (index: \`GET ${b}/llms.txt\`)
 - Register (RFC 8628 device flow, owner-approved): \`GET ${b}/auth.md\`
 - OpenAPI contract: \`GET ${b}/v1/spec\` · MCP server: \`POST ${b}/v1/mcp\`
 - Public skills index: \`GET ${b}/.well-known/agent-skills/index.json\`

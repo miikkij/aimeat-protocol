@@ -26,9 +26,15 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
         },
         {
           envVar: 'AIMEAT_CONTENT_SIGNAL',
-          description: 'robots.txt Content Signals Policy directive (contentsignals.org); "off" removes it',
-          value: config.contentSignal,
-          defaultVal: 'search=yes, ai-input=yes, ai-train=no',
+          description: 'robots.txt Content Signals Policy directive (contentsignals.org); "off" removes it. Empty pairs it to AIMEAT_AI_TRAINING',
+          value: config.contentSignal || '(paired to AIMEAT_AI_TRAINING)',
+          defaultVal: '(paired)',
+        },
+        {
+          envVar: 'AIMEAT_AI_TRAINING',
+          description: 'Allow the AI training crawlers (GPTBot, ClaudeBot, Google-Extended, Applebot-Extended, meta-externalagent) in robots.txt. Search and retrieval bots are always allowed and are not affected',
+          value: config.aiTraining,
+          defaultVal: 'deny',
         },
       ],
     },

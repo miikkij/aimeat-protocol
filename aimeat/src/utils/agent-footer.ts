@@ -28,6 +28,7 @@ export function agentFooterHtml(baseUrl: string): string {
     [`${b}/v1/glossary`, 'Glossary'],
     [`${b}/sitemap.md`, 'Site map'],
     [`${b}/llms.txt`, 'llms.txt'],
+    [`${b}/llms-full.txt`, 'llms-full.txt'],
     [`${b}/AGENTS.md`, 'AGENTS.md'],
     [`${b}/v1/spec`, 'API contract'],
   ];

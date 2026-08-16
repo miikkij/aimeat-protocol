@@ -500,8 +500,16 @@ export interface AimeatConfig extends AiCapabilityConfig {
   commerceSessionTtlMinutes: number;
   /** MCP Server Card commerce_tools block: embed the priced app-tool catalog or point at /v1/commerce/tools. */
   mcpCardCommerceTools: 'inline' | 'pointer';
-  /** robots.txt Content Signals Policy directive ("search=yes, ai-input=yes, ai-train=no"); 'off' removes it. */
+  /**
+   * robots.txt Content Signals Policy directive ("search=yes, ai-input=yes, ai-train=no"); 'off'
+   * removes it. Empty means "pair it to `aiTraining`", which is the default.
+   */
   contentSignal: string;
+  /**
+   * Whether the AI training crawlers are allowed in robots.txt. Search and retrieval bots are
+   * always allowed and are not covered by this; see `public/robots.node.txt`.
+   */
+  aiTraining: 'allow' | 'deny';
   /** Web Bot Auth: sign outbound safeFetch requests (RFC 9421, node Ed25519 key). OFF by default. */
   webBotAuthSign: boolean;
 

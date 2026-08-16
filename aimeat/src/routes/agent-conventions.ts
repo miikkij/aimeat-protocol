@@ -96,7 +96,7 @@ Scopes are chosen by the owner when they approve an agent. A call outside the ap
 
 ## Reference
 
-- Full manual: ${b}/llms.txt
+- Full manual: ${b}/llms-full.txt · Index: ${b}/llms.txt
 - Orientation: ${b}/AGENTS.md · Vocabulary: ${b}/v1/glossary.md
 - Site map: ${b}/sitemap.md · Contract: ${b}/openapi.json
 - Skills published here: ${b}/.well-known/agent-skills/index.json
@@ -114,6 +114,7 @@ Allow: /
 
 # Read freely. Anything public here is public on purpose.
 Allow: /llms.txt
+Allow: /llms-full.txt
 Allow: /sitemap.md
 Allow: /AGENTS.md
 Allow: /v1/glossary.md
@@ -125,7 +126,8 @@ Identity: ${b}/auth.md
 Scopes: memory:read, memory:write, wallet:read, task:write and others, granted per agent
 
 # Machine-readable surfaces
-Manual: ${b}/llms.txt
+Manual: ${b}/llms-full.txt
+Index: ${b}/llms.txt
 Skill: ${b}/skill.md
 OpenAPI: ${b}/openapi.json
 MCP: ${b}/mcp

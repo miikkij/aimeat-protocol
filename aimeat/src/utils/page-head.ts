@@ -19,6 +19,11 @@
  * @usage
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
  * @version-history
+ *   v1.1.0 — 2026-08-16 — The per-page WebPage JSON-LD is emitted again. Its guard was "the
+ *     document has no ld+json at all", and spa.html always ships SoftwareApplication +
+ *     Organization, so on every SPA route — which is every page in the registry — the per-page
+ *     block was silently skipped. Guard is now the WebPage marker itself. Adds the llmstxt.org
+ *     v2 rel="describedby" link beside the markdown alternate.
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phases 07 + 08)
  */
 import type { AimeatConfig } from '../config.js';
@@ -68,7 +73,18 @@ export function injectPageHead(
     out = upsert(out, /<link rel="alternate" type="text\/markdown"[^>]*>/i,
       `<link rel="alternate" type="text/markdown" href="${mirror}">`);
   }
-  if (!/application\/ld\+json/i.test(out)) {
+  // llmstxt.org v2 names rel="describedby" as the link from a page to the llms.txt that covers it,
+  // beside the markdown alternate above. A reader that finds one convention and not the other has
+  // to guess the path.
+  out = upsert(out, /<link rel="describedby"[^>]*>/i,
+    `<link rel="describedby" type="text/plain" href="${b}/llms.txt">`);
+
+  // The WebPage block describes THIS page and is separate from the site-level SoftwareApplication
+  // and Organization blocks that spa.html ships. This used to be guarded by "does the document
+  // already contain any ld+json", which spa.html always does — so on every SPA route, which is
+  // every page in the registry, the per-page structured data was never emitted. Multiple ld+json
+  // blocks in one document are legal, and are how you say two different things.
+  if (!/"@type"\s*:\s*"WebPage"/.test(out)) {
     const jsonLd = JSON.stringify({
       '@context': 'https://schema.org',
       '@type': 'WebPage',

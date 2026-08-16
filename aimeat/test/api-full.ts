@@ -175,8 +175,8 @@ await test('GET /v1/connect negotiates markdown (static info page HTML→md conv
     assert((browser.headers.get('content-type') ?? '').includes('text/html'), `browser content-type: ${browser.headers.get('content-type')}`);
 });
 
-await test('GET /llms.txt — contains builder guide', async () => {
-    const res = await fetch(`${BASE}/llms.txt`);
+await test('GET /llms-full.txt — contains builder guide', async () => {
+    const res = await fetch(`${BASE}/llms-full.txt`);
     assert(res.status === 200, `status ${res.status}`);
     const text = await res.text();
     assert(text.includes('## What is AIMEAT'), 'missing "What is AIMEAT" section');
@@ -188,11 +188,26 @@ await test('GET /llms.txt — contains builder guide', async () => {
     assert(text.includes('/v1/memory'), 'missing memory endpoint');
 });
 
+await test('GET /llms.txt — the index, not the manual', async () => {
+    // The manual moved to /llms-full.txt, which is the way round llmstxt.org means it. The index
+    // has to stay small enough to be worth fetching first, and it has to NAME the full document —
+    // everything that used to read the manual from this path finds it by that link and nothing else.
+    const res = await fetch(`${BASE}/llms.txt`);
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(text.length < 8192, `index must stay small, got ${text.length} bytes`);
+    assert(text.includes('/llms-full.txt'), 'index does not name the full manual');
+    assert(!text.includes('## Endpoints'), 'index carries the manual\'s endpoint reference');
+    assert(text.includes('## Human pages'), 'index has no human-page list');
+    // The generated list comes from the public-page registry, so a page added there shows up here.
+    assert(text.includes('/v1/how-it-works'), 'human-page list is not generated from the registry');
+});
+
 await test('GET /robots.txt — Content Signals Policy directive, consistent with per-bot rules', async () => {
     const res = await fetch(`${BASE}/robots.txt`);
     assert(res.status === 200, `status ${res.status}`);
     const text = await res.text();
-    // Default directive (AIMEAT_CONTENT_SIGNAL): search + ai-input allowed, ai-train disallowed —
+    // Default posture (AIMEAT_AI_TRAINING unset): search + ai-input allowed, ai-train disallowed —
     // the machine-readable statement of the stance the per-bot rules below it already express.
     assert(/^Content-Signal: search=yes, ai-input=yes, ai-train=no$/m.test(text), `Content-Signal directive missing/altered: ${text.split('\n').find(l => l.startsWith('Content-Signal')) ?? '(none)'}`);
     assert(text.includes('content signals'), 'policy preamble comment present');
@@ -200,6 +215,28 @@ await test('GET /robots.txt — Content Signals Policy directive, consistent wit
     assert(/User-agent: GPTBot\s*\r?\nDisallow: \//.test(text), 'GPTBot stays disallowed');
     assert(/User-agent: ClaudeBot\s*\r?\nDisallow: \//.test(text), 'ClaudeBot stays disallowed');
     assert(/User-agent: OAI-SearchBot\s*\r?\nAllow: \//.test(text), 'OAI-SearchBot stays allowed');
+    // The retrieval bots are the ones that decide whether an assistant can answer a live question
+    // about this node. They are allowed on every node and are NOT what AIMEAT_AI_TRAINING gates.
+    assert(/User-agent: ChatGPT-User\s*\r?\nAllow: \//.test(text), 'ChatGPT-User stays allowed');
+    assert(/User-agent: Claude-SearchBot\s*\r?\nAllow: \//.test(text), 'Claude-SearchBot stays allowed');
+    assert(/User-agent: PerplexityBot\s*\r?\nAllow: \//.test(text), 'PerplexityBot stays allowed');
+    // The Sitemap line used to hardcode aimeat.io, so every other node advertised somebody else's.
+    const sitemapLine = text.split('\n').find(l => l.startsWith('Sitemap:'))?.trim() ?? '';
+    assert(sitemapLine === `Sitemap: ${BASE.replace(/\/$/, '')}/sitemap.xml`, `Sitemap line is not this node's: ${sitemapLine}`);
+});
+
+await test('GET /llms-template.txt — templates are not served raw', async () => {
+    // Both llms templates live in public/, inside the express.static root. Without a redirect they
+    // answered with their {{BASE_URL}}, {{NODE_ID}} and {{LIBRARY_PACKS_TABLE}} tokens intact, under
+    // the 7-day static cache, to anyone who guessed the filename.
+    for (const p of ['/llms-template.txt', '/llms-index-template.txt', '/llms-full-template.txt', '/robots.node.txt']) {
+        const res = await fetch(`${BASE}${p}`, { redirect: 'manual' });
+        assert(res.status === 301, `${p} → ${res.status}, expected 301`);
+    }
+    for (const p of ['/llms.txt', '/llms-full.txt', '/robots.txt']) {
+        const body = await (await fetch(`${BASE}${p}`)).text();
+        assert(!body.includes('{{'), `${p} leaks an unsubstituted template token`);
+    }
 });
 
 await test('GET /.well-known/aimeat', async () => {

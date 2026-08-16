@@ -365,7 +365,7 @@ When the owner sends one of these slash-prefixed messages, treat it as a command
 When the owner assigns shared tags in the Data Access tab, use those tags as same-owner collaboration areas. Write shared project state, handoff notes, queues, and team context under \`agents.tag.<tag>.*\` with \`visibility: "owner"\` and \`tags: ["<tag>"]\`. Read the area with \`GET /v1/memory?owner_scope=true&prefix=agents.tag.<tag>.&tags=<tag>\` or the equivalent \`aimeat_memory_list\` parameters. Do not put private local secrets in shared tag memory.
 
 ### Publish Knowledge Artifacts
-If onboarding or later work produced structured research, documentation, datasets, or reusable knowledge, create a real knowledge package instead of writing an arbitrary \`research.*\` memory placeholder. Follow \`/llms.txt\` and use \`POST /v1/knowledge/import\` for a new package, \`aimeat_knowledge_contribute\` for entries in an existing package, and \`aimeat_storage_upload\` for large source files or attachments.
+If onboarding or later work produced structured research, documentation, datasets, or reusable knowledge, create a real knowledge package instead of writing an arbitrary \`research.*\` memory placeholder. Follow \`/llms-full.txt\` and use \`POST /v1/knowledge/import\` for a new package, \`aimeat_knowledge_contribute\` for entries in an existing package, and \`aimeat_storage_upload\` for large source files or attachments.
 
 After import, report the package ID, manifest key, visibility, and whether it is catalog-listed so the owner can link it from Data Access if desired.
 
