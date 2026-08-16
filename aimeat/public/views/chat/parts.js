@@ -10,17 +10,21 @@
  *   - ThreadList — the person's conversations
  *   - Turn — one thing said, with the tools that ran while it was said
  *   - WorkLine — one tool call, its status, and what it was
- *   - Composer — the box, Enter to send, Shift+Enter for a newline
+ *   - Composer — the box, Enter to send, Shift+Enter for a newline, and a recorder beside it
  *   - StatusBar — which agent, what is left to spend, and what is wrong when something is
  * @usage import { ThreadList, Turn, Composer, StatusBar } from './chat/parts.js';
  * @version-history
+ *   v1.1.0 — 2026-08-16 — Speech both ways: a recording becomes text in the box, which the person
+ *     reads before sending, and an agent turn can be read aloud.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { h } from 'preact';
-import { useRef, useEffect } from 'preact/hooks';
+import { useRef, useEffect, useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
+import { VoiceRecorder } from '/components/VoiceRecorder.js';
+import { speak, stop as stopSpeaking, isSpeechSupported, textToParagraphs } from '/js/services/speech-reader.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -68,12 +72,19 @@ export function WorkLog({ tools }) {
  * The agent's words go through the markdown renderer because the agent writes markdown; the
  * person's do not, because what they typed is what they meant.
  */
-export function Turn({ turn }) {
+export function Turn({ turn, id }) {
     const mine = turn.role === 'user';
+    const [reading, setReading] = useState(false);
     // A turn that failed before the agent said anything leaves an empty record, and an empty bubble
     // on screen reads as a message that arrived blank. Nothing was said, so nothing is drawn; the
     // error above it is what happened.
     if (!mine && !turn.text && !(turn.tools && turn.tools.length)) return null;
+
+    const listen = () => {
+        if (reading) { stopSpeaking(); setReading(false); return; }
+        setReading(speak(id, textToParagraphs(turn.text || '')));
+    };
+
     return html`
         <div class="chat-turn chat-turn--${mine ? 'user' : 'agent'}">
             <div class="chat-bubble">
@@ -85,6 +96,10 @@ export function Turn({ turn }) {
             <div class="chat-meta">
                 <span>${timeShort(turn.at)}</span>
                 ${turn.model ? html`<span class="chat-model" title=${tr('chat.modelTitle', 'The model that answered this turn')}>${turn.model}</span>` : ''}
+                ${!mine && turn.text && isSpeechSupported() ? html`
+                    <button type="button" class="btn-ghost chat-listen" onClick=${listen}>
+                        ${reading ? tr('chat.stopListening', 'Stop') : tr('chat.listen', 'Listen')}
+                    </button>` : ''}
             </div>
         </div>
     `;
@@ -167,7 +182,7 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
  * person's hands already expect. The field grows with what is in it up to a ceiling, so a long ask
  * is readable while being written without the composer eating the conversation.
  */
-export function Composer({ value, onInput, onSend, onStop, busy, disabled, note }) {
+export function Composer({ value, onInput, onSend, onStop, onSpeak, busy, disabled, note, listening, voiceMaxSeconds = 300 }) {
     const ref = useRef(null);
 
     // Re-measured on a resize as well as on every keystroke. Height depends on WIDTH: a line that
@@ -195,6 +210,7 @@ export function Composer({ value, onInput, onSend, onStop, busy, disabled, note 
     return html`
         <div class="chat-composer">
             ${note ? html`<p class="chat-composer-note">${note}</p>` : ''}
+            ${listening ? html`<p class="chat-composer-note">${tr('chat.hearing', 'Working out what you said…')}</p>` : ''}
             <div class="chat-composer-row">
                 <textarea ref=${ref} class="chat-input" rows="1"
                     value=${value}
@@ -204,6 +220,9 @@ export function Composer({ value, onInput, onSend, onStop, busy, disabled, note 
                         : tr('chat.placeholder', 'Ask for something, or describe what you want built.')}
                     onInput=${(e) => onInput(e.target.value)}
                     onKeyDown=${keydown}></textarea>
+                ${onSpeak && !busy ? html`
+                    <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}
+                        className="btn-outline chat-voice" onRecorded=${(file) => onSpeak(file)} />` : ''}
                 ${busy
                     ? html`<button type="button" class="btn-outline chat-send" onClick=${onStop}>${tr('chat.stop', 'Stop')}</button>`
                     : html`<button type="button" class="btn-primary chat-send"

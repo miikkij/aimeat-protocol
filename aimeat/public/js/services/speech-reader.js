@@ -19,6 +19,9 @@
  * @usage import { speak, stop, subscribeSpeech } from '/js/services/speech-reader.js';
  *   speak('msg-42', textToParagraphs(msg.body));
  * @version-history
+ *   v1.1.0 — 2026-08-16 — primeSpeech(): one silent utterance inside a user gesture, so automatic
+ *     read-aloud is not a no-op on iOS. It refuses without a gesture and refuses SILENTLY, which is
+ *     the hardest kind of missing sound to chase.
  *   v1.0.0 — 2026-07-31 — Initial version: extracted the Sanomat read-aloud pacing into a shared SPA
  *     service so the Inbox thread (and any later view) can speak its content.
  */
@@ -210,6 +213,29 @@ function speakNext(lang, voice) {
   utt.onend = advance;
   utt.onerror = advance;
   speechSynthesis.speak(utt);
+}
+
+/**
+ * Wake the speech engine inside a user gesture.
+ *
+ * iOS refuses `speechSynthesis.speak()` unless the page has spoken at least once from a real tap,
+ * and it refuses SILENTLY: automatic read-aloud simply never makes a sound, with no error to find.
+ * Speaking one empty utterance in the same click that starts the work removes that, costs nothing
+ * audible, and is a no-op on every other platform.
+ */
+let _primed = false;
+export function primeSpeech() {
+  if (_primed || !isSpeechSupported()) return;
+  _primed = true;
+  try {
+    const utt = new SpeechSynthesisUtterance('');
+    utt.volume = 0;
+    speechSynthesis.speak(utt);
+  } catch (err) {
+    // A browser refusing here IS the answer: it will refuse the real utterance too, and there is
+    // nothing to recover. Said out loud so a silent reader has a trace to find.
+    console.warn('[speech] the engine refused to prime:', err.message);
+  }
 }
 
 /** Start reading `paragraphs` under `id`. Any reading already in progress is cancelled first — one

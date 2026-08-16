@@ -10,10 +10,12 @@
  *   should know about.
  * @structure
  *   status / listThreads / createThread / getThread / deleteThread / resetThread / streamTurn
+ *   speakToText — a recording becomes text the person can read before they send it
  * @usage
  *   import * as chat from '/js/services/chat.js';
  *   for await (const u of chat.streamTurn(threadId, 'build me pong')) { … }
  * @version-history
+ *   v1.1.0 — 2026-08-16 — speakToText: a spoken message goes through storage and comes back as text.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { api, apiGet } from '/js/api.js';
@@ -128,5 +130,61 @@ export async function* streamTurn(id, text, signal) {
 
     if (!sawVerdict) {
         yield { kind: 'error', message: 'The connection closed before the answer finished.' };
+    }
+}
+
+/**
+ * Turn a recording into text.
+ *
+ * The clip goes to storage first and the node is handed a key, never the bytes: a minute of speech
+ * is megabytes, and base64 in a JSON body inflates it by a third before hitting a body limit that
+ * has nothing to do with the storage quota. The same path the inbox already uses for a voice
+ * message, for the same reason.
+ *
+ * The text comes back to the composer rather than being sent. A person should read what the machine
+ * heard before it becomes something they asked for.
+ */
+export async function speakToText(file) {
+    const rand = Math.random().toString(36).slice(2, 8);
+    const key = `chat-voice/${Date.now()}-${rand}.${(file.type.split('/')[1] || 'webm').split(';')[0]}`;
+    const mime = file.type || 'application/octet-stream';
+
+    const mint = await api('/v1/storage', {
+        method: 'POST',
+        body: JSON.stringify({ key, mime_type: mime, visibility: 'private', mode: 'presigned' }),
+    });
+    const uploadUrl = mint?.data?.upload_url;
+    if (!uploadUrl) throw new Error(mint?.error?.message || 'The node would not accept the recording.');
+
+    // Checked before the token is spent: it is single-use, so an oversized PUT burns it and answers
+    // a bare 413 instead of naming the limit.
+    const maxBytes = Number(mint?.data?.max_size_bytes) || 0;
+    if (maxBytes && file.size > maxBytes) {
+        throw new Error(`That recording is ${(file.size / 1048576).toFixed(1)} MB; this node accepts ${(maxBytes / 1048576).toFixed(0)} MB.`);
+    }
+
+    // Plain fetch, deliberately not api(): the presigned token IS the capability, so no
+    // Authorization header, and a retry on a consumed one-shot token answers 409 TOKEN_USED.
+    const put = await fetch(uploadTarget(uploadUrl), { method: 'PUT', headers: { 'Content-Type': mime }, body: file });
+    if (!put.ok) throw new Error(`The recording could not be stored (${put.status}).`);
+
+    const res = await api('/v1/ai/transcribe', {
+        method: 'POST',
+        body: JSON.stringify({ storage_key: key, mime, app_id: 'chat' }),
+        timeoutMs: 180_000,
+        retries: 0,
+    });
+    if (res?.ok === false) throw new Error(res.error?.message || 'The recording could not be transcribed.');
+    return String(res?.data?.text ?? '').trim();
+}
+
+/** The node mints an absolute upload URL. Collapse it to a path on the same origin so the PUT stays
+ *  a plain request rather than a preflighted one. */
+function uploadTarget(url) {
+    try {
+        const u = new URL(url, window.location.origin);
+        return u.origin === window.location.origin ? u.pathname + u.search : u.href;
+    } catch {
+        return url;   // an unparseable URL is used verbatim; the PUT above reports the failure
     }
 }

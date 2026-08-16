@@ -9,6 +9,7 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.1.0 — 2026-08-16 — The recorder beside the send button, and the read-aloud control on a turn.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 
@@ -333,6 +334,11 @@
 }
 
 .chat-send { flex: 0 0 auto; }
+.chat-voice { flex: 0 0 auto; }
+
+/* The read-aloud control sits with the timestamp rather than on the bubble: it is about the turn,
+   not part of what was said. */
+.chat-listen { font-size: 0.7rem; padding: 0 6px; }
 
 /* ── Phones ──
    One pane at a time. The page takes the whole viewport, the shell's sticky nav is hidden (it lives

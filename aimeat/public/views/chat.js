@@ -14,6 +14,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v1.1.0 — 2026-08-16 — Speech: a recording becomes text in the box for the person to read before
+ *     they send it, and the engine is primed inside the tap so reading an answer aloud works on iOS.
  *   v1.0.1 — 2026-08-16 — The work log keys tool calls by id rather than title, so a finished call
  *     stops reading as "starting".
  *   v1.0.0 — 2026-08-16 — Initial.
@@ -25,6 +27,7 @@ import { t } from '/js/i18n.js';
 import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
+import { primeSpeech } from '/js/services/speech-reader.js';
 import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar } from './chat/parts.js';
 
 const html = htm.bind(h);
@@ -42,6 +45,7 @@ export default function ChatView() {
     // On a phone the conversation takes the whole screen, so the list is a separate place rather
     // than a column that would leave neither readable.
     const [listOpen, setListOpen] = useState(false);
+    const [listening, setListening] = useState(false);
 
     const abortRef = useRef(null);
     const bottomRef = useRef(null);
@@ -149,6 +153,9 @@ export default function ChatView() {
     const send = useCallback(async (retryText) => {
         const text = (retryText ?? draft).trim();
         if (!text || busy) return;
+        // Inside the tap, because that is the only moment iOS will accept it. Without this, reading
+        // an answer aloud later is a silent no-op with nothing in the console to find.
+        primeSpeech();
 
         let target = thread;
         if (!target) {
@@ -225,6 +232,26 @@ export default function ChatView() {
 
     const stop = useCallback(() => { abortRef.current?.abort(); }, []);
 
+    /**
+     * A recording becomes text in the box, not a sent message.
+     *
+     * Speech recognition is wrong often enough that sending what it heard would make the person
+     * argue with a machine about what they said. They read it first, and edit it if it is wrong.
+     */
+    const speakToText = useCallback(async (file) => {
+        setListening(true);
+        setFailure('');
+        try {
+            const heard = await chat.speakToText(file);
+            if (heard) setDraft((d) => (d ? `${d} ${heard}` : heard));
+            else setFailure(tr('chat.heardNothing', 'Nothing was heard in that recording.'));
+        } catch (err) {
+            setFailure(err.message || tr('chat.transcribeFailed', 'That recording could not be turned into text.'));
+        } finally {
+            setListening(false);
+        }
+    }, []);
+
     const removeThread = useCallback(async (id) => {
         await chat.deleteThread(id);
         if (thread?.id === id) setThread(null);
@@ -277,7 +304,7 @@ export default function ChatView() {
                             <p>${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}</p>
                         </div>` : ''}
 
-                    ${turns.map((turn, i) => html`<${Turn} key=${i} turn=${turn} />`)}
+                    ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}
                     <${LiveTurn} text=${live.text} thought=${live.thought} tools=${live.tools} busy=${busy} />
                     <${TurnError} message=${failure}
                         onRetry=${lastAskRef.current && !busy ? () => send(lastAskRef.current) : null} />
@@ -289,6 +316,8 @@ export default function ChatView() {
                     onInput=${setDraft}
                     onSend=${() => send()}
                     onStop=${stop}
+                    onSpeak=${speakToText}
+                    listening=${listening}
                     busy=${busy}
                     disabled=${disabled}
                     note=${disabled ? (status?.note ?? '') : ''} />
