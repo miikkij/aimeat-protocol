@@ -53,16 +53,20 @@ function conversationAsText(title, turns) {
 /**
  * The openings offered on an empty conversation.
  *
- * Each one is a request a person could have typed, and the first is the one that ends with an
- * address they own: a page at /p/<their name> that did not exist a minute ago. The button sends the
- * sentence rather than filling the box with it — a half-written prompt waiting to be edited is one
- * more decision, and the point of these is to remove decisions.
+ * Each one is a request a person could have typed. The first ends with an address they own — a page
+ * at /p/<their name> that did not exist a minute ago. The second starts the conversation this place
+ * is actually for: what they are trying to get done, in their words, which is the thing everything
+ * else attaches to. A person who reads a feature list has told the agent nothing; a person who says
+ * what keeps slipping has told it enough to build the whole thing.
+ *
+ * The button sends the sentence rather than filling the box with it — a half-written prompt waiting
+ * to be edited is one more decision, and the point of these is to remove decisions.
  */
 const STARTERS = [
     { key: 'chat.starterPageAsk', fallback: 'Put up my welcome page — keep it simple, and tell me the address when it is live.',
       label: 'chat.starterPage', labelFallback: 'Make my welcome page' },
-    { key: 'chat.starterToolsAsk', fallback: 'What can you actually do for me on this node? Answer with three concrete things, not a list of features.',
-      label: 'chat.starterTools', labelFallback: 'What can you do here?' },
+    { key: 'chat.starterWorkAsk', fallback: 'Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.',
+      label: 'chat.starterWork', labelFallback: 'Take something off my plate' },
     { key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it to this node so it can do this work?',
       label: 'chat.starterConnect', labelFallback: 'Connect my own AI' },
 ];

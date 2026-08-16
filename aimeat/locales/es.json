@@ -9270,8 +9270,6 @@
   "chat.jumpLatest": "Ir a lo último",
   "chat.starterPage": "Crea mi página de bienvenida",
   "chat.starterPageAsk": "Publica mi página de bienvenida — sencilla, y dime la dirección cuando esté en línea.",
-  "chat.starterTools": "¿Qué sabes hacer aquí?",
-  "chat.starterToolsAsk": "¿Qué puedes hacer realmente por mí en este nodo? Responde con tres cosas concretas, no con una lista de funciones.",
   "chat.starterConnect": "Conecta mi propia IA",
   "chat.starterConnectAsk": "Ya pago una suscripción de IA. ¿Cómo la conecto a este nodo para que haga este trabajo?",
   "chat.card.open": "Abrir",
@@ -9294,5 +9292,7 @@
   "chat.attachRemove": "Quitar",
   "chat.nudgeMobileTitle": "Ponlo en tu teléfono.",
   "chat.nudgeMobileBody": "Se instala como una app, y con las notificaciones activadas te aviso cuando algo termina en vez de que vuelvas a comprobarlo.",
-  "chat.nudgeDismiss": "Ahora no"
+  "chat.nudgeDismiss": "Ahora no",
+  "chat.starterWork": "Quítame algo de encima",
+  "chat.starterWorkAsk": "Algo de mi lista se me escapa una y otra vez. Pregúntame por ello y luego propón una cosa de la que puedas encargarte."
 }
