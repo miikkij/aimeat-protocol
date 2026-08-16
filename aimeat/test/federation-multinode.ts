@@ -15,6 +15,11 @@
  *   v1.2.0 -- 2026-08-12 -- Security audit H-14: the ping tests now sign the way the heartbeat
  *     client signs, Node A pins the node key of each peer it is pinged by, and an unsigned and a
  *     wrong-key ping are asserted to be refused.
+ *   v1.3.0 -- 2026-08-16 -- E2E quality, multinode:291: every peer mutation here ran as the operator
+ *     credential /v1/admin/setup/register hands out, so requireRole('operator') was never told apart
+ *     from plain authentication. A non-operator owner (fedLoginUser, proven non-operator by decoding
+ *     its token) is now refused list, add, re-tune and de-peer on Node B, against a throwaway peer so
+ *     no mutation can cascade into the routing tests, with operator positive controls on the same doors.
  */
 
 // Run: cd aimeat && pnpm exec tsx test/federation-multinode.ts
@@ -540,6 +545,83 @@ await test('Authenticate federation login user on Node B', async () => {
     assert(loginRes.body.ok === true, `ghii login: ${JSON.stringify(loginRes.body.error)}`);
     fedLoginToken = loginRes.body.data?.token ?? loginRes.body.token;
     assert(typeof fedLoginToken === 'string' && fedLoginToken.length > 0, 'got fed login token');
+});
+
+// Every peer mutation in this file runs as the operator credential /v1/admin/setup/register hands out,
+// so requireRole('operator') has never been distinguished from plain authentication. fedLoginUser is a
+// real second account on Node B, registered through /v1/ghii — the only non-operator principal in the
+// file, and the doors it is refused decide who Node B federates with.
+//
+// The refusals are aimed at a throwaway peer, never at Node A: if the PUT gate falls, a succeeding
+// status/peer_mode change on the real peering would cascade into the routing and directory tests and
+// the mutation would redden more than this case. The fixture is created and removed inside the test,
+// so the suite's peer counts see nothing.
+await test('A non-operator on Node B cannot add, re-tune or de-peer → 403, and the operator still can', async () => {
+    const payload = JSON.parse(Buffer.from(fedLoginToken.split('.')[1], 'base64url').toString());
+    assert(Array.isArray(payload.roles) && payload.roles.includes('owner') && !payload.roles.includes('operator'),
+        `the premise: an owner who is not an operator. /v1/ghii register and login both self-heal an operator-less node, so the token is the only honest proof. Got ${JSON.stringify(payload.roles)}`);
+    const asUser = { Authorization: `Bearer ${fedLoginToken}` };
+    const asOperator = { Authorization: `Bearer ${nodeB!.ownerToken}` };
+    const throwId = `mnode-throwaway-${Date.now()}`;
+
+    const created = await nodeB!.json('/v1/federation/peers', {
+        method: 'POST', headers: asOperator,
+        body: JSON.stringify({ node_id: throwId, url: 'http://localhost:49999' }),
+    });
+    assert(created.status === 201, `fixture peer: ${created.status}: ${JSON.stringify(created.body.error)}`);
+
+    // ACCESS_DENIED is requireRole's own code; the routes' own refusals use FORBIDDEN / NOT_FOUND,
+    // so the code is what says which layer answered.
+    const listed = await nodeB!.json('/v1/federation/peers', { headers: asUser });
+    assert(listed.status === 403 && listed.body.error?.code === 'ACCESS_DENIED',
+        `peer list expected 403 ACCESS_DENIED, got ${listed.status} ${JSON.stringify(listed.body.error)}`);
+
+    const added = await nodeB!.json('/v1/federation/peers', {
+        method: 'POST', headers: asUser,
+        body: JSON.stringify({ node_id: `${throwId}-x`, url: 'http://localhost:49998' }),
+    });
+    assert(added.status === 403 && added.body.error?.code === 'ACCESS_DENIED',
+        `add-peer expected 403 ACCESS_DENIED, got ${added.status} ${JSON.stringify(added.body.error)}`);
+
+    const retuned = await nodeB!.json(`/v1/federation/peers/${throwId}`, {
+        method: 'PUT', headers: asUser,
+        body: JSON.stringify({ status: 'active', peer_mode: 'private', allow_federated_auth: true }),
+    });
+    assert(retuned.status === 403 && retuned.body.error?.code === 'ACCESS_DENIED',
+        `update-peer expected 403 ACCESS_DENIED, got ${retuned.status} ${JSON.stringify(retuned.body.error)}`);
+
+    const depeered = await nodeB!.json(`/v1/federation/peers/${throwId}?emergency=true`, { method: 'DELETE', headers: asUser });
+    assert(depeered.status === 403 && depeered.body.error?.code === 'ACCESS_DENIED',
+        `de-peer expected 403 ACCESS_DENIED, got ${depeered.status} ${JSON.stringify(depeered.body.error)}`);
+
+    // Nothing the refusals asked for happened: no new peer, and the fixture is untouched.
+    const after = await nodeB!.json('/v1/federation/peers', { headers: asOperator });
+    assert(after.status === 200, `operator list: ${after.status}`);
+    const peerRows = after.body.data.peers as any[];
+    assert(!peerRows.some(p => p.node_id === `${throwId}-x`), 'the refused add must not have registered a peer');
+    const fixture = peerRows.find(p => p.node_id === throwId);
+    assert(!!fixture, `the fixture peer must survive: ${JSON.stringify(peerRows.map(p => p.node_id))}`);
+    assert(fixture.status === 'pending', `still pending, got ${fixture.status}`);
+    assert(fixture.peer_mode === 'federation', `still federation mode, got ${fixture.peer_mode}`);
+    assert(fixture.allow_federated_auth === false, `federated auth still off, got ${fixture.allow_federated_auth}`);
+
+    // Positive controls: the same two doors, the same moment, the operator credential.
+    const opRetune = await nodeB!.json(`/v1/federation/peers/${throwId}`, {
+        method: 'PUT', headers: asOperator, body: JSON.stringify({ peer_mode: 'private' }),
+    });
+    assert(opRetune.status === 200, `operator update: ${opRetune.status}: ${JSON.stringify(opRetune.body.error)}`);
+    assert(opRetune.body.data.peer_mode === 'private', `operator update took effect, got ${opRetune.body.data.peer_mode}`);
+
+    const opDepeer = await nodeB!.json(`/v1/federation/peers/${throwId}?emergency=true`, { method: 'DELETE', headers: asOperator });
+    assert(opDepeer.status === 200 && opDepeer.body.data.deleted === true,
+        `operator emergency de-peer: ${opDepeer.status}: ${JSON.stringify(opDepeer.body)}`);
+
+    // …and the refusals plus the cleanup moved nothing else: the real peering is as it was.
+    const final = await nodeB!.json('/v1/federation/peers', { headers: asOperator });
+    const finalRows = final.body.data.peers as any[];
+    assert(!finalRows.some(p => p.node_id === throwId), 'the fixture peer is gone');
+    const a = finalRows.find(p => p.node_id === nodeA!.config.nodeId);
+    assert(!!a && a.status === 'active', `Node A must still be an active peer of B: ${JSON.stringify(finalRows.map(p => [p.node_id, p.status]))}`);
 });
 
 await test('Create auth consent for Node C on Node B', async () => {
