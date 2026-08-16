@@ -14,6 +14,8 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v1.1.0 — 2026-08-16 — The install suggestion (InstallCta) renders in both states: the browser
+ *     never proposes installing on its own, so the home does.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  */
 import { h } from 'preact';
@@ -32,6 +34,7 @@ import { StepBranchB } from '/views/home/step-branch-b.js';
 import { HomeFeed, Rooms } from '/views/home/feed.js';
 import { HomeHeader } from '/views/home/header.js';
 import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
+import { InstallCta } from '/components/InstallCta.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -174,6 +177,7 @@ export default function HomeView({ navigate }) {
         <${Rooms} rooms=${rooms} onEnter=${enterRoom} />
         <${OpenItemsList} />
         <${StepMatDone} state=${state} />
+        <${InstallCta} />
         <${HomeFeed} items=${feed} />
         <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
           session=${session} showToast=${showToast} />
@@ -219,6 +223,7 @@ export default function HomeView({ navigate }) {
                   note=${tr('home.step3Dim', 'Opens once you have an app that can connect.')} />`}
           </li>`}
       </ol>
+      <${InstallCta} />
       <${HomeFeed} items=${feed} />
         <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
           session=${session} showToast=${showToast} />

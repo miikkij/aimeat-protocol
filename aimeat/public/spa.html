@@ -108,6 +108,7 @@
   <link rel="stylesheet" href="/css/components/app-sandbox.css">
   <link rel="stylesheet" href="/css/components/voice-recorder.css">
   <link rel="stylesheet" href="/css/components/card-menu.css">
+  <link rel="stylesheet" href="/css/components/install-cta.css">
   <link rel="stylesheet" href="/css/views/app-grant.css">
   <link rel="stylesheet" href="/css/views/invite-accept.css">
   <!-- View CSS preloaded so they are ready before any view renders (prevents FOUC) -->
@@ -160,6 +161,8 @@
       "/js/hooks.js": "/js/hooks.js",
       "/js/recents.js": "/js/recents.js",
       "/js/intake.js": "/js/intake.js",
+      "/js/install-prompt.js": "/js/install-prompt.js",
+      "/components/InstallCta.js": "/components/InstallCta.js",
       "/js/services/admin.js": "/js/services/admin.js",
       "/js/services/agents.js": "/js/services/agents.js",
       "/js/services/audio-recorder.js": "/js/services/audio-recorder.js",
@@ -365,6 +368,9 @@
     import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
+    // Side-effect import, and EARLY on purpose: the browser fires `beforeinstallprompt` once,
+    // shortly after load, and the module must be listening before views lazy-load.
+    import '/js/install-prompt.js';
     import { LOCALES } from '/js/utils.js';
     import { initThemeSystem } from '/js/theme.js';
     import { siteLink } from '/js/site.js';

@@ -249,6 +249,8 @@ async function main() {
             assert(res.status === 200, `expected 200, got ${res.status}`);
             assert(res.body.includes('rel="manifest"') && res.body.includes('/manifest.webmanifest'),
                 'the manifest link is in the served head');
+            assert(res.body.includes('/js/install-chip.js'),
+                'the install-suggestion chip rides the same injection');
         });
 
         await test('an icon with markup in it comes out as text, not as elements', async () => {

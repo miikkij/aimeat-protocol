@@ -29,8 +29,9 @@
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
  *   v1.3.0 — 2026-08-16 — The app is installable from its own origin: a manifest link, a
- *     theme-color and an apple-touch-icon join the gap-fill set (the manifest itself is served by
- *     subdomains.ts). Same rule as every other tag here: the author's own declaration wins.
+ *     theme-color, an apple-touch-icon and the install-chip script join the gap-fill set (the
+ *     manifest itself is served by subdomains.ts; the chip shows the suggestion the browser never
+ *     makes). Same rule as every other tag here: the author's own declaration wins.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: takes and returns a string, so the single
  *     serve-time-marks pass (services/app-serve-marks.ts) decodes the document once instead of four
  *     times. Head-gap detection still runs against the text WITH the body marks already in it, which
@@ -127,6 +128,12 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
     // A PNG, because iOS ignores SVG here. The apex heart stands in for every app: the per-app
     // emoji icon is an SVG and rasterizing emoji server-side would need a font pipeline.
     add.push(`<link rel="apple-touch-icon" href="${spec.baseUrl.replace(/\/$/, '')}/icons/apple-touch-icon.png">`);
+  }
+  if (!has(text, /install-chip\.js/i)) {
+    // The suggestion half of installability: when the browser hands over an install offer, this
+    // shows a small "Install this app" pill above the aimeat.io badge — the browser itself never
+    // proposes anything. Does nothing on browsers that make no offer.
+    add.push(`<script src="/js/install-chip.js" defer></script>`);
   }
   if (!has(text, /<link rel="alternate" type="text\/markdown"/i)) {
     add.push(`<link rel="alternate" type="text/markdown" href="${origin}/?format=md">`);

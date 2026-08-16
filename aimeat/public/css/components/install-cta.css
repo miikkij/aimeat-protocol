@@ -1,0 +1,57 @@
+/**
+ * @file install-cta.css
+ * @description The "install this as an app" suggestion card (components/InstallCta.js): a slim,
+ *   dismissible row on Home and in the chat. Theme tokens only; the compact variant tightens it
+ *   for the chat column.
+ * @version-history
+ *   v1.0.0 — 2026-08-16 — Initial.
+ */
+
+.install-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.install-cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1 1 16rem;
+}
+
+.install-cta-title {
+  font-weight: 600;
+  color: var(--text-bright);
+  font-size: 0.95rem;
+}
+
+.install-cta-body {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.install-cta-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.install-cta--compact {
+  padding: 0.55rem 0.8rem;
+  margin: 0.5rem 0;
+}
+
+.install-cta--compact .install-cta-title {
+  font-size: 0.88rem;
+}

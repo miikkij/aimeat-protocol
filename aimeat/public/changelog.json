@@ -5,6 +5,18 @@
       "date": "2026-08-16",
       "kind": "feature",
       "title": {
+        "en": "The install offer now comes from us, because the browser hides its own",
+        "fi": "Asennustarjous tulee nyt meiltä, koska selain piilottaa omansa"
+      },
+      "body": {
+        "en": "Browsers stopped proposing app installation on their own: on a desktop the option sits behind the browser menu, and nothing ever points at it. So the suggestion now comes from the pages themselves. Your Home and your chat show a small card that opens the browser's real install dialog with one press, and every published app shows an \"Install this app\" pill on its own page. On iPhone and iPad the same card explains the Share menu route. Say \"not now\" and it stays quiet.",
+        "fi": "Selaimet eivät enää ehdota sovelluksen asentamista itse: työpöydällä vaihtoehto on selainvalikon takana, eikä mikään osoita sitä. Siksi ehdotus tulee nyt sivuilta itseltään. Home ja chat näyttävät pienen kortin, joka avaa selaimen oikean asennusikkunan yhdellä painalluksella, ja jokainen julkaistu appi näyttää omalla sivullaan \"Asenna tämä appi\" -napin. iPhonella ja iPadilla sama kortti neuvoo jakovalikon reitin. \"Ei nyt\" hiljentää sen."
+      }
+    },
+    {
+      "date": "2026-08-16",
+      "kind": "feature",
+      "title": {
         "en": "The installed app learns its trade: share into it, see the unread count, install any published app",
         "fi": "Asennettu sovellus oppii työnsä: jaa siihen, näe lukematta olevat, asenna mikä tahansa julkaistu appi"
       },
