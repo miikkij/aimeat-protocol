@@ -5,6 +5,18 @@
       "date": "2026-08-16",
       "kind": "feature",
       "title": {
+        "en": "The installed app learns its trade: share into it, see the unread count, install any published app",
+        "fi": "Asennettu sovellus oppii työnsä: jaa siihen, näe lukematta olevat, asenna mikä tahansa julkaistu appi"
+      },
+      "body": {
+        "en": "Share into your node from anywhere. On Android and on the desktop, AIMEAT.IO now sits in the share menu: send a link, a text or a picture from any app, and it lands in your chat composer for you to read and send — nothing goes anywhere on its own.\n\nThe installed app's icon shows the number of unread notifications, and a long press on it opens Chat, Inbox, Home or Apps directly. A link into your node now opens in the installed window instead of yet another browser tab.\n\nEvery published app is installable too, from its own address, with its own name and its own icon.\n\nAnd when the connection is gone, the app says so on its own page instead of a browser error, in your language. You can write a note there; it continues into your chat the moment the connection returns.",
+        "fi": "Jaa nodeesi mistä vain. Androidilla ja työpöydällä AIMEAT.IO on nyt jakovalikossa: lähetä linkki, teksti tai kuva mistä tahansa sovelluksesta, ja se laskeutuu chattisi kirjoituskenttään luettavaksi ja lähetettäväksi — mikään ei lähde minnekään itsestään.\n\nAsennetun sovelluksen kuvake näyttää lukemattomien ilmoitusten määrän, ja kuvakkeen pitkä painallus avaa suoraan Chatin, Inboxin, Homen tai Appsit. Linkki nodeesi avautuu nyt asennettuun ikkunaan eikä uuteen selainvälilehteen.\n\nMyös jokainen julkaistu appi on asennettavissa omasta osoitteestaan, omalla nimellään ja omalla kuvakkeellaan.\n\nJa kun yhteys katkeaa, sovellus kertoo sen omalla sivullaan selaimen virheilmoituksen sijaan, sinun kielelläsi. Siihen voi kirjoittaa viestin; se jatkaa chattiisi heti, kun yhteys palaa."
+      }
+    },
+    {
+      "date": "2026-08-16",
+      "kind": "feature",
+      "title": {
         "en": "Install aimeat.io as an app, on the desktop and on your phone",
         "fi": "aimeat.io asentuu sovellukseksi työpöydälle ja puhelimeen"
       },

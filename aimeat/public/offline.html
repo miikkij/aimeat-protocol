@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIMEAT.IO</title>
+<!-- The page a NAVIGATION lands on when the network is gone. It says the honest thing — this is
+     an online application — and holds a note box that writes into the intake queue, which the
+     chat drains when the connection is back. The styles are inline and the languages live in
+     /offline.js (the node CSP refuses inline script), so sw.js pre-caches BOTH files at install;
+     nothing else is fetched, because nothing else would arrive. -->
+<style>
+  :root {
+    --bg: #FAFAF8; --text: #1F2328; --dim: #6B7280; --coral: #E8564A;
+    --card: #FFFFFF; --border: #E5E1DA;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
+  main { max-width: 26rem; width: 100%; text-align: center; }
+  .heart { width: 72px; height: 72px; margin: 0 auto 1rem; display: block; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.6rem; }
+  p.lead { color: var(--dim); font-size: 0.95rem; line-height: 1.5; margin-bottom: 1.4rem; }
+  textarea {
+    width: 100%; min-height: 6rem; resize: vertical;
+    background: var(--card); color: var(--text);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 0.8rem; font: inherit; font-size: 0.95rem; margin-bottom: 0.8rem;
+  }
+  textarea:focus { outline: 2px solid var(--coral); outline-offset: -1px; border-color: transparent; }
+  .row { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; }
+  button {
+    font: inherit; font-weight: 600; font-size: 0.95rem; cursor: pointer;
+    border-radius: 10px; padding: 0.6rem 1.3rem; border: 1px solid transparent;
+  }
+  .primary { background: var(--coral); color: #fff; }
+  .primary:hover { filter: brightness(1.05); }
+  .outline { background: transparent; color: var(--text); border-color: var(--border); }
+  .outline:hover { border-color: var(--coral); color: var(--coral); }
+  .note { color: var(--dim); font-size: 0.85rem; margin-top: 0.9rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<main>
+  <svg class="heart" viewBox="0 0 100 100" aria-hidden="true">
+    <path fill="#E8564A" d="M50 88C28 70 12 55 12 38c0-12 9-21 20-21 8 0 14 4 18 10 4-6 10-10 18-10 11 0 20 9 20 21 0 17-16 32-38 50z"/>
+  </svg>
+  <h1 id="t-title"></h1>
+  <p class="lead" id="t-lead"></p>
+  <textarea id="note" rows="4"></textarea>
+  <div class="row">
+    <button class="primary" id="save" type="button"></button>
+    <button class="outline" id="retry" type="button"></button>
+  </div>
+  <p class="note" id="status"></p>
+</main>
+<script src="/offline.js"></script>
+</body>
+</html>

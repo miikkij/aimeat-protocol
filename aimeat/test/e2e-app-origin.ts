@@ -233,6 +233,49 @@ async function main() {
                 `it names the app or its owner: ${body.slice(0, 160)}`);
         });
 
+        // ── Installable app: the per-app manifest is the app's own, and the emoji icon is
+        // escaped because it is owner input inside an XML document ──────────────────────────
+        await test('the app origin serves a web-app manifest carrying the APP’s identity', async () => {
+            const res = await onAppOrigin('/manifest.webmanifest', SUB);
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            const man = res.json<{ name?: string; start_url?: string; scope?: string; icons?: Array<{ src: string }> }>();
+            assert(man.name === 'Origin Demo', `manifest name is the app name, got: ${man.name}`);
+            assert(man.start_url === '/' && man.scope === '/', 'start_url and scope are the app origin root');
+            assert((man.icons ?? []).some((i) => i.src === '/icon.svg'), 'the emoji icon is listed');
+        });
+
+        await test('the served app HTML links that manifest (injected, author tags win)', async () => {
+            const res = await onAppOrigin('/', SUB);
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert(res.body.includes('rel="manifest"') && res.body.includes('/manifest.webmanifest'),
+                'the manifest link is in the served head');
+        });
+
+        await test('an icon with markup in it comes out as text, not as elements', async () => {
+            const hostileFile = 'origin-hostile-icon.html';
+            const pub = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                    filename: hostileFile, content: b64(HTML), name: 'Hostile Icon', description: 'd',
+                    category: 'utility', tags: [], icon: '<script>1</script>',
+                }),
+            });
+            assert(pub.status === 201, `publish: ${pub.status}`);
+            await onAppOrigin(`/${owner}/${hostileFile}`, null); // auto-assign the subdomain
+            const res = await onAppOrigin('/icon.svg', 'origin-hostile-icon');
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            assert((res.header('content-type') ?? '').includes('svg'), 'served as SVG');
+            assert(!res.body.includes('<script'), `the icon text must be escaped: ${res.body}`);
+            assert(res.body.includes('&lt;'), 'the markup arrived as entities');
+        });
+
+        await test('an unmapped subdomain gets no manifest and no icon', async () => {
+            const man = await onAppOrigin('/manifest.webmanifest', 'no-such-app-here');
+            assert(man.status === 404, `expected 404, got ${man.status}`);
+            const icon = await onAppOrigin('/icon.svg', 'no-such-app-here');
+            assert(icon.status === 404, `expected 404, got ${icon.status}`);
+        });
+
         // ── Phase 4: the header must not grow with what the owner accumulates ───────────────
         // This is the test that was missing when frame-ancestors listed the owner's app origins:
         // it passed with two apps and took production down at 76, because the CSP header outgrew
@@ -655,6 +698,12 @@ async function main() {
             try { described = card.json<{ app?: { app_id?: string } }>().app?.app_id; }
             catch (err) { console.log(`     (mcp.json was not JSON, which is also not the app card: ${String(err).slice(0, 60)})`); }
             assert(described !== gatedFile, 'the MCP server card must not describe a gated app');
+            // The install surface follows the same rule: a gated app is not installable and its
+            // origin publishes no manifest or icon, grant or no grant.
+            const man = await onAppOrigin(`/manifest.webmanifest${grantQuery}`, GATED_SUB);
+            assert(man.status === 404, `a gated app must publish no manifest, got ${man.status}`);
+            const icon = await onAppOrigin(`/icon.svg${grantQuery}`, GATED_SUB);
+            assert(icon.status === 404, `a gated app must publish no icon, got ${icon.status}`);
         });
 
         // ── Phase 8: the marker is a claim, and the Host is what decides it ─────────────────

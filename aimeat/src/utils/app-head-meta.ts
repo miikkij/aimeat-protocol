@@ -28,6 +28,9 @@
  * @usage
  *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.3.0 — 2026-08-16 — The app is installable from its own origin: a manifest link, a
+ *     theme-color and an apple-touch-icon join the gap-fill set (the manifest itself is served by
+ *     subdomains.ts). Same rule as every other tag here: the author's own declaration wins.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: takes and returns a string, so the single
  *     serve-time-marks pass (services/app-serve-marks.ts) decodes the document once instead of four
  *     times. Head-gap detection still runs against the text WITH the body marks already in it, which
@@ -110,6 +113,20 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   if (!has(text, /<link rel="canonical"/i)) {
     // The app's OWN origin, never the apex. The app is the page here.
     add.push(`<link rel="canonical" href="${origin}/">`);
+  }
+  // Installable from its own origin: the manifest (served per-app by subdomains.ts) is what lets
+  // a browser offer "install" for THIS app, with its own name and its own icon, without the
+  // author writing a single tag. iOS reads the two tags after it instead of the manifest.
+  if (!has(text, /<link rel="manifest"/i)) {
+    add.push(`<link rel="manifest" href="/manifest.webmanifest">`);
+  }
+  if (!has(text, /<meta name="theme-color"/i)) {
+    add.push(`<meta name="theme-color" content="#FAFAF8">`);
+  }
+  if (!has(text, /<link rel="apple-touch-icon"/i)) {
+    // A PNG, because iOS ignores SVG here. The apex heart stands in for every app: the per-app
+    // emoji icon is an SVG and rasterizing emoji server-side would need a font pipeline.
+    add.push(`<link rel="apple-touch-icon" href="${spec.baseUrl.replace(/\/$/, '')}/icons/apple-touch-icon.png">`);
   }
   if (!has(text, /<link rel="alternate" type="text\/markdown"/i)) {
     add.push(`<link rel="alternate" type="text/markdown" href="${origin}/?format=md">`);

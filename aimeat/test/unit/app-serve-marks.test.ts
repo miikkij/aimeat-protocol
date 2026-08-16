@@ -12,6 +12,9 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.2.0 — 2026-08-16 — Goldens re-captured for the second intentional output change: the
+ *     head-meta pass now also fills in a manifest link, a theme-color and an apple-touch-icon
+ *     (installable apps). 9 of 17 cases changed, all of them headMeta cases.
  *   v1.1.0 — 2026-08-02 — Goldens re-captured after the first intentional output change since the
  *     consolidation: the reserved-strip declaration (`--aimeat-chrome-bottom`, app-chrome-reserve.ts)
  *     now rides along whenever visible chrome is served. From here the goldens are a regression

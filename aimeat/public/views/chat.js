@@ -14,6 +14,9 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v1.2.0 — 2026-08-16 — Drains the intake queue (OS share sheet + offline-page notes) into the
+ *     composer: text becomes draft, shared pictures ride the existing attach path. Reviewed and
+ *     sent by the person — nothing from the queue is submitted on its own.
  *   v1.1.0 — 2026-08-16 — Speech: a recording becomes text in the box for the person to read before
  *     they send it, and the engine is primed inside the tap so reading an answer aloud works on iOS.
  *   v1.0.1 — 2026-08-16 — The work log keys tool calls by id rather than title, so a finished call
@@ -28,6 +31,7 @@ import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
+import { readIntake, clearIntake, intakeText } from '/js/intake.js';
 import { ThreadList, Turn, LiveTurn, TurnError, Composer, StatusBar, GooseCredit, Choices, choicesIn, AiNotice, MobileNudge } from './chat/parts.js';
 import { CopyButton } from '/components/CopyButton.js';
 
@@ -353,6 +357,30 @@ export default function ChatView() {
                 .catch((err) => setAttachments((prev) => prev.map((a) => (a.id === id ? { ...a, state: 'error', error: err.message } : a))));
         }
     }, []);
+
+    // Drain the intake queue: what arrived through the OS share sheet, and the notes left on the
+    // offline page, become composer content here — text joins the draft, pictures ride the same
+    // attach path a hand-picked file does. The person reads it and presses send themselves;
+    // nothing from the queue is submitted on its own. Runs on mount and again when the
+    // connection returns, because that is the moment an offline note has been waiting for.
+    useEffect(() => {
+        if (!hasSession()) return undefined;
+        let gone = false;
+        const drain = () => (async () => {
+            const items = await readIntake();
+            if (gone || items.length === 0) return;
+            const texts = items.map(intakeText).filter(Boolean);
+            if (texts.length) setDraft((d) => [d.trim(), ...texts].filter(Boolean).join('\n\n'));
+            const files = items.flatMap((it) => (it.files ?? [])
+                .filter((f) => f && f.blob)
+                .map((f) => new File([f.blob], f.name || 'shared', { type: f.type || 'application/octet-stream' })));
+            if (files.length) attach(files);
+            await clearIntake();
+        })().catch((err) => console.warn('[chat] the intake queue could not be drained:', err.message));
+        drain();
+        window.addEventListener('online', drain);
+        return () => { gone = true; window.removeEventListener('online', drain); };
+    }, [attach]);
 
     const dropAttachment = useCallback((id) => {
         setAttachments((prev) => {

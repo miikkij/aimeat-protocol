@@ -20,6 +20,9 @@
  *   v1.3.0 — 2026-07-19 — "Clear all" in the dropdown head (DELETE /v1/notifications) — deletes every
  *     notification for the owner (not just mark-read), optimistic empty + reconcile.
  *   v1.3.1 — 2026-08-07 — Reads the JWT via /js/services/auth.js (single session source).
+ *   v1.4.0 — 2026-08-16 — The unread count also lands on the installed app's icon (Badging API):
+ *     set wherever this component learns the count, cleared when it reaches zero. The service
+ *     worker's push handler sets a plain dot; this is what turns it into the exact number.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -36,6 +39,17 @@ async function api(path, opts = {}) {
     const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
     return await res.json();
   } catch (err) { swallowed('NotificationBell: api', err); return null; }
+}
+
+/**
+ * Mirror the unread count onto the installed app's icon. A no-op in a plain tab (the API only
+ * exists for installed apps on supporting browsers); in the app it is the quiet end of the
+ * notification chain — visible after the notification itself was swiped away.
+ */
+function syncAppBadge(count) {
+  if (!('setAppBadge' in navigator)) return;
+  const call = count > 0 ? navigator.setAppBadge(count) : navigator.clearAppBadge();
+  call.catch((err) => swallowed('NotificationBell: app badge', err));
 }
 
 function relTime(iso) {
@@ -108,7 +122,11 @@ export function NotificationBell({ t, onNavigate }) {
 
   const load = useCallback(async () => {
     const r = await api('/v1/notifications');
-    if (r && r.data) { setItems(r.data.notifications || []); setUnread(r.data.unread || 0); }
+    if (r && r.data) {
+      setItems(r.data.notifications || []);
+      setUnread(r.data.unread || 0);
+      syncAppBadge(r.data.unread || 0);
+    }
   }, []);
 
   // "Clear all" — delete every notification for the owner (not just mark read). Optimistic: empty the
@@ -116,6 +134,7 @@ export function NotificationBell({ t, onNavigate }) {
   const clearAll = useCallback(async () => {
     setClearing(true);
     setItems([]); setUnread(0); setReplyFor(null); setResults({});
+    syncAppBadge(0);
     await api('/v1/notifications', { method: 'DELETE', body: JSON.stringify({}) });
     setClearing(false);
     load();
@@ -140,6 +159,7 @@ export function NotificationBell({ t, onNavigate }) {
     if (!next) { setReplyFor(null); setReplyText(''); }
     if (next && unread > 0) {
       setUnread(0);
+      syncAppBadge(0);
       setItems(its => its.map(n => ({ ...n, read: true })));
       await api('/v1/notifications/read', { method: 'POST', body: JSON.stringify({ all: true }) });
     }
