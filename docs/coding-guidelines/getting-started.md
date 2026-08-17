@@ -196,6 +196,24 @@ pnpm build
 pnpm start
 ```
 
+### Memory: run production under jemalloc
+
+On a glibc host (Ubuntu/Debian bare metal), the default allocator keeps freed memory inside the
+process forever, so RSS parks at the boot peak (~1.4 GB) no matter what the node actually uses.
+jemalloc hands freed pages back to the OS within seconds; measured on aimeat.io 2026-08-17, steady
+state fell to 250-450 MB with bursts unchanged. This is the production launch line:
+
+```bash
+sudo apt install libjemalloc2
+LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 \
+MALLOC_CONF="background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:10000" \
+NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" pnpm start
+```
+
+`LD_PRELOAD` must be process environment (launch line or systemd unit), never a `.env` entry —
+the dynamic linker consumes it before node starts, so a `.env` value arrives too late and is
+silently ignored. The Docker image ships with jemalloc preloaded already.
+
 ### With PostgreSQL
 
 ```bash
