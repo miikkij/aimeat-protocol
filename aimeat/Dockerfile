@@ -33,12 +33,20 @@ COPY package.json pnpm-lock.yaml ./
 # (see docker-compose.sqlite.yml) inherits writable ownership on first creation.
 RUN mkdir -p /data && chown node:node /data
 
+# Memory trace 2026-08-17, round 7: jemalloc returns freed pages to the OS within seconds
+# (dirty_decay_ms), so RSS tracks actual use instead of parking at the boot peak — measured
+# steady state fell from 1.4 GB to 250-450 MB with bursts unchanged. LD_PRELOAD has to be
+# process environment, never a .env entry: the dynamic linker consumes it before node starts.
+# (The MALLOC_ARENA_MAX=2 this replaces was a glibc knob that never did anything on this
+# musl-based image.)
+RUN apk add --no-cache jemalloc
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
+ENV MALLOC_CONF="background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:10000"
+
 ENV NODE_ENV=production
-# Memory audit 2026-08-17: cap the V8 heap (container-aware V8 would size it from host RAM),
-# stop glibc spreading freed native memory across per-core arenas that never return to the OS,
-# and let an operator take a production heap snapshot with `kill -USR2 <pid>`.
+# Cap the V8 heap (container-aware V8 would size it from host RAM) and let an operator take
+# a production heap snapshot with `kill -USR2 <pid>`.
 ENV NODE_OPTIONS="--max-old-space-size=2048 --heapsnapshot-signal=SIGUSR2"
-ENV MALLOC_ARENA_MAX=2
 ENV AIMEAT_PORT=40050
 EXPOSE 40050
 
