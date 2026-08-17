@@ -646,6 +646,24 @@ function googleMail(clientId: string, clientSecret: string, capabilityOn: boolea
           return u.toString();
         },
       },
+      attachment: {
+        label: 'a file attached to a message',
+        requiresScopes: [READ],
+        url(params) {
+          // Gmail hands back attachments by REFERENCE rather than inline, so a message with a
+          // 3 MB invoice on it is still a small answer and the bytes are fetched only when
+          // somebody wants them. Both ids go into the path, so both are checked.
+          const message = typeof params.message_id === 'string' ? params.message_id.trim() : '';
+          const attachment = typeof params.attachment_id === 'string' ? params.attachment_id.trim() : '';
+          if (!/^[A-Za-z0-9_-]{1,128}$/.test(message)) {
+            throw new Error('Name which message the attachment is on. The id comes from the message list.');
+          }
+          if (!/^[A-Za-z0-9_-]{1,512}$/.test(attachment)) {
+            throw new Error('Name which attachment. The id is on the message, under its parts.');
+          }
+          return `${API}/messages/${message}/attachments/${attachment}`;
+        },
+      },
       profile: {
         label: 'which mailbox this is',
         requiresScopes: [READ],

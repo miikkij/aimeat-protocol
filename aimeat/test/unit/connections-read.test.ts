@@ -82,6 +82,15 @@ describe('the URLs the node builds', () => {
         expect(u.searchParams.get('format')).toBe('full');
     });
 
+    it('fetches an attachment by reference, checking both ids that enter the path', () => {
+        const u = new URL(gmail().resources!.attachment.url({ message_id: '18f2c9a0', attachment_id: 'ANGjdJ_x1' }, null));
+        expect(u.pathname).toBe('/gmail/v1/users/me/messages/18f2c9a0/attachments/ANGjdJ_x1');
+
+        expect(() => gmail().resources!.attachment.url({ message_id: '../admin', attachment_id: 'a' }, null)).toThrow();
+        expect(() => gmail().resources!.attachment.url({ message_id: '18f2c9a0', attachment_id: '../../x' }, null)).toThrow();
+        expect(() => gmail().resources!.attachment.url({ message_id: '18f2c9a0' }, null)).toThrow();
+    });
+
     it('takes only the two formats it means, whatever is asked for', () => {
         const fmt = (v: unknown) => new URL(gmail().resources!.message.url({ id: 'abc', format: v }, null)).searchParams.get('format');
         expect(fmt('raw')).toBe('raw');
