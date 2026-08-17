@@ -42,6 +42,21 @@ describe('the Gmail connection', () => {
         expect(gmail().scopes.join(' ')).not.toMatch(/send|modify|compose|\.delete/);
     });
 
+    it('asks for a token that outlives the session, or it dies after an hour', () => {
+        // Google returns no refresh token without access_type=offline + prompt=consent, and says
+        // nothing about it: the connection works until the first renewal and then cannot.
+        expect(gmail().offlineAccess).toBe(true);
+    });
+
+    it('every provider on a Google endpoint asks for it, so the next one cannot inherit an hour', () => {
+        const all = buildOutboundProviders(config);
+        const google = all.filter((p) => (p.endpoints(null)?.token ?? '').includes('googleapis.com'));
+        expect(google.length).toBeGreaterThanOrEqual(2);
+        for (const p of google) {
+            expect(p.offlineAccess, `${p.id} would authorise and then be unable to renew`).toBe(true);
+        }
+    });
+
     it('carries no publishing capability, so no surface offers it a post box', () => {
         expect(gmail().capabilities).toEqual(['read-mail']);
     });

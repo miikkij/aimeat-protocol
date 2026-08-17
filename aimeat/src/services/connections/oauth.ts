@@ -186,9 +186,13 @@ export async function startAuthorization(
     q.set('code_challenge', b64url(createHash('sha256').update(verifier).digest()));
     q.set('code_challenge_method', 'S256');
   }
-  if (provider.id === 'youtube') {
+  if (provider.offlineAccess) {
     // Not optional, and the failure is silent: without these Google returns no refresh token on a
     // repeat authorization and the connection quietly becomes a one-hour connection.
+    //
+    // Read from the PROVIDER rather than matched on its id. It was an id check until a second
+    // Google provider arrived and silently inherited a one-hour lifetime -- the exact shape of
+    // defect this file already warns about for tokenAuth, one field over.
     q.set('access_type', 'offline');
     q.set('prompt', 'consent');
   }

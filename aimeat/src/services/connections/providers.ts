@@ -126,6 +126,17 @@ export interface OutboundProvider {
    */
   tokenAuth: 'body' | 'basic';
   /**
+   * Ask for a token that outlives the browser session.
+   *
+   * A PROPERTY OF THE PROVIDER'S OAUTH SERVER, not of what the connection is for, which is why it
+   * is a field. Google returns no refresh token at all unless `access_type=offline` and
+   * `prompt=consent` are sent, and the failure is silent: the connection authorises, works for an
+   * hour, and then cannot renew. That rule lived as a check on one provider id until 2026-08-18,
+   * when a SECOND Google provider was added and inherited a one-hour lifetime nobody would have
+   * seen until the second day.
+   */
+  offlineAccess: boolean;
+  /**
    * What an app may ASK about a connection at this provider (decision K1). An app never reads the
    * provider's own scope vocabulary — it cannot know what those names mean — so it asks a question
    * in AIMEAT's vocabulary and gets a yes or no.
@@ -199,6 +210,7 @@ function mastodon(capabilityOn: boolean): OutboundProvider {
     scopes: ['read:accounts', 'read:statuses', 'write:statuses', 'write:media'],
     pkce: true,
     tokenAuth: 'body',
+    offlineAccess: false,
     capabilities: ['publish-post', 'publish-video', 'read-metrics'],
     attachFields: null,
     // Instances rate-limit, but there is no single daily publish ceiling to state, and inventing
@@ -252,6 +264,7 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
     ],
     pkce: true,
     tokenAuth: 'body',
+    offlineAccess: true,
     capabilities: ['publish-video', 'read-metrics'],
     attachFields: null,
     // SIX. Read from the project's own quota page on 2026-08-02, not guessed:
@@ -325,6 +338,7 @@ function linkedin(clientId: string, clientSecret: string, capabilityOn: boolean)
     scopes: ['openid', 'profile', 'w_member_social'],
     pkce: false,
     tokenAuth: 'body',
+    offlineAccess: false,
     // Text and images at the Consumer tier. NOT publish-video and NOT a native PDF carousel: the
     // Documents API sits behind the partner-gated Community Management product, and advertising a
     // capability the recipe cannot perform is the bug the attach route was already fixed for.
@@ -392,6 +406,7 @@ function x(clientId: string, clientSecret: string, capabilityOn: boolean): Outbo
     scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
     pkce: true,
     tokenAuth: 'basic',
+    offlineAccess: false,
     // Text only for now. Media goes through a separate chunked endpoint with its own processing
     // wait, and claiming video before that exists is the failure the recipe guard now catches.
     // read-metrics is real here and it BILLS: public_metrics is charged per read, which is why
@@ -435,6 +450,7 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     scopes: [],
     pkce: false,
     tokenAuth: 'body',
+    offlineAccess: false,
     // publish-post ONLY, and publish-video is deliberately absent. Video on Bluesky goes through a
     // separate video service with its own job queue and limits, which is not built. Listing a
     // capability the recipe cannot perform is the same "advertised but unconnectable" mistake the
@@ -477,6 +493,7 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     scopes: ['publish'],
     pkce: true,
     tokenAuth: 'body',
+    offlineAccess: false,
     capabilities: ['publish-video', 'publish-post', 'read-metrics', 'read-items'],
     sharedDailyLimit: null,
     attachFields: null,
@@ -532,6 +549,7 @@ function fakeStatic(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     scopes: [],
     pkce: false,
     tokenAuth: 'body',
+    offlineAccess: false,
     capabilities: ['publish-post'],
     sharedDailyLimit: null,
     attachFields: [
@@ -611,6 +629,7 @@ function googleMail(clientId: string, clientSecret: string, capabilityOn: boolea
     scopes: [READ],
     pkce: true,
     tokenAuth: 'body',
+    offlineAccess: true,
     // Reading is all it does. It carries no publish capability, so no surface offers it a post box.
     capabilities: ['read-mail'],
     sharedDailyLimit: null,
