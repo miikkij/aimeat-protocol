@@ -13,6 +13,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-17 — getMetricsText: raw Prometheus text for the Metrics tab
+ *   v1.2.0 — 2026-08-17 — getAuthRefusals: the refusal log's tail for the Security tab
  */
 import { apiGet, apiGetText, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 
@@ -37,6 +38,7 @@ export const getAdminAgents  = ()       => apiGet('/v1/admin/agents');
 export const getAdminOwners  = ()       => apiGet('/v1/admin/owners');
 // Security incidents (rejected/quarantined uploads, etc.)
 export const getSecurityIncidents    = ()   => apiGet('/v1/admin/security/incidents');
+export const getAuthRefusals         = (limit = 200) => apiGet(`/v1/admin/auth-refusals?limit=${limit}`);
 export const resolveSecurityIncident = (id) => apiPost(`/v1/admin/security/incidents/${encodeURIComponent(id)}/resolve`);
 export const deleteSecurityIncident  = (id) => apiDelete(`/v1/admin/security/incidents/${encodeURIComponent(id)}`);
 export const getAgentDetail  = (gaii)   => apiGet(`/v1/agents/${encodeURIComponent(gaii)}`);

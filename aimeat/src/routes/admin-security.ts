@@ -5,11 +5,14 @@
  *   lets an operator download the quarantined payload for inspection, mark an incident resolved, or
  *   delete it together with its quarantined blob.
  * @structure adminSecurityRouter(config, storage)
+ *   - GET    /v1/admin/auth-refusals
  *   - GET    /v1/admin/security/incidents
  *   - GET    /v1/admin/security/incidents/:id/quarantine   (download the quarantined bytes)
  *   - POST   /v1/admin/security/incidents/:id/resolve
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.1.0 -- 2026-08-17 -- GET /v1/admin/auth-refusals: the refusal log's tail as a list,
+ *     so the Security tab can show who was turned away instead of only counting them.
  *   v1.0.0 -- 2026-06-09 -- Initial: list / inspect / resolve / delete security incidents.
  */
 import { Router } from 'express';
@@ -18,6 +21,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { SECURITY_INCIDENT_PREFIX, securityOwner } from '../services/security-incident.js';
+import { readRecentAuthFailures } from '../services/auth-audit.js';
 import { logger } from '../utils/logger.js';
 
 interface IncidentValue { id: string; type: string; code: string; actor: string; actor_name: string; detail: string; source: string; quarantine_key: string | null; size_bytes: number; status: string; createdAt: string }
@@ -30,6 +34,14 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
     const { items } = await storage.listAllMemory({ prefix: SECURITY_INCIDENT_PREFIX, limit: 1000 });
     return items.find(r => r.ownerGaii === owner && (r.value as IncidentValue | undefined)?.id === id) ?? null;
   };
+
+  /* ── GET /v1/admin/auth-refusals — the refusal log's tail, newest first ── */
+  router.get('/v1/admin/auth-refusals', requireAuth(), requireRole('operator'), (req, res) => {
+    const raw = parseInt(String(req.query.limit ?? '200'), 10);
+    const limit = Math.min(Math.max(Number.isFinite(raw) ? raw : 200, 1), 1000);
+    const { enabled, items } = readRecentAuthFailures(limit);
+    res.json(success(config.nodeId, { enabled, items, count: items.length }));
+  });
 
   /* ── GET /v1/admin/security/incidents — newest first + open count ── */
   router.get('/v1/admin/security/incidents', requireAuth(), requireRole('operator'), async (_req, res) => {

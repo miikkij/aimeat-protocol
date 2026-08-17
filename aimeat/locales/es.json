@@ -128,7 +128,21 @@
       "delete": "Eliminar",
       "deleted": "Eliminado",
       "deleteConfirm": "¿Eliminar este incidente y el archivo que quedó en cuarentena?",
-      "evidence": "Contenido"
+      "evidence": "Contenido",
+      "refusals": {
+        "title": "Registro de rechazos",
+        "desc": "Cada solicitud que este nodo rechazó en la puerta: quién lo intentó, desde dónde, en qué puerta y con qué. La columna de credencial muestra una huella, nunca la credencial misma.",
+        "disabled": "El registro de rechazos está apagado. Define una ruta en el entorno del nodo y reinícialo:",
+        "none": "No se ha rechazado a nadie desde que empezó el registro.",
+        "topDoors": "Puertas más probadas",
+        "topIps": "Fuentes más activas",
+        "time": "Hora",
+        "answer": "Respuesta",
+        "door": "Puerta",
+        "ip": "Fuente",
+        "credential": "Credencial",
+        "reason": "Motivo"
+      }
     },
     "tabs": {
       "agentIntegration": "Integración de agentes",
