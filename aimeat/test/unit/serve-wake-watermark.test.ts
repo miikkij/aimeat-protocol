@@ -9,13 +9,18 @@
  * @version-history
  *   v1.0.0 — 2026-08-17 — Written against the level-triggered hasPendingWake bug (one stuck agent
  *     measured at 28 req/s and 76% node CPU); red on the old code, green with the watermark.
+ *   v1.1.0 — 2026-08-17 — Restart case from production: the tunnel's on-connect backlog frame fills
+ *     the task queue through handleTask, so the old level check spun from the daemon's first second
+ *     on every tenant with one open task (measured: clean container start, 3 agents stuck, 91% CPU).
  */
 import { describe, it, expect } from 'vitest';
 import { AgentChannel } from '../../src/cli/connect/mcp/local-server.js';
 import type { RegisteredAgent } from '../../src/cli/connect/agent-registry.js';
 
-// nextWake/signalWake touch nothing on the entry; handleRecord is the side-effect-free push source.
-const entry = { agent: 'unit-agent', owner: 'unit-owner' } as RegisteredAgent;
+// nextWake/signalWake touch nothing on the entry. handleTask reads config.wake (absent → wakeAgent
+// returns before doing anything) and config.runner (absent → no runner launch), so an empty config
+// keeps the task path side-effect free too; handleRecord/handleDm never read the entry at all.
+const entry = { agent: 'unit-agent', owner: 'unit-owner', config: {} } as RegisteredAgent;
 
 describe('AgentChannel unified wake watermark', () => {
   it('one push wakes exactly once: the second park blocks even with the queue undrained', async () => {
@@ -50,6 +55,18 @@ describe('AgentChannel unified wake watermark', () => {
   it('a quiet park times out false', async () => {
     const ch = new AgentChannel(entry);
     await expect(ch.nextWake(20)).resolves.toBe(false);
+  });
+
+  it('an on-connect backlog fill costs one wake, not a spin from the first second', async () => {
+    const ch = new AgentChannel(entry);
+    // A daemon restart with open tasks: the tunnel's backlog frame queues them before anyone parks.
+    ch.handleTask({ id: 'task-open-1', title: 'left open across the restart' }, 'backlog');
+    ch.handleTask({ id: 'task-open-2', title: 'second open task' }, 'backlog');
+
+    // The daemon lists its tasks from the node store and never drains this queue — one wake to
+    // trigger that listing is correct, a second instant wake is the boot-time spin.
+    await expect(ch.nextWake(0)).resolves.toBe(true);
+    await expect(ch.nextWake(0)).resolves.toBe(false);
   });
 
   it('several pushes before one park still cost one wake', async () => {
