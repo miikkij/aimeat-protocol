@@ -28,7 +28,7 @@
       "title": "title",
       "text": "text",
       "url": "url",
-      "files": [{ "name": "files", "accept": ["image/*"] }]
+      "files": [{ "name": "files", "accept": ["image/*", "application/pdf", "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"] }]
     }
   },
   "categories": ["social", "utilities"],
