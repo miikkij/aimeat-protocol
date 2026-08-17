@@ -5,6 +5,11 @@
  *   Covers the full signing lifecycle, party gating, bad signatures, immutability after
  *   completion, and public verifiability without auth.
  * @version-history
+ *   v1.1.0 — 2026-08-17 — E2E quality, attestations:162. Every attestation in the file had exactly two
+ *     parties, so "the last party signed" and "a second signature arrived" were the same event and the
+ *     completion rule was never told apart from counting to two. Test 8b runs a three-party deed: the
+ *     middle signature must leave it open with the third slot empty, the third completes it, and the
+ *     public reader verifies it.
  *   v1.0.0 — 2026-08-06 — Initial: create/sign/complete + authz and immutability failures
  */
 
@@ -168,6 +173,52 @@ await test('8. B signs — attestation completes', async () => {
   const att = body.data.attestation;
   assert(att.state === 'complete', `state: ${att.state}`);
   assert(typeof att.completedAt === 'string', 'completedAt set');
+});
+
+/**
+ * EVERY ATTESTATION IN THIS FILE HAS EXACTLY TWO PARTIES, so "the last party signed" and "a second
+ * signature arrived" are the same event, and the rule that decides completion — every party present,
+ * not merely more than one — has never been distinguished from counting to two.
+ *
+ * Three parties separate them. The middle signature is the one that matters: it must leave the deed
+ * OPEN, and the third party's slot must still be empty.
+ */
+await test('8b. With three parties, the deed completes only when the third one signs', async () => {
+  const created = await json('/v1/attestations', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ payload, parties: [A.ghii, B.ghii, C.ghii], reference: 'tinki-listing-3' }),
+  });
+  assert(created.status === 201, `create: ${created.status}: ${JSON.stringify(created.body).slice(0, 300)}`);
+  const id = created.body.data.attestation.id as string;
+  const hash = created.body.data.attestation.payloadHash as string;
+  assert(created.body.data.attestation.state === 'open', 'a fresh deed is open');
+
+  const sign = async (who: { token: string; privKey: string }) => json(`/v1/attestations/${id}/sign`, {
+    method: 'POST', headers: authed(who.token),
+    body: JSON.stringify({ signature: await signMsg(who.privKey, `aimeat-attest:${id}:${hash}`) }),
+  });
+
+  const first = await sign(A);
+  assert(first.status === 200, `A signs: ${first.status}`);
+  assert(first.body.data.attestation.state === 'open', `one of three must leave it open, got ${first.body.data.attestation.state}`);
+
+  const second = await sign(B);
+  assert(second.status === 200, `B signs: ${second.status}`);
+  assert(second.body.data.attestation.state === 'open',
+    `two of three must STILL leave it open, got ${second.body.data.attestation.state}`);
+  assert(second.body.data.attestation.signatures[C.ghii] === undefined,
+    'the third party has not signed and must have no signature');
+  assert(!second.body.data.attestation.completedAt, 'completedAt must not be set while a party is missing');
+
+  const third = await sign(C);
+  assert(third.status === 200, `C signs: ${third.status}`);
+  assert(third.body.data.attestation.state === 'complete', `the third signature completes it, got ${third.body.data.attestation.state}`);
+  assert(typeof third.body.data.attestation.completedAt === 'string', 'completedAt set');
+
+  // …and the public reader agrees, which is the answer anyone outside actually gets.
+  const read = await json(`/v1/attestations/${id}`);
+  assert(read.status === 200, `public read: ${read.status}`);
+  assert(read.body.data.verified === true, `a complete three-party deed must verify: ${JSON.stringify(read.body.data.verified)}`);
 });
 
 await test('9. Signing after completion is refused (append-only)', async () => {
