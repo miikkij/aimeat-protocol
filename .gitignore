@@ -121,6 +121,9 @@ google*.html
 
 # Binary docs (use .md instead)
 *.docx
+# …but the ones the file readers are tested against ARE source. They come from a real producer
+# (python-docx) on purpose: a reader proved only against XML this repo wrote proves nothing.
+!aimeat/test/fixtures/file-text/*.docx
 
 # Business strategy (private)
 docs/businessfinland/
