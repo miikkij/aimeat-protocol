@@ -61,6 +61,7 @@ pnpm audit --fix
 | `otpauth` | ^9.5.0 | TOTP/HOTP 2FA | MIT |
 | `prom-client` | ^15.1.3 | Prometheus metrics | Apache-2.0 |
 | `qrcode` | ^1.5.4 | QR code generation | MIT |
+| `unpdf` | ^1.8.1 | PDF text extraction (attached files) | MIT |
 | `uuid` | ^13.0.0 | UUID generation | MIT |
 | `vanilla-cookieconsent` | ^3.1.0 | Cookie consent banner | MIT |
 | `web-push` | ^3.6.7 | Web push notifications | MIT |

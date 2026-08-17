@@ -20,6 +20,9 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.4.0 — 2026-08-17 — A spreadsheet, a Word document and a PDF become text instead of being
+ *     turned away. A .xlsx arrives as CSV, which is what the next question usually wants. The
+ *     pre-2007 binary formats are named as unsupported with the one step that fixes them.
  *   v1.3.0 — 2026-08-16 — Attachments are files, not only pictures: a text file is quoted into the
  *     prompt under its own name, and a format that needs parsing is named to the agent so it can
  *     tell the person it never saw it.
@@ -40,37 +43,10 @@ import { GooseAcpClient, aimeatMcpServer, type SessionUpdate } from './goose-acp
 import { ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
-import type { PromptImage } from './goose-acp.js';
+import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
 import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
-
-/**
- * How many pictures one turn may carry.
- *
- * Each one is read whole and base64-encoded into the prompt, so the ceiling is about the model's
- * context and the node's memory rather than about politeness. Four is more than any real question
- * needs and small enough that a mistake costs a request rather than a process.
- */
-const MAX_ATTACHMENTS_PER_TURN = 4;
-
-/** How much of a text file is quoted into the prompt. Beyond this the model is told what it has. */
-const MAX_TEXT_BYTES = 200 * 1024;
-
-/**
- * Can this be handed to a model as text?
- *
- * By mime first, because that is what the upload declared, and by extension second, because a
- * browser hands `text/plain` or nothing at all to plenty of files it has no opinion about. A format
- * that needs parsing to become text — pdf, docx, xlsx — answers no here and is reported to the
- * person instead of being pushed through as mojibake.
- */
-function readableAsText(mimeType: string, key: string): boolean {
-    if (mimeType.startsWith('text/')) return true;
-    if (/^application\/(json|xml|yaml|x-yaml|javascript|typescript|sql|toml|x-ndjson)$/.test(mimeType)) return true;
-    if (/\+(json|xml|yaml)$/.test(mimeType)) return true;
-    return /\.(txt|md|markdown|csv|tsv|json|ya?ml|toml|ini|conf|log|xml|html?|css|js|mjs|cjs|ts|tsx|jsx|py|rb|go|rs|java|kt|c|h|cpp|cs|sh|sql|env|srt|vtt)$/i.test(key);
-}
 
 /** The single agent process, and which generation it is. */
 let client: GooseAcpClient | null = null;
@@ -176,37 +152,14 @@ export async function* runChatTurn(
     // which makes a CSV, a log or a piece of code work today rather than after somebody adds a
     // format negotiation nobody asked for. Anything else is left out of the prompt and said out
     // loud — a file the model never saw is worse than one it was told about.
-    const images: PromptImage[] = [];
-    const quoted: string[] = [];
-    const skipped: string[] = [];
-    for (const key of attachmentKeys.slice(0, MAX_ATTACHMENTS_PER_TURN)) {
-        const file = await storage.getStorageFile(gaii, key);
-        if (!file) {
-            logger.warn(`[chat] attachment not found for ${gaii}: ${key}`);
-            continue;
-        }
-        const mimeType = file.mimeType || 'application/octet-stream';
-        if (mimeType.startsWith('image/')) {
-            images.push({ mimeType, base64: Buffer.from(file.data).toString('base64') });
-            continue;
-        }
-        if (readableAsText(mimeType, key)) {
-            const bytes = Buffer.from(file.data);
-            const clipped = bytes.length > MAX_TEXT_BYTES;
-            const body = bytes.subarray(0, MAX_TEXT_BYTES).toString('utf8');
-            const size = clipped
-                ? ` (first ${Math.round(MAX_TEXT_BYTES / 1024)} kB of ${Math.round(bytes.length / 1024)} kB)`
-                : '';
-            quoted.push(`Attached file: ${key}${size}\n\n${body}`);
-            continue;
-        }
-        skipped.push(`${key} (${mimeType})`);
-    }
+    const { images, quoted, notes, skipped } = await readAttachments(storage, gaii, attachmentKeys);
+
     const prompt = [
         text,
         ...quoted,
         // Said IN the prompt rather than only in a log: the agent is the one who has to tell the
         // person their file was not read, and it can only do that if it knows.
+        ...notes,
         ...(skipped.length ? [`These files were attached but could not be read as text or as a picture, so you have not seen them: ${skipped.join(', ')}. Say so plainly if they matter.`] : []),
     ].join('\n\n');
 
