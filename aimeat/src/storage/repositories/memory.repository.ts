@@ -43,6 +43,8 @@ export interface MemoryMetaRow {
   flagCount: number;
   /** Byte size of the value (the stored per-row byteSize; 0 for legacy rows not yet rewritten). */
   byteSize: number;
+  /** TTL in hours when the record carries one — lets the TTL sweeper run without values. */
+  ttlHours?: number | null;
   createdAt: string;
   updatedAt: string;
 }

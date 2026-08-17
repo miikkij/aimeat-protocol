@@ -67,7 +67,7 @@ export function rowToRecord(r: Selectable<Memory>): MemoryRecord {
 }
 
 /** The value-free META projection (`?include=meta`). */
-export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'visibility' | 'tags' | 'version' | 'flagCount' | 'byteSize' | 'createdAt' | 'updatedAt'>): MemoryMetaRow {
+export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'visibility' | 'tags' | 'version' | 'flagCount' | 'byteSize' | 'ttlHours' | 'createdAt' | 'updatedAt'>): MemoryMetaRow {
   return {
     key: r.key,
     ownerGaii: r.ownerGaii,
@@ -76,6 +76,7 @@ export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'vis
     version: r.version,
     flagCount: r.flagCount,
     byteSize: r.byteSize,
+    ttlHours: r.ttlHours ?? null,
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
   };

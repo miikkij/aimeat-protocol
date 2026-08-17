@@ -45,6 +45,7 @@ export const ownerMemoryScopeMethods = {
         version: row.version as number,
         flagCount,
         byteSize: (row.byteSize as number | null) ?? 0,
+        ttlHours: (row.ttlHours as number | null) ?? null,
         createdAt: row.createdAt as string,
         updatedAt: row.updatedAt as string,
       });

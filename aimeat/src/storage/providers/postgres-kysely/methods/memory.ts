@@ -52,7 +52,7 @@ function applyList(q: any, opts?: ListOpts) {
   return q;
 }
 
-const META_COLS = ['key', 'ownerGaii', 'visibility', 'tags', 'version', 'flagCount', 'byteSize', 'createdAt', 'updatedAt'] as const;
+const META_COLS = ['key', 'ownerGaii', 'visibility', 'tags', 'version', 'flagCount', 'byteSize', 'ttlHours', 'createdAt', 'updatedAt'] as const;
 
 export const memoryMethods = {
   /** Raw current row (any TTL/archive state) — for existence/version continuity on write. */

@@ -158,11 +158,15 @@ async function runWorkTimeoutJob(_config: AimeatConfig, storage: Storage): Promi
 }
 
 async function runMemoryTtlCleanupJob(storage: Storage): Promise<void> {
+  // Memory trace 2026-08-17: this job used to list every agent's memory WITH VALUES just to
+  // read ttlHours — measured at +368 MB of native churn per cron run on production, the
+  // largest single eater left after the WASM fix. The meta projection carries ttlHours and
+  // createdAt without ever loading a value, so the sweep now costs kilobytes.
   const now = Date.now();
   const allAgents = await storage.listAgents();
   for (const agent of allAgents) {
-    const memories = await storage.listMemory(agent.gaii);
-    for (const mem of memories) {
+    const metas = await storage.listMemoryMeta(agent.gaii);
+    for (const mem of metas) {
       if (mem.ttlHours) {
         const expiresAt = new Date(mem.createdAt).getTime() + mem.ttlHours * 3_600_000;
         if (now > expiresAt) {
