@@ -1,5 +1,13 @@
 // E2E Tests for Agent Services (Work-to-Task Bridge)
 // Run: cd aimeat && pnpm exec tsx test/e2e-agent-services.ts
+//
+// @version-history
+//   v1.1.0 — 2026-08-17 — E2E quality, agent-services:257. The three agents in this file never crossed:
+//     four hundred lines with no 401 and no 403 anywhere. Accepting a work item is taking on the job
+//     and the payment attached to it, so who may accept is the whole of it. Test 3b creates a work
+//     item of its own and has the REQUESTER try to accept it (403 ACCESS_DENIED) and an anonymous
+//     caller too (401), then reads it back still pending. Its own item, because aimed at the suite's,
+//     a broken gate makes the later provider accept answer 409 and the second failure says nothing.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -252,6 +260,44 @@ await test('3. Requester creates work request', async () => {
     assert(typeof body.data.tracking_code === 'string', 'has tracking_code');
     assert(body.data.status === 'pending', `status: ${body.data.status}`);
     trackingCode = body.data.tracking_code;
+});
+
+/**
+ * The three agents in this file never cross: the requester requests, the provider accepts and
+ * delivers, and nobody is ever refused anything. Grep the file for 401 or 403 and there are none, in
+ * four hundred lines. A work item names its provider, and accepting one is taking on the job and the
+ * payment attached to it, so who may accept is the whole of it.
+ *
+ * Run BEFORE the provider's own accept, so the item is still pending and a stranger's accept would
+ * really succeed if the gate were gone.
+ */
+await test('3b. Only the named provider can accept work — a stranger and an anonymous caller are refused', async () => {
+    // A work item of its own. Aimed at the suite's item, a broken gate means the stranger's accept
+    // succeeds and the provider's own accept below then answers 409 — two failures where one hole is,
+    // and the second one says nothing about the gate.
+    const made = await json('/v1/work/request', {
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
+        body: JSON.stringify({ action_id: 'test-scrape', provider_gaii: providerGaii, input: { url: 'https://example.com/denial' } }),
+    });
+    assert(made.status === 201, `fixture work request: ${made.status}: ${JSON.stringify(made.body)}`);
+    const fixtureCode = made.body.data.tracking_code as string;
+
+    const stranger = await json(`/v1/work/${fixtureCode}/accept`, {
+        method: 'POST', headers: { Authorization: `Bearer ${requesterToken}` },
+    });
+    assert(stranger.status === 403, `the requester accepted its own work: ${stranger.status}: ${JSON.stringify(stranger.body)}`);
+    assert(stranger.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${stranger.body.error?.code}`);
+
+    const anon = await json(`/v1/work/${fixtureCode}/accept`, { method: 'POST' });
+    assert(anon.status === 401, `an anonymous caller reached the accept door: ${anon.status}`);
+
+    // Refuse before you write: the item is still pending, so nothing was taken on.
+    const readBack = await json(`/v1/work/${fixtureCode}`, {
+        headers: { Authorization: `Bearer ${requesterToken}` },
+    });
+    assert(readBack.status === 200, `read the work item: ${readBack.status}`);
+    assert(readBack.body.data.status === 'pending',
+        `a refused accept moved the item to ${readBack.body.data.status}`);
 });
 
 await test('4. Provider accepts work', async () => {
