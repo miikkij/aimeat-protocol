@@ -1,5 +1,13 @@
 // E2E Tests for Agent Integration Kit
 // Run: cd aimeat && pnpm exec tsx test/e2e-integration-kit.ts
+//
+// @version-history
+//   v1.1.0 — 2026-08-17 — E2E quality, integration-kit:186. The file had no refusal in it at all: 354
+//     lines, one owner, one agent, not a single 401 or 403. The task write doors authorize on the task
+//     RECORD rather than on the :name in the path, so only a stranger exercises them. Test 7b adds a
+//     second owner and its agent, walks event/complete/fail as each of them and unauthenticated, and
+//     reads the event trail back — a 403 arriving after the append would look identical on status
+//     alone. It sits BEFORE the completion so the event door is measured while the task is still open.
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -231,6 +239,53 @@ await test('6. Verify events recorded', async () => {
     assert(types.includes('progress'), 'missing progress event');
     assert(types.includes('todo_completed'), 'missing todo_completed event');
     assert(types.includes('verification'), 'missing verification event');
+});
+
+/**
+ * THIS FILE HAD NO REFUSAL IN IT AT ALL: three hundred and fifty lines, one owner, one agent, and not
+ * a single 401 or 403. The task write doors authorize on the TASK RECORD rather than on the :name in
+ * the path, so a stranger's token is the only thing that exercises them, and no stranger existed.
+ *
+ * The events are the point: appending to another owner's task writes into their audit trail, and
+ * completing or failing it fans out into their workflows and counters under their name.
+ */
+await test('7b. A stranger cannot append to, complete or fail this task', async () => {
+    const otherName = `kitother${Date.now()}`;
+    const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherName, public_key: 'placeholder' }) });
+    assert(reg.status === 201, `register the second owner: ${reg.status}`);
+    const otherOwnerToken = await getToken(otherName, reg.body.data.private_key, false);
+    const otherAgent = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ name: 'kitotherbot', owner: otherName, capabilities: ['memory', 'actions'] }),
+    });
+    assert(otherAgent.status === 201, `register the second agent: ${otherAgent.status}`);
+    const otherAgentToken = await getToken(otherAgent.body.data.agent.gaii, otherAgent.body.data.private_key, true);
+
+    const doors: Array<{ label: string; suffix: string; body: unknown }> = [
+        { label: 'event', suffix: '/event', body: { type: 'progress', message: 'INJECTED by a stranger' } },
+        { label: 'complete', suffix: '/complete', body: { message: 'INJECTED by a stranger' } },
+        { label: 'fail', suffix: '/fail', body: { error: 'INJECTED by a stranger' } },
+    ];
+    for (const d of doors) {
+        for (const [who, token] of [['owner B', otherOwnerToken], ['B\'s agent', otherAgentToken]] as const) {
+            const r = await json(`/v1/agents/${agentName}/tasks/${taskId}${d.suffix}`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(d.body),
+            });
+            assert(r.status === 403, `${who} was allowed to ${d.label} another owner's task: ${r.status}`);
+        }
+        const anon = await json(`/v1/agents/${agentName}/tasks/${taskId}${d.suffix}`, {
+            method: 'POST', body: JSON.stringify(d.body),
+        });
+        assert(anon.status === 401, `a caller with no credential reached ${d.label}: ${anon.status}`);
+    }
+
+    // Refuse BEFORE you write: a 403 returned after the append would look identical from outside.
+    const events = await json(`/v1/agents/${agentName}/tasks/${taskId}/events`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(events.status === 200, `read the event trail: ${events.status}`);
+    assert(!JSON.stringify(events.body).includes('INJECTED by a stranger'),
+        'a refused call still wrote into the task\'s event trail');
 });
 
 await test('7. Complete task', async () => {

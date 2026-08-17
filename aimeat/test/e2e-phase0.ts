@@ -7,6 +7,10 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=phase0
  * @version-history
+ *   v1.2.0 — 2026-08-17 — E2E quality, phase0:322. The consent layer was driven by one principal end
+ *     to end, so the ownership comparison on the read and the revoke had never been asked about anybody
+ *     else. A stranger holding consent:manage — the scope, so the refusal can only be about ownership —
+ *     is refused both, an anonymous caller gets 401, and the grant is read back still active.
  *   v1.1.0 — 2026-08-12 — The semantic board case created a PUBLIC board with the agent token, which
  *     only an operator may do; it passed while the token mint still copied the owner's roles onto
  *     agent JWTs (audit H-2). It sends the owner's token now, which is the operator this suite
@@ -326,6 +330,64 @@ await test('GET /v1/consent/:id \u2192 200, get single consent', async () => {
     assert(body.data?.id === consentId, `id matches, got ${body.data?.id}`);
     assert(body.data?.data_pattern === 'profile.*', 'data_pattern matches');
     assert(body.data?.purpose === 'test-phase0', 'purpose matches');
+});
+
+/**
+ * A consent grant is one person's standing permission over their own data, and this whole file drives
+ * it with a single principal: create, list, get, revoke and audit all go through agentAuthed(). So the
+ * ownership comparison on the read and the revoke \u2014 the only thing separating a grant from everybody
+ * else on the node \u2014 has never been asked about anybody else.
+ *
+ * The stranger here holds `consent:manage` deliberately. Without it the refusal could come from the
+ * scope gate and say nothing about ownership; with it, the only thing left to refuse on is whose
+ * grant this is.
+ */
+await test('A stranger cannot read or revoke somebody else\'s consent grant', async () => {
+    const strangerName = `phase0stranger-${Date.now()}`;
+    const reg = await json('/v1/owners', {
+        method: 'POST', body: JSON.stringify({ name: strangerName, public_key: 'placeholder' }),
+    });
+    assert(reg.status === 201, `register the stranger: ${reg.status}`);
+    const ts = new Date().toISOString();
+    const ownerSig = await signMsg(reg.body.data.private_key, strangerName + NODE_ID + ts);
+    const strangerOwner = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ owner: strangerName, timestamp: ts, signature: ownerSig }),
+    });
+    const strangerOwnerToken = strangerOwner.body.data?.token;
+    assert(typeof strangerOwnerToken === 'string', 'stranger owner token');
+
+    const strangerAgent = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${strangerOwnerToken}` },
+        body: JSON.stringify({
+            name: 'strangeragent', owner: strangerName,
+            capabilities: ['memory'], scopes: ['consent:manage'],
+        }),
+    });
+    assert(strangerAgent.status === 201, `register the stranger's agent: ${strangerAgent.status}: ${JSON.stringify(strangerAgent.body.error)}`);
+    const at = new Date().toISOString();
+    const agentSig = await signMsg(strangerAgent.body.data.private_key, strangerAgent.body.data.agent.gaii + at);
+    const strangerTok = await json('/v1/auth/token', {
+        method: 'POST', body: JSON.stringify({ gaii: strangerAgent.body.data.agent.gaii, timestamp: at, signature: agentSig }),
+    });
+    const strangerAgentToken = strangerTok.body.data?.token;
+    assert(typeof strangerAgentToken === 'string', 'stranger agent token');
+
+    const asStranger = { Authorization: `Bearer ${strangerAgentToken}` };
+    const read = await json(`/v1/consent/${consentId}`, { headers: asStranger });
+    assert(read.status === 403, `a stranger read the grant: ${read.status}: ${JSON.stringify(read.body)}`);
+    assert(read.body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${read.body.error?.code}`);
+
+    const revoke = await json(`/v1/consent/${consentId}`, { method: 'DELETE', headers: asStranger });
+    assert(revoke.status === 403, `a stranger revoked the grant: ${revoke.status}: ${JSON.stringify(revoke.body)}`);
+
+    const anon = await json(`/v1/consent/${consentId}`);
+    assert(anon.status === 401, `an anonymous caller read the grant: ${anon.status}`);
+
+    // Proved by the record rather than by the status: the grant is still live, and the revoke below
+    // still has something to revoke.
+    const own = await json(`/v1/consent/${consentId}`, agentAuthed());
+    assert(own.status === 200, `the owner lost their own grant: ${own.status}`);
+    assert(own.body.data?.status === 'active', `the refused revoke took effect anyway: ${own.body.data?.status}`);
 });
 
 await test('DELETE /v1/consent/:id \u2192 200, revoke consent', async () => {

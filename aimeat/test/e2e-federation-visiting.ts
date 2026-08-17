@@ -10,6 +10,13 @@
  *   Nodes: A 40273 aimeat-test-001-fedvisa (open join on); C 40274 aimeat-test-001-fedvisc (off).
  *   Virtual joiner B: aimeat-peer-001-visitb (keypair only; not a running server).
  * @version-history
+ *   v1.1.0 — 2026-08-17 — E2E quality, federation-visiting:106. The introduce door is unauthenticated by
+ *     design — a node that has never met this one has no credential — so the Ed25519 signature IS the
+ *     authentication, and on a node with open-join ON, passing it means self-admission as an active
+ *     peer. Its three refusals had zero executions in the corpus: every introduce everywhere signs
+ *     correctly. Test 1b sends a signature over different bytes (401), no signature (400) and a
+ *     ten-minute-old timestamp (400), and reads the peer list back after each, since these gates run
+ *     before the write.
  *   v1.0.0 — 2026-06-19 — Initial visiting-tier tests (auto-join, caps, directory, promotion).
  */
 
@@ -112,6 +119,62 @@ await test('1. signed introduce self-admits as active visiting peer on A', async
   });
   assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body)}`);
   assert(r.body.data.status === 'active' && r.body.data.tier === 'visiting', `expected active/visiting, got ${JSON.stringify(r.body.data)}`);
+});
+
+/**
+ * The introduce door is unauthenticated by design: a node that has never met this one has no
+ * credential to present, and the Ed25519 signature over node_id + node_url + timestamp IS the
+ * authentication. Its three refusals — no signature, a stale timestamp, a signature over different
+ * bytes — have zero executions in the whole corpus. Every introduce in every suite signs correctly.
+ *
+ * On a node with open-join ON, passing this door is self-admission as an active peer, so a signature
+ * check that had quietly stopped working would let anyone name themselves a peer of this node.
+ *
+ * The read-back after each refusal is the other half: these gates run BEFORE the peer is written, and
+ * a 4xx returned after the write would look identical from the outside.
+ */
+await test('1b. The introduce signature is the credential: three ways of getting it wrong are refused', async () => {
+    const listPeerIds = async () => {
+        const r = await A.json('/v1/federation/peers', { headers: auth(A.ownerToken) });
+        return (r.body.data.peers as any[]).map(p => p.node_id);
+    };
+
+    // (a) A signature over a DIFFERENT node_url than the one being posted.
+    const forgedId = `${B_NODE}-forged`;
+    const t1 = new Date().toISOString();
+    const wrongBytes = await signIntroduce(bKeys.privateKey, forgedId, 'http://localhost:49997', t1);
+    const forged = await A.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: forgedId, node_url: B_URL, public_key: bKeys.publicKey, role: 'contributor', signature: wrongBytes, timestamp: t1 }),
+    });
+    assert(forged.status === 401, `a signature over different bytes must be refused, got ${forged.status}: ${JSON.stringify(forged.body)}`);
+    assert(forged.body.error?.code === 'INVALID_SIGNATURE', `expected INVALID_SIGNATURE, got ${forged.body.error?.code}`);
+
+    // (b) No signature at all.
+    const unsignedId = `${B_NODE}-unsigned`;
+    const unsigned = await A.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: unsignedId, node_url: B_URL, public_key: bKeys.publicKey, role: 'contributor', timestamp: new Date().toISOString() }),
+    });
+    assert(unsigned.status === 400, `an unsigned introduce must be refused, got ${unsigned.status}`);
+    assert(unsigned.body.error?.code === 'MISSING_SIGNATURE', `expected MISSING_SIGNATURE, got ${unsigned.body.error?.code}`);
+
+    // (c) Correctly signed, but ten minutes old: a replayed introduce is not a fresh one.
+    const staleId = `${B_NODE}-stale`;
+    const staleTs = new Date(Date.now() - 600_000).toISOString();
+    const staleSig = await signIntroduce(bKeys.privateKey, staleId, B_URL, staleTs);
+    const stale = await A.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: staleId, node_url: B_URL, public_key: bKeys.publicKey, role: 'contributor', signature: staleSig, timestamp: staleTs }),
+    });
+    assert(stale.status === 400, `a stale introduce must be refused, got ${stale.status}`);
+    assert(stale.body.error?.code === 'STALE_TIMESTAMP', `expected STALE_TIMESTAMP, got ${stale.body.error?.code}`);
+
+    // None of the three left a peer behind.
+    const ids = await listPeerIds();
+    for (const id of [forgedId, unsignedId, staleId]) {
+        assert(!ids.includes(id), `a refused introduce still registered ${id}: ${JSON.stringify(ids)}`);
+    }
 });
 
 await test('2. peer is listed as visiting with restricted flags', async () => {
