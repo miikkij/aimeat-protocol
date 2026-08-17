@@ -21,7 +21,7 @@
  *     Both are pure guest-side helpers: no host call, no API-budget cost.
  *   v2.3.0 -- 2026-07-18 -- transformScript preserves top-level helpers/consts declared ABOVE `export default` (rewrites the export in place instead of wrapping the whole script) -- fixes QuickJS "unexpected token 'const'" for actions that define a helper above the export, which the extension prompt explicitly permits
  */
-import { getQuickJS, newQuickJSWASMModule, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
+import { newQuickJSWASMModule, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { QuickJSContext, QuickJSHandle, QuickJSWASMModule } from 'quickjs-emscripten';
 import { safeFetch } from '../utils/url-validator.js';
 
@@ -379,30 +379,35 @@ export function trackMemoryAccess(ctx: ExtensionCtx): { ctx: ExtensionCtx; acces
 
 // ── Main entry point ─────────────────────────────────────────
 
-let quickJSPromise: Promise<QuickJSWASMModule> | null = null;
-function getQuickJSSingleton(): Promise<QuickJSWASMModule> {
-    if (!quickJSPromise) quickJSPromise = getQuickJS();
-    return quickJSPromise;
+/**
+ * One WASM module PER EXECUTION, not a shared singleton (memory trace 2026-08-17).
+ *
+ * Every runtime created from a shared module allocates inside that module's ONE emscripten
+ * linear memory, which grows to the high-water mark of everything that ever ran in it and can
+ * never shrink — WASM memory has no way down, and it is invisible to both the V8 heap and the
+ * nodejs external counter. On production that was the unexplained ~1.4 GiB anonymous block:
+ * a boot wave of extension jobs (190 MB sandbox ceiling each, plus dlmalloc fragmentation
+ * inside the WASM heap) ratcheted the shared memory to gigabytes that stayed for the process
+ * lifetime, and gating job concurrency did not help because sequential runs share the memory
+ * too. A per-execution module costs milliseconds to instantiate and its linear memory is
+ * garbage-collected WITH the job, so the process returns to its baseline between runs.
+ *
+ * This also retires the poisoned-singleton problem: an emscripten abort() used to poison the
+ * shared engine for every later run until a reset replaced it (leaking the old module's grown
+ * memory, audit finding #6). With per-execution modules an abort dies with its own module.
+ */
+function newQuickJSModuleForExecution(): Promise<QuickJSWASMModule> {
+    return newQuickJSWASMModule();
 }
 
 /**
  * True if `err` looks like an emscripten `abort()` — a hard WASM failure that
- * poisons the whole engine instance (every later runtime created from it fails
- * the same way). The canonical case is the JS_FreeRuntime gc assertion.
+ * kills the whole module instance. With per-execution modules the blast radius
+ * is the one run that caused it; kept exported for callers that classify errors.
  */
 export function isEngineAbort(err: unknown): boolean {
     const msg = err instanceof Error ? err.message : String(err);
     return msg.includes('Aborted(') || msg.includes('JS_FreeRuntime') || msg.includes('gc_obj_list');
-}
-
-/**
- * Discard a poisoned engine so the NEXT execution instantiates a fresh WASM
- * module instead of reusing the dead one. `getQuickJS()` hands back a shared
- * singleton (still poisoned after an abort), so recovery must use a brand-new
- * module instance via `newQuickJSWASMModule()`.
- */
-function resetQuickJSSingleton(): void {
-    quickJSPromise = newQuickJSWASMModule();
 }
 
 export async function executeExtensionAction(
@@ -411,7 +416,7 @@ export async function executeExtensionAction(
     input: Record<string, unknown>,
     limits: ExtensionLimits,
 ): Promise<Record<string, unknown>> {
-    const QuickJS = await getQuickJSSingleton();
+    const QuickJS = await newQuickJSModuleForExecution();
 
     const runtime = QuickJS.newRuntime();
     runtime.setMemoryLimit(limits.memoryMb * 1024 * 1024);
@@ -656,12 +661,10 @@ export async function executeExtensionAction(
             if (vm.alive) vm.dispose();
             if (runtime.alive) runtime.dispose();
         } catch (teardownErr) {
-            // A WASM abort here (should no longer happen for known triggers, but
-            // guard against any residual path) poisons the shared engine for the
-            // whole process. Rebuild it so the next execution gets a clean module
-            // instead of failing forever until a manual restart. Swallow the
-            // teardown error so it never masks the script's real result/error.
-            if (isEngineAbort(teardownErr)) resetQuickJSSingleton();
+            // A WASM abort in teardown dies with this run's own module (per-execution modules,
+            // 2026-08-17); nothing shared is poisoned. Logged and swallowed so a teardown
+            // failure never masks the script's real result or error.
+            console.warn('[extension-runtime] sandbox teardown failed; the module dies with this run:', String(teardownErr));
         }
     }
 }
