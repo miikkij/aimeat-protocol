@@ -14,6 +14,10 @@
  *   - StatusBar — which agent, what is left to spend, and what is wrong when something is
  * @usage import { ThreadList, Turn, Composer, StatusBar } from './chat/parts.js';
  * @version-history
+ *   v1.2.0 — 2026-08-17 — StatusBar speaks human: "Your agent" with the raw GAII in the tooltip
+ *     (the technical identity was the FIRST thing on a new person's screen), and when the node is
+ *     paying with no own key stored, a small door to Profile › OpenRouter sits on the same line —
+ *     the sentence about money is where a person actually reads about money.
  *   v1.1.0 — 2026-08-16 — Speech both ways: a recording becomes text in the box, which the person
  *     reads before sending, and an agent turn can be read aloud.
  *   v1.0.0 — 2026-08-16 — Initial.
@@ -524,11 +528,18 @@ export function StatusBar({ status, onReset }) {
         ? tr('chat.allowanceElsewhere', '{n} USD of your allowance left, for everything outside this chat.')
             .replace('{n}', remaining.toFixed(2))
         : null;
+    // The technical identity (a raw GAII like chat#alice@node-id) stays one hover away in the
+    // title; a person new to all of this reads "Your agent", which is what it is. The full string
+    // remains visible on the Agents tab, where identities are the subject.
+    const ownKeyLink = status.pays === 'node' && !status.has_own_key
+        ? tr('chat.useOwnKeyLink', 'Use your own key')
+        : null;
     return html`
         <div class="chat-status">
-            <span class="chat-status-agent">${status.agent_name}</span>
+            <span class="chat-status-agent" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>
             ${payer && html`<span class="chat-status-key">${payer()}</span>`}
             ${elsewhere && html`<span class="chat-status-elsewhere">${elsewhere}</span>`}
+            ${ownKeyLink && html`<a class="chat-status-ownkey" href="/v1/profile?tab=generator">${ownKeyLink} →</a>`}
             ${status.model && html`<span class="chat-model chat-status-model"
                 title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`

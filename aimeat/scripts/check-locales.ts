@@ -18,6 +18,11 @@
  *   v1.0.0 — 2026-08-12 — Initial, with the arrival of Spanish as the third language.
  *   v1.1.0 — 2026-08-13 — Rules moved into lib/locale-files.ts, shared with locale:extract and
  *     locale:merge so the three tools cannot disagree about what a valid translation is.
+ *   v1.2.0 — 2026-08-17 — missingAppGrantSentences(): the app-grant consent screen localizes every
+ *     scope row from the sentence tree (consent-vocab.js), so each APP_GRANTABLE_SCOPES key must
+ *     have a sentence (appGrant.scopeText or scopeUi.scopeText) and each family an appGrant.area
+ *     name. A scope with neither used to render the server's English-only description and the raw
+ *     family word, which is the screen that made a real user read "storage" as their hard drive.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -55,6 +60,39 @@ function missingScopeLabels(en: Record<string, unknown>): string[] {
   return out;
 }
 
+/**
+ * Same shape of guarantee for the app-grant consent screen. Its source of truth is
+ * APP_GRANTABLE_SCOPES in src/routes/app-grants.ts: every scope an app may request must have a
+ * plain-language sentence in en.json (the app-context override tree first, the shared agent tree
+ * as fallback — the exact chain consent-vocab.js resolves) and every scope FAMILY must have an
+ * appGrant.area name for the "Works with:" line. Without the sentence the row falls back to the
+ * server's English-only description; without the family name the raw word ("storage") prints.
+ */
+function missingAppGrantSentences(en: Record<string, unknown>): string[] {
+  const routePath = join(dirname(fileURLToPath(import.meta.url)), '..',
+    'src', 'routes', 'app-grants.ts');
+  const src = readFileSync(routePath, 'utf-8');
+  const block = src.match(/APP_GRANTABLE_SCOPES: Record<string, string> = \{([\s\S]*?)\n\};/);
+  if (!block) return ['(check-locales cannot find APP_GRANTABLE_SCOPES in src/routes/app-grants.ts — the parser needs updating)'];
+  const out: string[] = [];
+  const families = new Set<string>();
+  for (const m of block[1].matchAll(/'([a-z-]+):([a-z-]+)':/g)) {
+    const [, family, perm] = m;
+    families.add(family);
+    const override = `appGrant.scopeText.${family}.${perm}`;
+    const shared = `profile.agents.scopeUi.scopeText.${family}.${perm}`;
+    if (!(override in en) && !(shared in en)) {
+      out.push(`${override} (or ${shared}) — the consent sentence for "${family}:${perm}"`);
+    }
+  }
+  for (const family of families) {
+    if (!(`appGrant.area.${family}` in en)) {
+      out.push(`appGrant.area.${family} — the "Works with:" name for the "${family}" scope family`);
+    }
+  }
+  return out;
+}
+
 const listOnly = process.argv.includes('--list');
 const [, ...others] = shippedLocales();
 const en = flatten(loadLocale('en'));
@@ -77,6 +115,11 @@ if (listOnly) process.exit(0);
 // rather than falling back to English. en.json cannot notice a key nobody ever wrote; the code can.
 for (const missing of missingScopeLabels(en)) {
   failures.push(`✖ [en] the agent permission editor will render a raw key: ${missing}\n      → add it to locales/en.json (and fi/es), beside the other scopeUi labels`);
+}
+
+// The app-grant consent screen has the same key-derived contract against a different code source.
+for (const missing of missingAppGrantSentences(en)) {
+  failures.push(`✖ [en] the app-grant consent screen has no words for: ${missing}\n      → add it to locales/en.json (and fi/es); consent-vocab.js resolves override first, shared tree second`);
 }
 
 if (failures.length) {

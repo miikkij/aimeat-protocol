@@ -1,4 +1,11 @@
 import { defineConfig } from 'vitest/config';
+import { fileURLToPath } from 'node:url';
+
+// Frontend modules import each other by ABSOLUTE path ('/views/…', '/js/…') because the browser
+// resolves them against the site root. Node resolves them against the filesystem root and fails,
+// so unit tests that execute a frontend module (e.g. consent-vocab.js) need these two prefixes
+// mapped back to public/. Server code never uses these prefixes, so nothing else is affected.
+const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
 /**
  * TWO PROJECTS, FOR ONE REASON: a handful of tests EDIT files in the working tree.
@@ -24,6 +31,16 @@ const MUTATES_THE_TREE = [
 ];
 
 export default defineConfig({
+    // Vite treats ./public as a copy-as-is asset directory and refuses to IMPORT modules from it.
+    // These are tests, nothing is served or built, and the frontend modules under public/ are
+    // exactly what some unit tests execute — so the special treatment is turned off.
+    publicDir: false,
+    resolve: {
+        alias: {
+            '/views': `${publicDir}/views`,
+            '/js': `${publicDir}/js`,
+        },
+    },
     test: {
         coverage: {
             provider: 'v8',
@@ -34,6 +51,15 @@ export default defineConfig({
         },
         projects: [
             {
+                // Projects do not inherit the root-level vite options, so the public-dir opt-out
+                // and the absolute-path aliases are repeated here.
+                publicDir: false,
+                resolve: {
+                    alias: {
+                        '/views': `${publicDir}/views`,
+                        '/js': `${publicDir}/js`,
+                    },
+                },
                 test: {
                     name: 'unit',
                     environment: 'node',
@@ -42,6 +68,7 @@ export default defineConfig({
                 },
             },
             {
+                publicDir: false,
                 test: {
                     name: 'tree-mutating',
                     environment: 'node',

@@ -1,4 +1,23 @@
 <!DOCTYPE html>
+<!--
+  @file agent-consent.html
+  @description The standalone device-authorization consent page (/v1/agents/verify?code=…): the
+    owner confirms the code their AI showed, picks how much the agent may do, and approves or
+    denies. Standalone — not part of the SPA — but it reads the shared i18n runtime, the shared
+    scope model and the shared consent vocabulary, so its presets and sentences can never diverge
+    from the SPA's AgentConsent panel again.
+  @version-history
+    v1.1.0 — 2026-08-17 — Three private copies deleted, one behavior change. The inline EN/FI
+        string table (29 of its keys absent from locales) is replaced by /js/i18n.js over
+        agentConsentPage.* + the shared consent.* keys; the page-private SCOPE_PRESETS — whose
+        "Standard" DIVERGED from the SPA's (it granted memory:*, work:*, wallet:read and no
+        storage) — is replaced by SCOPE_TEMPLATES from scope-model.js, so Standard now grants the
+        same audited set on both doors (BEHAVIOR CHANGE, tested in e2e-device-consent-presets);
+        the stale 18-entry custom checkbox list (offering nonexistent board:*, consent:read,
+        wallet:write, work:write) is generated from SCOPE_DOMAINS with the localized sentence per
+        row. Preset buttons carry a one-line summary generated from the real preset sets, the
+        boundary sentences state what an agent can never reach, and deny says what was NOT granted.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -70,6 +89,9 @@
     .polling-hint code { font-family:'Courier New',monospace; color:var(--accent);
       background:rgba(130,100,255,.12); padding:.1rem .35rem; border-radius:.25rem; }
     .msg-muted { color:var(--muted); }
+    .boundary-list { margin:.75rem 0 0; padding-left:1.1rem; font-size:.82rem; color:var(--muted); }
+    .boundary-list li { margin-bottom:.3rem; }
+    .scope-token { font-size:.72rem; color:var(--muted); font-family:'Courier New',monospace; }
     #loading { text-align:center; padding:2rem; color:var(--muted); }
     #loading p { margin-top:.75rem; }
     .error-msg-spaced { margin-top:1rem; }
@@ -88,116 +110,28 @@
   </div>
 
   <script type="module">
+    import { loadTranslations, t as translate } from '/js/i18n.js';
+    import { scopeSentence, presetSummary, boundaryLines } from '/js/consent-vocab.js';
+    import { SCOPE_TEMPLATES, SCOPE_DOMAINS } from '/views/profile/agents/scope-model.js';
+
     const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
     const params = new URLSearchParams(location.search);
     const code = params.get('code') || '';
 
-    // i18n
-    const lang = (navigator.language || 'en').startsWith('fi') ? 'fi' : 'en';
-    const strings = {
-      en: {
-        title: 'Agent Authorization',
-        subtitle: 'An agent is requesting access to your AIMEAT node',
-        loginRequired: 'Sign in to approve or deny this request.',
-        usernameLabel: 'Username',
-        passwordLabel: 'Password',
-        totpLabel: 'TOTP code (if enabled)',
-        loginBtn: 'Sign In',
-        confirmHint: 'Confirm this code matches what the agent showed you',
-        agentName: 'Agent Name',
-        displayName: 'Display Name',
-        description: 'Description',
-        scopeLabel: 'Permission Level',
-        scopeKeep: 'Keep its current access',
-        scopeKeepDesc: 'This agent is already set up. Leave its permissions exactly as they are.',
-        scopeReadonly: 'Read Only',
-        scopeReadonlyDesc: 'Can read memory, wallet balance, and catalogue',
-        scopeStandard: 'Standard',
-        scopeStandardDesc: 'Can read/write memory, perform work, read wallet, manage catalogue',
-        scopeFull: 'Full Access',
-        scopeFullDesc: 'Unrestricted access to all node capabilities',
-        scopeCustom: 'Custom',
-        scopeCustomDesc: 'Select individual permissions',
-        approveBtn: 'Approve',
-        denyBtn: 'Deny',
-        approving: 'Approving...',
-        approved: 'Agent Authorized',
-        approvedMsg: 'The agent has been registered and can now access your node.',
-        agentGaii: 'Agent GAII',
-        denied: 'Request Denied',
-        deniedMsg: 'The authorization request has been denied. You can close this page.',
-        expired: 'Request Expired',
-        expiredMsg: 'This authorization request has expired. Please ask the agent to start a new request.',
-        errorNoCode: 'Missing code parameter. Please use the link provided by your agent.',
-        errorNotFound: 'Authorization request not found or expired.',
-        errorOwnerMismatch: 'This request belongs to a different user. Sign in with the correct account.',
-        errorGeneric: 'Something went wrong. Please try again.',
-        pollingNote: 'Your agent is polling for credentials automatically. If it cannot poll, copy the information below and paste it to your agent chat.',
-        pollingHint: 'The agent will receive its token and private key via polling. If polling fails, ask your agent to retry',
-        pollingHintCode: 'POST /v1/agents/device-token',
-        pollingHintSuffix: 'with the device code.',
-      },
-      fi: {
-        title: 'Agentin hyväksyminen',
-        subtitle: 'Agentti pyytää pääsyä AIMEAT-solmuusi',
-        loginRequired: 'Kirjaudu sisään hyväksyäksesi tai hylätäksesi pyynnön.',
-        usernameLabel: 'Käyttäjänimi',
-        passwordLabel: 'Salasana',
-        totpLabel: 'TOTP-koodi (jos käytössä)',
-        loginBtn: 'Kirjaudu',
-        confirmHint: 'Varmista, että koodi vastaa agentin näyttämää koodia',
-        agentName: 'Agentin nimi',
-        displayName: 'Näyttönimi',
-        description: 'Kuvaus',
-        scopeLabel: 'Käyttöoikeustaso',
-        scopeKeep: 'Pidä nykyiset oikeudet',
-        scopeKeepDesc: 'Tämä agentti on jo käytössä. Jätä sen oikeudet täsmälleen ennalleen.',
-        scopeReadonly: 'Vain luku',
-        scopeReadonlyDesc: 'Voi lukea muistia, lompakkosaldoa ja luetteloa',
-        scopeStandard: 'Normaali',
-        scopeStandardDesc: 'Voi lukea/kirjoittaa muistia, suorittaa työtä, lukea lompakkoa, hallita luetteloa',
-        scopeFull: 'Täysi pääsy',
-        scopeFullDesc: 'Rajoittamaton pääsy kaikkiin solmun toimintoihin',
-        scopeCustom: 'Mukautettu',
-        scopeCustomDesc: 'Valitse yksittäiset käyttöoikeudet',
-        approveBtn: 'Hyväksy',
-        denyBtn: 'Hylkää',
-        approving: 'Hyväksytään...',
-        approved: 'Agentti hyväksytty',
-        approvedMsg: 'Agentti on rekisteröity ja voi nyt käyttää solmuasi.',
-        agentGaii: 'Agentin GAII',
-        denied: 'Pyyntö hylätty',
-        deniedMsg: 'Valtuutuspyyntö on hylätty. Voit sulkea tämän sivun.',
-        expired: 'Pyyntö vanhentunut',
-        expiredMsg: 'Tämä valtuutuspyyntö on vanhentunut. Pyydä agenttia aloittamaan uusi pyyntö.',
-        errorNoCode: 'Koodi-parametri puuttuu. Käytä agentin antamaa linkkiä.',
-        errorNotFound: 'Valtuutuspyyntöä ei löydy tai se on vanhentunut.',
-        errorOwnerMismatch: 'Tämä pyyntö kuuluu toiselle käyttäjälle. Kirjaudu oikealla tilillä.',
-        errorGeneric: 'Jokin meni pieleen. Yritä uudelleen.',
-        pollingNote: 'Agenttisi hakee tunnistetietoja automaattisesti. Jos se ei pysty hakemaan, kopioi alla olevat tiedot ja liitä ne agentille.',
-        pollingHint: 'Agentti saa tunnuksen ja yksityisen avaimen kyselyllä. Jos kysely epäonnistuu, pyydä agenttia yrittämään uudelleen',
-        pollingHintCode: 'POST /v1/agents/device-token',
-        pollingHintSuffix: 'laitteen koodilla.',
-      }
-    };
-    const T = strings[lang] || strings.en;
-    const t = (key) => T[key] || key;
+    // Shared i18n runtime (stored-locale preference, en fallback, dot keys). Page-local shorthand:
+    // a bare key is agentConsentPage.*; a dotted key (consent.*, profile.*) passes through.
+    await loadTranslations();
+    const t = (key, vars) => translate(key.includes('.') ? key : 'agentConsentPage.' + key, vars);
 
-    const SCOPE_PRESETS = {
-      readonly: ['memory:read', 'wallet:read', 'catalogue:read'],
-      standard: ['memory:*', 'work:*', 'wallet:read', 'catalogue:*'],
-      full: ['*'],
-    };
+    // The three boundary sentences — shared with every other consent surface.
+    const boundaryHtml = () =>
+      `<ul class="boundary-list">${boundaryLines(t).map((l) => `<li>${escHtml(l)}</li>`).join('')}</ul>`;
 
-    const ALL_SCOPES = [
-      'memory:read', 'memory:write', 'memory:*',
-      'work:read', 'work:write', 'work:*',
-      'wallet:read', 'wallet:write', 'wallet:*',
-      'catalogue:read', 'catalogue:write', 'catalogue:*',
-      'consent:read', 'consent:write', 'consent:*',
-      'board:read', 'board:write', 'board:*',
-    ];
+    // Preset button labels come from the SPA's own label keys, so the two doors use one word.
+    const presetLabel = (p) => p === 'keep'
+      ? translate('profile.agents.pendingRequests.keepCurrent')
+      : translate(`profile.agents.scopeUi.${{ readonly: 'readOnly', standard: 'standard', full: 'fullAccess', custom: 'custom' }[p]}`);
 
     const app = document.getElementById('app');
     let session = null;
@@ -253,7 +187,7 @@
     function renderLogin() {
       app.innerHTML = `
         <h1>${escHtml(t('title'))}</h1>
-        <p class="subtitle">${escHtml(t('subtitle'))}</p>
+        <p class="subtitle">${escHtml(t('consent.priming.device'))}</p>
         <div class="user-code-display">
           <div class="user-code-value">${escHtml(code)}</div>
           <div class="user-code-hint">${escHtml(t('confirmHint'))}</div>
@@ -301,7 +235,7 @@
       // an existing agent keeps exactly what it holds.
       if (selectedPreset === 'keep') return null;
       if (selectedPreset === 'custom') return [...customScopes];
-      return SCOPE_PRESETS[selectedPreset] || SCOPE_PRESETS.standard;
+      return SCOPE_TEMPLATES[selectedPreset] || SCOPE_TEMPLATES.standard;
     }
 
     function renderConsent() {
@@ -310,13 +244,10 @@
       // An agent coming BACK keeps what it has unless the owner picks otherwise. 'Standard' used
       // to be preselected either way, so re-approving a full-access agent after its token expired
       // narrowed it on a click that meant "yes, this is my agent".
-      const scopeOptions = [
-        ...(info.existing_agent ? [{ key: 'keep', name: t('scopeKeep'), desc: t('scopeKeepDesc') }] : []),
-        { key: 'readonly', name: t('scopeReadonly'), desc: t('scopeReadonlyDesc') },
-        { key: 'standard', name: t('scopeStandard'), desc: t('scopeStandardDesc') },
-        { key: 'full', name: t('scopeFull'), desc: t('scopeFullDesc') },
-        { key: 'custom', name: t('scopeCustom'), desc: t('scopeCustomDesc') },
-      ];
+      // Presets, labels and descriptions all come from the shared model + vocabulary, so this door
+      // and the SPA's AgentConsent grant the same sets and describe them with the same sentences.
+      const presetKeys = [...(info.existing_agent ? ['keep'] : []), 'readonly', 'standard', 'full', 'custom'];
+      const scopeOptions = presetKeys.map((p) => ({ key: p, name: presetLabel(p), desc: presetSummary(p, t) }));
       if (info.existing_agent && selectedPreset === 'standard') selectedPreset = 'keep';
 
       const scopeRadiosHtml = scopeOptions.map(o => `
@@ -329,16 +260,21 @@
         </label>
       `).join('');
 
-      const customCheckboxesHtml = ALL_SCOPES.map(s => `
+      // The custom list is the editor vocabulary itself — every domain and permission the node
+      // enforces, each with its localized sentence. The old hand-kept 18-entry list offered four
+      // scope names the node never reads.
+      const customCheckboxesHtml = SCOPE_DOMAINS.flatMap((d) => d.permissions.map((p) => {
+        const s = `${d.key}:${p}`;
+        return `
         <label class="scope-checkbox">
           <input type="checkbox" value="${escHtml(s)}" ${customScopes.includes(s) ? 'checked' : ''} />
-          ${escHtml(s)}
-        </label>
-      `).join('');
+          <span>${escHtml(scopeSentence(s, t))} <code class="scope-token">${escHtml(s)}</code></span>
+        </label>`;
+      })).join('');
 
       app.innerHTML = `
         <h1>${escHtml(t('title'))}</h1>
-        <p class="subtitle">${escHtml(t('subtitle'))}</p>
+        <p class="subtitle">${escHtml(t('consent.priming.device'))}</p>
         <div class="user-code-display">
           <div class="user-code-value">${escHtml(info.user_code)}</div>
           <div class="user-code-hint">${escHtml(t('confirmHint'))}</div>
@@ -364,6 +300,7 @@
             ${customCheckboxesHtml}
           </div>
         </div>
+        ${boundaryHtml()}
         <div id="consentError" class="error-msg"></div>
         <div class="btn-row">
           <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
@@ -417,7 +354,7 @@
 
         const scopes = getSelectedScopes();
         if (scopes && scopes.length === 0) {
-          errEl.textContent = 'Select at least one scope';
+          errEl.textContent = t('selectOne');
           btn.disabled = false;
           btn.textContent = t('approveBtn');
           return;
@@ -470,8 +407,8 @@
     function renderDenied() {
       app.innerHTML = `
         <div class="denied-msg">
-          <h2>${escHtml(t('denied'))}</h2>
-          <p class="msg-muted">${escHtml(t('deniedMsg'))}</p>
+          <h2>${escHtml(t('consent.denied.title'))}</h2>
+          <p class="msg-muted">${escHtml(t('consent.denied.device'))}</p>
         </div>
       `;
     }

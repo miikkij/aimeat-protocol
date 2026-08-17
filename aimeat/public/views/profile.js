@@ -134,7 +134,10 @@ const TABS = [
   { id: 'security',      key: 'profile.tabs.security',       component: SecurityTab,       minTier: 'experienced' },
   { id: 'email',         key: 'profile.tabs.email',          component: EmailTab,          minTier: 'new' },
   { id: 'notifications', key: 'profile.tabs.notifications',  component: NotificationsTab,  minTier: 'active' },
-  { id: 'generator',     key: 'profile.generator.openrouter.title', component: OpenRouterTab, minTier: 'active' },
+  // 'new', not 'active', for the same reason as the mcp tab above: the own-key road is one of the
+  // two ways OFF the node's key, offered to a brand-new person by the chat's status line — a door
+  // that leads to a tab the menu refuses to show is a dead end.
+  { id: 'generator',     key: 'profile.generator.openrouter.title', component: OpenRouterTab, minTier: 'new' },
   { id: 'calibrator',   key: 'profile.calibrator.tabLabel', component: CalibratorTab,     minTier: 'active' },
   { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'active' },
   { id: 'libraries',     key: 'librariesTab.tabLabel',       component: LibrariesTab,      minTier: 'new' },

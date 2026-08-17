@@ -13,6 +13,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-chat
  * @version-history
+ *   v1.4.0 — 2026-08-17 — The first-turn funnel marker: written once with `at`, the starter
+ *     dimension lands when a starter button fired the turn, junk starters are dropped at the door,
+ *     and a later starter-carrying turn can never rewrite the first record.
  *   v1.3.0 — 2026-08-16 — The status counts reachable devices (the phone nudge reads it).
  *   v1.2.0 — 2026-08-16 — A turn may carry attached pictures: the keys travel, a non-string is
  *     dropped at the door, and the record keeps what was attached.
@@ -229,6 +232,54 @@ await test('A turn streams, and says what went wrong when there is no agent', as
     const last = events.at(-1);
     assert(last.kind === 'error' || last.kind === 'done', `the turn ends with a verdict, got ${last?.kind}`);
     console.log(`     ↳ turn ended as ${last.kind}${last.kind === 'error' ? `: ${String(last.message).slice(0, 60)}` : ''}`);
+});
+
+await test('The first turn writes the funnel marker once, and only once', async () => {
+    // Owner A has sent turns above with no starter button. The write-once marker must exist,
+    // record when, and carry no starter — the absence is itself the datum ("typed their own words").
+    // Written fire-and-forget off the turn path, so poll briefly like the other funnel suites do.
+    const read = async (auth: (o?: RequestInit) => RequestInit) => {
+        const { body } = await json('/v1/memory/onboarding.first_chat_turn?soft=1', auth());
+        return body.data?.exists === false ? null : body.data?.value ?? null;
+    };
+    let mark: any = null;
+    for (let i = 0; i < 16 && !mark; i++) { mark = await read(aAuthed); if (!mark) await new Promise(r => setTimeout(r, 250)); }
+    assert(!!mark, 'the first turn left a marker');
+    assert(typeof mark.at === 'string', `the marker records when, got ${JSON.stringify(mark)}`);
+    assert(mark.starter === undefined, `no starter button fired it, got ${JSON.stringify(mark.starter)}`);
+
+    // A later turn CARRYING a starter must not rewrite it: write-once is the whole point.
+    const res = await fetch(`${BASE}/v1/chat/threads/${threadId}/turn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aToken}` },
+        body: JSON.stringify({ text: 'once more', starter: 'page' }),
+    });
+    await res.text();
+    const after = await read(aAuthed);
+    assert(after.at === mark.at && after.starter === undefined,
+        `the marker never changes after the first write, got ${JSON.stringify(after)}`);
+});
+
+await test('A starter button names itself in the marker, and junk is dropped at the door', async () => {
+    // Owner B's FIRST turn arrives from a starter button — the dimension that answers "do the
+    // starters carry their weight" is recorded with it. An invalid starter string never lands.
+    const created = await json('/v1/chat/threads', bAuthed({ method: 'POST', body: JSON.stringify({}) }));
+    assert(created.status === 201, `B's conversation: ${created.status}`);
+    const bThread = created.body.data.thread.id;
+    const res = await fetch(`${BASE}/v1/chat/threads/${bThread}/turn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bToken}` },
+        body: JSON.stringify({ text: 'put up my page', starter: 'page' }),
+    });
+    await res.text();
+    let mark: any = null;
+    for (let i = 0; i < 16 && !mark; i++) {
+        const { body } = await json('/v1/memory/onboarding.first_chat_turn?soft=1', bAuthed());
+        mark = body.data?.exists === false ? null : body.data?.value ?? null;
+        if (!mark) await new Promise(r => setTimeout(r, 250));
+    }
+    assert(!!mark && mark.starter === 'page', `B's marker carries the starter, got ${JSON.stringify(mark)}`);
+    await json(`/v1/chat/threads/${bThread}`, bAuthed({ method: 'DELETE' }));
 });
 
 await test('A node that can never answer leaves the conversation clean', async () => {

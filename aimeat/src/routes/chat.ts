@@ -13,6 +13,9 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.5.0 — 2026-08-17 — A turn may carry `starter` (which starter button fired it); the first
+ *     turn writes the write-once onboarding.first_chat_turn funnel marker, closing the gap where a
+ *     chat-cohort account that landed, talked and left had written no marker at all.
  *   v1.4.0 — 2026-08-16 — The field is `attachments` (any file), with `images` still accepted.
  *   v1.3.0 — 2026-08-16 — A turn may carry `images`: storage keys of pictures the person attached,
  *     which the service reads from their own namespace and hands to the model as bytes.
@@ -36,6 +39,7 @@ import {
 import { chatEnabled, runChatTurn, resetChatSession } from '../services/chat-session.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
 import { readAllowance, remainingOf } from '../services/ai-allowance.js';
+import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
 import { logger } from '../utils/logger.js';
 
 export function chatRouter(config: AimeatConfig, storage: Storage): Router {
@@ -166,7 +170,7 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     // something, and a person watching a spinner for four minutes cannot tell work from a hang.
     router.post('/v1/chat/threads/:id/turn', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
         const threadId = req.params.id as string;
-        const { text, attachments, images } = req.body ?? {};
+        const { text, attachments, images, starter } = req.body ?? {};
         // Storage keys, never bytes: the browser has already uploaded through the presigned path,
         // which is the one place a file size is checked against the owner's quota. `images` is the
         // name this field had for a day and is still accepted, because a client in a tab that has
@@ -183,6 +187,11 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such conversation.'));
             return;
         }
+
+        // Funnel: the person's first-ever chat turn, with which starter button fired it (if one
+        // did). Fire-and-forget and write-once — the marker can never delay or fail a turn.
+        const starterId = typeof starter === 'string' && /^[a-z-]{1,32}$/.test(starter) ? starter : undefined;
+        void recordFirstChatTurn(storage, config, owner(req), starterId);
 
         res.writeHead(200, {
             'Content-Type': 'text/event-stream',

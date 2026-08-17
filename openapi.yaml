@@ -5890,7 +5890,11 @@ paths:
         - App Grants
       responses:
         '200':
-          description: '{ scopes: [{ scope, description, default }], declare_with, notes[] }'
+          description: >-
+            { scopes: [{ scope, description, description_keys, default }], declare_with, notes[] }.
+            `description_keys` is the ordered locale-key chain (app-context override first, then the
+            shared scope-sentence tree) a client resolves against /locales/{lang}.json to show the
+            sentence in the viewer's language; `description` stays the English fallback.
 
   /v1/app-grants/authorize:
     get:
@@ -5929,7 +5933,8 @@ paths:
       operationId: appGrantRequest
       summary: Read a pending app-grant request (for the consent page)
       description: |
-        Returns the requesting app and the exact scopes (with descriptions) for the consent UI to
+        Returns the requesting app and the exact scopes (with descriptions and `description_keys`,
+        the ordered locale-key chain for localizing each sentence client-side) for the consent UI to
         render, plus `app_owner` (the app's owner name) and `origin_bound` (the redirect origin is
         verified to be this very app's subdomain) — together these let the consent page auto-approve
         the signed-in owner's OWN app, matching the silent-bridge policy. `app_icon` and
@@ -7303,6 +7308,19 @@ paths:
               required: [text]
               properties:
                 text: { type: string, description: What to say. Must not be empty. }
+                attachments:
+                  type: array
+                  items: { type: string }
+                  description: >-
+                    Storage keys of files the person attached, uploaded beforehand through the
+                    presigned path. Keys, never bytes. The legacy field name `images` is still
+                    accepted.
+                starter:
+                  type: string
+                  description: >-
+                    Which starter button fired this turn (page | work | connect), for the
+                    write-once onboarding.first_chat_turn funnel marker. Omitted when the person
+                    typed their own words.
       responses:
         '200':
           description: SSE stream of turn updates

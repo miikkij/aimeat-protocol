@@ -14,6 +14,9 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v1.5.0 — 2026-08-17 — One trust sentence under the welcome (chat.welcomeTrust): what a person
+ *     makes here is theirs and stays private until they publish. The first screen asked for a
+ *     request without saying where the result would live.
  *   v1.4.0 — 2026-08-16 — The install suggestion (InstallCta, compact) sits where the mobile nudge
  *     does, whichever of the two applies — the browser never proposes installing on its own.
  *   v1.3.0 — 2026-08-16 — Drains the wish (sessionStorage 'aimeat.wish', stored by the landing's
@@ -73,11 +76,11 @@ function conversationAsText(title, turns) {
  * to be edited is one more decision, and the point of these is to remove decisions.
  */
 const STARTERS = [
-    { key: 'chat.starterPageAsk', fallback: 'Put up my welcome page — keep it simple, and tell me the address when it is live.',
+    { id: 'page', key: 'chat.starterPageAsk', fallback: 'Put up my welcome page — keep it simple, and tell me the address when it is live.',
       label: 'chat.starterPage', labelFallback: 'Make my welcome page' },
-    { key: 'chat.starterWorkAsk', fallback: 'Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.',
+    { id: 'work', key: 'chat.starterWorkAsk', fallback: 'Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.',
       label: 'chat.starterWork', labelFallback: 'Take something off my plate' },
-    { key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it to this node so it can do this work?',
+    { id: 'connect', key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it to this node so it can do this work?',
       label: 'chat.starterConnect', labelFallback: 'Connect my own AI' },
 ];
 
@@ -240,7 +243,7 @@ export default function ChatView() {
      * written them down by the time the first event arrives, and waiting to show them would make a
      * slow turn look like a lost one.
      */
-    const send = useCallback(async (retryText) => {
+    const send = useCallback(async (retryText, starterId) => {
         const text = (retryText ?? draft).trim();
         if (!text || busy) return;
         // Inside the tap, because that is the only moment iOS will accept it. Without this, reading
@@ -276,7 +279,7 @@ export default function ChatView() {
         const tools = new Map();
         const cards = new Map();
         try {
-            for await (const update of chat.streamTurn(target.id, text, controller.signal, attachmentKeys)) {
+            for await (const update of chat.streamTurn(target.id, text, controller.signal, attachmentKeys, starterId)) {
                 if (update.kind === 'text') {
                     answer += update.text;
                     setLive((l) => ({ ...l, text: answer }));
@@ -500,6 +503,7 @@ export default function ChatView() {
                         <div class="chat-welcome">
                             <h2>${tr('chat.welcomeTitle', 'Your first agent')}</h2>
                             <p>${tr('chat.welcomeBody', 'It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.')}</p>
+                            <p class="chat-welcome-trust">${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}</p>
                             <!-- One concrete thing to ask for, not a menu. An empty box asks a person
                                  to invent a task for a system they have not used; a first request
                                  that ends in a real address they can open answers "what is this for"
@@ -508,7 +512,7 @@ export default function ChatView() {
                                 ${STARTERS.map((st) => html`
                                     <button type="button" class="btn-outline chat-starter" key=${st.key}
                                         disabled=${disabled}
-                                        onClick=${() => send(tr(st.key, st.fallback))}>
+                                        onClick=${() => send(tr(st.key, st.fallback), st.id)}>
                                         ${tr(st.label, st.labelFallback)}
                                     </button>`)}
                             </div>

@@ -4,6 +4,10 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.23.0 — 2026-08-17 — .agc-preset-desc / .agc-boundary: the AgentConsent panel's preset
+ *     summary line and the shared boundary sentences. Unscoped on purpose — the panel mounts both
+ *     inside .pf (Agents tab) and on the home's koti-step, and the .pf prefix would style one door
+ *     and not the other.
  *   v2.22.0 — 2026-08-08 — Copy-button cleanup: deleted five dead rules (.agent-copy-btn, .ext-copy-btn, .tx-copy-btn,
  *       .wallet-balance-copy, .pf-gen-debug-copy-file — no markup used any of them) and the
  *       .copy-prompt-btn / .pn-copy-btn button styles, whose call sites are now shared .btn-*
@@ -1433,6 +1437,10 @@
    The panel is four sections that each save their own fields, so the answer to "did that save?"
    appears where the question is asked instead of at the bottom of one long form. */
 .pf-or-section { padding: 14px 0; border-top: 1px solid var(--border); }
+/* The why-lead: three sentences a first-time visitor reads before any field asks for anything. */
+.pf-or-why { border-top: none; padding-top: 4px; }
+.pf-or-why p { margin: 0 0 8px; font-size: 0.9rem; line-height: 1.5; color: var(--text-dim); }
+.pf-or-why p:first-child { color: var(--text); }
 .pf-or-section:first-child { border-top: none; padding-top: 4px; }
 .pf-or-section-title { font-size: 13px; font-weight: 700; margin: 0 0 10px; color: var(--text); }
 
@@ -3757,3 +3765,8 @@
 
 .pf-ureport-empty { color: var(--text-dim); font-size: 0.9rem; padding: var(--space-4, 1rem) 0; }
 .pf-ureport-error { color: var(--danger, #b3372c); font-size: 0.9rem; }
+
+/* AgentConsent (both mounts: .pf Agents tab and the home's koti-step, so unscoped) */
+.agc-preset-desc { margin: 0.35rem 0 0; line-height: 1.45; }
+.agc-boundary { margin: 0.6rem 0 0; padding-left: 1.1rem; line-height: 1.45; }
+.agc-boundary li { margin-bottom: 0.2rem; }

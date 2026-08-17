@@ -441,7 +441,7 @@
     "newScope": "nuevo",
     "area": {
       "memory": "tus datos guardados",
-      "storage": "tus archivos",
+      "storage": "los archivos que guardas aquí",
       "catalogue": "el catálogo público",
       "social": "los tableros",
       "messages": "tus mensajes",
@@ -452,7 +452,60 @@
       "ai": "tu presupuesto de IA",
       "notifications": "los avisos que te llegan",
       "organism": "tus espacios de trabajo",
-      "app": "las aplicaciones publicadas a tu nombre"
+      "app": "las aplicaciones publicadas a tu nombre",
+      "work": "el trabajo entre tus agentes",
+      "packages": "la instalación de paquetes",
+      "connections": "las cuentas que has conectado",
+      "provenance": "cómo se etiqueta el contenido",
+      "contract": "compras con tu dinero",
+      "share": "compartir tus datos con personas que elegiste",
+      "exchange": "el mercado",
+      "finance": "tu contabilidad",
+      "outbound": "correo a tus contactos",
+      "company": "tus empresas"
+    },
+    "scopeText": {
+      "task": {
+        "read": "Ver las tareas de tus agentes, sus ejecuciones y sus resultados.",
+        "write": "Crear e iniciar tareas para tus propios agentes."
+      },
+      "catalogue": {
+        "read": "Leer el catálogo público."
+      },
+      "social": {
+        "read": "Leer los tableros a los que tienes acceso."
+      },
+      "knowledge": {
+        "read": "Leer los paquetes de conocimiento guardados en tu cuenta."
+      },
+      "contract": {
+        "spend": "Comprar en tu nombre con los contratos que posees, hasta el límite que fijes. Esto gasta tus morsels o tu dinero."
+      }
+    }
+  },
+  "consent": {
+    "priming": {
+      "oauth": "Estás conectando {client} a tu cuenta AIMEAT. Funciona a través de uno de tus agentes y solo puede hacer lo que ese agente tiene permitido.",
+      "appGrant": "{app} pide permiso para usar parte de tu cuenta AIMEAT.",
+      "device": "Un asistente de IA pide permiso para trabajar en tu cuenta AIMEAT como tu agente. Tú decides cuánto puede hacer."
+    },
+    "boundary": {
+      "reach": "Esto se aplica solo a tu cuenta AIMEAT aquí. No puede abrir tu ordenador, los archivos de tu ordenador ni ninguna cuenta que tengas en otro lugar.",
+      "visibility": "Nada será visible para otras personas hasta que tú mismo lo compartas.",
+      "control": "Cada acción queda registrada, y puedes retirar este acceso en cualquier momento en Perfil › Acceso."
+    },
+    "denied": {
+      "title": "No se concedió nada",
+      "oauth": "{client} no puede usar tu cuenta. Si cambias de opinión, inicia la conexión de nuevo desde {client}.",
+      "appGrant": "La aplicación no se conectó y no puede ver nada de tu cuenta. Puedes abrirla de nuevo cuando quieras.",
+      "device": "El asistente no fue admitido. Pídele que inicie una nueva solicitud si cambias de opinión."
+    },
+    "preset": {
+      "readonly": "Puede ver: {areas}. No puede cambiar nada.",
+      "standard": "Puede leer y escribir: {areas}. Tu saldo, tus mensajes y los ajustes de tu cuenta quedan fuera de su alcance.",
+      "full": "Puede hacer casi todo lo que tú puedes hacer aquí. Tu inicio de sesión y la seguridad de la cuenta, los ajustes de pago de tu dinero, compartir tus datos con personas nuevas y cambiar los permisos de tus otros agentes requieren cada uno su propia marca separada.",
+      "keep": "Deja los permisos exactamente como están.",
+      "custom": "Elige tú mismo los permisos exactos de la lista."
     }
   },
   "auth": {
@@ -756,6 +809,8 @@
   "chat.retry": "Intentar de nuevo",
   "chat.send": "Enviar",
   "chat.signIn": "Inicia sesión y tu primer agente te está esperando aquí.",
+  "chat.statusYourAgent": "Tu agente",
+  "chat.useOwnKeyLink": "Usa tu propia clave",
   "chat.stop": "Detener",
   "chat.stopListening": "Detener",
   "chat.title": "Chat",
@@ -764,6 +819,7 @@
   "chat.turnFailed": "No se pudo completar el turno.",
   "chat.welcomeBody": "Funciona aquí igual que tu propia herramienta de IA: con los mismos permisos y el mismo registro de lo que hizo. Pídele algo.",
   "chat.welcomeTitle": "Tu primer agente",
+  "chat.welcomeTrust": "Todo lo que haces aquí queda en tu propia cuenta, y nada se hace público hasta que tú mismo lo publiques.",
   "chat.work.completed": "listo",
   "chat.work.failed": "falló",
   "chat.work.in_progress": "en curso",
@@ -4279,9 +4335,8 @@
     "newAgentNameError": "El nombre tiene que tener de 3 a 64 caracteres: solo minúsculas, números y guiones. Tiene que empezar y terminar por una letra o un número.",
     "createBtn": "Crear",
     "cancelBtn": "Cancelar",
-    "scopeLabel": "Permisos que pide:",
-    "scopeFull": "Acceso total: memoria, cartera, acciones, tableros y almacenamiento",
-    "walletNote": "La cartera de morsels de este agente se usará en todos los movimientos",
+    "actsAs": "{client} actuará como el agente que elijas, y puede hacer exactamente lo que ese agente tiene permitido:",
+    "agentPays": "Todo lo que esta conexión compre se paga con los morsels propios del agente, visibles junto a su nombre. No puede alcanzar tu tarjeta bancaria ni ningún dinero fuera de AIMEAT.",
     "approveBtn": "Aprobar la conexión",
     "denyBtn": "Denegar",
     "approving": "Aprobando...",
@@ -4294,6 +4349,36 @@
     "doneTitle": "Listo",
     "authCodeLabel": "Código de autorización:",
     "authCodeHint": "Pega este código de vuelta en la aplicación que pidió el acceso."
+  },
+  "agentConsentPage": {
+    "title": "Autorización del agente",
+    "loginRequired": "Inicia sesión para aprobar o denegar esta solicitud.",
+    "usernameLabel": "Nombre de usuario",
+    "passwordLabel": "Contraseña",
+    "totpLabel": "Código TOTP (si lo tienes activado)",
+    "loginBtn": "Iniciar sesión",
+    "confirmHint": "Confirma que este código coincide con el que te mostró el agente",
+    "agentName": "Nombre del agente",
+    "displayName": "Nombre visible",
+    "description": "Descripción",
+    "scopeLabel": "Nivel de permisos",
+    "approveBtn": "Aprobar",
+    "denyBtn": "Denegar",
+    "approving": "Aprobando...",
+    "approved": "Agente autorizado",
+    "approvedMsg": "El agente ha quedado registrado y ya puede trabajar en tu cuenta.",
+    "agentGaii": "GAII del agente",
+    "expired": "Solicitud caducada",
+    "expiredMsg": "Esta solicitud de autorización ha caducado. Pide al agente que inicie una nueva.",
+    "errorNoCode": "Falta el parámetro de código. Usa el enlace que te dio tu agente.",
+    "errorNotFound": "La solicitud de autorización no existe o ha caducado.",
+    "errorOwnerMismatch": "Esta solicitud pertenece a otro usuario. Inicia sesión con la cuenta correcta.",
+    "errorGeneric": "Algo salió mal. Inténtalo otra vez.",
+    "selectOne": "Elige al menos un permiso",
+    "pollingNote": "Tu agente está consultando sus credenciales automáticamente. Si no puede hacerlo, copia la información de abajo y pégala en el chat del agente.",
+    "pollingHint": "El agente recibirá su token y su clave privada por consulta. Si la consulta falla, pídele que reintente",
+    "pollingHintCode": "POST /v1/agents/device-token",
+    "pollingHintSuffix": "con el código de dispositivo."
   },
   "openItems.add": "Agregar a los pendientes",
   "openItems.byAi": "esto lo puso aquí tu IA",
@@ -5709,6 +5794,9 @@
       "connect": "Conectar un agente de automatización",
       "connectDesc": "Conecta un agente de IA a tu cuenta con la CLI del conector de AIMEAT o con un entorno capaz de ejecutar agentes. El conector es el camino más fácil, porque le da al agente una identidad permanente, permisos aprobados, un paquete de habilidades local y acceso por MCP a las herramientas de AIMEAT:",
       "connectOptionsTitle": "Elige primero cómo se conecta el agente a AIMEAT:",
+      "connectRecommendedTitle": "Recomendado: conecta la IA que ya pagas.",
+      "connectRecommendedDesc": "Elige tu herramienta abajo y sigue los pasos. No hay nada que instalar, y una cuenta gratuita de Claude es suficiente.",
+      "connectDeveloperTitle": "Para desarrolladores: conectar desde una terminal (agentes CLI y flotas)",
       "connectOptionConnectorTitle": "Recomendado: usa el conector de AIMEAT.",
       "connectOptionConnectorDesc": "Se encarga de autenticar el dispositivo, guarda el token del agente en local, descarga el paquete de habilidades y expone las herramientas de AIMEAT por MCP, para que el agente pueda usar tareas, mensajes, memoria, telemetría y Hello Integration de una sesión a otra.",
       "connectOptionFallbackTitle": "Alternativa: usa el prompt de la API.",
@@ -8367,6 +8455,9 @@
       "title": "Proveedor de IA",
       "statusReady": "Clave guardada",
       "statusNoKey": "Sin clave",
+      "whyLead": "Con tu propia clave, todas las funciones de IA y el chat de este nodo corren con tu presupuesto y el modelo que tú elijas, sin límite de la casa.",
+      "whyCost": "Los modelos normales cuestan fracciones de céntimo por intercambio. Una recarga única de 10 $ en OpenRouter además eleva sus modelos gratuitos a 1.000 solicitudes al día, lo que para la mayoría es gratis en la práctica para siempre.",
+      "whyModel": "Una buena primera elección: DeepSeek v4 0813, con razonamiento activado.",
       "section": {
         "connection": "Conexión",
         "models": "Modelos",

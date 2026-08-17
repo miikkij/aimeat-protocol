@@ -69,12 +69,17 @@ export async function resetThread(id) {
  * conversation that just stops is indistinguishable from one still thinking.
  *
  * `signal` aborts the read. The turn keeps running on the node; the connection is what closes.
+ * `starter` names the starter button that fired this turn — funnel bookkeeping, omitted otherwise.
  */
-export async function* streamTurn(id, text, signal, attachments = []) {
+export async function* streamTurn(id, text, signal, attachments = [], starter) {
     const res = await fetch(`${getNodeUrl()}/v1/chat/threads/${enc(id)}/turn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream', ...authHeaders() },
-        body: JSON.stringify(attachments.length ? { text, attachments } : { text }),
+        body: JSON.stringify({
+            text,
+            ...(attachments.length ? { attachments } : {}),
+            ...(starter ? { starter } : {}),
+        }),
         signal,
     });
 

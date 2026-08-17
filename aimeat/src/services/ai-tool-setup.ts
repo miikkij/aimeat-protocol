@@ -30,6 +30,11 @@
  *   remake's branch decision, kept beside the list it reads rather than in the calling code.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.4.0 — 2026-08-17 — A model recommendation on every chat-app tool (claude.ai, Claude
+ *     Desktop, ChatGPT, Grok, goose): pick the strongest model, thinking on. Watched in
+ *     production: onboarding on a mid-tier default model wanders and stalls; the same steps on a
+ *     strong model complete first try. The developer tools (Claude Code, Codex, Cursor, VS Code)
+ *     carry no line — their users choose models deliberately already.
  *   v1.3.0 — 2026-08-16 — goose joins the table as the ninth tool. It has been a supported
  *     client since the connect adapter shipped (src/cli/connect/clients/goose.ts), so a person
  *     who chose it was told to configure something this page did not list. Free on its own
@@ -138,6 +143,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
                 plans: s(l, 'Free, Pro, Max, Team and Enterprise. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot.',
                     'Free, Pro, Max, Team ja Enterprise. Team- ja Enterprise-tileillä omistaja lisää sen kohdassa Organization settings > Connectors > Add > Custom > Web, ja ennen sitä sinä et voi.'),
+                note: s(l, 'Pick Opus 5 or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.',
+                    'Valitse mallivalikosta Opus 5 tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.'),
             },
             instructions: {
                 where: s(l, 'Settings > General > Instructions for Claude (shown under Profile in some versions). Applies to every new conversation on the account.',
@@ -165,6 +172,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
                 plans: s(l, 'Free, Pro, Max, Team and Enterprise. A free account can hold exactly one custom connector, which is enough for this.',
                     'Free, Pro, Max, Team ja Enterprise. Ilmaisella tilillä voi olla tasan yksi oma konnektori, mikä riittää tähän.'),
+                note: s(l, 'Pick Opus 5 or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.',
+                    'Valitse mallivalikosta Opus 5 tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.'),
             },
             instructions: {
                 where: s(l, 'Settings > General > Instructions for Claude. Applies to every new conversation on the account.',
@@ -238,6 +247,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     'Plus, Pro, Business, Enterprise ja Education. Ei ilmaisella tasolla eikä sovelluksissa: vain selaimessa.'),
                 warn: s(l, 'OpenAI marks developer mode as being for people who understand the risk: it grants both read and write tools. Their own warning is worth reading before you switch it on.',
                     'OpenAI merkitsee developer moden niille jotka ymmärtävät riskin: se antaa sekä luku- että kirjoitustyökalut. Heidän oma varoituksensa kannattaa lukea ennen kuin kytket sen päälle.'),
+                note: s(l, 'Use GPT-5.6 with thinking enabled. A strong model makes the setup and the first conversations go right the first time.',
+                    'Käytä GPT-5.6:ta ajattelu päällä. Vahva malli vie kytkennän ja ensimmäiset keskustelut kerralla oikein.'),
             },
             instructions: {
                 where: s(l, 'Settings > Personalization > Custom instructions, in the field for what ChatGPT should know about you.',
@@ -362,6 +373,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                             'Windowsissa sama tiedosto on %APPDATA%-kansion Block/goose-hakemistossa.'),
                     },
                 ],
+                note: s(l, 'Point goose at a strong reasoning model. DeepSeek v4 0813 via OpenRouter is a good pick, with reasoning enabled.',
+                    'Osoita goose vahvaan päättelymalliin. Hyvä valinta on DeepSeek v4 0813 OpenRouterin kautta, päättely päällä.'),
             },
             instructions: {
                 where: s(l, '.goosehints at the root of the project, which goose reads at the start of every session there. For something that should apply everywhere, use a recipe instead.',
@@ -386,6 +399,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 capability: 'plan-dependent',
                 plans: s(l, 'Paid tiers only. The node also has to be reachable from the public internet, so a node on localhost will not work here.',
                     'Vain maksullisilla tasoilla. Noden pitää lisäksi olla saavutettavissa julkisesta internetistä, joten localhostilla ajettava node ei toimi tässä.'),
+                note: s(l, 'Pick Grok’s strongest model, with reasoning on. The cheap default model is where the setup goes wrong.',
+                    'Valitse Grokin vahvin malli, päättely päällä. Halpa oletusmalli on se, jossa kytkentä menee pieleen.'),
             },
             instructions: {
                 where: s(l, 'Open the mode menu next to the chat box, find Custom Instructions and click Customize. Applies to all your conversations.',

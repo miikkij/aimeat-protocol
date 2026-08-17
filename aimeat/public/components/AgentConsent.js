@@ -28,6 +28,10 @@
  *     preselected "Standard" for every request, so bringing a full-access agent back after its
  *     token expired — the ordinary way an agent returns — narrowed it to eight scopes on a click
  *     that meant "yes, this is my agent". A first approval is unchanged.
+ *   v1.3.0 — 2026-08-17 — The preset buttons say what they grant. "Standard" was a bare word with
+ *     no sentence under it, so the owner picked between labels; each button now carries the shared
+ *     one-line summary (consent-vocab.js, generated from the real preset sets), and the expanded
+ *     state shows the three boundary sentences — what an agent can never reach — under the choice.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -36,6 +40,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { SCOPE_TEMPLATES, templateLabel } from '/views/profile/agents/scope-config.js';
+import { presetSummary, boundaryLines } from '/js/consent-vocab.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -98,12 +103,16 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
                 ${p === 'keep' ? t('profile.agents.pendingRequests.keepCurrent') : templateLabel(p)}
               </button>`)}
           </div>
+          <p class="text-caption agc-preset-desc">${presetSummary(preset, t)}</p>
           ${returning && html`
             <p class="text-caption agc-returning">
               ${t('profile.agents.pendingRequests.returningAgent')}
               ${Array.isArray(req.current_scopes) && req.current_scopes.length > 0
                 ? ` (${req.current_scopes.join(', ')})` : ''}
             </p>`}
+          <ul class="text-caption agc-boundary">
+            ${boundaryLines(t).map(line => html`<li key=${line}>${escHtml(line)}</li>`)}
+          </ul>
         </div>
         <div class="flex-row mt-1">
           <button type="button" class="btn-success" disabled=${busy}

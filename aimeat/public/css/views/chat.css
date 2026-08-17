@@ -9,6 +9,9 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.4.0 — 2026-08-17 — .chat-status-ownkey (the own-key door on the payer line) and
+ *     .chat-welcome-trust (the one boundary sentence under the welcome). The status agent label is
+ *     now a plain word, so it drops the monospace styling.
  *   v1.3.0 — 2026-08-17 — Phones: the composer wraps into two rows (the textarea was the smallest
  *     thing on its own row), the GAII line yields its row, and a wide markdown table scrolls inside
  *     the bubble instead of crushing its columns.
@@ -164,7 +167,9 @@
   background: transparent;
 }
 
-.chat-status-agent { font-family: var(--font-mono); color: var(--accent); }
+.chat-status-agent { color: var(--accent); }
+.chat-status-ownkey { color: var(--accent); text-decoration: none; }
+.chat-status-ownkey:hover { text-decoration: underline; }
 /* The model sits beside the payer line, not in place of it: which model answered and whose money
    paid are two different questions and a person checking one still needs the other. */
 .chat-status-model { color: var(--text-dim); }
@@ -195,6 +200,7 @@
 }
 
 .chat-welcome p { margin: 0; line-height: 1.6; font-size: 0.9rem; }
+.chat-welcome .chat-welcome-trust { color: var(--text-dim); margin-top: 6px; }
 
 /* One concrete opening each, wrapping on a phone. Outline buttons: they are suggestions, and the
    composer stays the primary way in. */

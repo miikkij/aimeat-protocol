@@ -4,6 +4,10 @@
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.
  * @version-history
+ *   v3.4.0 -- 2026-08-17 -- The connect panel leads with the connector guide (McpSetupGuide, the
+ *     same component the MCP tab renders), open and first, and the npx CLI road folds into a
+ *     "For developers" expander. ai-tool-setup.ts has ranked claude.ai first on purpose since it
+ *     was written; this panel led every visitor to a terminal instead.
  *   v3.3.0 -- 2026-07-14 -- Task-runner section: add a "View the crewaimeat fleet on GitHub"
  *     link (github.com/miikkij/crewaimeat) with the GitHub Octocat mark.
  *   v3.2.0 -- 2026-07-13 -- Split (max-file-lines): moved scope constants/labels, connect
@@ -80,6 +84,7 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
 import SharedBoard from './agents/shared-board.js';
 import { AgentConsent } from '/components/AgentConsent.js';
+import { McpSetupGuide } from './ai-setup-guide.js';
 import { buildAgentPrompt, buildTaskRunnerPrompt, buildMcpOnboardingPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, popOutAgent } from './agents/tab-helpers.js';
 import { renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
@@ -99,6 +104,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [connectExpanded, setConnectExpanded] = useState(false);
+  const [cliExpanded, setCliExpanded] = useState(false);
   const [pasteExpanded, setPasteExpanded] = useState(false);
   const [taskRunnerExpanded, setTaskRunnerExpanded] = useState(false);
   const [taskRunnerName, setTaskRunnerName] = useState('');
@@ -486,45 +492,63 @@ export default function AgentsTab({ session, showToast, onStats }) {
     ${connectExpanded && html`
       <div class="pf-agd-connect-content">
         <p class="mb-half text-bold">${t('profile.agents.connectOptionsTitle')}</p>
-        <p class="text-caption mb-half"><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}</p>
-        <p class="text-caption mb-1"><strong>${t('profile.agents.connectOptionFallbackTitle')}</strong> ${t('profile.agents.connectOptionFallbackDesc')}</p>
 
-        <p class="mb-half text-bold">${t('profile.agents.cliInstall')}</p>
-        <div class="agent-prompt-box"><code>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}</code></div>
-        <${CopyButton}
-          text=${`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`}
-          className="btn-primary"
-          label=${t('profile.agents.copyCommand')}
-          />
-
-        <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
-        <div class="agent-prompt-box"><code>npx aimeat connect serve</code></div>
-
-      <p class="mt-1 text-caption">${t('profile.agents.cliDesc')}</p>
-
-        <p class="mt-1 mb-half text-bold">${t('profile.agents.agentInstructionTitle')}</p>
-        <p class="text-caption mb-half">${t('profile.agents.agentInstructionDesc')}</p>
-        <div class="agent-prompt-box">${buildMcpOnboardingPrompt()}</div>
-        <${CopyButton}
-          text=${buildMcpOnboardingPrompt()}
-          className="btn-primary"
-          label=${t('profile.agents.copyAgentInstruction')}
-          />
+        ${/* The recommended road comes first and OPEN: the tool the person already pays for,
+              connected through their own app's connector settings. ai-tool-setup.ts has ranked
+              claude.ai first for months while this panel led with a terminal command \u2014 the panel
+              now agrees with its own data. */''}
+        <p class="text-caption mb-half"><strong>${t('profile.agents.connectRecommendedTitle')}</strong> ${t('profile.agents.connectRecommendedDesc')}</p>
+        <${McpSetupGuide} />
 
         <div class="pf-agent-divider mt-1">
-          <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
-            <span>${t('profile.agents.noNodejs')}</span>
-            <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
+          <button class="expand-btn" onClick=${() => setCliExpanded(!cliExpanded)}>
+            <span>${t('profile.agents.connectDeveloperTitle')}</span>
+            <span class="pf-chevron ${cliExpanded ? 'pf-chevron-open' : ''}">\u25BC</span>
           </button>
-          ${platExpand && html`
-            <div class="platform-instructions expanded">
-              <div class="platform-tabs">
-                ${PLATFORM_KEYS.map(k => html`
-                  <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
-                `)}
+          ${cliExpanded && html`
+            <div class="mt-half">
+              <p class="text-caption mb-half"><strong>${t('profile.agents.connectOptionConnectorTitle')}</strong> ${t('profile.agents.connectOptionConnectorDesc')}</p>
+              <p class="text-caption mb-1"><strong>${t('profile.agents.connectOptionFallbackTitle')}</strong> ${t('profile.agents.connectOptionFallbackDesc')}</p>
+
+              <p class="mb-half text-bold">${t('profile.agents.cliInstall')}</p>
+              <div class="agent-prompt-box"><code>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}</code></div>
+              <${CopyButton}
+                text=${`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`}
+                className="btn-primary"
+                label=${t('profile.agents.copyCommand')}
+                />
+
+              <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
+              <div class="agent-prompt-box"><code>npx aimeat connect serve</code></div>
+
+              <p class="mt-1 text-caption">${t('profile.agents.cliDesc')}</p>
+
+              <p class="mt-1 mb-half text-bold">${t('profile.agents.agentInstructionTitle')}</p>
+              <p class="text-caption mb-half">${t('profile.agents.agentInstructionDesc')}</p>
+              <div class="agent-prompt-box">${buildMcpOnboardingPrompt()}</div>
+              <${CopyButton}
+                text=${buildMcpOnboardingPrompt()}
+                className="btn-primary"
+                label=${t('profile.agents.copyAgentInstruction')}
+                />
+
+              <div class="pf-agent-divider mt-1">
+                <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
+                  <span>${t('profile.agents.noNodejs')}</span>
+                  <span class="pf-chevron ${platExpand ? 'pf-chevron-open' : ''}">\u25BC</span>
+                </button>
+                ${platExpand && html`
+                  <div class="platform-instructions expanded">
+                    <div class="platform-tabs">
+                      ${PLATFORM_KEYS.map(k => html`
+                        <button class="platform-tab ${k === activePlat ? 'active' : ''}" onClick=${() => setActivePlat(k)}>${t(PLATFORM_LABELS[k])}</button>
+                      `)}
+                    </div>
+                    ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
+                    <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
+                  </div>
+                `}
               </div>
-              ${/* SAFE: PLATFORMS is hardcoded developer constant, not user input */''}
-              <div class="platform-content" dangerouslySetInnerHTML=${{ __html: PLATFORMS[activePlat] }}></div>
             </div>
           `}
         </div>

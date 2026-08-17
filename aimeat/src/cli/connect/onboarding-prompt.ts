@@ -10,6 +10,9 @@
  *   v1.1.0 -- 2026-06-30 -- Add anti-fabrication rule (only five aimeat_onboarding_* tools exist;
  *                            drive other steps via each step's howTo.tool from aimeat_onboarding_status;
  *                            stop at summary.completable).
+ *   v1.2.0 -- 2026-08-17 -- One model-recommendation line at the top: run onboarding on the
+ *                            strongest reasoning model, thinking on. Additive; the sequence and
+ *                            every step are untouched.
  */
 
 /** Canonical Hello Integration MCP tool sequence, in execution order. */
@@ -37,7 +40,9 @@ export const HELLO_INTEGRATION_TOOL_SEQUENCE: ReadonlyArray<string> = [
  * try to invoke these as terminal commands.
  */
 export function buildAgentOnboardingInstruction(): string {
-  return `You are connected to AIMEAT through MCP in this runtime.
+  return `Run this with your strongest reasoning model, thinking enabled -- onboarding is the step that most rewards it.
+
+You are connected to AIMEAT through MCP in this runtime.
 
 Use the available AIMEAT tools now. Hello Integration is AIMEAT's required first-run onboarding handshake for every newly connected agent. The names below are MCP tools shown by your AI runtime; do not type them as terminal commands.
 

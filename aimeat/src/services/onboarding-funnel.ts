@@ -75,6 +75,12 @@ export const ONBOARDING_KEYS = {
     /** A = MCP-capable client, B = needs a better one first, agent = the front-page agent door. */
     branchTaken: 'onboarding.branch_taken',
     firstAgentConnected: 'onboarding.first_agent_connected',
+    /**
+     * The first turn the person ever sent in the node's own chat, with which starter button fired
+     * it (if one did). Before this the chat cohort was invisible between "landed on /v1/chat" and
+     * "activated": an account that landed, talked and left wrote no marker at all.
+     */
+    firstChatTurn: 'onboarding.first_chat_turn',
     homeInitialized: 'onboarding.home_initialized',
     /** The FIRST of the four rooms entered. Later ones do not overwrite it. */
     roomEntered: 'onboarding.room_entered',
@@ -185,6 +191,32 @@ export async function recordHelloPageOpened(
     } catch (err) {
         seenHelloOwners.delete(owner);
         logger.warn('onboarding-funnel: hello_page_opened marker failed', { owner, error: String(err) });
+    }
+}
+
+// Same in-process de-dupe as the MCP marker: one storage read per owner per boot.
+const seenChatTurnOwners = new Set<string>();
+
+/**
+ * Record the person's FIRST turn in the node's own chat. Fire-and-forget from the turn route;
+ * never throws — funnel bookkeeping must not break a conversation. `starter` names the starter
+ * button that fired the turn ('page' | 'work' | 'connect'), absent when the person typed their own
+ * words, which is itself the answer to "do the starters carry their weight".
+ */
+export async function recordFirstChatTurn(
+    storage: Storage, config: AimeatConfig, owner: string, starter?: string,
+): Promise<void> {
+    if (!owner || seenChatTurnOwners.has(owner)) return;
+    capSeen(seenChatTurnOwners);
+    seenChatTurnOwners.add(owner);
+    try {
+        await writeMarkerOnce(storage, ownerGhii(config, owner), ONBOARDING_KEYS.firstChatTurn, {
+            at: new Date().toISOString(),
+            ...(starter ? { starter } : {}),
+        });
+    } catch (err) {
+        seenChatTurnOwners.delete(owner); // let a later turn retry
+        logger.warn('onboarding-funnel: first_chat_turn marker failed', { owner, error: String(err) });
     }
 }
 
@@ -494,6 +526,10 @@ export interface FunnelRow {
     homeInitializedAt: string | null;
     /** The FIRST room entered — which of the four the person wanted, not where they ended up. */
     room: OnboardingRoom | null;
+    /** The first turn in the node's own chat — the step between landing and activating. */
+    firstChatTurnAt: string | null;
+    /** Which starter button fired it ('page' | 'work' | 'connect'); null = typed their own words. */
+    chatStarter: string | null;
 }
 
 /**
@@ -566,6 +602,8 @@ export async function readOnboardingFunnel(
             firstAgentConnectedAt: str(ONBOARDING_KEYS.firstAgentConnected, 'at'),
             homeInitializedAt: str(ONBOARDING_KEYS.homeInitialized, 'at'),
             room: (val(ONBOARDING_KEYS.roomEntered).room as OnboardingRoom) ?? null,
+            firstChatTurnAt: str(ONBOARDING_KEYS.firstChatTurn, 'at'),
+            chatStarter: str(ONBOARDING_KEYS.firstChatTurn, 'starter'),
         });
     }
     return rows;
@@ -654,6 +692,7 @@ function rescueEmailContent(
                 'Ilmainen Claude-tili riittää: siihen mahtuu tasan yksi oma konnektori, ja se on tarpeeksi.',
                 'ChatGPT vaatii maksullisen tason (Plus tai ylempi) ja toimii vain selaimessa.',
                 'Kytkennän jälkeen aloita UUSI keskustelu. Jo auki ollut chat ei saa työkaluja.',
+                'Valitse työkalusi vahvin malli ja kytke ajattelu päälle. Vahvalla mallilla kytkennän askeleet menevät kerralla oikein.',
             ],
             closing: 'Tämä on ainoa muistutus tästä. Jos et halua kytkeä tekoälyä, voit jättää viestin huomiotta.',
         };
@@ -670,6 +709,7 @@ function rescueEmailContent(
             'A free Claude account is enough: it holds exactly one custom connector, and that is all this needs.',
             'ChatGPT requires a paid tier (Plus or higher) and works only in the browser.',
             'After connecting, start a NEW conversation. A chat that was already open does not get the tools.',
+            'Pick the strongest model your AI offers and turn thinking on. The connection steps go right the first time on a strong model.',
         ],
         closing: 'This is the only reminder about this. If you do not want to connect an AI, you can ignore it.',
     };

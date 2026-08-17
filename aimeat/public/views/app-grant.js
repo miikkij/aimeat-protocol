@@ -34,6 +34,14 @@
  *         (the old "Advanced" toggle hid subset selection from everyone who never found it);
  *       • the guarantees read as promises, not as the warning "This app is not yours";
  *       • "Don't trust" → "Not now": cancelling no longer means declaring the app untrustworthy.
+ *   v1.4.0 — 2026-08-17 — The vocabulary moved to /js/consent-vocab.js (shared with the OAuth and
+ *     device-auth consent pages) and the screen answers the OUTWARD fear it never addressed: a real
+ *     user read "storage" as their own hard drive. The boundary sentences (only your AIMEAT account
+ *     here, never your computer or outside accounts; nothing visible until you share; recorded and
+ *     revocable) lead the guarantees, the per-scope rows read the localized sentence tree instead
+ *     of the server's English-only description, and a priming line names what is happening before
+ *     anything is asked. The INWARD honesty is untouched: scope sentences still say the whole
+ *     namespace, per the v1.3.0 rule.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -44,6 +52,7 @@ import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, getStoredGhii } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
+import { scopeSentence, areaLine, boundaryLines } from '/js/consent-vocab.js';
 
 const html = htm.bind(h);
 /** t() with a literal fallback; {vars} are interpolated into the fallback too (missing-key safety). */
@@ -53,25 +62,6 @@ const tr = (key, fallback, vars) => {
   let s = fallback;
   if (vars) for (const [k, val] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(val));
   return s;
-};
-
-/**
- * Plain-language area per scope family, for the one-line summary. The summary names WHAT the app
- * touches; the exact verbs (read / create / delete) stay in the expandable list, unchanged.
- */
-const AREA_FALLBACKS = {
-  memory: 'your saved data',
-  storage: 'your files',
-  catalogue: 'the public catalogue',
-  social: 'boards',
-  messages: 'your messages',
-  wallet: 'your morsel balance',
-  knowledge: 'your knowledge packages',
-  task: "your agents' tasks",
-  workflow: 'your automations',
-  ai: 'your AI budget',
-  notifications: 'notifications to you',
-  organism: 'your workspaces',
 };
 
 export default function AppGrant() {
@@ -217,14 +207,10 @@ export default function AppGrant() {
   }
 
   const req = state.request;
-  // Areas, in the order the app asked for them — one plain line instead of a wall of boxes.
-  const areas = [];
-  for (const s of req.scopes) {
-    const family = String(s.scope).split(':')[0];
-    if (!areas.includes(family)) areas.push(family);
-  }
-  const areaLine = areas.map((a) => tr(`appGrant.area.${a}`, AREA_FALLBACKS[a] || a)).join(', ');
-  const keepsData = areas.includes('memory') || areas.includes('storage');
+  // One plain line of areas, in the order the app asked for them — the vocabulary is shared with
+  // every other consent surface (consent-vocab.js), so a family renamed there is renamed here.
+  const reqScopeNames = req.scopes.map((s) => s.scope);
+  const summaryLine = areaLine(reqScopeNames, t);
   const icon = String(req.app_icon || '').trim();
   const iconIsUrl = /^(https?:\/\/|\/)/.test(icon);
   const monogram = (Array.from(String(req.app_name || '?').trim())[0] || '?').toUpperCase();
@@ -250,11 +236,12 @@ export default function AppGrant() {
         <h1 class="agr-title">${existingGrant
           ? tr('appGrant.manageTitle', 'Manage this app’s access')
           : tr('appGrant.connectTitle', 'Connect {app} to your account', { app: req.app_name })}</h1>
+        ${!existingGrant && html`<p class="agr-muted">${tr('consent.priming.appGrant', '{app} is asking to use part of your AIMEAT account.', { app: req.app_name })}</p>`}
         ${req.app_description && html`<p class="agr-lede">${escHtml(req.app_description)}</p>`}
 
         <div class="agr-summary">
           <span class="agr-summary-label">${tr('appGrant.worksWith', 'Works with:')}</span>
-          <span class="agr-summary-areas">${escHtml(areaLine)}</span>
+          <span class="agr-summary-areas">${escHtml(summaryLine)}</span>
         </div>
         <button class="agr-details-toggle" aria-expanded=${details} onClick=${() => setDetails((v) => !v)}>
           ${details
@@ -269,7 +256,7 @@ export default function AppGrant() {
                 <input type="checkbox" class="agr-scope-check" checked=${selected.has(s.scope)}
                   onChange=${() => toggle(s.scope)} aria-label=${s.scope} />
                 <span class="agr-scope-text">
-                  <span class="agr-scope-desc">${escHtml(s.description || s.scope)}
+                  <span class="agr-scope-desc">${escHtml(scopeSentence(s.scope, t, s.description))}
                     ${existingGrant && !existingGrant.scopes.includes(s.scope) && html`<span class="agr-scope-newbadge">${tr('appGrant.newScope', 'new')}</span>`}
                   </span>
                   <span class="agr-scope-name">${escHtml(s.scope)}</span>
@@ -279,9 +266,8 @@ export default function AppGrant() {
           <p class="agr-details-hint">${tr('appGrant.subsetHint', 'Uncheck anything you would rather not give. The app gets exactly what stays checked.')}</p>`}
 
         <ul class="agr-assure">
+          ${boundaryLines(t).map((line) => html`<li key=${line}>${escHtml(line)}</li>`)}
           <li>${tr('appGrant.assureKey', 'It gets its own key, never your password.')}</li>
-          ${keepsData && html`<li>${tr('appGrant.assureHome', 'What it saves lives in your own AIMEAT account.')}</li>`}
-          <li>${tr('appGrant.assureRevoke', 'You can revoke it in one click: Profile › Access.')}</li>
           ${!existingGrant && html`<li>${tr('appGrant.assureNext', 'Next time it signs you in without this screen.')}</li>`}
         </ul>
 

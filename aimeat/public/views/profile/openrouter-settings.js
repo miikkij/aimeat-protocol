@@ -13,6 +13,11 @@
  *   openrouter/model-picker.js · openrouter/pricing.js · openrouter/budget-panel.js
  * @usage import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v3.1.0 — 2026-08-17 — The why-lead (three sentences, shown until a key is saved): what an own
+ *     key buys, what it costs (the one-time $10 that lifts OpenRouter's free tier to 1,000
+ *     requests/day), and the first model worth picking. The panel asked for a key without ever
+ *     saying why anyone would want one, and the tab is reachable at tier 'new' now, so a brand-new
+ *     person arriving from the chat's payer line is the ordinary visitor.
  *   v3.0.0 — 2026-08-01 — Sectioned rework. Save-next-to-the-key; searchable model pickers showing
  *     price, context and a link to the model's page (a flat <select> of 336 unlabelled options was
  *     unusable); reasoning + execution pickers surfaced at last (the server has stored those two
@@ -290,6 +295,16 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
 
       ${!collapsed && html`
         <div class="pf-or-panel">
+
+          <!-- ── 0. Why an own key — the motivation the panel never carried. A brand-new person
+               arrives here from the chat's payer line without knowing what OpenRouter is; the
+               three sentences answer why, what it costs, and what to pick first. -->
+          ${!hasApiKey && html`
+            <section class="pf-or-section pf-or-why">
+              <p>${t('profile.openrouter.whyLead')}</p>
+              <p>${t('profile.openrouter.whyCost')}</p>
+              <p>${t('profile.openrouter.whyModel')}</p>
+            </section>`}
 
           <!-- ── 1. Connection ───────────────────────────────── -->
           <section class="pf-or-section">

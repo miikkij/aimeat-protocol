@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   v1.3.0 — 2026-08-17 — GET /request/:id also proves the `description_keys` localization chain
+ *     (override key first, shared sentence tree second) that the consent UI resolves client-side.
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3).
  *   v1.2.0 — 2026-07-25 — Add Phase 2d: one live grant per (owner, app). Re-consent updates the
  *     live grant instead of stacking a duplicate (the bug that grew one account to 86 grants),
@@ -122,6 +124,12 @@ async function main() {
         assert(r.body.data.app === `${owner}/${FILENAME}`, 'app matches');
         assert(r.body.data.scopes.length === 1 && r.body.data.scopes[0].scope === 'memory:read', 'scope listed with description');
         assert(!!r.body.data.scopes[0].description, 'scope has a human description');
+        // The localization chain the consent UI resolves client-side: app-context override first,
+        // the shared agent sentence tree second. Served so API consumers localize the same way.
+        const keys = r.body.data.scopes[0].description_keys;
+        assert(Array.isArray(keys) && keys.length === 2, 'scope has the ordered description_keys chain');
+        assert(keys[0] === 'appGrant.scopeText.memory.read', `override key first, got ${keys[0]}`);
+        assert(keys[1] === 'profile.agents.scopeUi.scopeText.memory.read', `shared key second, got ${keys[1]}`);
     });
 
     await test('rejects an ungrantable scope at authorize', async () => {

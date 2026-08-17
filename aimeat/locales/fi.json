@@ -441,7 +441,7 @@
     "newScope": "uusi",
     "area": {
       "memory": "tallentamasi tiedot",
-      "storage": "tiedostosi",
+      "storage": "täällä säilyttämäsi tiedostot",
       "catalogue": "julkinen hakemisto",
       "social": "keskustelualueet",
       "messages": "viestisi",
@@ -452,7 +452,60 @@
       "ai": "AI-budjettisi",
       "notifications": "ilmoitukset sinulle",
       "organism": "työtilasi",
-      "app": "nimissäsi julkaistut appit"
+      "app": "nimissäsi julkaistut appit",
+      "work": "agenttiesi välinen työ",
+      "packages": "pakettien asentaminen",
+      "connections": "kytkemäsi tilit",
+      "provenance": "sisällön merkinnät",
+      "contract": "ostaminen rahoillasi",
+      "share": "tietojesi jakaminen valitsemillesi ihmisille",
+      "exchange": "kauppapaikka",
+      "finance": "kirjanpitosi",
+      "outbound": "sähköposti yhteystiedoillesi",
+      "company": "yrityksesi"
+    },
+    "scopeText": {
+      "task": {
+        "read": "Näkee agenttiesi tehtävät, ajot ja tulokset.",
+        "write": "Luo ja käynnistää tehtäviä omille agenteillesi."
+      },
+      "catalogue": {
+        "read": "Lukee julkista hakemistoa."
+      },
+      "social": {
+        "read": "Lukee keskustelualueita joihin sinulla on pääsy."
+      },
+      "knowledge": {
+        "read": "Lukee tilillesi tallennetut tietopaketit."
+      },
+      "contract": {
+        "spend": "Ostaa puolestasi hallussasi olevilla ostosopimuksilla, asettamaasi rajaan asti. Tämä kuluttaa morseleitasi tai rahaasi."
+      }
+    }
+  },
+  "consent": {
+    "priming": {
+      "oauth": "Olet yhdistämässä palvelua {client} AIMEAT-tiliisi. Se toimii yhden agenttisi kautta ja voi tehdä vain sen, mihin agentilla on lupa.",
+      "appGrant": "{app} pyytää lupaa käyttää osaa AIMEAT-tilistäsi.",
+      "device": "Tekoälyavustaja pyytää lupaa toimia AIMEAT-tililläsi agenttinasi. Sinä päätät, kuinka paljon se saa tehdä."
+    },
+    "boundary": {
+      "reach": "Tämä koskee vain AIMEAT-tiliäsi täällä. Se ei voi avata tietokonettasi, koneellasi olevia tiedostoja eikä mitään muualla olevaa tiliäsi.",
+      "visibility": "Mikään ei näy muille ihmisille ennen kuin itse jaat sen.",
+      "control": "Jokainen toimi kirjataan, ja voit perua pääsyn milloin tahansa: Profiili › Pääsy."
+    },
+    "denied": {
+      "title": "Mitään ei myönnetty",
+      "oauth": "{client} ei voi käyttää tiliäsi. Jos muutat mielesi, aloita yhdistäminen uudelleen palvelusta {client}.",
+      "appGrant": "Appia ei yhdistetty, eikä se näe tililtäsi mitään. Voit avata sen uudelleen milloin haluat.",
+      "device": "Avustajaa ei päästetty sisään. Pyydä sitä aloittamaan uusi pyyntö, jos muutat mielesi."
+    },
+    "preset": {
+      "readonly": "Voi katsella: {areas}. Se ei voi muuttaa mitään.",
+      "standard": "Voi lukea ja kirjoittaa: {areas}. Saldosi, viestisi ja tilisi asetukset pysyvät sen ulottumattomissa.",
+      "full": "Voi tehdä lähes kaiken minkä sinäkin täällä. Kirjautumisesi ja tilisi turva-asetukset, rahojesi maksatusasetukset, tietojesi jakaminen uusille ihmisille ja muiden agenttiesi oikeuksien muuttaminen vaativat kukin oman erillisen rastinsa.",
+      "keep": "Jättää oikeudet täsmälleen ennalleen.",
+      "custom": "Valitse tarkat oikeudet itse listasta."
     }
   },
   "auth": {
@@ -756,6 +809,8 @@
   "chat.retry": "Yritä uudelleen",
   "chat.send": "Lähetä",
   "chat.signIn": "Kirjaudu sisään, niin ensimmäinen agenttisi odottaa täällä.",
+  "chat.statusYourAgent": "Agenttisi",
+  "chat.useOwnKeyLink": "Käytä omaa avainta",
   "chat.stop": "Pysäytä",
   "chat.stopListening": "Pysäytä",
   "chat.title": "Chat",
@@ -764,6 +819,7 @@
   "chat.turnFailed": "Vuoroa ei saatu vietyä loppuun.",
   "chat.welcomeBody": "Se toimii täällä samalla tavalla kuin oma tekoälytyökalusi: samat oikeudet ja sama kirjaus siitä, mitä se teki. Pyydä siltä jotain.",
   "chat.welcomeTitle": "Ensimmäinen agenttisi",
+  "chat.welcomeTrust": "Kaikki mitä täällä teet on omalla tililläsi, eikä mikään ole julkista ennen kuin itse julkaiset sen.",
   "chat.work.completed": "valmis",
   "chat.work.failed": "epäonnistui",
   "chat.work.in_progress": "käynnissä",
@@ -4281,9 +4337,8 @@
     "newAgentNameError": "Nimen on oltava 3-64 merkkiä: pienet kirjaimet, numerot ja väliviivat. Nimen alku ja loppu kirjaimella tai numerolla.",
     "createBtn": "Luo",
     "cancelBtn": "Peruuta",
-    "scopeLabel": "Pyydetyt oikeudet:",
-    "scopeFull": "Täysi pääsy: muisti, lompakko, toiminnot, taulut, tallennus",
-    "walletNote": "Tämän agentin morselilompakkoa käytetään kaikissa tapahtumissa",
+    "actsAs": "{client} toimii valitsemanasi agenttina ja voi tehdä täsmälleen sen, mitä agentti saa tehdä:",
+    "agentPays": "Kaikki tämän yhteyden ostot maksetaan agentin omista morseleista, jotka näkyvät sen nimen vieressä. Se ei yletä pankkikorttiisi eikä mihinkään rahaan AIMEATin ulkopuolella.",
     "approveBtn": "Hyväksy yhteys",
     "denyBtn": "Hylkää",
     "approving": "Hyväksytään...",
@@ -4296,6 +4351,36 @@
     "doneTitle": "Valmis",
     "authCodeLabel": "Valtuutuskoodi:",
     "authCodeHint": "Liitä tämä koodi takaisin sovellukseen, joka pyysi pääsyä."
+  },
+  "agentConsentPage": {
+    "title": "Agentin hyväksyminen",
+    "loginRequired": "Kirjaudu sisään hyväksyäksesi tai hylätäksesi pyynnön.",
+    "usernameLabel": "Käyttäjänimi",
+    "passwordLabel": "Salasana",
+    "totpLabel": "TOTP-koodi (jos käytössä)",
+    "loginBtn": "Kirjaudu",
+    "confirmHint": "Varmista, että koodi vastaa agentin näyttämää koodia",
+    "agentName": "Agentin nimi",
+    "displayName": "Näyttönimi",
+    "description": "Kuvaus",
+    "scopeLabel": "Käyttöoikeustaso",
+    "approveBtn": "Hyväksy",
+    "denyBtn": "Hylkää",
+    "approving": "Hyväksytään...",
+    "approved": "Agentti hyväksytty",
+    "approvedMsg": "Agentti on rekisteröity ja voi nyt toimia tililläsi.",
+    "agentGaii": "Agentin GAII",
+    "expired": "Pyyntö vanhentunut",
+    "expiredMsg": "Tämä valtuutuspyyntö on vanhentunut. Pyydä agenttia aloittamaan uusi pyyntö.",
+    "errorNoCode": "Koodi-parametri puuttuu. Käytä agentin antamaa linkkiä.",
+    "errorNotFound": "Valtuutuspyyntöä ei löydy tai se on vanhentunut.",
+    "errorOwnerMismatch": "Tämä pyyntö kuuluu toiselle käyttäjälle. Kirjaudu oikealla tilillä.",
+    "errorGeneric": "Jokin meni pieleen. Yritä uudelleen.",
+    "selectOne": "Valitse vähintään yksi oikeus",
+    "pollingNote": "Agenttisi hakee tunnistetietoja automaattisesti. Jos se ei pysty hakemaan, kopioi alla olevat tiedot ja liitä ne agentille.",
+    "pollingHint": "Agentti saa tunnuksen ja yksityisen avaimen kyselyllä. Jos kysely epäonnistuu, pyydä agenttia yrittämään uudelleen",
+    "pollingHintCode": "POST /v1/agents/device-token",
+    "pollingHintSuffix": "laitteen koodilla."
   },
   "openItems.add": "Lisää avoimiin",
   "openItems.byAi": "tekoälysi lisäsi tämän",
@@ -5716,6 +5801,9 @@
       "connect": "Yhdistä automaatioagentti",
       "connectDesc": "Yhdistä tekoälyagentti tilillesi AIMEAT-liittimellä tai agenttia ajavassa ympäristössä. Liitin on helpoin polku, koska se antaa agentille pysyvän identiteetin, hyväksytyt rajaukset, paikallisen taitopaketin ja MCP-pääsyn AIMEAT-työkaluihin:",
       "connectOptionsTitle": "Valitse ensin, miten agentti yhdistetään AIMEATiin:",
+      "connectRecommendedTitle": "Suositus: kytke tekoäly josta jo maksat.",
+      "connectRecommendedDesc": "Valitse työkalusi alta ja seuraa askeleita. Mitään ei asenneta, ja ilmainen Claude-tili riittää.",
+      "connectDeveloperTitle": "Kehittäjille: kytkentä komentoriviltä (CLI-agentit ja fleetit)",
       "connectOptionConnectorTitle": "Suositus: käytä AIMEAT-liitintä.",
       "connectOptionConnectorDesc": "Se hoitaa laitetunnistautumisen, tallentaa agentin tunnuksen paikallisesti, lataa taitopaketin ja tarjoaa AIMEAT-työkalut MCP:n kautta, jotta agentti voi käyttää tehtäviä, viestejä, muistia, telemetriaa ja Hello Integrationia istuntojen välillä.",
       "connectOptionFallbackTitle": "Varapolku: käytä API-kehotetta.",
@@ -8375,6 +8463,9 @@
       "title": "Tekoälypalvelu",
       "statusReady": "Avain tallennettu",
       "statusNoKey": "Ei avainta",
+      "whyLead": "Omalla avaimella kaikki tekoälytoiminnot ja tämän noden chat kulkevat omalla budjetillasi ja itse valitsemallasi mallilla, ilman talon rajaa.",
+      "whyCost": "Tavalliset mallit maksavat sentin murto-osia per vastaus. Kertaluonteinen 10 $ lataus OpenRouteriin nostaa lisäksi sen ilmaismallit 1000 pyyntöön päivässä, mikä on useimmille käytännössä ilmaista pysyvästi.",
+      "whyModel": "Hyvä ensimmäinen valinta: DeepSeek v4 0813, päättely päällä.",
       "section": {
         "connection": "Yhteys",
         "models": "Mallit",

@@ -441,7 +441,7 @@
     "newScope": "new",
     "area": {
       "memory": "your saved data",
-      "storage": "your files",
+      "storage": "the files you keep here",
       "catalogue": "the public catalogue",
       "social": "boards",
       "messages": "your messages",
@@ -452,7 +452,60 @@
       "ai": "your AI budget",
       "notifications": "notifications to you",
       "organism": "your workspaces",
-      "app": "apps published in your name"
+      "app": "apps published in your name",
+      "work": "work between your agents",
+      "packages": "installing packages",
+      "connections": "accounts you have connected",
+      "provenance": "how content is labelled",
+      "contract": "buying with your money",
+      "share": "sharing your data with people you chose",
+      "exchange": "the marketplace",
+      "finance": "your bookkeeping",
+      "outbound": "email to your contacts",
+      "company": "your companies"
+    },
+    "scopeText": {
+      "task": {
+        "read": "See your agents' tasks, their runs and their results.",
+        "write": "Create and start tasks for your own agents."
+      },
+      "catalogue": {
+        "read": "Read the public catalogue and directory."
+      },
+      "social": {
+        "read": "Read the boards you can access."
+      },
+      "knowledge": {
+        "read": "Read the knowledge packages saved in your account."
+      },
+      "contract": {
+        "spend": "Buy on your behalf with the purchase agreements you hold, up to the limit you set. This spends your morsels or money."
+      }
+    }
+  },
+  "consent": {
+    "priming": {
+      "oauth": "You are connecting {client} to your AIMEAT account. It works through one of your agents and can do only what that agent is allowed to do.",
+      "appGrant": "{app} is asking to use part of your AIMEAT account.",
+      "device": "An AI assistant is asking to work in your AIMEAT account as your agent. You decide how much it may do."
+    },
+    "boundary": {
+      "reach": "This applies only to your AIMEAT account here. It cannot open your computer, the files on your computer, or any account you have somewhere else.",
+      "visibility": "Nothing becomes visible to other people until you share it yourself.",
+      "control": "Every action is recorded, and you can take this access away at any time under Profile › Access."
+    },
+    "denied": {
+      "title": "Nothing was granted",
+      "oauth": "{client} cannot use your account. If you change your mind, start the connection again from {client}.",
+      "appGrant": "The app was not connected and cannot see anything in your account. You can open it again whenever you like.",
+      "device": "The assistant was not let in. Ask it to start a new request if you change your mind."
+    },
+    "preset": {
+      "readonly": "Can look at {areas}. It cannot change anything.",
+      "standard": "Can read and write {areas}. Your balance, your messages and your account settings stay out of its reach.",
+      "full": "Can do almost everything you can do here. Your sign-in and account security, your money's payout settings, sharing your data with new people, and rewriting your other agents' permissions each need their own separate tick.",
+      "keep": "Leaves its permissions exactly as they are now.",
+      "custom": "Pick the exact permissions yourself from the list."
     }
   },
   "auth": {
@@ -756,14 +809,17 @@
   "chat.retry": "Try again",
   "chat.send": "Send",
   "chat.signIn": "Sign in and your first agent is waiting here.",
+  "chat.statusYourAgent": "Your agent",
   "chat.stop": "Stop",
   "chat.stopListening": "Stop",
   "chat.title": "Chat",
   "chat.transcribeFailed": "That recording could not be turned into text.",
   "chat.turnCount": "{n} messages",
   "chat.turnFailed": "The turn could not be completed.",
+  "chat.useOwnKeyLink": "Use your own key",
   "chat.welcomeBody": "It works here the way your own AI tool would, with the same permissions and the same record of what it did. Ask it for something.",
   "chat.welcomeTitle": "Your first agent",
+  "chat.welcomeTrust": "Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.",
   "chat.work.completed": "done",
   "chat.work.failed": "failed",
   "chat.work.in_progress": "running",
@@ -4281,9 +4337,8 @@
     "newAgentNameError": "Name must be 3-64 characters: lowercase letters, numbers, and hyphens only. Must start and end with a letter or number.",
     "createBtn": "Create",
     "cancelBtn": "Cancel",
-    "scopeLabel": "Permissions requested:",
-    "scopeFull": "Full access: memory, wallet, actions, boards, storage",
-    "walletNote": "This agent's morsel wallet will be used for all transactions",
+    "actsAs": "{client} will act as the agent you pick, and can do exactly what that agent may do:",
+    "agentPays": "Anything this connection buys is paid from this agent's own morsels, shown next to its name. It cannot reach your bank card or any money outside AIMEAT.",
     "approveBtn": "Approve Connection",
     "denyBtn": "Deny",
     "approving": "Approving...",
@@ -4296,6 +4351,36 @@
     "doneTitle": "Done",
     "authCodeLabel": "Authorization code:",
     "authCodeHint": "Paste this code back into the application that requested access."
+  },
+  "agentConsentPage": {
+    "title": "Agent Authorization",
+    "loginRequired": "Sign in to approve or deny this request.",
+    "usernameLabel": "Username",
+    "passwordLabel": "Password",
+    "totpLabel": "TOTP code (if enabled)",
+    "loginBtn": "Sign In",
+    "confirmHint": "Confirm this code matches what the agent showed you",
+    "agentName": "Agent Name",
+    "displayName": "Display Name",
+    "description": "Description",
+    "scopeLabel": "Permission Level",
+    "approveBtn": "Approve",
+    "denyBtn": "Deny",
+    "approving": "Approving...",
+    "approved": "Agent Authorized",
+    "approvedMsg": "The agent has been registered and can now work in your account.",
+    "agentGaii": "Agent GAII",
+    "expired": "Request Expired",
+    "expiredMsg": "This authorization request has expired. Please ask the agent to start a new request.",
+    "errorNoCode": "Missing code parameter. Please use the link provided by your agent.",
+    "errorNotFound": "Authorization request not found or expired.",
+    "errorOwnerMismatch": "This request belongs to a different user. Sign in with the correct account.",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "selectOne": "Select at least one permission",
+    "pollingNote": "Your agent is polling for credentials automatically. If it cannot poll, copy the information below and paste it to your agent chat.",
+    "pollingHint": "The agent will receive its token and private key via polling. If polling fails, ask your agent to retry",
+    "pollingHintCode": "POST /v1/agents/device-token",
+    "pollingHintSuffix": "with the device code."
   },
   "openItems.add": "Add to open items",
   "openItems.byAi": "your AI put this here",
@@ -5716,6 +5801,9 @@
       "connect": "Connect an Automation Agent",
       "connectDesc": "Connect an AI agent to your account using the AIMEAT connector CLI or an agent-capable runtime. The connector is the easiest path because it gives the agent a persistent identity, approved scopes, local skill bundle, and MCP access to AIMEAT tools:",
       "connectOptionsTitle": "Choose how the agent connects to AIMEAT first:",
+      "connectRecommendedTitle": "Recommended: connect the AI you already pay for.",
+      "connectRecommendedDesc": "Pick your tool below and follow the steps. Nothing to install, and a free Claude account is enough.",
+      "connectDeveloperTitle": "For developers: connect from a terminal (CLI agents and fleets)",
       "connectOptionConnectorTitle": "Recommended: use the AIMEAT connector.",
       "connectOptionConnectorDesc": "It handles device authentication, stores the agent token locally, downloads the skill bundle, and exposes AIMEAT tools through MCP so the agent can use tasks, messages, memory, telemetry, and Hello Integration across sessions.",
       "connectOptionFallbackTitle": "Fallback: use the API prompt.",
@@ -8375,6 +8463,9 @@
       "title": "AI provider",
       "statusReady": "Key saved",
       "statusNoKey": "No key",
+      "whyLead": "With your own key, every AI feature here and this node’s chat run on your budget and your choice of model, with no house limit.",
+      "whyCost": "Ordinary models cost a fraction of a cent per exchange. A one-time $10 credit on OpenRouter also lifts its free models to 1,000 requests a day, which for most people is effectively free forever.",
+      "whyModel": "A good first pick: DeepSeek v4 0813, with reasoning turned on.",
       "section": {
         "connection": "Connection",
         "models": "Models",

@@ -17,6 +17,10 @@
  *     POST /token, GET /v1/app-grants, DELETE /v1/app-grants/:grantId
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.11.0 — 2026-08-17 — Consent rows carry `description_keys`: the ordered locale-key chain the
+ *     consent UI already resolves client-side (consent-vocab.js), served so API consumers can
+ *     localize the sentence instead of hardcoding the English `description`. Display metadata only,
+ *     never part of the gate; the validation vocabulary (the APP_GRANTABLE_SCOPES keys) is untouched.
  *   v1.10.0 — 2026-08-11 — Security audit 1-later-c, step ONE of three: `app:write` joins
  *     APP_GRANTABLE_SCOPES, so an app can ask to publish under its owner's name and the owner can
  *     refuse. Publishing was reachable on an app-grant token and missing from this vocabulary, which
@@ -179,6 +183,21 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
 };
 
 /**
+ * Ordered locale-key candidates for one scope's consent sentence. The consent UI localizes
+ * client-side (public/js/consent-vocab.js applies this exact chain); this is served so an API
+ * consumer can localize the same way instead of hardcoding the English `description`. The
+ * app-context override tree wins over the shared agent sentence tree; the first key that exists in
+ * the locale file is the sentence.
+ */
+export function scopeDescriptionKeys(scope: string): string[] {
+  const [family, perm] = scope.split(':');
+  return [
+    `appGrant.scopeText.${family}.${perm}`,
+    `profile.agents.scopeUi.scopeText.${family}.${perm}`,
+  ];
+}
+
+/**
  * The most a token minted for a PORTFOLIO origin may carry.
  *
  * A portfolio origin exists for one job: the owner visiting their own published page sees their own
@@ -318,7 +337,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const DEFAULT_SCOPES = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
     res.json(success(config.nodeId, {
       scopes: Object.entries(APP_GRANTABLE_SCOPES).map(([scope, description]) => ({
-        scope, description, default: DEFAULT_SCOPES.includes(scope),
+        scope, description, description_keys: scopeDescriptionKeys(scope), default: DEFAULT_SCOPES.includes(scope),
       })),
       declare_with: '<meta name="aimeat-scopes" content="memory:read memory:write storage:read storage:write memory:delete ai:use">',
       notes: [
@@ -424,7 +443,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       // same policy as the silent bridge) — but ONLY when the redirect origin is bound to this app.
       app_owner: pending.app.includes('/') ? pending.app.slice(0, pending.app.indexOf('/')) : null,
       origin_bound: pending.originBound,
-      scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s] })),
+      scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s], description_keys: scopeDescriptionKeys(s) })),
     }));
   });
 
