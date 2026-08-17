@@ -117,6 +117,9 @@ export async function recordAccountEvent(
  * repeated "first use" a year later is a small wrong compared to a feed nobody can read.
  */
 const firstUseSeen = new Set<string>();
+// Memory audit 2026-08-17: one entry per owner-and-kind forever otherwise; a reset past
+// the cap costs a duplicate-check read, never a duplicate event (the write path checks).
+const FIRST_USE_SEEN_CAP = 50_000;
 
 export async function recordFirstUse(
   storage: Storage,
@@ -130,6 +133,7 @@ export async function recordFirstUse(
     const existing = await storage.listAccountEvents({
       ownerGhii: input.ownerGhii, kind: input.kind, limit: windowSize(config),
     });
+    if (firstUseSeen.size >= FIRST_USE_SEEN_CAP) firstUseSeen.clear();
     firstUseSeen.add(cacheKey);
     if (existing.some(e => e.subject === input.subject)) return;
   } catch (err) {

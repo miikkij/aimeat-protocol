@@ -554,6 +554,8 @@ export async function reconcileOwnerOfferingsThrottled(storage: Storage, princip
   const now = Date.now();
   const prev = lastReconcile.get(ownerGhii) ?? 0;
   if (now - prev < RECONCILE_WINDOW_MS) return;
+  // Memory audit 2026-08-17: one throttle entry per owner forever otherwise.
+  if (lastReconcile.size >= 50_000) lastReconcile.clear();
   lastReconcile.set(ownerGhii, now);
   await reconcileOwnerOfferings(storage, ownerGhii);
 }
