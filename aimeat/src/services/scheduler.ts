@@ -129,6 +129,27 @@ export class Scheduler {
   /** Guards against overlapping fires of the same job (one run at a time). */
   private executing = new Set<string>();
 
+  // Boot-memory trace 2026-08-17: a cron tick launched 13 jobs in the same second, several of
+  // them extension jobs that each open a QuickJS WASM sandbox (external memory spiked to
+  // ~570 MB), and the concurrent peak becomes the process's permanent RSS floor via the native
+  // allocator. Extension jobs now take one of two slots and queue behind them; core jobs are
+  // cheap reads and stay unthrottled. The slot holder chain is the queue, so order is FIFO.
+  private static readonly EXT_JOB_SLOTS = 2;
+  private extJobsRunning = 0;
+  private extJobWaiters: Array<() => void> = [];
+
+  private async acquireExtSlot(): Promise<void> {
+    if (this.extJobsRunning < Scheduler.EXT_JOB_SLOTS) { this.extJobsRunning++; return; }
+    await new Promise<void>(resolve => this.extJobWaiters.push(resolve));
+    this.extJobsRunning++;
+  }
+
+  private releaseExtSlot(): void {
+    this.extJobsRunning--;
+    const next = this.extJobWaiters.shift();
+    if (next) next();
+  }
+
   constructor(config: AimeatConfig, storage: Storage, emailService?: EmailService) {
     this.config = config;
     this.storage = storage;
@@ -327,6 +348,9 @@ export class Scheduler {
       }
     }
 
+    const isExtension = job.type === 'extension';
+    if (isExtension) await this.acquireExtSlot();
+
     this.executing.add(job.id);
     const startTime = Date.now();
     logger.info(`Scheduler executing job: ${job.id} (${job.displayName || job.name}) [${job.type}/${trigger}]`);
@@ -362,6 +386,7 @@ export class Scheduler {
       errorMessage = err instanceof Error ? err.message : String(err);
     } finally {
       this.executing.delete(job.id);
+      if (isExtension) this.releaseExtSlot();
     }
 
     const durationMs = Date.now() - startTime;
