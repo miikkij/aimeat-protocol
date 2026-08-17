@@ -150,14 +150,29 @@ export class DirectoryService {
 
   /** Rebuild the entire directory index from storage */
   async rebuildIndex(): Promise<void> {
+    // Boot-memory trace 2026-08-17: production RSS jumps ~1.3 GiB in the seconds around this
+    // rebuild (one 1.38 GiB native allocation, invisible to the V8 heap), and the log lines
+    // alone cannot say which read does it. Each phase below logs its RSS delta so the next
+    // boot names the eater — or proves this function innocent. Remove once the culprit is fixed.
+    const rssMb = () => Math.round(process.memoryUsage.rss() / 1048576);
+    let rssPrev = rssMb();
+    const tracePhase = (phase: string) => {
+      const now = rssMb();
+      logger.info('Directory rebuild phase', { phase, rssMb: now, deltaMb: now - rssPrev });
+      rssPrev = now;
+    };
+
     const newIndex = new Map<string, DirectoryEntry>();
 
     const ghiis = await this.storage.listGHIIs();
+    tracePhase('listGHIIs');
 
     // Batch the per-GHII agent + consent fan-out into two IN queries (was O(owners×agents)).
     const agentsByOwner = await this.storage.getAgentsByOwners([...new Set(ghiis.map(g => g.ownerName))]);
+    tracePhase('getAgentsByOwners');
     const allAgentGaiis = Object.values(agentsByOwner).flat().map(a => a.gaii);
     const consentsByAgent = await this.storage.listConsentsForAgents(allAgentGaiis, { status: 'active' });
+    tracePhase('listConsentsForAgents');
 
     for (const ghii of ghiis) {
       try {
@@ -251,7 +266,9 @@ export class DirectoryService {
 
     // Index organisms (Phase 2.2 — directory unification). Archived organisms are read-only/retired —
     // never indexed into the public directory/catalogue/discover surfaces.
+    tracePhase('profileLoop');
     const organisms = await this.storage.listOrganisms({ archived: 'exclude' });
+    tracePhase('listOrganisms');
     for (const org of organisms) {
       // Only index public and listed organisms
       if (org.visibility === 'private') continue;
@@ -284,6 +301,7 @@ export class DirectoryService {
 
     this.index = newIndex;
     this.lastUpdated = new Date().toISOString();
+    tracePhase('organismLoop');
     logger.info('Directory index rebuilt', { entries: newIndex.size });
   }
 
