@@ -143,6 +143,12 @@ export async function writeMarkerOnce(
 // In-process de-dupe so a busy owner costs one storage read per boot, not one per session.
 const seenMcpOwners = new Set<string>();
 const seenHelloOwners = new Set<string>();
+const SEEN_OWNERS_CAP = 50_000;
+// Memory audit 2026-08-17: these grow one entry per owner forever; past the cap a reset
+// only costs one extra storage read per owner, never correctness.
+function capSeen(set: Set<string>): void {
+  if (set.size >= SEEN_OWNERS_CAP) set.clear();
+}
 
 /**
  * Record the owner's FIRST authenticated MCP session. Called from the MCP initialize path;
@@ -152,6 +158,7 @@ export async function recordFirstMcpCall(
     storage: Storage, config: AimeatConfig, owner: string, client?: string,
 ): Promise<void> {
     if (!owner || seenMcpOwners.has(owner)) return;
+    capSeen(seenMcpOwners);
     seenMcpOwners.add(owner);
     try {
         await writeMarkerOnce(storage, ownerGhii(config, owner), FIRST_MCP_CALL_KEY, {
@@ -169,6 +176,7 @@ export async function recordHelloPageOpened(
     storage: Storage, config: AimeatConfig, owner: string,
 ): Promise<void> {
     if (!owner || seenHelloOwners.has(owner)) return;
+    capSeen(seenHelloOwners);
     seenHelloOwners.add(owner);
     try {
         await writeMarkerOnce(storage, ownerGhii(config, owner), HELLO_PAGE_OPENED_KEY, {

@@ -377,6 +377,25 @@ export class PresenceTracker {
       if (!activeIds.has(entry.node)) this.remote.delete(ghii);
     }
 
+    // Memory audit 2026-08-17: these maps used to keep one entry per owner who had EVER
+    // opened a stream. An owner who is offline, at the default raw status, with no pending
+    // delta, is indistinguishable from one we never saw — drop the state and let a future
+    // connect rebuild it. Entries still in `dirty` wait for their delta to go out first.
+    for (const [ghii, raw] of [...this.localRaw]) {
+      if (raw === 'offline' && !this.isOnline(ghii) && !this.dirty.has(ghii)) {
+        this.localRaw.delete(ghii);
+        this.localSince.delete(ghii);
+        this.lastBroadcast.delete(ghii);
+      }
+    }
+    const nowMs = Date.now();
+    for (const [k, v] of [...this.configCache]) {
+      if (v.exp <= nowMs) this.configCache.delete(k);
+    }
+    for (const [k, v] of [...this.agentSeenCache]) {
+      if (v.exp <= nowMs) this.agentSeenCache.delete(k);
+    }
+
     if (activePeers.length === 0) { this.dirty.clear(); return; }
 
     const nodeKey = await this.storage.getNodeKey();
