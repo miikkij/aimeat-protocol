@@ -14,6 +14,13 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v2.0.0 — 2026-08-18 — The finished home turns from an instruction sheet into a STATUS VIEW
+ *     (Jouni, on seeing his own: the strongest content was at the bottom and the screen read as
+ *     warnings). Order now: what your agents are doing (AgentCard + feed), open items only while
+ *     they are fresh (a week), one clear door to the chat at the top. The four room cards leave
+ *     the front page — the person the rooms were for is carried by the chat now — and the
+ *     "Your welcome mat is up" tutorial card collapses into one line with the address once the
+ *     mat exists. The uninitialised (onboarding) home is untouched.
  *   v1.1.0 — 2026-08-16 — The install suggestion (InstallCta) renders in both states: the browser
  *     never proposes installing on its own, so the home does.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
@@ -23,7 +30,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { api, apiGet } from '/js/api.js';
+import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
 import { swallowed } from '/js/swallowed.js';
@@ -31,7 +38,7 @@ import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent, AgentCard } from '/views/home/step-agent.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { StepBranchB } from '/views/home/step-branch-b.js';
-import { HomeFeed, Rooms } from '/views/home/feed.js';
+import { HomeFeed } from '/views/home/feed.js';
 import { HomeHeader } from '/views/home/header.js';
 import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { InstallCta } from '/components/InstallCta.js';
@@ -71,10 +78,22 @@ function Welcome() {
     </header>`;
 }
 
+/** One clear door to where the work actually happens. The home reports; the chat does. */
+function ChatDoor() {
+  return html`
+    <section class="koti-chatdoor">
+      <p class="koti-chatdoor-lede">
+        ${tr('home.chatDoor.lede', 'Your agent is in the chat. Say what you need, and it gets to work.')}
+      </p>
+      <a class="btn-primary koti-chatdoor-cta" href="/v1/chat">
+        ${tr('home.chatDoor.cta', 'Continue in the chat')}
+      </a>
+    </section>`;
+}
+
 export default function HomeView({ navigate }) {
   const session = useSession();
   const [state, setState] = useState(null);
-  const [rooms, setRooms] = useState([]);
   const [feed, setFeed] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
@@ -92,8 +111,6 @@ export default function HomeView({ navigate }) {
     try {
       const r = await apiGet('/v1/home/state');
       setState(r.data.state);
-      // Only the rooms the node actually has — the server decides, this view renders (E11).
-      setRooms(r.data.rooms ?? []);
       setLoadError('');
       // The feed is secondary to the steps: if it fails the page still works, but the failure is
       // recorded rather than swallowed, because a feed that silently never loads looks identical
@@ -107,16 +124,6 @@ export default function HomeView({ navigate }) {
     } catch (e) {
       setLoadError(e.message || String(e));
     }
-  }, []);
-
-  // Going into a room records WHICH one was first, then follows the door.
-  const enterRoom = useCallback(async (room) => {
-    // The door opens either way: a funnel marker must never stand between a person and the thing
-    // they just chose. The failure is still recorded, so a room that stops being counted is
-    // visible rather than mysterious.
-    await api('/v1/home/room', { method: 'POST', body: JSON.stringify({ room: room.id }) })
-      .catch(e => swallowed('home: room marker', e));
-    window.location.href = room.url;
   }, []);
 
   useEffect(() => { if (session) load(); }, [session, load]);
@@ -162,8 +169,10 @@ export default function HomeView({ navigate }) {
 
   const name = state.displayName || state.owner;
 
-  // ── The home, once it exists: the first agent as a card, its details below it. ──
+  // ── The home, once it exists: a status view. What your agents are doing first, the door to the
+  // chat above it all, and nothing that tutors a person whose home has been up for weeks. ──
   if (state.initialized) {
+    const matUrl = state.mat?.standaloneUrl || state.mat?.url || '';
     return html`
       <div class="koti">
         <${HomeHeader} name=${name} onOpenSettings=${() => setSettingsOpen(true)} />
@@ -172,13 +181,17 @@ export default function HomeView({ navigate }) {
           <p class="koti-welcome-sub">
             ${tr('home.readySub', 'Your welcome mat is out and your first agent is home.')}
           </p>
+          ${matUrl && html`
+            <p class="koti-matline">
+              ${tr('home.matCompact', 'Your welcome mat:')}${' '}
+              <a href=${matUrl} target="_blank" rel="noopener">${matUrl.replace(/^https?:\/\//, '')}</a>
+            </p>`}
         </header>
+        <${ChatDoor} />
         <${AgentCard} agent=${state.agent} />
-        <${Rooms} rooms=${rooms} onEnter=${enterRoom} />
-        <${OpenItemsList} />
-        <${StepMatDone} state=${state} />
-        <${InstallCta} />
         <${HomeFeed} items=${feed} />
+        <${OpenItemsList} maxAgeDays=${7} />
+        <${InstallCta} />
         <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
           session=${session} showToast=${showToast} />
       </div>`;

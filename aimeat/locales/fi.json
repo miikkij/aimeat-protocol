@@ -3031,6 +3031,11 @@
     "signIn": "Kirjaudu kotiisi",
     "readyTitle": "Kotisi on valmis.",
     "readySub": "Tervetuloamattosi on paikallaan ja ensimmäinen agenttisi on kotona.",
+    "matCompact": "Tervetuloamattosi:",
+    "chatDoor": {
+      "lede": "Agenttisi on chatissa. Sano mitä tarvitset, niin se ryhtyy töihin.",
+      "cta": "Jatka keskustelua"
+    },
     "step1": "Tervetuloamattosi",
     "step2": "Yhdistä kotiisi ensimmäinen agenttisi",
     "step2b": "Ota käyttöön sovellus joka osaa avata yhteyden",

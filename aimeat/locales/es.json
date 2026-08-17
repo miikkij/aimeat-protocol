@@ -3031,6 +3031,11 @@
     "signIn": "Iniciar sesión",
     "readyTitle": "Tu hogar está en marcha.",
     "readySub": "Tu felpudo de bienvenida está puesto y tu primer agente ya está en casa.",
+    "matCompact": "Tu felpudo de bienvenida:",
+    "chatDoor": {
+      "lede": "Tu agente está en el chat. Di qué necesitas y se pone a trabajar.",
+      "cta": "Continuar en el chat"
+    },
     "step1": "Tu felpudo de bienvenida",
     "step2": "Conecta tu primer agente",
     "step2b": "Consigue una aplicación que sepa conectarse",

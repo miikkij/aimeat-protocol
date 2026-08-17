@@ -21,9 +21,12 @@
  *
  *   EMPTY RENDERS NOTHING. Not a heading with an encouraging sentence under it: an empty state reads
  *   as broken, and "you have no open items" is exactly that.
- * @structure OpenItemsList({ compact })
- * @usage html`<${OpenItemsList} />`
+ * @structure OpenItemsList({ maxAgeDays })
+ * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   v1.1.0 — 2026-08-18 — `maxAgeDays`: a surface can ask for fresh items only. An eight-day-old
+ *     "Haluan luoda" at the top of the home is an inbox of guilt, not a status; a row an agent is
+ *     WORKING on stays regardless of age, because active work never goes stale by sitting there.
  *   v1.0.0 — 2026-08-09 — Replaces components/IntentPool.js. One prompt at the top instead of one
  *     per row, a state control instead of Done/Remove, and the AI's own rows are marked.
  */
@@ -61,14 +64,24 @@ function originLabel(origin) {
   return tr('openItems.yours', 'Yours');
 }
 
-export function OpenItemsList() {
+/** @param {{ maxAgeDays?: number }} [props] */
+export function OpenItemsList({ maxAgeDays } = {}) {
   const [items, setItems] = useState(null);
   const [prompt, setPrompt] = useState('');
 
   const load = useCallback(async () => {
-    try { setItems(await listOpenItems()); }
+    try {
+      let list = await listOpenItems();
+      // Freshness is opt-in per surface. A row being WORKED on never counts as stale: an agent in
+      // the middle of something is exactly the status the surface wants.
+      if (Number.isFinite(maxAgeDays)) {
+        const cutoff = Date.now() - maxAgeDays * 86400000;
+        list = list.filter(i => i.status === 'working' || (Date.parse(i.createdAt) || 0) >= cutoff);
+      }
+      setItems(list);
+    }
     catch (e) { swallowed('OpenItemsList: load', e); setItems([]); }
-  }, []);
+  }, [maxAgeDays]);
 
   useEffect(() => { load(); }, [load]);
 

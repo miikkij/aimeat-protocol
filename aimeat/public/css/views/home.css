@@ -7,6 +7,9 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v2.0.0 — 2026-08-18 — The four room cards left the finished home (status-view turn), so their
+ *     styles leave too; in their place .koti-chatdoor (the one door to the chat) and .koti-matline
+ *     (the mat address as one line under the greeting).
  *   v1.2.0 — 2026-08-17 — .koti-hist-*: the whole record behind the card. Grouped by day, because
  *     a hundred rows each saying "3 d ago" is a list nobody can navigate, and the archive under a
  *     rule of its own so opening it is a decision rather than a scroll.
@@ -357,26 +360,21 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-hist-more { margin-top: 1.2rem; }
 .koti-hist-error { margin-top: 1rem; font-size: 0.9rem; color: var(--danger); }
 
-/* ── The four rooms ── */
-/* Space on BOTH sides: on the finished home the done mat card follows this block directly, and with
-   a top margin only the two bordered cards met at the same y and read as one collided box. */
-.koti-rooms { margin: 2rem 0; }
-.koti-rooms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.9rem; }
-.koti-room {
-  display: flex; flex-direction: column; gap: 0.35rem;
+/* ── The door to the chat, and the mat address line (status-view home) ── */
+.koti-chatdoor {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  margin: 1.4rem 0;
   padding: 1.1rem 1.2rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
-  color: var(--text);
-  text-decoration: none;
-  transition: border-color .15s;
+  flex-wrap: wrap;
 }
-.koti-room:hover { border-color: var(--accent); }
-.koti-room-title { font-size: 1.05rem; font-weight: 700; }
-.koti-room-what { font-size: 0.92rem; color: var(--text-dim); line-height: 1.5; }
-/* The third line is the one that makes the choice possible, so it reads as a promise, not a note. */
-.koti-room-next { font-size: 0.88rem; color: var(--accent); line-height: 1.5; margin-top: 0.2rem; }
+.koti-chatdoor-lede { margin: 0; font-size: 0.95rem; line-height: 1.5; color: var(--text); }
+.koti-chatdoor-cta { flex: none; }
+.koti-matline { margin: 0.5rem 0 0; font-size: 0.88rem; color: var(--text-dim); }
+.koti-matline a { color: var(--accent); text-decoration: none; }
+.koti-matline a:hover { text-decoration: underline; }
 
 /* ── The front door on the landing page ── */
 .koti-door { max-width: 720px; margin: 0 auto 2.5rem; padding: 2rem 1.25rem 0; }
@@ -551,7 +549,6 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .open-items-btn:hover { color: var(--text); }
 .open-items-btn-count { font-weight: 700; color: var(--text); }
 
-.koti-room-save { margin-top: 0.5rem; font-size: 0.8rem; align-self: flex-start; }
 
 @media (max-width: 640px) {
   /* The row wraps rather than squeezing the title into a column two words wide, and the title
@@ -562,9 +559,6 @@ a.koti-feed-line:hover { text-decoration: underline; }
   .open-items-row { flex-wrap: wrap; }
   .open-items-main { padding-right: 2rem; }
 }
-
-/* The card's own corner. Every card that can be acted on puts its dots here, and only here. */
-.koti-room { position: relative; }
 
 
 /* The fleet line on the agent card is a link: it names a number you can do something about. */
