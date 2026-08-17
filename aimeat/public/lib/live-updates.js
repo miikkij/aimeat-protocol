@@ -15,6 +15,13 @@
  * coalesce) and notify only the subscribers that care. Hidden tabs do NO refetch fan-out (Page
  * Visibility gating) and catch up once when re-shown. A (re)connect forces one "all domains"
  * reconcile so nothing is missed. A legacy/opaque payload is treated as "everything changed".
+ *
+ * Dead-session stop (2026-08-17): a 401 on the ticket request means the stored session expired,
+ * and retrying it on the network-failure backoff turned every abandoned logged-in tab into a
+ * permanent knock on the door every 120 s — the production refusal log showed one dead JWT
+ * retried 17 times at exactly that cadence. A 401 now gets ONE retry after 10 s (another call on
+ * the same page may have just refreshed the session), then the connection stops and tries again
+ * only when the tab next becomes visible. Network failures keep the existing backoff.
  */
 
 let es = null;
@@ -25,7 +32,10 @@ let jwtGetter = null;
 let reconnectTimer = null;
 let reconnectDelay = 5000;
 let everOpened = false;
+let authRetried = false;             // the one 10 s retry after a 401 has been spent
+let authDead = false;                // session known dead: no timers run until the tab is shown again
 const MAX_RECONNECT_DELAY = 120000;
+const AUTH_RETRY_DELAY = 10000;
 const DEBOUNCE_MS = 1000;             // match server COALESCE_MS
 
 let pendingDomains = new Set();       // null ⇒ "everything changed" (sticky for the window)
@@ -89,6 +99,19 @@ async function _open() {
     });
     if (!resp.ok) {
       console.warn('[SSE] Ticket request failed:', resp.status);
+      if (resp.status === 401) {
+        // The stored session is expired. One retry shortly (another call on this page may have
+        // just refreshed it); after that, stop — the visibility listener resumes when the user
+        // actually returns, and a re-login remounts the views which restarts this machinery.
+        clearTimeout(reconnectTimer);
+        if (!authRetried) {
+          authRetried = true;
+          reconnectTimer = setTimeout(() => { if (refCount > 0) _open(); }, AUTH_RETRY_DELAY);
+        } else {
+          authDead = true;
+        }
+        return;
+      }
       scheduleReconnect();
       return;
     }
@@ -99,6 +122,8 @@ async function _open() {
 
     es.onopen = () => {
       reconnectDelay = 5000;
+      authRetried = false;
+      authDead = false;
       // Reconnect catch-up: after a gap we may have missed events, so force one "all domains"
       // reconcile (locally + relayed). Skip on the very first open (views load on mount).
       if (everOpened) { ingestDomains(null); relay(null); }
@@ -167,6 +192,13 @@ if (typeof document !== 'undefined') {
       pendingDomains = null;   // one catch-up reconcile across all domains
       flushDomains();
     }
+    // A dead-session stop gets one fresh attempt when the user actually comes back to the tab:
+    // by then they may have signed in again (here or in a sibling tab sharing the session).
+    if (!document.hidden && authDead && refCount > 0 && isLeader) {
+      authDead = false;
+      authRetried = false;
+      _open();
+    }
   });
 }
 
@@ -182,6 +214,8 @@ export function disconnect() {
     clearTimeout(debounceTimer);
     clearTimeout(reconnectTimer);
     reconnectDelay = 5000;
+    authRetried = false;
+    authDead = false;
     jwtGetter = null;
     everOpened = false;
     pendingDomains = new Set();
