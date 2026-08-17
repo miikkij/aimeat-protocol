@@ -38,6 +38,9 @@ export type AccountEventKind =
   | 'organism_joined'
   | 'organism_left'
   | 'organism_member_joined'
+  // What the account gained the ability to do
+  | 'skill_installed'
+  | 'extension_installed'
   // Money
   | 'payment_received'
   | 'payment_sent'

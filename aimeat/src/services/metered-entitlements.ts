@@ -46,6 +46,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { recordAccountEvent } from './account-events.js';
 
 /** System namespace — server-side only, never surfaced to a client (mirrors `ext-pay-token`). */
 export const NS_ENTITLEMENT = 'metered-entitlement';
@@ -405,6 +406,17 @@ export async function createEntitlement(
     updatedAt: now,
   };
   await persistEntitlement(storage, value);
+  // Both parties to the contract. A contract is an agreement between two accounts and each of them
+  // acquired an obligation; telling only the buyer would leave the seller to notice they had sold
+  // something by watching their balance.
+  const contractLabel = value.capabilityLabel || `${value.ext}/${value.action}`;
+  for (const side of new Set([ownerGhiiOf(value.consumerGaii), value.providerGhii])) {
+    void recordAccountEvent(storage, {
+      ownerGhii: side, kind: 'contract_started', actorGaii: value.createdBy,
+      subject: value.entitlementId, link: '/v1/profile?tab=usage',
+      data: { name: contractLabel },
+    });
+  }
   return value;
 }
 
@@ -680,6 +692,17 @@ export async function archiveEntitlement(
   storage: Storage, ent: MeteredEntitlement, reason: 'superseded' | 'revoked', proposalId?: string | null,
 ): Promise<void> {
   const now = new Date().toISOString();
+  // A SUPERSEDED contract is not an ending: the same arrangement continues on new terms, and saying
+  // "a contract ended" about a renegotiation would read as a loss. Only a revocation ends anything.
+  if (reason === 'revoked') {
+    const endedLabel = ent.capabilityLabel || `${ent.ext}/${ent.action}`;
+    for (const side of new Set([ownerGhiiOf(ent.consumerGaii), ent.providerGhii])) {
+      void recordAccountEvent(storage, {
+        ownerGhii: side, kind: 'contract_ended', subject: ent.entitlementId,
+        link: '/v1/profile?tab=usage', data: { name: endedLabel },
+      });
+    }
+  }
   const archivedId = randomUUID();
   const entry: EntitlementHistoryEntry = {
     ...ent, archivedId, archivedAt: now, archiveReason: reason, supersededByProposal: proposalId ?? null,

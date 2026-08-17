@@ -38,6 +38,7 @@ import type { Storage, OrganismRecord, OrganismMembershipRecord, JoinRequestReco
 import { emitChange } from './event-bus.js';
 import { notify } from './notify.js';
 import { recordPublicActivity } from './public-activity.js';
+import { recordAccountEvent } from './account-events.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { getOrganismReadme, setOrganismReadme } from './organism-readme.js';
 import { MEMBER_VISIBILITY_VALUES } from './organism-privacy.js';
@@ -333,6 +334,21 @@ export async function joinOrganism(
       updatedAt: now,
     });
     emitChange('organisms');
+    // Two feeds, because two people had something happen. The joiner joined; the creator gained a
+    // member, which is news on THEIR account and would otherwise reach them only if they went and
+    // looked at the roster.
+    void recordAccountEvent(storage, {
+      ownerGhii: joinerOwner, kind: 'organism_joined', actorGaii: joinerOwner,
+      subject: id, link: `/v1/organism/${encodeURIComponent(id)}`,
+      data: { name: organism.name || id },
+    }, config);
+    if (organism.createdBy && organism.createdBy !== joinerOwner) {
+      void recordAccountEvent(storage, {
+        ownerGhii: organism.createdBy, kind: 'organism_member_joined', actorGaii: joinerOwner,
+        subject: id, link: `/v1/organism/${encodeURIComponent(id)}`,
+        data: { name: organism.name || id, who: joinerOwner.split('@')[0] },
+      }, config);
+    }
     return { ok: true, outcome: 'joined', membership };
   }
 
@@ -382,7 +398,7 @@ export async function leaveOrganism(
   organism: OrganismRecord,
   leaverOwner: string,
 ): Promise<OrganismRefusal | { ok: true }> {
-  const { storage } = deps;
+  const { storage, config } = deps;
   const id = organism.id;
 
   if (isOrganismOwner(organism, leaverOwner)) {
@@ -405,5 +421,12 @@ export async function leaveOrganism(
   }
   await storage.updateOrganism(id, updates);
   emitChange('organisms');
+  // The leaver's own record only. Someone leaving is not something the organism's creator needs
+  // interrupting for, and a feed that reports every departure on somebody else's account turns
+  // into a roster diff nobody asked for.
+  void recordAccountEvent(storage, {
+    ownerGhii: leaverOwner, kind: 'organism_left', actorGaii: leaverOwner,
+    subject: id, data: { name: organism.name || id },
+  }, config);
   return { ok: true };
 }

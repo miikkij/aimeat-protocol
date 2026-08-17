@@ -37,6 +37,7 @@
  *   v1.0.0 -- 2026-07-05 -- Initial: Phase 2a registry core (node + user scopes, SkillRef resolver).
  */
 import type { AimeatConfig } from '../config.js';
+import { recordAccountEvent } from './account-events.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { validateSkillFiles, SkillValidationError, SKILL_NAME_RE } from './skill-md.js';
 import { canReadWorkspace } from './workspace-access.js';
@@ -669,6 +670,16 @@ export async function linkSkillToAgent(
       linkedBy,
     });
     await writeAgentSkillLinks(storage, config, ownerName, agentName, links);
+    // Inside the `if`, so re-linking a skill an agent already has says nothing. The event is the
+    // agent gaining a capability it did not have, not the request having been made.
+    void recordAccountEvent(storage, {
+      ownerGhii: `${ownerName}@${config.nodeId}`,
+      kind: 'skill_installed',
+      actorGaii: linkedBy,
+      subject: resolved.ref,
+      link: '/v1/profile?tab=skills',
+      data: { name: resolved.name || resolved.ref, agent: agentName },
+    }, config);
   }
   return links;
 }

@@ -47,6 +47,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import type { Scheduler } from './scheduler.js';
 import { upsertExtensionInPlace } from './extension-upsert.js';
+import { recordAccountEvent } from './account-events.js';
 import { registerExtensionSchedules } from './extension-schedules.js';
 import { reconcileAfterExtensionWrite } from './exchange-projection.js';
 import { extensionInstallRefusal } from './install-quotas.js';
@@ -139,6 +140,16 @@ export async function writeExtensionRecord(
         // TARGET-050: an action flagged `commercial.exchange` is projected onto the market from here.
         await reconcileAfterExtensionWrite(storage, listingOwner, config.nodeId, created.name);
         emitChange('extensions');
+        // Installed only. Replacing an extension's code in place is ordinary maintenance; arriving
+        // in the account for the first time is a new thing that can act there.
+        void recordAccountEvent(storage, {
+            ownerGhii: `${ctx.ownerName}@${config.nodeId}`,
+            kind: 'extension_installed',
+            actorGaii: ctx.actor,
+            subject: created.name,
+            link: '/v1/profile?tab=extensions',
+            data: { name: created.name },
+        }, config);
         return { ok: true, record: created, action: 'installed', reinitialized: false };
     }
 

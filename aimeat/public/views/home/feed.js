@@ -90,6 +90,12 @@ function line(item) {
       return tr('home.feed.organismLeft', 'You left {name}.').replace('{name}', d.name || '');
     case 'organism_member_joined':
       return tr('home.feed.memberJoined', '{who} joined {name}.').replace('{who}', d.who || '').replace('{name}', d.name || '');
+    case 'skill_installed':
+      return d.agent
+        ? tr('home.feed.skillInstalledFor', '{agent} can now do {name}.').replace('{agent}', d.agent).replace('{name}', d.name || '')
+        : tr('home.feed.skillInstalled', 'You installed the skill {name}.').replace('{name}', d.name || '');
+    case 'extension_installed':
+      return tr('home.feed.extensionInstalled', 'You installed the extension {name}.').replace('{name}', d.name || '');
     case 'payment_received':
       return tr('home.feed.paymentReceived', 'You were paid {amount}.').replace('{amount}', d.amount || '');
     case 'payment_sent':
