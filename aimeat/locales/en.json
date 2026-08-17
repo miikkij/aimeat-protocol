@@ -128,7 +128,21 @@
       "delete": "Delete",
       "deleted": "Deleted",
       "deleteConfirm": "Delete this incident and its quarantined file?",
-      "evidence": "Payload"
+      "evidence": "Payload",
+      "refusals": {
+        "title": "Refusal log",
+        "desc": "Every request this node turned away at the door: who tried, from where, at which door, and with what. The credential column shows a fingerprint, never the credential itself.",
+        "disabled": "The refusal log is switched off. Set a path in the node's environment and restart:",
+        "none": "Nothing has been refused since the log started.",
+        "topDoors": "Most-tried doors",
+        "topIps": "Most active sources",
+        "time": "Time",
+        "answer": "Answer",
+        "door": "Door",
+        "ip": "Source",
+        "credential": "Credential",
+        "reason": "Reason"
+      }
     },
     "tabs": {
       "agentIntegration": "Agent Integration",

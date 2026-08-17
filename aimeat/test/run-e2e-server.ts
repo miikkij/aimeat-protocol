@@ -244,6 +244,11 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         // 2026-08-17 after a merge dropped the pin the day it shipped.
         AIMEAT_METRICS_ENABLED: process.env.AIMEAT_METRICS_ENABLED ?? 'true',
 
+        // ── Refusal log ──
+        // Pinned to a test-local path so e2e-auth-refusals reads a log the suite itself
+        // produced, and a developer's aimeat/data/ never collects test refusals.
+        AIMEAT_AUTH_LOG_PATH: process.env.AIMEAT_AUTH_LOG_PATH ?? 'test/.auth-failures.log',
+
         // ── The money rails ──
         // x402 settlement: pin the rail ON and settle against the OFF-CHAIN double. e2e-x402 needs
         // the handler registered, and its X-PAYMENT proofs carry a FIXED placeholder signature

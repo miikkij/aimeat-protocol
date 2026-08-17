@@ -25,14 +25,16 @@
  *   NEVER IN THE WAY. Recording a refusal must not be able to change one. Every write is
  *   synchronous but tiny, and every failure is swallowed after one warning: a node that cannot
  *   write its log still has to be able to refuse people.
- * @structure AuthFailureContext · AuthFailureRecord · recordAuthFailure · credentialDigest · configureAuthAudit
+ * @structure AuthFailureContext · AuthFailureRecord · recordAuthFailure · readRecentAuthFailures · credentialDigest · configureAuthAudit
  * @usage
  *   configureAuthAudit(config);                       // once, at boot
  *   recordAuthFailure(ctx, { status: 401, code: 'AUTH_REQUIRED', reason: 'no credential' });
  * @version-history
+ *   v1.1.0 — 2026-08-17 — readRecentAuthFailures: the operator-facing tail reader over both
+ *     generations, so the admin Security tab can show the list instead of a count.
  *   v1.0.0 — 2026-08-17 — Initial: who was refused, at which door, and with what.
  */
-import { appendFileSync, existsSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readSync, renameSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname } from 'node:path';
 import type { AimeatConfig } from '../config-types.js';
@@ -167,4 +169,73 @@ export function recordAuthFailure(ctx: AuthFailureContext, record: AuthFailureRe
       });
     }
   }
+}
+
+/** One parsed line of the refusal log, as served to the operator. Shape mirrors what
+ *  recordAuthFailure writes; `unknown` fields tolerated so an older generation still parses. */
+export interface AuthFailureLine {
+  ts: string;
+  status: number;
+  code: string;
+  reason: string;
+  method: string;
+  path: string;
+  ip: string;
+  host: string;
+  ua: string;
+  credential: string;
+  credential_digest: string;
+  principal?: { sub: string; owner: string; roles: string[] };
+}
+
+// How much of each generation is read when the operator asks for the list. The rotation
+// ceiling bounds a generation at authLogMaxBytes, but reading megabytes synchronously to
+// show two hundred lines is rude to the event loop; the newest lines live at the end.
+const READ_TAIL_BYTES = 1024 * 1024;
+
+/** The tail of one file as text, or empty when it cannot be read. */
+function tailOf(path: string): string {
+  try {
+    if (!existsSync(path)) return '';
+    const size = statSync(path).size;
+    const want = Math.min(size, READ_TAIL_BYTES);
+    const fd = openSync(path, 'r');
+    try {
+      const buf = Buffer.alloc(want);
+      readSync(fd, buf, 0, want, size - want);
+      const text = buf.toString('utf-8');
+      // A partial first line (the cut fell mid-record) is dropped by starting after the
+      // first newline, unless the whole file fit in the window.
+      return want < size ? text.slice(text.indexOf('\n') + 1) : text;
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    // An unreadable generation (rotated away mid-read, or never created) renders as an empty
+    // tail; the other generation still lists, and refusing the whole page over it helps nobody.
+    // eslint-disable-next-line aimeat/no-silent-catch -- unreadable generation reads as empty tail by design
+    return '';
+  }
+}
+
+/**
+ * The most recent refusals, newest first, read from the log file (and the one rotated
+ * generation behind it). Returns enabled=false when the log is switched off by config,
+ * which the caller renders as "turn it on", never as an error.
+ */
+export function readRecentAuthFailures(limit: number): { enabled: boolean; items: AuthFailureLine[] } {
+  if (!filePath) return { enabled: false, items: [] };
+  const items: AuthFailureLine[] = [];
+  // Oldest generation first so the array ends newest; a malformed line is skipped, not fatal.
+  for (const text of [tailOf(`${filePath}.1`), tailOf(filePath)]) {
+    for (const line of text.split('\n')) {
+      if (!line) continue;
+      try {
+        const parsed = JSON.parse(line) as AuthFailureLine;
+        if (parsed && typeof parsed.ts === 'string') items.push(parsed);
+      // eslint-disable-next-line aimeat/no-silent-catch -- a torn line at the rotation boundary is expected; skipping it keeps every intact line readable
+      } catch { /* skip the malformed line */ }
+    }
+  }
+  return { enabled: true, items: items.slice(-limit).reverse() };
 }

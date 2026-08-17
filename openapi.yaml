@@ -37913,6 +37913,52 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/admin/auth-refusals:
+    get:
+      operationId: adminAuthRefusals
+      summary: The refusal log's tail — who was turned away, at which door, from where (operator Security tab)
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema: { type: integer, default: 200, minimum: 1, maximum: 1000 }
+          description: Max refusal lines to return, newest first
+      responses:
+        '200':
+          description: Refusal lines newest first; enabled=false when the log is switched off by config
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  data:
+                    type: object
+                    properties:
+                      enabled: { type: boolean }
+                      count: { type: integer }
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            ts: { type: string, format: date-time }
+                            status: { type: integer, enum: [401, 403] }
+                            code: { type: string }
+                            reason: { type: string }
+                            method: { type: string }
+                            path: { type: string }
+                            ip: { type: string }
+                            host: { type: string }
+                            ua: { type: string }
+                            credential: { type: string, description: Credential kind presented (none, bearer-jwt, pat, cookie, ...) }
+                            credential_digest: { type: string, description: 12-hex fingerprint of the credential; never the credential itself }
+        '401':
+          description: Not authenticated
+        '403':
+          description: Operator role required
   /v1/admin/storage-stats:
     get:
       operationId: adminStorageStats

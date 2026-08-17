@@ -128,7 +128,21 @@
       "delete": "Poista",
       "deleted": "Poistettu",
       "deleteConfirm": "Poistetaanko tämä tapahtuma ja sen karanteenitiedosto?",
-      "evidence": "Tiedosto"
+      "evidence": "Tiedosto",
+      "refusals": {
+        "title": "Epäysloki",
+        "desc": "Jokainen pyyntö, jonka tämä node käännytti ovelta: kuka yritti, mistä, mihin oveen ja millä. Tunnistesarake näyttää sormenjäljen, ei koskaan itse tunnistetta.",
+        "disabled": "Epäysloki on pois päältä. Aseta polku noden ympäristöön ja käynnistä uudelleen:",
+        "none": "Ketään ei ole käännytetty lokin aloituksen jälkeen.",
+        "topDoors": "Kokeilluimmat ovet",
+        "topIps": "Aktiivisimmat lähteet",
+        "time": "Aika",
+        "answer": "Vastaus",
+        "door": "Ovi",
+        "ip": "Lähde",
+        "credential": "Tunniste",
+        "reason": "Syy"
+      }
     },
     "tabs": {
       "agentIntegration": "Agentti-integraatio",
