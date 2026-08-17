@@ -117,13 +117,24 @@
       const session = getSession2();
       const value = String(addressOrKey || "").trim();
       if (!value) throw new Error("viewUrl() needs an address or a key");
-      let url;
-      if (/^https?:\/\//i.test(value)) url = value;
-      else if (value.startsWith("/v1/pub/")) url = NODE_URL + value;
-      else url = NODE_URL + "/v1/pub/" + encodeURIComponent(session.ghii || session.owner || "") + "/" + value.split("/").map(encodeURIComponent).join("/");
-      if (url.indexOf(NODE_URL) !== 0) return url;
-      const sep = url.indexOf("?") === -1 ? "?" : "&";
-      const r = await fetch(url + sep + "mode=handle", {
+      let path;
+      if (/^https?:\/\//i.test(value)) {
+        try {
+          path = new URL(value).pathname;
+        } catch {
+          return value;
+        }
+      } else if (value.startsWith("/v1/pub/")) {
+        path = value;
+      } else {
+        path = "/v1/pub/" + encodeURIComponent(session.ghii || session.owner || "") + "/" + value.split("/").map(encodeURIComponent).join("/");
+      }
+      if (path.indexOf("/v1/pub/") !== 0) return value;
+      const ownerGaii = decodeURIComponent(path.slice("/v1/pub/".length).split("/")[0] || "");
+      const ourNode = String(session.ghii || "").split("@")[1];
+      if (ourNode && ownerGaii.indexOf("@") !== -1 && ownerGaii.split("@")[1] !== ourNode) return value;
+      const url = NODE_URL + path;
+      const r = await fetch(url + "?mode=handle", {
         headers: session.jwt ? { "Authorization": "Bearer " + session.jwt } : {}
       });
       if (!r.ok) throw new Error("Could not open that file: " + r.status);

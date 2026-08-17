@@ -93,18 +93,32 @@ const storage = {
     const value = String(addressOrKey || '').trim();
     if (!value) throw new Error('viewUrl() needs an address or a key');
 
-    let url;
-    if (/^https?:\/\//i.test(value)) url = value;
-    else if (value.startsWith('/v1/pub/')) url = NODE_URL + value;
-    else url = NODE_URL + '/v1/pub/' + encodeURIComponent(session.ghii || session.owner || '') + '/'
-      + value.split('/').map(encodeURIComponent).join('/');
+    // The PATH decides, never the host. An address stored in a data package was written by the node
+    // under its own canonical URL, while an app on its own subdomain reaches that same node through
+    // a different origin — so comparing hosts calls the node's own file "somebody else's" and hands
+    // back an address that draws a broken icon. Found in a browser on 2026-08-17, where every
+    // thumbnail fell back to a bare link.
+    let path;
+    if (/^https?:\/\//i.test(value)) {
+      try { path = new URL(value).pathname; } catch { return value; }
+    } else if (value.startsWith('/v1/pub/')) {
+      path = value;
+    } else {
+      path = '/v1/pub/' + encodeURIComponent(session.ghii || session.owner || '') + '/'
+        + value.split('/').map(encodeURIComponent).join('/');
+    }
 
-    // A picture on somebody else's site is not ours to sign, and asking this node about it would
-    // answer 404 for a URL that works perfectly well as it stands.
-    if (url.indexOf(NODE_URL) !== 0) return url;
+    // Not an AIMEAT file address at all: a picture on somebody's own site, left exactly as written.
+    if (path.indexOf('/v1/pub/') !== 0) return value;
 
-    const sep = url.indexOf('?') === -1 ? '?' : '&';
-    const r = await fetch(url + sep + 'mode=handle', {
+    // A file on ANOTHER AIMEAT node. Ours to link to, not ours to sign: this node has no such file
+    // and would answer 404 for an address that works.
+    const ownerGaii = decodeURIComponent(path.slice('/v1/pub/'.length).split('/')[0] || '');
+    const ourNode = String(session.ghii || '').split('@')[1];
+    if (ourNode && ownerGaii.indexOf('@') !== -1 && ownerGaii.split('@')[1] !== ourNode) return value;
+
+    const url = NODE_URL + path;
+    const r = await fetch(url + '?mode=handle', {
       headers: session.jwt ? { 'Authorization': 'Bearer ' + session.jwt } : {},
     });
     if (!r.ok) throw new Error('Could not open that file: ' + r.status);
