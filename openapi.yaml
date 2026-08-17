@@ -6285,7 +6285,10 @@ paths:
     post:
       operationId: registerOwner
       summary: Register owner
-      description: Create a new human identity on this node. No auth required.
+      description: >-
+        Create a new human identity on this node. No auth required. On a node whose
+        registration mode is `invite` or `closed` this door answers 403 REGISTRATION_CLOSED
+        (see the `registration_mode` field in the GET / discovery document).
       tags: [Identity]
       requestBody:
         required: true
@@ -6296,6 +6299,8 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: REGISTRATION_CLOSED — this node is invite-only or closed to new accounts
         '409':
           description: Owner name already taken
 
@@ -8715,6 +8720,10 @@ paths:
                           next: { type: string }
         '400':
           description: A malformed address, or `agent.model` missing
+        '403':
+          description: >-
+            REGISTRATION_CLOSED — this self-service door is refused when the node's registration
+            mode is `invite` or `closed` (member-minted invitations are a different door).
         '429':
           description: Too many calls from this IP
 
@@ -22106,6 +22115,8 @@ paths:
                         $ref: '#/components/schemas/WebRegistrationResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          description: REGISTRATION_CLOSED — this node is invite-only or closed to new accounts
         '409':
           description: Username already taken
           content:
@@ -29857,7 +29868,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '403': { $ref: '#/components/responses/Forbidden' } # EMAIL_MISMATCH — signed-in email ≠ invited address; invite left pending
+        '403': { $ref: '#/components/responses/Forbidden' } # EMAIL_MISMATCH — signed-in email ≠ invited address — or REGISTRATION_CLOSED on a fully closed node; invite left pending either way
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '410': { $ref: '#/components/responses/AimeatError' }
@@ -43257,6 +43268,8 @@ paths:
                           note: { type: string }
         '400':
           description: INVALID_INPUT for a bad username or display_name, WEAK_PASSWORD when the password fails a strength rule, or EMAIL_REQUIRED when the node's email gate is on and no email was supplied
+        '403':
+          description: REGISTRATION_CLOSED — this node is invite-only or closed to new accounts
         '409':
           description: NAME_TAKEN, or EMAIL_TAKEN when the email is already verified on another account
     put:

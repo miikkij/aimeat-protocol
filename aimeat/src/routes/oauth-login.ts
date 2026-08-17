@@ -21,6 +21,7 @@
  *   (google also mirrors GHIIRecord.googleSub for the fast/indexed path).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): a FIRST sign-in (new account) answers 403 on an invite-only/closed node; an existing linked account keeps signing in.
  *   v1.0.0 — 2026-06-20 — Initial implementation: Google sign-in (link-by-verified-email or create).
  *   v1.1.0 — 2026-06-25 — Brand-new users choose their username once (pending-signup cookie +
  *     /login/pending + /login/google/finalize + /username-available); no more silent email-derived name.
@@ -47,7 +48,7 @@ import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
 import { establishOwnerSession } from '../services/owner-session.js';
-import { provisionOwner } from '../services/owner-provisioning.js';
+import { provisionOwner, registrationRefusal } from '../services/owner-provisioning.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
@@ -233,6 +234,7 @@ async function createOwnerForProvider(
 ): Promise<GHIIRecord> {
   const { providerId, username, displayName, sub, email, emailVerified } = opts;
   const { ghii } = await provisionOwner(storage, config, {
+    via: 'oauth',
     username,
     displayName,
     // The IdP asserts the email; record it as a verified email (level 1) when trusted.
@@ -436,6 +438,14 @@ export function oauthLoginRouter(
           let ghiiRecord = await storage.getGHIIByExternalId(p.id, pending.providerSub);
 
           if (!ghiiRecord) {
+            // Registration mode: an existing linked account above is a LOGIN and is never gated;
+            // only this branch — a brand-new account from a first sign-in — is refused when the
+            // node is invite-only or closed.
+            const modeRefusal = registrationRefusal(config, 'oauth');
+            if (modeRefusal) {
+              res.status(403).json(error(config.nodeId, 'REGISTRATION_CLOSED', modeRefusal));
+              return;
+            }
             // Username: the user's choice, falling back to the suggested name if they left it blank.
             const chosenRaw = (req.body && typeof req.body.username === 'string' && req.body.username.trim())
               ? req.body.username

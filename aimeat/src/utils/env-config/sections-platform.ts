@@ -249,6 +249,12 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
           value: config.maxAgentScopes.join(', '),
           defaultVal: '*',
         },
+        {
+          envVar: 'AIMEAT_REGISTRATION_MODE',
+          description: 'Who may get a new account: open, invite (member invitations only), or closed',
+          value: config.registrationMode,
+          defaultVal: 'open',
+        },
       ],
     },
     {

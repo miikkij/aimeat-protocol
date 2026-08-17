@@ -4,6 +4,7 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): register-web is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
  *   v1.4.0 — 2026-08-11 — Security audit H-2: both unauthenticated mints issue roles ['agent'] and
  *     stop copying the owner's owner/operator roles onto the token. A verification code and a magic
  *     link prove control of a mailbox; the roles they were handing out are the ones no scope list
@@ -33,6 +34,7 @@ import { GhiiWebRegistrationSchema, validateBody } from '../../models/schemas.js
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
+import { registrationRefusal } from '../../services/owner-provisioning.js';
 
 export function registerWebVerifyRoutes(
     router: Router,
@@ -49,6 +51,13 @@ export function registerWebVerifyRoutes(
     router.post('/v1/ghii/register-web', registrationLimit, validateBody(GhiiWebRegistrationSchema, config.nodeId), async (req, res) => {
         let { username, display_name } = req.body ?? {};
         const { email, locale, interests } = req.body ?? {};
+
+        // Registration mode: this is a direct door, refused in 'invite' and 'closed'.
+        const modeRefusal = registrationRefusal(config, 'direct');
+        if (modeRefusal) {
+            res.status(403).json(error(config.nodeId, 'REGISTRATION_CLOSED', modeRefusal));
+            return;
+        }
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));

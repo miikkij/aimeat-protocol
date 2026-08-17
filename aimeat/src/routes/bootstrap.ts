@@ -6,6 +6,7 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): discovery carries registration_mode so a client knows before sending anyone to the portal.
  *   v1.0.0 - 2026-04-30 - Add for_ai_assistants and for_ai_agents sections to bootstrap response
  *   v1.0.1 -- 2026-05-28 -- Document same-owner shared tag memory pattern
  *   v1.1.0 -- 2026-05-30 -- Advertise v2 purpose-scoped MCP surfaces (/v2/mcp/<role>) in mcp_connection;
@@ -327,6 +328,10 @@ export function bootstrapRouter(
           },
           register_and_start: {
             description: 'User wants full access with their own identity',
+            // 'open' = anyone can register; 'invite' = only a member-sent invitation creates an
+            // account; 'closed' = this node takes no new accounts. Read this BEFORE sending
+            // someone to the portal — on an invite/closed node the registration doors answer 403.
+            registration_mode: config.registrationMode,
             guide: 'Direct them to the portal to create a GHII identity. After registration they receive a wallet with welcome bonus (100 morsels), can create and manage AI agents, access all features, and build with full permissions.',
             portal_url: `${base}/v1/portal`,
             what_registration_gives: [

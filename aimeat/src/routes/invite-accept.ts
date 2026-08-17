@@ -19,6 +19,7 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): redeeming an invitation stays open in 'invite' mode and answers 403 only on a fully closed node; the invite is never consumed by the refusal.
  *   v1.0.0 — 2026-08-07 — Extracted from routes/organisms/workspace-access.ts when the node-level
  *     registration invite (remake 4b) made the flow shared. No behaviour change for organism
  *     invitations; the node variant is the added branch.
@@ -35,7 +36,7 @@ import { emitChange } from '../services/event-bus.js';
 import { notify } from '../services/notify.js';
 import { hashPassword } from '../services/password.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
-import { provisionOwner, ProvisionEmailTakenError } from '../services/owner-provisioning.js';
+import { provisionOwner, ProvisionEmailTakenError, registrationRefusal } from '../services/owner-provisioning.js';
 import { establishOwnerSession } from '../services/owner-session.js';
 import { hashInviteToken, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget } from '../services/invitations.js';
 import { logger } from '../utils/logger.js';
@@ -149,6 +150,14 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
         return; // do NOT consume the invite
       }
     } else {
+      // Registration mode: redeeming a member-minted invitation is the 'invitation' road — it
+      // stays open in 'invite' mode and closes only when the node is fully closed. A signed-in
+      // acceptance above creates no account and is never gated.
+      const modeRefusal = registrationRefusal(config, 'invitation');
+      if (modeRefusal) {
+        res.status(403).json(error(config.nodeId, 'REGISTRATION_CLOSED', modeRefusal));
+        return; // the invite is NOT consumed — it works again if the node reopens
+      }
       let { username } = req.body ?? {};
       const { password, display_name, locale } = req.body ?? {};
       if (!username || typeof username !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required')); return; }
@@ -164,6 +173,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
       let owner;
       try {
         ({ owner } = await provisionOwner(storage, config, {
+          via: 'invitation',
           username,
           displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : username,
           passwordHash,

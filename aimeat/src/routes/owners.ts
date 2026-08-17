@@ -9,6 +9,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.5.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): POST /v1/owners is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
  *   v1.4.0 — 2026-08-17 — Writes the account_created row at account creation, for the same reason
  *     v1.2.0 writes the track marker: an account made through this door opened on an empty feed,
  *     because only POST /v1/ghii recorded it.
@@ -34,6 +35,7 @@ import { calculateTrustScore } from '../services/trust.js';
 import { executeHooks } from '../services/hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
+import { registrationRefusal } from '../services/owner-provisioning.js';
 import { emitChange } from '../services/event-bus.js';
 import { eraseOwner } from '../services/owner-erasure.js';
 import { logger } from '../utils/logger.js';
@@ -45,6 +47,13 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   // POST /v1/owners — register a new owner (no auth required)
   router.post('/v1/owners', validateBody(OwnerRegistrationSchema, config.nodeId), async (req, res) => {
     const { name, display_name } = req.body ?? {};
+
+    // Registration mode: this is a direct door, refused in 'invite' and 'closed'.
+    const modeRefusal = registrationRefusal(config, 'direct');
+    if (modeRefusal) {
+      res.status(403).json(error(config.nodeId, 'REGISTRATION_CLOSED', modeRefusal));
+      return;
+    }
 
     // Extension hook: pre_owner_registration
     const hookResult = await executeHooks(config, storage, 'pre_owner_registration', { name, display_name });

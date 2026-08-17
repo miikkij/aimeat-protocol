@@ -338,6 +338,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable Prometheus metrics endpoint' },
   { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', validate: v => ['public', 'authenticated', 'operator'].includes(v as string), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
 
+  // ── Registration (mutable) ──
+  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', validate: v => ['open', 'invite', 'closed'].includes(v as string), immutable: false, description: 'Who may get a new account: open (everyone), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
+
   // ── Scoped Agent Capabilities (mutable) ──
   { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Default agent capability scopes (comma-separated)' },
   { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Max available agent scopes (comma-separated, * = all)' },

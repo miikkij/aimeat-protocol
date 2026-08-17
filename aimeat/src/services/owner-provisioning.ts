@@ -8,6 +8,9 @@
  * @structure ProvisionEmailTakenError; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.2.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): registrationRefusal() is the
+ *     one rule table, every ProvisionOwnerOpts carries a required `via`, and provisionOwner throws
+ *     RegistrationClosedError as the backstop behind the per-door checks.
  *   v1.1.0 — 2026-07-19 — Enforce one-verified-email-per-account-per-node: reject a verifiedEmail already
  *     bound elsewhere BEFORE creating any rows (ProvisionEmailTakenError), so the DB-unique emailHash can
  *     never leave a dangling owner.
@@ -32,7 +35,47 @@ export class ProvisionEmailTakenError extends Error {
   constructor(message: string) { super(message); this.name = 'ProvisionEmailTakenError'; }
 }
 
+/**
+ * How a new account is arriving. The registration-mode gate decides by this:
+ *  - 'direct'     — anyone who found the door: API/web registration, the self-service invite request
+ *  - 'oauth'      — a first sign-in through an OIDC provider (an existing linked account is a LOGIN
+ *                   and is never gated)
+ *  - 'invitation' — a member of this node minted an invitation (email invite, code key) and someone
+ *                   is redeeming it
+ */
+export type RegistrationVia = 'direct' | 'oauth' | 'invitation';
+
+/** Thrown by provisionOwner when config.registrationMode refuses this creation. Callers map it to
+ *  403 REGISTRATION_CLOSED. Routes SHOULD also refuse at the door with registrationRefusal() so the
+ *  visitor gets the answer before any work happens; this throw is the backstop that makes a
+ *  forgotten door impossible. */
+export class RegistrationClosedError extends Error {
+  readonly code = 'REGISTRATION_CLOSED';
+  constructor(message: string) { super(message); this.name = 'RegistrationClosedError'; }
+}
+
+/**
+ * Does the node's registration mode refuse an account arriving this way? Returns the refusal
+ * message, or null when the creation may proceed. One rule table, read everywhere:
+ *
+ *              direct   oauth   invitation
+ *   open        yes      yes      yes
+ *   invite      no       no       yes
+ *   closed      no       no       no
+ */
+export function registrationRefusal(config: AimeatConfig, via: RegistrationVia): string | null {
+  const mode = config.registrationMode;
+  if (mode === 'closed') return 'This node does not accept new accounts.';
+  if (mode === 'invite' && via !== 'invitation') {
+    return 'This node creates new accounts by invitation only. Ask a member of this node to send you an invitation.';
+  }
+  return null;
+}
+
 export interface ProvisionOwnerOpts {
+  /** How this account is arriving — the registration-mode gate decides by it. REQUIRED so the
+   *  compiler forces every new call site to classify itself (see {@link RegistrationVia}). */
+  via: RegistrationVia;
   /** Bare owner name (already validated + confirmed free by the caller). */
   username: string;
   displayName: string;
@@ -67,6 +110,11 @@ export async function provisionOwner(
 ): Promise<ProvisionedOwner> {
   const { username, displayName } = opts;
   const now = new Date().toISOString();
+
+  // Registration-mode backstop. Refuse BEFORE any row exists — the routes already answered the
+  // visitor at the door; this is what makes a door that forgot the check impossible.
+  const refusal = registrationRefusal(config, opts.via);
+  if (refusal) throw new RegistrationClosedError(refusal);
 
   // One-email-per-account-per-node: refuse to provision a verified email already bound elsewhere BEFORE
   // creating any rows (the GHII's emailHash is DB-unique — creating the owner first would leave a

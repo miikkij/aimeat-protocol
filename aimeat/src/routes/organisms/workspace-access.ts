@@ -4,6 +4,7 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): the code-key mint provisions via:'invitation' and maps RegistrationClosedError to 403 on a fully closed node.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  *   v1.1.0 — 2026-07-15 — Discovery list marks a workspace 'granted' for org managers (creator/admin),
  *     matching their automatic read access (isOrgManager).
@@ -46,7 +47,7 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { hashPassword } from '../../services/password.js';
-import { provisionOwner, ProvisionEmailTakenError } from '../../services/owner-provisioning.js';
+import { provisionOwner, ProvisionEmailTakenError, RegistrationClosedError } from '../../services/owner-provisioning.js';
 import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
@@ -576,6 +577,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const passwordHash = await hashPassword(code);
     try {
       await provisionOwner(storage, config, {
+        // A member-minted code key is the 'invitation' road: open in 'invite' mode, refused only
+        // when the node is fully closed (the backstop below turns that into a clean 403).
+        via: 'invitation',
         username: uname,
         displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : uname,
         passwordHash,
@@ -584,6 +588,10 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         enableMagicLink: false,
       });
     } catch (e) {
+      if (e instanceof RegistrationClosedError) {
+        res.status(403).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
       if (!(e instanceof ProvisionEmailTakenError)) throw e;
       res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email already belongs to an account on this node.'));
       return;

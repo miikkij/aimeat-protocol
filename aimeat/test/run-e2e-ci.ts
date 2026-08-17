@@ -311,6 +311,7 @@ const ALL_SUITES = [
     'test/e2e-metrics.ts',
     'test/e2e-auth-refusals.ts',
     'test/e2e-living-pulse.ts',
+    'test/e2e-registration-mode.ts',
     'test/e2e-usage-telemetry.ts',
     'test/e2e-organism-delete-cascade.ts',
     'test/e2e-organism-bulk-delete.ts',

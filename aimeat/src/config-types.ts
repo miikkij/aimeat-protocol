@@ -391,6 +391,14 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig {
   federationAvailabilityMinSamples: number;
 
   // Security limits (configurable per security audit)
+  /**
+   * Who may get a NEW account on this node. 'open' (default) keeps every registration door
+   * working; 'invite' refuses the direct doors (API/web registration, OAuth first sign-in, the
+   * self-service invite request) while member-minted invitations still create accounts; 'closed'
+   * refuses account creation everywhere. Existing accounts always sign in. Enforced at the doors
+   * AND inside provisionOwner, so a door added later cannot forget it.
+   */
+  registrationMode: 'open' | 'invite' | 'closed';
   loginRateLimitMax: number;
   loginRateLimitWindowMs: number;
   registrationRateLimitMax: number;

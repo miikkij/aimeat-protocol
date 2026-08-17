@@ -4,6 +4,7 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): POST /v1/ghii is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
  *   v1.3.1 — 2026-08-12 — POST /v1/ghii now answers WEAK_PASSWORD for a TOO SHORT password as well.
  *     The schema's own min(8) refused it first as VALIDATION_ERROR, so the handler's strength check
  *     was unreachable for that one case; the length rule now has a single home in
@@ -44,6 +45,7 @@ import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../mod
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { parseLoginIdentifier } from '../../utils/login-identifier.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
+import { registrationRefusal } from '../../services/owner-provisioning.js';
 
 export function registerRegisterLoginRoutes(
     router: Router,
@@ -59,6 +61,13 @@ export function registerRegisterLoginRoutes(
         let { username, display_name } = req.body ?? {};
         const { bio, avatar, locale, password, email } = req.body ?? {};
         const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+        // Registration mode: this is a direct door, refused in 'invite' and 'closed'.
+        const modeRefusal = registrationRefusal(config, 'direct');
+        if (modeRefusal) {
+            res.status(403).json(error(config.nodeId, 'REGISTRATION_CLOSED', modeRefusal));
+            return;
+        }
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));

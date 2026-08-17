@@ -22,6 +22,7 @@
  * @structure registrationInvitesRouter(config, storage): POST /v1/registration-invites
  * @usage app.use(registrationInvitesRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): the self-service door is direct, refused in invite AND closed modes.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4b).
  */
 import { Router } from 'express';
@@ -31,6 +32,7 @@ import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import { createRegistrationInvitation, InvitationError } from '../services/invitations.js';
+import { registrationRefusal } from '../services/owner-provisioning.js';
 import { resolveAiClient } from '../services/ai-tool-setup.js';
 
 /** Trim a claimed field to something loggable. The AI supplies these; none is trusted. */
@@ -51,6 +53,15 @@ export function registrationInvitesRouter(config: AimeatConfig, storage: Storage
     router.post('/v1/registration-invites',
         rateLimit(config.rateLimits.registrationInvites),
         async (req, res) => {
+            // Registration mode: this is the SELF-SERVICE door (anyone may ask), so it counts as
+            // direct — refused in 'invite' and 'closed'. Member-minted invitations are a different
+            // door and stay open in 'invite' mode.
+            const modeRefusal = registrationRefusal(config, 'direct');
+            if (modeRefusal) {
+                res.status(403).json(error(config.nodeId, 'REGISTRATION_CLOSED', modeRefusal));
+                return;
+            }
+
             const body = req.body ?? {};
             const email = typeof body.email === 'string' ? body.email.trim() : '';
             const agentIn = (body.agent ?? {}) as Record<string, unknown>;
