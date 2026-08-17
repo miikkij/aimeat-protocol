@@ -13,6 +13,10 @@
  *   - Sparkline              -- inline-SVG session history for one series
  *   - MetricsTab (default)   -- cards + HTTP routes table + security counters + all-metrics filter
  * @version-history
+ *   v1.1.0 — 2026-08-17 — The headline is "Memory in actual use" (heap used + external), and a
+ *     memory-ledger table explains every component in plain language — including that RSS is a
+ *     high-water mark inflated by freed-but-retained allocator pages, which kept being read as a
+ *     leak. RSS moves off the cards into the ledger's total row.
  *   v1.0.0 — 2026-08-17 — Initial: memory/CPU/event-loop cards, HTTP top routes with req/s,
  *     security counters, filterable raw metric table, 10 s visible-only poll.
  */
@@ -102,7 +106,7 @@ export default function MetricsTab() {
   const [toast, showErr, , clearToast] = useToast();
   // Last two samples for rate math + memory history for the sparklines.
   const samplesRef = useRef({ prev: null, curr: null });
-  const historyRef = useRef({ rss: [], heap: [], external: [] });
+  const historyRef = useRef({ real: [], heap: [], external: [] });
 
   // useToast returns fresh function identities every render. Reaching showErr through a ref
   // keeps `load` stable ([] deps below): with showErr as a dependency, every completed poll
@@ -121,9 +125,11 @@ export default function MetricsTab() {
       s.curr = { at, parsed };
       const hist = historyRef.current;
       const push = (arr, v) => { if (v !== null) { arr.push(v); if (arr.length > HISTORY_MAX) arr.shift(); } };
-      push(hist.rss, firstValue(parsed, 'process_resident_memory_bytes'));
-      push(hist.heap, firstValue(parsed, 'nodejs_heap_size_used_bytes'));
-      push(hist.external, firstValue(parsed, 'nodejs_external_memory_bytes'));
+      const heapNow = firstValue(parsed, 'nodejs_heap_size_used_bytes');
+      const extNow = firstValue(parsed, 'nodejs_external_memory_bytes');
+      push(hist.real, heapNow !== null && extNow !== null ? heapNow + extNow : heapNow);
+      push(hist.heap, heapNow);
+      push(hist.external, extNow);
       setState({ status: 'ok', at });
     } catch (e) {
       if (e.code === 'FEATURE_DISABLED') setState({ status: 'disabled' });
@@ -175,6 +181,21 @@ export default function MetricsTab() {
   const lagP50 = firstValue(m, 'nodejs_eventloop_lag_p50_seconds');
   const lagP99 = firstValue(m, 'nodejs_eventloop_lag_p99_seconds');
   const httpTotal = sum(m, 'aimeat_http_requests_total');
+
+  // The memory ledger: what the process HOLDS (the headline) versus what the OS has LENT it
+  // (RSS, a high-water mark that includes freed-but-retained allocator pages). The "freed and
+  // native" row is the remainder — RSS minus everything the runtime can account for.
+  const realUse = heapUsed !== null && external !== null ? heapUsed + external : heapUsed;
+  const heapHeadroom = heapTotal !== null && heapUsed !== null ? Math.max(0, heapTotal - heapUsed) : null;
+  const freedNative = rss !== null && heapTotal !== null && external !== null
+    ? Math.max(0, rss - heapTotal - external) : null;
+  const ledgerRows = [
+    { key: 'js', label: t('admin.metrics.ledgerJs'), value: heapUsed, hint: t('admin.metrics.ledgerJsHint') },
+    { key: 'headroom', label: t('admin.metrics.ledgerHeadroom'), value: heapHeadroom, hint: t('admin.metrics.ledgerHeadroomHint') },
+    { key: 'external', label: t('admin.metrics.ledgerExternal'), value: external, hint: t('admin.metrics.ledgerExternalHint') },
+    { key: 'other', label: t('admin.metrics.ledgerOther'), value: freedNative, hint: t('admin.metrics.ledgerOtherHint') },
+    { key: 'rss', label: t('admin.metrics.rss'), value: rss, hint: t('admin.metrics.ledgerRssHint') },
+  ].map(r => ({ ...r, pct: r.value !== null && rss ? Math.round((r.value / rss) * 100) : 0 }));
 
   // Rates from the delta between the last two polls.
   let cpuPct = null, reqPerSec = null, intervalAvgMs = null;
@@ -252,9 +273,10 @@ export default function MetricsTab() {
 
     <div class="adm-grid adm-grid-4">
       <div class="adm-card">
-        <h2>${t('admin.metrics.rss')}</h2>
-        <div class="adm-stat">${fmtBytes(rss)}</div>
-        <${Sparkline} points=${hist.rss} />
+        <h2>${t('admin.metrics.realUse')}</h2>
+        <div class="adm-stat">${fmtBytes(realUse)}</div>
+        <div class="adm-stat-label">${t('admin.metrics.realUseHint')}</div>
+        <${Sparkline} points=${hist.real} />
       </div>
       <div class="adm-card">
         <h2>${t('admin.metrics.heap')}</h2>
@@ -271,6 +293,29 @@ export default function MetricsTab() {
       <${StatCard} label=${t('admin.metrics.cpu')}
         value=${cpuPct === null ? '—' : cpuPct.toFixed(1) + ' %'}
         sub=${prev ? null : t('admin.metrics.needsTwoSamples')} />
+    </div>
+
+    <div class="adm-card">
+      <h2>${t('admin.metrics.ledgerTitle')}</h2>
+      <p class="adm-metrics-ledger-intro">${t('admin.metrics.ledgerIntro')}</p>
+      <table class="adm-db-table adm-metrics-ledger">
+        <thead>
+          <tr>
+            <th>${t('admin.metrics.ledgerPart')}</th>
+            <th class="num">${t('admin.metrics.value')}</th>
+            <th>${t('admin.metrics.share')}</th>
+            <th>${t('admin.metrics.ledgerMeaning')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ledgerRows.map(r => html`<tr key=${r.key}>
+            <td>${r.label}</td>
+            <td class="num">${fmtBytes(r.value)}</td>
+            <td><div class="adm-db-bar-track"><div class="adm-db-bar" style=${`width:${r.pct}%`}></div></div></td>
+            <td class="adm-metrics-ledger-hint">${r.hint}</td>
+          </tr>`)}
+        </tbody>
+      </table>
     </div>
 
     <div class="adm-grid adm-grid-4">
