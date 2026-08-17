@@ -55,6 +55,11 @@
  *     dist/ is older than the source it was built from; `/local/status` carries the same under `build`.
  *     Clients reach the node only through this daemon, so a stale dist silently drops newly-added
  *     fields — three separate hunts (outbound writes, inbound reads, `provider`) each ended here.
+ *   v1.6.0 — 2026-08-17 — Edge-triggered wake: `nextWake` reads a wakeSeq/wakeSeen watermark instead
+ *     of the queue lengths. The daemon lists tasks from the node store and never drains the local
+ *     task queue, so the level check returned 200 forever after one push — a zero-length idle wait
+ *     that cost ~56% of a core per affected agent and 28 req/s against the node from one stuck agent.
+ *     AgentChannel is exported for the unit tests (serve-wake-watermark.test.ts).
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
@@ -134,7 +139,7 @@ interface SpaceRef { organism_id: string; ws: string; space: string }
  * once per daemon lifetime. (Storage stays the source of truth — a consumer
  * that missed a long-poll window can always list tasks via the REST proxy.)
  */
-class AgentChannel {
+export class AgentChannel {
   transportMode: ServeDiscoveryAgent['transport'] = 'direct';
   tunnel: ConnectTunnelClient | null = null;
   /** Tunnel (re)connect count (mirrors the client's connectCount). A consumer that sees this change
@@ -151,6 +156,14 @@ class AgentChannel {
   private dmWaiters: RecordWaiter[] = [];
   /** One-shot waiters for the unified /local/wake/next signal (see nextWake/signalWake). */
   private wakeWaiters: Array<(woke: boolean) => void> = [];
+  /** Wake watermark: `wakeSeq` advances on every wake-worthy event, `wakeSeen` on every report of
+   *  one. The signal is edge-triggered on this pair and NEVER level-read from the queues: the daemon
+   *  parked on /local/wake/next lists its work from the node store and does not drain the local task
+   *  queue, so a queue-length check stays true forever after the first push and turns the idle wait
+   *  into a hot loop (one stuck agent measured at 28 req/s and 76% node CPU). An event landing
+   *  between the consumer's listing and its park still wakes it once: the counter already moved. */
+  private wakeSeq = 0;
+  private wakeSeen = 0;
   /** Task ids the node pushed as cancelled (P3) — checked by the daemon instead of polling the
    *  owner-scoped `agents.cancel.*` memory before every dispatch. Bounded by a daemon's task volume. */
   private cancelledIds = new Set<string>();
@@ -286,20 +299,19 @@ class AgentChannel {
    *  /local/wake/next wakes on all of them, not just its single queue. Purely a SIGNAL — it does not
    *  consume anything; the woken cycle drains each queue + re-lists tasks/messages as usual. */
   private signalWake(): void {
+    this.wakeSeq++;
+    // Resolving a parked waiter IS the report; without this line the next park would fire again
+    // for an event the consumer already woke on.
+    if (this.wakeWaiters.length > 0) this.wakeSeen = this.wakeSeq;
     for (const w of this.wakeWaiters.splice(0)) w(true);
   }
 
-  /** True if any push queue already holds an undelivered item (task/record/dm). Lets `nextWake` return
-   *  immediately when work is pending at park time (messages have no queue — only a live signal wakes). */
-  hasPendingWake(): boolean {
-    return this.queue.length > 0 || this.recordQueue.length > 0 || this.dmQueue.length > 0;
-  }
-
-  /** Unified long-poll SIGNAL: resolves true the instant any push source arrives (or was already
-   *  pending), or false after `waitMs`. Unlike nextTask/nextRecord/nextDm it does NOT consume — the
-   *  caller drains the individual queues. Lets a multi-source agent wake on every source. */
+  /** Unified long-poll SIGNAL: resolves true the instant any push source arrives (or arrived,
+   *  unreported, before the park), or false after `waitMs`. Unlike nextTask/nextRecord/nextDm it does
+   *  NOT consume — the caller drains the individual queues / re-lists from the node. One report per
+   *  event: see the wakeSeq/wakeSeen comment. */
   nextWake(waitMs: number): Promise<boolean> {
-    if (this.hasPendingWake()) return Promise.resolve(true);
+    if (this.wakeSeq > this.wakeSeen) { this.wakeSeen = this.wakeSeq; return Promise.resolve(true); }
     if (waitMs <= 0) return Promise.resolve(false);
     return new Promise<boolean>((resolve) => {
       const w = (woke: boolean) => { clearTimeout(timer); resolve(woke); };
