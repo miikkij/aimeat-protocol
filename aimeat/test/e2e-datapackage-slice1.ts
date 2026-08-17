@@ -483,6 +483,90 @@ await test('11. A stranger cannot publish into another owner\'s package namespac
   assert(mine.body.data.descriptor.resources[0].rowCount === 5, 'the first owner\'s package is untouched');
 });
 
+// ── The row-to-photograph link. A dataset read out of pictures is a set of claims, and the only
+//    way anybody checks one is by looking at the picture the claim came from. ───────────────────
+const PHOTO = 'photos/receipt-1.jpg';
+/** A real, if very small, JPEG: the first bytes of one, which is what a mime sniffer reads. */
+const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0xff, 0xd9]);
+
+await test('13. ACCEPTANCE: a row keeps the address of the photograph it was read from', async () => {
+  const up = await json('/v1/storage', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({ key: PHOTO, data: JPEG.toString('base64'), mime_type: 'image/jpeg', visibility: 'private' }),
+  });
+  assert(up.status === 201, `upload the photograph: ${up.status} ${JSON.stringify(up.body?.error)}`);
+
+  // What an agent holds after reading a picture: the total it read, and the KEY it uploaded to.
+  const pub = await json('/v1/datapackages', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({
+      name: 'receipts-2026-08', changes: 'first batch, read from photographs',
+      resources: [{ name: 'receipts', rows: [{ merchant: 'K-Market', total: 12.5, source_image: PHOTO }] }],
+    }),
+  });
+  assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+
+  // The CSV is the thing every other program reads, so the address has to be IN it — a key would
+  // mean nothing to DuckDB, pandas or a person following the link.
+  const csv = await fetch(pub.body.data.resources[0].url).then(r => r.text());
+  const expected = `${BASE}/v1/pub/${encodeURIComponent(owner.gaii)}/photos/receipt-1.jpg`;
+  assert(csv.includes(expected), `the row carries the permanent address, got:\n${csv}`);
+  assert(!csv.includes(`,${PHOTO}`), 'and not the bare key it was given');
+});
+
+await test('14. ACCEPTANCE: the photograph stays as private as it was, and the link still works for its owner', async () => {
+  const url = `${BASE}/v1/pub/${encodeURIComponent(owner.gaii)}/${PHOTO}`;
+
+  // This is the ownership half. Publishing a table made FROM the pictures must not publish the
+  // pictures: a spending summary is not thirty photographs of somebody's life.
+  const stranger = await fetch(url);
+  assert(stranger.status === 403 || stranger.status === 404,
+    `a stranger following the link gets nothing, got ${stranger.status}`);
+
+  const mine = await fetch(url, { headers: auth(owner.token) });
+  assert(mine.status === 200, `and the owner gets the picture, got ${mine.status}`);
+  assert(Buffer.from(await mine.arrayBuffer()).equals(JPEG), 'the same bytes that went up');
+});
+
+await test('15. ACCEPTANCE: a picture that is not there refuses the publish, and writes nothing', async () => {
+  const r = await json('/v1/datapackages', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({
+      name: 'receipts-broken', changes: 'points at a picture nobody uploaded',
+      resources: [{ name: 'receipts', rows: [{ total: 1, source_image: 'photos/never-uploaded.jpg' }] }],
+    }),
+  });
+  assert(r.status === 400, `refused, got ${r.status}`);
+  assert(String(r.body?.error?.message ?? '').includes('never-uploaded.jpg'), `and names it: ${JSON.stringify(r.body?.error)}`);
+
+  const list = await json('/v1/datapackages', { headers: auth(owner.token) });
+  assert(!(list.body.data.packages as any[]).some(p => p.name === 'receipts-broken'),
+    'and nothing at all was written');
+});
+
+await test('16. ACCEPTANCE: a row cannot point at somebody else\'s file', async () => {
+  const other = await setupOwner('c');
+  const secret = 'private/theirs.jpg';
+  const up = await json('/v1/storage', {
+    method: 'POST', headers: auth(other.token),
+    body: JSON.stringify({ key: secret, data: JPEG.toString('base64'), mime_type: 'image/jpeg', visibility: 'private' }),
+  });
+  assert(up.status === 201, `their upload: ${up.status}`);
+
+  // A published package is world-readable, so a row naming their file publishes that it exists.
+  const r = await json('/v1/datapackages', {
+    method: 'POST', headers: auth(owner.token),
+    body: JSON.stringify({
+      name: 'receipts-borrowed', changes: 'points somewhere it should not',
+      resources: [{ name: 'receipts', rows: [{ total: 1, source_image: `${BASE}/v1/pub/${encodeURIComponent(other.gaii)}/${secret}` }] }],
+    }),
+  });
+  assert(r.status === 400, `refused, got ${r.status}`);
+
+  const list = await json('/v1/datapackages', { headers: auth(owner.token) });
+  assert(!(list.body.data.packages as any[]).some(p => p.name === 'receipts-borrowed'), 'nothing was written');
+});
+
 await test('12. Publishing needs a token, and the write scopes', async () => {
   const noAuth = await json('/v1/datapackages', {
     method: 'POST',

@@ -41,6 +41,7 @@ import {
     publicUrl, resourceKey, resourcePath, validateName, RESOURCE_NAME_RE,
 } from './contract.js';
 import { inferSchema, toCsv, fromCsv, validateRows, type ValidationIssue } from './table.js';
+import { linkSourceImages } from './images.js';
 import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
@@ -91,10 +92,20 @@ export async function publishPackage(
         return { ok: false, code: 'INVALID_INPUT', message: 'a package needs at least one resource', issues: [] };
     }
 
+    // ── 0.5 Pictures. BEFORE inference and before the hash, because a rewritten reference changes
+    //        the bytes, and two publishes of the same photographs must land on the same address.
+    //        It refuses here rather than later for the same reason everything else here does: a
+    //        table pointing at a picture that is missing, or at somebody else's, is not written at
+    //        all. → services/datapackage/images.ts
+    const linked = await linkSourceImages({ storage, config }, ownerGhii, input.resources);
+    if (!linked.ok) {
+        return { ok: false, code: 'INVALID_INPUT', issues: [], message: linked.message };
+    }
+
     // ── 1. Schema, then the gate. Nothing is serialised until every resource passes. ──
     const issues: ValidationIssue[] = [];
     const prepared: Array<{ name: string; schema: TableSchema; inferred: boolean; rows: Array<Record<string, unknown>>; title?: string; description?: string }> = [];
-    for (const res of input.resources) {
+    for (const res of linked.resources) {
         if (!RESOURCE_NAME_RE.test(res.name)) {
             return { ok: false, code: 'INVALID_INPUT', issues: [],
                 message: `resource name "${res.name}" must be lowercase letters, digits and dashes, 2-64 characters` };
