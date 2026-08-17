@@ -3089,7 +3089,22 @@
       "justNow": "just now",
       "minutesAgo": "{n} min ago",
       "hoursAgo": "{n} h ago",
-      "daysAgo": "{n} d ago"
+      "daysAgo": "{n} d ago",
+      "seeAll": "See everything that has happened"
+    },
+    "history": {
+      "signInTitle": "Your record is yours to read",
+      "back": "Back to your home",
+      "sub": "The last {n} things on your account, newest first.",
+      "subPlain": "Everything on your account, newest first.",
+      "empty": "Nothing has been recorded here yet. It fills up as you use the place.",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "archiveTitle": "Older than that",
+      "archiveNote": "{n} things have moved out of the window. They are still here, just slower to read.",
+      "openArchive": "Open the archive",
+      "showMore": "Show {n} more",
+      "reading": "Reading…"
     },
     "rooms": {
       "title": "What would you like to do?",

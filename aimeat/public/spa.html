@@ -274,6 +274,7 @@
       "/views/home/step-agent.js": "/views/home/step-agent.js",
       "/views/home/step-branch-b.js": "/views/home/step-branch-b.js",
       "/views/home/feed.js": "/views/home/feed.js",
+      "/views/home/history.js": "/views/home/history.js",
       "/views/home/header.js": "/views/home/header.js",
       "/views/home/settings-dialog.js": "/views/home/settings-dialog.js",
       "/views/profile/access-tab/connected-apps.js": "/views/profile/access-tab/connected-apps.js",
@@ -476,6 +477,10 @@
       // Single-agent pop-out window: /v1/profile?solo=<agentName>
       if (pathname === '/v1/profile' && /[?&]solo=/.test(search)) {
         return () => import('/views/agent-solo.js' + B);
+      }
+      // The whole account record, and the archive behind it: /v1/home?history=1
+      if (pathname === '/v1/home' && /[?&]history=/.test(search)) {
+        return () => import('/views/home/history.js' + B);
       }
       // Single-document pop-out window: /v1/profile?doc=<org>:<ws>:<type>:<id>
       if (pathname === '/v1/profile' && /[?&]doc=/.test(search)) {

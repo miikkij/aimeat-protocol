@@ -12,9 +12,12 @@
  *   you go in, because without it they are four abstract words and a person picks by guessing. A
  *   card appears only for a room the node actually has (E11) — the server decides that and sends
  *   the list; this file renders what it is given.
- * @structure HomeFeed({ items }) · Rooms({ rooms, onEnter })
+ * @structure HomeFeed({ items }) · Rooms({ rooms, onEnter }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed, Rooms } from './feed.js';
  * @version-history
+ *   v1.2.0 — 2026-08-17 — The card shows six rows and offers the rest. A feed that scrolls past a
+ *     screen has stopped being a glance, and the record is now long enough to need its own page:
+ *     history.js reads the full window and the archive, and shares FeedRow so the two cannot drift.
  *   v1.1.0 — 2026-08-16 — Quiet is information too: when nothing has happened for a few days the
  *     feed says so and offers the next move (the chat), because an empty stretch is the strongest
  *     hint to go make an event rather than wait for one.
@@ -46,9 +49,23 @@ function when(iso) {
   return tr('home.feed.daysAgo', '{n} d ago').replace('{n}', String(days));
 }
 
-/** The sentence for one row. Built from a key so the node never decides which language to speak. */
-function line(item) {
+/**
+ * The sentence for one row. Built from a key so the node never decides which language to speak.
+ *
+ * AN APP'S OWN KIND IS NOT TRANSLATED, AND MUST NOT BE INVENTED. `app:{appId}:{kind}` is a key only
+ * the app knows the wording for; the node has no string for it and guessing one would put words in
+ * somebody else's mouth. So the row says which app recorded it and what it called the thing, and
+ * the app passes `app` in `data` when its display name differs from its id. Dropping these instead
+ * would make every row an app wrote invisible, which is the opposite of why apps can write here.
+ */
+export function line(item) {
   const d = item.data || {};
+  if (typeof item.kind === 'string' && item.kind.startsWith('app:')) {
+    const [, appId, ...rest] = item.kind.split(':');
+    const what = rest.join(':').replace(/_/g, ' ').trim();
+    const who = d.app || appId;
+    return what ? `${who}: ${what}` : who;
+  }
   switch (item.kind) {
     case 'account_created':
       return tr('home.feed.accountCreated', 'Your home exists.');
@@ -167,12 +184,32 @@ function line(item) {
 /** After this many days without an event, the feed stops pretending silence is neutral. */
 const QUIET_AFTER_DAYS = 3;
 
+/** How many rows the home card shows before it offers the rest. */
+const CARD_ROWS = 6;
+
+/** One row. Shared by the card and the full view, so the two cannot drift in how they read. */
+export function FeedRow({ item }) {
+  const text = line(item);
+  if (!text) return null;
+  return html`
+    <li class="koti-feed-item ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}">
+      <span class="koti-feed-dot" aria-hidden="true"></span>
+      <div class="koti-feed-body">
+        ${item.link
+          ? html`<a class="koti-feed-line" href=${item.link}>${text}</a>`
+          : html`<span class="koti-feed-line">${text}</span>`}
+        <span class="koti-feed-when">${when(item.at)}</span>
+      </div>
+    </li>`;
+}
+
 export function HomeFeed({ items }) {
   if (!items || !items.length) return null;
   // Quiet is information too. The newest event's age decides: past the threshold, the feed opens
   // with an invitation to go make an event instead of a list that ends three days ago.
   const newestAt = items.reduce((m, it) => Math.max(m, Date.parse(it.at) || 0), 0);
   const quiet = newestAt > 0 && (Date.now() - newestAt) > QUIET_AFTER_DAYS * 86400000;
+  const shown = items.filter(it => line(it));
   return html`
     <section class="koti-feed">
       <h2 class="koti-feed-title">${tr('home.feed.title', 'What has happened')}</h2>
@@ -181,17 +218,14 @@ export function HomeFeed({ items }) {
           ${tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}
         </a>`}
       <ul class="koti-feed-list">
-        ${items.filter(it => line(it)).map((item, i) => html`
-          <li class="koti-feed-item ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}" key=${i}>
-            <span class="koti-feed-dot" aria-hidden="true"></span>
-            <div class="koti-feed-body">
-              ${item.link
-                ? html`<a class="koti-feed-line" href=${item.link}>${line(item)}</a>`
-                : html`<span class="koti-feed-line">${line(item)}</span>`}
-              <span class="koti-feed-when">${when(item.at)}</span>
-            </div>
-          </li>`)}
+        ${shown.slice(0, CARD_ROWS).map((item, i) => html`<${FeedRow} item=${item} key=${i} />`)}
       </ul>
+      ${/* The card is a glance, not an archive. The door to everything only appears when there IS
+           more than a glance — a "see all" under six rows offers a page that shows the same six. */''}
+      ${shown.length > CARD_ROWS && html`
+        <a class="koti-feed-more" href="/v1/home?history=1">
+          ${tr('home.feed.seeAll', 'See everything that has happened')}
+        </a>`}
     </section>`;
 }
 

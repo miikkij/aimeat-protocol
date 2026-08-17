@@ -588,9 +588,31 @@ await test('The feed grows from the SAME markers the funnel counts', async () =>
     assert(mat?.link?.includes('/v1/portfolio/'), `the mat row links to the mat: ${mat?.link}`);
 });
 
-await test('FAILURE MODE: the feed is the account holder\'s own (K1)', async () => {
-    const { status } = await json('/v1/home/feed', auth(agentToken));
-    assert(status === 403, `an agent must not read its owner's history; got ${status}`);
+// This assertion USED to read "an agent must not read its owner's history; got 403". The product
+// decision changed on 2026-08-17: whether an agent may read this is the owner's call, and the node's
+// job is to give them a word for it rather than answer it for them. So the gate is `memory:read`,
+// and the test now holds the gate instead of the old blanket refusal — the scope decides, both ways.
+await test('The feed is the account holder\'s own, and the scope is what opens it (K1)', async () => {
+    const granted = await json('/v1/home/feed', auth(agentToken));
+    assert(granted.status === 200,
+        `an agent the owner gave memory:read may read it; got ${granted.status}`);
+});
+
+await test('FAILURE MODE: an agent without memory:read is refused the feed', async () => {
+    const reg = await json('/v1/agents', auth(tokenAgentOwner, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'hmnarrow', owner: ownerAgent, capabilities: ['actions'], scopes: ['catalogue:read'], model: 'test-model' }),
+    }));
+    assert(reg.status === 201, `narrow agent register ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const gaii = reg.body.data.agent.gaii;
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ gaii, timestamp: ts, signature: await signMsg(reg.body.data.private_key, gaii + ts) }),
+    });
+    assert(tok.body.ok === true, `narrow agent token: ${JSON.stringify(tok.body.error)}`);
+    const { status } = await json('/v1/home/feed', auth(tok.body.data.token));
+    assert(status === 403, `without the scope the door stays shut; got ${status}`);
 });
 
 await test('Only rooms that EXIST on this node are offered', async () => {

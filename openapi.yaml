@@ -230,6 +230,29 @@ components:
       description: One-time key for Tier 0.5 operations
 
   schemas:
+    AccountEvent:
+      type: object
+      description: >-
+        One thing that happened on an account. `kind` is a stable key the client translates, never a
+        stored sentence — a sentence in the store is a translation that became a data migration.
+      properties:
+        id: { type: string }
+        at: { type: string, format: date-time }
+        kind:
+          type: string
+          description: The key naming what happened. An app's own arrive as `app:{appId}:{kind}`.
+        actorGaii:
+          type: string
+          description: Who did it — the person, an agent, or an app acting under a grant.
+        subject:
+          type: string
+          description: What it was about, when the kind alone does not say.
+        link:
+          type: string
+          description: Where the row goes when clicked — the thing itself, not a page about it.
+        data:
+          type: object
+          description: Values the translated line interpolates.
     EcoDataAreaGrant:
       type: object
       description: |
@@ -8795,15 +8818,14 @@ paths:
       operationId: getHomeFeed
       summary: What has happened on this account
       description: >-
-        The home's feed, newest first. It reads the SAME markers the operator funnel reads — no
-        second store and no second write path — so the screen and the numbers cannot tell two
-        different stories about one account: if the funnel counted it the person sees it, and if
-        they see it, it was counted.
+        The home's feed, newest first: the newest rows of the account's own record, the same store
+        `GET /v1/account/events` reads in full. One store, so the screen and the numbers cannot tell
+        two different stories about one account.
 
         The first row exists before the person has done anything: the account being created is a
         real event with a real timestamp, and an empty feed on a first visit reads as broken.
-        One row is live rather than a marker (`agent_knocking`) — the only one that disappears
-        again, and the only one to act on.
+        One row is assembled live rather than stored (`agent_knocking`) — it is state, not
+        history: the only row that disappears again, and the only one to act on.
 
         `kind` is a stable key the client translates; the node never decides which language the
         person reads. K1: the account holder's own, not public — so nothing here needs moderation,
@@ -8844,6 +8866,179 @@ paths:
                           total: { type: integer }
         '403':
           description: Not the account holder's own session
+
+  /v1/account/events:
+    get:
+      operationId: listAccountEvents
+      summary: The account's record of what has happened
+      description: >-
+        Everything on this account, newest first, as far back as the window reaches. The window is
+        the operator's setting (`account_events.window`, 100 by default) and is returned alongside
+        the rows, because a list that stops without saying where it stops reads as a list that lost
+        something. Everything older is in the archive.
+
+        `kind` is a stable key the client translates; the node never decides which language the
+        person reads. An app's own kinds arrive as `app:{appId}:{kind}`.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer }
+          description: How many rows to return. Capped at the window size.
+      responses:
+        '200':
+          description: The window
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          events:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AccountEvent'
+                          count: { type: integer }
+                          window:
+                            type: integer
+                            description: How many rows this node keeps before moving them to the archive.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: recordAccountEvent
+      summary: An app records something that happened in it
+      description: >-
+        For an app acting under a grant: add one line to its owner's record. An order placed, a game
+        finished, a document signed — those happened to the person, in the app they were using, and
+        nothing else in the system is in a position to say so.
+
+        THE NAMESPACE IS THE SERVER'S. Whatever `kind` is sent arrives as `app:{appId}:{kind}`,
+        stamped from the grant and never from the body, so an app cannot claim a node kind and
+        cannot write in another app's name.
+
+        `kind` is a key, not a sentence: the app renders the wording itself, in the language the
+        person reads. `data` carries what that line interpolates and is reduced at the door to at
+        most 12 short string values; anything larger belongs behind `link`, which must be a path on
+        this node.
+
+        Gated on `memory:write`: an app holding that word can already write into the owner's memory,
+        and one line of its own history is strictly less.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind:
+                  type: string
+                  pattern: "^[a-z][a-z0-9_]{1,39}$"
+                  description: A key the interface translates. Namespaced by the server.
+                data:
+                  type: object
+                  additionalProperties: { type: string }
+                  description: Values the rendered line interpolates. At most 12, each at most 200 characters.
+                link:
+                  type: string
+                  description: Where the row goes when clicked. Must be a path on this node.
+                subject:
+                  type: string
+                  description: What the row is about, so rows can be grouped or found without parsing `data`.
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          recorded: { type: boolean }
+                          kind:
+                            type: string
+                            description: The namespaced kind as stored, `app:{appId}:{kind}`.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Not an app acting under a grant, or the grant lacks `memory:write`
+
+  /v1/account/events/archive:
+    get:
+      operationId: listAccountEventArchive
+      summary: Everything older than the window
+      description: >-
+        Rows the window has pushed out, newest first and paged. Its own route rather than a flag on
+        the read above: it answers a different question and costs more, and someone asking what
+        happened lately should never page through a year by accident.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, default: 50 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, default: 0 }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Oldest timestamp to include.
+        - name: to
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Newest timestamp to include.
+      responses:
+        '200':
+          description: A page of the archive
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          events:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AccountEvent'
+                          count: { type: integer }
+                          total:
+                            type: integer
+                            description: How many rows the archive holds in total.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/home/room:
     post:

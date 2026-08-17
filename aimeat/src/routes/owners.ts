@@ -9,6 +9,9 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.4.0 — 2026-08-17 — Writes the account_created row at account creation, for the same reason
+ *     v1.2.0 writes the track marker: an account made through this door opened on an empty feed,
+ *     because only POST /v1/ghii recorded it.
  *   v1.3.0 — 2026-08-11 — Security audit H-1/H-7: DELETE /v1/owners/:name is behind
  *     requireOwnerPrincipal(). Its own check answers "is this a DIFFERENT owner", which every one
  *     of the owner's machine principals passes, because req.auth.owner holds the human's account
@@ -117,6 +120,16 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     void import('../services/onboarding-funnel.js')
       .then(m => m.recordTrack(storage, config, owner.name))
       .catch(err => logger.warn('owners register: track marker failed', { error: String(err) }));
+
+    // The first row in this person's record. BOTH creation doors write it, for the same reason the
+    // track marker above is on both: an account created through this programmatic door would open
+    // on an empty feed, which reads as broken rather than as new. Fire-and-forget — a feed row must
+    // never be able to fail a registration.
+    void import('../services/account-events.js')
+      .then(m => m.recordAccountEvent(storage, {
+        ownerGhii: ghii, kind: 'account_created', actorGaii: ghii, link: '/v1/home',
+      }, config))
+      .catch(err => logger.warn('owners register: first feed row failed', { error: String(err) }));
 
     // The operator's welcome into the new mailbox. Same fire-and-forget contract as above.
     void import('../services/welcome-message.js')

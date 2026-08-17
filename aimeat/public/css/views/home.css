@@ -7,6 +7,9 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v1.2.0 — 2026-08-17 — .koti-hist-*: the whole record behind the card. Grouped by day, because
+ *     a hundred rows each saying "3 d ago" is a list nobody can navigate, and the archive under a
+ *     rule of its own so opening it is a decision rather than a scroll.
  *   v1.1.0 — 2026-08-16 — .koti-feed-quiet: the feed's quiet-days nudge, a dashed door into the
  *     chat rather than an alarm.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
@@ -319,6 +322,40 @@
 .koti-feed-line { font-size: 0.95rem; color: var(--text); text-decoration: none; }
 a.koti-feed-line:hover { text-decoration: underline; }
 .koti-feed-when { font-size: 0.8rem; color: var(--muted); }
+/* The door to the whole record. A link, not a button: it goes somewhere, it does nothing. */
+.koti-feed-more {
+  display: inline-block; margin-top: 0.7rem;
+  font-size: 0.88rem; color: var(--accent); text-decoration: none;
+}
+.koti-feed-more:hover { text-decoration: underline; }
+
+/* ── The whole record: the full window, day by day, and the archive under it ── */
+/* Narrower than the home. This page is read top to bottom, and a line of running text across a
+   wide screen is one a reader loses their place in. */
+.koti-hist { max-width: 46rem; }
+.koti-hist-back {
+  display: inline-block; margin-bottom: 1.2rem;
+  font-size: 0.88rem; color: var(--muted); text-decoration: none;
+}
+.koti-hist-back:hover { color: var(--accent); }
+.koti-hist-list { display: flex; flex-direction: column; gap: 1.4rem; }
+.koti-hist-day { display: flex; flex-direction: column; gap: 0.2rem; }
+/* The day heading is the structure of this page. It is quiet, but it is the thing being scanned,
+   so it sits apart from its rows rather than on top of them. */
+.koti-hist-daytitle {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--muted); font-weight: 700; margin: 0 0 0.3rem;
+  padding-bottom: 0.35rem; border-bottom: 1px solid var(--border);
+}
+.koti-hist-empty { font-size: 0.95rem; color: var(--text-dim); line-height: 1.6; }
+.koti-hist-archive { margin-top: 2.6rem; padding-top: 1.6rem; border-top: 1px solid var(--border); }
+.koti-hist-archtitle {
+  font-size: 0.82rem; text-transform: uppercase; letter-spacing: 1.4px;
+  color: var(--muted); font-weight: 700; margin: 0 0 0.4rem;
+}
+.koti-hist-archnote { margin: 0 0 1rem; font-size: 0.9rem; color: var(--text-dim); line-height: 1.6; }
+.koti-hist-more { margin-top: 1.2rem; }
+.koti-hist-error { margin-top: 1rem; font-size: 0.9rem; color: var(--danger); }
 
 /* ── The four rooms ── */
 /* Space on BOTH sides: on the finished home the done mat card follows this block directly, and with

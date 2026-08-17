@@ -3089,7 +3089,22 @@
       "justNow": "juuri nyt",
       "minutesAgo": "{n} min sitten",
       "hoursAgo": "{n} h sitten",
-      "daysAgo": "{n} pv sitten"
+      "daysAgo": "{n} pv sitten",
+      "seeAll": "Katso kaikki mitä on tapahtunut"
+    },
+    "history": {
+      "signInTitle": "Historiasi on sinun luettavissasi",
+      "back": "Takaisin kotiin",
+      "sub": "Tilisi {n} viimeisintä tapahtumaa, uusin ensin.",
+      "subPlain": "Kaikki mitä tililläsi on tapahtunut, uusin ensin.",
+      "empty": "Tänne ei ole vielä kertynyt mitään. Se täyttyy sitä mukaa kun käytät paikkaa.",
+      "today": "Tänään",
+      "yesterday": "Eilen",
+      "archiveTitle": "Tätä vanhemmat",
+      "archiveNote": "{n} tapahtumaa on siirtynyt ikkunan ulkopuolelle. Ne ovat yhä tallessa, mutta hitaampia lukea.",
+      "openArchive": "Avaa arkisto",
+      "showMore": "Näytä {n} lisää",
+      "reading": "Luetaan…"
     },
     "rooms": {
       "title": "Mitä haluaisit tehdä?",

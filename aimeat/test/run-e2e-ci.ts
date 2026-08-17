@@ -226,6 +226,8 @@ const ALL_SUITES = [
     'test/e2e-onboarding-funnel.ts',
     'test/e2e-remake-funnel.ts',
     'test/e2e-remake-home.ts',
+    // The account's own record, and the mount-order collision that made its window unreadable.
+    'test/e2e-account-events.ts',
     'test/e2e-operator-welcome.ts',
     'test/e2e-registration-invites.ts',
     'test/e2e-login-by-email.ts',

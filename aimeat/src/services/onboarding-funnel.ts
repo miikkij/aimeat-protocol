@@ -23,6 +23,10 @@
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.3.0 — 2026-08-17 — The welcome mat writes its own feed row. It is the one marker that
+ *     accumulates rather than being write-once, so it never reached the recorder that fires on a
+ *     first write, and the mat was the one onboarding step missing from the record. Written on the
+ *     first attempt that SUCCEEDED: a failed paste is not "you made your mat".
  *   v1.2.0 — 2026-08-07 — REMAKE phase 0: onboarding.track (legacy|remake + switched) written at
  *     account creation, the six remake event keys + the agent-door pair collected into
  *     ONBOARDING_KEYS, generic write-once + attempts-accumulating writers, and readOnboardingFunnel
@@ -415,7 +419,7 @@ export async function recordWelcomeMatPasted(
 ): Promise<{ attempts: number }> {
     const gaii = ownerGhii(config, owner);
     const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.welcomeMatPasted);
-    const prev = (existing?.value ?? {}) as { attempts?: number };
+    const prev = (existing?.value ?? {}) as { attempts?: number; result?: string };
     const attempts = (typeof prev.attempts === 'number' ? prev.attempts : 0) + 1;
     const now = new Date().toISOString();
     await storage.setMemory({
@@ -430,6 +434,22 @@ export async function recordWelcomeMatPasted(
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
     });
+
+    // The one row this function owes the person's record. It cannot come through
+    // recordOnboardingEvent(), which fires on a write-once marker, because this marker is the one
+    // that accumulates: three failed attempts and a success are four writes of the same key.
+    //
+    // So the condition is the EVENT rather than the write. A failed paste is not "you made your
+    // mat", and the second success is not a second mat — the row is written once, on the first
+    // attempt that worked.
+    if (result === 'ok' && prev.result !== 'ok') {
+        void recordAccountEvent(storage, {
+            ownerGhii: gaii,
+            kind: 'welcome_mat',
+            subject: ONBOARDING_KEYS.welcomeMatPasted,
+            link: FEED_LINK_FOR_MARKER[ONBOARDING_KEYS.welcomeMatPasted]?.(owner) ?? '/v1/home',
+        }, config);
+    }
     return { attempts };
 }
 

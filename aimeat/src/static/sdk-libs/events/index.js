@@ -25,6 +25,8 @@
  *   await AIMEAT.events.record('order_placed', { total: '24.90' }, { link: '/orders/9' });
  *   const { events } = await AIMEAT.events.list({ limit: 20 });
  * @version-history
+ *   v1.1.0 — 2026-08-17 — Moved to /v1/account/events. /v1/events is the SSE stream and matched
+ *     first, so reading the window answered MISSING_TICKET rather than the record.
  *   v1.0.0 — 2026-08-17 — Initial: an app writes its own history into its owner's record.
  */
 import { makeSession } from '../_core/session.js';
@@ -49,7 +51,7 @@ import { attach } from '../_core/namespace.js';
  * @returns {Promise<{recorded: boolean, kind: string}>}
  */
 async function record(kind, data, opts = {}) {
-  const res = await authFetch('/v1/events', {
+  const res = await authFetch('/v1/account/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -77,7 +79,7 @@ async function record(kind, data, opts = {}) {
  */
 async function list(opts = {}) {
   const qs = opts.limit ? `?limit=${encodeURIComponent(String(opts.limit))}` : '';
-  const res = await authFetch(`/v1/events${qs}`);
+  const res = await authFetch(`/v1/account/events${qs}`);
   const body = await res.json();
   if (!body.ok) throw new Error(body.error?.message || 'Could not read the events');
   return body.data;
@@ -96,7 +98,7 @@ async function archive(opts = {}) {
     if (opts[key] !== undefined && opts[key] !== null) params.set(key, String(opts[key]));
   }
   const qs = params.toString();
-  const res = await authFetch(`/v1/events/archive${qs ? `?${qs}` : ''}`);
+  const res = await authFetch(`/v1/account/events/archive${qs ? `?${qs}` : ''}`);
   const body = await res.json();
   if (!body.ok) throw new Error(body.error?.message || 'Could not read the archive');
   return body.data;

@@ -15,14 +15,20 @@
  *   The archive is a separate route rather than a flag, because it answers a different question and
  *   has a different cost. A person asking "what happened lately" should never accidentally page
  *   through a year.
+ *
+ *   UNDER /v1/account, NOT /v1/events. `GET /v1/events` was already the SSE stream, mounted first,
+ *   so the read here answered with its "ticket query parameter required" and nothing said why.
+ *   These three are about ONE account's record, and the prefix says so.
  * @structure
- *   - POST /v1/events          -- an app records one of its own
- *   - GET  /v1/events          -- the window, newest first
- *   - GET  /v1/events/archive  -- everything that fell out of it
+ *   - POST /v1/account/events          -- an app records one of its own
+ *   - GET  /v1/account/events          -- the window, newest first
+ *   - GET  /v1/account/events/archive  -- everything that fell out of it
  * @usage
  *   import { accountEventsRouter } from './routes/account-events.js';
  *   app.use(accountEventsRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-08-17 — Moved to /v1/account/events. /v1/events belongs to the SSE stream and
+ *     matched first, so the window read returned MISSING_TICKET on every call.
  *   v1.0.0 — 2026-08-17 — Initial: the app-facing write door and the two reads.
  */
 import { Router } from 'express';
@@ -73,13 +79,13 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
   const router = Router();
 
   /**
-   * POST /v1/events — an app adds one of its own events to its owner's record.
+   * POST /v1/account/events — an app adds one of its own events to its owner's record.
    *
    * `memory:write` gates it: an app holding that word can already write into the owner's memory, and
    * recording one line of its own history is strictly less than that. No new vocabulary for a
    * capability that is narrower than one the owner already grants.
    */
-  router.post('/v1/events', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
+  router.post('/v1/account/events', requireAuth(), requireScope('memory:write'), async (req: Request, res: Response) => {
     const identity = resolveIdentity(req.auth!, config.nodeId);
     const ownerGhii = ownerGhiiOf(identity);
 
@@ -110,8 +116,8 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
     res.status(201).json(success(config.nodeId, { recorded: true, kind }));
   });
 
-  /** GET /v1/events — the window. Same gate as the home feed: this is the same record. */
-  router.get('/v1/events', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
+  /** GET /v1/account/events — the window. Same gate as the home feed: this is the same record. */
+  router.get('/v1/account/events', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const limit = Number(req.query.limit);
     const events = await readAccountEvents(storage, ownerGhii, {
@@ -122,17 +128,17 @@ export function accountEventsRouter(config: AimeatConfig, storage: Storage): Rou
       count: events.length,
       window: windowSize(config),
     }, [
-      { description: 'Everything older than the window', method: 'GET', url: '/v1/events/archive' },
+      { description: 'Everything older than the window', method: 'GET', url: '/v1/account/events/archive' },
     ]));
   });
 
   /**
-   * GET /v1/events/archive — everything that fell out of the window.
+   * GET /v1/account/events/archive — everything that fell out of the window.
    *
    * Its own route rather than a flag on the read above: it answers a different question and costs
    * more, and someone asking what happened lately should never page through a year by accident.
    */
-  router.get('/v1/events/archive', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
+  router.get('/v1/account/events/archive', requireAuth(), requireScope('memory:read'), async (req: Request, res: Response) => {
     const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const limit = Number(req.query.limit);
     const offset = Number(req.query.offset);

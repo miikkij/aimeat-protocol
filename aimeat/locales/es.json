@@ -3089,7 +3089,22 @@
       "justNow": "ahora mismo",
       "minutesAgo": "hace {n} min",
       "hoursAgo": "hace {n} h",
-      "daysAgo": "hace {n} d"
+      "daysAgo": "hace {n} d",
+      "seeAll": "Ver todo lo que ha pasado"
+    },
+    "history": {
+      "signInTitle": "Tu historial es tuyo",
+      "back": "Volver a tu casa",
+      "sub": "Las últimas {n} cosas de tu cuenta, la más reciente primero.",
+      "subPlain": "Todo lo que ha pasado en tu cuenta, lo más reciente primero.",
+      "empty": "Aquí todavía no hay nada. Se irá llenando a medida que uses el sitio.",
+      "today": "Hoy",
+      "yesterday": "Ayer",
+      "archiveTitle": "Más antiguo",
+      "archiveNote": "{n} cosas han salido de la ventana. Siguen aquí, solo que tardan más en leerse.",
+      "openArchive": "Abrir el archivo",
+      "showMore": "Ver {n} más",
+      "reading": "Leyendo…"
     },
     "rooms": {
       "title": "¿Qué te gustaría hacer?",
