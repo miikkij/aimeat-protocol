@@ -535,18 +535,34 @@ await test('Re-pasting a mat from a CAPABLE app clears the block by itself', asy
 await test('The branch-B screen offers exactly ONE way, from the checked list', async () => {
     // The design removed a second route (a CLI, a local runner, an API key, picking a model): it
     // belongs to another track, and offering it here answers a question nobody on this screen has.
+    //
+    // This used to assert `tools.length === 8`, and it went red the day goose was added as a ninth
+    // (97f41f638) — a legitimate addition failing a test that meant to guard something else. The
+    // count was a proxy for two things worth stating directly, so they are stated: every entry is
+    // an MCP connector a person can actually follow, and exactly one is the recommended way in.
+    // A number that has to be edited whenever a vendor ships MCP support is a tripwire people learn
+    // to step over.
     const { status, body } = await json('/v1/ai-tools');
     assert(status === 200, `ai-tools ${status}`);
     const tools = body.data.tools ?? [];
-    assert(tools.length === 8, `the checked list is the eight tools, got ${tools.length}`);
+    // A floor rather than an exact count: the list may grow as vendors ship MCP, and must not
+    // silently shrink or empty, which is the failure that would leave branch B with no way out.
+    assert(tools.length >= 8, `the checked list has lost entries, got ${tools.length}`);
     // Every entry a person is sent to must carry its vendor's own instructions — check rather
-    // than trust — and the paid-tier ones must say so, since the tier is what blocked them.
+    // than trust — and steps they can follow once they get there. That IS "the checked list".
     for (const t of tools) {
         assert(typeof t.mcp?.docs === 'string' && t.mcp.docs.startsWith('http'),
             `${t.id} must link its vendor's own docs`);
+        assert(Array.isArray(t.mcp?.steps) && t.mcp.steps.length > 0,
+            `${t.id} must carry the steps to follow, not just a link`);
     }
+    // "Exactly ONE way": one entry is the recommended first path (K2 — the free tier's single
+    // connector slot is enough to start). Two recommendations is a choice this screen does not ask.
+    const recommended = tools.filter((t: any) => t.recommended);
+    assert(recommended.length === 1,
+        `one recommended way in, got ${recommended.length}: ${recommended.map((t: any) => t.id).join(', ')}`);
+    // The paid-tier ones must say so, since the tier is what blocked the person to begin with.
     const paid = tools.filter((t: any) => t.mcp?.capability === 'plan-dependent');
-    assert(paid.length === 2, `two tools need a paid tier, got ${paid.length}`);
     for (const t of paid) {
         assert(typeof t.mcp.plans === 'string' && t.mcp.plans.length > 10,
             `${t.id} must state its plan requirement — that is what blocked the person`);
