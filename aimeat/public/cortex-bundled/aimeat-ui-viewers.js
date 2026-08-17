@@ -10,6 +10,12 @@
  *     var ctrl = AIMEAT.ui.viewers.Grid({ target: '#app', items: [...] });
  *     ctrl.destroy();
  *   </script>
+ *
+ * Version history:
+ *   2026-08-17 — DataTable takes a column of type 'image': the cell holds an address and draws the
+ *     picture. Signs a private one through AIMEAT.storage.viewUrl when that lib is present, because
+ *     a browser sends no Authorization header for an <img> and the picture would otherwise be a
+ *     broken icon for its own owner.
  */
 (function (AIMEAT) {
   'use strict';
@@ -82,6 +88,9 @@
     '.aui-table th.sortable:hover { color: var(--accent, #E8564A); }',
     '.aui-table th .aui-sort-icon { margin-left: 4px; font-size: 0.7rem; }',
     '.aui-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border, #E5E7EB); }',
+    '.aui-table-image { display: inline-flex; align-items: center; min-height: 2.5rem; font-size: 0.75rem; color: var(--accent, #E8564A); text-decoration: none; }',
+    '.aui-table-image img { height: 2.5rem; width: 2.5rem; object-fit: cover; border-radius: var(--radius-xs, 6px); border: 1px solid var(--border, #E5E7EB); display: block; }',
+    '.aui-table-image:hover img { outline: 2px solid var(--accent, #E8564A); }',
     '.aui-table tr:nth-child(even) { background: var(--bg-surface-dim, #F9FAFB); }',
     '.aui-table-filter { padding: 0.5rem; border: 1px solid var(--border, #E5E7EB); border-radius: var(--radius-xs, 6px); font-size: 0.875rem; width: 100%; max-width: 300px; margin-bottom: 0.75rem; font-family: inherit; }',
     '.aui-table-pagination { display: flex; align-items: center; justify-content: center; gap: 0.75rem; padding: 0.75rem 0; font-size: 0.875rem; }',
@@ -406,6 +415,52 @@
     return { el: wrap, destroy: function() { closeLightbox(); if (wrap.parentNode) wrap.parentNode.removeChild(wrap); } };
   }
 
+  // ── An image cell ──────────────────────────────────────
+  //
+  // A column of type 'image' holds an address rather than a word: the picture a row was read out of.
+  // Two things make it non-trivial and both are handled here rather than by every app that wants a
+  // thumbnail.
+  //
+  // A BROWSER SENDS NO AUTHORIZATION HEADER FOR AN IMAGE, so a private picture drawn straight from
+  // its address is a broken icon even for the person who owns it. AIMEAT.storage.viewUrl() answers a
+  // presigned address that carries its own permission. It is used when it is there and skipped when
+  // it is not, because this pack must not require the storage lib to render a table.
+  //
+  // AND A CELL THAT SILENTLY SHOWS NOTHING IS WORSE THAN ONE THAT SAYS SO. A picture that will not
+  // load leaves a link, so the person can still follow it and see the refusal for themselves.
+  function imageCell(td, value) {
+    var address = value === undefined || value === null ? '' : String(value).trim();
+    if (!address) return;
+
+    var link = document.createElement('a');
+    link.className = 'aui-table-image';
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.href = address;
+    link.textContent = '…';
+    td.appendChild(link);
+
+    var draw = function(src) {
+      link.href = src;
+      link.textContent = '';
+      var img = document.createElement('img');
+      img.src = src;
+      img.loading = 'lazy';
+      img.alt = '';
+      // The one that stays: a picture that 404s or expires must not leave an empty cell pretending
+      // there was never anything there.
+      img.addEventListener('error', function() { link.textContent = 'open'; img.remove(); });
+      link.appendChild(img);
+    };
+
+    var storage = window.AIMEAT && window.AIMEAT.storage;
+    if (storage && typeof storage.viewUrl === 'function') {
+      storage.viewUrl(address).then(draw).catch(function() { link.textContent = 'open'; });
+    } else {
+      draw(address);
+    }
+  }
+
   // ── DataTable ──────────────────────────────────────────
   function DataTable(opts) {
     injectStyles();
@@ -516,7 +571,8 @@
         var tr = document.createElement('tr');
         columns.forEach(function(col) {
           var td = document.createElement('td');
-          td.textContent = row[col.key] !== undefined ? String(row[col.key]) : '';
+          if (col.type === 'image') imageCell(td, row[col.key]);
+          else td.textContent = row[col.key] !== undefined ? String(row[col.key]) : '';
           tr.appendChild(td);
         });
         tbody.appendChild(tr);

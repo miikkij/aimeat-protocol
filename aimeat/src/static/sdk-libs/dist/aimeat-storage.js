@@ -99,6 +99,39 @@
     publicUrl(key) {
       return NODE_URL + "/v1/storage/" + encodeURIComponent(key);
     },
+    /**
+     * A URL that will actually LOAD in an <img>, a <video> or a new tab, for a file that is not public.
+     *
+     * The problem this exists for: a browser does not send an Authorization header when it fetches an
+     * image, so `<img src="/v1/pub/alice@node/receipt.jpg">` on a private file draws a broken icon
+     * even for the person who owns it. The node answers `?mode=handle` with a presigned, short-lived
+     * address that carries its own permission, and that one loads anywhere.
+     *
+     * Takes what a table actually holds: a full address, a `/v1/pub/...` path, or a bare key of the
+     * signed-in person's own. A public file is handed back unchanged, because it already works and a
+     * presigned URL for it would only add an expiry it does not need.
+     *
+     * The URL expires. Fetch it when you are about to show the picture, not when you load the page.
+     */
+    async viewUrl(addressOrKey, opts) {
+      const session = getSession2();
+      const value = String(addressOrKey || "").trim();
+      if (!value) throw new Error("viewUrl() needs an address or a key");
+      let url;
+      if (/^https?:\/\//i.test(value)) url = value;
+      else if (value.startsWith("/v1/pub/")) url = NODE_URL + value;
+      else url = NODE_URL + "/v1/pub/" + encodeURIComponent(session.ghii || session.owner || "") + "/" + value.split("/").map(encodeURIComponent).join("/");
+      if (url.indexOf(NODE_URL) !== 0) return url;
+      const sep = url.indexOf("?") === -1 ? "?" : "&";
+      const r = await fetch(url + sep + "mode=handle", {
+        headers: session.jwt ? { "Authorization": "Bearer " + session.jwt } : {}
+      });
+      if (!r.ok) throw new Error("Could not open that file: " + r.status);
+      const body = await r.json();
+      const data = body.data || body;
+      if (data.visibility === "public" && !(opts && opts.forceSigned)) return url;
+      return data.download_url;
+    },
     // List all files
     async list() {
       const res = await authFetch2("/v1/storage");

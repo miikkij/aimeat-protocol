@@ -567,6 +567,33 @@ await test('16. ACCEPTANCE: a row cannot point at somebody else\'s file', async 
   assert(!(list.body.data.packages as any[]).some(p => p.name === 'receipts-borrowed'), 'nothing was written');
 });
 
+await test('17. ACCEPTANCE: the owner can put their own private photograph on a page', async () => {
+  // The half a thumbnail lives or dies on. A browser sends no Authorization header when it fetches
+  // an image, so the address in the row cannot be used in an <img> directly: it would draw a broken
+  // icon for the person who owns the picture. `?mode=handle` answers a presigned address that
+  // carries its own permission, which is what AIMEAT.storage.viewUrl() hands to the cell.
+  const address = `${BASE}/v1/pub/${encodeURIComponent(owner.gaii)}/${PHOTO}`;
+
+  const handle = await json(`/v1/pub/${encodeURIComponent(owner.gaii)}/${PHOTO}?mode=handle`, { headers: auth(owner.token) });
+  assert(handle.status === 200, `the owner gets a handle, got ${handle.status}`);
+  assert(handle.body.data.visibility === 'private', `for a file that is still private, got ${handle.body.data.visibility}`);
+  assert(typeof handle.body.data.download_url === 'string', 'with an address on it');
+
+  // No header at all, which is exactly what an <img> sends.
+  const drawn = await fetch(handle.body.data.download_url);
+  assert(drawn.status === 200, `and that address loads with no session, got ${drawn.status}`);
+  assert(Buffer.from(await drawn.arrayBuffer()).equals(JPEG), 'showing the picture itself');
+
+  // While the row's own address still refuses a stranger, which is the point of the whole design.
+  const raw = await fetch(address);
+  assert(raw.status === 403 || raw.status === 404, `the address in the row stays shut, got ${raw.status}`);
+
+  // And a stranger cannot mint a handle of their own for it either.
+  const outsider = await setupOwner('d');
+  const theirTry = await json(`/v1/pub/${encodeURIComponent(owner.gaii)}/${PHOTO}?mode=handle`, { headers: auth(outsider.token) });
+  assert(theirTry.status === 403 || theirTry.status === 404, `no handle for somebody else, got ${theirTry.status}`);
+});
+
 await test('12. Publishing needs a token, and the write scopes', async () => {
   const noAuth = await json('/v1/datapackages', {
     method: 'POST',
