@@ -353,6 +353,9 @@ export class Scheduler {
 
     this.executing.add(job.id);
     const startTime = Date.now();
+    // Boot-memory trace 2026-08-17 round 3: the boot flood survived the cron gate, so every
+    // job now reports its own RSS delta — the completion line names the eaters directly.
+    const rssBeforeMb = Math.round(process.memoryUsage.rss() / 1048576);
     logger.info(`Scheduler executing job: ${job.id} (${job.displayName || job.name}) [${job.type}/${trigger}]`);
 
     let result: ExecutionLogEntry['result'] = 'success';
@@ -442,9 +445,12 @@ export class Scheduler {
       return { code: 'error', detail: errorMessage };
     }
 
+    const rssAfterMb = Math.round(process.memoryUsage.rss() / 1048576);
     logger.info(`Scheduler job completed: ${job.id} (${job.displayName || job.name}, ${durationMs}ms) [${trigger}]`, {
       memoryReads: run.reads.length,
       memoryWrites: run.writes.length,
+      rssMb: rssAfterMb,
+      rssDeltaMb: rssAfterMb - rssBeforeMb,
     });
     // Stop the cron proactively when a max_runs cap is now reached.
     await this.maybeAutoDisableMaxRuns(job, newRunCount);
