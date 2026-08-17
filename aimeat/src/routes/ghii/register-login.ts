@@ -250,6 +250,15 @@ export function registerRegisterLoginRoutes(
             .then(m => m.recordTrack(storage, config, username))
             .catch(err => logger.warn('ghii register: track marker failed', { error: String(err) }));
 
+        // The first row in this person's record, and the reason the feed is never empty on a
+        // brand-new account. An account being created IS an event with a real timestamp, and an
+        // empty feed on the first screen someone sees reads as broken.
+        void import('../../services/account-events.js')
+            .then(m => m.recordAccountEvent(storage, {
+                ownerGhii: ghii, kind: 'account_created', actorGaii: ghii, link: '/v1/home',
+            }, config))
+            .catch(err => logger.warn('ghii register: first feed row failed', { error: String(err) }));
+
         // The operator's welcome into the new mailbox. Same fire-and-forget contract as above.
         void import('../../services/welcome-message.js')
             .then(m => m.sendOperatorWelcome(storage, config, username))

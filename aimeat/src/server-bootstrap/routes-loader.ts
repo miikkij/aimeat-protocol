@@ -83,6 +83,7 @@ import { workRouter } from '../routes/work.js';
 import { walletRouter } from '../routes/wallet.js';
 import { usageRouter } from '../routes/usage.js';
 import { usageReportsRouter } from '../routes/usage-reports.js';
+import { accountEventsRouter } from '../routes/account-events.js';
 import { boardsRouter } from '../routes/boards.js';
 import { promptsRouter } from '../routes/prompts.js';
 import { adminRouter } from '../routes/admin.js';
@@ -510,6 +511,8 @@ export async function mountRoutes(
   // The owner's own usage REPORTS, off the precomputed serving layer. A different meaning of
   // "usage" from usageRouter above (which is quota), hence a separate router.
   app.use(usageReportsRouter(config, storage));
+  // The account's own record of what happened: the two reads, and the door an app writes through.
+  app.use(accountEventsRouter(config, storage));
   app.use(knowledgeRouter(config, storage));
 
   // Extended features guard — returns 503 when extended features are disabled

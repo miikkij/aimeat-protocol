@@ -3,47 +3,46 @@
  * @description The home's feed (aimeat_remake/06-koti-feed-suostumus.md): what has happened on this
  *   account, newest first.
  *
- *   It reads the SAME markers the funnel reads — no second store, no separate write path. That is
- *   deliberate and it is the whole design: a feed fed by its own events would drift from the
- *   numbers, and then the screen and the operator would be telling two different stories about the
- *   same account. Here they cannot: if the funnel counted it, the person sees it, and if the person
- *   sees it, it was counted.
+ *   IT READS ONE STORE. Until 2026-08-17 the six onboarding rows were DERIVED here by reading the
+ *   funnel's own markers back, so the numbers an operator saw and the screen a person saw could not
+ *   disagree. The reasoning was right and its scope was six events; it stopped being right the day
+ *   the feed described everything, because then some rows were complete and others were not and a
+ *   reader had no way to know why.
+ *
+ *   The guarantee is kept and MOVED. Those events are recorded at the moment their marker is
+ *   written (services/onboarding-funnel.ts), from the same fact in the same act, so the funnel and
+ *   the feed still cannot drift. What is gone is the second source, not the promise.
+ *
+ *   ONE ROW IS STILL NOT RECORDED, and never should be: "an agent is knocking" is LIVE state. It is
+ *   the row that disappears again once the person answers, so it is not history and does not belong
+ *   in a store of things that happened.
  *
  *   K1: the feed is the account holder's own. Not public, so nothing here needs moderation,
  *   visibility rules or a way to take a row back. Making it public is a separate decision and a
  *   separate piece of work.
- *
- *   The FIRST row exists before the person has done anything: "your home exists". An empty feed on
- *   a brand-new account reads as broken, and the account being created is a real event with a real
- *   timestamp — so it is shown rather than invented.
- * @structure readHomeFeed(storage, config, owner) → FeedItem[]
+ * @structure readHomeFeed(storage, config, owner, opts) → FeedItem[]
  * @usage
  *   import { readHomeFeed } from '../services/home-feed.js';
  * @version-history
- *   v1.1.0 — 2026-08-17 — The feed is derived rows PLUS recorded ones. The six onboarding rows stay
- *     derived for the reason above; everything that happens after onboarding leaves no marker, which
- *     is why this went permanently quiet once an account was set up. Those events now have their own
- *     store (services/account-events.ts) and are merged here, newest first.
+ *   v2.0.0 — 2026-08-17 — The derived path is gone. Every row but the live one comes from
+ *     AccountEvent; onboarding records its own at the marker. backfillHomeFeed() converts an
+ *     existing account's markers once, so nobody's history disappears on deploy.
+ *   v1.1.0 — 2026-08-17 — The feed is derived rows PLUS recorded ones.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 6).
  */
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AccountEventKind } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { ONBOARDING_KEYS } from './onboarding-funnel.js';
-import { readAccountEvents } from './account-events.js';
-import type { AccountEventKind } from '../storage/interface.js';
+import { readAccountEvents, recordAccountEvent } from './account-events.js';
 
 /**
  * One thing that happened. `kind` is a stable key the UI translates — never a sentence built here,
  * because the node has no business deciding which language the person reads.
  */
 export interface FeedItem {
-    /**
-     * Either one of the six DERIVED rows below, or a recorded AccountEventKind. Both are stable keys
-     * the UI translates, so the two sources are indistinguishable to a reader — which is the point.
-     */
-    kind: 'account_created' | 'welcome_mat' | 'agent_knocking' | 'agent_connected'
-        | 'home_initialized' | 'room_entered' | AccountEventKind;
+    /** A recorded event's kind, or `agent_knocking`, which is live state rather than history. */
+    kind: AccountEventKind | 'agent_knocking';
     at: string;
     /** Where this row goes when clicked. The return email links straight to it. */
     link: string | null;
@@ -55,7 +54,7 @@ export interface FeedItem {
  * Build the feed. Newest first.
  *
  * `pendingAgents` is passed in rather than read here because "an agent is knocking right now" is
- * live state, not a marker — it is the one row that disappears again, and it is the one the person
+ * live state, not a record — it is the one row that disappears again, and it is the one the person
  * most needs to see.
  */
 export async function readHomeFeed(
@@ -64,35 +63,23 @@ export async function readHomeFeed(
 ): Promise<FeedItem[]> {
     const limit = Math.min(Math.max(opts.limit ?? 100, 1), 200);
     const ghii = `${owner}@${config.nodeId}`;
-    const [ghiiRecord, markers] = await Promise.all([
-        storage.getGHIIByOwner(owner),
-        storage.listMemoryForOwners([ghii], { prefix: 'onboarding.' }),
-    ]);
 
-    const byKey = new Map<string, Record<string, unknown>>();
-    for (const m of markers) {
-        byKey.set(m.key, (m.value && typeof m.value === 'object' ? m.value : {}) as Record<string, unknown>);
-    }
-    const at = (key: string): string | null => {
-        const v = byKey.get(key)?.at;
-        return typeof v === 'string' ? v : null;
-    };
-
-    const items: FeedItem[] = [];
-
-    // The row that exists before anything else does. An account being created IS an event, and a
-    // feed that starts empty tells a new person their home is broken on the first screen they see.
-    if (ghiiRecord?.createdAt) {
-        items.push({ kind: 'account_created', at: ghiiRecord.createdAt, link: '/v1/home' });
+    let recorded: FeedItem[] = [];
+    try {
+        recorded = (await readAccountEvents(storage, ghii, { limit }, config)).map(e => ({
+            kind: e.kind,
+            at: e.at,
+            link: e.link || null,
+            ...(Object.keys(e.data).length ? { data: e.data } : {}),
+        }));
+    } catch (err) {
+        // An unreadable store leaves the live row, which is the one that needs acting on anyway.
+        logger.warn('home-feed: could not read the account record', { owner, error: String(err) });
     }
 
-    const matMark = byKey.get(ONBOARDING_KEYS.welcomeMatPasted) ?? {};
-    if (matMark.result === 'ok' && typeof matMark.at === 'string') {
-        // Straight to the thing they made, not to a settings page about it.
-        items.push({ kind: 'welcome_mat', at: matMark.at, link: `/v1/portfolio/${encodeURIComponent(owner)}` });
-    }
+    const items: FeedItem[] = [...recorded];
 
-    // Live, not a marker: this row is here only while someone is actually waiting at the door.
+    // Live, not recorded: this row is here only while someone is actually waiting at the door.
     if ((opts.pendingAgents ?? 0) > 0) {
         items.push({
             kind: 'agent_knocking',
@@ -102,56 +89,78 @@ export async function readHomeFeed(
         });
     }
 
-    const firstAgent = byKey.get(ONBOARDING_KEYS.firstAgentConnected) ?? {};
-    if (typeof firstAgent.at === 'string') {
-        items.push({
-            kind: 'agent_connected',
-            at: firstAgent.at,
-            link: '/v1/home',
-            ...(typeof firstAgent.agentName === 'string' ? { data: { name: firstAgent.agentName } } : {}),
-        });
+    return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
+}
+
+/** Which marker becomes which row, for an account that predates the recorded feed. */
+const BACKFILL: Array<{ key: string; kind: AccountEventKind; data?: (v: Record<string, unknown>) => Record<string, string> }> = [
+    { key: ONBOARDING_KEYS.welcomeMatPasted, kind: 'welcome_mat' },
+    {
+        key: ONBOARDING_KEYS.firstAgentConnected, kind: 'agent_connected',
+        data: v => (typeof v.agentName === 'string' ? { name: v.agentName } : {} as Record<string, string>),
+    },
+    { key: ONBOARDING_KEYS.homeInitialized, kind: 'home_initialized' },
+    {
+        key: ONBOARDING_KEYS.roomEntered, kind: 'room_entered',
+        data: v => (typeof v.room === 'string' ? { room: v.room } : {} as Record<string, string>),
+    },
+];
+
+/**
+ * Convert one account's onboarding markers into recorded events, once.
+ *
+ * WHY THIS EXISTS. Deleting the derived path without this would erase every existing account's
+ * history at deploy time — their home would go from three rows to none, and the only evidence they
+ * had ever set the place up would be gone from the screen that shows it.
+ *
+ * IDEMPOTENT, and the check is the point: it reads what is already recorded and skips any kind
+ * already present. Run it twice and the second run does nothing. It also stamps each row with the
+ * marker's OWN timestamp, so a five-month-old account reads as five months old rather than as
+ * having been created the day this shipped.
+ *
+ * Returns how many rows it wrote, so a maintenance route can report something true.
+ */
+export async function backfillHomeFeed(
+    storage: Storage, config: AimeatConfig, owner: string,
+): Promise<{ written: number }> {
+    const ghii = `${owner}@${config.nodeId}`;
+    const [existing, ghiiRecord, markers] = await Promise.all([
+        readAccountEvents(storage, ghii, { limit: 200 }, config),
+        storage.getGHIIByOwner(owner),
+        storage.listMemoryForOwners([ghii], { prefix: 'onboarding.' }),
+    ]);
+
+    const already = new Set(existing.map(e => e.kind));
+    const byKey = new Map<string, Record<string, unknown>>();
+    for (const m of markers) {
+        byKey.set(m.key, (m.value && typeof m.value === 'object' ? m.value : {}) as Record<string, unknown>);
     }
 
-    const initAt = at(ONBOARDING_KEYS.homeInitialized);
-    if (initAt) items.push({ kind: 'home_initialized', at: initAt, link: '/v1/home' });
+    let written = 0;
+    const write = async (kind: AccountEventKind, at: string, data?: Record<string, string>, link?: string) => {
+        if (already.has(kind)) return;
+        await recordAccountEvent(storage, {
+            ownerGhii: ghii, kind, at, link: link ?? '/v1/home', ...(data ? { data } : {}),
+        }, config);
+        already.add(kind);
+        written++;
+    };
 
-    const room = byKey.get(ONBOARDING_KEYS.roomEntered) ?? {};
-    if (typeof room.at === 'string' && typeof room.room === 'string') {
-        items.push({ kind: 'room_entered', at: room.at, link: '/v1/home', data: { room: room.room } });
+    // The account itself. Its timestamp is the GHII's, which is the real one.
+    if (ghiiRecord?.createdAt) await write('account_created', ghiiRecord.createdAt);
+
+    for (const entry of BACKFILL) {
+        const marker = byKey.get(entry.key);
+        const at = marker?.at;
+        if (typeof at !== 'string') continue;
+        // The welcome mat is the one marker that accumulates attempts; only a successful paste made
+        // anything, so a failed one is not an event.
+        if (entry.key === ONBOARDING_KEYS.welcomeMatPasted && marker?.result !== 'ok') continue;
+        const link = entry.key === ONBOARDING_KEYS.welcomeMatPasted
+            ? `/v1/portfolio/${encodeURIComponent(owner)}`
+            : '/v1/home';
+        await write(entry.kind, at, entry.data?.(marker ?? {}), link);
     }
 
-    // ── The recorded half ──
-    // The six rows above are DERIVED from the onboarding markers, and stay that way: the funnel and
-    // the screen must not be able to tell different stories about the same account. Everything after
-    // onboarding leaves no marker, which is why this feed went quiet forever once the account was
-    // set up — so those events are recorded in their own system (services/account-events.ts) and
-    // merged here. Best-effort: the derived rows are worth showing even if this read fails.
-    let recorded: FeedItem[] = [];
-    try {
-        recorded = (await readAccountEvents(storage, ghii, { limit })).map(e => ({
-            kind: e.kind,
-            at: e.at,
-            link: e.link || null,
-            ...(Object.keys(e.data).length ? { data: e.data } : {}),
-        }));
-    } catch (err) {
-        logger.warn('home-feed: recorded events unavailable, showing derived rows only', {
-            error: String(err),
-        });
-    }
-
-    // `agent_connected` exists in BOTH halves: the derived row is the onboarding marker for the
-    // FIRST agent, and the recorded one fires for every new agent including that first. Showing both
-    // would tell the same person the same thing twice. The recorded row wins — it names the agent
-    // and carries a link — and the derived one survives only for accounts that connected an agent
-    // before this system existed and therefore have a marker and no event.
-    const recordedAgentNames = new Set(
-        recorded.filter(r => r.kind === 'agent_connected').map(r => r.data?.name ?? ''),
-    );
-    const derived = items.filter(it =>
-        !(it.kind === 'agent_connected' && recordedAgentNames.has(it.data?.name ?? '')));
-
-    return [...derived, ...recorded]
-        .sort((a, b) => b.at.localeCompare(a.at))
-        .slice(0, limit);
+    return { written };
 }

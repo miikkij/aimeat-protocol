@@ -41,6 +41,14 @@ async function seed(count: number, owner = ALICE, kind: AccountEventKind = 'app_
   }
 }
 
+/** The GHII a backfill reads its `account_created` timestamp from. */
+async function createAliceGhii(): Promise<void> {
+  await storage.createGHII({
+    username: 'alice', nodeId: 'node', ghii: ALICE, displayName: 'Alice',
+    verificationLevel: 0, ownerName: 'alice', createdAt: at(0), updatedAt: at(0),
+  } as never);
+}
+
 describe('the window', () => {
   it('keeps the newest KEEP_HOT and nothing more', async () => {
     await seed(KEEP_HOT + 12);
@@ -168,5 +176,86 @@ describe('the window is the operator decision', () => {
     expect(windowSize({ accountEventWindow: 0 })).toBe(10);
     expect(windowSize({ accountEventWindow: 999_999 })).toBe(10_000);
     expect(windowSize(undefined)).toBe(KEEP_HOT);
+  });
+});
+
+describe('the home feed reads one store', () => {
+  /** A config just complete enough for readHomeFeed and the backfill. */
+  const cfg = { nodeId: 'node', accountEventWindow: 100 } as never;
+
+  it('shows recorded events and nothing derived', async () => {
+    const { readHomeFeed } = await import('../../src/services/home-feed.js');
+    await recordAccountEvent(storage, {
+      ownerGhii: ALICE, kind: 'app_published', at: at(5), data: { name: 'thing.html' },
+    });
+    const items = await readHomeFeed(storage, cfg, 'alice');
+    expect(items.map(i => i.kind)).toEqual(['app_published']);
+  });
+
+  it('adds the knocking row live, and it is not in the store', async () => {
+    const { readHomeFeed } = await import('../../src/services/home-feed.js');
+    const items = await readHomeFeed(storage, cfg, 'alice', { pendingAgents: 2 });
+    expect(items.map(i => i.kind)).toEqual(['agent_knocking']);
+    // Live state is not history: nothing was written to answer this.
+    expect(await readAccountEvents(storage, ALICE)).toHaveLength(0);
+  });
+});
+
+describe('backfill gives an existing account its history back', () => {
+  const cfg = { nodeId: 'node', accountEventWindow: 100 } as never;
+
+  /** An account that predates the recorded feed: a GHII and the onboarding markers, no events. */
+  async function seedOldAccount(): Promise<void> {
+    await createAliceGhii();
+    for (const [key, value] of [
+      ['onboarding.welcome_mat_pasted', { at: at(1), result: 'ok' }],
+      ['onboarding.first_agent_connected', { at: at(2), agentName: 'scribe' }],
+      ['onboarding.home_initialized', { at: at(3) }],
+    ] as const) {
+      await storage.setMemory({
+        key, ownerGaii: ALICE, value, visibility: 'private', tags: [],
+        ttlHours: null, version: 1, createdAt: at(1), updatedAt: at(1),
+      } as never);
+    }
+  }
+
+  it('converts the markers, keeping their own timestamps', async () => {
+    const { backfillHomeFeed } = await import('../../src/services/home-feed.js');
+    await seedOldAccount();
+
+    const { written } = await backfillHomeFeed(storage, cfg, 'alice');
+    expect(written).toBe(4);
+
+    const rows = await readAccountEvents(storage, ALICE, { limit: 50 });
+    expect(rows.map(r => r.kind).sort()).toEqual(
+      ['account_created', 'agent_connected', 'home_initialized', 'welcome_mat'],
+    );
+    // A five-month-old account must read as five months old, not as created the day this shipped.
+    expect(rows.find(r => r.kind === 'account_created')!.at).toBe(at(0));
+    expect(rows.find(r => r.kind === 'agent_connected')!.data.name).toBe('scribe');
+  });
+
+  it('is idempotent: a second run writes nothing', async () => {
+    const { backfillHomeFeed } = await import('../../src/services/home-feed.js');
+    await seedOldAccount();
+    await backfillHomeFeed(storage, cfg, 'alice');
+    const second = await backfillHomeFeed(storage, cfg, 'alice');
+    expect(second.written).toBe(0);
+    expect(await readAccountEvents(storage, ALICE, { limit: 50 })).toHaveLength(4);
+  });
+
+  it('does not invent a welcome mat from a failed paste', async () => {
+    const { backfillHomeFeed } = await import('../../src/services/home-feed.js');
+    await createAliceGhii();
+    // The one marker that accumulates attempts. A failed paste made nothing, so it is not an event.
+    await storage.setMemory({
+      key: 'onboarding.welcome_mat_pasted', ownerGaii: ALICE,
+      value: { at: at(1), result: 'failed' }, visibility: 'private', tags: [],
+      ttlHours: null, version: 1, createdAt: at(1), updatedAt: at(1),
+    } as never);
+
+    await backfillHomeFeed(storage, cfg, 'alice');
+    const rows = await readAccountEvents(storage, ALICE, { limit: 50 });
+    expect(rows.map(r => r.kind)).toEqual(['account_created']);
   });
 });

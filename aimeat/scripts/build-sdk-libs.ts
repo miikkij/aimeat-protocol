@@ -70,6 +70,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'tunnel', entry: 'tunnel/index.js' },
   { name: 'connect', entry: 'connect/index.js' },
   { name: 'datapackage', entry: 'datapackage/index.js' },
+  { name: 'events', entry: 'events/index.js' },
   { name: 'auth', entry: 'auth/index.js' },
 ];
 

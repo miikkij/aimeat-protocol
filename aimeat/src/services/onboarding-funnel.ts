@@ -38,6 +38,8 @@ import type { Storage } from '../storage/interface.js';
 import { getActiveEmailService } from './email.js';
 import { outboundEmailHtml } from './email-templates.js';
 import { logger } from '../utils/logger.js';
+import { recordAccountEvent } from './account-events.js';
+import type { AccountEventKind } from '../storage/interface.js';
 
 /** Written once, when the owner's first authenticated MCP session initializes. */
 export const FIRST_MCP_CALL_KEY = 'onboarding.first_mcp_call';
@@ -270,13 +272,61 @@ export async function recordOnboardingEvent(
 ): Promise<boolean> {
     if (!owner) return false;
     try {
-        return await writeMarkerOnce(storage, ownerGhii(config, owner), key, {
+        const wrote = await writeMarkerOnce(storage, ownerGhii(config, owner), key, {
             at: new Date().toISOString(), ...value,
         });
+        // The home feed used to DERIVE its rows by reading these markers back, so that the funnel
+        // the operator reads and the screen the person reads could not disagree. That guarantee is
+        // kept and moved: the event is recorded HERE, from the same fact in the same act, the
+        // moment the marker is written. What it buys is a feed that reads one store instead of two,
+        // which matters now that everything after onboarding is recorded rather than derived.
+        //
+        // Guarded on `wrote`, because these markers are write-once: a second attempt is not a second
+        // event, and an owner who pasted the welcome mat twice did one thing.
+        if (wrote) {
+            const kind = FEED_KIND_FOR_MARKER[key];
+            if (kind) {
+                void recordAccountEvent(storage, {
+                    ownerGhii: ownerGhii(config, owner),
+                    kind,
+                    subject: key,
+                    link: FEED_LINK_FOR_MARKER[key]?.(owner) ?? '/v1/home',
+                    data: feedDataFor(key, value),
+                }, config);
+            }
+        }
+        return wrote;
     } catch (err) {
         logger.warn('onboarding-funnel: marker failed', { owner, key, error: String(err) });
         return false;
     }
+}
+
+/**
+ * Which markers are worth a line in the person's own record, and which are measurement only.
+ *
+ * Most of this funnel exists to tell an OPERATOR how onboarding is going — which branch was taken,
+ * what model was detected, whether an invite went out. Those are not events in someone's life. The
+ * four here are: your home exists, you made your mat, your agent arrived, your home is ready.
+ */
+const FEED_KIND_FOR_MARKER: Partial<Record<string, AccountEventKind>> = {
+    [ONBOARDING_KEYS.welcomeMatPasted]: 'welcome_mat',
+    [ONBOARDING_KEYS.firstAgentConnected]: 'agent_connected',
+    [ONBOARDING_KEYS.homeInitialized]: 'home_initialized',
+    [ONBOARDING_KEYS.roomEntered]: 'room_entered',
+};
+
+/** Where each row goes when clicked. Straight to the thing that was made, not to a page about it. */
+const FEED_LINK_FOR_MARKER: Partial<Record<string, (owner: string) => string>> = {
+    [ONBOARDING_KEYS.welcomeMatPasted]: (owner) => `/v1/portfolio/${encodeURIComponent(owner)}`,
+};
+
+/** Only the values the translated line interpolates — never the whole marker. */
+function feedDataFor(key: string, value: Record<string, unknown>): Record<string, string> {
+    const pick = (k: string): string => (typeof value[k] === 'string' ? value[k] as string : '');
+    if (key === ONBOARDING_KEYS.firstAgentConnected) return { name: pick('agentName') };
+    if (key === ONBOARDING_KEYS.roomEntered) return { room: pick('room') };
+    return {};
 }
 
 /** What we know about the person's AI, and how we came to know it. */

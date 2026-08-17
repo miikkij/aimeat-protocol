@@ -16,6 +16,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
+import { logger } from '../utils/logger.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { HookName } from '../config.js';
@@ -111,6 +112,41 @@ export function adminMaintenanceRouter(
             res.json(success(config.nodeId, result));
         } catch (err) {
             res.status(500).json(error(config.nodeId, 'COMPACTION_FAILED', `Workspace version compaction failed: ${(err as Error).message}`));
+        }
+    });
+
+    /**
+     * POST /v1/admin/maintenance/backfill-home-feed — give existing accounts their history back.
+     *
+     * The home feed used to DERIVE its rows from the onboarding markers. It reads the recorded
+     * account log now, so without this an account created before that change would open its home
+     * and find nothing — every trace of having set the place up gone from the screen that shows it.
+     *
+     * Idempotent per owner: it skips any kind already recorded, and it stamps each row with the
+     * marker's own timestamp, so a five-month-old account reads as five months old. Run it twice
+     * and the second run writes nothing. `owner` does one; omitting it does every account on the
+     * node, which is the deploy-day case.
+     */
+    router.post('/v1/admin/maintenance/backfill-home-feed', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const one = typeof req.body?.owner === 'string' && req.body.owner.trim() ? req.body.owner.trim() : null;
+            const { backfillHomeFeed } = await import('../services/home-feed.js');
+            const owners = one ? [one] : (await storage.listOwners()).map(o => o.name);
+            let written = 0;
+            const failed: string[] = [];
+            for (const owner of owners) {
+                try {
+                    written += (await backfillHomeFeed(storage, config, owner)).written;
+                } catch (err) {
+                    // One account's markers being unreadable is not a reason to leave every other
+                    // account without its history. Named in the response rather than logged away.
+                    failed.push(owner);
+                    logger.warn('backfill-home-feed: one owner failed', { owner, error: String(err) });
+                }
+            }
+            res.json(success(config.nodeId, { owners: owners.length, written, failed }));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'BACKFILL_FAILED', `Home-feed backfill failed: ${(err as Error).message}`));
         }
     });
 

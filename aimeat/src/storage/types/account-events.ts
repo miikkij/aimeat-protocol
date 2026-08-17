@@ -25,6 +25,16 @@
  * of them reports nothing. These are the ones a person would want to be told about without asking.
  */
 export type AccountEventKind =
+  // Getting started
+  //
+  // These four were DERIVED by the home feed from the onboarding markers until 2026-08-17. They are
+  // recorded now, at the moment the marker is written, so the feed reads one store — and the funnel
+  // an operator reads still cannot disagree with the screen, because both come from the same act.
+  // `agent_knocking` is deliberately NOT here: it is live state, the one row that disappears again.
+  | 'account_created'
+  | 'welcome_mat'
+  | 'home_initialized'
+  | 'room_entered'
   // Agents
   | 'agent_connected'
   | 'agent_removed'
