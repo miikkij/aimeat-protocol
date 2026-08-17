@@ -3297,6 +3297,8 @@
   "inbox.linkPreview.showAll": "Näytä linkkien esikatselut",
   "inbox.loading": "Ladataan…",
   "inbox.markImportant": "Merkitse tärkeäksi (vaatii vastauksen)",
+  "inbox.viaAddress": "osoitteeseen",
+  "inbox.groupParticipants": "{count} osallistujaa",
   "inbox.messageThis": "Lähetä viesti",
   "inbox.modelClaimed": "Agentti ilmoittaa, että tämän kirjoitti {model}. Tieto on agentin oma ilmoitus: node ei voi tarkistaa sitä, ja alusta voi siirtää työn toiselle mallille kesken istunnon.",
   "inbox.new": "Uusi viesti",

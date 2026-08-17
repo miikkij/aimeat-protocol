@@ -472,6 +472,31 @@ await test('S7. An outsider reading a support thread learns nothing about it', a
         `the operator must still see the reporter, got ${JSON.stringify(theirs.body.data?.conversation)}`);
 });
 
+await test('S8. A support thread names a person in the operator\'s list, not an address', async () => {
+    // The stored recipient on a group message is the THREAD's address, because a group has no single
+    // other party. The conversations list derives its peer from the last message, so an operator's row
+    // came back naming `support@operators`: no display name resolves for it and no presence does
+    // either, and the inbox rendered "support · Unknown" beside a real person's question.
+    const { status, body } = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${op.token}` } });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const row = (body.data.conversations ?? []).find((c: any) => c.conversationId === supportConvId);
+    assert(!!row, 'the support thread is in the operator\'s conversations list');
+    assert(row.peerGhii === alice.ghii,
+        `the operator's peer must be the person who asked, got ${JSON.stringify(row.peerGhii)}`);
+    assert(row.groupAlias === 'support@operators',
+        `the row must still say which address it arrived through, got ${JSON.stringify(row.groupAlias)}`);
+    assert((row.participants ?? []).includes(op.ghii), 'the row carries the membership');
+
+    // The person who ASKED still sees "support", because that is genuinely who they wrote to — and the
+    // alias tells the client to render a thread rather than ask whether an address is online.
+    const theirs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    const mine = (theirs.body.data.conversations ?? []).find((c: any) => c.conversationId === supportConvId);
+    assert(!!mine, 'the reporter sees their own support thread');
+    assert(mine.peerGhii === 'support@operators',
+        `the reporter wrote to the address and should still see it, got ${JSON.stringify(mine.peerGhii)}`);
+    assert(mine.groupAlias === 'support@operators', 'the reporter\'s row is tagged as a thread, not a principal');
+});
+
 // ─── The node reports its OWN faults, without asking anyone to describe them ───
 // 108 places raise INTERNAL_ERROR, and every one of them used to be a dead end: one person saw
 // "An unexpected error occurred" and the operators heard nothing unless that person happened to

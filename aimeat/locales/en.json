@@ -3297,6 +3297,8 @@
   "inbox.linkPreview.showAll": "Show link previews",
   "inbox.loading": "Loading…",
   "inbox.markImportant": "Mark important (needs a reply)",
+  "inbox.viaAddress": "sent to",
+  "inbox.groupParticipants": "{count} in this conversation",
   "inbox.messageThis": "Send a message",
   "inbox.modelClaimed": "The agent says {model} wrote this. Self-reported: the node cannot verify it, and a platform may hand work to a different model mid-session.",
   "inbox.new": "New message",

@@ -11,6 +11,10 @@
  * @structure MessagingDbService.ownerConversations(ownerGhii, ownerName) → { conversations } in a read scope
  * @usage const { conversations } = await createMessagingDbService(storage).ownerConversations(ghii, owner);
  * @version-history
+ *   v1.1.0 — 2026-08-16 — A group row names a person. peerGhii on a group thread was the thread's own
+ *     address, which resolves to no name and no presence, so the inbox showed "support · Unknown"
+ *     beside a real question. An operator now sees whoever opened the thread; the person who opened
+ *     it still sees the address, tagged `groupAlias` so the client renders a thread, not a principal.
  *   v1.0.0 — 2026-07-16 — Phase 3: batch the owner + per-agent conversations fan-out into one call.
  */
 import type { Storage } from '../../storage/interface.js';
@@ -19,8 +23,21 @@ import { runInReadScope } from '../../storage/read-scope/read-scope.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
-/** A conversations-list row, optionally tagged with the owning agent when it is an agent's own thread. */
-export type OwnerConversation = ConversationSummary & { viaAgent?: string };
+/**
+ * A conversations-list row, optionally tagged with the owning agent when it is an agent's own thread,
+ * and — for a GROUP thread — with what the thread actually is.
+ *
+ * `groupAlias` is the named address the thread was opened through (`support@operators`). Its presence
+ * is what tells a client this row is a thread rather than a person, which matters because everything
+ * the inbox does with `peerGhii` assumes a principal: it looks up a display name, it asks the
+ * presence store whether they are online, it seeds an avatar. A thread address answers none of those,
+ * and the screen said so out loud: the row read "support · Unknown".
+ */
+export type OwnerConversation = ConversationSummary & {
+  viaAgent?: string;
+  groupAlias?: string;
+  participants?: string[];
+};
 
 export class MessagingDbService {
   constructor(private readonly storage: Storage) {}
@@ -52,7 +69,52 @@ export class MessagingDbService {
           agentConvs.push({ ...c, viaAgent: a.gaii });
         }
       }
-      return { conversations: [...own, ...agentConvs] };
+      return { conversations: await this.nameGroupThreads(ownerGhii, [...own, ...agentConvs]) };
+    });
+  }
+
+  /**
+   * Give every GROUP row a peer a person can be identified by.
+   *
+   * The stored `recipientGhii` on a group message is the THREAD's address, because in a group there
+   * is no single other party. The conversations list derives `peerGhii` from the last message, so a
+   * group row came back naming the address: no display name resolved, no presence resolved, and the
+   * inbox rendered "support · Unknown" next to a real person's question.
+   *
+   * Who the other party is depends on who is reading, so it is answered here rather than stored:
+   *
+   *   - Reading as someone OTHER than the person who opened the thread (an operator reading a support
+   *     request) → the peer is the person who opened it. That is a GHII, so the name, the avatar and
+   *     the presence dot all work exactly as they do on a 1:1 thread.
+   *   - Reading as the person who opened it → the peer stays the address, because "support" is
+   *     genuinely who they wrote to. `groupAlias` tells the client to render it as a thread and not
+   *     to ask whether an address is online.
+   *
+   * ONE query for the reader's whole group membership, so this costs nothing per row.
+   */
+  private async nameGroupThreads(readerGhii: string, rows: OwnerConversation[]): Promise<OwnerConversation[]> {
+    if (!rows.length) return rows;
+    const groups = await this.storage.listConversationsForParticipant(readerGhii)
+      .catch(err => { logger.warn('nameGroupThreads: continuing without group identity', { error: String(err) }); return []; });
+    if (!groups.length) return rows;
+
+    const byId = new Map(groups.map(g => [g.id, g] as const));
+    return rows.map(row => {
+      const convo = byId.get(row.conversationId);
+      if (!convo) return row;
+      const readerOpenedIt = parseGaiiLoose(convo.createdBy).owner === parseGaiiLoose(readerGhii).owner;
+      const address = convo.alias ?? `group:${convo.id}`;
+      return {
+        ...row,
+        // Assigned outright rather than left to the derived value. The list derives its peer from the
+        // LAST message, so on a group thread the row changed identity every time somebody replied:
+        // the person who asked saw "support" until an operator answered and then saw that operator.
+        // Who the other party is does not depend on who spoke last.
+        peerGhii: readerOpenedIt ? address : convo.createdBy,
+        groupAlias: address,
+        participants: convo.participants,
+        subject: row.subject ?? convo.subject,
+      };
     });
   }
 

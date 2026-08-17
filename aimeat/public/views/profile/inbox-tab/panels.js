@@ -55,7 +55,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
         ${nested ? html`<span class="inbox-conv-subico">${icon}</span>` : html`<${Avatar} seed=${c.peerGhii} size=${40} />`}
         <div class="inbox-conv-main">
           <div class="inbox-conv-line1">
-            <span class="inbox-name">${escHtml(label)} ${(!nested || c.peerGhii?.includes('#')) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
+            <span class="inbox-name">${escHtml(label)} ${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
             ${!nested && via ? html`<span class="inbox-via-chip">${t('inbox.viaAgent')} ${escHtml(via)}</span>` : ''}
             <span class="inbox-conv-time">${c.updatedAt ? timeShort(c.updatedAt) : ''}</span>
           </div>
@@ -150,10 +150,12 @@ export function ThreadPanel({
       <div class="inbox-thread-head">
         <${Avatar} seed=${activeConv.peerGhii} size=${36} />
         <div class="inbox-thread-id">
-          <div class="inbox-name">${escHtml(peerDisplay(activeConv.peerGhii))} <${PresenceDot} ghii=${activeConv.peerGhii} label=${true} /></div>
+          <div class="inbox-name">${escHtml(peerDisplay(activeConv.peerGhii))} ${activeConv.groupAlias ? null : html`<${PresenceDot} ghii=${activeConv.peerGhii} label=${true} />`}</div>
           ${activeConv.subject ? html`<div class="inbox-thread-subject">🏷 ${escHtml(activeConv.subject)}</div>` : null}
           ${viaAgentName ? html`<div class="inbox-thread-via">🤖 ${t('inbox.sentByAgent')} ${escHtml(viaAgentName)}</div>` : null}
-          <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
+          <div class="inbox-sub">${escHtml(activeConv.peerGhii)}${activeConv.groupAlias && activeConv.groupAlias !== activeConv.peerGhii
+            ? ` · ${t('inbox.viaAddress')} ${activeConv.groupAlias}` : ''}${activeConv.participants?.length
+            ? ` · ${t('inbox.groupParticipants', { count: String(activeConv.participants.length) })}` : ''}</div>
         </div>
         <${ThreadReadAloud} thread=${thread} peerLabelText=${peerDisplay(activeConv.peerGhii)} convId=${activeConv.conversationId} />
         ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ <span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
