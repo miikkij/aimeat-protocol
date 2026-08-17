@@ -37257,6 +37257,97 @@ paths:
                               $ref: '#/components/schemas/PublishHistoryItem'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  /v1/connections/{id}/read/{resource}:
+    post:
+      operationId: readFromConnection
+      summary: Read something from a connected account
+      description: >
+        The direction this surface never had. Everything else here writes OUT; this brings a
+        person's own data home from wherever it lives behind somebody else's OAuth.
+
+
+        A caller names a RESOURCE the provider declares and supplies parameters. It never supplies a
+        URL: the node builds every one of them, because the moment a caller can name the host, a
+        connection stops being "read my mail" and becomes an open proxy standing behind somebody's
+        Google account. Ask GET /v1/connections/providers for what a provider offers.
+
+
+        POST although it reads. It spends a request against a rate limit the person owns, a mail
+        search is a body rather than a query string, and nothing that costs somebody's allowance
+        belongs behind a URL a browser will prefetch.
+
+
+        Needs `connections:use`, not `connections:read`. Reading the LIST of connections is knowing
+        what you attached; reading THROUGH one is spending it.
+
+
+        The token never reaches the caller. It is spent here and the answer comes back.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The connection, which must be yours. Somebody else's is the same 404 as none.
+          schema:
+            type: string
+        - name: resource
+          in: path
+          required: true
+          description: >
+            A name the provider declares. Gmail offers `messages`, `message` and `profile`.
+          schema:
+            type: string
+      requestBody:
+        required: false
+        description: >
+          Parameters for that resource. Gmail's `messages` takes `limit` (default 25, max 100),
+          `query` (Gmail's own search syntax) and `page_token`; `message` takes `id` and an optional
+          `format` of `full` or `raw`.
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: What the provider answered, unchanged.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          provider:
+                            type: string
+                          resource:
+                            type: string
+                          data:
+                            description: The provider's own answer, as it came.
+        '400':
+          description: >
+            No such resource on this provider, or a parameter it cannot use. Both name what to send
+            instead.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >
+            Either this connection was made without the permission that resource needs, in which
+            case connecting the account again and approving it is the fix, or the provider has since
+            withdrawn it.
+        '404':
+          description: No such connection of yours. Somebody else's connection is this same 404.
+        '409':
+          description: The connection was revoked, or its stored permission can no longer be read.
+        '413':
+          description: More than 4 MB of answer. Ask for a smaller window.
+        '502':
+          description: The provider could not be reached, or could not answer.
   /v1/connections/attempts/{id}/metrics:
     get:
       operationId: listPublishMetrics

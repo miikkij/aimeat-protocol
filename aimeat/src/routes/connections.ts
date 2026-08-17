@@ -47,6 +47,7 @@ import {
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
+import { readResource } from '../services/connections/read.js';
 import { attachCredential } from '../services/connections/attach.js';
 import { quotaStatus, openPublish } from '../services/connections/publish-gate.js';
 import { publishToProvider } from '../services/connections/publish.js';
@@ -678,6 +679,54 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     const provider = findProvider(providers, conn.provider);
     const status = await quotaStatus(storage, did, provider?.sharedDailyLimit ?? null);
     res.json(success(config.nodeId, { quota: status, per_user_limit: delegation.perUserLimit }));
+  });
+
+  /**
+   * Read something from a connected account.
+   *
+   * The direction this surface never had. Everything before it writes OUT: this is the one that
+   * brings a person's own data home from wherever it lives behind somebody's OAuth.
+   *
+   * POST rather than GET even though it reads, and that is not a mistake. It spends a request at
+   * the provider against a rate limit the person owns, the parameters are a body rather than a
+   * query string because a mail search is one, and nothing that costs somebody else's allowance
+   * belongs behind a URL a browser will prefetch.
+   *
+   * `connections:use` and not `connections:read`: reading the LIST of connections is knowing what
+   * you attached, while reading THROUGH one is spending it. An app granted only the first must not
+   * be able to read the mailbox.
+   */
+  router.post('/v1/connections/:id/read/:resource', requireAuth(), requireScope('connections:use'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const principal = resolve(req);
+    const connection = await storage.getConnection(req.params.id as string);
+    // Absent and not-yours answer alike, as everywhere else in this file.
+    if (!connection || connection.principal !== principal) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such connection of yours'));
+    }
+
+    const key = requireEncryptionKey(config);
+    if (!key) {
+      return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY', 'this node cannot read stored credentials'));
+    }
+
+    const ctx: ConnectContext = { config, storage, providers, key };
+    const params = (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) ? req.body : {};
+    const out = await readResource(ctx, connection.id, req.params.resource as string, params as Record<string, unknown>);
+
+    if (!out.ok) {
+      // A refusal by the PROVIDER is not this node failing, and a 5xx here would invite a retry
+      // loop against somebody's rate limit. Only genuine unreachability gets a 502.
+      const status = out.code === 'NO_SUCH_RESOURCE' || out.code === 'BAD_PARAMETERS' ? 400
+        : out.code === 'MISSING_PERMISSION' || out.code === 'REFUSED_BY_PROVIDER' ? 403
+          : out.code === 'NOT_FOUND' ? 404
+            : out.code === 'TOO_LARGE' ? 413
+              : out.code === 'REVOKED' || out.code === 'UNREADABLE' ? 409
+                : 502;
+      return res.status(status).json(error(config.nodeId, out.code, out.message));
+    }
+
+    res.json(success(config.nodeId, { provider: out.provider, resource: out.resource, data: out.data }));
   });
 
   return router;

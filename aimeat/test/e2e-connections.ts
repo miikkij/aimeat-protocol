@@ -491,7 +491,10 @@ async function main(): Promise<void> {
         connectLinkedinClientId: 'x', connectLinkedinClientSecret: 'x',
         connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
       } as any);
-      const missing = all.filter(p => p.capabilities.length > 0 && !RECIPES_FOR_TEST[p.id]);
+      // PUBLISH capabilities, not every capability. `read-mail` is a capability with no publish
+      // recipe by design, and the invariant here is about the publishing half.
+      const publishes = (p: { capabilities: string[] }) => p.capabilities.some(c => c.startsWith('publish-'));
+      const missing = all.filter(p => publishes(p) && !RECIPES_FOR_TEST[p.id]);
       assert(missing.length === 0, `advertises a capability with no recipe: ${missing.map(p => p.id).join(', ')}`);
     });
 
@@ -1635,7 +1638,10 @@ async function main(): Promise<void> {
         connectXClientId: 'x', connectXClientSecret: 'x',
         connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
       } as any);
-      const publishers = all.filter(p => p.capabilities.length > 0 && p.id !== 'fake-static');
+      // Same correction as the recipe invariant above: a provider that only READS has nothing to
+      // report numbers about, and demanding a metric reader for it would be demanding a reader for
+      // a channel nobody can publish to.
+      const publishers = all.filter(p => p.capabilities.some(c => c.startsWith('publish-')) && p.id !== 'fake-static');
       const missing = publishers.filter(p => !METRIC_READERS_FOR_TEST[p.id]);
       assert(missing.length === 0, `can publish but has no metric reader: ${missing.map(p => p.id).join(', ')}`);
     });
@@ -1669,6 +1675,66 @@ async function main(): Promise<void> {
       const out = await METRIC_READERS_FOR_TEST.linkedin({} as any);
       assert(!out.ok && out.permanent === true,
         'the LinkedIn reader stopped refusing permanently — the capability list must be revisited');
+    });
+
+    console.log('\nPhase 14 — Reading FROM a connected account');
+    await test('a connection can be read through, and the answer comes from the provider', async () => {
+      const before = provider.stats.itemReads;
+      const r = await api(`/v1/connections/${connA}/read/items`, {
+        method: 'POST', bearer: jwtA, body: { limit: 2 },
+      });
+      assert(r.status === 200, `read: ${r.status} ${JSON.stringify(r.data?.error)}`);
+      assert(r.data.data.provider === 'fake', `provider ${r.data.data.provider}`);
+      assert(Array.isArray(r.data.data.data?.items), `no items: ${JSON.stringify(r.data.data.data)}`);
+      assert(r.data.data.data.asked_for === 2, `the parameter did not reach the provider: ${r.data.data.data.asked_for}`);
+      assert(provider.stats.itemReads === before + 1, 'the request never reached the provider');
+    });
+
+    await test('the caller never sees the credential', async () => {
+      const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', bearer: jwtA, body: {} });
+      const body = JSON.stringify(r.data);
+      assert(!/access_token|refresh_token/.test(body), 'a token name appears in the answer');
+      assert(!body.includes('Bearer '), 'a bearer credential appears in the answer');
+    });
+
+    await test('a resource the provider never declared is refused, and the real ones are named', async () => {
+      const r = await api(`/v1/connections/${connA}/read/everything`, { method: 'POST', bearer: jwtA, body: {} });
+      assert(r.status === 400, `expected 400, got ${r.status}`);
+      assert(r.data.error.code === 'NO_SUCH_RESOURCE', `code ${r.data.error.code}`);
+      assert(String(r.data.error.message).includes('items'), `it should name what CAN be read: ${r.data.error.message}`);
+    });
+
+    await test('a permission the connection never had is refused BEFORE the provider is asked', async () => {
+      const before = provider.stats.itemReads;
+      const r = await api(`/v1/connections/${connA}/read/needs-more`, { method: 'POST', bearer: jwtA, body: {} });
+      assert(r.status === 403, `expected 403, got ${r.status}`);
+      assert(r.data.error.code === 'MISSING_PERMISSION', `code ${r.data.error.code}`);
+      assert(provider.stats.itemReads === before, 'the request went out anyway');
+    });
+
+    await test('somebody else\'s connection is the same 404 as none', async () => {
+      const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', bearer: jwtB, body: {} });
+      assert(r.status === 404, `expected 404, got ${r.status}`);
+    });
+
+    await test('reading needs a token at all', async () => {
+      const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', body: {} });
+      assert(r.status === 401, `expected 401, got ${r.status}`);
+    });
+
+    await test('an app granted connections:use can read through, because an agent is a first-class caller', async () => {
+      const appToken = await grantAppToken(jwtA, userA, ['connections:use']);
+      const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', bearer: appToken, body: { limit: 1 } });
+      assert(r.status === 200, `an app may read through: ${r.status} ${JSON.stringify(r.data?.error)}`);
+      assert(Array.isArray(r.data.data.data?.items), 'and gets the answer');
+    });
+
+    await test('an app granted nothing of the sort is refused', async () => {
+      // `connections:use` is the ONLY connection scope an app grant offers, so the meaningful
+      // negative is an app that holds a different scope entirely.
+      const elsewhere = await grantAppToken(jwtA, userA, ['memory:read']);
+      const r = await api(`/v1/connections/${connA}/read/items`, { method: 'POST', bearer: elsewhere, body: {} });
+      assert(r.status === 403, `expected 403, got ${r.status}`);
     });
 
     console.log(`\n${'─'.repeat(60)}\n  ${passed} passed, ${failed} failed\n`);

@@ -21,6 +21,9 @@
  *   - findProvider(list, id) / listProviderMeta(list) — lookup + the safe public projection
  * @usage const providers = buildOutboundProviders(config);
  * @version-history
+ *   v1.3.0 — 2026-08-17 — A provider may declare `resources`: things that can be READ from a
+ *     connected account, by name, with the node building every URL. Gmail is the first, read-only,
+ *     because mail is the connector everybody already has and nothing of theirs can see it.
  *   v1.2.0 — 2026-08-08 — `read-metrics` joins the capability vocabulary, so an app can tell before
  *     spending a request (and, on X, money) whether a channel will ever report numbers to its
  *     author. LinkedIn does not carry it, which is the whole point.
@@ -33,7 +36,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CredentialShape } from '../../models/connection-schemas.js';
 
 /** Stable provider identifiers. Also the value stored in `Connection.provider`. */
-export type OutboundProviderId = 'mastodon' | 'youtube' | 'linkedin' | 'x' | 'bluesky' | 'fake' | 'fake-static';
+export type OutboundProviderId = 'mastodon' | 'youtube' | 'linkedin' | 'x' | 'bluesky' | 'google-mail' | 'fake' | 'fake-static';
 
 /**
  * What a user must supply for a provider that has NO authorization round.
@@ -56,6 +59,26 @@ export interface OAuthEndpoints {
   token: string;
   /** Null when the provider offers no revocation endpoint — revoking is then local-only. */
   revoke: string | null;
+}
+
+/**
+ * One thing that may be READ from a connected account.
+ *
+ * A caller names a resource and supplies parameters; this builds the URL. The direction of that
+ * arrow is the security property: the moment a caller can name the host, a connection stops being
+ * "read my mail" and becomes an open proxy standing behind somebody's Google account.
+ *
+ * `requiresScopes` is checked against what the connection was actually granted BEFORE the request
+ * goes out, because a provider answering 403 tells the person nothing they can act on, while
+ * "this connection was made without permission to read mail" names the fix.
+ */
+export interface ProviderResource {
+  /** What it is, in words a person reads in a refusal. */
+  label: string;
+  /** Provider scopes this resource cannot work without. */
+  requiresScopes: string[];
+  /** Build the URL from caller parameters. Throws with a plain sentence on a bad parameter. */
+  url(params: Record<string, unknown>, instance: string | null): string;
 }
 
 export interface OutboundProvider {
@@ -114,6 +137,11 @@ export interface OutboundProvider {
    * A provider carries it exactly when metrics.ts has a reader that can succeed for it.
    */
   capabilities: string[];
+  /**
+   * What may be read from this connection, by name. Absent on a publish-only provider, which is
+   * every provider that existed before the read direction did.
+   */
+  resources?: Record<string, ProviderResource>;
   /**
    * The provider's own daily ceiling on publishes, when it has one that is shared rather than
    * per-user. YouTube's allowance is per Google PROJECT, so ten publishers on one shared channel
@@ -449,9 +477,29 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     scopes: ['publish'],
     pkce: true,
     tokenAuth: 'body',
-    capabilities: ['publish-video', 'publish-post', 'read-metrics'],
+    capabilities: ['publish-video', 'publish-post', 'read-metrics', 'read-items'],
     sharedDailyLimit: null,
     attachFields: null,
+    // A readable resource, so the read direction can be driven against a real HTTP round rather
+    // than against a mock of one. `publish` is deliberately the scope it needs: the point is that
+    // the check compares against what the connection was GRANTED, whatever the words are.
+    resources: baseUrl ? {
+      items: {
+        label: 'the test items',
+        requiresScopes: ['publish'],
+        url(params) {
+          const u = new URL(`${baseUrl}/items`);
+          const n = Number(params.limit);
+          u.searchParams.set('limit', String(Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 50) : 10));
+          return u.toString();
+        },
+      },
+      'needs-more': {
+        label: 'something this connection was never allowed',
+        requiresScopes: ['publish', 'read:everything'],
+        url() { return `${baseUrl}/items`; },
+      },
+    } : undefined,
     endpoints() {
       if (!baseUrl) return null;
       return {
@@ -525,6 +573,100 @@ export function tokenRequest(
  * answer "why can I not connect YouTube" with the reason instead of a bare absence — an operator
  * staring at an empty list has nothing to act on.
  */
+/**
+ * Gmail, read-only.
+ *
+ * THE FIRST CONNECTION THAT EXISTS TO BE READ RATHER THAN WRITTEN TO, and the reason the read
+ * direction was built at all: mail is the connector everybody already has. A person forwards
+ * themselves an invoice, a booking, a meter reading, and it sits in a mailbox no tool of theirs can
+ * see.
+ *
+ * `gmail.readonly` and NOTHING else. Google offers scopes that send, delete and modify, and none of
+ * them are asked for: a permission that is never requested cannot be misused, cannot be leaked and
+ * does not have to be explained to the person on the consent screen. If sending ever becomes a
+ * feature it becomes a SECOND provider entry with its own consent, not a wider scope on this one.
+ *
+ * Shares the Google client with YouTube, because they are one registered application at Google. The
+ * scopes are what differ, and the consent screen names them.
+ */
+function googleMail(clientId: string, clientSecret: string, capabilityOn: boolean): OutboundProvider {
+  const configured = Boolean(clientId && clientSecret);
+  const enabled = capabilityOn && configured;
+  const READ = 'https://www.googleapis.com/auth/gmail.readonly';
+  const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
+
+  return {
+    id: 'google-mail',
+    label: 'Gmail',
+    credentialShape: 'oauth2',
+    instanceScoped: false,
+    enabled,
+    capabilityOn,
+    disabledReason: enabled
+      ? null
+      : !capabilityOn
+        ? 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)'
+        : 'no client credentials (AIMEAT_CONNECT_GOOGLE_CLIENT_ID / _SECRET)',
+    client: configured ? { id: clientId, secret: clientSecret } : null,
+    scopes: [READ],
+    pkce: true,
+    tokenAuth: 'body',
+    // Reading is all it does. It carries no publish capability, so no surface offers it a post box.
+    capabilities: ['read-mail'],
+    sharedDailyLimit: null,
+    attachFields: null,
+    resources: {
+      messages: {
+        label: 'the list of messages',
+        requiresScopes: [READ],
+        url(params) {
+          const limit = clampLimit(params.limit, 25, 100);
+          const q = typeof params.query === 'string' ? params.query.slice(0, 500) : '';
+          const page = typeof params.page_token === 'string' ? params.page_token.slice(0, 200) : '';
+          const u = new URL(`${API}/messages`);
+          u.searchParams.set('maxResults', String(limit));
+          if (q) u.searchParams.set('q', q);
+          if (page) u.searchParams.set('pageToken', page);
+          return u.toString();
+        },
+      },
+      message: {
+        label: 'one message',
+        requiresScopes: [READ],
+        url(params) {
+          const id = typeof params.id === 'string' ? params.id.trim() : '';
+          // The id goes into the PATH, so it is checked rather than trusted: Gmail ids are
+          // hexadecimal, and anything else here is either a mistake or an attempt to walk the URL
+          // somewhere this node never meant to send a token.
+          if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+            throw new Error('Name which message to open. The id comes from the message list.');
+          }
+          const u = new URL(`${API}/messages/${id}`);
+          u.searchParams.set('format', params.format === 'raw' ? 'raw' : 'full');
+          return u.toString();
+        },
+      },
+      profile: {
+        label: 'which mailbox this is',
+        requiresScopes: [READ],
+        url() { return `${API}/profile`; },
+      },
+    },
+    endpoints: () => ({
+      authorize: 'https://accounts.google.com/o/oauth2/v2/auth',
+      token: 'https://oauth2.googleapis.com/token',
+      revoke: 'https://oauth2.googleapis.com/revoke',
+    }),
+  };
+}
+
+/** A caller-supplied count, made safe without an error: a silly number is a small number. */
+function clampLimit(value: unknown, fallback: number, max: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return Math.min(Math.floor(n), max);
+}
+
 export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[] {
   const on = config.connectionsEnabled;
   const list = [
@@ -532,6 +674,7 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
     youtube(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
     linkedin(config.connectLinkedinClientId, config.connectLinkedinClientSecret, on),
     x(config.connectXClientId, config.connectXClientSecret, on),
+    googleMail(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
     bluesky(on),
   ];
   // Appended only when configured, so a production node's list is exactly the three above.

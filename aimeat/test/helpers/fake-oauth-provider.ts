@@ -40,6 +40,8 @@ export interface FakeProvider {
     wrongClientRefreshAttempts: number;
     /** Metric reads. Counted because on a real provider each one costs a request, or money. */
     metricReads: number;
+    /** Reads through the READ direction. Counted for the same reason: a real one costs. */
+    itemReads: number;
     revocations: number;
     identityLookups: number;
     /** Secrets exchanged for a session, and pairs refused. */
@@ -94,7 +96,7 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
 
   const state: FakeProvider = {
     baseUrl: '',
-    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, wrongClientRefreshAttempts: 0, metricReads: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0, publishes: 0, contentRejections: 0, lastPublishBytes: 0 },
+    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, wrongClientRefreshAttempts: 0, metricReads: 0, itemReads: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0, publishes: 0, contentRejections: 0, lastPublishBytes: 0 },
     accessTokenTtlSeconds: 3600,
     breakRefresh: false,
     noMetrics: false,
@@ -152,6 +154,20 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
           // Deliberately WITHOUT an impression count: the normalisation has to keep "not reported"
           // distinct from zero, and a test provider that reports everything cannot show that.
           likes: 7, comments: 2, shares: 3,
+        });
+      }
+
+      // What the READ direction asks for. Behind the same bearer token everything else here is
+      // behind, because that is the property under test: the node spends a stored credential and
+      // the caller never sees it.
+      if (url.pathname === '/items' && req.method === 'GET') {
+        const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+        if (!grants.has(token)) return json(res, 401, { error: 'invalid_token' });
+        state.stats.itemReads++;
+        const limit = Number(url.searchParams.get('limit') ?? 10);
+        return json(res, 200, {
+          items: Array.from({ length: Math.min(limit, 3) }, (_, i) => ({ id: `item-${i + 1}` })),
+          asked_for: limit,
         });
       }
 
