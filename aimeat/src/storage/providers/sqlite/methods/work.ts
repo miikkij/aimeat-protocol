@@ -2,6 +2,8 @@
  * @file src/storage/providers/sqlite/methods/work.ts
  * @description Action, Work, Wallet, Board, OTK, Node-key, Dispute, Micro-memory methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.3.0 — 2026-08-17 — pruneExpiredBoardPosts: one cross-board TTL DELETE for the cleanup job
+ *     (which used to page 10,000 posts per board through listPosts just for its side-effect delete).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: board posts round-trip `aiProvenanceId`.
  *     NOTE FOR WHOEVER TOUCHES BOARDS NEXT: ../repos/board.ts is a second, complete implementation
  *     of this same board domain and NOTHING IMPORTS IT. The methods here are the live ones (they are
@@ -414,6 +416,13 @@ export const workMethods = {
   async deletePost(this: SqliteStorage, boardId: string, postId: string): Promise<boolean> {
     const result = this.db.prepare('DELETE FROM board_posts WHERE boardId = ? AND id = ?').run(boardId, postId);
     return result.changes > 0;
+  },
+
+  async pruneExpiredBoardPosts(this: SqliteStorage, nowIso: string): Promise<number> {
+    // ISO-8601 strings compare correctly as text, so this is one indexed-scan DELETE with no
+    // values loaded — the TTL sweep no longer pages 10,000 posts per board through listPosts.
+    const result = this.db.prepare('DELETE FROM board_posts WHERE ttlExpiresAt IS NOT NULL AND ttlExpiresAt < ?').run(nowIso);
+    return result.changes;
   },
 
   async addReaction(this: SqliteStorage, boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean> {

@@ -3,6 +3,9 @@
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history
+ *   v1.2.0 - 2026-08-17 - Both scans use the `lean` listings (no extension source, no cortex
+ *     manifest/seed-data): this job reads schemas and metadata, never code, and the full loads were
+ *     measured at +203 MB of native churn per cron run on production.
  *   v1.1.0 - 2026-07-13 - Cortex capabilities now refresh when the source version or the
  *     derived usage (exports/api_surface/prompt) changes — previously a cortex capability
  *     was only updated when its exports were missing entirely, so a manifest enrichment
@@ -33,9 +36,11 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
   const seenRefs = new Set<string>();
   const now = new Date().toISOString();
 
-  // 1. Scan active extensions
+  // 1. Scan active extensions. `lean`: schemas and metadata only — this scan never executes code,
+  // and loading every action's full source cost +203 MB of native churn per cron run on production
+  // (memory trace 2026-08-17).
   try {
-    const extensions = await storage.listExtensions();
+    const extensions = await storage.listExtensions({ lean: true });
     for (const ext of extensions) {
       if (ext.status !== 'active' || !ext.actions) continue;
       for (const action of ext.actions) {
@@ -126,9 +131,10 @@ export async function runCapabilityAggregation(config: AimeatConfig, storage: St
     }
   } catch (err) { logger.error('Capability aggregator: action scan failed', { error: String(err) }); }
 
-  // 3. Scan active cortex modules (callable in browser)
+  // 3. Scan active cortex modules (callable in browser). `lean`: no raw manifest YAML, no seed-data
+  // entries — this scan reads lib exports/api_surface and prompt content only.
   try {
-    const cortexList = await storage.listCortexExtensions({ status: 'active' });
+    const cortexList = await storage.listCortexExtensions({ status: 'active', lean: true });
     logger.info(`Capability aggregator: found ${cortexList.length} active cortex modules`);
     for (const cortex of cortexList) {
       const ref = `cortex:${cortex.name}`;

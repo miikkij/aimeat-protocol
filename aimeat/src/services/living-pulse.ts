@@ -13,6 +13,9 @@
  *   - scanOwnerDue(storage, config, ownerGaii) — pulse the owner's own due instances (manual trigger)
  *   - pulseInstanceServer(storage, config, ownerGaii, loc, cfg) — one instance, self-fulfilled
  * @version-history
+ *   v1.2.0 — 2026-08-17 — The due-scan runs on the value-free meta projection and fetches only the
+ *     matched config records (was: 10,000 full organism.* values per tick, +151..230 MB/run measured
+ *     on production).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: a derived section carries the provenance record the
  *     completion already minted. A living document derives itself on a cadence with nobody present,
  *     which is exactly the case where the origin has to be recorded rather than remembered.
@@ -101,8 +104,12 @@ function cadenceMs(charter: Record<string, unknown> | undefined): number {
   return ({ hourly: 60, daily: 1440, weekly: 10080 }[named] ?? 1440) * 60_000;
 }
 
+/** The slice of a memory row the due-evaluation reads — satisfied by full records AND meta rows,
+ *  so the scheduler scan can run on the value-free projection. */
+type WsItem = Pick<MemoryRecord, 'key' | 'updatedAt'>;
+
 /** Count workspace activity (user content changed) since `lastMs`, ignoring living-doc machinery. */
-function workspaceActivity(wsItems: MemoryRecord[], lastMs: number): { changedSince: number; lastActivityMs: number } {
+function workspaceActivity(wsItems: WsItem[], lastMs: number): { changedSince: number; lastActivityMs: number } {
   let changedSince = 0, lastActivityMs = 0;
   for (const r of wsItems) {
     if (/\.living(-src|-slot|-ledger)?\./.test(r.key) || /\.meta\./.test(r.key)) continue;
@@ -119,7 +126,7 @@ function workspaceActivity(wsItems: MemoryRecord[], lastMs: number): { changedSi
  *   guards:   { cadence_floor_h } | { no_workspace_activity_for_h }
  * With no `triggers` declared it falls back to the cadence. `wsItems` = the instance's workspace memory.
  */
-function evaluateDue(cfg: Record<string, unknown>, wsItems: MemoryRecord[], now = Date.now()): boolean {
+function evaluateDue(cfg: Record<string, unknown>, wsItems: WsItem[], now = Date.now()): boolean {
   const status = (cfg.status as Record<string, unknown>) || {};
   if (status.paused === true || status.health === 'retired') return false;
   const charter = (cfg.charter as Record<string, unknown>) || {};
@@ -328,37 +335,44 @@ async function evaluateStop(
   return null;
 }
 
-function pulseRecord(rec: MemoryRecord): Loc | null {
+function pulseRecord(rec: { key: string }): Loc | null {
   const m = CONFIG_RE.exec(rec.key);
   return m ? { orgId: m[1], wsId: m[2], docId: m[3] } : null;
 }
 
-/** Scan ALL owners' living instances and pulse the due ones (scheduler entrypoint). */
+/** Scan ALL owners' living instances and pulse the due ones (scheduler entrypoint).
+ *  Memory trace 2026-08-17: this used to load 10,000 full `organism.*` VALUES per tick just to find
+ *  a handful of living-configs — +151..230 MB of native churn per run. The meta projection carries
+ *  everything the due-evaluation reads (key + updatedAt); only the matched config records are fetched. */
 export async function scanAllDue(storage: Storage, config: AimeatConfig, services?: LivingNotify): Promise<void> {
-  const { items } = await storage.listAllMemory({ prefix: 'organism.', limit: 10_000 });
+  const { items } = await storage.listAllMemoryMeta({ prefix: 'organism.', limit: 10_000 });
   let pulsed = 0;
-  for (const rec of items) {
+  for (const meta of items) {
     if (pulsed >= MAX_PER_SCAN) break;
-    const loc = pulseRecord(rec);
-    const cfg = rec.value as Record<string, unknown> | null;
-    if (!loc || !cfg || cfg.type !== 'living-config') continue;
+    const loc = pulseRecord(meta);
+    if (!loc) continue;
+    const rec = await storage.getMemory(meta.ownerGaii, meta.key);
+    const cfg = rec?.value as Record<string, unknown> | null | undefined;
+    if (!cfg || cfg.type !== 'living-config') continue;
     const wsItems = items.filter(i => i.key.startsWith(`${wsRoot(loc)}.`));
     if (!evaluateDue(cfg, wsItems)) continue;
-    try { await pulseInstanceServer(storage, config, rec.ownerGaii, loc, cfg, services); pulsed++; }
-    catch (e) { logger.warn(`living pulse failed for ${rec.key}: ${String((e as Error).message || e)}`); }
+    try { await pulseInstanceServer(storage, config, meta.ownerGaii, loc, cfg, services); pulsed++; }
+    catch (e) { logger.warn(`living pulse failed for ${meta.key}: ${String((e as Error).message || e)}`); }
   }
   if (pulsed > 0) logger.info(`Living-document pulse: refreshed ${pulsed} due instance(s)`);
 }
 
 /** Pulse the owner's OWN due instances now (manual trigger via POST /v1/living/pulse-due). */
 export async function scanOwnerDue(storage: Storage, config: AimeatConfig, ownerGaii: string, services?: LivingNotify): Promise<{ pulsed: number }> {
-  const items = await storage.listMemory(ownerGaii);
+  const metas = await storage.listMemoryMeta(ownerGaii);
   let pulsed = 0;
-  for (const rec of items) {
-    const loc = pulseRecord(rec);
-    const cfg = rec.value as Record<string, unknown> | null;
-    if (!loc || !cfg || cfg.type !== 'living-config') continue;
-    const wsItems = items.filter(i => i.key.startsWith(`${wsRoot(loc)}.`));
+  for (const meta of metas) {
+    const loc = pulseRecord(meta);
+    if (!loc) continue;
+    const rec = await storage.getMemory(ownerGaii, meta.key);
+    const cfg = rec?.value as Record<string, unknown> | null | undefined;
+    if (!cfg || cfg.type !== 'living-config') continue;
+    const wsItems = metas.filter(i => i.key.startsWith(`${wsRoot(loc)}.`));
     if (!evaluateDue(cfg, wsItems)) continue;
     await pulseInstanceServer(storage, config, ownerGaii, loc, cfg, services);
     pulsed++;

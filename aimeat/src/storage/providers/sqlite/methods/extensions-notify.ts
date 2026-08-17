@@ -2,6 +2,8 @@
  * @file src/storage/providers/sqlite/methods/extensions-notify.ts
  * @description Site-log, Extension, Escrow, Cortex, Push, Notification, Session, PAT, Email-invitation methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.2.0 — 2026-08-17 — `lean` listings on extensions (no scriptContent) and cortex (no manifest /
+ *     seed-data entries), same contract as the Postgres provider.
  *   v1.1.0 — 2026-08-13 — revokeSessionsByGaii, matching the Postgres provider.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
@@ -80,12 +82,19 @@ export const extensionsNotifyMethods = {
     return row ? this.deserializeExtension(row) : null;
   },
 
-  async listExtensions(this: SqliteStorage, opts?: { status?: string }): Promise<ExtensionRecord[]> {
+  async listExtensions(this: SqliteStorage, opts?: { status?: string; lean?: boolean }): Promise<ExtensionRecord[]> {
     let sql = 'SELECT * FROM extensions';
     const params: unknown[] = [];
     if (opts?.status) { sql += ' WHERE status = ?'; params.push(opts.status); }
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeExtension(r));
+    const records = rows.map(r => this.deserializeExtension(r));
+    // lean: same contract as the Postgres provider (scriptContent stripped per action). The database
+    // is in-process here so the strip happens after parse — the win is the retained copies, and the
+    // two backends return the same shape.
+    if (opts?.lean) {
+      return records.map(rec => ({ ...rec, actions: rec.actions.map(a => ({ ...a, scriptContent: '' })) }));
+    }
+    return records;
   },
 
   async updateExtension(this: SqliteStorage, name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null> {
@@ -228,7 +237,7 @@ export const extensionsNotifyMethods = {
     return row ? this.deserializeCortexExtension(row) : null;
   },
 
-  async listCortexExtensions(this: SqliteStorage, opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> {
+  async listCortexExtensions(this: SqliteStorage, opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string; lean?: boolean }): Promise<CortexExtensionRecord[]> {
     let sql = 'SELECT * FROM cortex_extensions WHERE 1=1';
     const params: unknown[] = [];
     if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
@@ -236,7 +245,17 @@ export const extensionsNotifyMethods = {
     if (opts?.visibility) { sql += ' AND visibility = ?'; params.push(opts.visibility); }
     if (opts?.installedBy) { sql += ' AND installedBy = ?'; params.push(opts.installedBy); }
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeCortexExtension(r));
+    const records = rows.map(r => this.deserializeCortexExtension(r));
+    // lean: same contract as the Postgres provider — manifest '' and seed-data entries [] (lib
+    // exports/api_surface/prompt content kept). See node.repository.ts.
+    if (opts?.lean) {
+      return records.map(rec => ({
+        ...rec,
+        manifest: '',
+        components: rec.components.map(c => (c.type === 'seed-data' ? { ...c, entries: [] } : c)),
+      }));
+    }
+    return records;
   },
 
   async updateCortexExtension(this: SqliteStorage, name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null> {

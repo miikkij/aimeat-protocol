@@ -9,6 +9,9 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.3.0 — 2026-08-17 — Memory trace: the memory-TTL sweep reads the meta projection, and the
+ *     board-post TTL sweep is one cross-board DELETE (it used to page 10,000 full posts per board
+ *     for a side-effect delete only SQLite performed — Postgres never pruned).
  *   v1.2.0 — 2026-08-14 — Register the usage-rollup fold and the usage-archive sweep
  *     (docs/internal/telemetria/02-design.md).
  *   v1.1.0 — 2026-07-16 — Register the workspace-version-compaction handler (retention P2; not
@@ -178,10 +181,11 @@ async function runMemoryTtlCleanupJob(storage: Storage): Promise<void> {
 }
 
 async function runBoardPostTtlCleanupJob(storage: Storage): Promise<void> {
-  const boards = await storage.listBoards();
-  for (const board of boards) {
-    await storage.listPosts(board.id, { limit: 10000 });
-  }
+  // Memory trace 2026-08-17 (+145 MB/run): this used to load up to 10,000 full posts per board
+  // through listPosts for its lazy side-effect delete — which only SQLite had, so on Postgres the
+  // job read everything and removed nothing. One cross-board DELETE does the actual work.
+  const removed = await storage.pruneExpiredBoardPosts(new Date().toISOString());
+  if (removed > 0) logger.info(`Board-post TTL cleanup: removed ${removed} expired posts`);
 }
 
 async function runDisputeTimeoutJob(_config: AimeatConfig, storage: Storage): Promise<void> {

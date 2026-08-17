@@ -196,6 +196,37 @@ await test('4–5. Wait 4s then list posts → expired post filtered out', async
     assert(!ids.includes(ttlPostId), `expired post still in list: ${ids}`);
 });
 
+await test('5b. TTL cleanup job DELETES the expired row (not just filters it)', async () => {
+    // The single-post GET serves an expired-but-unpruned row with 200 (it never filters TTL), which
+    // is what makes the sweep observable over HTTP: create an expired post WITHOUT listing the board
+    // (the SQLite list lazily deletes), trigger the core job as operator, and the row must be GONE.
+    // Until 2026-08-17 the Postgres backend failed this — the job read posts and deleted nothing.
+    const created = await json(`/v1/boards/${privateBoardId}/posts`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ title: 'Prune me', body: 'Expired row for the sweep', ttl_hours: 0.0004 }),
+    });
+    assert(created.status === 201, `create status ${created.status}`);
+    const pruneId = created.body.data.id;
+    await sleep(2000);   // 0.0004h ≈ 1.44s
+
+    const before = await json(`/v1/boards/${privateBoardId}/posts/${pruneId}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(before.status === 200, `expired-but-unpruned row should still serve, got ${before.status}`);
+
+    const trig = await json('/v1/admin/scheduler/jobs/core:board-post-ttl-cleanup/trigger', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },   // first owner is auto-operator
+    });
+    assert(trig.status === 200, `trigger status ${trig.status}: ${JSON.stringify(trig.body)}`);
+
+    const after = await json(`/v1/boards/${privateBoardId}/posts/${pruneId}`, {
+        headers: { Authorization: `Bearer ${agentToken}` },
+    });
+    assert(after.status === 404, `pruned row must 404, got ${after.status}`);
+});
+
 await test('6. Post with default TTL (168h)', async () => {
     const { status, body } = await json(`/v1/boards/${privateBoardId}/posts`, {
         method: 'POST',

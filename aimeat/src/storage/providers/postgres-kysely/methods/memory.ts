@@ -7,6 +7,8 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.4.0 — 2026-08-17 — listAllMemoryMeta: cross-owner enumeration with the META_COLS projection
+ *     (no value column), for scheduled scans that only decide from keys + timestamps.
  *   v1.3.0 — 2026-08-11 — `groupId` is written on the UPDATE paths and on createMemoryIfAbsent, not
  *     only on the first INSERT (shared rule in storage/memory-sharing.ts). It was frozen at creation,
  *     so a record could never be shared after it existed, and MOVING one to another group changed
@@ -348,6 +350,24 @@ export const memoryMethods = {
     const total = all.length;
     const start = opts?.offset ?? 0;
     const items = (opts?.limit ? all.slice(start, start + opts.limit) : all).map(rowToRecord);
+    return { items, total };
+  },
+
+  async listAllMemoryMeta(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryMetaRow[]; total: number }> {
+    // listAllMemory with the META_COLS projection: same filters and windowing, no `value` column
+    // ever leaves the database (see memory.repository.ts).
+    let q = this.db.selectFrom('Memory').select(META_COLS);
+    if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
+    if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', opts.ownerPrefix + '%');
+    if (opts?.excludeOwnerPrefix) q = q.where('ownerGaii', 'not like', opts.excludeOwnerPrefix + '%');
+    if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
+    if (opts?.excludeVersionRows) q = q.where('key', 'not like', '%.version.%');
+    q = applyArchive(q, opts?.archived);
+    const ordered = opts?.newestFirst ? q.orderBy('updatedAt', 'desc') : q.orderBy('key');
+    const all = (await ordered.execute()).filter(isLive);
+    const total = all.length;
+    const start = opts?.offset ?? 0;
+    const items = (opts?.limit ? all.slice(start, start + opts.limit) : all).map(rowToMeta);
     return { items, total };
   },
 

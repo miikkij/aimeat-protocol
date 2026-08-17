@@ -12,6 +12,8 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   v1.1.0 — 2026-08-17 — listAllMemoryMeta: the cross-owner enumeration gains the same value-free
+ *     META projection listMemoryMeta has, so scheduled scans stop loading values they discard.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { ArchiveFilter, MemoryRecord } from '../interface.js';
@@ -211,6 +213,14 @@ export interface MemoryRepository {
    * whenever `limit` is used and recency is what you meant.
    */
   listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryRecord[]; total: number }>;
+  /**
+   * {@link listAllMemory} as value-free META rows — same filters and windowing, but the DB projects
+   * only the metadata columns (see {@link listMemoryMeta}). For cross-owner scans that decide FROM
+   * key + timestamps which few records to actually read: the living-pulse due-scan walked 10,000
+   * full `organism.*` values per tick when all it needed was keys, updatedAt, and a handful of
+   * config records it then fetches with getMemory.
+   */
+  listAllMemoryMeta(opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryMetaRow[]; total: number }>;
   /**
    * List archived prior versions of a TRACKABLE memory key, newest version first. Only keys marked
    * `trackable` accumulate history (the latest value always lives in `getMemory`). Empty for keys that

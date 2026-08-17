@@ -5,6 +5,8 @@
  *   and the boards API. Translated 1:1 from the Prisma implementation. The business key is `boardId`
  *   (record.id), `postId` for posts.
  * @version-history
+ *   v1.2.0 — 2026-08-17 — pruneExpiredBoardPosts: this backend gains its first real TTL delete
+ *     (listPosts only filtered, so expired posts accumulated forever).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: `BoardPost.aiProvenanceId` round-trips
  *     (migration 0020). A post on a public board also satisfies the derived-visibility predicate in
  *     ./ai-provenance.ts, so an anonymous reader of that board can resolve the record behind it.
@@ -81,6 +83,12 @@ export const boardMethods = {
   async deletePost(this: PostgresKyselyStorage, boardId: string, postId: string): Promise<boolean> {
     const r = await this.db.deleteFrom('BoardPost').where('boardId', '=', boardId).where('postId', '=', postId).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
+  },
+  async pruneExpiredBoardPosts(this: PostgresKyselyStorage, nowIso: string): Promise<number> {
+    // One cross-board DELETE. Until 2026-08-17 this backend never removed expired posts at all:
+    // listPosts only filtered them out, so the rows accumulated forever on production.
+    const r = await this.db.deleteFrom('BoardPost').where('ttlExpiresAt', 'is not', null).where('ttlExpiresAt', '<', new Date(nowIso)).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0);
   },
   async addReaction(this: PostgresKyselyStorage, boardId: string, postId: string, emoji: string, gaii: string): Promise<boolean> {
     const post = await this.db.selectFrom('BoardPost').select('reactions').where('boardId', '=', boardId).where('postId', '=', postId).executeTakeFirst();

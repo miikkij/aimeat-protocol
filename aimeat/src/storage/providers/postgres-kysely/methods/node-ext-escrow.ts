@@ -6,12 +6,15 @@
  *   CortexLibFile). Translated 1:1 from the Prisma implementation against the same tables — jsonb
  *   columns go through the shared `jsonb()` param helper; status/visibility unions are DB strings.
  * @version-history
+ *   v1.2.0 — 2026-08-17 — `lean` listings strip scriptContent / manifest / seed-data entries IN SQL
+ *     (jsonb projection), so the capability aggregator stops pulling every extension's source and
+ *     every cortex manifest through the process on each cron run.
  *   v1.0.0 — 2026-07-15 — Phase 5: node extension/instance/escrow/cortex on Postgres+Kysely.
  *   v1.1.0 — 2026-07-26 — updateExtension no longer swallows write errors into `null` (see the note
  *     on the method): a failed UPDATE was indistinguishable from a missing row, and callers reported
  *     the resulting null as a successful no-op.
  */
-import type { Selectable } from 'kysely';
+import { sql, type Selectable } from 'kysely';
 import type {
   CortexExtensionRecord, EscrowHoldRecord, ExtensionInstanceRecord, ExtensionRecord,
 } from '../../../interface.js';
@@ -77,7 +80,16 @@ export const nodeExtEscrowMethods = {
     const r = await this.db.selectFrom('Extension').selectAll().where('name', '=', name).executeTakeFirst();
     return r ? toExtension(r) : null;
   },
-  async listExtensions(this: PostgresKyselyStorage, opts?: { status?: string }): Promise<ExtensionRecord[]> {
+  async listExtensions(this: PostgresKyselyStorage, opts?: { status?: string; lean?: boolean }): Promise<ExtensionRecord[]> {
+    if (opts?.lean) {
+      // scriptContent is stripped IN SQL, per action, so the source bytes never leave the database
+      // (see node.repository.ts — the capability aggregator reads schemas, never code).
+      let q = this.db.selectFrom('Extension')
+        .select(['id', 'name', 'version', 'description', 'author', 'status', 'requiredApis', 'config', 'limits', 'federation', 'instances', 'installedBy', 'installedAt', 'activatedAt', 'createdAt', 'updatedAt'])
+        .select(sql`(SELECT coalesce(jsonb_agg(t.elem - 'scriptContent' ORDER BY t.ord), '[]'::jsonb) FROM jsonb_array_elements(("Extension"."actions")::jsonb) WITH ORDINALITY AS t(elem, ord))`.as('actions'));
+      if (opts.status) q = q.where('status', '=', opts.status);
+      return (await q.execute()).map(r => toExtension(r as unknown as Selectable<Extension>));
+    }
     let q = this.db.selectFrom('Extension').selectAll();
     if (opts?.status) q = q.where('status', '=', opts.status);
     return (await q.execute()).map(toExtension);
@@ -165,13 +177,24 @@ export const nodeExtEscrowMethods = {
     const r = await this.db.selectFrom('CortexExtension').selectAll().where('name', '=', name).executeTakeFirst();
     return r ? toCortex(r) : null;
   },
-  async listCortexExtensions(this: PostgresKyselyStorage, opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]> {
-    let q = this.db.selectFrom('CortexExtension').selectAll();
+  async listCortexExtensions(this: PostgresKyselyStorage, opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string; lean?: boolean }): Promise<CortexExtensionRecord[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any;
+    if (opts?.lean) {
+      // Raw manifest YAML + seed-data entries stripped IN SQL — the two payloads a metadata reader
+      // never touches (lib exports/api_surface/prompt content are kept; see node.repository.ts).
+      q = this.db.selectFrom('CortexExtension')
+        .select(['id', 'name', 'namespace', 'shortName', 'apiVersion', 'version', 'description', 'author', 'license', 'tags', 'labels', 'aimeatCompat', 'status', 'visibility', 'installedAt', 'activatedAt', 'installedBy', 'activationArtifacts'])
+        .select(sql`''`.as('manifest'))
+        .select(sql`(SELECT coalesce(jsonb_agg(CASE WHEN t.elem->>'type' = 'seed-data' THEN jsonb_set(t.elem, '{entries}', '[]'::jsonb) ELSE t.elem END ORDER BY t.ord), '[]'::jsonb) FROM jsonb_array_elements(("CortexExtension"."components")::jsonb) WITH ORDINALITY AS t(elem, ord))`.as('components'));
+    } else {
+      q = this.db.selectFrom('CortexExtension').selectAll();
+    }
     if (opts?.status) q = q.where('status', '=', opts.status);
     if (opts?.namespace) q = q.where('namespace', '=', opts.namespace);
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
     if (opts?.installedBy) q = q.where('installedBy', '=', opts.installedBy);
-    return (await q.execute()).map(toCortex);
+    return ((await q.execute()) as Selectable<CortexExtension>[]).map(toCortex);
   },
   async updateCortexExtension(this: PostgresKyselyStorage, name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null> {
     try {

@@ -10,6 +10,8 @@
  *   - extension, escrow-hold, and cortex-extension/lib-file CRUD
  *
  * @version-history
+ *   v1.2.0 — 2026-08-17 — `lean` option on listExtensions (no scriptContent) and
+ *     listCortexExtensions (no manifest / seed-data entries) for metadata-only readers.
  *   v1.1.0 — 2026-08-11 — Push subscriptions are per DEVICE (audit H-8): listPushSubscriptionsByOwner
  *     added, deletePushSubscription takes an optional endpoint.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -63,7 +65,13 @@ export interface NodeRepository {
   listSiteChangeLog(limit: number, cursor?: string): Promise<SiteChangeLogEntry[]>;
   createExtension(record: ExtensionRecord): Promise<ExtensionRecord>;
   getExtension(name: string): Promise<ExtensionRecord | null>;
-  listExtensions(opts?: { status?: string }): Promise<ExtensionRecord[]>;
+  /**
+   * `lean: true` returns every action with `scriptContent: ''` — for callers that read schemas and
+   * metadata but never execute (the capability aggregator loaded every extension's full source on
+   * each cron run; measured as part of a +203 MB/run native churn on production, 2026-08-17).
+   * Postgres strips it IN SQL so the bytes never leave the database.
+   */
+  listExtensions(opts?: { status?: string; lean?: boolean }): Promise<ExtensionRecord[]>;
   updateExtension(name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null>;
   deleteExtension(name: string): Promise<boolean>;
   createEscrowHold(record: EscrowHoldRecord): Promise<EscrowHoldRecord>;
@@ -73,7 +81,12 @@ export interface NodeRepository {
   refundEscrowHold(holdId: string): Promise<EscrowHoldRecord | null>;
   createCortexExtension(record: CortexExtensionRecord): Promise<CortexExtensionRecord>;
   getCortexExtension(name: string): Promise<CortexExtensionRecord | null>;
-  listCortexExtensions(opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string }): Promise<CortexExtensionRecord[]>;
+  /**
+   * `lean: true` returns `manifest: ''` and every seed-data component with `entries: []` — the two
+   * payloads a metadata reader (the capability aggregator) never touches. Lib exports, api_surface
+   * and prompt content are kept. Postgres strips both IN SQL.
+   */
+  listCortexExtensions(opts?: { status?: string; namespace?: string; visibility?: string; installedBy?: string; lean?: boolean }): Promise<CortexExtensionRecord[]>;
   updateCortexExtension(name: string, updates: Partial<CortexExtensionRecord>): Promise<CortexExtensionRecord | null>;
   deleteCortexExtension(name: string): Promise<boolean>;
   setCortexLibFile(extName: string, libName: string, content: string): Promise<void>;
