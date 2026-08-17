@@ -168,7 +168,7 @@ export async function speakToText(file) {
     // a bare 413 instead of naming the limit.
     const maxBytes = Number(mint?.data?.max_size_bytes) || 0;
     if (maxBytes && file.size > maxBytes) {
-        throw new Error(`That recording is ${(file.size / 1048576).toFixed(1)} MB; this node accepts ${(maxBytes / 1048576).toFixed(0)} MB.`);
+        throw new Error(`That recording is ${(file.size / 1048576).toFixed(1)} MB; the largest accepted here is ${(maxBytes / 1048576).toFixed(0)} MB.`);
     }
 
     // Plain fetch, deliberately not api(): the presigned token IS the capability, so no
@@ -209,7 +209,7 @@ export async function uploadAttachment(file) {
 
     const maxBytes = Number(mint?.data?.max_size_bytes) || 0;
     if (maxBytes && file.size > maxBytes) {
-        throw new Error(`That file is ${(file.size / 1048576).toFixed(1)} MB; this node accepts ${(maxBytes / 1048576).toFixed(0)} MB.`);
+        throw new Error(`That file is ${(file.size / 1048576).toFixed(1)} MB; the largest accepted here is ${(maxBytes / 1048576).toFixed(0)} MB.`);
     }
 
     const put = await fetch(uploadTarget(uploadUrl), { method: 'PUT', headers: { 'Content-Type': mime }, body: file });

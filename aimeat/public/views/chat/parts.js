@@ -478,7 +478,7 @@ export function Composer({ value, onInput, onSend, onStop, onSpeak, onAttach, at
                     value=${value}
                     disabled=${disabled}
                     placeholder=${disabled
-                        ? tr('chat.disabledPlaceholder', 'This node has no chat agent yet.')
+                        ? tr('chat.disabledPlaceholder', 'There is no chat agent here yet.')
                         : tr('chat.placeholder', 'Ask for something, or describe what you want built.')}
                     onInput=${(e) => onInput(e.target.value)}
                     onKeyDown=${keydown}></textarea>
@@ -518,7 +518,7 @@ export function StatusBar({ status, onReset }) {
     const payer = {
         own: () => tr('chat.ownKey', 'Running on your own OpenRouter key.'),
         allowance: () => tr('chat.allowance', '{n} USD left of your allowance.').replace('{n}', remaining.toFixed(2)),
-        node: () => tr('chat.nodeKey', 'This node pays for the conversation, on its own key.'),
+        node: () => tr('chat.nodeKey', 'The house pays for this conversation, on its own key.'),
     }[status.pays] ?? null;
     // What the person's OWN money is doing while the node pays for this conversation. Shown only
     // when it is not already the subject of the payer line, and worded so it cannot be read as a

@@ -80,7 +80,7 @@ const STARTERS = [
       label: 'chat.starterPage', labelFallback: 'Make my welcome page' },
     { id: 'work', key: 'chat.starterWorkAsk', fallback: 'Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.',
       label: 'chat.starterWork', labelFallback: 'Take something off my plate' },
-    { id: 'connect', key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it to this node so it can do this work?',
+    { id: 'connect', key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it here so it can do this work?',
       label: 'chat.starterConnect', labelFallback: 'Connect my own AI' },
 ];
 

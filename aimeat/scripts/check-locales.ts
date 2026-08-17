@@ -23,6 +23,13 @@
  *     have a sentence (appGrant.scopeText or scopeUi.scopeText) and each family an appGrant.area
  *     name. A scope with neither used to render the server's English-only description and the raw
  *     family word, which is the screen that made a real user read "storage" as their hard drive.
+ *   v1.3.0 — 2026-08-18 — jargonOffenders(): "node" (fi also "solmu", es "nodo") is a word only we
+ *     understand, and the registration modal was saying "Tästä tulee pysyvä tunnuksesi tällä
+ *     nodella" to people on their first day. A ratchet, same model as plain-language-baseline:
+ *     security/locale-jargon-baseline.json records the existing offenders (operator and developer
+ *     surfaces mostly, where the word is legitimate vocabulary), the gate fails on any NEW string
+ *     carrying the word, and the file may only shrink. Node.js (the runtime) and {placeholders}
+ *     are not offenses.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -93,6 +100,39 @@ function missingAppGrantSentences(en: Record<string, unknown>): string[] {
   return out;
 }
 
+/**
+ * "node" carries meaning only for people who build this; a person registering reads it cold. The
+ * word is still legitimate on operator and developer surfaces (the start wizard, federation,
+ * admin), so this is a RATCHET rather than a ban: everything that already says it is recorded in
+ * the baseline, anything NEW fails, and the baseline may only shrink. An entry that stops
+ * offending (fixed or deleted) must be removed from the baseline in the same change, so the file
+ * stays an honest worklist. Node.js the runtime and {placeholder} names are never offenses.
+ */
+const JARGON_BY_LOCALE: Record<string, RegExp> = {
+  fi: /\b(?:node(?!\.?js)\w*|solmu\w*)/iu,
+  en: /\bnodes?\b(?!\.js)/i,
+  es: /\bnodos?\b/i,
+};
+const JARGON_BASELINE = new URL('../security/locale-jargon-baseline.json', import.meta.url);
+
+function jargonOffenders(): { fresh: string[]; stale: string[] } {
+  let baseline: string[] = [];
+  try { baseline = JSON.parse(readFileSync(JARGON_BASELINE, 'utf-8')); } catch { baseline = []; }
+  const known = new Set(baseline);
+  const current = new Set<string>();
+  for (const tag of ['fi', 'en', 'es']) {
+    const re = JARGON_BY_LOCALE[tag];
+    const loc = flatten(loadLocale(tag));
+    for (const [key, value] of Object.entries(loc)) {
+      const text = String(value).replace(/\{\{?[^}]*\}?\}/g, ''); // placeholders are not prose
+      if (re.test(text)) current.add(`${tag}:${key}`);
+    }
+  }
+  const fresh = [...current].filter(id => !known.has(id)).sort();
+  const stale = baseline.filter(id => !current.has(id)).sort();
+  return { fresh, stale };
+}
+
 const listOnly = process.argv.includes('--list');
 const [, ...others] = shippedLocales();
 const en = flatten(loadLocale('en'));
@@ -120,6 +160,15 @@ for (const missing of missingScopeLabels(en)) {
 // The app-grant consent screen has the same key-derived contract against a different code source.
 for (const missing of missingAppGrantSentences(en)) {
   failures.push(`✖ [en] the app-grant consent screen has no words for: ${missing}\n      → add it to locales/en.json (and fi/es); consent-vocab.js resolves override first, shared tree second`);
+}
+
+// The jargon ratchet: no NEW "node"/"solmu"/"nodo" reaches a person, and the baseline only shrinks.
+const jargon = jargonOffenders();
+for (const id of jargon.fresh) {
+  failures.push(`✖ [${id.split(':')[0]}] new jargon a person cannot parse: ${id.split(':').slice(1).join(':')} says "node"\n      → say it in the person's words (täällä / here / talo / your account); the word is for operator and developer surfaces only`);
+}
+for (const id of jargon.stale) {
+  failures.push(`✖ baseline entry no longer offends: ${id}\n      → remove it from security/locale-jargon-baseline.json — the ratchet only tightens`);
 }
 
 if (failures.length) {
