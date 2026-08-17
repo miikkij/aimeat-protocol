@@ -86,6 +86,13 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   // all live updates (memory tab, agent task event logs, etc.). Skipping
   // text/event-stream lets those writes pass straight through.
   app.use(compression({
+    // Memory audit 2026-08-17: each compressed response allocates a native zlib context
+    // (~256 kB at defaults) that fragments glibc's malloc arenas under sustained traffic
+    // and never returns to the OS. Small responses gain nothing from compression, so the
+    // threshold skips them entirely, and memLevel 7 halves the per-context window cost
+    // for a compression-ratio difference that is noise on JSON.
+    threshold: 4096,
+    memLevel: 7,
     filter: (req, res) => {
       if (res.getHeader('Content-Type') === 'text/event-stream') return false;
       return compression.filter(req, res);

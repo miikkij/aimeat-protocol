@@ -37,15 +37,28 @@ addFormats(ajv);
 // workspace record forms). Register it as a no-op keyword so strict-mode compile accepts it.
 ajv.addKeyword({ keyword: 'x-default' });
 
-// Compiled validator cache — key = JSON.stringify(schema)
+// Compiled validator cache — key = JSON.stringify(schema). Bounded as an LRU (memory audit
+// 2026-08-17): the values are COMPILED FUNCTIONS with closures, the keys arrive from
+// user-authored workflow schemas, and an unbounded map of generated code is the most
+// expensive kind of heap growth there is. Map iteration order is insertion order, so
+// delete+set on hit makes the first key the least recently used.
 const validatorCache = new Map<string, ValidateFunction>();
+const VALIDATOR_CACHE_MAX = 200;
 
 function getValidator(schema: Record<string, unknown>): ValidateFunction {
   const key = JSON.stringify(schema);
-  if (!validatorCache.has(key)) {
-    validatorCache.set(key, ajv.compile(schema));
+  const hit = validatorCache.get(key);
+  if (hit) {
+    validatorCache.delete(key);
+    validatorCache.set(key, hit);
+    return hit;
   }
-  return validatorCache.get(key)!;
+  const compiled = ajv.compile(schema);
+  if (validatorCache.size >= VALIDATOR_CACHE_MAX) {
+    validatorCache.delete(validatorCache.keys().next().value as string);
+  }
+  validatorCache.set(key, compiled);
+  return compiled;
 }
 
 export function clearValidatorCache(): void {

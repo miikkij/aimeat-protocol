@@ -34,6 +34,11 @@ COPY package.json pnpm-lock.yaml ./
 RUN mkdir -p /data && chown node:node /data
 
 ENV NODE_ENV=production
+# Memory audit 2026-08-17: cap the V8 heap (container-aware V8 would size it from host RAM),
+# stop glibc spreading freed native memory across per-core arenas that never return to the OS,
+# and let an operator take a production heap snapshot with `kill -USR2 <pid>`.
+ENV NODE_OPTIONS="--max-old-space-size=2048 --heapsnapshot-signal=SIGUSR2"
+ENV MALLOC_ARENA_MAX=2
 ENV AIMEAT_PORT=40050
 EXPOSE 40050
 

@@ -77,6 +77,13 @@ function touchAgentLastSeen(auth: VerifiedToken): void {
   const now = Date.now();
   const last = _lastSeenCache.get(id) ?? 0;
   if (now - last < LAST_SEEN_THROTTLE_MS) return;
+  // One permanent entry per agent/eco principal otherwise (memory audit 2026-08-17): past the
+  // cap, drop entries whose throttle window has long passed — they re-enter on next sight.
+  if (_lastSeenCache.size >= 10_000) {
+    for (const [k, seen] of _lastSeenCache) {
+      if (now - seen > LAST_SEEN_THROTTLE_MS * 2) _lastSeenCache.delete(k);
+    }
+  }
   _lastSeenCache.set(id, now);
   const iso = new Date(now).toISOString();
   // Best-effort liveness bookkeeping on the hot auth path: a failure must not fail the request, but

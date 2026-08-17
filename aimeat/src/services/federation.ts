@@ -29,9 +29,22 @@ import { getSoftwareVersion } from '../utils/version.js';
 import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 
-/** Cache of resolved GAIIs to their hosting node URL. TTL: 5 minutes. */
+/** Cache of resolved GAIIs to their hosting node URL. TTL: 5 minutes. Expiry used to be
+ * checked only on read, so every GAII ever resolved kept a permanent entry (memory audit
+ * 2026-08-17); pruneGaiiCache runs on write and a hard cap backstops a resolve storm. */
 const gaiiCache = new Map<string, { nodeId: string; nodeUrl: string; expiresAt: number }>();
 const CACHE_TTL_MS = 5 * 60_000;
+const GAII_CACHE_MAX = 5000;
+
+function pruneGaiiCache(): void {
+  const now = Date.now();
+  for (const [k, v] of gaiiCache) {
+    if (v.expiresAt <= now) gaiiCache.delete(k);
+  }
+  while (gaiiCache.size >= GAII_CACHE_MAX) {
+    gaiiCache.delete(gaiiCache.keys().next().value as string);
+  }
+}
 
 /** Consecutive failure counter per peer (for health tracking). */
 const peerFailures = new Map<string, number>();
@@ -103,6 +116,7 @@ export async function resolveGaii(
     const personalNodes = await storage.listPersonalNodes();
     for (const pn of personalNodes) {
         if (pn.agentGaiis.includes(gaii)) {
+            pruneGaiiCache();
             gaiiCache.set(gaii, { nodeId: pn.nodeId, nodeUrl: config.baseUrl, expiresAt: Date.now() + CACHE_TTL_MS });
             return { nodeId: pn.nodeId, nodeUrl: config.baseUrl, local: false };
         }
