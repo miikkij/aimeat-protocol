@@ -36,6 +36,7 @@ import { createFulfillmentTask } from './fulfillment.js';
 import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
 import { appSpendRefusal } from '../services/metered-access.js';
 import { isMoneyCurrency, percentFee } from './money.js';
+import { recordAccountEvent } from '../services/account-events.js';
 import { logger } from '../utils/logger.js';
 import { readSplit, computeSplit, type DynamicDesignation } from './beneficiary-split.js';
 import { bookBeneficiaryShares } from './beneficiary-book.js';
@@ -96,6 +97,15 @@ async function resolveItems(
     total += sellable.priceMorsels * quantity;
   }
   return { items, sellerOwner, sellerGhii, total };
+}
+
+/**
+ * The amount as a feed row shows it. Money is 6-decimal micros here and morsels are whole units, and
+ * a row that said "24900000" would be worse than no row.
+ */
+function formatCheckoutAmount(total: number, currency: string): string {
+  if (!isMoneyCurrency(currency)) return `${Math.round(total)} morsels`;
+  return `${(total / 1_000_000).toFixed(2)} ${currency.toUpperCase()}`;
 }
 
 export async function createSession(
@@ -213,6 +223,13 @@ export async function cancelSession(
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
   const updated: CheckoutSessionRecord = { ...session, status: 'cancelled', updatedAt: new Date().toISOString() };
+  // Only the buyer. A cancelled checkout never reached the seller as anything but an open session,
+  // so telling them one was abandoned would report a non-event on somebody else's account.
+  void recordAccountEvent(storage, {
+    ownerGhii: session.buyerGhii, kind: 'checkout_cancelled', actorGaii: session.buyerGhii,
+    subject: session.id,
+    data: { what: session.items.map(i => i.title).filter(Boolean).join(', ').slice(0, 120) },
+  });
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), updated);
   return updated;
 }
@@ -436,6 +453,27 @@ export async function completeSession(
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);
   // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data).
   await putRecord(storage, session.sellerGhii, orderKey(session.id), completed);
+
+  // BOTH sides get a row. Money moved in two directions and each party experienced a different
+  // event: one paid, one was paid. A single row on the buyer's feed would leave the seller — the
+  // person whose income it is — to find out by looking.
+  const what = session.items.map(i => i.title).filter(Boolean).join(', ').slice(0, 120);
+  const amount = formatCheckoutAmount(session.total, session.currency);
+  void recordAccountEvent(storage, {
+    ownerGhii: session.buyerGhii, kind: 'payment_sent', actorGaii: session.buyerGhii,
+    subject: session.id, link: `/v1/profile?tab=wallet&checkout=${encodeURIComponent(session.id)}`,
+    data: { amount, what, who: session.sellerGhii.split('@')[0] },
+  }, config);
+  void recordAccountEvent(storage, {
+    ownerGhii: session.sellerGhii, kind: 'payment_received', actorGaii: session.buyerGhii,
+    subject: session.id, link: `/v1/profile?tab=wallet&order=${encodeURIComponent(session.id)}`,
+    data: { amount, what, who: session.buyerOwner ?? session.buyerGhii.split('@')[0] },
+  }, config);
+  void recordAccountEvent(storage, {
+    ownerGhii: session.buyerGhii, kind: 'checkout_completed', actorGaii: session.buyerGhii,
+    subject: session.id, link: `/v1/profile?tab=wallet&checkout=${encodeURIComponent(session.id)}`,
+    data: { amount, what },
+  }, config);
 
   // Bookkeeping: a completed MONEY checkout books an income voucher (tosite) for the seller.
   // Best-effort — a voucher failure must never fail the checkout (the money already moved);

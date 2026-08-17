@@ -145,7 +145,7 @@ export async function transcribeForOwner(
     // transcription is not a hole in the per-model report.
     model: result.model, provider, promptTokens: 0, completionTokens: totalTok,
     source: 'ai-transcribe',
-  });
+  }, config);
 
   logger.info(`[stt] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} seconds=${seconds} chars=${result.text.length} cost=$${costUsd.toFixed(6)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
 

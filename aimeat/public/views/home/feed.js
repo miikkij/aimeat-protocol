@@ -104,6 +104,52 @@ function line(item) {
       return tr('home.feed.appRevoked', 'You took {name} access away.').replace('{name}', d.name || '');
     case 'ai_budget_reached':
       return tr('home.feed.aiBudgetReached', 'Your AI budget for the day is used up.');
+
+    // Workflows
+    case 'workflow_created':
+      return tr('home.feed.workflowCreated', 'You created the workflow {name}.').replace('{name}', d.name || '');
+    case 'workflow_updated':
+      return tr('home.feed.workflowUpdated', 'You changed the workflow {name}.').replace('{name}', d.name || '');
+    case 'workflow_deleted':
+      return tr('home.feed.workflowDeleted', 'You deleted the workflow {name}.').replace('{name}', d.name || '');
+    case 'workflow_run_started':
+      return tr('home.feed.workflowRunStarted', '{name} started running.').replace('{name}', d.name || '');
+    case 'workflow_run_finished':
+      return tr('home.feed.workflowRunFinished', '{name} finished its run.').replace('{name}', d.name || '');
+    case 'workflow_run_failed':
+      return tr('home.feed.workflowRunFailed', '{name} stopped without finishing.').replace('{name}', d.name || '');
+
+    // Apps doing work
+    case 'app_tool_first_use':
+      return tr('home.feed.toolFirstUse', '{app} used {tool} for the first time.')
+        .replace('{app}', d.app || '').replace('{tool}', d.tool || '');
+    case 'app_tool_paid':
+      return tr('home.feed.toolPaid', '{app} paid {amount} to use {tool}.')
+        .replace('{app}', d.app || '').replace('{amount}', d.amount || '').replace('{tool}', d.tool || '');
+
+    // Money
+    case 'checkout_completed':
+      return tr('home.feed.checkoutCompleted', 'You bought {what} for {amount}.')
+        .replace('{what}', d.what || '').replace('{amount}', d.amount || '');
+    case 'checkout_cancelled':
+      return tr('home.feed.checkoutCancelled', 'You cancelled a purchase.');
+
+    // AI
+    case 'ai_spend_daily':
+      return tr('home.feed.aiSpendDaily', 'AI cost you {amount} on {day}.')
+        .replace('{amount}', d.amount || '').replace('{day}', d.day || '');
+    case 'ai_key_changed':
+      return tr('home.feed.aiKeyChanged', 'You set your AI key.');
+    case 'ai_settings_changed':
+      return tr('home.feed.aiSettingsChanged', 'You changed your AI settings: {changed}.').replace('{changed}', d.changed || '');
+
+    // Consent
+    case 'consent_granted':
+      return tr('home.feed.consentGranted', 'You gave {who} access to {what}.')
+        .replace('{who}', d.who || '').replace('{what}', d.what || '');
+    case 'consent_revoked':
+      return tr('home.feed.consentRevoked', 'You took {who} access to {what} away.')
+        .replace('{who}', d.who || '').replace('{what}', d.what || '');
     default:
       // A kind this build does not know renders nothing rather than a blank bullet — a row with no
       // sentence reads as a broken feed, and an older client meeting a newer server should degrade

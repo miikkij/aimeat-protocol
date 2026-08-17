@@ -72,6 +72,7 @@ import { logger } from '../utils/logger.js';
 import { resolveModelFor, type ModelRole } from './ai-model-defaults.js';
 import { resolveAiKey, debitAllowance } from './ai-allowance.js';
 import { recordUsageEvent } from './usage-metering.js';
+import { recordAccountEvent } from './account-events.js';
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).
@@ -209,6 +210,29 @@ export function assertWithinBudget(
 }
 
 /**
+ * Record what yesterday cost, once. Silent when there was no spend: "you spent nothing" is not news,
+ * and a feed that says it every morning is a feed people stop reading.
+ */
+async function reportYesterdaysSpend(
+  storage: Storage, gaii: string, config?: AimeatConfig,
+): Promise<void> {
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const rec = (await storage.getMemory(gaii, `ai-usage.${gaii}.${yesterday}`))?.value as UsageRecord | undefined;
+  if (!rec || !(rec.total_cost_usd > 0)) return;
+  await recordAccountEvent(storage, {
+    ownerGhii: gaii,
+    kind: 'ai_spend_daily',
+    subject: yesterday,
+    link: '/v1/profile?tab=usage',
+    data: {
+      day: yesterday,
+      amount: `$${rec.total_cost_usd < 1 ? rec.total_cost_usd.toFixed(4) : rec.total_cost_usd.toFixed(2)}`,
+      calls: String(rec.total_calls ?? 0),
+    },
+  }, config);
+}
+
+/**
  * Fold one call into today's usage record and persist it. Text completions and transcriptions share
  * ONE record, so the daily budget covers both and the spend charts show them together — an owner
  * whose budget is being eaten by voice messages sees it in the same place as everything else.
@@ -231,6 +255,9 @@ export async function recordAiUsage(
      *  had a key of its own there was only one possible answer, so it was hardcoded. */
     apiKeyScope?: 'own' | 'node';
   },
+  /** The node's config, so the event window is the operator's number. Optional: the two callers
+   *  have it, and a caller that does not gets the default rather than a compile error. */
+  config?: AimeatConfig,
 ): Promise<UsageRecord> {
   const updated: UsageRecord = {
     date: todayKey(),
@@ -249,6 +276,15 @@ export async function recordAiUsage(
     tokens: existing.tokens + call.tokens,
     audio_seconds: (existing.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
   };
+  // THE DAY BEFORE, told once. A row per completion would be the loudest thing on the account and
+  // the least interesting; what a person wants told is what a day cost. `usage.total_calls === 0`
+  // means this is the first call of a new UTC day for them, so yesterday's record is final and can
+  // be reported — one extra read per owner per active day, and no marker to keep in step.
+  if ((usage.total_calls ?? 0) === 0) {
+    void reportYesterdaysSpend(storage, gaii, config).catch(err =>
+      logger.warn('[ai] daily spend digest is best-effort', { gaii, error: String(err) }));
+  }
+
   await upsertUsage(storage, gaii, updated);
 
   // The reporting half. Best-effort on purpose: the owner has already been served and the budget
@@ -592,7 +628,7 @@ export async function settleAiCall(
     model: outcome.model, provider: plan.provider,
     promptTokens: outcome.promptTokens, completionTokens: outcome.completionTokens,
     source: outcome.source, apiKeyScope: plan.keyScope,
-  });
+  }, config);
   // Only the node's key draws down an allowance. An own key is the person's own account.
   const allowanceAfter = plan.keyScope === 'node'
     ? await debitAllowance(storage, config, gaii, outcome.costUsd)

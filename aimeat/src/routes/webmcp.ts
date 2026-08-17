@@ -42,6 +42,8 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { respondMeteredRefusal } from './extensions/metered-response.js';
 import { mintInternalPass } from './extensions/internal-pass.js';
 import { recordCallDuration } from '../services/call-timing.js';
+import { recordAccountEvent, recordFirstUse } from '../services/account-events.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 import { buildAppAgentSurface } from '../services/app-agent-surface.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
@@ -221,6 +223,29 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
             callerGaii, jwt, 'normal', mintInternalPass(coordExt, toolName));
           // Measured so the provider can propose a service commitment from evidence (call-timing.ts).
           recordCallDuration(storage, providerGhii, coordExt, toolName, Date.now() - startedAt);
+
+          // The CALLER's own record. Two shapes, not one row per call: a tool can be invoked
+          // hundreds of times an hour, and a row each would fill the window in minutes while the
+          // per-call record already exists in UsageCall. The first time is news; a call that cost
+          // something is always news; the nine-hundredth free call is not.
+          const callerOwner = ownerGhiiOf(meteredCaller);
+          const toolSubject = `${ownerName}/${filename}#${toolName}`;
+          if (outcome.kind === 'settled' && outcome.charged > 0) {
+            void recordAccountEvent(storage, {
+              ownerGhii: callerOwner, kind: 'app_tool_paid', actorGaii: meteredCaller,
+              subject: toolSubject, link: `/v1/profile?tab=usage`,
+              data: {
+                app: `${ownerName}/${filename}`, tool: toolName,
+                amount: `${outcome.charged} ${outcome.entitlement.unit || 'morsels'}`,
+              },
+            }, config);
+          } else {
+            void recordFirstUse(storage, {
+              ownerGhii: callerOwner, kind: 'app_tool_first_use', actorGaii: meteredCaller,
+              subject: toolSubject, link: `/v1/profile?tab=usage`,
+              data: { app: `${ownerName}/${filename}`, tool: toolName },
+            }, config);
+          }
           // Delivered → book the provider's beneficiaries out of the provider's own cut.
           const shared = takeDesignations(invoked.result);
           if (outcome.kind === 'settled') await outcome.accrue(shared.designations);

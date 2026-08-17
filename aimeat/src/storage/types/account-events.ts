@@ -43,11 +43,37 @@ export type AccountEventKind =
   | 'payment_sent'
   | 'contract_started'
   | 'contract_ended'
+  // Workflows
+  | 'workflow_created'
+  | 'workflow_updated'
+  | 'workflow_deleted'
+  | 'workflow_run_started'
+  | 'workflow_run_finished'
+  | 'workflow_run_failed'
+  // Apps doing work
+  //
+  // `app_tool_first_use` and `app_tool_paid` rather than one row per call, deliberately. An app
+  // tool can be invoked hundreds of times an hour; a row each would fill the window in minutes and
+  // push everything else out, and the per-call record already exists in UsageCall. The FIRST time an
+  // app uses a tool is news, and a call that COST something is always news. The nine-hundredth free
+  // call is not.
+  | 'app_tool_first_use'
+  | 'app_tool_paid'
+  // Money
+  | 'checkout_completed'
+  | 'checkout_cancelled'
+  // AI
+  //
+  // `ai_spend_daily` is a digest for the same reason: one row per completion would be the loudest
+  // thing on the account and the least interesting. What a person wants told is what a day cost.
+  | 'ai_spend_daily'
+  | 'ai_key_changed'
+  | 'ai_settings_changed'
   // Permissions and limits
-  | 'app_granted'
-  | 'app_revoked'
   | 'consent_granted'
   | 'consent_revoked'
+  | 'app_granted'
+  | 'app_revoked'
   | 'ai_budget_reached'
   // AI settings
   | 'ai_settings_changed'
