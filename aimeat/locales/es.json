@@ -3036,6 +3036,13 @@
       "lede": "Tu agente está en el chat. Di qué necesitas y se pone a trabajar.",
       "cta": "Continuar en el chat"
     },
+    "things": {
+      "title": "Lo que has hecho",
+      "apps": "Aplicaciones",
+      "organisms": "Espacios compartidos",
+      "memory": "Notas y registros",
+      "files": "Archivos"
+    },
     "step1": "Tu felpudo de bienvenida",
     "step2": "Conecta tu primer agente",
     "step2b": "Consigue una aplicación que sepa conectarse",

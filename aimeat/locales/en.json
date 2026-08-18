@@ -3036,6 +3036,13 @@
       "lede": "Your agent is in the chat. Say what you need, and it gets to work.",
       "cta": "Continue in the chat"
     },
+    "things": {
+      "title": "What you have made",
+      "apps": "Apps",
+      "organisms": "Shared spaces",
+      "memory": "Notes and records",
+      "files": "Files"
+    },
     "step1": "Your welcome mat",
     "step2": "Connect your first agent",
     "step2b": "Get an app that can connect",

@@ -9,6 +9,9 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   v2.1.0 — 2026-08-18 — The list becomes a timeline: kindCategory() maps every kind onto six
+ *     colours (made / agent work / trouble / money / access / system) and the row carries its
+ *     category as a class, so the home card and the history page colour their dots from one rule.
  *   v2.0.0 — 2026-08-18 — The four room cards (Rooms, RoomMenu) are gone with the home's turn into
  *     a status view: the choosing the rooms staged is carried by the chat now, and a component no
  *     screen renders is a copy waiting to drift. The feed, the only part of the finished home a
@@ -173,6 +176,28 @@ export function line(item) {
   }
 }
 
+/**
+ * Which of six colours one event kind carries on the timeline. Categories, not kinds: a person
+ * scanning the trunk asks "did my agents work, did anything break, did money move" — not which of
+ * forty kinds a dot is. An app's own kind (app:*) is an app doing work, so it reads as agent work.
+ */
+export function kindCategory(kind) {
+  const k = String(kind || '');
+  if (k.startsWith('app:')) return 'agent';
+  if (['welcome_mat', 'app_published', 'app_updated', 'workspace_record_published',
+    'workflow_created', 'workflow_updated', 'workflow_deleted', 'skill_installed',
+    'extension_installed'].includes(k)) return 'made';
+  if (['agent_connected', 'agent_knocking', 'agent_task_done', 'workflow_run_started',
+    'workflow_run_finished', 'app_tool_first_use'].includes(k)) return 'agent';
+  if (['agent_task_failed', 'workflow_run_failed', 'ai_budget_reached', 'checkout_cancelled',
+    'agent_removed'].includes(k)) return 'trouble';
+  if (['payment_received', 'payment_sent', 'checkout_completed', 'app_tool_paid', 'ai_spend_daily',
+    'contract_started', 'contract_ended'].includes(k)) return 'money';
+  if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
+    'organism_left', 'organism_member_joined'].includes(k)) return 'access';
+  return 'system';
+}
+
 /** After this many days without an event, the feed stops pretending silence is neutral. */
 const QUIET_AFTER_DAYS = 3;
 
@@ -184,7 +209,7 @@ export function FeedRow({ item }) {
   const text = line(item);
   if (!text) return null;
   return html`
-    <li class="koti-feed-item ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}">
+    <li class="koti-feed-item koti-feed-item--${kindCategory(item.kind)} ${item.kind === 'agent_knocking' ? 'koti-feed-item-live' : ''}">
       <span class="koti-feed-dot" aria-hidden="true"></span>
       <div class="koti-feed-body">
         ${item.link

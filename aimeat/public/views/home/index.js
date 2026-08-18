@@ -14,6 +14,9 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v2.1.0 — 2026-08-18 — Things({usage}): what the person has made (apps, shared spaces, notes,
+ *     files), each count a door to its surface, between the agent card and the feed. Reads the
+ *     cached /v1/owner/usage summary the profile already uses.
  *   v2.0.0 — 2026-08-18 — The finished home turns from an instruction sheet into a STATUS VIEW
  *     (Jouni, on seeing his own: the strongest content was at the bottom and the screen read as
  *     warnings). Order now: what your agents are doing (AgentCard + feed), open items only while
@@ -78,6 +81,34 @@ function Welcome() {
     </header>`;
 }
 
+/**
+ * What the person has made here, as a row of doors. Counts come from the same cached summary the
+ * profile's usage card reads (GET /v1/owner/usage, 60 s TTL) — no second bookkeeping. A zero row
+ * does not render, and when everything is zero the whole section stays away: an empty inventory
+ * reads as broken, and the feed below already says what has actually happened.
+ */
+function Things({ usage }) {
+  if (!usage) return null;
+  const rows = [
+    { n: usage.counts?.apps?.used, key: 'home.things.apps', fallback: 'Apps', href: '/v1/profile?tab=apps' },
+    { n: usage.counts?.organisms, key: 'home.things.organisms', fallback: 'Shared spaces', href: '/v1/profile?tab=organisms' },
+    { n: usage.memory?.used_keys, key: 'home.things.memory', fallback: 'Notes and records', href: '/v1/profile?tab=memory' },
+    { n: usage.storage?.used_files, key: 'home.things.files', fallback: 'Files', href: '/v1/profile?tab=memory' },
+  ].filter((r) => typeof r.n === 'number' && r.n > 0);
+  if (!rows.length) return null;
+  return html`
+    <section class="koti-things">
+      <h2 class="koti-feed-title">${tr('home.things.title', 'What you have made')}</h2>
+      <div class="koti-things-row">
+        ${rows.map((r) => html`
+          <a class="koti-thing" key=${r.key} href=${r.href}>
+            <span class="koti-thing-n">${r.n}</span>
+            <span class="koti-thing-label">${tr(r.key, r.fallback)}</span>
+          </a>`)}
+      </div>
+    </section>`;
+}
+
 /** One clear door to where the work actually happens. The home reports; the chat does. */
 function ChatDoor() {
   return html`
@@ -95,6 +126,7 @@ export default function HomeView({ navigate }) {
   const session = useSession();
   const [state, setState] = useState(null);
   const [feed, setFeed] = useState([]);
+  const [usage, setUsage] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -120,6 +152,13 @@ export default function HomeView({ navigate }) {
         if (f?.data?.items) setFeed(f.data.items);
       } catch (e) {
         swallowed('home: feed', e);
+      }
+      // Same standing as the feed: the page works without it, a silent failure is still recorded.
+      try {
+        const u = await apiGet('/v1/owner/usage');
+        if (u?.data) setUsage(u.data);
+      } catch (e) {
+        swallowed('home: usage', e);
       }
     } catch (e) {
       setLoadError(e.message || String(e));
@@ -189,6 +228,7 @@ export default function HomeView({ navigate }) {
         </header>
         <${ChatDoor} />
         <${AgentCard} agent=${state.agent} />
+        <${Things} usage=${usage} />
         <${HomeFeed} items=${feed} />
         <${OpenItemsList} maxAgeDays=${7} />
         <${InstallCta} />

@@ -7,6 +7,9 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v2.1.0 — 2026-08-18 — The feed becomes a timeline: a trunk line behind category-coloured dots
+ *     (.koti-feed-item--made/agent/trouble/money/access/system), the live row pulsing on top of
+ *     its colour. Also .koti-things: the what-you-have-made chip row above the feed.
  *   v2.0.0 — 2026-08-18 — The four room cards left the finished home (status-view turn), so their
  *     styles leave too; in their place .koti-chatdoor (the one door to the chat) and .koti-matline
  *     (the mat address as one line under the greeting).
@@ -298,6 +301,20 @@
 .koti-b-app-plans { margin: 0.35rem 0 0; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; }
 .koti-b-app-docs { display: inline-block; margin-top: 0.4rem; font-size: 0.85rem; }
 
+/* ── What you have made: each count is a door to its surface. Zero rows never render. ── */
+.koti-things { margin-top: 2rem; }
+.koti-things-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.koti-thing {
+  display: inline-flex; align-items: baseline; gap: 0.45rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card); color: var(--text); text-decoration: none;
+  transition: border-color .15s;
+}
+.koti-thing:hover { border-color: var(--accent); }
+.koti-thing-n { font-size: 1.05rem; font-weight: 700; color: var(--accent); }
+.koti-thing-label { font-size: 0.88rem; color: var(--text-dim); }
+
 /* ── The feed: what has happened. Quiet by design — it reports, it does not compete. ── */
 .koti-feed { margin-top: 2.5rem; }
 .koti-feed-title {
@@ -313,14 +330,29 @@
   background: var(--surface);
 }
 .koti-feed-quiet:hover { border-color: var(--accent); }
-.koti-feed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+/* ── The timeline. A trunk runs through the dots, and every dot carries its category's colour:
+   what you made (accent), agent work (green), trouble (red), money (amber), access (blue),
+   system (grey). One rule in feed.js decides the category; these only paint it. ── */
+.koti-feed-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.1rem; position: relative; }
+.koti-feed-list::before {
+  content: ''; position: absolute; left: 0.34rem; top: 0.9rem; bottom: 0.9rem;
+  width: 2px; background: var(--border);
+}
 .koti-feed-item { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; }
 .koti-feed-dot {
-  flex: none; width: 0.5rem; height: 0.5rem; margin-top: 0.45rem;
+  flex: none; width: 0.75rem; height: 0.75rem; margin-top: 0.35rem;
   border-radius: var(--radius-full); background: var(--border);
+  /* Punches the dot out over the trunk, so the line reads as passing BEHIND the events. */
+  border: 2px solid var(--bg); position: relative; z-index: 1;
 }
-/* The one row that is happening NOW gets the accent — it is the one to act on. */
-.koti-feed-item-live .koti-feed-dot { background: var(--accent); }
+.koti-feed-item--made .koti-feed-dot { background: var(--accent); }
+.koti-feed-item--agent .koti-feed-dot { background: var(--success); }
+.koti-feed-item--trouble .koti-feed-dot { background: var(--danger); }
+.koti-feed-item--money .koti-feed-dot { background: var(--warn); }
+.koti-feed-item--access .koti-feed-dot { background: var(--info-fg); }
+.koti-feed-item--system .koti-feed-dot { background: var(--muted); }
+/* The one row that is happening NOW pulses on top of its category colour — it is the one to act on. */
+.koti-feed-item-live .koti-feed-dot { animation: koti-pulse 1.4s ease-in-out infinite; }
 .koti-feed-body { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
 .koti-feed-line { font-size: 0.95rem; color: var(--text); text-decoration: none; }
 a.koti-feed-line:hover { text-decoration: underline; }
