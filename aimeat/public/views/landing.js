@@ -730,7 +730,7 @@ export default function Landing({ navigate }) {
               answers "what can I make" while leaving "what is this" unanswered. The lead-in
               line frames the fold as one example rather than the whole product. -->
       <section class="ld-pitch">
-        <p class="ld-pitch-line">${tr('landing.pitch', 'AIMEAT is a digital agency where people, AI, agents and apps work under one roof and everyone owns their own data.')}</p>
+        <p class="ld-pitch-line">${tr('landing.pitch', 'AIMEAT — the Linux of AI. An open, federated, self-hosted AI operating system, and everything in it is yours.')}</p>
         <${WishBox} navigate=${navigate} />
         <p class="ld-pitch-lead">${tr('landing.wishLead', 'Say what you need and press GO. You land in a chat that starts building it with you; new here, you make an account on the way and lose nothing you typed.')}</p>
       </section>
