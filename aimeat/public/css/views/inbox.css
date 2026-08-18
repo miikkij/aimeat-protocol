@@ -5,6 +5,10 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.x — 2026-08-18 — The Toast UI composer repainted with theme tokens: its shipped styles are
+ *     light-only, so dark mode typed white on white. Chrome, tabs, mode switch, popups and both
+ *     editing surfaces read var(--card)/var(--text)/var(--border); the toolbar icon sprite gets a
+ *     dark-only invert.
  *   v1.14.0 -- 2026-08-18 -- Two measured faults. The actions row took a line of its own under a
  *     breadcrumb that says the same word, 87px of window for four items; it sits ON the breadcrumb line
  *     now above 1000px. And the thread header answered to the VIEWPORT, so a wide window with a narrow
@@ -590,6 +594,47 @@
 /* Toast UI editor host + markdown fallback. */
 .inbox-editor { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .inbox-editor .toastui-editor-defaultUI { border: none; }
+
+/* Toast UI ships light-only styles (white chrome, dark text), so in dark mode the typed text was
+   white on white — invisible (found by Jouni mid-sentence). Everything below repaints the editor
+   with the theme's own tokens, so it follows light, dark AND the palettes; only the toolbar icon
+   sprite needs a dark-only invert, because it is an image, not a colour. */
+.inbox-editor .toastui-editor-defaultUI,
+.inbox-editor .toastui-editor-defaultUI-toolbar,
+.inbox-editor .toastui-editor-md-tab-container,
+.inbox-editor .toastui-editor-mode-switch,
+.inbox-editor .toastui-editor,
+.inbox-editor .toastui-editor-ww-container,
+.inbox-editor .toastui-editor-md-container,
+.inbox-editor .toastui-editor-md-preview { background: var(--card); color: var(--text); }
+.inbox-editor .toastui-editor-defaultUI-toolbar,
+.inbox-editor .toastui-editor-md-tab-container,
+.inbox-editor .toastui-editor-mode-switch { border-color: var(--border); }
+.inbox-editor .toastui-editor .ProseMirror,
+.inbox-editor .toastui-editor-contents { color: var(--text); caret-color: var(--text); }
+.inbox-editor .toastui-editor-md-container .toastui-editor md-code,
+.inbox-editor .toastui-editor-contents code,
+.inbox-editor .toastui-editor-contents pre { background: var(--bg-dim); color: var(--text); }
+.inbox-editor .toastui-editor-md-tab-container .tab-item {
+  background: var(--card); color: var(--text-dim); border-color: var(--border);
+}
+.inbox-editor .toastui-editor-md-tab-container .tab-item.active { background: var(--card); color: var(--text); }
+.inbox-editor .toastui-editor-mode-switch .tab-item {
+  background: var(--bg-dim); color: var(--text-dim); border-color: var(--border);
+}
+.inbox-editor .toastui-editor-mode-switch .tab-item.active { background: var(--card); color: var(--text); }
+.inbox-editor .toastui-editor-popup {
+  background: var(--card); color: var(--text); border-color: var(--border);
+}
+.inbox-editor .toastui-editor-popup-body label { color: var(--text-dim); }
+.inbox-editor .toastui-editor-popup-body input[type='text'] {
+  background: var(--bg-input); color: var(--text); border-color: var(--border);
+}
+.inbox-editor .toastui-editor-defaultUI-toolbar button { border-color: transparent; }
+.inbox-editor .toastui-editor-defaultUI-toolbar button:not(:disabled):hover { background: var(--bg-dim); border-color: var(--border); }
+[data-theme='dark'] .inbox-editor .toastui-editor-toolbar-icons { filter: invert(0.85) hue-rotate(180deg); }
+[data-theme='dark'] .inbox-editor .toastui-editor-md-tab-container .tab-item,
+[data-theme='dark'] .inbox-editor .toastui-editor-mode-switch .tab-item { border-color: var(--border); }
 .inbox-md-fallback { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 @media (max-width: 760px) { .inbox-md-fallback { grid-template-columns: 1fr; } }
 .inbox-md-preview {
