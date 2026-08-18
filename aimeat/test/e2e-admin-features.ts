@@ -4,6 +4,9 @@
  *   sending, the directory and matching runs, push templates, CSM and MSM, genesis peers, and the
  *   node config doors mounted alongside them.
  * @version-history
+ *   v1.2.0 — 2026-08-19 — The front-page switch: site.front_page=demo serves the static showroom
+ *     at / (Finnish sibling by Accept-Language, JSON bootstrap untouched), classic restores the
+ *     SPA, and a value outside classic|demo is refused.
  *   v1.1.0 — 2026-08-16 — E2E quality, admin-features:118. One probe covered one route out of the
  *     thirty-six this file drives, and the gate here is per route rather than router-level, so
  *     thirty-five of them could lose the operator role unnoticed. Two loops now walk every door as a
@@ -455,6 +458,48 @@ await test('PUT /v1/admin/config \u2192 reject invalid path', async () => {
     }));
     assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === false, 'ok is false');
+});
+
+// \u2500\u2500\u2500 The front-page switch (site.front_page) \u2500\u2500\u2500
+console.log('\nFront-page switch');
+
+await test('site.front_page: demo serves the showroom at /, classic restores the SPA', async () => {
+    const html = async (extra: Record<string, string> = {}) => {
+        const r = await fetch(`${BASE}/`, { headers: { Accept: 'text/html', ...extra } });
+        return { status: r.status, text: await r.text() };
+    };
+    const before = await html();
+    assert(before.status === 200, `status ${before.status}`);
+    assert(!before.text.includes('fd-ribbon'), 'the showroom must not serve before the switch');
+    const put = await json('/v1/admin/config', authed({
+        method: 'PUT',
+        body: JSON.stringify({ changes: [{ path: 'site.front_page', value: 'demo' }] }),
+    }));
+    assert(put.status === 200, `flip on: ${put.status} ${JSON.stringify(put.body)}`);
+    try {
+        const on = await html();
+        assert(on.text.includes('fd-ribbon'), 'the showroom serves at / when the switch is on');
+        const fi = await html({ 'Accept-Language': 'fi-FI,fi;q=0.9' });
+        assert(fi.text.includes('Kokeile kaikkea'), 'a Finnish reader gets the Finnish sibling');
+        const jsonRoot = await (await fetch(`${BASE}/?format=json`)).json();
+        assert(jsonRoot.protocol === 'aimeat', 'the JSON bootstrap is untouched by the switch');
+    } finally {
+        // Flip back whatever happened, so the suite leaves the node as it found it.
+        await json('/v1/admin/config', authed({
+            method: 'PUT',
+            body: JSON.stringify({ changes: [{ path: 'site.front_page', value: 'classic' }] }),
+        }));
+    }
+    const after = await html();
+    assert(!after.text.includes('fd-ribbon'), 'classic restores the SPA front');
+});
+
+await test('site.front_page: a value outside classic|demo is refused', async () => {
+    const { status, body } = await json('/v1/admin/config', authed({
+        method: 'PUT',
+        body: JSON.stringify({ changes: [{ path: 'site.front_page', value: 'bogus' }] }),
+    }));
+    assert(status === 400, `expected 400, got ${status}: ${JSON.stringify(body)}`);
 });
 
 // ─── Translations ───

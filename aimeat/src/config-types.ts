@@ -7,6 +7,9 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.2.0 — 2026-08-19 — SitePresenceConfig mixed in (config-site-presence.ts): contentSignal,
+ *     aiTraining and webBotAuthSign extracted verbatim, frontPage added there — this file had
+ *     crossed the 800-line ceiling.
  *   v1.1.0 — 2026-08-18 — SealedConfig mixed in: the settings whoever runs this node set and its
  *     operator cannot change. The field lives with its rule in services/config-sealing.ts.
  *   v1.1.0 — 2026-07-14 — mcpCardCommerceTools: MCP card commerce_tools mode (TARGET-034 phase D)
@@ -175,8 +178,9 @@ export interface SiteLinksConfig {
 }
 
 import type { AiCapabilityConfig } from './config-types-ai.js';
+import type { SitePresenceConfig } from './config-site-presence.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig {
   port: number;
   baseUrl: string;
   /**
@@ -524,18 +528,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   commerceSessionTtlMinutes: number;
   /** MCP Server Card commerce_tools block: embed the priced app-tool catalog or point at /v1/commerce/tools. */
   mcpCardCommerceTools: 'inline' | 'pointer';
-  /**
-   * robots.txt Content Signals Policy directive ("search=yes, ai-input=yes, ai-train=no"); 'off'
-   * removes it. Empty means "pair it to `aiTraining`", which is the default.
-   */
-  contentSignal: string;
-  /**
-   * Whether the AI training crawlers are allowed in robots.txt. Search and retrieval bots are
-   * always allowed and are not covered by this; see `public/robots.node.txt`.
-   */
-  aiTraining: 'allow' | 'deny';
-  /** Web Bot Auth: sign outbound safeFetch requests (RFC 9421, node Ed25519 key). OFF by default. */
-  webBotAuthSign: boolean;
+  // contentSignal, aiTraining, webBotAuthSign and frontPage live in SitePresenceConfig
+  // (config-site-presence.ts), extracted when this file crossed the 800-line ceiling.
 
   // Push Notifications / PWA (Phase 3.1)
   pushEnabled: boolean;

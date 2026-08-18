@@ -8,6 +8,10 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.2.0 — 2026-08-19 — AIMEAT_FRONT_PAGE=demo: the root's HTML answer becomes the static
+ *     showroom page (public/front-demo.html, .fi sibling by ?lang / Accept-Language). One config
+ *     switch, browsers only: JSON, markdown and plain-text negotiation are untouched, and an
+ *     operator's custom portal template still wins over the switch.
  *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): discovery carries registration_mode so a client knows before sending anyone to the portal.
  *   v1.0.0 - 2026-04-30 - Add for_ai_assistants and for_ai_agents sections to bootstrap response
  *   v1.0.1 -- 2026-05-28 -- Document same-owner shared tag memory pattern
@@ -205,6 +209,22 @@ export function bootstrapRouter(
         // per-request CSP nonce so they pass script-src 'self' 'nonce-...'.
         res.type('text/html').send(injectCspNonce(customHtml, res.locals.cspNonce as string | undefined));
         return;
+      }
+      // The demo front page, behind one switch (AIMEAT_FRONT_PAGE=demo). Finnish readers get
+      // the Finnish sibling; the ?lang override beats the header so the page's own EN/FI links
+      // work. Falls through to the SPA when the file is missing, so a broken deploy shows the
+      // classic front rather than nothing.
+      if (config.frontPage === 'demo') {
+        res.vary('Accept-Language');
+        const langParam = typeof _req.query.lang === 'string' ? _req.query.lang.toLowerCase() : '';
+        const wantsFi = langParam === 'fi'
+          || (langParam === '' && /^fi\b/i.test((_req.headers['accept-language'] as string | undefined) ?? ''));
+        const demoPath = resolvePublicFile(wantsFi ? 'front-demo.fi.html' : 'front-demo.html');
+        if (demoPath) {
+          res.set('Cache-Control', 'no-cache');
+          res.type('html').send(readFileSync(demoPath, 'utf-8'));
+          return;
+        }
       }
       const spaPath = resolvePublicFile('spa.html');
       if (spaPath) { serveSpa(res, spaPath, config, '/'); return; }

@@ -447,6 +447,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // linkability + a small risk of strict/legacy endpoints rejecting unknown headers. The key
     // DIRECTORY is always served; only outbound signing is gated.
     webBotAuthSign: process.env.AIMEAT_WEB_BOT_AUTH_SIGN === 'true',
+    // The root's front page for browsers. 'demo' serves the static showroom (front-demo.html);
+    // anything else stays on the SPA landing, so a typo cannot take the front door down.
+    frontPage: process.env.AIMEAT_FRONT_PAGE?.trim().toLowerCase() === 'demo' ? 'demo' : 'classic',
     // Content Signals Policy directive served in robots.txt (contentsignals.org). Left empty, it
     // pairs itself to AIMEAT_AI_TRAINING so the directive and the per-bot rules cannot contradict
     // each other; set it explicitly to override both. 'off' removes the directive.
