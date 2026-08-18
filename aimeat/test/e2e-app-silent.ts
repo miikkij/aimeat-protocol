@@ -81,8 +81,12 @@ async function register(username: string): Promise<{ rt: string; token: string }
     assert(login.status === 200 && !!login.rt, `login ${username}: ${login.status}`);
     return { rt: login.rt!, token: login.body.data.token };
 }
-async function publish(token: string, filename: string): Promise<void> {
-    const html = '<!DOCTYPE html><html><head></head><body>app</body></html>';
+async function publish(token: string, filename: string, declaredScopes?: string): Promise<void> {
+    // `declaredScopes` writes the app's own `<meta name="aimeat-scopes">`. That tag is what the node
+    // reads when it decides whether a live grant still matches the app, so a test about drift needs
+    // an app that actually declares something.
+    const meta = declaredScopes ? `<meta name="aimeat-scopes" content="${declaredScopes}">` : '';
+    const html = `<!DOCTYPE html><html><head>${meta}</head><body>app</body></html>`;
     const r = await json('/v1/apps', { method: 'POST', headers: { Authorization: `Bearer ${token}` },
         body: JSON.stringify({ filename, content: b64(html), name: filename, description: 'd', category: 'utility' }) });
     assert(r.status === 201, `publish ${filename}: ${r.status} ${JSON.stringify(r.body)}`);
@@ -143,8 +147,16 @@ async function main() {
         await publish(B.token, 'app-b.html');
         await assignSub(A.token, 'aaa', `${a}/app-a.html`); // A operator assigns both
         await assignSub(A.token, 'bbb', `${bn}/app-b.html`);
+        // A third app of B's, used ONLY by the re-consent case below. That case has to leave a live
+        // grant behind to have something to widen, and Phase 2 asserts that A holds no grant on B's
+        // app at all — so the two cannot share a fixture.
+        // …and it DECLARES one permission, which is the fact the drift tests turn on: a grant that
+        // carries more than this is a grant the app itself no longer asks for.
+        await publish(B.token, 'app-c.html', 'memory:read');
+        await assignSub(A.token, 'ccc', `${bn}/app-c.html`);
         const ORIGIN_A = `https://aaa.${APP_HOST}`;
         const ORIGIN_B = `https://bbb.${APP_HOST}`;
+        const ORIGIN_C = `https://ccc.${APP_HOST}`;
 
         console.log('\nPhase 1: Owner gets their OWN app token silently (no separate login)');
         await test('logged-in owner A → own app (aaa) issues a scoped token from the cookie alone', async () => {
@@ -174,6 +186,84 @@ async function main() {
                 body: JSON.stringify({ key: 'nope.png', mime_type: 'image/png', visibility: 'private', data: b64('X') }),
             });
             assert(up.status === 403, `memory-only token must be denied storage write, got ${up.status}`);
+        });
+
+        /**
+         * A grant used to be a SNAPSHOT of what the app declared the day it was made. Every later
+         * refresh minted from that stored list without re-reading the app, so an app could narrow
+         * its `<meta name="aimeat-scopes">` and keep the wider grant for as long as it kept
+         * refreshing. Measured on aimeat.io on 2026-08-18: of 108 live grants, 2 matched the app's
+         * current declaration and 106 carried permissions the app no longer asks for.
+         *
+         * Two directions, two answers, and the difference is the whole point: taking a permission
+         * away needs nobody's approval, and gaining one needs the person's.
+         */
+        console.log('\nPhase 1b: A grant follows the app, and widening asks again');
+
+        await test('a stranger\'s app that asks for LESS has its live grant narrowed, with no prompt', async () => {
+            // A approves two permissions for B's app through the visible screen.
+            const r0 = await authorize(`${bn}/app-c.html`, 'memory:read memory:write', `${ORIGIN_C}/callback`);
+            assert(r0.status === 302 && !!r0.requestId, `authorize: ${r0.status}`);
+            const granted = await consentAndExchange(r0.requestId!, r0.verifier, `${ORIGIN_C}/callback`, A.token);
+            assert(granted.scope === 'memory:read memory:write', `approved scope, got ${granted.scope}`);
+
+            // The app is updated and now asks for one. No consent screen: nobody has to approve
+            // losing a permission, and a prompt here would train people to click through the one
+            // that matters.
+            const narrow = await silent(ORIGIN_C, 'memory:read', A.rt);
+            assert(narrow.ok === true, `narrowing should be silent, got ${JSON.stringify(narrow)}`);
+            assert(narrow.scope === 'memory:read', `the grant must follow the app down, got ${narrow.scope}`);
+
+            // …and it is the stored grant that moved, not just this one token.
+            const refreshed = await json('/v1/app-grants/token', {
+                method: 'POST',
+                body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: narrow.refresh_token }),
+            });
+            assert(refreshed.status === 200, `refresh: ${refreshed.status} ${JSON.stringify(refreshed.body)}`);
+            assert(refreshed.body.data.scope === 'memory:read',
+                `a refresh must not resurrect the wider grant, got ${refreshed.body.data.scope}`);
+        });
+
+        await test('a refresh alone brings a stale grant down to what the app declares', async () => {
+            // The case the silent bridge cannot reach: an app that lives on refresh tokens and never
+            // does another handshake. Its grant used to keep the old snapshot for as long as it kept
+            // refreshing. app-c declares memory:read; this grant is approved for two.
+            const r0 = await authorize(`${bn}/app-c.html`, 'memory:read memory:write', `${ORIGIN_C}/callback`);
+            assert(r0.status === 302 && !!r0.requestId, `authorize: ${r0.status}`);
+            const granted = await consentAndExchange(r0.requestId!, r0.verifier, `${ORIGIN_C}/callback`, A.token);
+            assert(granted.scope === 'memory:read memory:write', `approved scope, got ${granted.scope}`);
+
+            const refreshed = await json('/v1/app-grants/token', {
+                method: 'POST',
+                body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: granted.refresh_token }),
+            });
+            assert(refreshed.status === 200, `refresh: ${refreshed.status} ${JSON.stringify(refreshed.body)}`);
+            assert(refreshed.body.data.scope === 'memory:read',
+                `the refresh must follow the app's declaration, got ${refreshed.body.data.scope}`);
+        });
+
+        await test('a STRANGER\'s app that asks for MORE is sent back to consent, and the reply says why', async () => {
+            // Owner A approves owner B's app once, through the visible screen, for one permission.
+            const first = await authorize(`${bn}/app-c.html`, 'memory:read', `${ORIGIN_C}/callback`);
+            assert(first.status === 302 && !!first.requestId, `authorize: ${first.status}`);
+            await consentAndExchange(first.requestId!, first.verifier, `${ORIGIN_C}/callback`, A.token);
+
+            // The same permission afterwards is silent — the approval is remembered.
+            const same = await silent(ORIGIN_C, 'memory:read', A.rt);
+            assert(same.ok === true, `a remembered approval must stay silent, got ${JSON.stringify(same)}`);
+
+            // The app is updated and now wants one more. That is the moment the person has to be
+            // asked again, and told which permission is the new one.
+            const wider = await silent(ORIGIN_C, 'memory:read memory:write', A.rt);
+            assert(wider.ok === false, `widening must not be silent, got ${JSON.stringify(wider)}`);
+            assert(wider.error === 'consent_required', `expected consent_required, got ${wider.error}`);
+            assert((wider as any).reason === 'app_updated', `expected reason app_updated, got ${(wider as any).reason}`);
+            assert((wider as any).added === 'memory:write', `the new permission must be named, got ${(wider as any).added}`);
+
+            // Refused means refused: the grant still carries only what was approved.
+            const still = await silent(ORIGIN_C, 'memory:read', A.rt);
+            assert(still.ok === true && still.scope === 'memory:read',
+                `the refused widening must not have been written, got ${JSON.stringify(still)}`);
         });
 
         console.log('\nPhase 2: Security — no cross-user / cross-app leakage');

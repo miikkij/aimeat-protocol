@@ -211,6 +211,12 @@ export default function AppGrant() {
   // every other consent surface (consent-vocab.js), so a family renamed there is renamed here.
   const reqScopeNames = req.scopes.map((s) => s.scope);
   const summaryLine = areaLine(reqScopeNames, t);
+  // What this app asks for that the live grant does not already carry. Non-empty means the screen is
+  // back because the APP changed, not because the person is connecting it for the first time — and a
+  // person who has approved this app before deserves to be told which of the two is happening.
+  const addedScopes = existingGrant
+    ? reqScopeNames.filter((s) => !existingGrant.scopes.includes(s))
+    : [];
   const icon = String(req.app_icon || '').trim();
   const iconIsUrl = /^(https?:\/\/|\/)/.test(icon);
   const monogram = (Array.from(String(req.app_name || '?').trim())[0] || '?').toUpperCase();
@@ -237,6 +243,10 @@ export default function AppGrant() {
           ? tr('appGrant.manageTitle', 'Manage this app’s access')
           : tr('appGrant.connectTitle', 'Connect {app} to your account', { app: req.app_name })}</h1>
         ${!existingGrant && html`<p class="agr-muted">${tr('consent.priming.appGrant', '{app} is asking to use part of your AIMEAT account.', { app: req.app_name })}</p>`}
+        ${addedScopes.length > 0 && html`<p class="agr-updated">${tr(
+          'appGrant.updatedNotice',
+          'This app has been updated and now asks for something new. Approve it again to keep using it.',
+        )}</p>`}
         ${req.app_description && html`<p class="agr-lede">${escHtml(req.app_description)}</p>`}
 
         <div class="agr-summary">

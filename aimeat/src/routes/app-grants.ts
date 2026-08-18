@@ -81,106 +81,11 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
 import { readRefreshCookie } from '../services/owner-session.js';
 import { PORTFOLIO_TARGET_PREFIX, resolveAppOriginTarget } from '../services/app-origin-target.js';
+import { parseAppScopes } from '../services/protected-resource.js';
+import { logger } from '../utils/logger.js';
 
-/**
- * Scopes an app may request, each with a short description key for the consent UI. Drawn from the
- * scope vocabulary the node actually enforces (auth/middleware.ts requireScope). Deliberately a
- * curated subset — not operator/admin or destructive-by-default scopes.
- */
-export const APP_GRANTABLE_SCOPES: Record<string, string> = {
-  'memory:read': 'Read your stored memories and data',
-  'memory:write': 'Create and update your memories and data',
-  'memory:delete': 'Delete your memories and data',
-  'storage:read': 'Read your stored files (images, documents)',
-  'storage:write': 'Save and update your stored files (images, documents)',
-  'catalogue:read': 'Read the public catalogue/directory',
-  'social:read': 'Read boards you can access',
-  'social:write': 'Post to boards on your behalf',
-  'messages:send': 'Send direct messages on your behalf across the federation',
-  'messages:read': 'Read direct messages addressed to you across the federation',
-  'wallet:read': 'See your morsel balance and transactions',
-  'knowledge:read': 'Read your knowledge packages',
-  // Installing a package REGISTERS an app, a cortex, an extension and any @activate cron the
-  // manifest declares, under the installer's identity. Until 2026-08-15 that door asked for nothing,
-  // so it arrived inside whatever single scope the owner had approved. Named here so the consent
-  // screen can say what it is and the owner can uncheck it.
-  'packages:write': 'Install packages for you (registers their apps, extensions and scheduled jobs)',
-  // task:* and workflow:* let a control-plane app (e.g. AGENCY) orchestrate the owner's OWN
-  // agents on their behalf. The task routes enforce an owner-match (an app may only create/read
-  // tasks for agents whose owner is the app's own owner) and workflow routes already resolve to
-  // the owner's memory namespace, so a granted app never reaches another owner's agents/data.
-  'task:read': "See your agents' tasks, runs, and results",
-  'task:write': 'Create and start tasks for your own agents on your behalf',
-  'workflow:read': 'See your automations (workflows) and their runs',
-  'workflow:write': 'Create, save, and run your automations (workflows)',
-  'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
-  // TARGET-057. Deliberately NOT connections:write: an app that may publish to an account you
-  // already connected is a different favour from one that may attach new accounts to your name.
-  // Attaching is a human act at the provider's own consent screen and no app performs it.
-  'connections:use': 'Publish to accounts you have already connected (never see or change the accounts themselves)',
-  // TARGET-058. Recording what the node OBSERVED needs no permission — that happens whether anyone
-  // asks or not. Asserting how content was made is different: a declaration can say a person wrote
-  // or reviewed something, which is exactly the statement that decides whether a visible AI label is
-  // owed. So the assertion is the thing an owner grants, and staying silent is always free.
-  'provenance:write': 'State how content it creates was made (whether AI wrote it, and whether a person reviewed it)',
-  // Spending is its own permission. Reading your memory and buying on your behalf are not the same
-  // favour, and until this existed the narrowest grant there is was enough to draw on any contract
-  // its owner held — the app presented the owner's own GHII, so the money layer could not tell them
-  // apart. Paired with a per-app ceiling (`spend_cap_units`) so the answer can be an amount rather
-  // than a yes.
-  'contract:spend': 'Buy on your behalf using contracts you hold (spends your morsels or money)',
-  // The other side of the same coin: an app that manages who may use ITS owner's capability.
-  // A membership gate that approves someone and cannot open the door for them is decoration, and
-  // the owner is the one paying for what it gives away — so it is asked for, never assumed.
-  // Handing another account a standing right to read part of your memory is not something
-  // memory:write covers, and reading it that way would be the wrong bargain: an app allowed to
-  // write your records would silently also be allowed to publish them to people you never named.
-  // So it is asked for on its own, exactly as exchange:grant is for giving away what you sell.
-  'share:manage': 'Share parts of your memory with people and groups you have set up (and stop sharing)',
-  'exchange:grant': 'Give and withdraw free access to capabilities you sell (you carry the cost)',
-  // Declaring that part of your revenue goes to someone else, and paying it out, both move value out
-  // of the owner's own pocket. That is a spending decision even though nobody is being charged for it,
-  // so an app that arranges revenue sharing asks for it rather than inheriting it from selling.
-  'exchange:beneficiary': 'Share part of what you earn with other accounts, and pay those shares out',
-  'notifications:send': 'Send you notifications (bell + browser push) that open this app',
-  'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
-  'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',
-  'organism:write': 'Create organisms and workspaces on your behalf (an app that provisions its own structured data space)',
-  // Company-in-a-box. Reading the books and writing them are different favours: TILIT (the
-  // accountant app) reads; an invoicing surface writes. Neither implies the other, and neither
-  // implies outbound:send — sending a message to a customer is a third, separate favour.
-  'finance:read': 'Read your bookkeeping: invoices, vouchers, VAT reports and exports',
-  'finance:write': 'Create and send invoices and book accounting vouchers on your behalf',
-  'outbound:send': 'Send email/messages to your saved outbound contacts on your behalf (opt-outs and daily limits always apply)',
-  // A company is an addressable public identity, so claiming one and pointing its address
-  // somewhere are separate from reading the registry.
-  'company:read': 'See the companies you have registered and their addresses',
-  'company:write': 'Register companies in your name and set what their address serves',
-  // Publishing under the owner's name. This word is STEP ONE OF THREE and deliberately gates
-  // nothing yet. POST /v1/apps, the draft routes and fork/patch/delete ask for requireAuth() and no
-  // scope, and at least one live app (ORIGAMI, 460 downloads) publishes through an app-grant token
-  // while requesting ten permissions, none of them this one. Refusing role 'app' at those doors
-  // today would take a working app off the air. So step one only makes the favour askable: an app
-  // can request it, and the owner sees it on the consent screen and can uncheck it. Until now
-  // publishing was absent from this vocabulary entirely, which is why no owner has ever been asked.
-  //
-  // STEP TWO belongs to the apps. ORIGAMI, and anything else that publishes on a grant, declares
-  // `app:write` in its <meta name="aimeat-scopes">, and each of its owners passes the consent screen
-  // once more. A live grant carries the scopes that were approved when it was made and gains nothing
-  // from the app being updated. The owner's own app clears this with no prompt through
-  // /v1/auth/app-grant-silent; a stranger's app shows the screen with the new line badged "new".
-  //
-  // STEP THREE is still pending: the publish doors (routes/apps/publish.ts, drafts.ts,
-  // fork-manage.ts) start refusing a scoped principal that does not carry the word. Take it only
-  // once the live grants show that the apps publishing this way already hold it, or the outage
-  // repeats the shape of changelog 1.33.1. When it is taken, two surfaces nobody meant to touch are
-  // already safe: requireScope waves an owner session through (its owner branch is roles includes
-  // owner AND NOT agent AND NOT ecosystem), so publishing from the website is unaffected, and every
-  // agent alive on 2026-08-10 was handed `app:write` at boot by
-  // services/scope-vocabulary-migration.ts, so no agent loses publishing either. The app grant is
-  // the principal the gate is actually for, which is why it has to ask first.
-  'app:write': 'Publish and update apps in your name (each one gets a public address anyone with the link can open)',
-};
+import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
+export { APP_GRANTABLE_SCOPES };
 
 /**
  * Ordered locale-key candidates for one scope's consent sentence. The consent UI localizes
@@ -213,6 +118,34 @@ export const PORTFOLIO_GRANT_SCOPES: readonly string[] = ['memory:read'];
 /** Is this grant target a portfolio origin rather than a published app? */
 function isPortfolioTarget(target: string): boolean {
   return target.startsWith(PORTFOLIO_TARGET_PREFIX);
+}
+
+/**
+ * What the app at this grant target declares TODAY, or null when it says nothing.
+ *
+ * `<meta name="aimeat-scopes">` is the app's own statement of what it will ask for, and it is the
+ * only place the answer lives — the publish path does not copy it onto the app record. Reading it
+ * from the stored bytes costs one row and no HTTP.
+ *
+ * Null, not the empty list, when the app declares nothing: an app with no tag has made no statement,
+ * and a caller must be able to tell that apart from "asks for nothing".
+ */
+async function declaredScopesOf(storage: Storage, target: string): Promise<string[] | null> {
+  if (isPortfolioTarget(target)) return null;
+  const slash = target.indexOf('/');
+  if (slash <= 0 || slash === target.length - 1) return null;
+  const owner = target.slice(0, slash);
+  const filename = target.slice(slash + 1);
+  const bare = owner.includes('@') ? owner.split('@')[0] : owner;
+  const app = await storage.getAppByOwnerName(bare, filename).catch(err => {
+    logger.warn('app-grants: could not read the app behind a grant target', { target, error: String(err) });
+    return null;
+  });
+  if (!app) return null;
+  const data = app.data as Buffer | Uint8Array | string;
+  const html = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+  const declared = parseAppScopes(html);
+  return declared.length ? declared : null;
 }
 
 /**
@@ -302,6 +235,19 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
   const pendingRequests = new Map<string, PendingRequest>();
   const authCodes = new Map<string, AuthCode>();
+
+  /**
+   * The stored scopes, trimmed to what the app declares now — or null when nothing changes.
+   *
+   * Only ever removes. An app that gained a permission in its manifest has to go through the consent
+   * screen for it, and a refresh is not consent. An app that declares nothing is left as it is.
+   */
+  async function narrowToDeclaration(target: string, stored: string[]): Promise<string[] | null> {
+    const declared = await declaredScopesOf(storage, target);
+    if (!declared) return null;
+    const kept = stored.filter(s => declared.includes(s));
+    return kept.length === stored.length ? null : kept;
+  }
 
   // Sweep expired entries lazily on each authorize/token call (cheap; bounded maps).
   function sweep() {
@@ -594,21 +540,49 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // it wants and believes the answer. See capPortfolioScopes for what this does and does not fix.
     const requested = isPortfolioTarget(grantTarget) ? capPortfolioScopes(asked) : asked;
 
-    // Policy: own app → auto-approve requested scopes; otherwise require a prior non-revoked grant
-    // that already covers them (remembered approval). Anything else needs the visible consent.
+    // Policy: a live grant is answered from what the app asks for TODAY, not from what it asked for
+    // the day the grant was made.
+    //
+    // A grant used to be a snapshot: the scopes were written at the handshake, and every later
+    // `grant_type=refresh_token` minted from that stored list without ever re-reading the app. So an
+    // app could narrow its `<meta name="aimeat-scopes">` and keep the wider grant indefinitely.
+    // Measured on aimeat.io on 2026-08-18: of 108 live grants, 2 matched the app's current
+    // declaration and 106 carried permissions the app no longer asks for.
+    //
+    // Two directions, two answers:
+    //   NARROWING  — the app asks for less than the grant holds. Applied silently. Nobody needs to be
+    //                asked for permission to take a permission away, and asking would train people to
+    //                click through the screen that matters.
+    //   WIDENING   — the app asks for something the grant does not carry. The consent screen, with
+    //                `reason: 'app_updated'` so the SDK can say WHY it is asking again: the app was
+    //                updated and the new permissions have not been approved by this person yet.
+    // The owner's OWN app keeps approving itself in both directions. Publishing the app IS the
+    // author's decision about their own account, and a screen on every scope edit would land on the
+    // one person who wrote the line that triggered it. Their drift is closed by the narrowing above
+    // and by the same narrowing on refresh, without a prompt anywhere.
     const isOwnApp = owner === grantOwner;
     const existing = await storage.getAppGrantByOwnerAndApp(owner, grantTarget);
+    const fallback = ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
+    const wanted = requested.length ? requested : (existing?.scopes ?? fallback);
+    const added = existing ? wanted.filter(s => !existing.scopes.includes(s)) : [];
     let scopes: string[];
     if (isOwnApp) {
-      scopes = requested.length ? requested : ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
-    } else if (existing && requested.every(s => existing.scopes.includes(s))) {
-      scopes = requested.length ? requested : existing.scopes;
+      scopes = wanted;
+    } else if (!existing) {
+      return reply({ ok: false, error: 'consent_required', app: grantTarget, app_name: grantName, scope: wanted.join(' ') });
+    } else if (added.length === 0) {
+      // Same set, or a narrower one. Take the app at its word and shrink the grant to match.
+      scopes = wanted;
     } else {
       // Surface what the app is + what it's asking for, so the SDK can launch the visible consent
       // popup (the authorize flow) without a second round-trip to discover the app identity.
       // NOTE: the visible authorize flow resolves app targets only (owner/file) — a portfolio
       // visitor lands here and stays logged out (safe placeholder); the apex viewer covers them.
-      return reply({ ok: false, error: 'consent_required', app: grantTarget, app_name: grantName, scope: requested.join(' ') });
+      return reply({
+        ok: false, error: 'consent_required', reason: 'app_updated',
+        app: grantTarget, app_name: grantName, scope: wanted.join(' '),
+        added: added.join(' '),
+      });
     }
 
     // Mint: reuse this owner's live grant for the app, else create one (one live grant per app).
@@ -675,7 +649,19 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       }
       // Rotate the refresh token (one-time use).
       const newRaw = randomBytes(32).toString('hex');
-      await storage.updateAppGrant(grant.grantId, { refreshTokenHash: hashToken(newRaw), lastUsedAt: new Date().toISOString() });
+      // …and bring the grant down to what the app asks for TODAY. This is the second half of the
+      // drift fix: the silent bridge only runs on a fresh page load, so an app that lives on refresh
+      // tokens would otherwise carry its old snapshot for as long as it keeps refreshing.
+      //
+      // NARROWING ONLY. Widening is the consent screen's business, never a side effect of a refresh.
+      // And an app that declares NOTHING is left alone rather than shrunk to the default set: a
+      // publish that drops the meta tag by accident must not quietly cut an app's reach.
+      const narrowed = await narrowToDeclaration(grant.app, grant.scopes);
+      await storage.updateAppGrant(grant.grantId, {
+        refreshTokenHash: hashToken(newRaw), lastUsedAt: new Date().toISOString(),
+        ...(narrowed ? { scopes: narrowed } : {}),
+      });
+      if (narrowed) grant.scopes = narrowed;
       // AUDIT H-9: the same portfolio ceiling, applied at the second door that mints from a stored
       // grant. The silent bridge caps what it writes, so a fresh record can no longer hold more than
       // memory:read for a portfolio — a record written before that cap existed still can, and this

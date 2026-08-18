@@ -9563,5 +9563,6 @@
   "chat.nudgeMobileBody": "It installs as an app, and with notifications on I can tell you when something finishes instead of you coming back to check.",
   "chat.nudgeDismiss": "Not now",
   "chat.starterWork": "Take something off my plate",
-  "chat.starterWorkAsk": "Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over."
+  "chat.starterWorkAsk": "Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.",
+  "appGrant.updatedNotice": "This app has been updated and now asks for something new. Approve it again to keep using it."
 }

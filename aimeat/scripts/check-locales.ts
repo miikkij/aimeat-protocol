@@ -69,7 +69,8 @@ function missingScopeLabels(en: Record<string, unknown>): string[] {
 
 /**
  * Same shape of guarantee for the app-grant consent screen. Its source of truth is
- * APP_GRANTABLE_SCOPES in src/routes/app-grants.ts: every scope an app may request must have a
+ * APP_GRANTABLE_SCOPES in src/routes/app-grant-vocabulary.ts: every scope an app may request must
+ * have a
  * plain-language sentence in en.json (the app-context override tree first, the shared agent tree
  * as fallback — the exact chain consent-vocab.js resolves) and every scope FAMILY must have an
  * appGrant.area name for the "Works with:" line. Without the sentence the row falls back to the
@@ -77,10 +78,10 @@ function missingScopeLabels(en: Record<string, unknown>): string[] {
  */
 function missingAppGrantSentences(en: Record<string, unknown>): string[] {
   const routePath = join(dirname(fileURLToPath(import.meta.url)), '..',
-    'src', 'routes', 'app-grants.ts');
+    'src', 'routes', 'app-grant-vocabulary.ts');
   const src = readFileSync(routePath, 'utf-8');
   const block = src.match(/APP_GRANTABLE_SCOPES: Record<string, string> = \{([\s\S]*?)\n\};/);
-  if (!block) return ['(check-locales cannot find APP_GRANTABLE_SCOPES in src/routes/app-grants.ts — the parser needs updating)'];
+  if (!block) return ['(check-locales cannot find APP_GRANTABLE_SCOPES in src/routes/app-grant-vocabulary.ts — the parser needs updating)'];
   const out: string[] = [];
   const families = new Set<string>();
   for (const m of block[1].matchAll(/'([a-z-]+):([a-z-]+)':/g)) {

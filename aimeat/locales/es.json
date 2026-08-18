@@ -9553,5 +9553,6 @@
   "chat.nudgeMobileBody": "Se instala como una app, y con las notificaciones activadas te aviso cuando algo termina en vez de que vuelvas a comprobarlo.",
   "chat.nudgeDismiss": "Ahora no",
   "chat.starterWork": "Quítame algo de encima",
-  "chat.starterWorkAsk": "Algo de mi lista se me escapa una y otra vez. Pregúntame por ello y luego propón una cosa de la que puedas encargarte."
+  "chat.starterWorkAsk": "Algo de mi lista se me escapa una y otra vez. Pregúntame por ello y luego propón una cosa de la que puedas encargarte.",
+  "appGrant.updatedNotice": "Esta aplicación se ha actualizado y ahora pide algo nuevo. Apruébala de nuevo para seguir usándola."
 }

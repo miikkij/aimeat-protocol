@@ -9563,5 +9563,6 @@
   "chat.nudgeMobileBody": "Se asentuu sovelluksena, ja ilmoitusten kanssa kerron kun jokin valmistuu sen sijaan että palaisit tarkistamaan.",
   "chat.nudgeDismiss": "Ei nyt",
   "chat.starterWork": "Ota jotain harteiltani",
-  "chat.starterWorkAsk": "Yksi asia listallani lipsuu jatkuvasti. Kysy siitä minulta, ja ehdota sitten yhtä asiaa jonka voisit ottaa hoitaaksesi."
+  "chat.starterWorkAsk": "Yksi asia listallani lipsuu jatkuvasti. Kysy siitä minulta, ja ehdota sitten yhtä asiaa jonka voisit ottaa hoitaaksesi.",
+  "appGrant.updatedNotice": "Tämä sovellus on päivittynyt ja pyytää nyt jotain uutta. Hyväksy uudelleen, niin se toimii kuten ennenkin."
 }

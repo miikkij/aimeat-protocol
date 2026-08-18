@@ -54,6 +54,18 @@
 .agr-lede { color: var(--text-dim); font-size: 0.9rem; margin: 0 0 1rem; }
 .agr-muted { color: var(--text-dim); font-size: 0.92rem; margin: 0 0 1rem; }
 
+/* Why the screen is back: the app changed, not the person. Small on purpose — it explains a
+   familiar screen rather than announcing a problem, and the permissions below carry the weight. */
+.agr-updated {
+  color: var(--text-dim);
+  font-size: 0.88rem;
+  margin: 0 0 1rem;
+  padding: 0.5rem 0.7rem;
+  border-left: 3px solid var(--accent);
+  background: var(--bg-dim);
+  border-radius: 0 8px 8px 0;
+}
+
 /* ── One line instead of a wall: the areas the app works with ──────────────────────── */
 .agr-summary {
   border: 1px solid var(--border);
