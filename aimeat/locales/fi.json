@@ -3042,11 +3042,34 @@
       "organisms": "Jaetut tilat",
       "memory": "Muistiinpanot ja tietueet",
       "files": "Tiedostot",
-      "knowledge": "Tietopaketit"
+      "knowledge": "Jäsennelty tietosi",
+      "knowledgeExplain": "Jäsenneltyä tietoa: mitä olet järjestänyt talteen AI-chateistasi omien älyjesi, appiesi ja — kun niin haluat — muiden käyttöön.",
+      "star": "Pidä tämä aina näkyvissä",
+      "showAll": "Näytä kaikki ({n})",
+      "showLess": "Näytä vähemmän"
     },
     "ai": {
       "viaMcp": "{names} on kytketty agenttinasi MCP:n yli.",
+      "viaMcpMany": "{names} on kytketty agenteiksesi MCP:n yli.",
+      "andMore": "{names} ja {n} muuta",
       "houseModel": "Talon chat vastaa mallilla {model}."
+    },
+    "mail": {
+      "unread": "{n} lukematonta — käy katsomassa",
+      "empty": "Postilaatikko — ei uutta"
+    },
+    "fleet": {
+      "oneOk": "Agenttisi on kotona ja kunnossa.",
+      "oneTrouble": "Agenttisi {name} tarvitsee katseen.",
+      "allOk": "{total} agenttia kotona, kaikki kunnossa.",
+      "trouble": "{total} agenttia kotona · {n} tarvitsee katseen"
+    },
+    "apps": {
+      "title": "Appisi",
+      "favTitle": "Suosikkiappisi",
+      "modeLabel": "Mitkä appit näytetään",
+      "saved": "Viimeksi tallennetut",
+      "used": "Viimeksi avatut"
     },
     "ach": {
       "title": "Saavutukset",

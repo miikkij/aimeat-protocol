@@ -3042,11 +3042,34 @@
       "organisms": "Espacios compartidos",
       "memory": "Notas y registros",
       "files": "Archivos",
-      "knowledge": "Paquetes de conocimiento"
+      "knowledge": "Tu conocimiento estructurado",
+      "knowledgeExplain": "Conocimiento estructurado: lo que has organizado de tus chats de IA, para tus IAs, tus aplicaciones y — cuando tú quieras — otras personas.",
+      "star": "Mantener este siempre visible",
+      "showAll": "Mostrar todo ({n})",
+      "showLess": "Mostrar menos"
     },
     "ai": {
       "viaMcp": "{names} está conectado como tu agente por MCP.",
+      "viaMcpMany": "{names} están conectados como tus agentes por MCP.",
+      "andMore": "{names} y {n} más",
       "houseModel": "El chat de la casa responde con {model}."
+    },
+    "mail": {
+      "unread": "{n} sin leer — ve a mirar",
+      "empty": "Buzón — nada nuevo"
+    },
+    "fleet": {
+      "oneOk": "Tu agente está en casa y bien.",
+      "oneTrouble": "Tu agente {name} necesita un vistazo.",
+      "allOk": "{total} agentes en casa, todos bien.",
+      "trouble": "{total} agentes en casa · {n} necesitan un vistazo"
+    },
+    "apps": {
+      "title": "Tus aplicaciones",
+      "favTitle": "Tus aplicaciones favoritas",
+      "modeLabel": "Qué aplicaciones mostrar",
+      "saved": "Últimas guardadas",
+      "used": "Últimas abiertas"
     },
     "ach": {
       "title": "Logros",

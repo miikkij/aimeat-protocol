@@ -3042,11 +3042,34 @@
       "organisms": "Shared spaces",
       "memory": "Notes and records",
       "files": "Files",
-      "knowledge": "Knowledge packages"
+      "knowledge": "Structured knowledge",
+      "knowledgeExplain": "Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and — when you choose — other people to use.",
+      "star": "Keep this one always visible",
+      "showAll": "Show all ({n})",
+      "showLess": "Show less"
     },
     "ai": {
       "viaMcp": "{names} is connected as your agent over MCP.",
+      "viaMcpMany": "{names} are connected as your agents over MCP.",
+      "andMore": "{names} and {n} more",
       "houseModel": "The house chat answers with {model}."
+    },
+    "mail": {
+      "unread": "{n} unread — go have a look",
+      "empty": "Mailbox — nothing new"
+    },
+    "fleet": {
+      "oneOk": "Your agent is home and well.",
+      "oneTrouble": "Your agent {name} needs a look.",
+      "allOk": "{total} agents home, all well.",
+      "trouble": "{total} agents home · {n} need a look"
+    },
+    "apps": {
+      "title": "Your apps",
+      "favTitle": "Your favourite apps",
+      "modeLabel": "Which apps to show",
+      "saved": "Last saved",
+      "used": "Last opened"
     },
     "ach": {
       "title": "Achievements",
