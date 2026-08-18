@@ -5,6 +5,11 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.14.0 -- 2026-08-18 -- Two measured faults. The actions row took a line of its own under a
+ *     breadcrumb that says the same word, 87px of window for four items; it sits ON the breadcrumb line
+ *     now above 1000px. And the thread header answered to the VIEWPORT, so a wide window with a narrow
+ *     pane (365px pane at a 1000px window) overflowed by 157px and put the buttons on top of the name.
+ *     A container query asks the pane instead, which is the thing that is actually too narrow.
  *   v1.13.0 -- 2026-08-18 -- The composer is a thin line again. v1.12.0 gave the rich editor a share of
  *     the window, which on a real screen took half the pane: the reading area is the valuable one and
  *     the editor is a thing you ask for. .inbox-composer-bar is flex:none so it can never absorb slack.
@@ -68,6 +73,14 @@
    the sidebar entry is highlighted besides — so the tab's heading was the third label for one screen.
    The row keeps its actions and gives the height back to the conversation. */
 .inbox-head-text { display: none; }
+
+/* …and the actions then sit on the breadcrumb's OWN line rather than on a line of their own. Measured
+   at 1292x995: the breadcrumb occupied y 76–98 and this row y 114–155, so 87px of the window went to
+   one word and three buttons. Only where there is room for both: below 1000px the row drops back
+   under the breadcrumb, where a long breadcrumb and the buttons would otherwise collide. */
+@media (min-width: 1000px) {
+  .inbox-head { margin-top: -58px; min-height: 36px; }
+}
 .inbox-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 
 /* Two-pane messenger with its own internal scroll.
@@ -335,6 +348,24 @@
 /* The name never shrinks: truncating WHO you are talking to to "ka…" to make room for a button is the
    wrong trade. The subject gives way instead — it is already in the list on the left. */
 .inbox-thread-id .inbox-name { flex: 0 0 auto; white-space: nowrap; }
+
+/* THE BUTTONS ANSWER TO THE PANE, NOT THE WINDOW.
+   A wide window can still hold a narrow thread pane: at 1000px the pane is 365px and these four
+   buttons are 422px, so the row overflowed by 157px and the buttons sat ON TOP of the name — measured,
+   77px of "kalle" underneath them. The ≤760px rule that collapses their labels reads the VIEWPORT, so
+   it never fired here. A container query asks the pane instead, which is the thing that is actually
+   too narrow. */
+.inbox-panel { container-type: inline-size; container-name: thread; }
+@container thread (max-width: 620px) {
+  /* Labels go, icons stay: four icons fit where four words never will. */
+  .inbox-thread-head .inbox-ai-btn-label { display: none; }
+  .inbox-thread-head .inbox-linkprev-toggle { display: none; }
+  .inbox-thread-head { gap: 6px; padding: 8px 10px; }
+}
+@container thread (max-width: 430px) {
+  /* Below this the subject is noise — it is the line the conversation list shows for every row. */
+  .inbox-thread-id .inbox-thread-subject { display: none; }
+}
 .inbox-thread-id .inbox-thread-subject {
   flex: 1 1 auto;
   white-space: nowrap;
