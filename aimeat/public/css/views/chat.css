@@ -9,6 +9,11 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.5.0 — 2026-08-18 — A phone could not LEAVE: the chat owns the whole screen and hides the
+ *     site nav, and nothing led back out (found by Jouni on his phone). .chat-back is the door,
+ *     mobile-only. Plus air: roomier scroll padding and turn gap, the long model id ellipsized to
+ *     40vw (full string stays in the tooltip), the thread title ellipsized so the head keeps one
+ *     row.
  *   v1.4.0 — 2026-08-17 — .chat-status-ownkey (the own-key door on the payer line) and
  *     .chat-welcome-trust (the one boundary sentence under the welcome). The status agent label is
  *     now a plain word, so it drops the monospace styling.
@@ -576,6 +581,9 @@
 }
 
 .chat-send { flex: 0 0 auto; }
+
+/* The way OUT of the full-screen phone chat. Desktop has the site nav, so it hides there. */
+.chat-back { display: none; }
 .chat-voice { flex: 0 0 auto; }
 
 /* The read-aloud control sits with the timestamp rather than on the bubble: it is about the turn,
@@ -622,8 +630,11 @@
     height: 100%;
   }
 
+  .chat-back { display: inline-flex; align-items: center; min-height: 40px; flex: 0 0 auto; }
+  .chat-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   .chat-turn { max-width: 92%; }
-  .chat-scroll { padding: 12px 10px; }
+  .chat-scroll { padding: 16px 12px; gap: 16px; }
   .chat-composer {
     padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   }
@@ -642,6 +653,8 @@
      model stay because one is about their wallet and the other makes answers checkable. */
   .chat-status { padding: 4px 12px; gap: 8px; }
   .chat-status-agent { display: none; }
+  /* The full model id is a third of the screen's width; the tooltip keeps the whole string. */
+  .chat-status-model { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chat-ai-notice { padding: 4px 12px; }
   .chat-head { padding: 10px 12px; }
   .chat-copy-all { font-size: 0.7rem; padding: 2px 6px; }

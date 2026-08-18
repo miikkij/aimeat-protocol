@@ -9502,6 +9502,7 @@
   },
   "chat.allowanceElsewhere": "{n} USD of your allowance left, for everything outside this chat.",
   "chat.poweredBy": "Powered by goose",
+  "chat.back": "Back",
   "chat.busyThinking": "thinking",
   "chat.busyWriting": "writing the answer",
   "chat.busyTool": "running {t}",

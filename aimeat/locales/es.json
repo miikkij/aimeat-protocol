@@ -9492,6 +9492,7 @@
   },
   "chat.allowanceElsewhere": "Te quedan {n} USD de saldo, para todo lo que no sea este chat.",
   "chat.poweredBy": "Con tecnología de goose",
+  "chat.back": "Atrás",
   "chat.busyThinking": "pensando",
   "chat.busyWriting": "escribiendo la respuesta",
   "chat.busyTool": "ejecutando {t}",

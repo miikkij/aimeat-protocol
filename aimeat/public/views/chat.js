@@ -35,6 +35,8 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 import { hasSession } from '/js/services/auth.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
@@ -106,6 +108,9 @@ export default function ChatView() {
     // not take the others with it or block a message that never needed it.
     const [attachments, setAttachments] = useState([]);
     const [nudgeDismissed, setNudgeDismissed] = useState(true);
+    // Where "back" leads on a phone, where this page owns the whole screen and the site nav is
+    // hidden: the person's own side of the house. Remake accounts have the home; legacy the profile.
+    const [exitHref, setExitHref] = useState('/v1/profile');
 
     const abortRef = useRef(null);
     const bottomRef = useRef(null);
@@ -127,6 +132,9 @@ export default function ChatView() {
     // First load: what this node offers, and where the person left off.
     useEffect(() => {
         if (!hasSession()) { setLoading(false); return; }
+        apiGet('/v1/home/ui-track')
+            .then((r) => { if (r?.data?.track === 'remake') setExitHref('/v1/home'); })
+            .catch((e) => swallowed('chat: ui-track', e));
         (async () => {
             try {
                 const [st, list, nudges] = await Promise.all([
@@ -474,6 +482,10 @@ export default function ChatView() {
 
             <section class="chat-main">
                 <header class="chat-head">
+                    <!-- On a phone this page owns the whole screen and the site nav is hidden, so
+                         without this there is NO way back to anything. Mobile-only via CSS. -->
+                    <a class="btn-ghost chat-back" href=${exitHref}
+                        aria-label=${tr('chat.back', 'Back')}>← ${tr('chat.back', 'Back')}</a>
                     <button type="button" class="btn-ghost chat-list-toggle"
                         onClick=${() => setListOpen((o) => !o)}>
                         ${listOpen ? tr('chat.closeList', 'Close') : tr('chat.openList', 'Conversations')}

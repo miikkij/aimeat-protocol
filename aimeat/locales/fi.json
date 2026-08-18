@@ -9502,6 +9502,7 @@
   },
   "chat.allowanceElsewhere": "Saldoa jäljellä {n} USD, ja se on kaikkea muuta kuin tätä chattia varten.",
   "chat.poweredBy": "Moottorina goose",
+  "chat.back": "Takaisin",
   "chat.busyThinking": "miettii",
   "chat.busyWriting": "kirjoittaa vastausta",
   "chat.busyTool": "ajaa {t}",
