@@ -6,6 +6,9 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.x — 2026-08-18 — Conversation and broadcast rows stamp with stampShort (today→time,
+ *     yesterday→word, this week→weekday, older→date) with the full moment in the tooltip. A bare
+ *     clock time on a week-old row read as "today".
  *   v1.7.0 — 2026-08-03 — ThreadPanel: "Show full history (N messages)" pill at the top of a thread
  *     showing only its newest page (threads now open on the newest 50 — inbox-tab v1.28.0).
  *   v1.6.0 — 2026-08-01 — Voice messages threaded through: ThreadPanel passes onTranscribe /
@@ -35,7 +38,7 @@ import { PresenceDot } from '/components/PresenceDot.js';
 import { getSession } from '/js/services/auth.js';
 import { Avatar, MessageBubble, Composer, CommandBar, CommandFill, SchedulePanel } from './components.js';
 import { ThreadReadAloud } from './read-aloud.js';
-import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, groupConversations, timeShort, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet } from './helpers.js';
+import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, groupConversations, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet, stampShort, stampFull } from './helpers.js';
 
 export function ListPanel({ requests, conversations, activeConv, peerDisplay, accept, block, openConversation }) {
   /** One conversation row. `nested` = inside a person group (labelled by the agent/thread, indented). */
@@ -57,7 +60,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
           <div class="inbox-conv-line1">
             <span class="inbox-name">${escHtml(label)} ${(!c.groupAlias && (!nested || c.peerGhii?.includes('#'))) ? html`<${PresenceDot} ghii=${c.peerGhii} />` : ''}</span>
             ${!nested && via ? html`<span class="inbox-via-chip">${t('inbox.viaAgent')} ${escHtml(via)}</span>` : ''}
-            <span class="inbox-conv-time">${c.updatedAt ? timeShort(c.updatedAt) : ''}</span>
+            <span class="inbox-conv-time" title=${c.updatedAt ? stampFull(c.updatedAt) : ''}>${c.updatedAt ? stampShort(c.updatedAt) : ''}</span>
           </div>
           <div class="inbox-conv-line2">
             ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">🏷 ${escHtml(c.subject)}</span>` : ''}
@@ -288,7 +291,7 @@ export function ResultsPanel({ resultsId, recentBroadcasts, results, openResults
             <div class="inbox-conv-main">
               <div class="inbox-conv-line1">
                 <span class="inbox-name">${b.type === 'poll' ? '📊' : '📨'} ${escHtml(b.title)}</span>
-                <span class="inbox-conv-time">${b.createdAt ? timeShort(b.createdAt) : ''}</span>
+                <span class="inbox-conv-time" title=${b.createdAt ? stampFull(b.createdAt) : ''}>${b.createdAt ? stampShort(b.createdAt) : ''}</span>
               </div>
             </div>
           </button>`)}

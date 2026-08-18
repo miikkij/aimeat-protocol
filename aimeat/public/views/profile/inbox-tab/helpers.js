@@ -5,6 +5,8 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.x — 2026-08-18 — stampShort/stampFull: the list-row stamp that answers WHEN, not just what
+ *     time of day. timeShort stays for rows inside an open thread, under their day separators.
  *   v1.6.0 — 2026-08-04 — resolveThreadAttachmentUrls(): cache entries carry a mint timestamp and are
  *     re-minted after ATTACHMENT_URL_REUSE_MS instead of reused forever — a presigned download URL
  *     held past its 1 h token TTL failed every click with the browser's bare "Couldn't download".
@@ -204,6 +206,37 @@ export function timeShort(s) {
   if (!Number.isFinite(d.getTime())) return '';
   return d.toLocaleTimeString(getLocale() === 'fi' ? 'fi-FI' : undefined, { hour: '2-digit', minute: '2-digit' });
 }
+/**
+ * The stamp for a LIST row, where the date is the information: a bare clock time on a week-old
+ * conversation reads as "today" and answers the wrong question (found by Jouni: "mistään en näe
+ * päiväystä, vain kellonajan"). Today → the time; yesterday → the word; the last week → the
+ * weekday; older → the date, with the year only when it differs. Rows inside an open thread keep
+ * timeShort — the day separators already carry the date there.
+ */
+export function stampShort(s) {
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return '';
+  const locale = getLocale() === 'fi' ? 'fi-FI' : undefined;
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  }
+  if (d.toDateString() === new Date(Date.now() - 86400000).toDateString()) return t('inbox.yesterday');
+  if (Date.now() - d.getTime() < 6 * 86400000) return d.toLocaleDateString(locale, { weekday: 'short' });
+  return d.toLocaleDateString(locale, {
+    day: 'numeric', month: 'short',
+    ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}),
+  });
+}
+
+/** The full moment, for the tooltip on a shortened stamp. */
+export function stampFull(s) {
+  const d = new Date(s);
+  if (!Number.isFinite(d.getTime())) return '';
+  const locale = getLocale() === 'fi' ? 'fi-FI' : undefined;
+  return d.toLocaleString(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export function dayKey(s) { return new Date(s).toDateString(); }
 export function dayLabel(s) {
   const d = new Date(s);
