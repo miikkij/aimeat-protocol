@@ -1,11 +1,15 @@
 /**
  * @file public/views/profile/inbox-tab/components.js
  * @description Presentational sub-components for the profile Inbox tab: Avatar, AttachmentItem,
- *   MarkdownViewer, InteractiveForm/InteractiveAnswered (federated AskUserQuestion), PollBuilder,
+ *   MarkdownViewer, PollBuilder,
  *   MessageBubble, Composer (Toast UI editor + markdown fallback), CommandBar/CommandFill (agent
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-08-18 — The composer opens as the thin auto-growing line on every screen, the way a
+ *     chat works, and ⤢ swaps in the full editor with the draft carried both ways. Toast UI is not even
+ *     loaded until asked. Each branch of the composer body carries a key: without them Preact reused the
+ *     editor div as the button row and its inline height rode along.
  *   v1.11.0 — 2026-08-01 — Voice messages. AttachmentItem hands an audio attachment to AudioAttachment
  *     (./voice-parts.js) so it plays in the bubble instead of opening in a browser tab, which is a
  *     download and not a conversation. The Composer gains a 🎤 recorder feeding the SAME attachment
@@ -59,7 +63,8 @@ import { AiInteractionNotice } from '/components/ai-label.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
-import { composerHeight, loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
+import { InteractiveForm, InteractiveAnswered } from './interactive-form.js';
+import { bigEditorHeight, loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind } from './helpers.js';
 import { BubbleSpeakButton } from './read-aloud.js';
 import { AudioAttachment, fmtClock, stopOtherAudio } from './voice-parts.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
@@ -149,93 +154,6 @@ export function MarkdownViewer({ url, name, onClose }) {
     </div>`;
 }
 
-/** The interactive question form rendered inline in the thread (a federated AskUserQuestion): radio
- *  groups (single-select), checkbox groups (multiSelect), an always-available "Other" freeform, and a
- *  Submit button gated until every `required` question is answered. */
-export function InteractiveForm({ spec, submitting, onSubmit }) {
-  const questions = spec?.questions || [];
-  const [sel, setSel] = useState(() => {
-    const init = {};
-    for (const q of questions) init[q.id] = { picks: new Set(), other: '' };
-    return init;
-  });
-  const setQ = (qid, updater) => setSel(prev => ({ ...prev, [qid]: updater(prev[qid] || { picks: new Set(), other: '' }) }));
-  const pickSingle = (qid, optId) => setQ(qid, s => ({ picks: new Set([optId]), other: optId === IFORM_OTHER ? s.other : '' }));
-  const toggleMulti = (qid, optId) => setQ(qid, s => {
-    const picks = new Set(s.picks);
-    if (picks.has(optId)) picks.delete(optId); else picks.add(optId);
-    return { picks, other: picks.has(IFORM_OTHER) ? s.other : '' };
-  });
-  const setOther = (qid, text) => setQ(qid, s => ({ picks: s.picks, other: text }));
-
-  const answeredOk = (q) => {
-    const s = sel[q.id]; if (!s) return false;
-    const realPicks = [...s.picks].filter(p => p !== IFORM_OTHER);
-    const otherOk = s.picks.has(IFORM_OTHER) && s.other.trim().length > 0;
-    return realPicks.length > 0 || otherOk;
-  };
-  const canSubmit = questions.every(q => !q.required || answeredOk(q));
-
-  const submit = () => {
-    if (!canSubmit || submitting) return;
-    const answers = {};
-    for (const q of questions) {
-      const s = sel[q.id] || { picks: new Set(), other: '' };
-      const selected = [...s.picks].filter(p => p !== IFORM_OTHER);
-      const other = (s.picks.has(IFORM_OTHER) && s.other.trim()) ? s.other.trim() : null;
-      answers[q.id] = { selected, other };
-    }
-    onSubmit?.(answers);
-  };
-
-  const renderOpt = (q, optId, label) => {
-    const multi = !!q.multiSelect;
-    const on = sel[q.id]?.picks.has(optId);
-    return html`
-      <label class=${`inbox-iform-opt${on ? ' inbox-iform-opt--on' : ''}`} key=${optId}>
-        <input type=${multi ? 'checkbox' : 'radio'} name=${`q-${q.id}`} checked=${!!on}
-          onChange=${() => multi ? toggleMulti(q.id, optId) : pickSingle(q.id, optId)} />
-        <span class="inbox-iform-opt-label">${escHtml(label)}</span>
-      </label>`;
-  };
-
-  return html`
-    <div class="inbox-iform">
-      ${questions.map(q => html`
-        <div class="inbox-iform-q" key=${q.id}>
-          ${q.header ? html`<span class="inbox-iform-chip">${escHtml(q.header)}</span>` : null}
-          <div class="inbox-iform-prompt">${escHtml(q.prompt)}${q.required ? html`<span class="inbox-iform-req"> *</span>` : null}</div>
-          <div class="inbox-iform-opts" role=${q.multiSelect ? 'group' : 'radiogroup'}>
-            ${(q.options || []).map(o => renderOpt(q, o.id, o.label))}
-            ${q.allowOther !== false ? html`
-              ${renderOpt(q, IFORM_OTHER, t('inbox.answer.other'))}
-              ${sel[q.id]?.picks.has(IFORM_OTHER) ? html`
-                <input class="inbox-iform-other" type="text" value=${sel[q.id]?.other || ''}
-                  placeholder=${t('inbox.answer.otherPlaceholder')} onInput=${e => setOther(q.id, e.target.value)} />` : null}` : null}
-          </div>
-        </div>`)}
-      <button class="btn-primary btn-sm inbox-iform-submit" disabled=${!canSubmit || submitting} onClick=${submit}>
-        ${submitting ? t('inbox.sending') : (spec?.submitLabel || t('inbox.answer.send'))}
-      </button>
-    </div>`;
-}
-
-/** Read-only summary shown on a question bubble once it has been answered. */
-export function InteractiveAnswered({ spec, answers }) {
-  return html`
-    <div class="inbox-iform inbox-iform--done">
-      ${(spec?.questions || []).map(q => {
-        const a = answers[q.id] || { selected: [], other: null };
-        const labels = (q.options || []).filter(o => a.selected.includes(o.id)).map(o => o.label);
-        if (a.other) labels.push(`${t('inbox.answer.other')}: ${a.other}`);
-        return html`
-          <div class="inbox-iform-q" key=${q.id}>
-            <span class="inbox-iform-chip">${escHtml(q.header || q.prompt)}</span>
-            <div class="inbox-iform-answered">✓ ${labels.length ? escHtml(labels.join(', ')) : '—'}</div>
-          </div>`;
-      })}
-    </div>`;
-}
 
 /** Compose the questions for a poll broadcast (a fanned-out AskUserQuestion). Controlled — owns no state;
  *  edits go through setQuestions. */
@@ -358,12 +276,17 @@ export function Composer({
   // Restore an in-progress draft for this conversation/compose (localStorage), or the passed initialText.
   const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   const seeded = initialText || readDraft();   // an explicit suggested reply wins; else restore a draft
-  // 'rich' = Toast UI (desktop); 'simple' = a plain auto-growing textarea (mobile chat input, no toolbar/
-  // preview — a phone keyboard + heavy WYSIWYG toolbar is miserable); 'markdown' = the textarea+preview
-  // fallback when Toast UI can't load. Mobile opens straight into 'simple' so we never load Toast UI there.
-  const isNarrow = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 760px)').matches;
-  const [mode, setMode] = useState(isNarrow ? 'simple' : 'rich');
+  // 'simple' = a thin auto-growing textarea, the way every chat works: one line that grows as you type.
+  // 'rich' = the Toast UI editor with its toolbar and preview tabs, which costs 92px of chrome before a
+  // single character — worth having, not worth spending the reading area on by default. The ⤢ button
+  // switches between them. 'markdown' = the textarea+preview fallback when Toast UI cannot load.
+  //
+  // Desktop used to open in 'rich', which handed the composer a third of the window and pushed the
+  // conversation into the strip above it. The messages are what the screen is for.
+  const [mode, setMode] = useState('simple');
   const [md, setMd] = useState(seeded);
+  const mdRef = useRef(seeded);
+  useEffect(() => { mdRef.current = md; }, [md]);
   // Temporarily enlarge the editor (~60% of the viewport) so long/formatted drafts are fully visible.
   const [expanded, setExpanded] = useState(false);
   const [files, setFiles] = useState([]);
@@ -439,10 +362,10 @@ export function Composer({
         // it between them. Writing the message is the point of this screen, so on a desktop window the
         // box gets a share of the height instead of a constant. A phone keeps the small default — its
         // composer is the auto-growing single line, and the keyboard owns the bottom half anyway.
-        height: composerHeight() + 'px',
+        height: bigEditorHeight() + 'px',
         initialEditType: 'markdown',     // open in markdown mode; the built-in toggle switches to WYSIWYG
         previewStyle: 'tab',
-        initialValue: seeded,            // seed from a saved draft / suggested reply (remounts via key)
+        initialValue: mdRef.current || seeded,   // whatever is in the thin input right now, else the draft
         usageStatistics: false,
         // editorRef is set only AFTER construction, so the constructor's own change (initialValue) is
         // skipped — only real user edits auto-save the draft.
@@ -499,13 +422,12 @@ export function Composer({
   // in CSS instead). `160px` matches the construction default.
   useEffect(() => {
     if (mode !== 'rich' || !editorRef.current?.setHeight) return undefined;
+    // The editor holds whatever height it was built with, so a window that gets shorter would keep an
+    // editor sized for the taller one and squeeze the conversation instead.
     const apply = () => {
-      const tall = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 400;
-      try { editorRef.current.setHeight(expanded ? tall + 'px' : composerHeight() + 'px'); } catch (err) { swallowed('components: composer resize', err); }
+      try { editorRef.current.setHeight(bigEditorHeight() + 'px'); } catch (err) { swallowed('components: composer resize', err); }
     };
     apply();
-    // The editor holds whatever height it was built with, so a window that gets shorter would keep a
-    // composer sized for the taller one and squeeze the conversation instead.
     window.addEventListener('resize', apply);
     return () => window.removeEventListener('resize', apply);
   }, [expanded, mode]);
@@ -521,6 +443,24 @@ export function Composer({
   // expand cap changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (mode === 'simple') autoGrow(taRef.current); }, [mode, expanded]);
+
+  /**
+   * ⤢ / ⤡ — swap the thin chat input for the full editor and back.
+   *
+   * Not a height toggle. The thin input IS the default because the conversation above it is what the
+   * screen is for; the toolbar, the preview tabs and the room to format are a thing you ask for when
+   * you are writing something long. The draft travels in both directions, so switching mid-sentence
+   * never costs a word.
+   */
+  const toggleBigEditor = () => {
+    if (mode === 'rich') {
+      const text = editorRef.current?.getMarkdown ? editorRef.current.getMarkdown() : md;
+      setMd(text); mdRef.current = text; saveDraft(text);
+      setExpanded(false); setMode('simple');
+      return;
+    }
+    setExpanded(true); setMode('rich');
+  };
 
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
@@ -560,26 +500,30 @@ export function Composer({
         })}
       </div>` : null}
       ${mode === 'rich'
-        ? html`<div class="inbox-editor" ref=${containerRef}></div>`
+        // Keys, because the three branches are different DOM shapes sharing one slot. Without them
+        // Preact reused the rich editor's <div> as the toolbar row below when switching back to the
+        // thin input, and Toast UI's inline height=450px rode along with it — the composer stayed
+        // half the pane while the textarea inside it was 40px.
+        ? html`<div key="rich" class="inbox-editor" ref=${containerRef}></div>`
         : mode === 'simple'
-        ? html`<textarea class="inbox-textarea inbox-textarea--chat" rows="1" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
+        ? html`<textarea key="thin" class="inbox-textarea inbox-textarea--chat" rows="1" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
             value=${md} onPaste=${handleImagePaste}
             onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); autoGrow(e.target); }}></textarea>`
-        : html`<div class="inbox-md-fallback">
+        : html`<div key="fallback" class="inbox-md-fallback">
             <textarea class="inbox-textarea" rows="3" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
               value=${md} onPaste=${handleImagePaste}
               onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); }}></textarea>
             <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
           </div>`}
-      <div class="inbox-composer-bar">
+      <div key="bar" class="inbox-composer-bar">
         <div class="inbox-bar-left">
           <label class="inbox-attach-btn" title=${t('inbox.attach')}>
             📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
           </label>
           <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} className="inbox-attach-btn"
             onRecorded=${addRecording} />
-          <button type="button" class="inbox-attach-btn" title=${expanded ? t('inbox.collapse') : t('inbox.expand')}
-            aria-pressed=${expanded} onClick=${() => setExpanded((v) => !v)}>${expanded ? '⤡' : '⤢'}</button>
+          <button type="button" class="inbox-attach-btn" title=${mode === 'rich' ? t('inbox.collapse') : t('inbox.expand')}
+            aria-pressed=${mode === 'rich'} onClick=${toggleBigEditor}>${mode === 'rich' ? '⤡' : '⤢'}</button>
         </div>
         <button class="btn-primary btn-sm" disabled=${sending || !recipient} onClick=${submit}>
           ${sending ? t('inbox.sending') : sendLabel}
