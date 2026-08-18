@@ -11,6 +11,11 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.16.0 -- 2026-08-19 -- MCP sessions expire after config.mcpSessionIdleMinutes without a
+ *     request. Each session holds a full McpServer (hundreds of tools, each with its Zod schema
+ *     graph) and died only on an explicit client DELETE, which most clients never send -- the
+ *     production heap held 17,815 live Zod check-closures and ~1 GB of schema graphs after four
+ *     hours. A reaped client gets the spec's 404 and re-initializes.
  *   v1.15.0 -- 2026-08-16 -- SECURITY: a revoked access token is refused at this door. POST
  *     /v1/mcp/token/revoke writes the JWT into the revocation list and answers {revoked:true}, and
  *     nothing here ever read that list, so a credential that was dead on every REST route stayed
@@ -159,6 +164,36 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     // the node's own HTTP surface (capability invocation) must use the CURRENT one, not the one
     // captured at initialize — otherwise they start answering AUTH_REQUIRED an hour into a session.
     const sessionTokens = new Map<string, { current: string | undefined }>();
+    // IDLE EXPIRY (memory trace 2026-08-19). Every session carries a full McpServer — hundreds of
+    // registered tools, each with its Zod schema graph — and until now a session died ONLY when the
+    // client sent DELETE. Most clients never do: a closed desktop app, a dropped connection or a
+    // restarted daemon just stops talking, so its server object stayed in `transports` forever.
+    // Production heap snapshot: 17,815 live Zod check-closures and ~1 GB of retained schema graphs
+    // after four hours. The sweep below closes any session with no request for
+    // config.mcpSessionIdleMinutes; a returning client gets the spec's 404 and re-initializes.
+    const sessionLastSeen = new Map<string, number>();
+    // Every 10 s: the scan is a Map walk over a handful of sessions, and a short interval is what
+    // lets the idle floor go sub-minute (the E2E proves expiry with a 6-second idle).
+    const SWEEP_EVERY_MS = 10_000;
+    const sweeper = setInterval(() => {
+        const cutoff = Date.now() - config.mcpSessionIdleMinutes * 60_000;
+        let reaped = 0;
+        for (const [id, t] of transports) {
+            const seen = sessionLastSeen.get(id) ?? 0;
+            if (seen < cutoff) {
+                reaped++;
+                // close() fires transport.onclose, which removes the session from every map.
+                void Promise.resolve(t.close()).catch(err =>
+                    logger.warn('MCP idle sweep: transport close failed; maps are cleaned regardless', { error: String(err) }));
+                transports.delete(id);
+                sessionChatInstances.delete(id);
+                sessionTokens.delete(id);
+                sessionLastSeen.delete(id);
+            }
+        }
+        if (reaped > 0) logger.info(`MCP idle sweep: closed ${reaped} session(s) idle over ${config.mcpSessionIdleMinutes} min (${transports.size} remain)`);
+    }, SWEEP_EVERY_MS);
+    sweeper.unref();
 
     async function createMcpServer(
         agentGaii: string,
@@ -317,6 +352,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
 
         if (sessionId && transports.has(sessionId)) {
             // Existing session — update lastSeen for session tracking
+            sessionLastSeen.set(sessionId, Date.now());
             const ciId = sessionChatInstances.get(sessionId);
             if (ciId) {
                 // notify:false — this heartbeat fires on every tool call, and a `chat` change event
@@ -486,6 +522,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 transports.delete(transport.sessionId);
                 sessionChatInstances.delete(transport.sessionId);
                 sessionTokens.delete(transport.sessionId);
+                sessionLastSeen.delete(transport.sessionId);
             }
         };
 
@@ -496,6 +533,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Store transport for session reuse (sessionId is generated during handleRequest)
         if (transport.sessionId) {
             transports.set(transport.sessionId, transport);
+            sessionLastSeen.set(transport.sessionId, Date.now());
             sessionTokens.set(transport.sessionId, tokenBox);
             if (chatInstanceId) {
                 sessionChatInstances.set(transport.sessionId, chatInstanceId);
@@ -511,6 +549,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             res.status(400).json({ error: 'Missing or invalid mcp-session-id header' });
             return;
         }
+        sessionLastSeen.set(sessionId, Date.now());
         const transport = transports.get(sessionId)!;
         await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse);
     };

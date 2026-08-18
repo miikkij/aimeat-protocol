@@ -676,6 +676,11 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   sameOwnerAutoApprove: boolean;
   /** F1: enforce per-agent scopes on the /v1/mcp tool surface (default true; false = warn-only). */
   mcpEnforceScopes: boolean;
+  /** Close an MCP session after this many minutes without a request (fractions allowed, floor
+   *  0.05 -- the sub-minute range exists for tests; run production at 30-120). Each session
+   *  holds a full tool catalog in memory, and most clients never send the DELETE that would
+   *  end it — they just stop talking. A reaped client re-initializes on its next call. */
+  mcpSessionIdleMinutes: number;
 
   // Ecosystem application (GEAI) scope bounds — parallel to the agent knobs above, so an operator
   // can bound ecosystem connections independently of agents.

@@ -570,6 +570,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Set false for a warn-only rollout: tools are still registered, but would-be-filtered
     // tools are logged so you can measure impact before enforcing.
     mcpEnforceScopes: process.env.AIMEAT_MCP_ENFORCE_SCOPES !== 'false',
+    mcpSessionIdleMinutes: Math.max(0.05, parseFloat(process.env.AIMEAT_MCP_SESSION_IDLE_MINUTES ?? '60') || 60),
 
     // Ecosystem application (GEAI) scope bounds. Defaults lean read + deposit (ecosystem apps mostly
     // deposit refined data into owner areas). Events/capability scopes are deferred to later chunks.

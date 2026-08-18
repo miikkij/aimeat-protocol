@@ -352,6 +352,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'metricsEnabled', dotPath: 'metrics.enabled', envVar: 'AIMEAT_METRICS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable Prometheus metrics endpoint' },
   { key: 'metricsAccess', dotPath: 'metrics.access', envVar: 'AIMEAT_METRICS_ACCESS', type: 'string', validate: v => ['public', 'authenticated', 'operator'].includes(v as string), immutable: false, description: 'Metrics endpoint visibility: public, authenticated, or operator' },
 
+  // ── MCP sessions (mutable) ──
+  { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
+
   // ── Registration (mutable) ──
   { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', validate: v => ['open', 'invite', 'closed'].includes(v as string), immutable: false, description: 'Who may get a new account: open (everyone), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
 
