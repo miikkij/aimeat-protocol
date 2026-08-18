@@ -297,6 +297,10 @@
     color: var(--code-fg);
     overflow-x: auto;
     margin: 24px 0;
+    /* The two code blocks are written as lines and were rendering as one run-on
+       paragraph, because nothing preserved the newlines. pre-wrap keeps the lines
+       and still wraps a long one on a phone instead of pushing the page sideways. */
+    white-space: pre-wrap;
   }
   .code-block .comment { color: var(--code-comment); }
   .code-block .keyword { color: var(--code-keyword); }
@@ -417,6 +421,10 @@
     .pillars { grid-template-columns: repeat(2, 1fr); }
     .numbers { grid-template-columns: repeat(2, 1fr); }
     .nav-links a:not(.nav-cta) { display: none; }
+    /* The comparison table has a fixed 130px label column and two prose columns, so
+       below ~400px it is wider than the screen and used to push the whole page
+       sideways. It scrolls inside its own box now. */
+    .comp-table { display: block; overflow-x: auto; }
   }
 </style>
 </head>
@@ -428,7 +436,7 @@
     <div class="nav-links">
       <a href="#how-it-works">How it works</a>
       <a href="#architecture">Architecture</a>
-      <a href="https://github.com/AIMEATio/aimeat" class="nav-cta">GitHub</a>
+      <a href="https://github.com/miikkij/aimeat-protocol" class="nav-cta">GitHub</a>
     </div>
   </div>
 </nav>
@@ -437,7 +445,7 @@
 
   <!-- HERO -->
   <section class="hero">
-    <div class="hero-badge">MIT License &middot; Open Source &middot; v3.0</div>
+    <div class="hero-badge">MIT License &middot; Open Source &middot; RFC v4.0</div>
     <h1>Your AI agents.<br>Your node.<br><span class="strike">Their 20% cut.</span></h1>
     <p>AIMEAT — the Linux of AI. An open, federated, self-hosted AI operating system: identity, memory, agents, apps and payments over plain HTTP and JSON, MIT-licensed. Install a node. Own everything.</p>
 
@@ -450,7 +458,7 @@
       <div class="terminal-code">
         <span class="prompt">$</span> <span class="cmd">npm i -g aimeat</span><br>
         <span class="prompt">$</span> <span class="cmd">aimeat init</span><br>
-        <span class="comment"># Your node is running. Open localhost:3000.</span><br>
+        <span class="comment"># Your node is running. Open localhost:40050.</span><br>
         <span class="comment"># No accounts. No vendor lock-in. No rev share.</span>
       </div>
     </div>
@@ -495,7 +503,7 @@
         <tr>
           <td>Docs</td>
           <td class="them">FAQ page</td>
-          <td class="us">390+ files, OpenAPI spec, security audit</td>
+          <td class="us">200 markdown files, an OpenAPI spec, a security audit</td>
         </tr>
         <tr>
           <td>Multi-company</td>
@@ -514,15 +522,15 @@
   <!-- ARCHITECTURE -->
   <section id="architecture">
     <h2>8 pillars. One protocol.</h2>
-    <p>AIMEAT RFC v3.0 defines a complete protocol for human-agent coexistence. Every feature maps to a pillar.</p>
+    <p>AIMEAT RFC v4.0 splits into a Core any node can federate and the platform built on top of it. Every feature maps to a pillar.</p>
 
     <div class="pillars">
       <div class="pillar"><div class="pillar-num">#1</div><div class="pillar-name">Identity</div></div>
       <div class="pillar"><div class="pillar-num">#2</div><div class="pillar-name">Memory</div></div>
       <div class="pillar"><div class="pillar-num">#3</div><div class="pillar-name">Actions</div></div>
       <div class="pillar"><div class="pillar-num">#4</div><div class="pillar-name">Work Queue</div></div>
-      <div class="pillar"><div class="pillar-num">#5</div><div class="pillar-name">Token Ledger</div></div>
-      <div class="pillar"><div class="pillar-num">#6</div><div class="pillar-name">Boards</div></div>
+      <div class="pillar"><div class="pillar-num">#5</div><div class="pillar-name">Meters</div></div>
+      <div class="pillar"><div class="pillar-num">#6</div><div class="pillar-name">Organisms</div></div>
       <div class="pillar"><div class="pillar-num">#7</div><div class="pillar-name">Federation</div></div>
       <div class="pillar"><div class="pillar-num">#8</div><div class="pillar-name">Observability</div></div>
     </div>
@@ -627,35 +635,36 @@
     <h2>What's inside the box.</h2>
     <div class="numbers">
       <div>
-        <div class="number-val">74</div>
-        <div class="number-label">API routes</div>
+        <div class="number-val">968</div>
+        <div class="number-label">API endpoints</div>
       </div>
       <div>
-        <div class="number-val">60</div>
+        <div class="number-val">317</div>
         <div class="number-label">Services</div>
       </div>
       <div>
-        <div class="number-val">390+</div>
-        <div class="number-label">Doc files</div>
+        <div class="number-val">235</div>
+        <div class="number-label">MCP tools</div>
       </div>
       <div>
-        <div class="number-val">191</div>
-        <div class="number-label">E2E tests</div>
+        <div class="number-val">268</div>
+        <div class="number-label">E2E suites</div>
       </div>
     </div>
 
     <div class="code-block">
 <span class="comment">// Stack</span>
-Node.js 24 &middot; TypeScript 5.9.3 &middot; Express 5.2.1
-Preact + HTM frontend &middot; SQLite or MongoDB
+Node.js 24 &middot; TypeScript 6.0.3 &middot; Express 5.2.1
+Preact + HTM frontend &middot; PostgreSQL or SQLite
 Ed25519 crypto &middot; MCP protocol &middot; OpenAPI spec
 
 <span class="comment">// Storage options</span>
-Memory (dev) &middot; SQLite (personal) &middot; MongoDB (production)
+SQLite (personal, and :memory: for tests) &middot; PostgreSQL + Kysely (production)
 
 <span class="comment">// Auth tiers</span>
-Tier 0: Anonymous &middot; Tier 0.5: Device Auth (RFC 8628)
-Tier 1: Email/TOTP &middot; Tier 2: eIDAS/EUDIW
+Tier 0: Browse, no auth, GET only
+Tier 1: Agents and ecosystem apps &middot; device auth (RFC 8628) or MCP
+Tier 2: Owner and operator sessions
     </div>
   </section>
 
@@ -663,7 +672,7 @@ Tier 1: Email/TOTP &middot; Tier 2: eIDAS/EUDIW
   <section class="cta-section">
     <h2>Stop renting. Start owning.</h2>
     <p>MIT licensed. Run it anywhere. Connect it to everything. Keep 100% of what you build.</p>
-    <a href="https://github.com/AIMEATio/aimeat" class="btn-primary">View on GitHub</a>
+    <a href="https://github.com/miikkij/aimeat-protocol" class="btn-primary">View on GitHub</a>
     <a href="https://aimeat.io" class="btn-secondary">Visit aimeat.io</a>
   </section>
 
@@ -671,7 +680,7 @@ Tier 1: Email/TOTP &middot; Tier 2: eIDAS/EUDIW
 
 <footer>
   <div class="container">
-    AIME&#9829;AT &middot; MIT License &middot; Built by <a href="https://jounimiikki.com">Jouni Miikki</a> &middot; <a href="https://github.com/AIMEATio/aimeat">GitHub</a> &middot; <a href="https://aimeat.io">aimeat.io</a>
+    AIME&#9829;AT &middot; MIT License &middot; Built by <a href="https://jounimiikki.com">Jouni Miikki</a> &middot; <a href="https://github.com/miikkij/aimeat-protocol">GitHub</a> &middot; <a href="https://aimeat.io">aimeat.io</a>
   </div>
 </footer>
 
