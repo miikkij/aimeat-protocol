@@ -1,5 +1,7 @@
 /**
  * @file workflows.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for Agent Workflows (Profile › Workflows tab). Wraps the
  *   /v1/workflows endpoints (list / get / blueprint / runs / run / health). All functions return
  *   the AIMEAT envelope; callers read `res.data`.

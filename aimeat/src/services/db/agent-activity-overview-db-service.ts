@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/agent-activity-overview-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the agent-card **Activity** subtab — the ONE call
  *   behind GET /v1/agents/:name/activity/overview. Opening the Activity tab fired SIX parallel requests
  *   across FIVE route domains (getActivity, getActivityLog, getDirectives, getWebhookConfig, getTelemetry,

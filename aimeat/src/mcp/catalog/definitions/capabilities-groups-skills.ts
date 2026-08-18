@@ -1,5 +1,7 @@
 /**
  * @file capabilities-groups-skills.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file organism-readme.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Read/write the organism-level free-form README — a markdown description (mermaid
  *   allowed) that explains what the organism is about, shown at the top of the organism home. Stored
  *   as a single creator-owned memory key `organism.{id}.meta.readme`, parallel to the per-workspace

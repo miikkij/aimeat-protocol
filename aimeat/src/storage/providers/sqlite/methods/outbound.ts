@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/outbound.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) implementation of the outbound door (recipient
  *   registry + send log). Schema: schema-tables-3.ts. Email lookups compare lower-cased,
  *   matching the unique index.

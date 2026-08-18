@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/ai-provenance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Postgres+Kysely implementation of the addressable AI provenance store (TARGET-058).
  *   Four methods, no update and no delete: a provenance record is an attributable statement about a
  *   specific set of bytes, so a correction is a NEW record about the new bytes.

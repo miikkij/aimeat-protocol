@@ -1,5 +1,7 @@
 /**
  * @file organism-namespace-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Who may read or write an `organism.{id}.*` key. Membership, the namespace role
  *   (meta = admin/creator write, shared = member, member.{owner} = self) and the consent layer,
  *   in one function that takes a caller rather than an Express request.

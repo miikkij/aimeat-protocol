@@ -1,5 +1,7 @@
 /**
  * @file goose.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Goose adapter. Goose keeps one YAML config with an `extensions` map and speaks
  *   Streamable HTTP natively, and it expands `${VAR}` inside header values from the merged
  *   env/env_keys map — so the agent token stays in the environment and never in the file.

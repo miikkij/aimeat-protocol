@@ -4,6 +4,8 @@ const html = htm.bind(h);
 
 /**
  * @file TagList.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical tag/chip row — renders a flex row of tag chips using the
  *   shared `.tag-cloud` + `.tag-pill` classes from css/components/tags.css, with an
  *   optional `+N` overflow pill when the list exceeds `max`. Consolidates the many

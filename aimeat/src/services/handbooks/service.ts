@@ -1,5 +1,7 @@
 /**
  * @file service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operating handbook for the v2 `service` surface (/v2/mcp/service · `aimeat connect
  *   serve --surface service`). Self-contained; tool list mirrors MCP_SURFACES.service.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file agent-capabilities-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation schemas for agent capability reporting endpoints
  * @version-history
  *   v1.1.0 -- 2026-05-22 -- Add modules_loaded and limitations fields

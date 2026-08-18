@@ -1,5 +1,7 @@
 /**
  * @file src/services/account-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one write door for "what has happened on this account". A curated set of call
  *   sites reports the things a person would want to be told about; this records them and keeps the
  *   window at 100.

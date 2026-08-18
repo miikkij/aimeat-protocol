@@ -1,5 +1,7 @@
 /**
  * @file src/services/organism-reputation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism reputation calculation service (Phase 3.4) — computes a weighted 0–1
  *   reputation score for an organism from member count, activity, trust, age, and flags, using
  *   log/cap normalization constants.

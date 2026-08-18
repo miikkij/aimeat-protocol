@@ -1,5 +1,7 @@
 /**
  * @file ai.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-level AI completion endpoint. Sibling of /v1/openrouter/complete
  *   but without the project-id gate: any logged-in owner (or agent with `ai:use`
  *   scope) can call it from a sandboxed app or extension. The actual completion,

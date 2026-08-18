@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-peer/peers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin Dashboard SPA view — sidebar layout with data preloading and tab components.
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.

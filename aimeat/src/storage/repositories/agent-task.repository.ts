@@ -1,5 +1,7 @@
 /**
  * @file agent-task.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for agent task CRUD, events, and stall detection
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1

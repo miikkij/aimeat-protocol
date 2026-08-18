@@ -1,5 +1,7 @@
 /**
  * @file tab-agent-config.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent Config tab -- platform-specific config files with preview
  *   and two-way sync. Shows files pushed by the agent (soul.md, AGENTS.md, etc).
  *   Supports edit, copy, download, and upload actions.

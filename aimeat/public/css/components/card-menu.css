@@ -1,5 +1,7 @@
 /**
  * @file public/css/components/card-menu.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The dots in the top right corner of a card, and the menu they open.
  *
  *   Its own file under css/components/ because that is the directory spa.html actually loads.

@@ -1,5 +1,7 @@
 /**
  * @file federation-tiers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source of truth for federation peer TIERS and the permission
  *   flags each tier grants. A peer's `tier` decides what it may do on the network;
  *   `deriveTierFlags(tier)` returns the canonical flag set so the literals live in

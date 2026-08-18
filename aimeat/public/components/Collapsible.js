@@ -4,6 +4,8 @@ const html = htm.bind(h);
 
 /**
  * @file Collapsible.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical expand/collapse (chevron) section — a clickable header
  *   (title + a chevron that rotates 180° when open) with its body rendered only
  *   while open. CONTROLLED component: the parent owns the `open` state and is

@@ -1,5 +1,7 @@
 /**
  * @file presence-store.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared client-side presence store powering the `usePresence(ghii)`
  *   hook. Every <PresenceDot> in a list subscribes here; the store COALESCES all
  *   ghiis requested within one tick into a single batched GET /v1/presence call —

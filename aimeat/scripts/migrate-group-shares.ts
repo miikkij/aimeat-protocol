@@ -1,5 +1,7 @@
 /**
  * @file scripts/migrate-group-shares.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Turn every `visibility:'group'` memory record into a key-space share.
  *
  *   WHY THIS IS A SCRIPT AND NOT A BOOT STEP. It creates access rights, and access rights should not

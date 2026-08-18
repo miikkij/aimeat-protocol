@@ -1,5 +1,7 @@
 /**
  * @file scaffold.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Scaffold utility for `aimeat init`, `aimeat update`, and start-time self-heal.
  *   Copies runtime assets (public/, locales/, static/) into a target directory with a
  *   checksum manifest, so the server's CWD-first asset copies stay in sync with the

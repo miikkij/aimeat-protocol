@@ -1,5 +1,7 @@
 /**
  * @file attach.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connecting an account by SUPPLYING a credential rather than by an authorization
  *   round (TARGET-057). The other half of the connect surface, and the one that existed as a
  *   provider entry before it existed as a route.

@@ -1,5 +1,7 @@
 /**
  * @file group-shares.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Key-space shares: the decision engine behind "this owner lets this group read this
  *   key pattern". One place answers all three questions the table exists for — may this principal
  *   create a share, is this key covered for this reader right now, and what does each side see.

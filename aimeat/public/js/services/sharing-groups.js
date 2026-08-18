@@ -1,5 +1,7 @@
 /**
  * @file sharing-groups.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for sharing group operations.
  *   Provides list/get/create/update/delete for groups and add/update/remove for members.
  * @structure

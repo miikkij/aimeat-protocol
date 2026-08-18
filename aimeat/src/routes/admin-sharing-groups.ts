@@ -1,5 +1,7 @@
 /**
  * @file admin-sharing-groups.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin endpoints for cross-owner sharing group overview.
  *   Lists all sharing groups on the node with member and entry counts.
  * @version-history

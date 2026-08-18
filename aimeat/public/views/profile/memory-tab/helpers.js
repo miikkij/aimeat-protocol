@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/memory-tab/helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure presentation helpers for the Memory tab — byte/relative-time formatting,
  *   hierarchical key grouping (group id / short token / shortened remainder), and the shared
  *   visibility option list. Extracted from memory-tab.js to satisfy max-file-lines.

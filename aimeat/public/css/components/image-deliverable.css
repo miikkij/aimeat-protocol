@@ -1,5 +1,7 @@
 /**
  * @file image-deliverable.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the shared ImageDeliverable renderer (/components/ImageDeliverable.js):
  *   size-capped, click-to-open image thumbnails plus the loading / failure chips, used across the
  *   task, memory, offers/inbox, and workflow surfaces. Theme-variable driven (no dark-only rgba).

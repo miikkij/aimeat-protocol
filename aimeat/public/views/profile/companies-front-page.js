@@ -1,5 +1,7 @@
 /**
  * @file companies-front-page.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "what does this address serve" section of a company card: the kind selector,
  *   the app picker, the redirect field, and — for kind 'portfolio' — the editor that publishes
  *   a standalone HTML page straight to the company's address.

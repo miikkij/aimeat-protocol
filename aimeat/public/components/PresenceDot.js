@@ -1,5 +1,7 @@
 /**
  * @file PresenceDot.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical presence/availability indicator — a small colored dot
  *   (optionally with a text label) showing whether a person is reachable. Drop it
  *   next to any avatar/name across views (inbox, organism members, directory).

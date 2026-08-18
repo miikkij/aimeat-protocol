@@ -1,5 +1,7 @@
 /**
  * @file css/components/hello-mcp.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the Hello MCP panel (`.hm-*`) and the organism instruction block
  *   (`.ib-*`). Both are onboarding surfaces, so the visual job is to make ONE thing obviously
  *   next at any moment: the proof step is the only one with an accent edge, and the pass state

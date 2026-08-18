@@ -1,5 +1,7 @@
 /**
  * @file agent-face.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Agent Face convention: a published app's markdown read-surface for agents.
  *   An app publishes ONE public memory record `apps.{filename}.agentface` (a markdown string,
  *   ≤ 256 KB) under the app owner's GHII — the same record family as the WebMCP tool manifest

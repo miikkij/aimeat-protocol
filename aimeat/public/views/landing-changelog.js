@@ -1,5 +1,7 @@
 /**
  * @file landing-changelog.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node's change log on the landing page: what the people running this node
  *   shipped, newest first. Folded by default so it costs one line — the fold shows the freshest
  *   entry, and opening it reveals the scrollable history. Data is a plain file (/changelog.json)

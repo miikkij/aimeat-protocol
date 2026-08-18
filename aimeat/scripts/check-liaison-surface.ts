@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-liaison-surface.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two surfaces outside this node that name its tools, and the signal that they
  *   have to be republished.
  *

@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/boards.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service layer for the Boards API — thin wrappers over /v1/boards*
  *   for board CRUD, membership/subscriptions, posts, and reactions.
  *

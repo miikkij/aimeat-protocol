@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-connect-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Step 2 of the home path: the prompt that turns the AI a person already talks to
  *   into an agent with its own way into their home (aimeat_remake/02-kayttajapolut.md, branch A).
  *

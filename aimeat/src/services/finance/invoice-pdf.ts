@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/invoice-pdf.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Invoice PDF rendering (pdfkit): the human-readable A4 document attached to
  *   invoice emails and downloadable from the API. Layout is a conventional Finnish
  *   invoice: parties top, line table middle, totals right-aligned, and the payment box

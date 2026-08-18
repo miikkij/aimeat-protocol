@@ -1,5 +1,7 @@
 /**
  * @file instances.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for instance management -- listing,
  *   creating, and checking instance status.
  * @version-history

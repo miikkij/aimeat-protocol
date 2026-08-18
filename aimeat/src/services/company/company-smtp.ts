@@ -1,5 +1,7 @@
 /**
  * @file src/services/company/company-smtp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A company's own sending identity: store it, read it back without the
  *   password, and build a nodemailer transport from it at send time.
  *

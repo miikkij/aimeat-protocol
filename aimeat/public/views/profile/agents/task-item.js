@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/agents/task-item.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single task row for the agent Tasks sub-tab: expand/collapse, todo plan,
  *   deliverable + per-task memory preview, start/cancel/delete/rate/triage actions, plus its
  *   helper renderers (status labels, JSON tree, memory entry, request-changes modal, blur

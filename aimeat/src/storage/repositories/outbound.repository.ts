@@ -1,5 +1,7 @@
 /**
  * @file outbound.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository contract for the outbound door: recipient registry CRUD and
  *   the append-only send log with the counters the daily limit is enforced from.
  *   Same discipline as finance.repository.ts: no method applies authorization, and

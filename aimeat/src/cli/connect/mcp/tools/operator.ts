@@ -1,5 +1,7 @@
 /**
  * @file operator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the operator config-enactment tools
  *   (aimeat_operator_agent_configure, aimeat_operator_ai_config) so `aimeat connect serve --surface
  *   agent` covers the full agent surface locally. The SERVER MCP versions run a propose-then-confirm

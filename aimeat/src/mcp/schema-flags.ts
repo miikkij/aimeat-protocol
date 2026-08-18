@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/schema-flags.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Argument shapes that MCP clients disagree about, defined once.
  *
  *   Clients differ in how they serialise arguments: some send JSON booleans, some send every value

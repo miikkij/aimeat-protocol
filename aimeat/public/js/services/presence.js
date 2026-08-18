@@ -1,5 +1,7 @@
 /**
  * @file presence.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AIMEAT Presence Service — thin API layer over /v1/presence/*. Read
  *   your own config + status, update it, and read viewer-scoped status for one or
  *   many identities. List/dot rendering should go through /js/presence-store.js

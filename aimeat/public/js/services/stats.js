@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/stats.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service that fetches node-level statistics from GET /v1/stats
  *   for display in the SPA.
  *

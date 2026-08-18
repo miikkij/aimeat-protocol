@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/schedules.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Scheduler domain for the Postgres+Kysely backend (ScheduledJob / ExecutionLog). Backs the
  *   cron scheduler + the agents-card next-run + execution history. Translated 1:1 from the Prisma
  *   implementation. Replaces the listScheduledJobs startup-compat placeholder.

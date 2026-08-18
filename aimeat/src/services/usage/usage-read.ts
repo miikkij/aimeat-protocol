@@ -1,5 +1,7 @@
 /**
  * @file src/services/usage/usage-read.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one read path over the serving layer. A caller names a REPORT and a scope; this
  *   resolves it to a declared cut, queries the precomputed rows, and returns them already grouped,
  *   sorted and totalled. Design: docs/internal/telemetria/02-design.md

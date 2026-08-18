@@ -1,5 +1,7 @@
 /**
  * @file extension-runtime.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description QuickJS WASM Sandbox Runtime for AIMEAT Extension Actions.
  *   Executes user-provided extension scripts in a sandboxed QuickJS engine
  *   compiled to WASM via `quickjs-emscripten`. The sandbox has NO access to

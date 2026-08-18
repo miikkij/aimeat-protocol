@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/fulfillment.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The commerce TASK fulfillment: create the agent TASK for one settled checkout line
  *   item. Extracted from session-service.ts (TARGET-034 phase B) so the app-tool resolver's
  *   task-path fulfillment — tools without a callable binding — reuses the exact same record shape

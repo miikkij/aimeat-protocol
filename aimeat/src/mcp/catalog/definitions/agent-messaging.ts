@@ -1,5 +1,7 @@
 /**
  * @file agent-messaging.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history

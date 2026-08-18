@@ -1,5 +1,7 @@
 /**
  * @file src/services/sharing-group-members.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Every write to a sharing group: creating one, and adding or removing a member.
  *
  *   A sharing group IS the boundary of who reads the owner's memory, so the operations that change

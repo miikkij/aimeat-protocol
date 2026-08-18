@@ -1,5 +1,7 @@
 /**
  * @file package.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Package domain repository interface — create, retrieve, update, and archive
  *   versioned package records. Each record represents a single version; all versions of
  *   the same package share a packageGroupId.

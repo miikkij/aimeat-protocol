@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/usage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation of usage telemetry's three layers: the hot call stream, the
  *   archive sweep, and the discriminated serving rollup with its transactional fold.
  *   Design: docs/internal/telemetria/02-design.md

@@ -1,5 +1,7 @@
 /**
  * @file app-templates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Authoring-template registry — the "booster kit" data. Curated starting points
  *   the app-prompt builders (app-catalog + landing) inject so the AI copies from a model instead
  *   of building from scratch. Templates are DATA: adding one is a new entry here (+ its content),

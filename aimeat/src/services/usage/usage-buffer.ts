@@ -1,5 +1,7 @@
 /**
  * @file src/services/usage/usage-buffer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one write door for the usage call stream. Every measured call anywhere in the
  *   node goes through `recordUsageCall`, which buffers in memory and flushes on an interval.
  *   Design: docs/internal/telemetria/02-design.md

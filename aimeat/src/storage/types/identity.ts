@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/identity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
  *   v1.2.0 — 2026-08-13 — AgentRecord.registeredBy: who asked for this agent. The node recorded it

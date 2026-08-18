@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/wallet.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for the wallet/morsel transaction ledger: append a
  *   transaction, read a principal's (or all) transaction history, and purge a principal's records —
  *   implemented per backend (SQLite/Prisma).

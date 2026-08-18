@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/node.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-backend-agnostic interface for node-level state: node keypair, maintenance
  *   mode, push subscriptions, trusted issuers, verification nonces, realtime rooms, site change log,
  *   extensions, escrow holds, and cortex extensions/lib files. Implemented per backend.

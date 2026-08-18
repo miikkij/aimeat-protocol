@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/outbound.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Postgres+Kysely implementation of the outbound door (recipient registry +
  *   send log). Schema: migrations/0027_outbound.sql. Email lookups compare lower-cased,
  *   matching the unique index — the same address with different casing is one contact.

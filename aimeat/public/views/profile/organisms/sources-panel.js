@@ -1,5 +1,7 @@
 /**
  * @file sources-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace Sources panel — references the workspace draws on (memory entries, storage
  *   files, knowledge packages; own or external/read-only). Pointers ONLY: nothing is copied or moved.
  *   Attach via a picker with Memory / Storage / Knowledge tabs. Extracted from organisms-tab.js with

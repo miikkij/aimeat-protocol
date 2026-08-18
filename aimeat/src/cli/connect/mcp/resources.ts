@@ -1,5 +1,7 @@
 /**
  * @file resources.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP resource providers for handbook, skill bundle, and reference
  *   docs. In multi-agent mode, resources use the registry's primary agent
  *   (single-agent installs are unaffected). Per-agent resource URIs

@@ -1,5 +1,7 @@
 /**
  * @file tab-directives.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Directives tab -- structured text editor for behavioral instructions.
  *   View mode shows formatted text; edit mode uses a single textarea.
  *   Memory areas, knowledge packages, and config files live in their own tabs.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-tool-interfaces.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The PINNED INTERFACE versioning for EXCHANGE app-tool offerings (TARGET-045, Gap 1 —
  *   cross-app selling). An app owner sells a named tool (e.g. `getCompanyBrief`) as a metered offering;
  *   a consumer contracts it and integrates against its I/O SCHEMA. The problem this solves: the provider

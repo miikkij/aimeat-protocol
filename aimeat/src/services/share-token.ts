@@ -1,5 +1,7 @@
 /**
  * @file share-token.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace-share session tokens. When a workspace's public share is in
  *   'password' access mode, a successful POST /workspace/share/unlock mints one of these
  *   time-limited EdDSA JWTs (org + ws baked in). The client then presents it on the NO-AUTH

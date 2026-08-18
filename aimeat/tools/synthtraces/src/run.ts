@@ -1,5 +1,7 @@
 /**
  * @file run.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Entry point for the SynthTraces self-play harness. Optionally
  *   boots an in-process AIMEAT node (sqlite, test mode), then runs N self-play
  *   sessions — each registers a fresh owner + agent, plays a persona against the

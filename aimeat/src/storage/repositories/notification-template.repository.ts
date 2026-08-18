@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/notification-template.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for localized notification templates: fetch by id+locale,
  *   upsert, list, and bulk-clear — implemented per backend (SQLite/Prisma).
  *

@@ -1,5 +1,7 @@
 /**
  * @file app-obfuscate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Obfuscate an app's inline <script> blocks at serve time (the `obfuscate`
  *   protection flag). Uses javascript-obfuscator with a CONSERVATIVE preset — mangled
  *   identifiers + string-array encoding, but NO control-flow flattening / dead-code

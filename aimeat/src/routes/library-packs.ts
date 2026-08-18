@@ -1,5 +1,7 @@
 /**
  * @file library-packs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves the library-pack registry — the per-library AI documentation surface
  *   of the Library Acceleration Program. GET /v1/library-packs returns the compact index
  *   (no aiDoc/changelog); GET /v1/library-packs/:id returns one pack WITH its full AI usage

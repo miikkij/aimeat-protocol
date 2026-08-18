@@ -1,5 +1,7 @@
 /**
  * @file package-seeder.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Auto-seeds the bundled example packages (digital-signage, aimeat-iam, …) into the
  *   package catalog on server startup, so they are always available to install — every user on
  *   the node sees them in Profile → Packages without an operator running `aimeat seed`.

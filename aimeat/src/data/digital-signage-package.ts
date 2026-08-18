@@ -1,5 +1,7 @@
 /**
  * @file digital-signage-package.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Installable package for "digital-signage" — the AGENT-FACED digital signage system
  *   (Template 3, documents edition). Installing it from Profile > Packages registers a per-instance
  *   copy of BOTH apps (admin + kiosk); the owner launches the admin and configures WHICH organism +

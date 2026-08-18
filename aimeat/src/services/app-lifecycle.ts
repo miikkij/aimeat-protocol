@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The app-catalogue writes that are NOT a publish: the draft slot, the fork, and the
  *   delete. services/app-publish.ts owns "publish one version" for the same reason and after the same
  *   kind of drift; this file owns the other three acts.

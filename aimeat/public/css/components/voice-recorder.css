@@ -1,5 +1,7 @@
 /**
  * @file voice-recorder.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for /components/VoiceRecorder.js — the record button and its active state
  *   (pulsing dot, elapsed time, input-level meter, stop and cancel). Shared by the inbox composer and
  *   the OpenRouter settings transcription test, so it lives with the component rather than inside a

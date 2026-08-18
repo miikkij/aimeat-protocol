@@ -1,5 +1,7 @@
 /**
  * @file helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared pure helpers for the organisms tab modules — locale-aware date
  *   formatting, relative-time labels, avatar monograms, and the whole-organism ZIP export.
  *   Extracted from organisms-tab.js (no behaviour change) so every organism module shares

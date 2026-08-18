@@ -1,5 +1,7 @@
 /**
  * @file src/services/ai-provenance-page.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The READABLE provenance record — the page a person lands on after clicking the
  *   "How this was made" link on a visible AI label.
  *

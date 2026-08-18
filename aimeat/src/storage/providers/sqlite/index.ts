@@ -1,5 +1,7 @@
 /**
  * @file sqlite/index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite Storage implementation (better-sqlite3) of the full Storage
  *   interface. Synchronous prepared statements; schema created/migrated on
  *   construction via initializeSchema(). Backs `:memory:`, dev, and personal nodes.

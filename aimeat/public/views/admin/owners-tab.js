@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/owners-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab listing registered owners (name, display name, roles,
  *   agent count, created date) with operator actions to grant and revoke the operator role.
  *

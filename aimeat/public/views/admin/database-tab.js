@@ -1,5 +1,7 @@
 /**
  * @file database-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Database tab — operator storage-growth telemetry. Shows the LIVE per-table
  *   row counts (backend-specific server-side), the total + how it changed over the last hour / 24h / 7d
  *   (derived from the hourly snapshots the storage-stats core job captures), and a per-table table with a

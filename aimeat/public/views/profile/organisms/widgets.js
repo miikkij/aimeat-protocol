@@ -1,5 +1,7 @@
 /**
  * @file widgets.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism-domain widgets shared across the organisms tab modules. Currently the
  *   collapsible OKF-style structure-overview panel (used at organism and workspace level).
  *   Extracted from organisms-tab.js with no behaviour change.

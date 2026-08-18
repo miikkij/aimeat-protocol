@@ -1,5 +1,7 @@
 /**
  * @file src/services/file-text/index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Turns the three file formats people actually attach -- a spreadsheet, a Word
  *   document, a PDF -- into text a model can read.
  *

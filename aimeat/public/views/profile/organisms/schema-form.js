@@ -1,5 +1,7 @@
 /**
  * @file schema-form.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A form rendered from a JSON Schema — typed inputs (enum→select, integer→number,
  *   array→lines, boolean→checkbox, date/datetime→pickers, else text). Used by the workspace record
  *   spaces to add/edit drafts of any objectType. Extracted from organisms-tab.js, no behaviour change.

@@ -1,5 +1,7 @@
 /**
  * @file tab-usage.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent detail "Usage" tab — the first UI over the LLM usage ledger
  *   (LEDGER / TARGET-016). Shows this agent's priced per-call usage: totals (cost /
  *   tokens / calls), a by-model breakdown, and a recent-runs drill-down. Reads

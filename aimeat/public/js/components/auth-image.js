@@ -1,5 +1,7 @@
 /**
  * @file auth-image.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Image component that fetches via authenticated request and displays as blob URL.
  *   Browser <img> tags cannot send JWT Authorization headers, so this component
  *   fetches the image using the session JWT and renders it via an object URL.

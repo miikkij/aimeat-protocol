@@ -1,5 +1,7 @@
 /*
  * @file aimeat-game/board.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Competition and table styles for the aimeat-game kit: the leaderboard (sortable
  *   metrics, a highlighted "you" row, an empty state that reads as "nobody yet"), the responsive
  *   stat grid, the compact data table that scrolls inside its own container, and the showcase

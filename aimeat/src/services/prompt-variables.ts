@@ -1,5 +1,7 @@
 /**
  * @file src/services/prompt-variables.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Helpers for managed system prompts — substitute {{variable}} placeholders and
  *   resolve locale-specific prompt content from an Accept-Language header.
  *

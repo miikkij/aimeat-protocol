@@ -1,5 +1,7 @@
 /**
  * @file src/utils/fire-hook.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Fire-and-forget wrapper around the hooks service — runs hook handlers for an event
  *   asynchronously without blocking the caller, logging (rather than throwing) any failure.
  *

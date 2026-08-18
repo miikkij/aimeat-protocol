@@ -1,5 +1,7 @@
 /**
  * @file node-stats-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab showing real-time node statistics including uptime,
  *   request counts, tunnel metrics, mailbox stats, and security counters.
  * @version-history

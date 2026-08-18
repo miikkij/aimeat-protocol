@@ -1,5 +1,7 @@
 /**
  * @file app-commands.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description P5 (app layer) shared primitives: the COMMAND MANIFEST + mutation tiers that let an app
  *   expose a command interface agents read and call, gated by the SAME level→capability model the node
  *   uses for organisms/workspaces (services/iam/model.ts). An app's level schema is just a LevelSchema

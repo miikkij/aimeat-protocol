@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin/setup-html.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin setup page HTML — the password login page and the setup wizard
  *   (Login + Register tabs) served by the admin setup routes. Extracted from
  *   src/routes/admin.ts to satisfy max-file-lines.

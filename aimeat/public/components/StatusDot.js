@@ -4,6 +4,8 @@ const html = htm.bind(h);
 
 /**
  * @file StatusDot.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical status-indicator dot — a small colored circle whose
  *   color is driven by a semantic status token (online/healthy → success,
  *   syncing/pending → warn, error/offline → danger, idle/muted → text-muted).

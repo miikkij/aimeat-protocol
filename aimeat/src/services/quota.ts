@@ -1,5 +1,7 @@
 /**
  * @file quota.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Quota enforcement and overage charging — RFC §8.2, §8.4, §5.7.4, §15
  *
  * Memory:        default 10 MB total per agent, 10 morsels/MB/month overage

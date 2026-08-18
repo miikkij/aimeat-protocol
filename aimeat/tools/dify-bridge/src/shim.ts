@@ -1,5 +1,7 @@
 /**
  * @file shim.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Dify ↔ AIMEAT bridge shim. Receives AIMEAT capability-invoke webhooks
  *   (source.type 'manual') and translates them into a Dify Service API call, then maps the
  *   Dify response back into the { result } shape AIMEAT expects. This is the Direction-2

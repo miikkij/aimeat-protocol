@@ -1,5 +1,7 @@
 /**
  * @file Card.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical themed card container (.card). Renders an optional
  *   header (title/subtitle) and arbitrary children. The `variant` prop selects
  *   a tokenized modifier — `variant="glass"` adds `.card-glass` (the former

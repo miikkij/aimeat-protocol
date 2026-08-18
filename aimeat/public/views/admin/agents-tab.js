@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/agents-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Agents" tab (Preact + HTM): lists registered GAII agents with owner,
  *   trust score, morsel balance, and last-seen, and expands each row on demand to show full agent
  *   detail (capabilities + trust breakdown) fetched from the admin API.

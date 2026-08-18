@@ -1,5 +1,7 @@
 /**
  * @file aimeat-iam-package.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Installable package definition for "aimeat-iam" — an in-app role & permission
  *   (RBAC) system for an app OWNER to manage other users' rights. Delivered as a package
  *   (like digital-signage): installing it registers a per-instance copy of each component,

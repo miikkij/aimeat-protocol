@@ -1,5 +1,7 @@
 /**
  * @file docs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI subcommand: view documentation
  * @structure Reads cached handbook markdown from the connector config directory and prints overview or module docs.
  * @usage Called by `aimeat connect docs [module]`.

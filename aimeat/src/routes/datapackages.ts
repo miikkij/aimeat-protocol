@@ -1,5 +1,7 @@
 /**
  * @file src/routes/datapackages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The HTTP door onto the data-package contract — the one a browser app reaches, and
  *   the reason the browser library does not reimplement any of it.
  *

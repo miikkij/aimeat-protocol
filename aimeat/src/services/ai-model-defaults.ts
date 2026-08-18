@@ -1,5 +1,7 @@
 /**
  * @file ai-model-defaults.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One rule for picking a model, for every role: the owner's own setting, then the
  *   instance default, then nothing.
  *

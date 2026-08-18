@@ -1,5 +1,7 @@
 /**
  * @file src/config-types.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AimeatConfig and its supporting type/interface declarations
  *   (ExtensionHooks, RateLimits, OperatorConfig, LoadConfig* result types).
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports

@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/use-thread-ux.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Thread-pane UX hooks for the profile Inbox tab: useThreadAutoScroll (jump to the
  *   latest message on open / near-bottom follow / a single one-time jump when a NEW message arrives —
  *   never a sticky pin), useMobileComposerKeyboard (≤760px: publishes the on-screen keyboard's

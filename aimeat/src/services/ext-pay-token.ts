@@ -1,5 +1,7 @@
 /**
  * @file src/services/ext-pay-token.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-time invoke token for the priced-raw-call MONEY channel (design notes
  *   doc-r6tyr3o, decisions D1/D3). After a buyer settles `commercial.payMoney` through a checkout
  *   (kind 'ext-call'), the node mints a token bound to (buyerOwner, ext, action, currency, amount);

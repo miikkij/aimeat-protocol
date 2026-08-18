@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/step-branch-b.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Branch B (aimeat_remake/09-haara-b-teksti.md): the person made a welcome mat, and
  *   the app they made it in cannot open a connection. They need a different app before step 3.
  *

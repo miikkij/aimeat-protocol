@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/step-agent.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Step 2 of the home path: connect your first agent (aimeat_remake/
  *   02-kayttajapolut.md, branch A). This is where the person turns the AI they already talk to
  *   into something that can reach their home directly, instead of copying text back and forth.

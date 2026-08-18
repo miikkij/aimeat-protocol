@@ -1,5 +1,7 @@
 /**
  * @file capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for capability CRUD, invocation, and vouching.
  * @version-history
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)

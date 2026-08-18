@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/account-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Postgres implementation of the per-owner event window and its archive.
  * @structure accountEventMethods — append / list / listArchive / countArchive / trim
  * @usage Object.assign(PostgresKyselyStorage.prototype, accountEventMethods) in ../index.ts

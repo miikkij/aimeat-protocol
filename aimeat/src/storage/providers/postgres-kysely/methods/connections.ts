@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/connections.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Postgres+Kysely implementation of the outbound connection store (TARGET-057).
  *
  *   Two methods here are concurrency primitives rather than CRUD, and both exist because of failures

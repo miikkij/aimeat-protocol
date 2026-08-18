@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/actions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extension action execution routes — instance-scoped (/v1/ext/:extName/:instanceId/:actionId)
  *   and default (/v1/ext/:extName/:actionId). Each builds the sandbox ExtensionCtx (memory/fetch/wallet/
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to

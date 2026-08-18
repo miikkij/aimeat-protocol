@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/owner.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner, Agent, and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.5.0 — 2026-08-13 — …and `registeredBy`. It is carried through updateAgent rather than

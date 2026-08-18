@@ -1,5 +1,7 @@
 /**
  * @file src/services/personal-routing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Routes messages (action requests, work assignments, notifications, federation
  *   sync) to an agent hosted on a personal node. Delivers via the WebSocket tunnel when the
  *   node is online and awaits a response; otherwise queues to the agent's mailbox.

@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/doc-space.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A document-space tab for organism workspaces: the left section-tree index (with an
  *   Unsorted group + drag-to-file, inline rename, color tags, multi-part series collapse) and the
  *   main area showing the active document (view/edit) with comments. A pure render function driven

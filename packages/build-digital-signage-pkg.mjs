@@ -1,5 +1,7 @@
 /**
  * @file build-digital-signage-pkg.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generator for aimeat/src/data/digital-signage-package.ts. Reads the two standalone
  *   signage app sources in this folder and inlines them (escaped for a JS template literal) into the
  *   installable package definition, so installing "digital-signage" from Profile > Packages registers

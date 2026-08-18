@@ -1,5 +1,7 @@
 /**
  * @file groups.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for sharing group management -- creating,
  *   listing, viewing, and managing group membership.
  * @version-history

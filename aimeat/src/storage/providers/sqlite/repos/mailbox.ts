@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/mailbox.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite repository functions for personal-node mailbox items: CRUD over
  *   the `mailbox_items` table while keeping each personal node's `mailboxUsedBytes`
  *   quota counter in sync. Also carries maintenance-state persistence helpers.

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories-impl/memory-repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-AGNOSTIC memory repository — composes the {@link ../adapter/memory-adapter.js}
  *   primitives into domain read/write operations. This is the layer the old `repositories/*.ts`
  *   interfaces never had: real, shared composition (owner-scope union + GHII-first key dedup, subtree

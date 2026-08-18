@@ -1,5 +1,7 @@
 /**
  * @file src/services/intent-pool-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What a connected agent needs to know about its owner's intent pool, served by the
  *   node so a correction reaches every agent rather than the copies people pasted last month.
  *

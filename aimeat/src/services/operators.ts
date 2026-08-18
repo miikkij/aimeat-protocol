@@ -1,5 +1,7 @@
 /**
  * @file operators.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Who the operators of this node are.
  *
  *   The question was answered in three places and two of them disagreed with each other:

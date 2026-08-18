@@ -1,5 +1,7 @@
 /**
  * @file src/services/ai-provenance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE mint path for AI provenance records (TARGET-058). Everything that produces or
  *   accepts a statement about how content was made goes through mintProvenance() — there is
  *   deliberately no second way to write one, because a second way is how two subtly different

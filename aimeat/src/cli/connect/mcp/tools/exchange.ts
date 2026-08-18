@@ -1,5 +1,7 @@
 /**
  * @file exchange.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the EXCHANGE marketplace tools — parity with the server
  *   MCP (src/mcp/exchange.ts) so `aimeat connect serve --surface service|agent` exposes offering
  *   browse/detail, contract acceptance + list + pause/revoke, need post/browse, bidding, bid-accept and

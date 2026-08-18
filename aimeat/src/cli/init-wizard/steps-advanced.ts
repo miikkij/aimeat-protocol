@@ -1,5 +1,7 @@
 /**
  * @file src/cli/init-wizard/steps-advanced.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Economy + advanced-settings wizard steps (quotas, federation, consent, CORS, TOTP, matching, marketplace, realtime, extensions, app/portfolio origin) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
  *   v1.2.0 — 2026-08-08 — Ask whether THIS operator signed the EU Code of Practice and which

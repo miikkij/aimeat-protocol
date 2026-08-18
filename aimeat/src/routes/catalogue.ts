@@ -1,5 +1,7 @@
 /**
  * @file catalogue.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public (Tier-0) discovery catalogue — node-global, mostly unauthenticated listings of
  *   actions, agents, and boards, plus the people/organism directory and catalogue hash for federation
  *   sync. Node-global scans are cached (~30s) and invalidated by domain tags. Agents tagged `unlisted`

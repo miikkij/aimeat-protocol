@@ -1,5 +1,7 @@
 /**
  * @file src/services/email-verification-start.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Creates a pending 'registration' email verification (a 15-minute 6-digit code, stored
  *   hashed) and dispatches it when the node has email enabled. Two routes need exactly this and must
  *   stay identical: POST /v1/ghii (register with an address) and POST /v1/ghii/login/attach-email

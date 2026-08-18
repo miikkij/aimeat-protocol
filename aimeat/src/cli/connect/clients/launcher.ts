@@ -1,5 +1,7 @@
 /**
  * @file launcher.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generates the two small scripts a connected client needs, so a token never has to
  *   live inside a config file: a LAUNCHER that exports the agent token and starts the client in a
  *   sane working directory, and a HEADERS HELPER that prints an Authorization header on stdout for

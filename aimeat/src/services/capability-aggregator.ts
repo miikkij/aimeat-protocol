@@ -1,5 +1,7 @@
 /**
  * @file capability-aggregator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Background job that scans extensions, actions, and cortex modules
  *   to auto-create/update capability records.
  * @version-history

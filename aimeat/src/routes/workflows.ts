@@ -1,5 +1,7 @@
 /**
  * @file workflows.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-facing REST API for Agent Workflows — declared, ordered agent pipelines with
  *   per-step input/output signals (the abstraction the bare scheduler lacks: it shows "did it
  *   fire", a workflow shows "did it produce"). Definitions are stored in the owner's own memory

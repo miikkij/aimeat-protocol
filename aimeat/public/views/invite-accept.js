@@ -1,5 +1,7 @@
 /**
  * @file invite-accept.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public accept page for an EMAIL invitation. Reached via the emailed link
  *   /v1/invite?token=<token>. Loads the invitation (GET /v1/invitations/:token) and shows what the
  *   recipient is being invited to (organism + workspace roles + inviter). A NOT-yet-registered

@@ -1,5 +1,7 @@
 /**
  * @file register-capability.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-time owner setup: registers a webhook-backed ('manual') AIMEAT capability
  *   that points at the dify-bridge shim, so other AIMEAT agents can invoke a Dify workflow.
  *   See docs/integrations/dify-hello-integration.md §6c. Capability creation is owner-only,

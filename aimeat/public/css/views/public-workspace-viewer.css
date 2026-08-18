@@ -1,5 +1,7 @@
 /**
  * @file public-workspace-viewer.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the public (no-login) workspace document viewer. A two-column layout —
  *   table-of-contents sidebar + rendered markdown — that collapses to a single column on narrow
  *   screens, plus a print stylesheet so "Print / Save as PDF" produces a clean content-only page.

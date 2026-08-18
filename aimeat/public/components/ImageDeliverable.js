@@ -1,5 +1,7 @@
 /**
  * @file ImageDeliverable.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description ONE shared image detector + renderer for agent deliverables, used across every surface
  *   where an agent-produced value may be an image (task results, the memory viewer, the offers / Ask
  *   inbox deliverable preview, and workflow run/step results). A value counts as an image when it is a

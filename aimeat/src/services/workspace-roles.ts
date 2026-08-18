@@ -1,5 +1,7 @@
 /**
  * @file workspace-roles.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ONE shared implementation of organism workspace member roles — the "unified IAM"
  *   the grant/revoke/list surfaces all call, so there is no parallel ad-hoc mechanism. A workspace
  *   CREATOR (or an org admin acting on the creator's behalf) grants an approved member one of two

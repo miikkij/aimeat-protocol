@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-peer/promotion.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Peer promotion-eligibility metrics helper (Phase B). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)

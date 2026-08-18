@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/config.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-layer interface for persisting admin-editable config values (keyed by dot-path,
  *   stored under a "config:" prefix in the backend), implemented per backend (SQLite / Prisma).
  *

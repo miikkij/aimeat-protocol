@@ -1,5 +1,7 @@
 /**
  * @file agent-webhook.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interfaces for agent telemetry events and webhook delivery logs.
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation (Phase A push layer)

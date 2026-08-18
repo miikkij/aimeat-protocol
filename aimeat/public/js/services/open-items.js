@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/open-items.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Client for open items — the one list of what you are going to do here.
  *
  *   Thin over /v1/open-items. The one piece of logic it owns is handing an item to an agent, which

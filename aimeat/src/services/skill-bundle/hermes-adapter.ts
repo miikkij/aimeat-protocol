@@ -1,5 +1,7 @@
 /**
  * @file hermes-adapter.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Hermes (OpenClaw) runtime adapter for skill bundle generation.
  *   Produces aimeat-hermes bundle with SKILL.md, scripts/, and config/ directories.
  * @structure

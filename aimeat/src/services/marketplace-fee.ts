@@ -1,5 +1,7 @@
 /**
  * @file src/services/marketplace-fee.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The marketplace fee policy shared by every morsel sale flow (offer invoke,
  *   commerce checkout, app-store purchase, EE org sales): which percent applies and where the
  *   fee goes. Two destinations — `operator` credits the node operator's GHII (a real income

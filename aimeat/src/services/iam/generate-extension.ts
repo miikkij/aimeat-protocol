@@ -1,5 +1,7 @@
 /**
  * @file generate-extension.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Turn a validated app IAM design into an INSTALLABLE extension — the piece that
  *   changes "fork aimeat-iam and edit the JavaScript" into "declare the spec, get a gate".
  *

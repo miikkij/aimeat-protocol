@@ -1,5 +1,7 @@
 /**
  * @file agent-telemetry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for agent telemetry -- append and list telemetry events.
  *   Owners can access telemetry for any of their agents; agents can access their own.
  * @structure

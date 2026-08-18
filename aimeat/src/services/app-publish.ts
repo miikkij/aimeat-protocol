@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-publish.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE one act of publishing an app version. Three doors lead here — `POST /v1/apps`
  *   (inline base64), the presigned upload completion (`PUT /v1/upload/:token`, utype `app`), and
  *   `POST /v1/apps/:owner/:filename/publish-draft` — and after this file they differ only in how

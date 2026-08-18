@@ -1,5 +1,7 @@
 /**
  * @file public/js/components/tag-cloud.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Preact/HTM presentational component rendering a set of tags as clickable
  *   filter pills, with an optional "show all / fewer" cap and a clear button.
  *

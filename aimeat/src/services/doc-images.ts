@@ -1,5 +1,7 @@
 /**
  * @file doc-images.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Save-time normalization of embedded image URLs in workspace documents. A document's
  *   markdown may embed images as `![alt](/v1/storage/<key>)` or `![alt](/v1/memory/files/<key>)` — raw,
  *   owner-less paths that only load for the file's owner (the GET carries no owner + needs the caller's

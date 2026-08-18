@@ -1,5 +1,7 @@
 /**
  * @file public/components/useViewCSS.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description No-op hook kept only for call-site API compatibility. View CSS is now preloaded as
  *   <link rel="stylesheet"> in spa.html (BUILD_ID-stamped by portal.ts serveSpa), so no dynamic
  *   per-view CSS loading is needed.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-system-run.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Running one extension action with NOBODY PRESENT — the shared half of the two roads
  *   that do it: a schedule firing on a clock, and a workflow step reaching its turn.
  *

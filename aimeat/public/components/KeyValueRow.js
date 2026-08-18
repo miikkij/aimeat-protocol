@@ -4,6 +4,8 @@ const html = htm.bind(h);
 
 /**
  * @file KeyValueRow.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical key/value detail row — a label/value pair laid out as
  *   flex space-between with a muted label and an emphasized value, separated by
  *   a subtle bottom border. Backed by `.kv-row` / `.kv-label` / `.kv-value` in

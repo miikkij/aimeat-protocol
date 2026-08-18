@@ -1,5 +1,7 @@
 /**
  * @file src/services/chat-attachments.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What the person attached to this turn, turned into the two things a model takes:
  *   image blocks, and text quoted into the prompt.
  *

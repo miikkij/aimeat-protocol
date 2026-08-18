@@ -1,5 +1,7 @@
 /**
  * @file llm.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Inference providers for the two SynthTraces models, behind a
  *   provider-neutral conversation model (Turn[]) so each provider owns its wire
  *   format. The agent model uses tool calling; the persona model produces plain

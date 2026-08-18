@@ -1,5 +1,7 @@
 /**
  * @file src/utils/catalogue-hash.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Computes the SHA-256 federation catalogue hash used for change-detection between
  *   peers, hashing sorted "name:updatedAt" entries of CSMs marked federate:true (RFC v1.6 §13.11.3).
  *

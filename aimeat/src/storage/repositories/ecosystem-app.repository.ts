@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-app.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage interface for the GEAI (ecosystem application) principal and its
  *   "hello integration" handshake — the near-copy of the agent + device-auth repositories, minus
  *   tasks. Implemented by both backends (SQLite + MongoDB/Prisma).

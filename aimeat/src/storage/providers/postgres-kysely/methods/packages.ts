@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/packages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Package + Package-instance domains for the Postgres+Kysely backend. A Package row is one
  *   version of a package group (all versions share packageGroupId; the (packageGroupId, version) pair is
  *   unique); getLatestPublished returns the highest-version published row in a group. A PackageInstance

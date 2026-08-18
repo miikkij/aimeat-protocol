@@ -1,5 +1,7 @@
 /**
  * @file app-members.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The roster for an app's OWN members, owned by the node rather than by each app.
  *
  *   Six apps on this node grew their own copy of this and disagreed six ways, but the deciding

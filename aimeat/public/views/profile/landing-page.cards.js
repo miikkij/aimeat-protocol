@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/landing-page.cards.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
  *   2026-07-19 — Re-add the orphaned OpenRouter Settings item (route id 'generator') to the Build & Share

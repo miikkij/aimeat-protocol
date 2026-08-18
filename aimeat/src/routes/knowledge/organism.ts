@@ -1,5 +1,7 @@
 /**
  * @file src/routes/knowledge/organism.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism-facing knowledge package routes — contribute a package to an organism,
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.

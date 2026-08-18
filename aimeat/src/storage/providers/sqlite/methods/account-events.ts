@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/account-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite method group for the per-owner event window (AccountEventRepository). Thin
  *   async wrappers over ../repos/account-events.ts, which holds the SQL.
  * @structure accountEventMethods

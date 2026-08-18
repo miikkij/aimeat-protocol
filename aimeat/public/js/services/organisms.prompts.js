@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/organisms.prompts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Copy-paste prompts that teach an AI/agent how to use a specific organism workspace —
  *   the human/agent "access" prompt and the "contract agent" build prompt, each with this
  *   workspace's real structure and ids inlined. Extracted from organisms.js.

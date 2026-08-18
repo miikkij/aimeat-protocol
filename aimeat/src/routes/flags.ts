@@ -1,5 +1,7 @@
 /**
  * @file src/routes/flags.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Content-flagging (moderation report) API. Lets authenticated principals flag
  *   memory, board posts, actions, or agents with a reason, and moderators review flags —
  *   resolving organism-scoped moderation config when a flagged memory key belongs to an organism.

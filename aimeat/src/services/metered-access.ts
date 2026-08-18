@@ -1,5 +1,7 @@
 /**
  * @file src/services/metered-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE chokepoint for "may this principal make this priced call, and what does it cost?".
  *
  *   Every priced capability on this node is reachable through several doors: the raw extension route,

@@ -1,5 +1,7 @@
 /**
  * @file tracked-classify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Tracked Response triage — the records-oriented analog of the notebook document
  *   classifier. Given an inbox message and the caller's organisms → workspaces → RECORD types, asks the
  *   caller's own model to choose the single best place for the message AS AN ACTIONABLE RECORD: which

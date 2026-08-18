@@ -1,5 +1,7 @@
 /**
  * @file app-template-proposals.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for agent-proposed app templates (AppDev KB Phase 6):
  *   aimeat_app_template_propose (upsert; call after a successful publish, model mandatory),
  *   aimeat_app_template_list, aimeat_app_template_get (adds the source app's LIVE commerce

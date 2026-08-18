@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/subdomain-sites.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Subdomain-site mapping domain for the Postgres+Kysely backend (SubdomainSite table, keyed
  *   by unique `subdomain`). Maps a subdomain to an app or redirect target. Translated 1:1 from Prisma.
  * @version-history

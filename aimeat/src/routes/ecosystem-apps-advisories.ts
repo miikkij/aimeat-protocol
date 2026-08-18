@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ecosystem-apps-advisories.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The advisory approval gate (B7) and delivery (B8): the owner's surface to the
  *   pending advisories a recipe with requireApproval parked, plus the approve/reject decision.
  *   Extracted from ecosystem-apps.ts by pure move to satisfy max-file-lines — the three routes and

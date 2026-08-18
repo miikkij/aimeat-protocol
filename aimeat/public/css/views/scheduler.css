@@ -1,5 +1,7 @@
 /**
  * @file scheduler.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the Profile › Scheduler master view (scheduler-tab.js)
  *   and the agent Schedules sub-tab (agents/tab-schedules.js). Prefix: sch-.
  *   Theme-token driven (no hardcoded colors) so it flips with dark/light mode.

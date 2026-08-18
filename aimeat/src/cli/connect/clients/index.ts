@@ -1,5 +1,7 @@
 /**
  * @file index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description `aimeat connect client <id>` — one command that points a chat client at this node:
  *   it authorizes a dedicated agent into its own connector home, writes the client's MCP config,
  *   and leaves a launcher that supplies the token at run time. The point is that talking to AIMEAT

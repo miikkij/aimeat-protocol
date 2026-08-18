@@ -2,6 +2,8 @@ import { scrypt, randomBytes, timingSafeEqual } from 'node:crypto';
 
 /**
  * @file password.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Password hashing with scrypt. Uses versioned hash format for forward
  *   compatibility: v2 hashes use stronger parameters (N=32768), legacy hashes (no prefix)
  *   use Node.js defaults (N=16384). Transparent upgrade on successful login.

@@ -1,5 +1,7 @@
 /**
  * @file public/js/components/tag-editor.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Preact + HTM inline tag editor — renders removable tag pills plus an input
  *   to add new tags, enforcing a max count and 64-char cap, and reports every change via onSave.
  *

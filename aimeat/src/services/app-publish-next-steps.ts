@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-publish-next-steps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What is still missing from a freshly published app, told in the one place the
  *   publisher is guaranteed to read: the publish response.
  *

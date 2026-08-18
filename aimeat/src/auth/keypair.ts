@@ -1,5 +1,7 @@
 /**
  * @file src/auth/keypair.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Ed25519 keypair primitives (@noble/ed25519) used across the node for signing:
  *   generates base64 keypairs and signs/verifies UTF-8 messages (federation advisories, JWT-adjacent
  *   signatures, personal-node anchoring).

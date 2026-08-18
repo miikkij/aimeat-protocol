@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-app.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) implementation of the EcosystemAppRepository — the GEAI
  *   principal records (`ecosystem_apps`) and the "hello integration" handshake requests (`eco_auth`).
  *   Near-copy of the agent + device-auth SQLite repos, minus tasks. JSON columns: scopes, dataAreas,

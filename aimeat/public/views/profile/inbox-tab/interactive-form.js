@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/interactive-form.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two renderers for an interactive message: InteractiveForm (the questions a
  *   broadcast asks, with single/multi select and an "other" free-text box) and InteractiveAnswered
  *   (the read-only summary once the person has answered).

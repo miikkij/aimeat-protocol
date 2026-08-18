@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/scheduler.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for scheduled jobs and their execution logs — the
  *   backend-agnostic repository shape each provider implements for the job scheduler.
  *

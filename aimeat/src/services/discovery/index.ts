@@ -1,5 +1,7 @@
 /**
  * @file index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Barrel for the discovery (master directory) service. Re-exports the Phase 0 building
  *   blocks — types, normalizer, classifier, registry, facet helpers — so consumers import from one
  *   path. Later phases add the FTS/table source adapters and the `/v1/discover` route on top of these.

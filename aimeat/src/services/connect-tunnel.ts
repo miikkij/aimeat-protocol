@@ -1,5 +1,7 @@
 /**
  * @file connect-tunnel.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description ConnectTunnelManager — server side of the Connector Forward
  *   Tunnel. Holds one persistent WebSocket per connected PRINCIPAL — an agent
  *   (a GAII, `agent#owner@node`) OR an ecosystem app (a GEAI, `eco:app#owner@node`).

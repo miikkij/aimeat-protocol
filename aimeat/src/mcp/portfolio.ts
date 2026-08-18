@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/portfolio.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description `aimeat_portfolio_publish` — the person's own welcome page, written by their AI.
  *
  *   The moment this exists for: somebody says "make my welcome page better" in their chat, and the

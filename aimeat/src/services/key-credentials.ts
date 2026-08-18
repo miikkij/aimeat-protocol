@@ -1,5 +1,7 @@
 /**
  * @file key-credentials.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description First-login credential issuance for provisioned-code ("key") accounts. A code key
  *   provisions an account whose emailed code IS its bootstrap password (see routes/organisms.ts).
  *   That code carries a leading "EXChex-" (a dash) and was never run through the strength validator,

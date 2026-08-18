@@ -1,5 +1,7 @@
 /**
  * @file Modal.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reusable modal and confirm dialog components (Preact + HTM).
  * @structure
  *   - Modal: generic overlay dialog (Escape / backdrop close)

@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-serve-marks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE one pass that adds the node's marks to a published app document on its way out.
  *
  *   WHY IT EXISTS. Four separate injectors used to run in sequence — the aimeat.io attribution

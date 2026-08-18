@@ -1,5 +1,7 @@
 /**
  * @file package-hash.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Utility for computing SHA-256 content hashes of AIMEAT components.
  *   Used by the package system to detect user customizations after installation.
  * @structure

@@ -1,5 +1,7 @@
 /**
  * @file calibrator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Prompt Calibrator API — CRUD for calibration projects, versions, and batches.
  *   V2 uses a batch-based 4-step flow: Generate → Analyze → Reflect → Synthesize.
  * @structure

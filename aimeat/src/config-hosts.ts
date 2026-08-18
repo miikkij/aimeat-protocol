@@ -1,5 +1,7 @@
 /**
  * @file config-hosts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description How the origin-family hosts are derived from the node's baseUrl: the app
  *   origin (`apps.<apex>`), the standalone-portfolio origin (`portfolio.<apex>`) and the
  *   company origin (`co.<apex>`). One rule in one place — each family is an apex subdomain

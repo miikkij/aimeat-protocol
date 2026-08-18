@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Auth, OAuth, device/eco authorization, consent, and identity-verification record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)

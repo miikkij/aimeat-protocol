@@ -1,5 +1,7 @@
 /**
  * @file public/css/views/transparency.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styling for the public AI transparency page (views/transparency.js, TARGET-058
  *   Phase 10). Every colour, space and radius is a theme.css token, so the page reads in both
  *   themes and carries no hardcoded brand hex; nothing here is `rgba(255,255,255,…)`, which is

@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/memory-tab/file-helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure file helpers for the Memory tab — mime/extension categorization, category
  *   icons, authenticated blob fetch, and owner_gaii-aware byte-URL builders. Extracted from
  *   memory-tab.js to satisfy max-file-lines.

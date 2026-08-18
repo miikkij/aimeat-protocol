@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/agent.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-backend-agnostic interface for agent (GAII) persistence: CRUD/lookup by
  *   gaii, name, or owner, plus atomic morsel-balance operations (debit/credit/capped-credit/transfer).
  *   Each backend (SQLite, MongoDB, PostgreSQL) implements this contract.

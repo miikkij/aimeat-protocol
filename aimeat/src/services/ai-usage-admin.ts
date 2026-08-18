@@ -1,5 +1,7 @@
 /**
  * @file ai-usage-admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only cross-user AI-apps spend: a per-day series with a per-app split, grand
  *   per-app totals, per-user top spenders, and overall totals.
  *

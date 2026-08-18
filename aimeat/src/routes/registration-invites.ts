@@ -1,5 +1,7 @@
 /**
  * @file src/routes/registration-invites.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The agent door (aimeat_remake/12-ai-rekisteroi.md): POST /v1/registration-invites.
  *
  *   An AI makes ONE call with a person's email address. The node emails that address a link; the

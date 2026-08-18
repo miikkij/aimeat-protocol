@@ -1,5 +1,7 @@
 /**
  * @file crew-def-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation for the DECLARATIVE crew-def documents an app manifest may carry
  *   under `cortex.agents` (Agent-Bundled Apps, Slice 1). A crew-def is the crewaimeat crew_def
  *   JSON shape (agents/tasks/tool-names/llm-profile/skills) — DATA, never code. The node only

@@ -1,5 +1,7 @@
 /**
  * @file subdomain-admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only CRUD for subdomain mappings (`/v1/admin/subdomains`). Split from
  *   subdomains.ts, which serves them: managing which label points where and answering a request
  *   on that label are different jobs, and only the serving half is on the request hot path.

@@ -1,5 +1,7 @@
 /**
  * @file sdk-serve.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serving glue for the migrated SDK libraries. Each /v1/libs/aimeat-<name>.js route
  *   serves the committed, node-independent esbuild IIFE bundle (src/static/sdk-libs/dist/) with a
  *   tiny per-node config prelude prepended — `window.__AIMEAT_SDK_CFG__ = {…}` — which _core/config.js

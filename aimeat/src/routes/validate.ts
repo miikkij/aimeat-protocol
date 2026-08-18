@@ -1,5 +1,7 @@
 /**
  * @file src/routes/validate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Dry-run validation endpoint — POST /v1/validate checks an arbitrary request body
  *   against the Zod schema mapped to a given endpoint+method, letting clients pre-validate before
  *   committing a real call.

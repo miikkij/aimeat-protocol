@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/ecosystem-tab.helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure helpers + constants for the Ecosystem apps tab (scope presets, outbound events,
  *   key fingerprint, cadence⇄cron maps, trigger-glob / schedulable / cadence derivations,
  *   recommended-agent matching, organism-name resolution). Extracted from ecosystem-tab.js to

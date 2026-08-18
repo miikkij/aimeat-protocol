@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/panels.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The fixed panels + chrome of the organism workspace view: the grouped tab nav, the
  *   add-document-space form, the Settings panel (manifest form, spaces, process/restructure, danger
  *   zone), the public Share tab, the Review (publish-gate + approvals) tab, and the Activity tab.

@@ -1,5 +1,7 @@
 /**
  * @file operator-config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator config-enactment MCP tools (Claude-as-operator, Phase 3).
  *   Every WRITE follows PROPOSE-THEN-CONFIRM: called without confirm_token the tool
  *   applies nothing — it returns { current, proposed, diff, confirm_token } for the

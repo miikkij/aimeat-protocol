@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/node-ext-escrow.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node-level extension / cortex / escrow domain for the Postgres+Kysely backend:
  *   WASM extensions (Extension), per-owner extension instances (ExtensionInstance), generic escrow
  *   holds (EscrowHold), and manifest-based cortex extensions + their lib files (CortexExtension /

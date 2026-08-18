@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation barrel router — composes the peer, sync, settlements, genesis, and auth
  *   sub-routers into one mountable router, and re-exports shared federation helpers for back-compat.
  *

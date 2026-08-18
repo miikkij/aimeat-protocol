@@ -1,5 +1,7 @@
 /**
  * @file appdev-research.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP research surface for building apps ON AIMEAT: aimeat_appdev_overview —
  *   the one call an agent makes BEFORE framing a build. Returns compact indexes (owner's
  *   apps, library packs with per-model proofs, T1/T2/T3 templates, skills, curated +

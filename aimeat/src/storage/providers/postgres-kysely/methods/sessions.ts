@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/sessions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Session domain for the Postgres+Kysely backend (Session table): JWT-tracking sessions,
  *   owner refresh-token sessions (rotating hashes, idle+absolute windows), and revocation. Translated
  *   1:1 from the Prisma implementation. Backs POST /v1/auth/token and the owner refresh flow.

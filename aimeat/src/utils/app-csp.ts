@@ -1,5 +1,7 @@
 /**
  * @file src/utils/app-csp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one Content-Security-Policy a published AIMEAT app runs under, wherever it is
  *   served from: the app origin (`<sub>.apps.<apex>`), the /v1/apps inline route, and the draft
  *   preview. Kept in a single module because the policy used to exist as three hand-copied string

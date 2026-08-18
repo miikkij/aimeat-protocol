@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ghii/web-verify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GHII web-registration + email/magic-link login routes: POST /v1/ghii/register-web,
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.

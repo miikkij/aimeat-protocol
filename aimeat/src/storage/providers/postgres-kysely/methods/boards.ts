@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/boards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Boards domain for the Postgres+Kysely backend (Board / BoardPost / BoardSubscription).
  *   Each organism owns a board (organism creation calls createBoard), so this unblocks POST /v1/organisms
  *   and the boards API. Translated 1:1 from the Prisma implementation. The business key is `boardId`

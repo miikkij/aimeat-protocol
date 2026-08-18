@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agent-tasks/lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-task lifecycle routes (update, delete, queue, start, propose-todos, request-changes, pause). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
  *   v1.3.0 — 2026-08-16 — POST .../queue: the exit a draft never had. Reported by crewaimeat-dev,

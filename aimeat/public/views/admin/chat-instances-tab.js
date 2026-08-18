@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/chat-instances-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for AI chat instances and operator channels:
  *   lists active chat sessions (with delete), and manages `ops:`-prefixed operator
  *   boards with an inline live chat panel that polls posts every 5s.

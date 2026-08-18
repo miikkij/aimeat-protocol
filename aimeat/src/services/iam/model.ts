@@ -1,5 +1,7 @@
 /**
  * @file model.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The shared IAM level/capability PRIMITIVES — one model used by platform structures
  *   (organism, workspace) AND, later, by apps (their own owner-defined schemas) and the node. This is
  *   Phase 1 of the IAM rework: PURE, ADDITIVE, ZERO enforcement change. Nothing here is wired into a

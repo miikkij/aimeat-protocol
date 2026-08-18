@@ -1,5 +1,7 @@
 /**
  * @file readiness-scorer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Composite readiness score: onboarding baseline * operational health.
  *   Baseline is set once when onboarding completes (9 pts per required step, 10 bonus for services).
  *   Health is a 7-day rolling average of delivery, telemetry, and task completion signals.

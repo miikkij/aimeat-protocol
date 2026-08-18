@@ -1,5 +1,7 @@
 /**
  * @file agents.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent registration, device authorization, public profiles,
  *   owner-managed metadata, heartbeat, portability, and import/export routes.
  * @structure

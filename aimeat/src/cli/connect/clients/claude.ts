@@ -1,5 +1,7 @@
 /**
  * @file claude.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Claude Code and Claude Desktop adapters. They are the two clients that do NOT take
  *   a plain remote entry with a token in it:
  *     - Claude Code has `headersHelper`, a command whose stdout becomes the request headers. That

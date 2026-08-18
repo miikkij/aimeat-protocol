@@ -1,5 +1,7 @@
 /**
  * @file doc-solo.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Standalone single-document view, served at /v1/profile?doc=<org>:<ws>:<type>:<id>.
  *   Opened in its own window by the document "pop out" (⧉) button so several documents — from any
  *   document-space — can sit side by side, each independent (one window never closes another).

@@ -1,5 +1,7 @@
 /**
  * @file workflows.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools letting an agent author + operate Agent Workflows (declared, ordered agent
  *   pipelines with per-step input/output signals). Deliberately TIGHT — three tools: save, get,
  *   run. The full descriptor is passed as one `definition` object (validated server-side against the

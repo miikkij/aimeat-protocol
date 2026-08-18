@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-profile-tabs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pre-commit gate: every profile tab registered in profile.js must also have an
  *   entry in the sidebar menu (landing-page.cards.js). A tab that is registered but not
  *   listed is reachable ONLY by typing ?tab=<id> into the address bar — it renders fine, it

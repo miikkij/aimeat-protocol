@@ -1,5 +1,7 @@
 /**
  * @file agent-activity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation for recording and querying agent activity metrics
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1

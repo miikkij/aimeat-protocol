@@ -1,5 +1,7 @@
 /*
  * @file aimeat-game/progress.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Progression styles for the aimeat-game kit: the step rail, the labelled meter,
  *   the clickable score breakdown, badges, the coming-soon card, the animating counter and the
  *   streak tracker. Imported by /lib/aimeat-game.css — never linked on its own.

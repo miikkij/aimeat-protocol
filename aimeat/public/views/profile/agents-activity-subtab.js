@@ -1,5 +1,7 @@
 /**
  * @file agents-activity-subtab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Activity sub-tab for agent detail view.
  *   Shows stats summary cards (tasks completed, tokens used, success rate),
  *   daily activity chart with time range selector, scheduled jobs list,

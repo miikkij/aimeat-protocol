@@ -1,5 +1,7 @@
 /**
  * @file jwt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description EdDSA JWT minting/verification signed with the node's Ed25519 key, plus storage-backed
  *   token revocation. Issues credentials for every authenticated principal — owner (GHII), agent
  *   (GAII), and ecosystem app (GEAI). Optional claims (mcp_client, federated, eco_app, …) are threaded

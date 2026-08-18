@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/app-tool-catalog.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE priced-app-tool enumerator (TARGET-034 phase D): one shared scan of every
  *   PUBLIC apps.{appId}.tools manifest on the node, yielding normalized catalog entries every
  *   discovery surface renders from — the ACP product feed, the dedicated GET /v1/commerce/tools

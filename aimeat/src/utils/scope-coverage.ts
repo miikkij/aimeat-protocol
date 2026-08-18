@@ -1,5 +1,7 @@
 /**
  * @file src/utils/scope-coverage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "Does this principal already hold that scope?" — the one place that answers it,
  *   including the scopes a wildcard deliberately does NOT carry.
  *

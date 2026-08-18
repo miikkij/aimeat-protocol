@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/board.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository functions for boards — CRUD and (de)serialization
  *   for board records, posts, and subscriptions, with JSON-encoded array/object columns.
  *

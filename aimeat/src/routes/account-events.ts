@@ -1,5 +1,7 @@
 /**
  * @file src/routes/account-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The account's own record of what happened: read it, and — for an app acting under a
  *   grant — add to it. Design: docs/internal/telemetria/04-account-events.md
  *

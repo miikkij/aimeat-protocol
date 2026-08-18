@@ -1,5 +1,7 @@
 /**
  * @file track-response-modal.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "Track a response" modal, shared by the Inbox tab and the Notebook. The INTENT is
  *   formed entirely by AI (the records triage): on open it asks the caller's own model which organism
  *   → workspace → RECORD TYPE best fits this message (chosen generically from what each workspace

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/totp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Routes for TOTP two-factor authentication on GHII accounts: setup
  *   (generate secret + QR + backup codes), verify/activate, disable, and backup-code
  *   handling. Gated on config.totpEnabled and driven by the totp service; secrets are

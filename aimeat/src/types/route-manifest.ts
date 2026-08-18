@@ -1,5 +1,7 @@
 /**
  * @file src/types/route-manifest.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Route Manifest types and helpers — tracks the relay hop chain a work
  *   request travels through federation, for signed integrity and network-fee settlement
  *   (RFC v1.6 §13.12).

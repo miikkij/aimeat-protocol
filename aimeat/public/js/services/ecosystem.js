@@ -1,5 +1,7 @@
 /**
  * @file ecosystem.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AIMEAT Ecosystem Apps (GEAI) service — the owner-facing API layer for the profile
  *   "Ecosystem apps" tab. Wraps the /v1/ecosystem-apps + /v1/ecosystem endpoints (the GEAI
  *   onboarding handshake, the connected-app list, outbound event subscriptions, and revoke).

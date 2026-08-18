@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/internal.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SqliteInternals — signatures of the private deserialize/helper methods shared across SqliteStorage method groups. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)

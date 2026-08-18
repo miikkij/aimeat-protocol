@@ -1,5 +1,7 @@
 /**
  * @file tags.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared tag/chip styles — the canonical `.tag-pill` / `.tag-cloud` /
  *   `.tag-editor` classes backing the TagList component (/components/TagList.js).
  *   All colors come from theme tokens so chips flip correctly in dark mode.

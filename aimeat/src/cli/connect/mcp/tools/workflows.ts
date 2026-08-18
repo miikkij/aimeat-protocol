@@ -1,5 +1,7 @@
 /**
  * @file workflows.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the Agent Workflows tools — parity with the server
  *   MCP (src/mcp/workflows.ts) so `aimeat connect serve --surface agent` exposes the same
  *   save/get/run tools locally. Thin REST wrappers over /v1/workflows.

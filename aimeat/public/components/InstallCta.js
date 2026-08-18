@@ -1,5 +1,7 @@
 /**
  * @file InstallCta.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node's own "install this as an app" suggestion — the browser never makes one.
  *
  *   Rendered where a person already is (Home, the chat): a small dismissible card offering the

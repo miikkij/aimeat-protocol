@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/__tests__/cookie-consent.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Vitest unit tests for the cookie-consent middleware — verifies the consent banner
  *   snippet is injected into HTML responses before </body>, skipped for non-HTML/non-string bodies,
  *   and that categories/policy URL are reflected in the emitted CookieConsent.run() config.

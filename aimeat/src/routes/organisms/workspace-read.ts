@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/workspace-read.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Manifest-driven workspace read + read-only projections: the aggregated workspace read,
  *   OKF overviews, structure graphs, dangling-refs scan, structure timeline, content search, and the
  *   comments/threads endpoints. Extracted from src/routes/organisms.ts to satisfy max-file-lines.

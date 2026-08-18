@@ -1,5 +1,7 @@
 /**
  * @file draft-offer-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "draft my offer" guided prompt — the liaison half of the offers/workflows surface
  *   (doc-pho2b29 surface ②). An agent (or its owner) fetches this prompt, the agent's own LLM uses it
  *   to draft a valid offer descriptor (offering → optional pricing → optional workflow signals), and

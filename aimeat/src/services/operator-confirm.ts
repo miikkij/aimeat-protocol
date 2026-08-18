@@ -1,5 +1,7 @@
 /**
  * @file operator-confirm.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Propose-then-confirm tokens for operator config-enactment MCP tools.
  *   A config-WRITE tool called without a confirm token returns a structured proposal
  *   (current state, proposed state, diff) plus a short-lived single-use token bound to

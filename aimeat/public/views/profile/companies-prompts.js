@@ -1,5 +1,7 @@
 /**
  * @file companies-prompts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The three copy-paste prompts the Companies tab hands to an AI chat: fill in the
  *   company's details, build its public page, and build it an app. Each one names the exact
  *   AIMEAT MCP tools to call, so a chat with the connector does the work directly instead of

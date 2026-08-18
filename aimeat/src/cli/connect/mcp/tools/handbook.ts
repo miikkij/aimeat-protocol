@@ -1,5 +1,7 @@
 /**
  * @file handbook.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registration for retrieving the agent operating handbook,
  *   with optional module-level drill-down.
  * @version-history

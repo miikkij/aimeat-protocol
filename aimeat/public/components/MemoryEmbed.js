@@ -1,5 +1,7 @@
 /**
  * @file MemoryEmbed.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Live memory embed for markdown documents: an ```aimeat-memory fenced block names a
  *   memory key and this component fetches it AT RENDER TIME and shows the value as a table /
  *   property list / list / value — so a document that references agent-produced data is fresh every

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-sync/routing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history

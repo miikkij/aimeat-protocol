@@ -1,5 +1,7 @@
 /**
  * @file structure-graph.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Deterministic STRUCTURED GRAPH of an organism or a single workspace — the data behind
  *   the interactive mindmap. Unlike the OKF structure overview (structure-overview.ts) which renders
  *   Markdown, this returns plain JSON nodes/edges the client turns into a clickable Mermaid diagram

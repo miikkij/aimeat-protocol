@@ -1,5 +1,7 @@
 /**
  * @file event-bus.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Process-local pub/sub bus for live updates. Two channels:
  *   `change` — coarse domain-string events broadcast to every SSE client (UI
  *   live refresh); `delivery` — agent-scoped targeted events carrying a full

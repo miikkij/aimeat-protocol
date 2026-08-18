@@ -1,5 +1,7 @@
 /**
  * @file offline.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The offline page's script, external because the node CSP refuses inline script.
  *   Picks the language (localStorage 'aimeat-lang' → navigator.language → en), fills the page
  *   texts, and writes notes into the intake queue that the chat drains when the connection is

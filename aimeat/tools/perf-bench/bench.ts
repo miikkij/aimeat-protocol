@@ -1,5 +1,7 @@
 /**
  * @file tools/perf-bench/bench.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Structural performance harness. Boots a real Storage backend, seeds a configurable
  *   dataset (owner + N agents + K owner memories + a workspace organism of R records each with V
  *   published versions), then runs the platform's hot operation CHAINS — not single ops — and reports,

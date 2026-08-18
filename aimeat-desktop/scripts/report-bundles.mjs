@@ -1,5 +1,7 @@
 /**
  * @file report-bundles.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Prints the installer artifacts produced by `tauri build` (paths +
  *   sizes), so `pnpm package` ends with a clear "here's what was built" summary
  *   instead of leaving the user to hunt under target/release/bundle/.

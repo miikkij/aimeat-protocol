@@ -1,5 +1,7 @@
 /**
  * @file src/services/datapackage/table.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The tabular half of the contract, and all of it pure: infer a Table Schema from rows,
  *   validate rows against one, and turn rows into canonical CSV and back.
  *

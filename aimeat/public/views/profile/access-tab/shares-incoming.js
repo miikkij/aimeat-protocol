@@ -1,5 +1,7 @@
 /**
  * @file views/profile/access-tab/shares-incoming.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "Shared with you" — the key spaces other people have opened to this account.
  *
  *   The reader's half of sharing, and the half whose absence made the feature unusable: until this

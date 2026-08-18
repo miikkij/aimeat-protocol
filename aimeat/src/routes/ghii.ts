@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ghii.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GHII (Global Human Intelligence Identifier) routes — the human identity layer on top
  *   of AIMEAT's owner system (GHII format username@nodeId): registration, password/federated/social
  *   login, email verification, magic link, password reset, account recovery, and legacy-account

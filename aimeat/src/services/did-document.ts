@@ -1,5 +1,7 @@
 /**
  * @file did-document.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description DID Document generation for the node's did:web identifier.
  *   Serves at /.well-known/did.json per the did:web specification.
  * @version-history

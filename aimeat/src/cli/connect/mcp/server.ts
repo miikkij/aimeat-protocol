@@ -1,5 +1,7 @@
 /**
  * @file server.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP server entry point. Loads every credential from
  *   `~/.aimeat/tokens/`, builds an AgentRegistry, registers all MCP tools +
  *   resources against that registry, then either connects the stdio transport

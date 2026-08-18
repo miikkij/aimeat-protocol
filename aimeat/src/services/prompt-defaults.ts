@@ -1,5 +1,7 @@
 /**
  * @file prompt-defaults.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Hardcoded prompt templates seeded into the prompt management layer.
  * @structure Defines default handbook/system prompt entries and variable placeholders.
  * @usage Imported by prompt routes/services to seed and serve agent-facing guidance.

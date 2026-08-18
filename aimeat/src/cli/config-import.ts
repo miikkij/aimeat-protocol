@@ -1,5 +1,7 @@
 /**
  * @file src/cli/config-import.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI command `aimeat config import` — loads config values from a file or Consul KV,
  *   classifies them as mutable/immutable/unknown, and writes only the valid mutable ones into the
  *   persistent database after operator confirmation.

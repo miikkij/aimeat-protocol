@@ -1,5 +1,7 @@
 /**
  * @file src/routes/portal-api.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Small JSON API carried over from the removed SSR portal. Currently exposes
  *   POST /v1/portal/try-memory — an authenticated append to a public "board" memory key that keeps only
  *   the last 20 messages with a 72h TTL, used by the try-it demo surface.

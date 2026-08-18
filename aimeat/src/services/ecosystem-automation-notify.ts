@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-automation-notify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Feature B6 — "email the report on completion" for ecosystem-app automation recipes.
  *   When an agent task that was materialised by an automation recipe (its `automation` provenance is
  *   set, see B5/ecosystem-automation.ts) transitions to DONE, and the recipe had `email:true`, this

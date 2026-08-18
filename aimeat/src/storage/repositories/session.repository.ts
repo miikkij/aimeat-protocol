@@ -1,5 +1,7 @@
 /**
  * @file session.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage contract for server-side session tracking. Covers both the
  *   legacy JWT-tracking sessions (created by /v1/auth/token and /v1/auth/refresh)
  *   and owner login sessions that carry a rotating, server-side refresh token.

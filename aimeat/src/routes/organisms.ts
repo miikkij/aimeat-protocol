@@ -1,5 +1,7 @@
 /**
  * @file organisms.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic organism (group/team/club/cooperative/project) routes: CRUD, join/leave,
  *   membership + admin management, join-request review, and the manifest-driven workspace read.
  *   An organism is the one container; a "project" is just `type:'project'` + a `meta.manifest`.

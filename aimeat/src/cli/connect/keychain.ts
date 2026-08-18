@@ -1,5 +1,7 @@
 /**
  * @file keychain.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Token storage abstraction. Uses a file-based fallback since keytar
  *   requires native compilation and may not be available in all environments.
  *   Tokens live at `~/.aimeat/tokens/{agent}@{owner}.token` with mode 0600.

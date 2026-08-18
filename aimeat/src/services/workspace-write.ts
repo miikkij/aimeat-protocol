@@ -1,5 +1,7 @@
 /**
  * @file src/services/workspace-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Writing one workspace record, and removing one, for every surface that does either.
  *
  *   WHY THIS FILE EXISTS. A workspace draft is a memory record, and it was written two ways. The

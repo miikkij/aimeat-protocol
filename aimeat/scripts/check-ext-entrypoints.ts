@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-ext-entrypoints.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Every road into the extension sandbox gets its capability object from the same
  *   builder. `executeExtensionAction` is reached from four places, and until 2026-08-10 each one
  *   assembled that object by hand: roughly 200 lines apiece, never the same twice. The August 2026

@@ -1,5 +1,7 @@
 /**
  * @file cli/connect/tool-call-defs-organism.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
  *   v1.3.0 -- 2026-08-13 -- Add the aimeat_schedule_trigger connect-call handler (POST

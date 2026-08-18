@@ -1,5 +1,7 @@
 /**
  * @file env-config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI config display — shows all settings with current values, defaults,
  *   and descriptions. Usage: aimeat config. Section definitions live in ./env-config/*.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file src/services/knowledge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Deprecated knowledge-template seeding shim. Knowledge packager prompt templates
  *   are now managed by system-prompt storage (prompt-defaults.ts / prompt-seeder.ts); this file
  *   keeps seedKnowledgeTemplates as a no-op for backward compatibility with the startup sequence.

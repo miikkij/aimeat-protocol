@@ -1,5 +1,7 @@
 /**
  * @file push-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Push Notifications tab — subscription stats, browser
  *   subscribe/test/unsubscribe, per-locale web-push/email template editing, reset,
  *   notification-trigger reference, and the subscriptions table.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/owner-erasure.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Erasing an owner, as ONE operation. This is the whole of `DELETE /v1/owners/:name`
  *   below the HTTP layer: cancel in-flight work and return escrow, clear the GHII-level data the
  *   storage cascade does not reach, then hand off to `storage.deleteOwner()` for the per-identity

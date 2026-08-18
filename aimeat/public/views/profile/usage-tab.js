@@ -1,5 +1,7 @@
 /**
  * @file usage-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile "Usage" tab — what this owner actually used, and what it cost. One report at
  *   a time over one time window, read from GET /v1/usage/summary (the precomputed serving layer, so
  *   the answer costs the same whatever the history has grown to).

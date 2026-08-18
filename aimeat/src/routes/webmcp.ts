@@ -1,5 +1,7 @@
 /**
  * @file src/routes/webmcp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description WebMCP bridge, server half (TARGET-034 phase C): expose an agent-faced app's
  *   declared tool manifest (apps.{appId}.tools, phase A) as a WebMCP-style tool surface over
  *   HTTP. WebMCP itself (W3C Web Machine Learning CG draft, 2026) is an IN-PAGE JS API

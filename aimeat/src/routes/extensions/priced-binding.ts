@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/priced-binding.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Is this raw extension action the thing a PRICED app-tool actually sells? If it is,
  *   the raw door onto it must not be free — otherwise every priced app on the node has a bypass
  *   sitting beside its own front door, and the buyer who paid is the only one who paid.

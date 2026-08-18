@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-denial-coverage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The gate for the largest class the August 2026 E2E test-quality audit measured:
  *   197 of 591 findings were `missing-denial` — a suite that drives a surface with ONE principal and
  *   never asks what happens to a second. A suite like that proves the feature and cannot prove the

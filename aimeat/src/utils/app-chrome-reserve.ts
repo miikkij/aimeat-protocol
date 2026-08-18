@@ -1,5 +1,7 @@
 /**
  * @file app-chrome-reserve.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Publish the height of the node's bottom chrome strip to a served app document as a
  *   CSS custom property, so the app can keep its own bottom UI out from under the node's marks.
  *

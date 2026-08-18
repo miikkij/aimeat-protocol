@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/refusals.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The refusals a PERSON hears, written for the person rather than for us.
  *
  *   WHAT THIS IS FOR. Of 2107 messages a caller can see, 490 are refusal-shaped and 22 of them say

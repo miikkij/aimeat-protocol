@@ -1,5 +1,7 @@
 /**
  * @file src/routes/home/state.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GET /v1/home/state — where this account stands on the new path, in one call
  *   (aimeat_remake/06-koti-feed-suostumus.md). The home view renders entirely from this: which
  *   step is open, which are named but not yet reachable, and whether the home exists at all.

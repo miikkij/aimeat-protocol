@@ -1,5 +1,7 @@
 /**
  * @file src/routes/companies.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The company registry's REST surface: create a company (claiming
  *   {slug}.co.<apex>), list/read/update your own, set what the address serves, and check
  *   whether a name is free. Business rules live in services/company/company-service.ts.

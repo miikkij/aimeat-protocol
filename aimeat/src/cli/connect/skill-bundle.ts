@@ -1,5 +1,7 @@
 /**
  * @file skill-bundle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Download and cache the agent's skill bundle ZIP.
  * @structure Fetches the authenticated skill bundle archive, stores the ZIP, and extracts its files locally.
  * @usage Called after `aimeat connect` auth and by `aimeat connect refresh`.

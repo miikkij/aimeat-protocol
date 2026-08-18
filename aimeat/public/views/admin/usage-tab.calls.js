@@ -1,5 +1,7 @@
 /**
  * @file usage-tab.calls.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin Usage tab, section 3 — the CALL stream. The other two sections count LLM
  *   spend; this one counts what was actually invoked on the node: which surface carried the work,
  *   which tools get called, which apps are alive, and how much of it was REFUSED.

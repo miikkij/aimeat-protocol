@@ -1,5 +1,7 @@
 /**
  * @file src/services/workflow/engine-util.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Small pure helpers shared across the workflow engine modules — localized-string
  *   display (loc) and key-template substitution (template). Extracted from engine.ts to satisfy
  *   max-file-lines.

@@ -1,5 +1,7 @@
 /**
  * @file federation-sync.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation sync routes — memory replication, catalogue sync,
  *   trust advisories, cross-node query routing, GAII resolution,
  *   cross-node work submission, and cross-node template sharing.

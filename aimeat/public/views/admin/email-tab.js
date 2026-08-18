@@ -1,5 +1,7 @@
 /**
  * @file email-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Email tab — SMTP config view, test-send, group
  *   broadcast, and per-locale email template editor with AI-prompt generation.
  * @structure EmailTab (default), TemplateEditor, buildAiPrompt

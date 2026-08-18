@@ -1,5 +1,7 @@
 /**
  * @file src/services/mailbox.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Store-and-forward mailbox service for offline personal nodes: enqueues items under a
  *   per-node capacity/retention quota, flushes them on reconnect, expires stale items, and emits
  *   stats/Prometheus metrics for enqueue/flush/quota-rejection events.

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/exchange-market.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two-sided EXCHANGE MARKETPLACE surface (TARGET-045 Phase C): supply (OFFERINGs), demand
  *   (NEEDs), and BIDs against needs — the browse/post/bid/accept flow above the metered entitlement. Pricing
  *   is always AUTHORITATIVE from the provider extension action (resolveActionPricing), so listings and bids

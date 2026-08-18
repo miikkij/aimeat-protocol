@@ -1,5 +1,7 @@
 /**
  * @file src/routes/consent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Consent-grant API — lets an owner create, list, inspect, and revoke consent records
  *   authorizing recipients (wildcard, GAII, organism, ghii, domain, node) to access data patterns.
  *   Also exposes the buffered consent-audit log. Identity resolved via resolveIdentity().

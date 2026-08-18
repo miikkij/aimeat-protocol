@@ -1,5 +1,7 @@
 /**
  * @file src/i18n.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Server-side i18n core: loads every locales/<tag>.json in LOCALES at startup and
  *   produces bound translation functions with dot-path key resolution, {{var}} interpolation, and
  *   fallback to English for any key a locale has not translated yet.

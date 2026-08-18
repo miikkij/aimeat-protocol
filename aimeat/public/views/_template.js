@@ -1,5 +1,7 @@
 /**
  * @file public/views/_template.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Scaffold template for a new AIMEAT SPA view (Preact + HTM) — copy-and-rename
  *   starting point demonstrating view CSS loading, data fetching, form submit, and render states.
  *

@@ -1,5 +1,7 @@
 /**
  * @file ghii-resolver.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared utility to resolve an owner's GHII (Global Human Identity Identifier)
  *   from the storage identity system, falling back to the provided GAII.
  * @usage

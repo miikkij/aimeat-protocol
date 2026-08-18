@@ -1,5 +1,7 @@
 /**
  * @file upload-zip.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description ZIP parsing for extension and cortex uploads via presigned URL.
  *   Validates ZIP structure, extracts manifest + scripts/libs, applies security checks
  *   (magic bytes, zip bomb detection, path traversal prevention).

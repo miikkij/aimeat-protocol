@@ -1,5 +1,7 @@
 /**
  * @file src/services/schedule-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Creating, editing and cancelling one schedule, once, for every surface that can do it.
  *
  *   WHY THIS FILE EXISTS. `POST /v1/schedules` and `aimeat_schedule_create` each built a

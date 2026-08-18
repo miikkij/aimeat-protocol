@@ -1,5 +1,7 @@
 /**
  * @file tools/odps-coverage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Coverage report for the EXCHANGE → ODPS v4.1 projection: walks every field the published
  *   ODPS v4.1 JSON Schema defines and reports which ones a MAXIMALLY-filled AIMEAT offering can populate,
  *   which the provider must author (and can, via the `odps` block), and which AIMEAT has no source for at

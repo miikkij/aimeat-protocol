@@ -1,5 +1,7 @@
 /**
  * @file src/services/workflow/engine-reachability.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-reachability helpers for the workflow engine's agent-offline fast-fail —
  *   isAgentReachable / isAgentStep / anyAgentReachable + the reachability constants. Extracted from
  *   engine.ts to satisfy max-file-lines.

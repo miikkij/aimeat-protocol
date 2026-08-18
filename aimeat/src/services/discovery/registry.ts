@@ -1,5 +1,7 @@
 /**
  * @file registry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The `DiscoverySource` registry — the backbone that makes the directory extensible
  *   (design §3, §7). The `/v1/discover` handler iterates this registry instead of hardcoding domains;
  *   adding a new content type means registering one adapter. Pure in-memory container with no I/O.

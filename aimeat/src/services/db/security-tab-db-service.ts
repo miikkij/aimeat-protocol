@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/security-tab-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile **Security** tab — the ONE call behind
  *   GET /v1/security/overview. The tab mounted listAgents + listSessions + a per-agent CORS fan-out: it
  *   read GET /v1/agents/:name/cors once PER agent (3 + N requests). But per-agent CORS is just

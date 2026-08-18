@@ -1,5 +1,7 @@
 /**
  * @file portfolio.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Portfolio routes — builder content catalog, per-user portfolio config,
  *   HTML upload (stored as a storage file), public showcase listing, and the public
  *   portfolio-data endpoint consumed by the SPA viewer.

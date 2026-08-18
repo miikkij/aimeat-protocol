@@ -1,5 +1,7 @@
 /**
  * @file tab-activity.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file src/services/scope-vocabulary-migration.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Grandfather every existing agent onto the scope names added on 2026-08-10.
  *
  *   WHY THIS EXISTS. The MCP surface filters tools at REGISTRATION: `mcp/index.ts` wraps

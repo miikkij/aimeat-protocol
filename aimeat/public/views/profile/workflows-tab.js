@@ -1,5 +1,7 @@
 /**
  * @file workflows-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile › Workflows — the owner-facing surface for Agent Workflows (declared, ordered
  *   agent pipelines with per-step input/output signals). Three views: a list of workflows with a
  *   health sparkline; a detail view showing the derived blueprint (the "whole workflow" graph) + the

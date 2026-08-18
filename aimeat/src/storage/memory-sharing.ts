@@ -1,5 +1,7 @@
 /**
  * @file memory-sharing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one decision about which sharing group a memory record belongs to after a write.
  *   Both storage providers call it, so the rule cannot drift between them.
  * @structure

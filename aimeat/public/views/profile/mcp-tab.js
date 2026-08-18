@@ -1,5 +1,7 @@
 /**
  * @file mcp-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for managing MCP (Model Context Protocol) connections.
  *   Shows AI assistants connected to the node, their platform, and allows removal.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file public-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public, unauthenticated landing-feed transport. Two endpoints:
  *   GET /v1/public/activity-feed?category=apps|organisms|agents&limit= — initial
  *   load of recent public activity (cached + rate-limited, like public-stats.ts);

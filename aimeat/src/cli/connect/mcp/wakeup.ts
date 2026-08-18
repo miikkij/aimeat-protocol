@@ -1,5 +1,7 @@
 /**
  * @file wakeup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent wake-up via shell command or webhook POST.
  *
  * SECURITY NOTE: `wake.command` is executed via `child_process.exec` as the user

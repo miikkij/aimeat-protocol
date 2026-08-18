@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/stripe-handler.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Stripe card PaymentHandler: settles a MONEY checkout session on the SELLER's own
  *   Stripe account, using the secret key they brought themselves (`commerce.psp.secretKey` under
  *   their GHII, set from the Wallet tab or `aimeat_commerce_psp_set`). There is NO node-level Stripe

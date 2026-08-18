@@ -1,5 +1,7 @@
 /**
  * @file data-wallet-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Data Wallet profile tab — displays consent rules, audit trail,
  *   permission summary, and GDPR export controls for the logged-in owner.
  * @structure

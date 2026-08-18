@@ -1,5 +1,7 @@
 /**
  * @file sitemaps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node's two sitemaps. `/sitemap.xml` is the page registry a crawler should
  *   index; `/sitemap-index.xml` is the sitemapindex that tells a crawler the per-app hosts exist
  *   at all, which is the one thing nothing on the apex said before.

@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/realtime-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Realtime" tab (Preact + HTM) — displays live collaboration state:
  *   active rooms with peer counts and Yjs documents, with an operator action to close a room.
  *

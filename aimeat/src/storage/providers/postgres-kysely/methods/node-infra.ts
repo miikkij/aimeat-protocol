@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/node-infra.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node-infrastructure storage domain for the Postgres+Kysely backend: web-push
  *   subscriptions, trusted federation issuers, OIDC/EUDIW verification nonces, realtime rooms, and the
  *   site change log. Translated 1:1 from the Prisma (Mongo) implementation against the same tables.

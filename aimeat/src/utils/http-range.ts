@@ -1,5 +1,7 @@
 /**
  * @file src/utils/http-range.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description HTTP byte-range parsing for the stored-file download paths, in one place.
  *
  *   WHAT WAS WRONG. Three download handlers each carried the same four lines, and those four lines

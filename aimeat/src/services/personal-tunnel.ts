@@ -1,5 +1,7 @@
 /**
  * @file src/services/personal-tunnel.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description WebSocket tunnel manager linking a genesis node to owners' personal (home) nodes:
  *   maintains per-node connections, correlates request/response messages, runs heartbeats, and syncs
  *   queued mailbox items to a node when it reconnects.

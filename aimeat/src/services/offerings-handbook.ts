@@ -1,5 +1,7 @@
 /**
  * @file offerings-handbook.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "Offerings & Workflows for agents" handbook page (doc-pho2b29 surface ②). A single
  *   agent-facing operational page that ties together the three things an agent does to get the most out
  *   of AIMEAT: publish offers (legibility), make an offer workflow-compatible (chainable), and price an

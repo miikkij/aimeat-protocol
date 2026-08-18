@@ -1,5 +1,7 @@
 /**
  * @file src/storage/interface.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Central storage contract for the node: the record type definitions
  *   (owners, agents, memory, and every other domain entity) plus the `Storage`
  *   interface every backend (SQLite, MongoDB, PostgreSQL) must implement. Adding a

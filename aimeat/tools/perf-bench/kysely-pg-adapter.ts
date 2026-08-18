@@ -1,5 +1,7 @@
 /**
  * @file tools/perf-bench/kysely-pg-adapter.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Phase 4 BENCHMARK CANDIDATE — a thin Postgres memory-domain adapter built on Kysely (the
  *   query layer doc-s4hgvp5 proposes as the Prisma replacement). It implements the SAME
  *   {@link ../../src/storage/adapter/memory-adapter.js MemoryStorageAdapter} contract the SQLite/Mongo

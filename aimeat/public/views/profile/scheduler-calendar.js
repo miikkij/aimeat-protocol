@@ -1,5 +1,7 @@
 /**
  * @file scheduler-calendar.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile › Scheduler calendar — day / week / month views of when every
  *   enabled schedule fires, so the owner can see cadence at a glance ("how often does
  *   this run?"). Fire-times come from GET /v1/schedules/occurrences (croner projection

@@ -1,5 +1,7 @@
 /**
  * @file HomeUiSwitch.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The switch between the new home and the old profile — ONE component, mounted on
  *   both sides, because a person has to be able to get back from wherever they are.
  *

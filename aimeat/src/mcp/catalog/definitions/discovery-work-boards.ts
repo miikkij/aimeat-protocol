@@ -1,5 +1,7 @@
 /**
  * @file discovery-work-boards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history

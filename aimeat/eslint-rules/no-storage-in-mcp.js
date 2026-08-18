@@ -1,5 +1,7 @@
 /**
  * @file no-storage-in-mcp.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint rule: an MCP tool does not talk to storage itself. Reports any
  *   `storage.<method>(...)` call inside `src/mcp/`.
  *

@@ -1,5 +1,7 @@
 /**
  * @file cortex.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for cortex model lifecycle -- listing,
  *   installing, activating, deactivating, and deleting cortex models.
  * @version-history

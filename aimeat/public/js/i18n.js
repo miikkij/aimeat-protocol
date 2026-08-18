@@ -1,5 +1,7 @@
 /**
  * @file public/js/i18n.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SPA i18n runtime: fetches /locales/*.json (with English fallback), flattens the
  *   nested JSON into dot-notation keys, and exposes t()/tOr() lookup plus locale switching.
  *

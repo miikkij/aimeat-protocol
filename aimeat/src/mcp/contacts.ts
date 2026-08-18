@@ -1,5 +1,7 @@
 /**
  * @file contacts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for the OWNER's contacts (address book) — a thin layer over the shared
  *   core in services/contacts.ts (also behind the REST /v1/contacts routes, so both surfaces
  *   behave identically). The list merges saved identities, DM conversation peers and saved

@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile "Ecosystem apps" tab — the owner-facing surface for GEAI (ecosystem app)
  *   principals, the near-copy sibling of the Agents tab. Covers the core loop: pending
  *   "hello integration" requests (approve with a scope preset / deny), the connected-GEAI list, and

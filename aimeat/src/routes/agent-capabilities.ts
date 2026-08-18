@@ -1,5 +1,7 @@
 /**
  * @file agent-capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for agent capability reporting and retrieval.
  *   Agents report their technical capabilities (MCP servers, skills, tools),
  *   domain expertise, and language support. Owners can view capabilities

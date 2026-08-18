@@ -1,5 +1,7 @@
 /**
  * @file apps-backup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner app-catalog backup endpoints:
  *   GET  /v1/apps/backup          — streamed ZIP of every app (every version) + own cortex extensions
  *   POST /v1/apps/backup/inspect  — parse an uploaded backup, report contents/conflicts, write NOTHING

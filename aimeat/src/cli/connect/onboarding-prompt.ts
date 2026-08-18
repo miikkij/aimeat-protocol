@@ -1,5 +1,7 @@
 /**
  * @file onboarding-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical Hello Integration MCP tool sequence and paste-into-agent
  *   instruction. Single source of truth for the post-connect onboarding hand-off
  *   reused by `auth.ts` (terminal output) and `skill-bundle.ts` (compatibility

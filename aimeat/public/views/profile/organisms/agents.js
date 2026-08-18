@@ -1,5 +1,7 @@
 /**
  * @file agents.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism Agents tab — attached agents listed first; "+ Attach agent" opens a picker
  *   of the user's OWN agents (free-text GAII attach behind "Advanced"), with per-agent activity
  *   context aggregated from the accessible workspaces. Extracted from organisms-tab.js, no behaviour

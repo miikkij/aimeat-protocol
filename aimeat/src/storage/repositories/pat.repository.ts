@@ -1,5 +1,7 @@
 /**
  * @file pat.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage contract for owner-created Personal Access Tokens (PATs):
  *   reusable, revocable Bearer tokens an owner issues for agents to authenticate
  *   and act (e.g. drive/verify a webapp they built). A token grants either selected

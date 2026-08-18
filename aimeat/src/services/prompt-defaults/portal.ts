@@ -1,5 +1,7 @@
 /**
  * @file src/services/prompt-defaults/portal.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extracted from prompt-defaults.ts (max-file-lines). Portal group — site portal editor, bootstrap (anon/auth), anonymous share prompt.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.

@@ -1,5 +1,7 @@
 /**
  * @file knowledge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Knowledge package routes — import, CRUD, links, sharing, cloning,
  *   export, organism contribution, reputation, and operator review endpoints.
  *   All routes are under /v1/knowledge/* (plus /v1/templates/* and /v1/admin/knowledge/*).

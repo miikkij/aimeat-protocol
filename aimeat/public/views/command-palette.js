@@ -1,5 +1,7 @@
 /**
  * @file command-palette.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Global command palette / quick-switcher (Cmd/Ctrl-K) — Layer 2 of the search feature.
  *   Mounted once at the app shell so it works on any authenticated page. Empty query shows recents;
  *   typing runs the indexed cross-owner librarian search (GET /v1/librarian/search, own scope) plus a

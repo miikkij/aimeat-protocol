@@ -1,5 +1,7 @@
 /**
  * @file oidc-client.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic OIDC Relying Party wrapper built on openid-client v6.
  *   Broker-agnostic: works with any standard OIDC provider (FTN, BankID, MitID).
  * @version-history

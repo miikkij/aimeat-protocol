@@ -1,5 +1,7 @@
 /**
  * @file prompts-intent-pool.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GET /v1/prompts/intent-pool, lifted out of routes/prompts.ts verbatim when that file
  *   reached its line limit. Same route, same text, its own file.
  * @structure registerIntentPoolPrompt(router, config)

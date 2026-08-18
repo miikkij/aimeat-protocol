@@ -1,5 +1,7 @@
 /**
  * @file agent-integration-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Agent Integration tab. Four sections:
  *   Platform Registry, Onboarding Overview (with readiness distribution),
  *   Skill Bundle Management, Bundle Templates.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/ai-provenance-adapters.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ONLY place in AIMEAT where an external AI-transparency vocabulary string appears.
  *   Five pure functions project the canonical `aimeat.provenance/v1` record onto the four external
  *   vocabularies plus the official EU icons. Nothing here does I/O; nothing here is stored.

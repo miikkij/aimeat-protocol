@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/app-grants.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-grant OAuth tokens for the Postgres+Kysely backend (AppGrant table): the revocable,
  *   scoped grant an owner issues to a hosted app so its app-origin token resolves to `role:'app'` fenced
  *   to approved scopes (H-2 app-origin isolation). Backs POST /token (authorization_code + refresh_token),

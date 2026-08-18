@@ -1,5 +1,7 @@
 /**
  * @file agent-tasks-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for browsing all agent tasks across all owners.
  *   Provides status filtering, pagination, and TODO progress display.
  * @version-history

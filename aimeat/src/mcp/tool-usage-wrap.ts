@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/tool-usage-wrap.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Measures every MCP tool call, in the one place every MCP tool is registered.
  *   Design: docs/internal/telemetria/02-design.md
  *

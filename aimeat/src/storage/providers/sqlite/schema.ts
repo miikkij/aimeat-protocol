@@ -1,5 +1,7 @@
 /**
  * @file sqlite/schema.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite schema bootstrap + in-place migrations for all AIMEAT storage
  *   entities. One CREATE TABLE/INDEX exec block (idempotent via IF NOT EXISTS) followed
  *   by additive ALTER TABLE migrations (safeAddColumn) for databases that predate newer

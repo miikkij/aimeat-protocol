@@ -1,5 +1,7 @@
 /**
  * @file telemetry-buffer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description In-memory accumulator for high-frequency agent signals (raw telemetry
  *   events, telemetry-derived activity counters, and heartbeat lastSeen timestamps),
  *   flushed to storage on a fixed interval instead of per request. This decouples the

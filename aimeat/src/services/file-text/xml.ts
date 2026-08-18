@@ -1,5 +1,7 @@
 /**
  * @file src/services/file-text/xml.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The small amount of XML reading that Office formats need, and nothing more.
  *
  *   WHY NOT AN XML PARSER. A .docx and a .xlsx are machine-written by a handful of programs, and

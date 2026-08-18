@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/wallet.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Wallet transaction ledger for the Postgres+Kysely backend (Transaction table) plus the
  *   atomic morsel-BALANCE mutations (debit/credit/creditCapped/transfer) on GHIIRecord.morselBalance —
  *   all balance ops resolve any GAII/GEAI/bare-name to the owner GHII first (agents hold no balance).

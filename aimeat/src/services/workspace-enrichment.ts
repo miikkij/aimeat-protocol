@@ -1,5 +1,7 @@
 /**
  * @file workspace-enrichment.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure derivation helpers for workspace list enrichment — the SINGLE source of truth
  *   for the per-workspace projections (record/doc counts, latest event, participants) that were
  *   previously computed inline in the per-ws endpoints (GET /workspace, /workspace/activity,

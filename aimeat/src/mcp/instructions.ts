@@ -1,5 +1,7 @@
 /**
  * @file instructions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The MCP `instructions` string served in the initialize result — the short orientation
  *   a connecting agent reads before it has called anything. The tool surface runs to a few hundred
  *   descriptions, so an agent that arrives with no orientation has to infer the node's shape from

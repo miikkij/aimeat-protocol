@@ -1,5 +1,7 @@
 /**
  * @file apps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP app management tools. Provides 6 tools for the app lifecycle: publish, list,
  *   get details, delete, list versions, and fork. Apps are single-file HTML applications stored
  *   with auto-incrementing version numbers and manifest metadata.

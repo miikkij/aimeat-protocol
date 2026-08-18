@@ -1,5 +1,7 @@
 /**
  * @file safe-zip.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Hardened ZIP extraction. Every untrusted ZIP entering the system MUST go through
  *   safeUnzip() rather than reading entries blindly: it enforces a file-count cap, a per-file and
  *   total decompressed-size cap, a compression-ratio cap (zip-bomb / "endless unpacking" defence),

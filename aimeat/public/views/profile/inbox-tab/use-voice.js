@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/use-voice.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Inbox tab's voice-message state: whether this owner can transcribe at all, how
  *   long the node lets a recording run, and the call that turns one voice attachment into text.
  *   Extracted from inbox-tab.js to keep it under the max-file-lines rule.

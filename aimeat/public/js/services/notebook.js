@@ -1,5 +1,7 @@
 /**
  * @file notebook.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Notebook slice B client service. classifyNote() asks the backend AI classifier where a
  *   note belongs; materializeDocument() then ORCHESTRATES the placement over the existing generic
  *   memory/organism APIs (no-SSR — the client composes create-organism / create-workspace /

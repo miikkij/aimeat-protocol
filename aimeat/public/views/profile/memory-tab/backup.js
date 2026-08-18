@@ -1,5 +1,7 @@
 /**
  * @file views/profile/memory-tab/backup.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Export and import of a memory backup, as one hook. Extracted from memory-tab.js to
  *   satisfy max-file-lines; behaviour unchanged.
  * @structure

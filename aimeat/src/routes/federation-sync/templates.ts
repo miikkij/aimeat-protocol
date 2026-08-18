@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-sync/templates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history

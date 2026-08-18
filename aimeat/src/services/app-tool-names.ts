@@ -1,5 +1,7 @@
 /**
  * @file app-tool-names.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The sellable tool names of one published app, for the agent-discovery block injected
  *   into its served HTML. Cached for a minute: an app page is a hot path and the manifest changes
  *   only when its owner republishes it, so the read must not ride on every view. A missing or

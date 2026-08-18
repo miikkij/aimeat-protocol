@@ -1,5 +1,7 @@
 /**
  * @file publish-run.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Publishing to the caller's OWN connection, end to end, in ONE place (TARGET-057).
  *
  *   WHY THIS FILE EXISTS. There are two ways a post leaves this node — a person presses send, and a

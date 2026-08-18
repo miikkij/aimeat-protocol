@@ -1,5 +1,7 @@
 /**
  * @file src/services/usage/record-app-open.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Records that an app was opened, from the two places an app is actually served.
  *   Design: docs/internal/telemetria/02-design.md
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/__tests__/money.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Unit tests for the money chokepoint (src/commerce/money.ts): rail round-trips are
  *   exact, sub-cent amounts (0.002 EUR = 2000 micros) never collapse to zero anywhere except the
  *   card rail (where a 0-cent result is the documented aggregate-first signal), fee rounding always

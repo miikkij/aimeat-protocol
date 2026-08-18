@@ -1,5 +1,7 @@
 /**
  * @file company-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The company registry: a company is a first-class entity on the node, the
  *   same way an app is. Creating one reserves {slug}.co.<apex> — the co family is to
  *   companies exactly what the apps family is to apps.

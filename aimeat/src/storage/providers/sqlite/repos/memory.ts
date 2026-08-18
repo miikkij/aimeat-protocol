@@ -1,5 +1,7 @@
 /**
  * @file repos/memory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The SQLite memory helpers that do NOT fit as prototype methods: the shared archive-filter
  *   SQL fragment, the DB-side byte/row aggregates behind the quota + stats, and the FTS5 full-text
  *   search path. Every export here is called from methods/owner.ts or methods/owner-memory-scope.ts.

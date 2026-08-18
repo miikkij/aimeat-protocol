@@ -1,5 +1,7 @@
 /**
  * @file index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP module entry point. Contains the Express router factory (mcpRouter), OAuth 2.1
  *   endpoints, transport management, session lifecycle, and the resource change event bus.
  *   Tool/resource registrations live in ./core.ts.

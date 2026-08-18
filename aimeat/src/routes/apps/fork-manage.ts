@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps/fork-manage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-catalog fork + owner-management routes: POST /v1/apps/:owner/:filename/fork,
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.

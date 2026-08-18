@@ -1,5 +1,7 @@
 /**
  * @file agent-skills-discovery.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent Skills discovery index (Agent Skills Discovery RFC v0.2.0,
  *   github.com/cloudflare/agent-skills-discovery-rfc / agentskills.io): serves
  *   /.well-known/agent-skills/index.json enumerating the node-scope skills that are

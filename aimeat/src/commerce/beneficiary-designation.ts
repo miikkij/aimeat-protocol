@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/beneficiary-designation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description How a provider's capability names WHO shares this particular call's revenue.
  *
  *   Some splits are standing facts — "a fifth of what this tool earns goes to the two people who

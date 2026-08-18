@@ -1,5 +1,7 @@
 /**
  * @file store.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workflow persistence + save-time validation + offer resolution + blueprint, all over
  *   the owner's existing memory (NO new SQLite/Mongo tables — Agent Workflows reuses the flexible
  *   memory system). Definitions live in the owner GHII namespace so the owner AND all their agents

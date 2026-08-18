@@ -1,5 +1,7 @@
 /**
  * @file app-protect.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Opt-in, per-app copy-protection transforms applied to an app's inline
  *   (runnable) HTML at serve time — the narrowly-scoped sibling of injectAimeatBadge.
  *   Each is gated by a manifest.protection flag the owner sets; ALL default OFF:

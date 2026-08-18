@@ -1,5 +1,7 @@
 /**
  * @file app-grant.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Trusted consent page (apex origin) for the H-2 app-grant flow. An app on the
  *   isolated app origin sends the owner here (GET /v1/app-grants/authorize → 302 → /v1/app-grant
  *   ?req=...). The owner, authenticated on aimeat.io, reviews the requesting app + the exact

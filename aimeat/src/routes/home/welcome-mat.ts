@@ -1,5 +1,7 @@
 /**
  * @file src/routes/home/welcome-mat.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The welcome-mat paste (aimeat_remake/03-welcome-mat.md, phase 2). A person copies a
  *   prompt into their own AI chat and pastes the answer here. This is step 1 of the new path and
  *   there is no way past it: without a mat there is no home.

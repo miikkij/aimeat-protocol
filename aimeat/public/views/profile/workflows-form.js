@@ -1,5 +1,7 @@
 /**
  * @file workflows-form.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Create/Edit form for an Agent Workflow (Profile › Workflows). Authors the descriptor
  *   the API validates: trigger (manual/schedule/event) + typed vars + steps (each picks an agent +
  *   a workflow-compatible offer; signals are inherited from that offer, so the form needs no signal

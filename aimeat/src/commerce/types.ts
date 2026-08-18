@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/types.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared types for the protocol-agnostic commerce core (TARGET-033): the normalized
  *   Sellable (an agent offer priced in morsels), the CheckoutSession lifecycle record persisted as
  *   a memory record (no schema changes), and the PaymentHandler provider contract that payment

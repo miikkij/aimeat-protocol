@@ -1,5 +1,7 @@
 /**
  * @file src/auth/ai-gate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Who may spend an owner's AI budget.
  *
  *   One rule, on every door that calls a model: an owner session, or a token carrying `ai:use`.

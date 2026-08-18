@@ -1,5 +1,7 @@
 /**
  * @file chat-session.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One turn of the chat, end to end: the person's identity, the agent process, the
  *   conversation record, and what came back.
  *

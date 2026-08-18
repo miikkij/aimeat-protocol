@@ -1,5 +1,7 @@
 /**
  * @file notebook.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the profile Notebook tab (pf-nb-* prefix): capture box, librarian hits,
  *   and inbox notes. Dark-theme only — all colors/spacing via theme.css variables.
  * @version-history

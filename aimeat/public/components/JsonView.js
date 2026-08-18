@@ -1,5 +1,7 @@
 /**
  * @file JsonView.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared "human-readable value" renderer. Renders a JSON object/array as an indented
  *   key/value TREE (type-coloured primitives) — far easier to scan than raw JSON — and renders a
  *   non-JSON string as safe Markdown. Mirrors the agent-tasks memory renderer so structured data

@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/prompts-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard System Prompts tab — browse managed prompts grouped by category,
  *   edit content + locale overrides + active flag, view/restore version history, and reset a
  *   single prompt / group / all prompts to factory defaults.

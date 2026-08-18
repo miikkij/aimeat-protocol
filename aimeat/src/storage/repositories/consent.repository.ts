@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/consent.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic storage contract for the consent layer — CRUD over consent grants,
  *   matching a grant to a (memory key, accessor) access attempt, expiring stale grants, and the
  *   append/query/prune lifecycle of the consent audit log. Implemented per storage backend.

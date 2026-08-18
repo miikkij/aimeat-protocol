@@ -1,5 +1,7 @@
 /**
  * @file memory-source.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The FTS/memory `DiscoverySource` adapter — the Phase 1 workhorse that surfaces every
  *   memory-backed domain (knowledge, documents, decisions, workflows, companies, offerings, research,
  *   material, plain memory) in one place. Query path uses the `storage.searchText()` FTS primitive;

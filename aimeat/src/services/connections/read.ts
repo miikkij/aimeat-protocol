@@ -1,5 +1,7 @@
 /**
  * @file src/services/connections/read.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reading FROM a connected account, which is the direction this machinery never had.
  *
  *   Connections were built to publish: a person attaches an account and the node writes to it. Every

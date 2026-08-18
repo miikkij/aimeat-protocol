@@ -1,5 +1,7 @@
 /**
  * @file file-header.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint rule that enforces file headers with @file and @description tags
  *   on all TypeScript source files. Warns when headers are missing.
  *

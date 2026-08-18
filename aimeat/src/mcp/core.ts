@@ -1,5 +1,7 @@
 /**
  * @file core.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Core MCP tool and resource registrations. Contains all 18 tools and 3 resources
  *   that are registered on each MCP server session. Extracted from the monolithic mcp.ts to
  *   allow modular expansion of the tool set.

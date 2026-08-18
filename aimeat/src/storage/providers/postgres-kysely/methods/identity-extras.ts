@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/identity-extras.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Chat instances (ChatInstance) + email verifications (EmailVerification) for the
  *   Postgres+Kysely backend — the parts of the identity repository not in methods/identity.ts.
  *   Translated 1:1 from the Prisma provider.

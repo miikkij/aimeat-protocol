@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-file domain for the Postgres+Kysely backend (StorageFile table, bytea `data`) +
  *   the transient in-memory chunked-upload buffer. Translated 1:1 from the Prisma implementation:
  *   create is upsert (re-upload replaces), sumStorageBytesForOwners is one cross-identity aggregate,

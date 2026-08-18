@@ -1,5 +1,7 @@
 /**
  * @file organisms-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for managing organisms (groups, communities, teams). This is now the thin
  *   shell: the organisms list (compact rows + drag-and-drop ordering + sort + create/import), the
  *   discover section, and the routing between the list, an organism's home page, and a workspace.

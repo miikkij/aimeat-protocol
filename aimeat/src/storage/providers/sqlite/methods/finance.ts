@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/finance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) implementation of the finance domain (invoices,
  *   vouchers, VAT codes, fiscal years, counters). Schema: schema-tables-3.ts.
  *

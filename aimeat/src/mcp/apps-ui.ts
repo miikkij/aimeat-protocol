@@ -1,5 +1,7 @@
 /**
  * @file apps-ui.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The app index as an MCP App: an interactive card grid the host renders inside the
  *   conversation, instead of the person reading a JSON array of their own apps. Pairs with
  *   aimeat_app_list, whose `_meta` points here (see ./apps.ts).

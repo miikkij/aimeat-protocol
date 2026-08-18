@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/payment-handlers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Payment-handler registry for the commerce core (TARGET-033) + the built-in morsel
  *   handler. Core registers every handler at mount: `io.aimeat.morsels` (this node's ledger),
  *   `com.stripe.spt` (cards on the SELLER's own account), `io.aimeat.invoice` (settled offline) and,

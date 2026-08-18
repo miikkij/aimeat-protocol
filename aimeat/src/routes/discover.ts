@@ -1,5 +1,7 @@
 /**
  * @file discover.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The unified "master directory" discovery route — one faceted surface over every
  *   content domain so agents/Secretary and humans can ask "what exists here that I can use?"
  *   `GET /v1/discover` returns ranked, paginated, normalized `DiscoveryEntry` items; `GET

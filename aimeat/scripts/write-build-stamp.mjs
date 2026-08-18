@@ -1,5 +1,7 @@
 /**
  * @file scripts/write-build-stamp.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Stamp dist/ with the identity of the source it was built from, so a stale build can
  *   announce itself instead of silently behaving like an older commit. Written as the last step of
  *   `pnpm build`, after tsc, so the recorded state is the state that actually got compiled.

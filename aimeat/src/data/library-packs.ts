@@ -1,5 +1,7 @@
 /**
  * @file library-packs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The library-pack registry — ONE data-driven source of truth for every
  *   client-side library an AIMEAT app can include (SDK wrappers at /v1/libs, node-bundled
  *   cortex libs at /v1/cortex/<n>/libs, vendored third-party assets at /lib). Every AI-facing

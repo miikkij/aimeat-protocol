@@ -1,5 +1,7 @@
 /**
  * @file max-file-lines.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint rule that warns when a file exceeds a configurable line count.
  *   Encourages splitting large files into smaller, focused modules.
  *

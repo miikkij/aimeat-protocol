@@ -1,5 +1,7 @@
 /**
  * @file src/routes/work.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Work-queue routes — the agent-to-agent paid work lifecycle: request/batch submission,
  *   inbox/sent listing, accept/progress/reject/deliver/rate, plus escrow holds and settlement, webhook
  *   delivery with exponential-backoff retries, cross-node work resolution, and a work→task bridge.

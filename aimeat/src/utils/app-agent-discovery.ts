@@ -1,5 +1,7 @@
 /**
  * @file app-agent-discovery.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Inject a static, script-free DISCOVERY block into an inline-served published app, so
  *   an agent that has nothing but the app's URL can find what the app sells and how to call it.
  *   Every published app is a single-file SPA: its <body> is empty until JavaScript runs, so a

@@ -1,5 +1,7 @@
 /**
  * @file finance.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository contract for the finance domain: invoices, vouchers, the VAT-code
  *   registry, fiscal years and the atomic number counters behind gapless invoice/voucher
  *   numbering. Implemented by both storage providers (postgres-kysely + sqlite).

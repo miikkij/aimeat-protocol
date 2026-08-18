@@ -1,5 +1,7 @@
 /**
  * @file check-plain-language.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Does a message a PERSON hears read like a sentence, and does it leave them somewhere
  *   to go?
  *

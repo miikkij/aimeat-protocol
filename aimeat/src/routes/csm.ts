@@ -1,5 +1,7 @@
 /**
  * @file src/routes/csm.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Routes for CSM (Client Service Model) definitions — the YAML/JSON
  *   schemas that describe a service's data shape and rules. Registers/validates CSMs,
  *   converts them to JSON Schema, and serves built-in CSM templates loaded from

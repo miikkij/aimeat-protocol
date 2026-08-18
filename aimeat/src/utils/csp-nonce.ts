@@ -1,5 +1,7 @@
 /**
  * @file csp-nonce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Inject a per-request CSP nonce into <script> and <style> tags of an
  *   HTML string so inline scripts/styles satisfy the node's Content-Security-Policy
  *   (script-src 'self' 'nonce-...'). Used when serving operator-authored HTML such as

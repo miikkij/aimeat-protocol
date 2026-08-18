@@ -1,5 +1,7 @@
 /**
  * @file catalogue.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP catalogue tools. Provides 3 read-only discovery tools for browsing
  *   the agent directory, public boards, and the people directory.
  * @structure

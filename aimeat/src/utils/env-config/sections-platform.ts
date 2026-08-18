@@ -1,5 +1,7 @@
 /**
  * @file src/utils/env-config/sections-platform.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Realtime, load-balancer, extensions, generator, app-origin, cortex, portfolio, agent-scope, moderation, setup, consul, metrics config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)

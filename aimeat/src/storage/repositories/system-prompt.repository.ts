@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/system-prompt.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-backend-agnostic interface for managed system prompts and their version
  *   history — upsert, lookup by id/group, list, and version create/prune. Backs the DB-served
  *   prompts (e.g. GET /v1/prompts/:name). Implemented per backend.

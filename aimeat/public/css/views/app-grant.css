@@ -1,5 +1,7 @@
 /**
  * @file public/css/views/app-grant.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the app-grant consent page (agr- prefix) — the trusted apex approval
  *   screen where an owner reviews a published app's requested scopes (H-2 Phase 3).
  * @structure identity head (icon/monogram + name + origin + badge), title + lede, one-line area

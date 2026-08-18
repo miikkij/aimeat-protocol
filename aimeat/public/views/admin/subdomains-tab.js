@@ -1,5 +1,7 @@
 /**
  * @file subdomains-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Subdomains tab — operator management of
  *   subdomain → site mappings (serve a published app at `<sub>.<apex>` or
  *   301-redirect). Table with enabled-toggle, create form, and

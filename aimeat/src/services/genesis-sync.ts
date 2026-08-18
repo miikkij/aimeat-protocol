@@ -1,5 +1,7 @@
 /**
  * @file src/services/genesis-sync.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Genesis Sync Service — periodic catalogue exchange with cross-federation genesis peers
  *   (RFC v1.6 §13.11.7). Fetches peer catalogues, stores entries under a `genesis:{node}:{entry}` prefix,
  *   prunes stale entries, pushes local federable CSMs, and syncs prefix-subscribed memory. All outbound

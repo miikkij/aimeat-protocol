@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/account-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Record types for the per-owner "what has happened" window and its archive.
  *
  *   `kind` IS A KEY, NOT A SENTENCE. Every row is translated by the UI at render time, which is the

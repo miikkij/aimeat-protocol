@@ -1,5 +1,7 @@
 /**
  * @file table-sources.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Phase 2 table-backed `DiscoverySource` adapters — capabilities, apps, and agent
  *   tasks. These domains live in dedicated SQL tables (outside the memory FTS index), so each adapter
  *   enumerates via the domain's existing list method and maps rows into the shared `DiscoveryEntry`

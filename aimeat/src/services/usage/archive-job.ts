@@ -1,5 +1,7 @@
 /**
  * @file src/services/usage/archive-job.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Moves raw usage rows past the hot window into the archive tables, and prunes the
  *   hour-grain rollups the live dashboards no longer need.
  *   Design: docs/internal/telemetria/02-design.md

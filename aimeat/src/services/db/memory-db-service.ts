@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/memory-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Application DB Service for the memory domain — the layer the routes/MCP will call
  *   INSTEAD of touching storage directly (the missing kerros in doc-id925fp). It exposes WHOLE
  *   operations (owner-scope read as one unit, a keyspace listing, a write, a record-family delete),

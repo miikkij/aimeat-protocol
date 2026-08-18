@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/owner.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-layer interface for owner (GHII account) persistence, implemented per backend
  *   (SQLite / Prisma).
  *

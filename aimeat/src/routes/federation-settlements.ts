@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-settlements.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express routes for signed cross-node morsel settlements — receives Ed25519-signed
  *   settlements from approved peers and initiates outbound settlements, with multi-hop relay-fee logic.
  *

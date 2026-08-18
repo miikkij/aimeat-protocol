@@ -1,5 +1,7 @@
 /**
  * @file tools.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AIMEAT tool surface exposed to the agent model (Anthropic /
  *   OpenAI tool-use schema) plus the dispatcher that maps each tool call to a
  *   real AIMEAT action via the active AgentDriver (REST or MCP). This is the

@@ -1,5 +1,7 @@
 /**
  * @file portfolio.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history

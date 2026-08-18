@@ -1,5 +1,7 @@
 /**
  * @file src/services/notification-templates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Notification template service — default templates in every language the node ships
  *   (en/fi/es) plus placeholder substitution and resolution for web-push and email mailbox
  *   notifications.

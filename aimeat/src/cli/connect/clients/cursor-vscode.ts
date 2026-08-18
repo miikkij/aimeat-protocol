@@ -1,5 +1,7 @@
 /**
  * @file cursor-vscode.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cursor and VS Code adapters. Both keep a JSON MCP config and both expand
  *   `${env:NAME}` inside header values, so the token stays in the environment. They differ in the
  *   top-level key (`mcpServers` vs `servers`), in whether `type` is required, and in where the file

@@ -1,5 +1,7 @@
 /**
  * @file tab-data-access.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history

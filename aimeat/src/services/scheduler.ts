@@ -1,5 +1,7 @@
 /**
  * @file scheduler.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Internal Scheduler System for AIMEAT — centralized cron-based job scheduler.
  *   Both core services and sandboxed extensions register jobs here.
  *   Supports special @activate trigger: runs on extension activation AND every server startup.

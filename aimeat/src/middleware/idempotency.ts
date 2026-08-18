@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/idempotency.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express middleware implementing idempotent POST/PUT requests via an Idempotency-Key
  *   header: caches the first response (24h TTL, bounded LRU-style eviction) and replays it for repeat
  *   keys. Validates the key is a UUID to prevent cache-key abuse.

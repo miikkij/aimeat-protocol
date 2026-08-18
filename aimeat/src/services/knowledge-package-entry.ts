@@ -1,5 +1,7 @@
 /**
  * @file src/services/knowledge-package-entry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Adding one entry to a knowledge package, once, for every surface that can add one.
  *
  *   WHY THIS FILE EXISTS. `aimeat_knowledge_contribute` did the work itself: it normalised the entry

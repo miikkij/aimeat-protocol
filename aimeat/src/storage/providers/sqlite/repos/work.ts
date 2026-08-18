@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/work.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository functions for work orders and wallet transactions —
  *   CRUD plus (de)serialization of JSON-encoded input/output/cost/rating columns.
  *

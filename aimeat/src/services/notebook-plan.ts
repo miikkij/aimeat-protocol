@@ -1,5 +1,7 @@
 /**
  * @file notebook-plan.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Notebook stage 2 — AI enrichment PLANNER. Given a free-text note and the user's
  *   organism/workspace structure, asks the user's own OpenRouter model to reason about the note's
  *   intent and propose an ordered plan of enrichment steps that EXPAND the note before it is filed.

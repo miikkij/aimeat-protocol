@@ -1,5 +1,7 @@
 /**
  * @file csm-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard CSM (Community Service Manifest) tab — list,
  *   detail, create and delete of registered CSM templates, plus an AI builder
  *   prompt view.

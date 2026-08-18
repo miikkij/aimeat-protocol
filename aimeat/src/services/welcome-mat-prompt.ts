@@ -1,5 +1,7 @@
 /**
  * @file src/services/welcome-mat-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The welcome mat prompt (aimeat_remake/03-welcome-mat.md): the first thing a person
  *   does here, in their own AI chat, before anything technical is connected. Copy the prompt →
  *   paste it into your chat → paste the answer back into the box.

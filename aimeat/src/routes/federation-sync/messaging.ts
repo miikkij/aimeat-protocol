@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-sync/messaging.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history

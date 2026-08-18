@@ -1,5 +1,7 @@
 /**
  * @file src/services/scheduler-extension-job.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Scheduled `extension` job executor: turns a ScheduledJobRecord into one unattended
  *   extension run. The run itself — resolving the extension and action, the owner fence, secrets,
  *   the instance, the sandbox context — is services/extension-system-run.ts, shared with the

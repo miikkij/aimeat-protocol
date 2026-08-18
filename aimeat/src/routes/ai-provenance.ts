@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ai-provenance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AI-provenance HTTP surface (TARGET-058, EU AI Act Article 50). Four routes: the
  *   published JSON Schema, resolve-by-id, the PUBLIC hash-keyed detection lookup, and declare.
  *

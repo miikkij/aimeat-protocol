@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/schema.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface segment for locked memory schemas (CSM/MSM) — the contract each
  *   backend implements to set/get/delete/list schemas and resolve the schema applicable to a memory key.
  *

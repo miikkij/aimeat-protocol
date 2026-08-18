@@ -1,5 +1,7 @@
 /**
  * @file scripts/carousel/make.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds a LinkedIn document carousel (a PDF read one page at a time) out of a
  *   slide list and screenshots taken from a real board. Sibling of scripts/demo-video/ and
  *   scripts/gen_image.py: a marketing-asset tool, nothing here touches the app or the protocol.

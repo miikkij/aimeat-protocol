@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-onboard-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The agent door's prompt (aimeat_remake/12-ai-rekisteroi.md): the front-page button's
  *   payload. A person copies it into their own AI chat, and if that AI can make a POST request, it
  *   gets them an account without their touching the interface at all.

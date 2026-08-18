@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/genesis-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for Genesis federation peers — shows peer stats and a table
  *   with per-peer approve/suspend/remove actions (operator tooling).
  *

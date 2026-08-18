@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agents/profile-metadata.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
  *   v1.5.0 — 2026-08-13 — `registered_by` joins the agent list: who asked for each agent.

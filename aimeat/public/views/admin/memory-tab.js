@@ -1,5 +1,7 @@
 /**
  * @file memory-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for browsing and managing all memory keys
  *   across all owners. Provides filtering, pagination, expandable value preview,
  *   and delete functionality.

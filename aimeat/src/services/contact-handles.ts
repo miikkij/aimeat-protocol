@@ -1,5 +1,7 @@
 /**
  * @file src/services/contact-handles.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A handle saying "this owner chose this contact, for this app, just now".
  *
  *   The problem it exists for: an app must be able to reach one person out of the owner's address

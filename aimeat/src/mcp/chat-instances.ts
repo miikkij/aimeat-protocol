@@ -1,5 +1,7 @@
 /**
  * @file chat-instances.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP chat instance tools and resource registrations. Provides 3 tools for
  *   chat instance management (list, create, status) and 1 resource template for reading
  *   instance details via the MCP resource protocol.

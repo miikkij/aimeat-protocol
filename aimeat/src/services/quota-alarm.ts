@@ -1,5 +1,7 @@
 /**
  * @file quota-alarm.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Warns an owner while there is still room to act, instead of letting a memory quota
  *   arrive as a wall. A principal that fills its key budget through one-key-per-small-fact gets no
  *   signal at all today: every write succeeds, and then one write fails with a 413 and a keyspace

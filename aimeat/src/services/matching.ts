@@ -1,5 +1,7 @@
 /**
  * @file src/services/matching.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AI Matching Engine — automatically scores and pairs user profiles by shared interests
  *   (0.40), geographic proximity (0.25), activity (0.20), and compatibility (0.15), persisting match
  *   records and optionally emailing suggestions. Runs on demand or on a schedule.

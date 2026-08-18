@@ -1,5 +1,7 @@
 /**
  * @file consent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for consent management -- granting,
  *   listing, and revoking data-sharing consent.
  * @version-history

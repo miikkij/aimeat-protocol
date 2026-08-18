@@ -1,5 +1,7 @@
 /**
  * @file rate-limit.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Per-instance, in-memory request rate limiter. Keys by GAII when
  *   authenticated, else by client IP (IPv6 aggregated to /64 so host-bit rotation
  *   can't mint fresh buckets). Role-based multipliers widen limits for owners/operators.

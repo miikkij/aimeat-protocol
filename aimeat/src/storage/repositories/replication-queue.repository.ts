@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/replication-queue.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic storage contract for the per-peer federation replication queue —
  *   enqueue pending changes, dequeue a batch for a peer, mark sent/failed, prune aged entries, and
  *   report queue depth. Implemented per storage backend.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/board-subscribers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Telling a board's subscribers that a post landed.
  *
  *   It moved out of routes/boards.ts because the MCP door could not reach it there: the function was

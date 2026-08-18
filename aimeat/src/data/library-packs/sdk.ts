@@ -1,5 +1,7 @@
 /**
  * @file sdk.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SDK library packs — the AIMEAT-authored `/v1/libs/*.js` API wrappers, one
  *   LibraryPack entry per served lib. The `description` texts mirror the (pre-registry)
  *   GET /v1/libs catalogue and the `promptLine` texts mirror the hand-tuned build-app-prompt

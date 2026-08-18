@@ -1,5 +1,7 @@
 /**
  * @file url-validator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SSRF guard for outbound HTTP. `validateOutboundUrl` rejects URLs
  *   that target private/reserved/loopback addresses (including via DNS — checks
  *   ALL resolved A/AAAA records, normalises IPv4-mapped IPv6, blocks CGNAT). Use

@@ -1,5 +1,7 @@
 /**
  * @file packages.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description API service layer for the AIMEAT packages, instances, and templates system.
  *   Provides functions for CRUD operations on packages, package versions, instances
  *   (install/update/remove), and template gallery listings including reviews and discussions.

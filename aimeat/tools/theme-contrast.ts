@@ -1,5 +1,7 @@
 /**
  * @file tools/theme-contrast.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Verifies the AIMEAT theme system (public/lib/aimeat-theme.css) against WCAG 2.1
  *   contrast — EVERY palette in BOTH modes — and verifies that the ratios the file CLAIMS in its
  *   own comments are the ratios it actually has. The claims are parsed out of the CSS, so a

@@ -1,5 +1,7 @@
 /**
  * @file living-author.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Living Documents — AI template author (Phase 1). Turns a user's plain-language need into
  *   a reusable living-document template (title + description + charter + sections), using the caller's
  *   own OpenRouter model (shared resolution in notebook-ai.ts) and grounded by a compact catalogue of

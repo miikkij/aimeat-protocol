@@ -1,5 +1,7 @@
 /**
  * @file locale-extract.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Hands you the next slice of a language to translate: every key en.json has that the
  *   target locale does not, as a flat {key: "the English"} file you overwrite in place.
  *

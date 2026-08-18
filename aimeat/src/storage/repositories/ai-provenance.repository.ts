@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/ai-provenance.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for addressable AI provenance records (TARGET-058). Append-only
  *   by design: a provenance record is an attributable statement about a specific set of bytes, so
  *   correcting one means minting a new record about the new bytes, never editing the old statement.

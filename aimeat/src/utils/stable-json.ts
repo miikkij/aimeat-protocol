@@ -1,5 +1,7 @@
 /**
  * @file stable-json.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical JSON serialization for order-independent equality checks.
  *   Object keys are sorted recursively; array element order is preserved. This is
  *   essential when comparing values that round-trip through a store that does not

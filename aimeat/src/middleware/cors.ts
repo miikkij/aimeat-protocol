@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/cors.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CORS middleware with per-entity origin resolution: picks the most specific
  *   allowedOrigins (memory key → agent → GHII → node default), sets/omits CORS headers accordingly,
  *   and short-circuits preflight OPTIONS with 204/403. Anonymous mode allows all origins.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/prompt-defaults/platform.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extracted from prompt-defaults.ts (max-file-lines). Platform group — platform app builder / mcp / api / browse + package builder.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.

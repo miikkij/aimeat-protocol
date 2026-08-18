@@ -1,5 +1,7 @@
 /**
  * @file src/services/datapackage/contract.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE AIMEAT Data Package contract: what a package is, where it lives, and what its
  *   version is called. Everything else in this directory implements it, and the three bindings
  *   (ctx.datapackage, the browser library, the MCP tools) are doors onto that one implementation.

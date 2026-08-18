@@ -1,5 +1,7 @@
 /**
  * @file views/profile/access-tab/sharing-groups.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file workspace-write-items.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared normalisation for workspace draft writes — the part `aimeat_workspace_write`
  *   does identically on all three MCP surfaces (the node-hosted server, the `aimeat connect` CLI
  *   server, and the tool-call definition table). One call may carry ONE item (space + value) or a

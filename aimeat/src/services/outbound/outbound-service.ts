@@ -1,5 +1,7 @@
 /**
  * @file src/services/outbound/outbound-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The outbound door's policy chain — the ONE path through which the node
  *   sends a customer-facing message. Order of the gates, each one structural:
  *

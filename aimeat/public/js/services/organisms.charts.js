@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/organisms.charts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Deterministic Mermaid charts built from stable workspace/organism data (no AI) — the
  *   label sanitiser, the participants graph, and the edit→publish lifecycle flowchart. Extracted
  *   from organisms.js. (The organism-overview chart stays in organisms.js — it orchestrates the

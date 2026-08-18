@@ -1,5 +1,7 @@
 /**
  * @file src/services/company/company-portfolio.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A company's own HTML page: publish it, read what is published, remove it.
  *   This is the company-scale twin of the personal portfolio — same idea (a standalone
  *   document the owner wrote, served on an isolated origin), different address family:

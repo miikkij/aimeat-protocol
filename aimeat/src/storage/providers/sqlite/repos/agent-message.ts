@@ -1,5 +1,7 @@
 /**
  * @file agent-message.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation for agent message CRUD, inbox, and thread listing
  * @version-history
  *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 9 step 0: `aiProvenanceId` written and read back, so an

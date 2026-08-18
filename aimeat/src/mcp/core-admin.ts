@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/core-admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only core MCP admin tools (aimeat_admin_stats, aimeat_admin_agents,
  *   aimeat_admin_config, aimeat_admin_mint, aimeat_admin_organism_ownership,
  *   aimeat_admin_organism_owner_add). Registered for all sessions but each checks the operator role

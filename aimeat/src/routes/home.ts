@@ -1,5 +1,7 @@
 /**
  * @file src/routes/home.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The KOTI (home) routes — the new onboarding path, built beside the old one rather
  *   than on top of it (aimeat_remake/08-kytkin.md). Nothing here modifies an existing route: the
  *   old profile keeps /v1/profile and every endpoint it already used, and a person moves between

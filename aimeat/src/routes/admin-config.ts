@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only admin config API. Exposes the node's configuration schema
  *   (types, ranges, descriptions, provenance/source, editability) and applies mutations to
  *   persistable fields, integrating with Consul-sourced values and provenance tracking.

@@ -1,5 +1,7 @@
 /**
  * @file gate-policy.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The CONFIG half of the gate primitive (the gate ENGINE is the routes + storage).
  *   Decides whether a requested action must pause for human approval (a PendingApproval) or may
  *   auto-run with an audit row — driven entirely by data (the manifest's `policy`), never code.

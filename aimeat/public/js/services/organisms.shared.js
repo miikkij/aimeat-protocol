@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/organisms.shared.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared leaf helpers for the organisms service and its sibling modules — the workspace
  *   key root, the memory/document space predicates, and the object-type schema fetch. Extracted from
  *   organisms.js so the workspace-gen / prompts / charts siblings can reuse them without a cycle.

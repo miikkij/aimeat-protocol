@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/beneficiary-split.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE SECOND RAKE. The platform rake (`marketplace-fee.ts`) takes a percent of what the
  *   CONSUMER pays and routes it to one operator account. This takes a percent of what the PROVIDER
  *   earns and routes it to N beneficiary GHIIs who are neither the consumer nor the seller.

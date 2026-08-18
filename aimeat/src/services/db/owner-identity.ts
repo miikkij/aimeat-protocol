@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/owner-identity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ONE place an owner's agent list, ecosystem-app list, and owner-scope identity set are
  *   resolved — the fix for `getAgentsByOwner` being re-read independently by ~60 call sites (and the
  *   owner-scope identity array being re-derived in services/db/index.ts, usage-summary.ts and several

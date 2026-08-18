@@ -1,5 +1,7 @@
 /**
  * @file prompts-managed.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node's managed prompts registered as MCP prompts — the primitive a client shows
  *   the PERSON to pick (Claude Code renders them as slash commands), rather than something the model
  *   decides to call. The node has served these from the DB since long before this file; the only way

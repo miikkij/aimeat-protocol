@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-automation-advisories.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Features B7 (approval gate) + B8 (deliver an approved advisory to the app) for the
  *   ecosystem-app automation pipeline. After a wisdom agent runs (its automation task completes), it
  *   has written zero or more `support-advisory@1` payloads into the owner's namespace at the outbox

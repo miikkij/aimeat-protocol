@@ -1,5 +1,7 @@
 /**
  * @file UsageChart.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical Chart.js wrapper for Preact views. Lazily loads the vendored
  *   Chart.js (`/lib/chartjs@4.js`, global `window.Chart` — NOT a CDN, so it works under
  *   the app CSP), draws into a `<canvas>`, and destroys/rebuilds the chart when its data

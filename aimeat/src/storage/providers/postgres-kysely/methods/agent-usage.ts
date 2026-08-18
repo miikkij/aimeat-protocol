@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/agent-usage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent LLM usage ledger (LEDGER / TARGET-016) for the Postgres+Kysely backend:
  *   append-only per-call events (AgentUsageEvent, the billing-audit source of truth) plus the
  *   upsert-incremented daily rollup (AgentUsageDaily) the UI reads. Translated 1:1 from the Prisma

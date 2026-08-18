@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/header.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The topmost part of the home: the person's name on the left, one settings button on
  *   the right.
  *

@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/nodes.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service for personal-node lifecycle: gated by the bootstrap
  *   `personal_nodes_enabled` flag, it lists, anchors (registers), detaches, and changes the
  *   visibility of the owner's personal node via `/v1/personal/*` endpoints.

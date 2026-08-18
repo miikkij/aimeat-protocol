@@ -1,5 +1,7 @@
 /**
  * @file markdown.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE canonical stylesheet for the shared Markdown component (components/Markdown.js).
  *   Scoped to the component's own `.md-body` wrapper and UNSCOPED to any view, so anywhere the
  *   <Markdown> component is used it renders the same readable, well-structured document — headings,

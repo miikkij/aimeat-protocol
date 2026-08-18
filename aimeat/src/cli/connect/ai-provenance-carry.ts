@@ -1,5 +1,7 @@
 /**
  * @file src/cli/connect/ai-provenance-carry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ONE place the connector decides how a caller's `ai_provenance` declaration
  *   reaches the node — used by BOTH connector surfaces (the MCP tools under `mcp/tools/` and the
  *   shell-callable handlers in `tool-call-defs-*.ts`), because they are separate code paths and

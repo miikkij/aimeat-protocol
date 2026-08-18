@@ -1,5 +1,7 @@
 /**
  * @file panels.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Small standalone organism panels: OrgSearch (content search across a member's
  *   readable workspaces), IncomingInvitations (pending invites banner with Accept/Decline), and
  *   BoardPreview (embedded organism board: latest posts + composer). Extracted from organisms-tab.js

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/organism.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage repository interface for organisms and their membership graph:
  *   organism CRUD/listing, memberships, join requests, reputation, and the Phase 4
  *   pending-approval (gate) primitive. Each backend implements this contract.

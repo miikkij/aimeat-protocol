@@ -1,5 +1,7 @@
 /**
  * @file src/services/datapackage/ext-capability.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description `ctx.datapackage` — the data-package contract as a HOST capability, because a
  *   sandboxed extension cannot load a shared library and the deterministic producers live there.
  *

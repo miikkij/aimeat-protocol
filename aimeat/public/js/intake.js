@@ -1,5 +1,7 @@
 /**
  * @file intake.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The intake queue: things captured OUTSIDE a working session, waiting for the chat.
  *
  *   Two producers write here. The service worker stores what arrives through the OS share sheet

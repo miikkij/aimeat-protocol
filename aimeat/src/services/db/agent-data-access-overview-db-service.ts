@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/agent-data-access-overview-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the agent-card **Data Access** subtab — the ONE call
  *   behind GET /v1/agents/:name/data-access/overview. The subtab mounted a 3-request fan-out across three
  *   domains: getDirectives (memory_areas + resources), the agent's memory list, and the agent's skill

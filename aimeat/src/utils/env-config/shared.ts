@@ -1,5 +1,7 @@
 /**
  * @file src/utils/env-config/shared.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared ConfigEntry/ConfigSection types + secret-masking helpers for the `aimeat config` display. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)

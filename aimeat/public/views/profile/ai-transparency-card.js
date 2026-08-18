@@ -1,5 +1,7 @@
 /**
  * @file ai-transparency-card.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What YOU published with a model in it, how much of it carries a label, and what this
  *   node records about a model call (TARGET-058 Phase 8).
  *

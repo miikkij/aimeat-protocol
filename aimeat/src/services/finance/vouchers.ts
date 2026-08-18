@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/vouchers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Voucher booking: the single door through which every tosite is created.
  *   Resolves the fiscal year from the booking date (auto-creating a calendar year),
  *   rejects a locked year, claims the sequential voucher number atomically, and keeps

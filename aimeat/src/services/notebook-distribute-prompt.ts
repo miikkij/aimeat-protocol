@@ -1,5 +1,7 @@
 /**
  * @file notebook-distribute-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source of truth for the notebook DISTRIBUTE prompt. Imported BOTH by the
  *   distribute service (as the fallback when the managed prompt is missing) and by prompt-defaults.ts
  *   (as the seed content), so the operator-editable managed prompt `notebook-distribute` and the code

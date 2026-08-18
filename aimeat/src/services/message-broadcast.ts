@@ -1,5 +1,7 @@
 /**
  * @file message-broadcast.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Send-to-many (broadcast / mass posting). Resolves an audience — an explicit recipient list
  *   and/or a Share Group's members (the group's natural job as a distribution list) — and fans out one
  *   ordinary direct message per recipient via sendDirectMessage, tagged with a shared `broadcastId` so the

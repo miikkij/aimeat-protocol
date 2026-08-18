@@ -1,5 +1,7 @@
 /* ── Admin Dashboard SPA Styles ──
  * @file admin.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard (operator tooling) styles, .adm-* scoped. Keeps
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.

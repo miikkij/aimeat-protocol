@@ -1,5 +1,7 @@
 /**
  * @file conversation-group.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A conversation with more than two participants: people and AIs in one thread, each
  *   holding their own mailbox copy of every message.
  *

@@ -1,5 +1,7 @@
 /**
  * @file agent-directives.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for agent directives operations.
  *   Provides get/upsert/delete for per-agent directives and owner-level defaults.
  * @version-history

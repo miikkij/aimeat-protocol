@@ -1,5 +1,7 @@
 /**
  * @file agent-directives-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation schemas for agent directives CRUD
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1

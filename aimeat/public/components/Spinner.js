@@ -1,5 +1,7 @@
 /**
  * @file public/components/Spinner.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Preact + HTM inline loading indicator component rendering the theme.css
  *   .spinner element with optional trailing loading text.
  *

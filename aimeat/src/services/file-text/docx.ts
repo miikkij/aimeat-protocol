@@ -1,5 +1,7 @@
 /**
  * @file src/services/file-text/docx.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A Word document as its text, with the paragraph and table structure that carries
  *   meaning and none of the styling that does not.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/owners.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner (GHII human account) routes — registration of new owners with keypair
  *   generation, first-owner operator bootstrap, pre-registration extension hooks, and owner
  *   profile/trust surfacing.

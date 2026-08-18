@@ -1,5 +1,7 @@
 /**
  * @file living.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Living Documents routes. Phase 1 exposes the AI template AUTHOR: given a plain-language
  *   need (+ the owner's agent-offer catalogue for grounding), the caller's own OpenRouter model designs
  *   a reusable living-document template the client editor can load and the user can hand-edit. Template

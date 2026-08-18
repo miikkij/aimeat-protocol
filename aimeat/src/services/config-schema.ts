@@ -1,5 +1,7 @@
 /**
  * @file src/services/config-schema.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source of truth for AIMEAT's tunable config fields — each entry maps an
  *   AimeatConfig key to its admin dot-path, AIMEAT_* env var, type, validator, mutability, and admin
  *   display mode. Consumed by the admin config API, startup overrides, live Consul updates, the config

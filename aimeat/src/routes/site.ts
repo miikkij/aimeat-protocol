@@ -1,5 +1,7 @@
 /**
  * @file src/routes/site.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Portal/site routes — serve the portal HTML and manage the operator's custom
  *              template, portal memory/KV, changelog and cache. Protocol-only (no SSR beyond
  *              the operator-authored portal template).

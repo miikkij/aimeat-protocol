@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/agents/groups-render.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agents-tab list rendering: tag filter bar, fleet "running now" panel, and the
  *   grouped agent-card renderer (none / custom groups / mode / tag). Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.

@@ -1,5 +1,7 @@
 /**
  * @file setup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds the canonical `DiscoveryRegistry` with every production source registered, so
  *   the REST route (`/v1/discover`) and the MCP tool (`aimeat_discover`) share ONE source list and
  *   can never drift. Adding a content type = add one `register()` here (design §7) and both surfaces

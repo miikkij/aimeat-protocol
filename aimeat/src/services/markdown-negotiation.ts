@@ -1,5 +1,7 @@
 /**
  * @file markdown-negotiation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "Markdown for Agents" content negotiation (Cloudflare convention,
  *   developers.cloudflare.com/fundamentals/reference/markdown-for-agents/): when a client's
  *   Accept header prefers text/markdown over text/html, the public human-facing info pages

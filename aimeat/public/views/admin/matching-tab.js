@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/matching-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for the AI matching engine — shows profile/match stats and
  *   provides a button to manually trigger a matching run, reporting the number of matches found.
  *

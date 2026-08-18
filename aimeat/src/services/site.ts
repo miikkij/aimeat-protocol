@@ -1,5 +1,7 @@
 /**
  * @file src/services/site.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SiteService — serves the portal HTML (custom operator template or default spa.html
  *   fallback, cached), resolving {{config|memory|storage|kv|board:*}} tags and header-nav config.
  *

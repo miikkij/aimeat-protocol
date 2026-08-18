@@ -1,5 +1,7 @@
 /**
  * @file admin-capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin endpoints for capability management: list all, override, logs.
  * @version-history
  *   v1.0.0 - 2026-05-02 - Initial admin capability endpoints

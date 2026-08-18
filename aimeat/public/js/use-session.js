@@ -1,5 +1,7 @@
 /**
  * @file public/js/use-session.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one Preact hook for "who is signed in". Wraps the session service
  *   (/js/services/auth.js) so a view never keeps its own copy of the session, and never writes its
  *   own subscribe/unsubscribe effect — the two habits that let stale sessions render (a header

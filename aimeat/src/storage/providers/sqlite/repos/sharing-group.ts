@@ -1,5 +1,7 @@
 /**
  * @file sharing-group.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation for sharing group CRUD, member-based lookups and key-space shares
  * @version-history
  *   v1.1.0 -- 2026-08-11 -- group_shares: the table that says what a group reaches. Indexed both

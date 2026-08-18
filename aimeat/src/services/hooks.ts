@@ -1,5 +1,7 @@
 /**
  * @file src/services/hooks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extension-hook execution service — runs the action references configured for a hook
  *   name in sequence, calling each action's webhook (SSRF-guarded), aborting the flow on rejection.
  *

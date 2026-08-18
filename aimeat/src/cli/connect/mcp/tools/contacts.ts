@@ -1,5 +1,7 @@
 /**
  * @file contacts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the OWNER's contacts (address book) — parity with the
  *   server MCP (src/mcp/contacts.ts) so `aimeat connect serve --surface agent` exposes list/add/remove/
  *   resolve_email locally. Thin proxies over the shared /v1/contacts routes (owner-role), so both

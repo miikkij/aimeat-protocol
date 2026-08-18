@@ -1,5 +1,7 @@
 /**
  * @file capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for capability discovery, detail, invocation, and CRUD management.
  * @structure
  *   - read tools: list, get

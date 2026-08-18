@@ -1,5 +1,7 @@
 /**
  * @file workspace-ref.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Normalise a caller-supplied workspace binding for the 'workspace' visibility tier into
  *   the canonical SPACE-SEPARATED "<org>/<ws> <org>/<ws>" string stored on records/files. A file may be
  *   shared into SEVERAL workspaces (readable by members of any), so callers may pass an array

@@ -1,5 +1,7 @@
 /**
  * @file types.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Transport-neutral tool-contract metadata types (ToolCallerType, ToolVisibility,
  *   ToolInputField, AimeatToolDefinition) plus the shared `agentEverywhere` visibility constant.
  *   Consumed by definitions.ts and every extracted definitions/*.ts tool-group module.

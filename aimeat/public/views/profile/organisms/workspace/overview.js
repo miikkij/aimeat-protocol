@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/overview.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The organism-workspace Overview landing (the whole workspace on one vertical scroll —
  *   a "what happened here" strip, then every manifest space as its own stacked section), the
  *   measurability Objectives card, the in-workspace search results, and the jump handlers that route

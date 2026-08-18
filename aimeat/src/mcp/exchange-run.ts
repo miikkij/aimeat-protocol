@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/exchange-run.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The GENERIC "act on EXCHANGE" MCP tools — the operations that had no MCP surface, so any
  *   MCP client (Claude chat, another agent, a fleet) can do what a bespoke runtime tool did, NOT just one.
  *   These are the app/agent-layer moat's primitives, exposed generically:

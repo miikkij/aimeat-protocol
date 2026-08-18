@@ -1,5 +1,7 @@
 /**
  * @file knowledge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP knowledge tools and resource registrations. Provides 4 tools for knowledge
  *   package management (list, get, contribute, links) and 1 resource template for reading
  *   knowledge packages via the MCP resource protocol.

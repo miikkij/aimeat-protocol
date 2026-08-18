@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-outbound-fetch.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The gate for Rule 10 invariant 3: any fetch whose URL is not a compile-time constant
  *   goes through safeFetch(), which re-validates every redirect hop. A validated host can 3xx-bounce
  *   to 169.254.169.254 or to loopback, so validating only the first hop validates nothing.

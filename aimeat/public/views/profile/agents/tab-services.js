@@ -1,5 +1,7 @@
 /**
  * @file tab-services.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Services tab -- declared services list with active/inactive status.
  *   Wraps the existing services subtab component.
  * @version-history

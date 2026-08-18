@@ -1,5 +1,7 @@
 /**
  * @file src/services/task-outcome.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What a finished task actually produced, in one place, for every door that reports a
  *   task.
  *

@@ -1,5 +1,7 @@
 /**
  * @file cortex.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST routes for the Cortex extension system — install (POST), idempotent
  *   upsert/redeploy (PUT), inspect, activate/deactivate, visibility, prompts/ontology/export,
  *   uninstall (DELETE), and public lib-file serving. Cortex extensions materialise schemas,

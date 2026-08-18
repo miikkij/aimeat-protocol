@@ -1,5 +1,7 @@
 /**
  * @file views/profile/access-tab/access-tokens.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent Access Tokens section — create/revoke revocable Bearer
  *   tokens an agent can use to log in and test apps. Extracted from access-tab.js
  *   to satisfy max-file-lines.

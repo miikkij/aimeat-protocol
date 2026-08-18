@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/notifications.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Notification domain for the Postgres+Kysely backend: personal-node push subscriptions
  *   (PersonalPushSubscription), per-node notification preferences (NotificationPreference), and the
  *   operator notification templates (NotificationTemplate, keyed by (templateId, locale)). The plain

@@ -1,5 +1,7 @@
 /**
  * @file cli/connect/tool-call-defs-core.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Memory, discovery, work, wallet, board, storage, admin, capabilities, catalogue, consent, flag, group, instance, knowledge and skill connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @structure
  *   - knowledgeContributeUnreachable() -- the one refusal both connector doors serve for the knowledge

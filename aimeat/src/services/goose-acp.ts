@@ -1,5 +1,7 @@
 /**
  * @file goose-acp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description An ACP client for a goose agent, over stdio, that answers the agent's callbacks.
  *
  *   The callbacks are why this is not thirty lines. ACP is bidirectional: the agent calls BACK

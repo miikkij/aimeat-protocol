@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/actions-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab that lists registered catalogue actions in a table —
  *   id, name/description, provider, category, base morsel cost, and tags.
  *

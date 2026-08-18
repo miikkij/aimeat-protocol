@@ -1,5 +1,7 @@
 /**
  * @file agent-messages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for agent direct messaging (send, list, inbox, threads, status updates)
  * @structure
  *   - POST   /v1/agents/:name/messages         -- Send message

@@ -1,5 +1,7 @@
 /**
  * @file api-client.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description HTTP client for AIMEAT node API with automatic auth header injection.
  * @structure Wraps fetch, response-envelope handling, and stored-token based client
  *   construction. `Transport` is the pluggable seam: the default transport does a

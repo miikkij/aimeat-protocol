@@ -1,5 +1,7 @@
 /**
  * @file example-packages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Example package definitions for seeding. Used by both the admin
  *   seed endpoint (POST /v1/admin/seed-examples) and the CLI seed script.
  * @structure

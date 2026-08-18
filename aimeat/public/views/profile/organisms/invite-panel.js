@@ -1,5 +1,7 @@
 /**
  * @file invite-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Unified "add people" panel for the organism Members tab + the pending-invitation
  *   rows. ONE form handles all three paths: an existing owner name → DIRECT ADD (active
  *   immediately, default) or a name invitation (when "require acceptance" is ticked), and an

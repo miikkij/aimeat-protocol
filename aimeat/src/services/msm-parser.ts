@@ -1,5 +1,7 @@
 /**
  * @file src/services/msm-parser.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Parser and validator for MSM (Machine Service Manifest) YAML — the descriptor of an
  *   external service's auth, actions (endpoint/input/output/mapping), and health check.
  *

@@ -1,5 +1,7 @@
 /**
  * @file message-delivery.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cross-node delivery for human↔human direct messages. Signs an outbound message with
  *   the node Ed25519 key and POSTs it to the recipient node's federation receive endpoint; mirrors
  *   the signing/verification pattern used by memory replication. Also propagates read receipts and

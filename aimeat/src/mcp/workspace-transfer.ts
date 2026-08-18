@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/workspace-transfer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The `aimeat_workspace_transfer` MCP tool — export one workspace to a base64 ZIP, or
  *   import such a ZIP as a NEW workspace. Extracted from mcp/workspaces.ts to satisfy max-file-lines;
  *   the shared helpers (denyReason, findWsEntry, roleOf, ok, fail) are passed in from the parent

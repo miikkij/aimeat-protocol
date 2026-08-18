@@ -1,5 +1,7 @@
 /**
  * @file engine.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Agent Workflows engine — the deterministic, node-owned run loop. A workflow run
  *   is an ASYNC persisted state machine (NOT a synchronous loop): the node dispatches an agent_task
  *   and parks; the run advances when that task reaches a terminal state (the agent-tasks route calls

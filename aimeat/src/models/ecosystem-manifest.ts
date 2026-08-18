@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-manifest.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ecosystem-app (GEAI) manifest schema + the STATIC compatibility-validation checks
  *   run at hello time (connector profile §5.1 step 4). An app declares its app name/origin, the scopes
  *   it requests, and the capabilities + events it provides/consumes; AIMEAT validates the manifest is

@@ -1,5 +1,7 @@
 /**
  * @file storage-files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Binary file storage REST API: upload (inline/presigned/chunked), list, download,
  *   delete, and public/consent access. Files are addressed by key under an owner GAII.
  * @structure

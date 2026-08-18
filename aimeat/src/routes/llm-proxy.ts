@@ -1,5 +1,7 @@
 /**
  * @file src/routes/llm-proxy.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description An OpenAI-compatible door in front of the node's own AI decisions, so an agent that
  *   speaks that dialect spends money under the same rules as everything else here.
  *

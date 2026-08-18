@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/ecosystem-tab.automation.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The GEAI card "Automation" flow and its pieces — <EcoScheduleLog> (per-schedule
  *   run-history), <EcoStatusChip> (status-timeline chip), <EcoAgentPicker> (recommendation-aware
  *   agent picker), and <EcoAutomationSection> (the unified turnkey publish→process→deliver flow).

@@ -1,5 +1,7 @@
 /**
  * @file src/utils/login-identifier.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reads what a person typed into a sign-in field. Three shapes arrive there and they
  *   must not be confused: an email address, a full GHII (`alice@node-id`, local or federated), and a
  *   plain owner handle. The `@` alone cannot tell them apart, which is why this is one function

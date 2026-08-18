@@ -1,5 +1,7 @@
 /**
  * @file contacts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Framework-agnostic core for the per-owner CONTACTS (address book), shared by the
  *   REST routes (src/routes/contacts.ts) and the MCP tools (src/mcp/contacts.ts).
  *

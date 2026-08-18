@@ -1,5 +1,7 @@
 /**
  * @file gaii.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Identity parsing/validation for the three AIMEAT principal types: GHII (human owner,
  *   `owner@node`), GAII (AI agent, `agent#owner@node`), and GEAI (ecosystem application,
  *   `eco:{app}#{owner}@{node}`). Provides the regexes, parsers, validators, builders, and the

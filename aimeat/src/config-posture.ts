@@ -1,5 +1,7 @@
 /**
  * @file src/config-posture.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The startup security-posture self-check, extracted from config.ts by pure move when
  *   that file reached the 800-line limit. Body verbatim.
  *

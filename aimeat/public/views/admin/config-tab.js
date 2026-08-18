@@ -1,5 +1,7 @@
 /**
  * @file config-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Config tab — renders the mutable node config
  *   schema (GET /v1/admin/config) with per-type editors and persists changes
  *   via PUT /v1/admin/config.

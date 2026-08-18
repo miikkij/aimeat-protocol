@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-apps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The GEAI (ecosystem application) onboarding router — a near-copy of the agent
  *   device-authorization flow (RFC 8628) in routes/agents.ts, minus tasks. An ecosystem app (or an
  *   owner-initiated start) says "hello integration"; the owner approves it from their portal and

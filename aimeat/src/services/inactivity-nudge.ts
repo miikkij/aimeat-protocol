@@ -1,5 +1,7 @@
 /**
  * @file src/services/inactivity-nudge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One friendly email to somebody nobody has seen for a fortnight, carrying a prompt
  *   they can run the moment they read it.
  *

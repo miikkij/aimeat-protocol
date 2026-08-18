@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/manifest.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history

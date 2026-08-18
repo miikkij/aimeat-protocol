@@ -1,5 +1,7 @@
 /**
  * @file track-registry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic in-process registry of "tracked" memory keys for the Memory Contract pattern
  *   (docs/coding-guidelines/memory-contracts.md). A reactive contract (e.g. a Tracked Response)
  *   declares a memory key it watches; this registry holds the set of watched keys so the memory-write

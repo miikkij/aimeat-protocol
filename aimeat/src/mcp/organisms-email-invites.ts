@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/organisms-email-invites.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP email-invitation tools for organisms (invite_email, invitations_email,
  *   invitation_email_cancel) plus the shared creator/admin gate. Extracted from organisms.ts to
  *   satisfy max-file-lines.

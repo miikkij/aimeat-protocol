@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/data-wallet-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile **Data Wallet** tab — the ONE call
  *   behind GET /v1/data-wallet. The tab mounted three requests: GET /v1/consent (consents), GET
  *   /v1/consent/audit (audit log + not-yet-flushed buffer), and GET /v1/permissions/summary (which

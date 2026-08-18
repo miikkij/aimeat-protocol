@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps/helpers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared helpers for the app-catalog routes: appOriginUrl (H-2 app-origin redirect
  *   target builder), its read-only sibling resolveAppUrls (batch, assigns nothing) and the
  *   CanonicalOwner closure type. Extracted from src/routes/apps.ts to satisfy max-file-lines.

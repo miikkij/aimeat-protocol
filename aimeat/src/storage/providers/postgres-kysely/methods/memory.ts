@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/memory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Memory-domain methods for the Postgres+Kysely backend — the MemoryRepository contract
  *   implemented as thin Kysely queries over the Memory / MemoryVersion tables, with the same semantics
  *   the SQLite/Mongo backends have (version bump + trackable-history archive on overwrite, byteSize +

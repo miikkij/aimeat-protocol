@@ -1,5 +1,7 @@
 /**
  * @file ai-usage-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "AI Apps Usage" tab — operator-wide view of AI spend across every
  *   owner. Shows node totals (spend / tokens / calls), a per-app stacked daily bar (cost⇄tokens
  *   toggle), and two breakdown tables: per-app grand totals and per-user top spenders. Backed by

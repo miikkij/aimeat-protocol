@@ -1,5 +1,7 @@
 /**
  * @file access-tokens.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-created Personal Access Tokens (PATs) for agents. The owner mints a
  *   reusable, revocable Bearer token in profile > access-tab, granting either selected agent
  *   scopes (a scoped, sandboxed test GAII) or — when explicitly chosen — full owner / operator

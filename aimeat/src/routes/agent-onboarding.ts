@@ -1,5 +1,7 @@
 /**
  * @file agent-onboarding.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for Hello Integration onboarding process.
  *   Agents confirm steps, owners view status and manage onboarding.
  * @structure

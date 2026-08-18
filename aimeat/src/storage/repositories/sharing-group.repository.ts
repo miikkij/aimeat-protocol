@@ -1,5 +1,7 @@
 /**
  * @file sharing-group.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for sharing group CRUD, member-based lookups, and the
  *   key-space shares that say what a group actually reaches.
  * @version-history

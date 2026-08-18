@@ -1,5 +1,7 @@
 /*
  * @file aimeat-theme.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE AIMEAT theme system — five designed palettes, each defining BOTH light and
  *   dark, expressed as daisyUI 5 theme variables so a published app gets a finished look without
  *   hardcoding a single hex value. Two orthogonal axes (the model proven by aimeat-tdr-cortex):

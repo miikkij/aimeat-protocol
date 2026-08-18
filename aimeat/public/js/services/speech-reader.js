@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/speech-reader.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared "read this aloud" engine for the SPA, built on the browser's Web Speech API
  *   (`speechSynthesis`) — no server call, no API key, no audio download. One reader is active at a
  *   time: it owns an id (whatever the caller passes — a message id, `'thread'`, …) so a view can show

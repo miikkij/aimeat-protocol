@@ -1,5 +1,7 @@
 /**
  * @file vendored-libs.d.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Type stubs for the vendored, minified ESM libraries the frontend imports by bare
  *   specifier (preact, preact/hooks, htm). The browser resolves these via the importmap to
  *   public/lib/*.mjs at runtime; this stub exists only so `tsc --noEmit` (checkJs) resolves the

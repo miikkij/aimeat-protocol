@@ -1,5 +1,7 @@
 /**
  * @file views/portfolio/shared.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared portfolio helpers — node URL, translation fallback, CSP
  *   nonce stamping for srcdoc iframes, and session accessor. Extracted from
  *   portfolio.js to satisfy max-file-lines.

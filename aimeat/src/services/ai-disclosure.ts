@@ -1,5 +1,7 @@
 /**
  * @file src/services/ai-disclosure.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description disclosureFor() — the ONE function that decides whether a visible AI disclosure is
  *   owed, and how strong it should be. Nothing else may decide this. The label component renders
  *   what this returns; when the guidance changes, this function changes and no UI does.

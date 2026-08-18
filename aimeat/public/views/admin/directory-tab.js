@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/directory-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Directory" tab (Preact + HTM) — shows directory index stats (entries,
  *   cities, categories) and an operator control to rebuild the directory index.
  *

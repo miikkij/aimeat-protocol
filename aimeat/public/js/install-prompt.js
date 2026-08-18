@@ -1,5 +1,7 @@
 /**
  * @file install-prompt.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one holder of the browser's install offer for the SPA.
  *
  *   A browser never proposes installing on its own: Chrome buries desktop install under

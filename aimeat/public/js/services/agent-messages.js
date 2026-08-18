@@ -1,5 +1,7 @@
 /**
  * @file agent-messages.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for agent messages.
  *   Provides send, list, thread listing, and status update operations.
  * @version-history

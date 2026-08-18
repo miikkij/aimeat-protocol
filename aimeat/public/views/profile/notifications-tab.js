@@ -1,5 +1,7 @@
 /**
  * @file notifications-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for push notification and email notification preferences.
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS classes; use ToggleSwitch and GlassCard from shared.js

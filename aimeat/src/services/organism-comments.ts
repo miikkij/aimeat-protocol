@@ -1,5 +1,7 @@
 /**
  * @file organism-comments.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Comments / threads on workspace objects (records + documents). A comment targets one
  *   object by (ws, space, instanceId), may be anchored to part of a document (anchor.section or
  *   anchor.quote) or general (no anchor), and may reply to another comment (parentId) to thread.

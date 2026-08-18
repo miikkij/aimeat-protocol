@@ -1,5 +1,7 @@
 /**
  * @file src/services/open-items.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Open items: the one list of what a person is going to do here, readable and writable
  *   by their own AI. ONE owner-namespace memory record, `open-items.list`, holding an object with an
  *   array inside.

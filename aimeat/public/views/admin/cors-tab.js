@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/cors-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard CORS tab — shows the node-default allowed origins and lets
  *   the operator add/edit/clear per-GHII and per-agent CORS allow-list overrides.
  *

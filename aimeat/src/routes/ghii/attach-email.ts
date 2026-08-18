@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ghii/attach-email.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description POST /v1/ghii/login/attach-email — the way out of a chicken-and-egg: /v1/ghii/email/verify
  *   needs a session, but an account below verificationLevel 1 is held at the EMAIL_NOT_VERIFIED gate and
  *   can never get one. This endpoint re-verifies username+password itself (so nobody attaches an address

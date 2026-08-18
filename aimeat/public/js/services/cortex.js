@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/cortex.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service layer for the Cortex (extension) API — centralizes all
  *   /v1/cortex REST calls: list, detail (with prompt content + ontology), lifecycle, and installs.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/cookie-consent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds and injects a vanilla-cookieconsent banner into HTML responses when
  *   enabled by config. Constructs the CookieConsent.run() config from configured categories
  *   and injects the CSS/JS snippet before </body>; also exposes a standalone IIFE variant.

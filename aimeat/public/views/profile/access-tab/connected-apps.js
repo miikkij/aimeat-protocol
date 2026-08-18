@@ -1,5 +1,7 @@
 /**
  * @file views/profile/access-tab/connected-apps.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connected Apps section (H-2 app grants) — list + revoke the
  *   scoped, user-approved access tokens published apps hold. Extracted from
  *   access-tab.js to satisfy max-file-lines.

@@ -1,5 +1,7 @@
 /**
  * @file trace.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Trace schema + JSONL writer for SynthTraces. One session => one
  *   trace line. The trace leans on AIMEAT's native task container: the task's
  *   immutable event timeline + telemetry are fetched at the end and embedded,

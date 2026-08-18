@@ -1,5 +1,7 @@
 /**
  * @file cortex-seeder.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Auto-installs bundled cortex extensions from public/cortex-bundled/ on server startup.
  *   Activates newly installed cortexes. When a cortex is already installed, refreshes it IN PLACE
  *   only if the bundled manifest version changed (lib code + components), preserving the owner's

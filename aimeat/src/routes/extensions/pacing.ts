@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/pacing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The pacing burn: morsels spent per metered call to bound the RATE at which a capability
  *   can be consumed, independent of how it is paid for.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/services/onboarding-funnel.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The MCP onboarding funnel made observable (UX-remake v3, P3). The connector step
  *   happens inside the user's AI tool where this node cannot see it, so the node records the two
  *   ends it CAN see — the hello page being opened, and the first MCP session actually arriving —

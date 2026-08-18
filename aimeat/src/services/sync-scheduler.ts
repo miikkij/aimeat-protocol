@@ -1,5 +1,7 @@
 /**
  * @file src/services/sync-scheduler.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Coordinates federation catalogue/memory sync to peers based on the node's
  *   sync mode (bulk/instant/hybrid), debouncing change events into batched sync runs and
  *   applying peer prioritization and throttling from sync-health.

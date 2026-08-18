@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
  * @file index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Main AIMEAT CLI entry point, including node management commands and agent connector dispatch.
  * @structure Parses top-level CLI flags, routes subcommands, starts the server, and delegates connector commands.
  * @usage Executed through the published `aimeat` binary.

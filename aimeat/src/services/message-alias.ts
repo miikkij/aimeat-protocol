@@ -1,5 +1,7 @@
 /**
  * @file message-alias.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Named message addresses that stand for a GROUP of people rather than one person.
  *
  *   `support@operators` is the first and, for now, the only one. It exists because the identity

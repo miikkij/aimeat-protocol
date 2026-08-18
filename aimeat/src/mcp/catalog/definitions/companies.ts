@@ -1,5 +1,7 @@
 /**
  * @file companies.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Catalog entries for the company registry tools. A company on AIMEAT is a
  *   first-class entity the way an app is: registering one reserves {slug}.co.<apex>, and the
  *   record carries the legal identity every invoice prefills its seller party from.

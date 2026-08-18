@@ -1,5 +1,7 @@
 /**
  * @file src/services/match-notification.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Background job that periodically rebuilds the directory index, detects newly
  *   appeared profiles/matches, and emails notifications to opted-in users. Skips silently when the
  *   feature or the email service is disabled; the first run only primes the known-set (no emails).

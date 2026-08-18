@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-organisms.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node operator's break-glass over organism ownership. An organism has exactly one
  *   creator, and every gate below it defers to that one name: an admin cannot remove, demote or
  *   replace a creator, and only the creator can hand the organism on or delete it. So an organism

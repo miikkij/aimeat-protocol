@@ -1,5 +1,7 @@
 /**
  * @file owner-provisioning.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source of truth for minting a brand-new owner + GHII account: generates the
  *   owner keypair, applies the first-owner→operator self-heal, creates the OwnerRecord + GHII
  *   profile (optionally with a password hash, a verified email, and/or a linked external identity),

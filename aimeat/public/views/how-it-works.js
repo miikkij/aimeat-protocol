@@ -1,5 +1,7 @@
 /**
  * @file how-it-works.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "How it works" page: H1 + intro, a hand-written inline SVG pipeline
  *   diagram (models → agents → organism → your assets, human at the gate), three
  *   explainer cards, a live example box (real public app link) and a CTA row.

@@ -1,5 +1,7 @@
 /**
  * @file agent-onboarding.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for required Hello Integration onboarding. These tools expose
  *   the same agent lifecycle actions through the public /v1/mcp surface that the
  *   local connector bridge exposes through aimeat connect serve.

@@ -1,5 +1,7 @@
 /**
  * @file notebook-plan.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Notebook stage 2 client service — enrichment PLAN generation + step execution. The plan
  *   itself is produced server-side (POST /v1/librarian/plan, the user's own OpenRouter model reasoning
  *   over the note); each step is then EXECUTED here over the generic AI + librarian APIs (no-SSR), and

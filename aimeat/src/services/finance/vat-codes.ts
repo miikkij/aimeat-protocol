@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/vat-codes.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Finnish VAT-code seed registry and the resolution helpers. Rates are
  *   DATA with validity windows, never hardcoded into calculations: the reduced rate
  *   changed 14 % → 13.5 % on 2026-01-01 (verified against vero.fi 2026-08-06), so an

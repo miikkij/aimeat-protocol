@@ -1,5 +1,7 @@
 /**
  * @file appdev-flow-constants.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared vocabulary of the research-first appdev flow — imported by the build-app
  *   prompt, the appdev-flow prompt, and the appdev handbook so the step names, the skip phrase,
  *   and the tool list can never drift between surfaces. The flow itself: RESEARCH (what exists)

@@ -1,5 +1,7 @@
 /**
  * @file public-knowledge-viewer.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public knowledge package viewer -- no login required.
  *   Browse, search, filter, and read public knowledge packages.
  * @version-history v1.0.0 — 2026-05-26 — Initial implementation

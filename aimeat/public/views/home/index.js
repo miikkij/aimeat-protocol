@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/index.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description KOTI — the home (aimeat_remake/06-koti-feed-suostumus.md). The new onboarding path,
  *   living beside the old profile rather than replacing it: nothing under public/views/profile/ is
  *   touched, and a person moves between the two with a switch.

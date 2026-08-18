@@ -1,5 +1,7 @@
 /**
  * @file instruction-block.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The copyable instruction block for one organism, in the three formats people
  *   actually paste into: CLAUDE.md, AGENTS.md, and the AI chat's own instructions field. Each
  *   format says where it goes, because "copy this" without "put it here" is where these die.

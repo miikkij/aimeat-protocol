@@ -1,5 +1,7 @@
 /**
  * @file prompts-open-items.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The home path's three prompts: `open-items`, `welcome-mat` and
  *   `ai-instructions`.
  *

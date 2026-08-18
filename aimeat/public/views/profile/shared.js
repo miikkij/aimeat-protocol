@@ -1,5 +1,7 @@
 /**
  * @file shared.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared components and utilities for profile tab modules.
  *   Exports: Spinner, recipientBadge, isExpiringSoon, VisibilityPill, ToggleSwitch, GlassCard,
  *   KebabMenu, TagInput.

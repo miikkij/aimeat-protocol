@@ -1,5 +1,7 @@
 /**
  * @file boards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for board management -- creating, listing,
  *   subscribing, reacting, replying, member updates, and deletion.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file public/css/components/app-sandbox.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Full-screen overlay that hosts a sandboxed (opaque-origin) iframe for
  *   viewing user-published apps without granting them the apex origin (H-2). Paired with
  *   /js/app-sandbox.js (openAppSandboxed).

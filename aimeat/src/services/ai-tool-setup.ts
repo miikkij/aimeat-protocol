@@ -1,5 +1,7 @@
 /**
  * @file ai-tool-setup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The canonical per-tool setup table: for each AI tool, how to attach THIS node over
  *   MCP, and where that tool keeps its persistent instructions field. Served from the node so
  *   every surface reads the same answer.

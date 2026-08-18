@@ -1,5 +1,7 @@
 /**
  * @file service-summary.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Computes a compact summary of all federated items on this node.
  *   Used by the network directory system to detect when a peer's services change
  *   and to serve the full summary on request.

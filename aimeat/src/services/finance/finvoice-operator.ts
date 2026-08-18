@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/finvoice-operator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The e-invoice operator adapter seam. One interface, three implementations:
  *
  *   - 'mock'  — in-process test double (E2E + local dev without an operator account).

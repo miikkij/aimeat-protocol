@@ -1,5 +1,7 @@
 /**
  * @file tab-quality.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Quality tab for the expanded agent view. Reads the recomputed
  *   GET /v1/agents/:name/statistics rollups and renders three sections:
  *   Performance (task counts, success rate, make-time, durations by context),

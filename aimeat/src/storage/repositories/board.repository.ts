@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/board.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic storage interface for boards — the persistence contract implemented
  *   by each provider (SQLite/MongoDB/PostgreSQL) covering boards, posts, reactions, and subscriptions.
  *   (Boards are marked deprecated per RFC v4.0 but the contract remains.)

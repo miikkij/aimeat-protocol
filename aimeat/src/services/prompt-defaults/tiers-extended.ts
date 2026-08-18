@@ -1,5 +1,7 @@
 /**
  * @file src/services/prompt-defaults/tiers-extended.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extracted from prompt-defaults.ts (max-file-lines). Tiers group (part 2) — tier-1 memory/activity/social/appdev/collaboration/mcp modules.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.

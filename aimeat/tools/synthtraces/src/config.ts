@@ -1,5 +1,7 @@
 /**
  * @file config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Runtime configuration for the SynthTraces self-play harness.
  *   Merges process env + simple `--key=value` CLI args into one typed object.
  *   Providers: anthropic, openrouter (default — free owl-alpha), xai (Grok),

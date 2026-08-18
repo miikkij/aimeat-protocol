@@ -1,5 +1,7 @@
 /**
  * @file vendor-three-world.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reproducible builder for the vendored `three-world` bundle: downloads the PINNED
  *   three.js release from npm, bundles three core + OrbitControls + Sky + RGBELoader into ONE
  *   classic IIFE exposing window.THREE (with addons on THREE.Addons), and writes

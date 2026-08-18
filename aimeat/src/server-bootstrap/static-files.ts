@@ -1,5 +1,7 @@
 /**
  * @file static-files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Wires static asset serving (CSP nonce, public/ via express.static,
  *   locales/, PWA assets) onto the Express app. Also redirects direct access to
  *   the underlying `.html` files of any templated page (privacy, connect) to

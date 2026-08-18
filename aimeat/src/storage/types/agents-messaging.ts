@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/agents-messaging.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
  *   2026-08-15 — AgentTaskRecord.createdBy: who ORDERED the task, beside agentGaii who receives it.

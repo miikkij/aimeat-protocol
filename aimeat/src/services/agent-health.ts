@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-health.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ONE account-level answer to "is this agent OK". Every surface that shows a
  *   per-agent verdict — the Agents tab, the fleet board, the home — renders this and computes
  *   nothing of its own.

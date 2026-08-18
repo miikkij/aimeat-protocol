@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/dispute.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository for disputes, dispute audit trails, and moderation
  *   appeals: synchronous CRUD + list queries plus row (de)serialization of the JSON ruling field.
  *

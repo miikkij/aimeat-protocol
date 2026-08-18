@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/agents/tab-helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Per-browser (localStorage) helpers for the agents tab: agent ordering,
  *   custom-group collapse state, per-tab "last seen" change tracking, effective ordering,
  *   and pop-out. Extracted from ../agents-tab.js to satisfy max-file-lines.

@@ -1,5 +1,7 @@
 /**
  * @file extensions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP extension tools and resource registrations. Provides 7 tools for extension
  *   lifecycle management (list, invoke, install, activate, deactivate, delete, get) and 1
  *   resource template for reading extension details via the MCP resource protocol.

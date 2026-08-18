@@ -1,5 +1,7 @@
 /**
  * @file app-member-sweep.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Take the free access back when a membership term runs out.
  *
  *   Access itself stops on the clock: `getMember` returns nothing for a lapsed row, so a member who

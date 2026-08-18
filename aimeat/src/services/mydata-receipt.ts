@@ -1,5 +1,7 @@
 /**
  * @file src/services/mydata-receipt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generates Kantara/MyData-style consent receipts from AIMEAT consent records — mapping a
  *   ConsentRecord (owner, purpose, data pattern, expiry) into a structured MyDataConsentReceipt with
  *   PII principal/controller and purpose metadata (version KI-CR-v1.1.0, FI jurisdiction).

@@ -1,5 +1,7 @@
 /**
  * @file upload-token.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Presigned upload token generation and verification. Tokens are single-use,
  *   time-limited JWTs that authorize a single file upload to PUT /v1/upload/:token.
  *   Uses the existing node JWT signing infrastructure (no separate key management).

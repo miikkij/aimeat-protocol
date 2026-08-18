@@ -1,5 +1,7 @@
 /**
  * @file base64.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Strict base64 decoder used by every inline-upload endpoint
  *   (POST /v1/apps, POST /v1/memory/files, POST /v1/storage, app screenshot).
  *   Wraps Node's `Buffer.from(str, 'base64')` with input validation because

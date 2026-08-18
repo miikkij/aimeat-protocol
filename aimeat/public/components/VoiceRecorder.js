@@ -1,5 +1,7 @@
 /**
  * @file VoiceRecorder.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Record-a-voice-clip control, shared by the inbox composer and the OpenRouter
  *   settings' transcription test. Wraps /js/services/audio-recorder.js in a Preact button that
  *   shows what is happening: elapsed time, a live input level so a dead microphone is obvious

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/exchange.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description EXCHANGE contract-acceptance surface (TARGET-045) — the WRITE side of the G1 metered
  *   entitlement. When a negotiation concludes (a human in an MCP chat, or a closed negotiation agent),
  *   the CONSUMER's owner accepts the contract here, which mints the durable entitlement the G2 gateway

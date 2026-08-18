@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/hooks-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Extension Hooks" tab (Preact + HTM): shows each lifecycle hook
  *   (owner/agent registration, work, settlement, board, federation) with an inline description and
  *   its bound actions, and lets an operator clear a hook's bindings after confirmation.

@@ -1,5 +1,7 @@
 /**
  * @file catalogue.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for catalogue browsing -- agent directory,
  *   public boards, and people directory searches.
  * @version-history

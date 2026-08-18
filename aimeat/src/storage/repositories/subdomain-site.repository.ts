@@ -1,5 +1,7 @@
 /**
  * @file subdomain-site.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for operator-managed subdomain → site mappings
  *              (subdomain_sites). A mapping serves a published app at the root of
  *              `<subdomain>.<apex>` or 301-redirects to an external URL.

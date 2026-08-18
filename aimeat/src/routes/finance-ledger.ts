@@ -1,5 +1,7 @@
 /**
  * @file src/routes/finance-ledger.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Ledger endpoints of the finance domain: vouchers (append-only booking,
  *   reversal, evidence), the VAT-code registry, fiscal years with locking, the VAT
  *   period report, and the accountant exports (CSV + Finvoice ZIP). Invoice endpoints

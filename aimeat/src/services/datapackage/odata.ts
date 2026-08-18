@@ -1,5 +1,7 @@
 /**
  * @file src/services/datapackage/odata.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The OData v4 projection of a data package: CSDL metadata from the Table Schema, and
  *   the readable subset of the query language applied to rows. Pure — no HTTP, no storage.
  *

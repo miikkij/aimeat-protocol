@@ -1,5 +1,7 @@
 /**
  * @file skills.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST surface of the skills registry (dedicated system — NOT knowledge packages).
  *   Registry CRUD on /v1/skills (node + user scopes) and the agent attachment surface on
  *   /v1/agents/:name/skills — the read the crewaimeat connector consumes to materialize an

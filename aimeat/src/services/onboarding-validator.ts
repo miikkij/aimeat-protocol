@@ -1,5 +1,7 @@
 /**
  * @file onboarding-validator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Validates onboarding steps by checking actual system state.
  *   AIMEAT does not trust the agent's word -- every step is verified against
  *   real data (capabilities reported, telemetry received, test task completed, etc.).

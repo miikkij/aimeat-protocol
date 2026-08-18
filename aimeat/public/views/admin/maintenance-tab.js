@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/maintenance-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Maintenance" tab (Preact + HTM) — toggles the node's
  *   maintenance mode with a custom message, downloads a full JSON backup, and restores from an
  *   uploaded backup file (behind a danger-confirm).

@@ -1,5 +1,7 @@
 /**
  * @file federation-book.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "federation book" — a phone-book of the federation: per node, its operator
  *   GHIIs, the resources it offers (counts + a few highlights), its AIMEAT version, and curated
  *   behaviour settings. The PRIMARY (genesis/anchor — a node with no genesisUrl) assembles the book

@@ -1,5 +1,7 @@
 /**
  * @file src/services/ai-provenance-marks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE one place that turns a stored provenance record into the marks a surface carries
  *   (TARGET-058 Phase 2). Every plane AIMEAT serves — the JSON envelope, HTTP headers, HTML, and
  *   markdown — gets its mark from a function here, so a record cannot say one thing on the header

@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-offers-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Publishing one agent's offers document (`agents.{name}.offers`) — the record the
  *   profile Offers surface, the owner's "Do" feed, the mesh delegate picker and the EXCHANGE
  *   projection all read.

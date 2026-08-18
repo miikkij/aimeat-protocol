@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-task-rules.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two task decisions that are the same decision whichever door the call came down.
  *
  *   Both were written out twice for a while — once in the HTTP handler and once in the MCP tool

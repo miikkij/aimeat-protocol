@@ -1,5 +1,7 @@
 /**
  * @file scripts/changelog-add.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Add one entry to BOTH change logs from one file, so shipping a note is one command.
  *
  *   There are two logs and they are for different readers: `public/changelog.json` is what a person

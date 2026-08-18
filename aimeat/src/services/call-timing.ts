@@ -1,5 +1,7 @@
 /**
  * @file src/services/call-timing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description How long a capability actually takes to answer, measured per (ext, action) coordinate so
  *   a provider can commit to a service level from EVIDENCE instead of a guess.
  *

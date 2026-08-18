@@ -1,5 +1,7 @@
 /**
  * @file security-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin Security tab — lists security incidents (e.g. rejected/quarantined ZIP uploads):
  *   what happened, the machine code, on whose behalf, the source, when, and the status. Operators can
  *   download the quarantined payload for inspection, mark an incident resolved, or delete it.

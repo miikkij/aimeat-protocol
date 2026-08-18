@@ -1,5 +1,7 @@
 /**
  * @file status.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI subcommand: show agent status
  * @structure Loads connector config, verifies the stored token, and prints the current agent identity.
  * @usage Called by `aimeat connect status` and `aimeat connect whoami`.

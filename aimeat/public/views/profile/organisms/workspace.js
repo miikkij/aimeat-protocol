@@ -1,5 +1,7 @@
 /**
  * @file workspace.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The organism workspace view (manifest-driven) — the draft → publish → version loop,
  *   grouped manifest-space tabs, the Overview landing scroll, the publish gate + approval inbox,
  *   document/record spaces, settings (manifest form, spaces, restructure, danger zone), and the AI

@@ -1,5 +1,7 @@
 /**
  * @file tunnel-client.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node-side client for the Connector Forward Tunnel
  *   (`/v1/connect/tunnel`). One instance per agent. Holds a single persistent
  *   WebSocket to the AIMEAT node and multiplexes id-correlated forward API

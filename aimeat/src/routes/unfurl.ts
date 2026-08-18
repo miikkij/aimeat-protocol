@@ -1,5 +1,7 @@
 /**
  * @file src/routes/unfurl.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic link-preview (unfurl) endpoints. A client passes any http(s) URL and gets back
  *   its OpenGraph/Twitter-card metadata (title/description/image/siteName) so a pasted link can render
  *   as a rich card. Reusable by any client (inbox threads, notebook, workspace docs) — not tied to one

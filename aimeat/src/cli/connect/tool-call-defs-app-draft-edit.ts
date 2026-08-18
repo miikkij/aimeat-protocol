@@ -1,5 +1,7 @@
 /**
  * @file tool-call-defs-app-draft-edit.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI-fallback definitions for the four incremental app-draft tools: write a piece,
  *   replace an exact passage, read a line range, seed the slot from a published version.
  *

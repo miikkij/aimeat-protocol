@@ -1,5 +1,7 @@
 /**
  * @file connect-onboard.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-time setup for using AIMEAT from Dify (Direction 1). Registers a named
  *   agent via device authorization (RFC 8628), waits for the OWNER to approve it in the
  *   AIMEAT profile (Agents tab), then runs the full Hello Integration onboarding to

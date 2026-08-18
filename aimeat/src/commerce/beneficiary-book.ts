@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/beneficiary-book.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The beneficiary's book: one memory record per settled call that owed a third party
  *   (`commerce.benefit.{trackingCode}` under the BENEFICIARY's own GHII), listing what they are owed,
  *   by whom, and whether it has been released yet.

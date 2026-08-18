@@ -1,5 +1,7 @@
 /**
  * @file audio-recorder.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Microphone capture for voice messages and the transcription test. Plain JS, no
  *   framework: one function starts a recording and hands back the controls to stop or cancel it.
  *

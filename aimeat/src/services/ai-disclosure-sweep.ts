@@ -1,5 +1,7 @@
 /**
  * @file src/services/ai-disclosure-sweep.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The sweep that catches the case nobody thought of (TARGET-058 Phase 8).
  *
  *   Every gate in this programme protects a path somebody has already thought about. This one

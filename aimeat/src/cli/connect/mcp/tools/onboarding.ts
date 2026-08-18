@@ -1,5 +1,7 @@
 /**
  * @file onboarding.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for Hello Integration onboarding status
  *   and API-confirmed onboarding steps.
  * @structure Registers status plus convenience confirmation tools for platform,

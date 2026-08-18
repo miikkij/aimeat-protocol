@@ -1,5 +1,7 @@
 /**
  * @file invitations.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Framework-agnostic core for organism invitations, shared by the REST routes
  *   (src/routes/organisms/*) and the MCP tools (src/mcp/organisms.ts) so both entry points behave
  *   identically. Covers BOTH invitation kinds: (1) EMAIL invitations to people not yet on the node —

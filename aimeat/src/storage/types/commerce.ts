@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/commerce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, marketplace, flags, and escrow record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
  *   v1.1.0 — 2026-07-27 — WalletTransaction.initiatorGaii: `gaii` is the payer and can only be a human,

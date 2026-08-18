@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/consul-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for the Consul KV config integration — shows connection
  *   status and key count, and lets operators export config to / import config from Consul.
  *

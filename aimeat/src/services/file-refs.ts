@@ -1,5 +1,7 @@
 /**
  * @file src/services/file-refs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One place that turns a FILE REFERENCE into either an authorized handle or a legible
  *   refusal. A reference is `"<gaii>/<key>"` (a bare key means the caller's own storage) — the same
  *   form `ctx.files.read` already takes, so an extension, an MCP tool, a task attachment and a DM

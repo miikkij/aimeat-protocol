@@ -1,5 +1,7 @@
 /**
  * @file invoke-capability.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description End-to-end test caller: invokes the registered Dify-backed capability through
  *   AIMEAT, proving the AIMEAT → shim → Dify(mock|live) → back loop. Any authenticated caller
  *   (agent or owner) can invoke a public capability. See docs/integrations/dify-hello-integration.md.

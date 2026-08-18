@@ -1,5 +1,7 @@
 /**
  * @file agent-message-send.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE write path for one agent-dashboard message — the agent↔owner chat the Messages
  *   subtab renders. Two doors reach it: POST /v1/agents/:name/messages and the MCP tool
  *   aimeat_message_send. Until this file existed each door built the record for itself, and the two

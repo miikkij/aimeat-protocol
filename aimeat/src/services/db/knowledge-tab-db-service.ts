@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/knowledge-tab-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile **Knowledge** tab — the ONE call behind
  *   GET /v1/knowledge/tab for the tab's OWNER-scoped data: the owner's knowledge packages (a memory read)
  *   + their consents (from which the tab derives which packages are federated). Composes both in one read

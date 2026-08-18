@@ -1,5 +1,7 @@
 /**
  * @file agent-card.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history

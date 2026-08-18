@@ -1,5 +1,7 @@
 /**
  * @file metrics-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Metrics tab — the node's live process metrics read from the
  *   Prometheus endpoint (/v1/metrics) and rendered as cards instead of raw exposition text.
  *   Memory is the headline: RSS, V8 heap used/total, and external memory (WASM sandboxes +

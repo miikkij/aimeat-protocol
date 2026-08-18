@@ -1,5 +1,7 @@
 /**
  * @file src/services/csm-parser.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CSM (Community Service Model) parser: parses a YAML service definition into a typed
  *   CsmDefinition, validates its structure/consent/moderation/uiHints blocks, and converts its data
  *   schema into a JSON Schema for the generic validation layer.

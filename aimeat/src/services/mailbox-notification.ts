@@ -1,5 +1,7 @@
 /**
  * @file mailbox-notification.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Mailbox notification service -- notifies personal node owners when messages
  *   are queued, via web push and/or email channels with cooldown, quiet hours, and per-type filtering.
  * @structure

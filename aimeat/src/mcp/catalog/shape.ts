@@ -1,5 +1,7 @@
 /**
  * @file shape.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Transport-neutral helpers shared by the public server MCP surface
  *   (`src/mcp/*.ts`) and the local connector MCP surface (`src/cli/connect/mcp/tools/*.ts`).
  *   Centralising description lookup + response shaping here is what keeps the two

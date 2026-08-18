@@ -1,5 +1,7 @@
 /**
  * @file src/data/app-templates/shells.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-shell template bodies (T1 pure-client, T2 cortex, T3 extension) for the
  *   authoring-template registry. Pure data — the AI copies these skeletons instead of building
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.

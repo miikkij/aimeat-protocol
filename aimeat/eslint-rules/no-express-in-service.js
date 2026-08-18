@@ -1,5 +1,7 @@
 /**
  * @file no-express-in-service.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint rule: a service does not take an Express request. Reports any import
  *   from `express` inside `src/services/`.
  *

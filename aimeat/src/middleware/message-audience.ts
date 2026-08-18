@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/message-audience.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Who hears this error — and therefore what language it has to be in.
  *
  *   THE MEASUREMENT THIS COMES FROM. 2107 messages a caller can see, 297 distinct codes. Treating

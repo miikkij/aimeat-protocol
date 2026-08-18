@@ -1,5 +1,7 @@
 /**
  * @file agent-directives.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for agent directives and owner-level agent defaults
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1

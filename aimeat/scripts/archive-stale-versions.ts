@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
  * @file archive-stale-versions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-time, REVERSIBLE cleanup of accumulated workspace-record version bloat. Publishing a
  *   workspace record used to append a new `.version.N` on every publish with no change-guard, so a
  *   contract agent that re-published the same draft each poll cycle piled up dozens of byte-identical

@@ -1,5 +1,7 @@
 /**
  * @file src/services/profile-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Defines the standardized JSON Schemas for interest-profile fields (interests,
  *   location, bio, seeking, availability, languages) and seeds them into Schema Locking at startup.
  *   Idempotent and non-destructive — it will not overwrite operator-customized schemas.

@@ -1,5 +1,7 @@
 /**
  * @file selfplay.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One self-play session = one trace. The owner-persona queues a
  *   task; the agent model works it through AIMEAT tools (memory + task events +
  *   owner replies) over the active transport (REST or MCP); if the agent asks

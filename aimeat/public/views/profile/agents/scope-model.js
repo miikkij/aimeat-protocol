@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/agents/scope-model.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What an agent's scope set IS and how the checkbox editor converts to and from it —
  *   the pure half of scope-config.js, with no imports, so it can be executed by a unit test.
  *

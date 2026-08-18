@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/schema.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Memory JSON-schema locks for the Postgres+Kysely backend (SchemaLock table). Backs
  *   validateMemoryWrite (findApplicableSchema runs on EVERY write). Reuses the shared process cache
  *   (schema-lock-cache) + wildcard matcher (pattern-utils) so the resolution logic + 0-DB-after-warmup

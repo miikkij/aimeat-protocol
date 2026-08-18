@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-config-coverage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The gate that keeps the admin Config tab honest: every AIMEAT_* environment variable
  *   the node READS must have a row in CONFIG_FIELDS, or an exemption that says why it cannot.
  *

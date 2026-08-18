@@ -1,5 +1,7 @@
 /**
  * @file config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Central AimeatConfig type and loadConfig() entry point. Reads
  *   env vars + optional file source + CLI overrides into a single config
  *   object consumed by every module. Also defines OperatorConfig (privacy

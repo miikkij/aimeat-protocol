@@ -1,5 +1,7 @@
 /**
  * @file public/components/ContactPicker.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared identity picker: a text input with a suggestion dropdown fed by the owner's
  *   CONTACTS (address book, lazy-loaded on focus) plus the member DIRECTORY (opt-in name search
  *   when typing ≥ 2 chars). Free text always passes through (owner names, GHIIs, emails), so any

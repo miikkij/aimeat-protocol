@@ -1,5 +1,7 @@
 /**
  * @file agent-capabilities.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for agent capability reporting and retrieval
  * @version-history
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 2

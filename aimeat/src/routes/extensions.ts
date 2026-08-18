@@ -1,5 +1,7 @@
 /**
  * @file extensions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST routes for the WASM/sandbox Extension system — install (POST), idempotent
  *   upsert/redeploy (PUT), inspect, activate/deactivate, action-script patch, instances, action
  *   execution (/v1/ext/...), and uninstall (DELETE). Extensions run server-side action scripts

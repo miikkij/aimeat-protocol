@@ -1,5 +1,7 @@
 /**
  * @file connections.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST surface for outbound connections (TARGET-057): a principal's own accounts at
  *   external services, and the delegations an app owner grants over a shared channel.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/agent-integration-overview-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the agent-card **Integration** subtab — the ONE call
  *   behind GET /v1/agents/:name/integration/overview. The subtab mounted a 4-request fan-out
  *   (getWebhookConfig, getSkillBundleVersion, getDeliveryLog, getOnboarding). This folds the THREE plain

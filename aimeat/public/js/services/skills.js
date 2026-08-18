@@ -1,5 +1,7 @@
 /**
  * @file skills.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Front-end service layer for the skills registry (/v1/skills +
  *   /v1/agents/:name/skills). Skills are a dedicated system, distinct from
  *   knowledge packages: SKILL.md packs in scoped registries (node/user),

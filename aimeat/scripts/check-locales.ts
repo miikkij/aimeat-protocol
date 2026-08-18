@@ -1,5 +1,7 @@
 /**
  * @file check-locales.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Keeps the language files honest against locales/en.json, which is the source of
  *   truth for what keys exist and what shape each value has.
  *

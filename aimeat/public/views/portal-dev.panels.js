@@ -1,5 +1,7 @@
 /**
  * @file public/views/portal-dev.panels.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connection panels (MCP/API/Browse/Prompt Package) + capability tabs for the portal-dev view. Extracted from portal-dev.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from portal-dev.js (max-file-lines)

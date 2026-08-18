@@ -1,5 +1,7 @@
 /**
  * @file notebook-card.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One inbox note's card + its full "organize" workflow, extracted from notebook-tab.js so
  *   each note manages its own state. Three flows over a single note:
  *     - Suggest (slice B): classify → editable single home → materialize as one document.

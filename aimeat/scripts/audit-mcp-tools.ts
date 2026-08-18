@@ -1,5 +1,7 @@
 /**
  * @file audit-mcp-tools.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Audits MCP tool registrations in the public server MCP surface and
  *   the local connector MCP bridge. Produces a name-level parity report so drift
  *   between /v1/mcp and `aimeat connect serve` is visible during migration.

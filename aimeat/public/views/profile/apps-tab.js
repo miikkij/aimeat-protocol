@@ -1,5 +1,7 @@
 /**
  * @file apps-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
  *   v1.7.0 — 2026-07-17 — Agent-Bundled Apps Slice 2: the Deploy action opens a panel with a

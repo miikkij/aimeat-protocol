@@ -1,5 +1,7 @@
 /**
  * @file vc-issuer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description W3C Verifiable Credential issuer service. Issues AIMEATIdentityCredential
  *   as unsigned JSON or signed vc+ld+jwt using the node's Ed25519 keypair.
  * @version-history

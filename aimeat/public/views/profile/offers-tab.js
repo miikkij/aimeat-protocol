@@ -1,5 +1,7 @@
 /**
  * @file offers-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Agent Offers "Do" surface — goal-first "what do you want to do with your agents".
  *   Aggregates every agent's published offers into one searchable list with trust badges
  *   (cost/latency/verification/dataHandling/availability), and a mode-aware Ask (Run / Copy prompt /

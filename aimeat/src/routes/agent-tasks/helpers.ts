@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agent-tasks/helpers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared helper-closure interface + shared types for the agent-tasks route modules. Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)

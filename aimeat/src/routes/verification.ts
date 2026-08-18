@@ -1,5 +1,7 @@
 /**
  * @file verification.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Routes for identity verification (EUDIW, FTN), W3C VC issuance,
  *   MyData consent receipts, and trusted issuer management.
  * @version-history

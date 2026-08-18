@@ -1,5 +1,7 @@
 /**
  * @file presence.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Human (GHII) presence/availability tracker — the single source of
  *   truth for "is this person reachable right now". Holds three things in memory:
  *   (1) local online state derived from open portal SSE connections, (2) each

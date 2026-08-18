@@ -1,5 +1,7 @@
 /**
  * @file document.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Document-space editor + viewer for organism workspaces: a read-only DocumentView
  *   (markdown render, private-image resolution, Draft/Published compare toggle) and a DocumentEditor
  *   (Toast UI WYSIWYG with a markdown fallback, image upload + per-image visibility). Lazy-loads the

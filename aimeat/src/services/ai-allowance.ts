@@ -1,5 +1,7 @@
 /**
  * @file ai-allowance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Whose key pays for a completion, and how much of the node's key one person may use.
  *
  *   A node can hold one OpenRouter key of its own (AIMEAT_OPENROUTER_INSTANCE_KEY) so that a person

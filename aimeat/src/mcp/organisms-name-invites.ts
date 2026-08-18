@@ -1,5 +1,7 @@
 /**
  * @file organisms-name-invites.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for NAME invitations + direct member adds — already-registered local
  *   owners joining an organism. Mirrors the REST membership routes via the shared
  *   services/invitations.ts core (invite-time role + workspace grants, pending-invite edit/cancel,

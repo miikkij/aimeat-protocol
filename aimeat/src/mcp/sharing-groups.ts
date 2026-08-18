@@ -1,5 +1,7 @@
 /**
  * @file sharing-groups.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for sharing groups: the audience (list, get, create, add/remove members)
  *   and what it reaches (share create/list/revoke).
  * @structure

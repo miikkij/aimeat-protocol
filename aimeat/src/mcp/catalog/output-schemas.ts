@@ -1,5 +1,7 @@
 /**
  * @file output-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared MCP outputSchema shapes (F4). Tools registered via mcp.registerTool() declare
  *   one of these so the result carries machine-readable `structuredContent` (validated by the SDK)
  *   alongside the human-readable text content. Fields are optional so the same schema validates both

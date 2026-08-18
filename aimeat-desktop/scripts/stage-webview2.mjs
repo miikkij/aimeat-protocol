@@ -1,5 +1,7 @@
 /**
  * @file stage-webview2.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Stages WebView2Loader.dll into src-tauri/ so it ships next to the
  *   app executable. The MSVC Rust toolchain links this loader statically (no DLL
  *   needed), but the GNU (mingw) toolchain links it dynamically — without the DLL

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/boards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public message-board API — create boards, post/reply/react, subscribe, and read with
  *   consent + moderation enforcement. New posts fan out to subscriber callback URLs via SSRF-safe
  *   fetch, and system/public boards are operator-gated.

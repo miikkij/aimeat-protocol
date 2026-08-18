@@ -1,5 +1,7 @@
 /**
  * @file agent-conventions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The de-facto conventional paths agent tooling probes at an origin root, each serving
  *   something this node already had somewhere else: `/openapi.json`, `/skill.md`, `/agents.txt`,
  *   `/.well-known/webmcp.json` and `/.well-known/x402.json`.

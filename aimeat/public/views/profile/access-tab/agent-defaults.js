@@ -1,5 +1,7 @@
 /**
  * @file views/profile/access-tab/agent-defaults.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent Defaults section — owner-level default rules and token
  *   budget for agents. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/wellknown.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves the node's discovery documents at /.well-known — the AIMEAT node
  *   descriptor, the OpenAI-style ai-plugin.json manifest, the MCP Server Card (SEP-1649),
  *   and the RFC 9727 API catalog — plus the RFC 8288 discovery Link-header middleware.

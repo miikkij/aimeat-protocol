@@ -1,5 +1,7 @@
 /**
  * @file companies-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab: the company registry. Register a company (which claims
  *   {slug}.co.<apex> the same way publishing an app claims an apps subdomain), edit its
  *   legal identity — the one every later invoice prefills its seller from — and choose

@@ -1,5 +1,7 @@
 /**
  * @file src/services/datapackage/images.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The link between a row and the photograph it was read from.
  *
  *   THE PROBLEM THIS SOLVES. A person photographs thirty receipts and an agent turns them into a

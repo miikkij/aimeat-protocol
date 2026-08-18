@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/messages-inbox-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the Messages/Inbox view — the ONE call behind
  *   GET /v1/messages/overview. The inbox mounts a 6-request fan-out (requests + conversations +
  *   important-flags + tracked-responses + agents + groups); this composes all six in ONE read scope so

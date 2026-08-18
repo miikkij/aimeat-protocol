@@ -1,5 +1,7 @@
 /**
  * @file app-similarity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Catalog-wide near-duplicate detection (Phase 4 copy-protection). Flags apps
  *   whose content closely matches another app that they are NOT fork-linked to — i.e. copied
  *   without going through the sanctioned Fork. Uses MOSS-style k-gram winnowing fingerprints

@@ -1,5 +1,7 @@
 /**
  * @file workspace-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express wrapper over the organism-namespace access rule. The rule itself lives in
  *   services/organism-namespace-access.ts, because it is not about HTTP: the MCP write path needs
  *   the same answer and could not call a RequestHandler. This file turns a request into a caller and

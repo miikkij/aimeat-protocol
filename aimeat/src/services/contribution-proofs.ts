@@ -1,5 +1,7 @@
 /**
  * @file src/services/contribution-proofs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Attaching one self-reported acceleration proof to a community contribution, for
  *   every surface that can attach one.
  *

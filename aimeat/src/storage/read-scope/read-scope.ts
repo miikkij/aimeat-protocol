@@ -1,5 +1,7 @@
 /**
  * @file src/storage/read-scope/read-scope.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operation-scoped read state. It owns one {@link ./identity-map.js IdentityMap} so a
  *   shared entity (the owner's agent list, an organism, a manifest) is read ONCE per operation and
  *   reused by every service composed into it. An `AsyncLocalStorage` binding lets deep code reach the

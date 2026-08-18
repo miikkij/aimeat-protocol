@@ -1,5 +1,7 @@
 /**
  * @file work-task-bridge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Auto-creates an AgentTask when a work item is accepted by an agent
  *   that has the task system enabled. Links via workTrackingCode.
  * @version-history

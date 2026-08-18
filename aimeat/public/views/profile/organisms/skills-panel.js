@@ -1,5 +1,7 @@
 /**
  * @file skills-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace Skills panel — the workspace-scope slice of the skills registry
  *   (`ws:{org}/{ws}/{name}` refs). Members see the loadable expertise this workspace carries,
  *   view a skill's SKILL.md (rendered markdown), publish/update one into the workspace, and

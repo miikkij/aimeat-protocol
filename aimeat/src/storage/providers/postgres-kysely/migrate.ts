@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/migrate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Migration runner for the Postgres+Kysely backend. Applies the ordered `migrations/*.sql`
  *   files exactly once each, tracked in a `_kysely_migrations` table, so the schema is materialised on
  *   first boot with no Prisma involvement. DDL is run through the raw `pg` pool (simple-query protocol)

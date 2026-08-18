@@ -1,5 +1,7 @@
 /**
  * @file src/services/storage-file-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storing and removing one binary file, once, for every surface that can do either.
  *
  *   WHY THIS FILE EXISTS. `POST /v1/storage` and `aimeat_storage_upload` are the same capability, and

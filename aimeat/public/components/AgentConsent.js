@@ -1,5 +1,7 @@
 /**
  * @file AgentConsent.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The agent-approval consent panel — ONE source, mounted in two places
  *   (aimeat_remake/06-koti-feed-suostumus.md, E7). An agent asks to join by device authorization
  *   (RFC 8628); the account holder sees the request here, picks how much it may do, and approves

@@ -1,5 +1,7 @@
 /**
  * @file stats.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Stats and metrics route handlers. Serves node statistics at GET /v1/stats
  *   (with optional from/to time-range filtering) and Prometheus metrics at GET /v1/metrics.
  * @structure

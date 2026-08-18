@@ -1,5 +1,7 @@
 /*
  * @file profile.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile SPA view styles (.pf-* prefix) — hero, tabs, cards,
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.

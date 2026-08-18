@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-silent-catch.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Measures the silent-exception backlog: runs ONLY aimeat/no-silent-catch across the
  *   codebase and reports counts per area and per finding type. This is the progress meter for the
  *   cleanup roadmap — the rule itself is enforced at `error` in eslint.config.js for the areas

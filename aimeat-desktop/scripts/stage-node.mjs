@@ -1,5 +1,7 @@
 /**
  * @file stage-node.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Stages a Node.js runtime as a Tauri sidecar binary for the AIMEAT
  *   Personal Node desktop app. Copies the build host's own Node executable
  *   (process.execPath) to src-tauri/binaries/node-<target-triple><ext>, which

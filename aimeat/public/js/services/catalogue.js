@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/catalogue.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service layer for the AIMEAT action catalogue — lists an owner's services,
  *   browses the public catalogue by category, and publishes/unpublishes services via /v1/catalogue.
  *

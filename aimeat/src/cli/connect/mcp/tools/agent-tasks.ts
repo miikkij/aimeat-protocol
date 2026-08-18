@@ -1,5 +1,7 @@
 /**
  * @file agent-tasks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for agent task management. Routes are
  *   scoped to the connected agent via /v1/agents/{name}/tasks. In multi-agent
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the

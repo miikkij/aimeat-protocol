@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/money.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE money chokepoint for the commerce core (TARGET-033). Money currencies (EUR/USD)
  *   are stored as INTEGER MICRO-UNITS — 6 decimal places, 1 unit = 1_000_000 micros — never cents
  *   and never floats. Six decimals matches USDC/x402 exactly and covers sub-cent agent

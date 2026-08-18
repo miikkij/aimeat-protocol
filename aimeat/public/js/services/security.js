@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/security.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service for the profile Security tab — manages GHII (owner-wide) and
  *   per-agent CORS allow-lists and lists/revokes active owner JWT sessions.
  *

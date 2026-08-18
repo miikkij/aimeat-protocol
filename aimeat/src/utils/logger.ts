@@ -1,5 +1,7 @@
 /**
  * @file src/utils/logger.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Central Winston logger with request-scoped context and credential masking. An
  *   AsyncLocalStorage-backed format injects requestId/gaii into every log line; a masking format redacts
  *   sensitive fields (tokens, passwords, keys, cookies). JSON output in production, colorized pretty

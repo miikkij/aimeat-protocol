@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/capabilities-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab listing all registered capabilities — searchable table with
  *   input/output schema keys, source type, invocation/error stats, and an expandable per-row
  *   panel showing full JSON schemas, owner, status, auth, vouches, and usage.

@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-route-scopes.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The gate for Rule 10 invariant 4: every mutating route carries an explicit scope or
  *   role check. Whether a route requires a scope is stated in exactly one place, the argument list
  *   of an Express handler, and until this script nothing read that place. The August 2026 audit

@@ -1,5 +1,7 @@
 /**
  * @file app-head-meta.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Fills in the `<head>` metadata a published app is missing, and one `<h1>` when it
  *   has none, derived from the app record and its tool manifest.
  *

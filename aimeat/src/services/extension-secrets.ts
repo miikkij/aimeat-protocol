@@ -1,5 +1,7 @@
 /**
  * @file extension-secrets.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Secret-config wiring for the Extension system (S-C / §18). Extension config
  *   fields marked `type: 'secret'` in a manifest (extension-level `config:` or per-instance
  *   `instances.config_per_instance`) are encrypted at rest with AES-256-GCM (the node master

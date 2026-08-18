@@ -1,5 +1,7 @@
 /**
  * @file src/routes/knowledge/sharing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Knowledge package sharing routes — update sharing settings, per-entry visibility,
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.

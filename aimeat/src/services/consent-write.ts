@@ -1,5 +1,7 @@
 /**
  * @file src/services/consent-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Granting and revoking a consent, once, for every surface that can do it.
  *
  *   WHY THIS FILE EXISTS. `POST /v1/consent` and `aimeat_consent_grant` are the same capability, and

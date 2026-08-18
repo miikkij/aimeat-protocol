@@ -1,5 +1,7 @@
 /**
  * @file schedules.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for recurring schedules (Profile Scheduler
  *   master view + per-agent Schedules sub-tab). Wraps the /v1/schedules and
  *   /v1/agents/:name/schedules endpoints. All functions return the AIMEAT

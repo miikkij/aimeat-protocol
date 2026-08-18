@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps/agents-deploy.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-Bundled Apps (Slice 1) — deploy/undeploy/status routes for the crew-defs an
  *   app declares under manifest.cortex.agents. Deploy/undeploy create a pointer task (scope kind
  *   "deploy-app-agent"/"undeploy-app-agent") on the AUTHENTICATED OWNER'S OWN runner agent —

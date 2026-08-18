@@ -1,5 +1,7 @@
 /**
  * @file agents-detail.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for agent detail view sub-tabs (tasks, directives).
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.

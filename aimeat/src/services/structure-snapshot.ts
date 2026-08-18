@@ -1,5 +1,7 @@
 /**
  * @file structure-snapshot.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism STRUCTURE TIMELINE — captures how an organism's shape changes over time. It
  *   keeps a single trackable memory key `organism.{id}.meta.structure` holding the current structural
  *   FINGERPRINT (workspaces, their spaces + counts, member/agent counts — NO content, NO timestamps in

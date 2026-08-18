@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-agents.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only admin routes for agents — list all agents with full detail and
  *   set/clear an agent's CORS allowed-origins (validated http(s) URLs or '*').
  *

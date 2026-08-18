@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
  * @file consent-audit-prune.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Measure and prune the consent-audit store (ConsentAudit collection /
  *   consent_audit table). Historically this logged one row on EVERY data-access check and
  *   grew without bound (1.2M+ rows in prod). The server now only writes denials + consent

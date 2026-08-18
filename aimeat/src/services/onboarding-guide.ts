@@ -1,5 +1,7 @@
 /**
  * @file onboarding-guide.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds the machine-readable Hello Integration guidance attached to the
  *   onboarding status payload: per-step `descriptionText` + `howTo`, a flow-scoped
  *   `step_guide`, and a reachability `summary`. A connector drives onboarding from this

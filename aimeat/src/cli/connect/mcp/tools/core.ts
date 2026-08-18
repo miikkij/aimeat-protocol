@@ -1,5 +1,7 @@
 /**
  * @file core.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Core MCP tool registrations for memory, catalogue, work, wallet,
  *   boards, storage, and admin endpoints. These cover the most commonly used
  *   AIMEAT API surface.

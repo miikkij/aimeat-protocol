@@ -1,5 +1,7 @@
 /**
  * @file calibrator-batch.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Batch card component for the Prompt Calibrator V2.
  *   Renders collapsed summary + expanded 4-step detail view.
  *   Handles step execution (generate, analyze, reflect, synthesize).

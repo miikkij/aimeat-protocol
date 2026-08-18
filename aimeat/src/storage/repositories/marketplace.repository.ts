@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/marketplace.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-layer interface for marketplace persistence — listings and purchases —
  *   implemented per backend (SQLite / Prisma).
  *

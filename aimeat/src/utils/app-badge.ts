@@ -1,5 +1,7 @@
 /**
  * @file app-badge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Inject a small, fixed "aimeat.io · publish your own app" attribution badge into an
  *   inline-served published-app document. A shared app link is often an external visitor's first
  *   contact with AIMEAT, and a bare full-page app gives them no way to the project and no hint they

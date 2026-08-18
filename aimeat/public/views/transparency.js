@@ -1,5 +1,7 @@
 /**
  * @file public/views/transparency.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The public, human-language transparency page (TARGET-058 Phase 10) — the plain
  *   sibling of docs/ai-transparency.md, for a visitor rather than an operator. What this node
  *   marks, what it CANNOT do, who runs it, who supervises it, how to check a piece of content,

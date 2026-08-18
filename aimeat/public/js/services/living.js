@@ -1,5 +1,7 @@
 /**
  * @file living.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Living Documents client service (Phase 0 — no pulse yet). A living document is a
  *   workspace-backed markdown document ASSEMBLED from memory keys. Two surfaces:
  *     - Templates (personal, owner memory `living.template.{id}`): reusable charter+template

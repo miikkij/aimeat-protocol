@@ -1,5 +1,7 @@
 /*
  * @file portal-dev.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "For Developers" portal view styles (.dv-* prefix) — animated
  *   background layers, onboarding steps, platform/goal cards, prompt output,
  *   capability tabs. Consumes theme.css tokens so it flips with dark/light.

@@ -1,5 +1,7 @@
 /**
  * @file organism-lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The organism lifecycle WRITES (create, update, join, leave) as one implementation
  *   for every surface. Until the August 2026 MCP audit these existed twice: once in
  *   src/routes/organisms/crud.ts (POST /v1/organisms, PUT /v1/organisms/:id, POST /:id/join,

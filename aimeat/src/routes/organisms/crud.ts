@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/crud.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism CRUD + lifecycle routes: create, list, the "waiting for you" aggregate,
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.

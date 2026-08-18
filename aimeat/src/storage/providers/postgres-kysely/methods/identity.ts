@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/identity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Identity domain for the Postgres+Kysely backend: owners, agents, GHIIs, and token
  *   revocation — translated from the Prisma implementations against the same Owner / Agent / Ghii /
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the

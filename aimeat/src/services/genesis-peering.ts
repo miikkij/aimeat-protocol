@@ -1,5 +1,7 @@
 /**
  * @file src/services/genesis-peering.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Service managing cross-federation "genesis" peerings — request/approve/suspend/remove
  *   peer records, aggregate a cross-node catalogue, and compute network-reach statistics.
  *

@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/model.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure derived-state + view-model builders for the organism workspace: the merged
  *   draft/published record & document lists, the public-sharing helpers, the activity-title
  *   resolver, and the grouped-tab model (groups, active tab/space/group, tab pickers). Plus the

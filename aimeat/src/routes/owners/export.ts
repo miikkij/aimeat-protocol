@@ -1,5 +1,7 @@
 /**
  * @file src/routes/owners/export.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GDPR data export for one owner: GET /v1/owners/:name/export. Extracted VERBATIM
  *   from src/routes/owners.ts to satisfy max-file-lines; the route body is unchanged, so what the
  *   export contains and who may call it are exactly what they were.

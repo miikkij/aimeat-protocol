@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-ai-posture.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What a published app says about the AI inside it, and the publish-time check that
  *   notices when it says nothing (TARGET-058 Phase 5).
  *

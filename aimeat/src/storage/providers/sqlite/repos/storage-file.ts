@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/storage-file.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository functions for binary storage files, chunked uploads,
  *   and micro-memory. Handles row (de)serialization of file blobs, tags, access codes, and the federate
  *   flag, keyed by (ownerGaii, key).

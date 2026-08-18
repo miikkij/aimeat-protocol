@@ -1,5 +1,7 @@
 /**
  * @file app-agent-surface.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What ONE published app offers an agent, in one document: the app's identity, the
  *   scopes it declares, the SKILL.md packs bound to it, the crew-defs it ships, and what it sells
  *   on the EXCHANGE. These facts already existed on this node, each behind a different endpoint,

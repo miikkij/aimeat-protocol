@@ -1,5 +1,7 @@
 /**
  * @file personas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Seed persona library — the diversity engine. Each persona is a
  *   human-owner role the persona model plays, plus the opening request that the
  *   harness turns into a queued AIMEAT task for the agent to work. Mirrors the

@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ecosystem-app (GEAI) event plane: the per-GEAI OUTBOUND subscription registry and
  *   the best-effort outbound emitter, plus the INBOUND audit log. Outbound events (e.g. memory.write,
  *   binding.revoked) are pushed to a subscribed GEAI over the connect-tunnel via emitDelivery — the

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-extensions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only admin routes for managing bundled extensions: it reads the
  *   `docs/extensions/` directory, exposes the catalogue of available extensions, and lets operators
  *   install/reinstall them, scaffold new ones, and edit action scripts.

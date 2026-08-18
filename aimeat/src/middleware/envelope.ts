@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/envelope.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical AIMEAT response envelope — every route builds its JSON body with the
  *   success()/error() helpers here so all responses share the same protocol/version/node/timestamp/
  *   request_id shape plus optional hint next-actions and pagination meta.

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-peer/policy-book.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Network-policy (genesis-defined federation rules) + federation-book (operator phone-book)
  *   routes — policy get/put/pull with signature verification, node-card, book get/rebuild/pull. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history

@@ -1,5 +1,7 @@
 /*
  * @file aimeat-game/shell.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shell and navigation styles for the aimeat-game kit: the full-screen menu, the
  *   screen (header / scrolling body / fixed action bar), the modal dialog, the confirm and the
  *   toast stack. Imported by /lib/aimeat-game.css — never linked on its own.

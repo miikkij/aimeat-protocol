@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/test-money-handler.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description TEST-ONLY money payment handler (EUR/USD) that settles WITHOUT a real PSP, so the
  *   priced-raw-call MONEY chain (checkout → settle → mint one-time token → retry) and the hold
  *   rail (authorize → capture | release) can be proven end-to-end in OSS E2E. Off-ledger: it

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/helpers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared row↔record mapping + value helpers for the Postgres+Kysely memory methods. Keeps
  *   the JSONB/tsvector/byteSize conventions in one place so every method serialises a MemoryRecord the
  *   same way (matching the Mongo/SQLite backends: byteSize = utf8 bytes of the JSON value; searchBlob =

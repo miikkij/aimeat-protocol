@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/boards-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Boards" tab (Preact + HTM) — lists boards, expands/collapses
  *   their posts, creates new boards, and adds/removes board members through the admin API service.
  *

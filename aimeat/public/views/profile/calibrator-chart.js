@@ -1,5 +1,7 @@
 /**
  * @file calibrator-chart.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SVG multiline chart for calibration score tracking across runs.
  *   X-axis = individual runs (sorted by date), Y-axis = score 0-100%.
  *   One line per model, data points per run.

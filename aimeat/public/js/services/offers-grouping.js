@@ -1,5 +1,7 @@
 /**
  * @file offers-grouping.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure, deterministic helpers for the Agent Offers "Do" surface — turning a flat offer
  *   list into something you can grasp by NEED, not by reading every row. No DOM, no i18n, no fetch:
  *   labels are resolved by the caller, so this whole module is unit-testable in isolation. It powers

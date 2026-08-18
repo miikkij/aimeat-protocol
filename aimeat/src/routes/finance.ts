@@ -1,5 +1,7 @@
 /**
  * @file src/routes/finance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Invoice endpoints of the generic finance domain: draft CRUD, the
  *   draft→sent transition, payment marking, credit notes and Finvoice 3.0 XML download.
  *   All business rules live in src/services/finance/*; handlers stay thin.

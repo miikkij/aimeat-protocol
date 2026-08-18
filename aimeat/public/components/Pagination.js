@@ -4,6 +4,8 @@ const html = htm.bind(h);
 
 /**
  * @file Pagination.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical pagination primitives backed by `.pagination` /
  *   `.load-more` in theme.css. Consolidates the near-identical per-view
  *   prev/page/next clones (.adm-mem-pagination, and the prev/"Page X"/next

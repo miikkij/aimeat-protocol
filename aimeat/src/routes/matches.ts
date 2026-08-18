@@ -1,5 +1,7 @@
 /**
  * @file src/routes/matches.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Match API — endpoints for viewing and responding to AI-generated match suggestions
  *   between profiles, with per-partner consent checks that gate whether a matched profile's details
  *   are revealed.

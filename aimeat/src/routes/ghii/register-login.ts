@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ghii/register-login.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GHII human-identity registration + password login routes: POST /v1/ghii (register),
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/extensions-notify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Site-log, Extension, Escrow, Cortex, Push, Notification, Session, PAT, Email-invitation methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.2.0 — 2026-08-17 — `lean` listings on extensions (no scriptContent) and cortex (no manifest /

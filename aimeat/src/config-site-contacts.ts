@@ -1,5 +1,7 @@
 /**
  * @file src/config-site-contacts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description parseSiteContacts(): the people printed on the public pages, read from
  *   AIMEAT_SITE_CONTACTS. Moved out of config.ts by pure extraction when that file reached the
  *   800-line limit; the code is unchanged and config.ts calls it exactly where it used to.

@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-sse-parity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description An MCP tool file that writes must say so on the change bus.
  *
  *   WHY. Every live view in this node subscribes to SSE change domains, and every REST route that

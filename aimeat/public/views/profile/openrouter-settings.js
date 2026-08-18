@@ -1,5 +1,7 @@
 /**
  * @file openrouter-settings.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AI provider configuration — OpenRouter / LM Studio / custom OpenAI-compatible
  *   endpoint, the API key, the five model roles (default, reasoning, execution, vision,
  *   speech-to-text), sampling parameters, and the AI spend panel.

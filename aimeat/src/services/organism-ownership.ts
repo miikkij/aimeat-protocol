@@ -1,5 +1,7 @@
 /**
  * @file src/services/organism-ownership.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Who holds an organism, and the only place that changes it.
  *
  *   An organism used to have exactly one owner, stored in `creatorGhii`, and that column answered two

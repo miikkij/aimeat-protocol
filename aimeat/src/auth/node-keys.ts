@@ -1,5 +1,7 @@
 /**
  * @file src/auth/node-keys.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Bootstraps the node's Ed25519 signing keypair: loads it from storage,
  *   falls back to a persisted `~/.aimeat/node-key.json` (optionally AES-256-GCM
  *   encrypted via AIMEAT_KEY_PASSPHRASE), or generates a fresh pair — then wires the

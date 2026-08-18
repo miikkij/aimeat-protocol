@@ -1,5 +1,7 @@
 /**
  * @file agent-directives.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for agent directives (three-layer: system + owner + agent)
  * @structure
  *   - GET    /v1/agents/:name/directives      -- Get merged directives

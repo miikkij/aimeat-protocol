@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/notification.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage interface segment for personal-node push notifications — the contract every
  *   backend implements to store Web Push subscriptions (CRUD, per-node listing/counting) and each
  *   personal node's notification preferences.

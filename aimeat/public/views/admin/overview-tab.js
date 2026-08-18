@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/overview-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard overview tab: node health card, headline counters
  *   (owners/agents/actions/boards/tasks/sharing-groups), today's economy figures,
  *   quick config, and a health-warnings table. Fetches live task and sharing-group

@@ -1,5 +1,7 @@
 /**
  * @file members.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node members showcase (published-portfolio owners). Each member renders as an ID
  *   card: identicon + name + full GHII + bio, linking to their portfolio. Plus the "you can have
  *   one too" panel above the grid.

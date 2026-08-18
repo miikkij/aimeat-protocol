@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/components.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Presentational sub-components for the profile Inbox tab: Avatar, AttachmentItem,
  *   MarkdownViewer, PollBuilder,
  *   MessageBubble, Composer (Toast UI editor + markdown fallback), CommandBar/CommandFill (agent

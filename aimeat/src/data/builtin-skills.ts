@@ -1,5 +1,7 @@
 /**
  * @file builtin-skills.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Built-in node-scope skills seeded into the skills registry at startup —
  *   the starter library every agent on this node can load: operator runbooks and
  *   user-level how-tos for automating node and profile management. Content is embedded

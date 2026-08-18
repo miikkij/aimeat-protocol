@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/patch.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description PATCH /v1/memory/:key — apply a JSON Merge Patch (RFC 7386) to one record, so several
  *   principals can each own a subtree of the same key without losing each other's writes.
  *

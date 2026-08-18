@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/economy-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Economy tab — renders morsel-supply, daily-activity, and policy
  *   metrics, plus an operator mint form that credits morsels to a target GAII.
  *

@@ -1,5 +1,7 @@
 /**
  * @file skills-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin Skills tab — manage the NODE-scope skills registry: the node-wide
  *   library every agent on this node can load (operator runbooks, user-level how-tos).
  *   Publish/edit SKILL.md packs, set visibility (members = any authenticated node

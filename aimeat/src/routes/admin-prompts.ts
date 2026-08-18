@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-prompts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only routes for managing DB-backed system prompts: list/get, update
  *   (with content-size + locale-override validation and versioning), reset to factory defaults
  *   (single / group / all), and version history browse + restore.

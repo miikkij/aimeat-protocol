@@ -1,5 +1,7 @@
 /**
  * @file js/services/hello-mcp.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Hello MCP: the single check that says whether the user's MCP connection actually
  *   works. One lookup, one boolean, no computation.
  *

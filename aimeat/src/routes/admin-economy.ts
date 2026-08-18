@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-economy.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only economy administration route: mints morsels to an agent's balance while
  *   enforcing the per-day mint cap (config.maxOperatorMintPerDay) and recording a 'mint' transaction.
  *

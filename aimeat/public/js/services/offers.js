@@ -1,5 +1,7 @@
 /**
  * @file offers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service for the Agent Offers surface ("what can I do with my agents"). Reads
  *   the owner aggregate feed + per-agent offers, and the mode-aware Ask: a schedule-born offer triggers
  *   its schedule; a task-runner/autonomous agent runs a task; an interactive/workstation agent gets a

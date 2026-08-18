@@ -1,5 +1,7 @@
 /**
  * @file src/services/web-bot-auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Web Bot Auth (draft-meunier-web-bot-auth-architecture / RFC 9421 HTTP Message
  *   Signatures) for the node: makes AIMEAT's outbound agent/crawler traffic cryptographically
  *   verifiable. One state, two faces: (1) the key directory served at

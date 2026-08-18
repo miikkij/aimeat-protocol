@@ -1,5 +1,7 @@
 /**
  * @file notebook-plan-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source of truth for the notebook enrichment-PLANNER prompt. Imported BOTH by the
  *   planner service (as the fallback when the managed prompt is missing) and by prompt-defaults.ts (as
  *   the seed content), so the operator-editable managed prompt `notebook-plan` and the code fallback

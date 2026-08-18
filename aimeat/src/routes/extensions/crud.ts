@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/crud.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extension lifecycle REST routes — list, install (POST), idempotent upsert (PUT),
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.

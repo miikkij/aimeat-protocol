@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/owner-cascade.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The owner deletion cascade for the Postgres backend, mirroring
  *   {@link ../../sqlite/methods/owner-cascade.js the SQLite one} table for table.
  *

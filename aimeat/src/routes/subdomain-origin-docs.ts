@@ -1,5 +1,7 @@
 /**
  * @file subdomain-origin-docs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The per-origin documents an app origin publishes about ITSELF: llms.txt, robots.txt,
  *   sitemap.xml, the MCP server card, the web-app manifest + icon (installable apps), AGENTS.md,
  *   sitemap.md and the root markdown mirror. Pure extraction from subdomains.ts when that file

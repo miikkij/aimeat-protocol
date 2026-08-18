@@ -1,5 +1,7 @@
 /**
  * @file portfolio-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for the portfolio. NOT a landing page: with no published
  *   portfolio it forwards straight to the builder (an empty two-button page was a wasted
  *   click); with one published it earns its place — public URL with copy, last updated,

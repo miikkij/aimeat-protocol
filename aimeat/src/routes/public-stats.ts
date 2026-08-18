@@ -1,5 +1,7 @@
 /**
  * @file public-stats.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public, unauthenticated landing-page data: a live activity ticker and
  *   today's node activity counters. Serves ONLY public-visibility data (public memory
  *   entries + aggregate counts) — never private keys, organisms or per-user details.

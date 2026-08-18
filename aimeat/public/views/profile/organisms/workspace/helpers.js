@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure helpers for the organism workspace view — the primary-field map, type-aware
  *   record-field rendering, multi-part document series parsing/grouping, KPI target formatting +
  *   evaluation, and small display utilities. Extracted from workspace.js to satisfy max-file-lines

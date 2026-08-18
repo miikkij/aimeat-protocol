@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/ai-provenance-result.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The `ai_provenance` block on an MCP tool RESULT — defined once, so every read tool
  *   that carries it carries the same shape (TARGET-058 Phase 4).
  *

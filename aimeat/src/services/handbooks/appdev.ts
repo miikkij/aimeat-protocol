@@ -1,5 +1,7 @@
 /**
  * @file appdev.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history

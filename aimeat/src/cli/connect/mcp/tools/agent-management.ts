@@ -1,5 +1,7 @@
 /**
  * @file agent-management.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for agent classification attributes (tags, mode).
  *   These call the same REST endpoints the UI uses:
  *   - PATCH /tags is same-owner gated -- an agent may set tags on itself or a

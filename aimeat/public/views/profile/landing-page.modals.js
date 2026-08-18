@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/landing-page.modals.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)

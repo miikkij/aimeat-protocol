@@ -1,5 +1,7 @@
 /**
  * @file organism-search.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Content search across an organism's workspaces. Backed by the INDEXED full-text
  *   primitive (storage.searchText — SQLite FTS5 / Mongo text), key-prefix-scoped to
  *   `organism.{id}.` (or one workspace), so it stays fast as workspaces grow instead of scanning

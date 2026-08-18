@@ -1,5 +1,7 @@
 /**
  * @file security-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for CORS origin management (GHII + per-agent) and session revocation.
  * @version-history
  *   v1.2.0 — 2026-07-18 — Vaihe 2d: the two bespoke `consent-table`s (per-agent CORS + sessions) →

@@ -1,5 +1,7 @@
 /**
  * @file libs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves browser helper libraries used by AIMEAT apps, including auth, data, storage, social, wallet, and capability clients.
  * @structure libsRouter route registration — a data-driven loop over SDK_LIB_NAMES + explicit auth
  *   (OIDC-provider prelude) and portfolio-standalone routes, all serving committed esbuild-IIFE

@@ -1,5 +1,7 @@
 /**
  * @file sdk-globals.d.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Ambient declarations for the browser globals the served SDK libraries touch that
  *   are not on TypeScript's stock lib.dom `Window` — the webkit-prefixed / non-standard APIs
  *   (webkitAudioContext, SpeechRecognition, webkitSpeechRecognition) plus the serve-time config

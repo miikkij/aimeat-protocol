@@ -1,5 +1,7 @@
 /**
  * @file company-smtp-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A company's own sending identity: the SMTP server its outbound mail leaves
  *   through, so a customer sees mail from the company's domain rather than the node's shared
  *   sender. The password is never carried in this record — it lives encrypted in storage and

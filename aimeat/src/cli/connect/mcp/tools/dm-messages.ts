@@ -1,5 +1,7 @@
 /**
  * @file dm-messages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP tools for the FEDERATED direct-message inbox ("Postilaatikko") — send a DM
  *   from the connected agent to anyone on the network, and read replies addressed to it. Thin proxies to
  *   the node REST API (POST /v1/messages, GET /v1/messages/agent-inbox|agent-thread). Distinct from the

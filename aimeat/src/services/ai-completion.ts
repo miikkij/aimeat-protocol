@@ -1,5 +1,7 @@
 /**
  * @file ai-completion.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reusable server-side AI completion for a single owner, using the
  *   owner's encrypted OpenRouter (or compatible) key + budget settings stored in
  *   memory. Extracted from routes/ai.ts so both the HTTP route (/v1/ai/complete)

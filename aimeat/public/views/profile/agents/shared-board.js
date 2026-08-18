@@ -1,5 +1,7 @@
 /**
  * @file shared-board.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared Agent Board ("radiator") — fleet state at a glance. Mini-cards per agent
  *   (name + status color + ONE essential figure), a status legend that doubles as filter pills,
  *   and issue-first sorting so a problem never drowns among healthy agents. Clicking a card

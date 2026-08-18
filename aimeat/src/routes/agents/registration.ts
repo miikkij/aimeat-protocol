@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agents/registration.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
  *   v1.2.0 — 2026-08-13 — The created agent records `registeredBy`: this door is owner-only, so it

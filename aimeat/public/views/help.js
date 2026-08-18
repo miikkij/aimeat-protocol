@@ -1,5 +1,7 @@
 /**
  * @file help.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Help page, two audiences on one page. "For me" answers the questions a
  *   human actually arrives with; "For my AI" serves the node's help prompt, rendered as
  *   markdown and copyable as raw text. The page used to be the second tab alone, dumping

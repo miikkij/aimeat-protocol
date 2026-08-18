@@ -1,5 +1,7 @@
 /**
  * @file home.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism home page — breadcrumb header (avatar, name, badges, description, Export +
  *   Settings) and tabs (Workspaces / Members / Agents / Board). The Settings panel hosts the
  *   labelled+grouped edit form, the read-only metadata line, and the danger zone (leave / delete).

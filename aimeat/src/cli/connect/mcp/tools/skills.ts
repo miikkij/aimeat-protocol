@@ -1,5 +1,7 @@
 /**
  * @file skills.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP tool registrations for the skills registry (dedicated system,
  *   distinct from knowledge packages): publish, list (library/linked/mine), get (resolve),
  *   link, unlink. Thin proxies over the node's /v1/skills + /v1/agents/:name/skills REST

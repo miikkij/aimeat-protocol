@@ -1,5 +1,7 @@
 /**
  * @file src/services/memory-ceilings.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The three limits a memory write answers to, in one place.
  *
  *   A value may hold at most `memoryMaxValueSizeKb`. A principal may hold at most

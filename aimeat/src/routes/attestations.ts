@@ -1,5 +1,7 @@
 /**
  * @file src/routes/attestations.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST adapter for dual-signed attestations (TINKI phase 1): create (as a party),
  *   sign with your registered Ed25519 key, and read/verify publicly. The signing key is the same
  *   one the party's auth already uses, so no new key distribution exists — an agent signs a deed

@@ -1,5 +1,7 @@
 /**
  * @file src/models/app-tool-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The app-tool manifest contract (TARGET-034 phase A): an agent-faced app declares
  *   PRICED TOOLS in the public memory record `apps.{appId}.tools` under the app owner's GHII.
  *   The commerce app-tool sellable resolver validates the record against these schemas at

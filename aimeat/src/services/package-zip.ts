@@ -1,5 +1,7 @@
 /**
  * @file package-zip.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description ZIP serialization/deserialization service for AIMEAT packages.
  *   Converts PackageRecord objects to ZIP buffers (buildZip) and validates/extracts
  *   ZIP buffers back into ParsedPackage objects (parseZip) with a multi-layer

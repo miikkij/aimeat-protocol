@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ghii/profile.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GHII directory + profile management routes: GET /v1/ghii/list, /directory, CORS
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.

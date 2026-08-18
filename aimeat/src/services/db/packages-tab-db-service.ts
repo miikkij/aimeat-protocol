@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/packages-tab-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile Packages tab — the ONE call behind
  *   GET /v1/packages/tab. The tab mounts a 4-request fan-out: installed instances + the owner's packages
  *   + newest template listings (three LOCAL reads) plus a cross-node federation-templates call. This

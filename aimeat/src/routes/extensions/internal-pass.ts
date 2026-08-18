@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/internal-pass.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A one-shot, in-process pass saying "this call was already settled upstream, do not
  *   charge it again".
  *

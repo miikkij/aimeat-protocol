@@ -1,5 +1,7 @@
 /**
  * @file public/components/CardMenu.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The dots in the top right corner of a card: what you can do with this thing, and
  *   what state it is in, in one control that is always in the same place.
  *

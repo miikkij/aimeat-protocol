@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/metrics.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express middleware that records per-request Prometheus metrics
  *   (HTTP request count and duration by method/route/status) into the shared
  *   prom-client registry on response finish.

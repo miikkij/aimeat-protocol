@@ -1,5 +1,7 @@
 /**
  * @file src/services/prompt-defaults/app-builders.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extracted from prompt-defaults.ts (max-file-lines). Builders group — custom app / game / notes / dashboard / chat builders + CSM builder.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.

@@ -1,5 +1,7 @@
 /**
  * @file public/js/consent-vocab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ONE vocabulary every consent surface reads: the plain-language sentence for a
  *   scope, the friendly name for a scope family, the "Works with:" line, the one-line summary of a
  *   permission preset, and the three boundary sentences (what a grant can NEVER reach). Four

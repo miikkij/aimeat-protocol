@@ -1,5 +1,7 @@
 /**
  * @file organism-import.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Import an organism bundle ZIP: create a NEW organism (settings from organism.json; the
  *   importer becomes creator/admin/member, with a fresh discussion board) and restore every workspace
  *   under it via restoreWorkspace(). Membership/board from the source are NOT restored — only the

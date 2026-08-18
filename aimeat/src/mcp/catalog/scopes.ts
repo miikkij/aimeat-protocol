@@ -1,5 +1,7 @@
 /**
  * @file scopes.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description F1 scope enforcement metadata for the MCP tool surface. Maps each scope-gated tool
  *   to the scope its REST counterpart already requires (auth/middleware.ts requireScope), so the
  *   public /v1/mcp surface enforces the SAME least-privilege rules as REST — closing the hole where

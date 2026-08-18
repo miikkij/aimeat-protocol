@@ -1,5 +1,7 @@
 /**
  * @file profile.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile SPA shell — the authenticated user dashboard. Owns the
  *   tab registry (tier-gated), the active-tab/visited-tab state, live-update
  *   wiring, stats aggregation, and a local showToast() passed down to every tab

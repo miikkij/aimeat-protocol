@@ -1,5 +1,7 @@
 /**
  * @file css/components/managed-env.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for ManagedEnvNote (`.mgd-note`), the note that sits above every copyable
  *   prompt on the public pages. Deliberately neutral chrome — border + surface, a dim left rule,
  *   no alert colour — because it explains the reader's environment rather than warning about this

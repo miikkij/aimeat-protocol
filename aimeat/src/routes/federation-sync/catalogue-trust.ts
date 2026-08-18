@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-sync/catalogue-trust.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation catalogue sync (signed upsert of peer actions) + trust-advisory routes
  *   (warning/suspend/ban with tier demotion and peer purge). Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history

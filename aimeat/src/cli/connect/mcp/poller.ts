@@ -1,5 +1,7 @@
 /**
  * @file poller.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Background poller for new tasks and messages. Per-agent: each
  *   loaded agent gets its own poll loop with its own seen-id state, its own
  *   wake adapter, and its own optional task-runner hook. When a task-runner

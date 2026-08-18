@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/entitlement-gate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The HTTP adapter over the metered chokepoint — thin on purpose.
  *
  *   The decision and the settlement moved to `services/metered-access.ts` and

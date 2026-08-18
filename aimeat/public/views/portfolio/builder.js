@@ -1,5 +1,7 @@
 /**
  * @file views/portfolio/builder.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Portfolio builder component — select content, generate the AI
  *   prompt, and upload/publish the resulting HTML. Extracted from portfolio.js
  *   to satisfy max-file-lines.

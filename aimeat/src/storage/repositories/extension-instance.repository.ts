@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/extension-instance.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-backend-agnostic interface for extension instance records — per-owner
  *   instantiations of an extension. Each backend (SQLite, MongoDB, PostgreSQL) implements it.
  *

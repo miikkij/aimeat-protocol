@@ -1,5 +1,7 @@
 /**
  * @file tab-readme.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description README tab for the agent detail tab-view. Renders the agent's
  *   owner-namespaced `agents.<name>.readme` memory entry as GitHub-flavored
  *   Markdown. The value is agent-authored (often LLM-generated) and already

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/consent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Consent domain for the Postgres+Kysely backend (Consent / ConsentAudit). Backs the
  *   workspace-access grant flow and the GDPR consent ledger. findMatchingConsents reuses the shared
  *   recipient/pattern matchers (services/consent + pattern-utils + gaii) so access decisions are

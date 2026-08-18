@@ -1,5 +1,7 @@
 /**
  * @file knowledge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for knowledge package browsing,
  *   retrieval, contribution, and link discovery.
  * @structure registerKnowledgeTools() -- list, get, contribute, links. The contribute tool is

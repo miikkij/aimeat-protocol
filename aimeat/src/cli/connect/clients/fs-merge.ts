@@ -1,5 +1,7 @@
 /**
  * @file fs-merge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Read-modify-write helpers shared by the client adapters. Every adapter edits a file
  *   the user already owns and that usually holds OTHER servers, so the rules here are the same for
  *   all of them: parse what is there, replace only our own key, back the file up first, and never

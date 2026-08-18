@@ -1,5 +1,7 @@
 /**
  * @file src/services/task-files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Task attachments: the create-time check and the read-time handle enrichment for
  *   `task.resources.files`. File-shaped work (read this invoice, fill this form, summarise this
  *   report) is naturally a TASK, but a task could only carry knowledge packages and memory keys, so

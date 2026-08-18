@@ -1,5 +1,7 @@
 /**
  * @file schema-validator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Schema-lock validation service — compiles JSON Schemas (Ajv, cached) and
  *   validates memory writes against the applicable lock. Also validates schemas themselves
  *   before they are registered (validateSchemaItself). Since v1.2.0 every memory write is

@@ -1,5 +1,7 @@
 /**
  * @file public-knowledge-viewer.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the public knowledge package viewer (no-auth browsing)
  * @version-history
  *   v1.2.0 — 2026-06-02 — Component unification (#23 collapsible): tokenize the

@@ -1,5 +1,7 @@
 /**
  * @file src/data/getting-started.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The `getting_started` narrative in the node's discovery response (GET /). This is
  *   the FIRST thing an AI reads about this node, and for a long time it was wrong: it told agents
  *   to ask their user for a "connectivity key", a flow removed in v1.1.0, and it never mentioned

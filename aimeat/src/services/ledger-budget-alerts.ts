@@ -1,5 +1,7 @@
 /**
  * @file ledger-budget-alerts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Threshold alerting for the usage ledger (LEDGER / TARGET-017). Evaluates an
  *   owner's live daily LLM spend against their budget and, when it first crosses the warn
  *   (≥80%) or over (≥100%) threshold on a given UTC day, emits ONE `budget_alert`

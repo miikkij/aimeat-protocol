@@ -1,5 +1,7 @@
 /**
  * @file platform-detector.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Auto-detect agent platform from connection metadata.
  *   Checks User-Agent header and MCP client metadata against known patterns.
  * @structure

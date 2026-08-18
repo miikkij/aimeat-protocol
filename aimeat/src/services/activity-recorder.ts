@@ -1,5 +1,7 @@
 /**
  * @file activity-recorder.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Records agent activity to the agent_activity table and updates
  *   AgentRecord.activityStats counters on task lifecycle and telemetry events.
  * @version-history

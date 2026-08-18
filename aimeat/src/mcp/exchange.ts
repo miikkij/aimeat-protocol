@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/exchange.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP EXCHANGE marketplace tools (TARGET-045 over MCP): the agent-facing surface for the
  *   two-sided data-service market. Consumer side — browse OFFERINGs, read one in full (I/O schema +
  *   call-recipe + stats), ACCEPT a contract (mint a metered entitlement for the CALLER), list the

@@ -1,5 +1,7 @@
 /**
  * @file ai-image.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The MCP tool that makes a picture.
  *
  *   It returns a storage key and a URL, never the image. Bytes in a tool result travel through the

@@ -1,5 +1,7 @@
 /**
  * @file knowledge-tab.helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure helpers for the Knowledge tab, split out to keep knowledge-tab.js under the file-size
  *   limit.
  * @version-history

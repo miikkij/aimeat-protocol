@@ -1,5 +1,7 @@
 /**
  * @file src/config-security.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two door-defence settings and their defaults, kept together because they answer
  *   one question: what happens when somebody is refused.
  *

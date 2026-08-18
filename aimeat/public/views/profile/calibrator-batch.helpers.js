@@ -1,5 +1,7 @@
 /**
  * @file views/profile/calibrator-batch.helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure helpers, the OpenRouter model-call wrapper, pending-state constants and small
  *   reusable presentational components for the Prompt Calibrator V2 batch card. Extracted from
  *   calibrator-batch.js to satisfy max-file-lines.

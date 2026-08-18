@@ -1,5 +1,7 @@
 /**
  * @file src/routes/realtime.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Realtime "rooms" API (gated by config.realtimeEnabled). Lets authenticated
  *   principals create and list rooms for realtime/multiplayer apps, returning a WebSocket URL;
  *   delegates room lifecycle to the RealtimeManager and honours room limits.

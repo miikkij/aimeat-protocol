@@ -1,5 +1,7 @@
 /**
  * @file ledger-billing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner monthly billing rollup for the usage ledger (LEDGER / TARGET-019): the
  *   technical basis for the "running the house is a subscription" hosted-billing model. Rolls
  *   an owner's daily aggregates up to a month, split by api_key_scope — `own` (the owner's own

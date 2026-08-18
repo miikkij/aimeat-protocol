@@ -1,5 +1,7 @@
 /**
  * @file start.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The /v1/start diagnosis page ("How dead is your JIRA?"): a
  *   story-style choice flow that builds a visible trail, reveals a shareable
  *   verdict (Level 0–3), then asks three build questions and reveals a personal

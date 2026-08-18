@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/evm-address.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Guards for the ONE value a seller types by hand in the whole stablecoin flow: the
  *   address their USDC settles to. Getting it wrong is not a validation nicety — an EIP-3009 transfer
  *   to the wrong target is irreversible, and the two ways to get it wrong are both easy:

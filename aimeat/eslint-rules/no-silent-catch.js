@@ -1,5 +1,7 @@
 /**
  * @file no-silent-catch.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint rule: a caught error must leave a trace. Reports catch clauses (and
  *   `.catch(fn)` handlers) that discard the error — no log, no rethrow, no surfacing to the caller.
  *

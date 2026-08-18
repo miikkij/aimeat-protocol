@@ -1,5 +1,7 @@
 /**
  * @file agent-telemetry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for reporting agent telemetry through the connector.
  * @structure Registers `aimeat_agent_telemetry_report` (write) and `aimeat_usage_report` (read)
  *   against the node's own routes, so the connector surface answers the same questions the public

@@ -1,5 +1,7 @@
 /**
  * @file public-pages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node's public, human-facing HTML pages as ONE registry. Every surface that has
  *   to enumerate those pages reads this list instead of keeping its own copy: sitemap.xml, the
  *   markdown site map, the per-page markdown mirrors, and the per-route <head> metadata (canonical,

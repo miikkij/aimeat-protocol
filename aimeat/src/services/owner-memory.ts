@@ -1,5 +1,7 @@
 /**
  * @file owner-memory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-scope memory aggregation: the union of an owner's GHII keyspace and every one
  *   of the owner's agents' keyspaces, deduped by key (GHII wins). This is the SAME view
  *   `GET /v1/memory?owner_scope=true` returns — memory is keyed by the WRITER's identity, so a

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/community.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Membership, Join-request, Approval, Appeal, Marketplace, Push, Issuer, Nonce, Genesis-peer, Reputation, Realtime-room methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.3.0 — 2026-08-11 — Push subscriptions are per device: upsert on (ownerName, endpoint),

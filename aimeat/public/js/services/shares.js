@@ -1,5 +1,7 @@
 /**
  * @file shares.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for key-space shares — letting a sharing group read a
  *   pattern of the owner's memory. The group says who; a share says what they reach.
  * @structure

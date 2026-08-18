@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/moderation.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface segment for moderation — the CRUD contract each backend implements
  *   for content flags, appeals, and profile matches (create/get/update/list plus match expiry/cleanup).
  *

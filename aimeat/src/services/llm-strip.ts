@@ -1,5 +1,7 @@
 /**
  * @file strip.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Strip markdown code fences from LLM responses.
  *   Handles single blocks, multi-block (yaml+js), and outer-wrapped blocks.
  * @version-history

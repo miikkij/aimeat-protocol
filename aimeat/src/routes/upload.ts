@@ -1,5 +1,7 @@
 /**
  * @file upload.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Presigned upload endpoint. Receives raw file bodies at PUT /v1/upload/:token,
  *   validates the token, enforces size limits, and delegates processing based on upload type
  *   (app, storage, extension, cortex, skill).

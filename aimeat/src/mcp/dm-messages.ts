@@ -1,5 +1,7 @@
 /**
  * @file dm-messages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for the FEDERATED direct-message inbox ("Postilaatikko") — distinct from the
  *   agent-dashboard `aimeat_message_*` tools (which are an agent↔its-own-owner task channel, not
  *   federated). These let an agent send a direct message FROM its own GAII TO any person/agent across

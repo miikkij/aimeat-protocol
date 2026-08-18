@@ -1,5 +1,7 @@
 /**
  * @file env-validator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.

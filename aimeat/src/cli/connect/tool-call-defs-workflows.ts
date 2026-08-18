@@ -1,5 +1,7 @@
 /**
  * @file cli/connect/tool-call-defs-workflows.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-workflow tools for the shell / local-call dispatch: save, get, run, answer a
  *   waiting human-input step, and list what is waiting.
  * @structure workflowTools[] -- the shell handler table, registered by tool-call.ts

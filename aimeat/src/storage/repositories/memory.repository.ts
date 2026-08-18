@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/memory.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic storage contract for the memory subsystem — set/get/list/delete/count,
  *   optimistic-locked updates, per-owner and cross-owner substring search, native ranked full-text
  *   search (the Tier-1 librarian primitive), flag counting, admin-wide listing, and version-history

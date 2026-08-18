@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/memory-tab/files-view.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Renderer for the Memory tab "files" sub-tab — upload button, copy-all URLs, name/tag/
  *   type search, tag cloud, and the file card grid with thumbnail/preview, visibility select, tag
  *   editing, cart toggle, per-file copy-URL, download, and delete. Extracted verbatim from

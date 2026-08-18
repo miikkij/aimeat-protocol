@@ -1,5 +1,7 @@
 /**
  * @file agent-activity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for agent activity stats, history, and event log.
  *   Provides time-series activity data and task event drill-down for the
  *   Agent Dashboard. Owners can view any of their agents; agents can only

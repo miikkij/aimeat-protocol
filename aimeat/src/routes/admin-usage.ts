@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-usage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The operator's cross-owner usage surface: node-wide reports off the precomputed
  *   layer, a per-owner drill, the raw call list, and the two maintenance actions (rebuild a rollup
  *   range, prune the archive). Design: docs/internal/telemetria/02-design.md

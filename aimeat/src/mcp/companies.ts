@@ -1,5 +1,7 @@
 /**
  * @file companies.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for the company registry — a thin layer over the same service core the
  *   REST /v1/companies routes use, so both surfaces enforce identical rules (slug arbitration,
  *   "the front-page app must be YOURS", the portfolio size cap).

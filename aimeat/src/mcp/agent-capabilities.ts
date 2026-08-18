@@ -1,5 +1,7 @@
 /**
  * @file agent-capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for agent capability reporting and activity history viewing.
  *   Tool 1 lets an agent self-report its technical/domain capabilities.
  *   Tool 2 lets an agent view its own activity stats and history.

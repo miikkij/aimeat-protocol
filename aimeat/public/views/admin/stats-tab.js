@@ -1,5 +1,7 @@
 /**
  * @file stats-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Statistics tab with time range selector, notification
  *   delivery sections (email, push, mailbox), and per-day Chart.js charts.
  *   Manages its own data fetching so the period can be changed without reloading

@@ -1,5 +1,7 @@
 /*
  * @file style-testbed.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Interactivity for the dev style-decision testbed
  *   (style-testbed.html). Injects a per-clone decision <select> into each
  *   variant, wires the light/dark theme toggle, and serializes every choice +

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/work.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage interface segment for work items (escrow/paid work between agents) — the
  *   contract every backend implements to create, fetch, update, and list work records by provider or
  *   requester GAII (identified by tracking code).

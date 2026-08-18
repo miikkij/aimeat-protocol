@@ -1,5 +1,7 @@
 /**
  * @file portal.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Portal router — serves the SPA shell, platform prompt generation,
  *   cookie consent JS, and backward-compatible URL routes for static HTML pages.
  * @structure

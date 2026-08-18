@@ -1,5 +1,7 @@
 /**
  * @file model-picker.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One model selector, used for every model role (default, reasoning, execution, vision,
  *   speech-to-text). Replaces a flat <select> that rendered the provider's whole catalogue — 336
  *   options on OpenRouter, with no search, no prices and no way to find out what a model is.

@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/extensions-tab.prompts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AI scaffolding prompt builders for the Extensions tab — buildCortexPrompt() (Cortex
  *   YAML manifest builder) and buildServerExtensionPrompt() (sandboxed server extension builder).
  *   Extracted from extensions-tab.js to satisfy max-file-lines.

@@ -1,5 +1,7 @@
 /**
  * @file agent-messages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for agent-to-agent messaging. Routes are
  *   scoped to the connected agent via /v1/agents/{name}/messages.
  * @version-history

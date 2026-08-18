@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/welcome-door.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The front door (aimeat_remake/01-speksi.md §1 and 12-ai-rekisteroi.md): the first
  *   thing on the landing page.
  *

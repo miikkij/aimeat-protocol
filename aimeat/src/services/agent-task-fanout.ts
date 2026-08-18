@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-task-fanout.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Everything that happens BECAUSE a task finished, in one place, for every door.
  *
  *   WHY. Completing a task writes one record and sets off eight other things, and all eight lived

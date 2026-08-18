@@ -1,5 +1,7 @@
 /**
  * @file pricing.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure pricing + ranking helpers for the AI provider model pickers. No Preact, no DOM,
  *   no network — everything here is a function of the model list the provider returned, which is what
  *   makes it the one place the pricing rules can be read and checked.

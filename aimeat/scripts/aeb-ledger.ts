@@ -1,5 +1,7 @@
 /**
  * @file aeb-ledger.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Prints the AI-acceleration tier + per-model proof ledger for every library pack
  *   (the answer to "which models has each lib been tested on, and what happened?"). Reads the
  *   registry directly (source of truth) — no running node needed. See tools/aeb/acceleration-tiers.md.

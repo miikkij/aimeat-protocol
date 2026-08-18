@@ -1,5 +1,7 @@
 /**
  * @file format.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical display formatters shared across the frontend (number,
  *   date/time, uptime, bytes). Previously these lived only in admin/shared.js and
  *   ~29 profile views hand-inlined `.toLocaleString()` — this is the single home so

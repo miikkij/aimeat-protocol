@@ -1,5 +1,7 @@
 /**
  * @file src/services/exchange-work.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AGENT WORK records for EXCHANGE (TARGET-045 Gap 2) — the async third sellable surface
  *   (DATA / SERVICES / AGENT WORK). A consumer holding a metered contract for a provider agent's TASK TYPE
  *   STARTS a work item (input); the provider agent DELIVERS (output); the per-task price is metered ON

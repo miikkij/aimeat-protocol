@@ -1,5 +1,7 @@
 /**
  * @file reassign-apps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-off operator migration: reassign published apps from one owner
  *   (default "anonymous") to another real owner. Moves EVERY version row, the
  *   screenshot, the download counter, and any subdomain mapping, then deletes the

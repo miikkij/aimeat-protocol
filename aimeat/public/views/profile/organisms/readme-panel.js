@@ -1,5 +1,7 @@
 /**
  * @file readme-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Free-form README panel for an organism or workspace — a markdown body (mermaid allowed)
  *   rendered at the top of the page that explains what the thing is about and is kept up to date. View
  *   mode renders via the safe Markdown component; edit mode is a markdown textarea with a live preview

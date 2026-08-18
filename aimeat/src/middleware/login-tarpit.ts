@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/login-tarpit.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A per-IP delay in front of the credential doors that grows with each failure, so
  *   guessing costs the guesser time and costs everyone else nothing.
  *

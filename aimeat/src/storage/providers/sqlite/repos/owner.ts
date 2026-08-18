@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/owner.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository for owner (GHII) records — CRUD over the `owners`
  *   table with JSON serialization of the roles array.
  *

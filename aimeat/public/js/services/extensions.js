@@ -1,5 +1,7 @@
 /**
  * @file extensions.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description V8 sandboxed extension API service — list, activate, deactivate,
  *   manage instances, and invoke actions on AIMEAT V8 extensions.
  *   Separate from Cortex extensions (cortex.js) which handle UI/schema bundles.

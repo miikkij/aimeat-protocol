@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/account-event.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for the per-owner event window and its archive.
  *
  *   WHY `trim` TAKES THE KEEP COUNT RATHER THAN OWNING IT. How many events stay hot is a product

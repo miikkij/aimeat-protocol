@@ -1,5 +1,7 @@
 /**
  * @file src/routes/instances/migration.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Instance migration routes — generate AI migration prompts (analyze + migrate)
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.

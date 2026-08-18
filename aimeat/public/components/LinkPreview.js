@@ -1,5 +1,7 @@
 /**
  * @file public/components/LinkPreview.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Rich link-preview (unfurl) cards for a pasted URL. `LinkPreview` fetches one URL's
  *   OpenGraph metadata from the node (`/js/services/unfurl.js`) and renders a card (site · title ·
  *   description · thumbnail); the thumbnail is pulled through the node's image proxy into a `blob:`

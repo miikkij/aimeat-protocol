@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/workspace-members.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP workspace membership tools — `aimeat_workspace_access` (request access, list
  *   requests + members, decide one) and the role tools (member_grant, member_revoke, members) that
  *   proactively add/remove an existing GHII/GAII member on one or many workspaces as

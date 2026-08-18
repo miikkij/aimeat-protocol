@@ -1,5 +1,7 @@
 /**
  * @file dangling-refs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Read-only referential-integrity scan for an organism's workspaces: finds reference
  *   fields (and prose mentions) that point to an id which no longer exists — or was archived — in the
  *   SAME workspace. It NEVER blocks a write; it only surfaces findings (the anomaliavahti / TARGET-009

@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-upsert.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Swapping an installed extension's code in place.
  *
  *   An upsert is three things, not one: the field swap, the EXCHANGE re-projection (a price or a

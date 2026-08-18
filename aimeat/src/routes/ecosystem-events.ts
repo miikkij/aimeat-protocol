@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The GEAI (ecosystem app) event plane HTTP surface: the INBOUND event ingress a GEAI
  *   posts to (over its tunnel or directly), and the owner-facing OUTBOUND subscription CRUD. Inbound
  *   events are authenticated as the emitting GEAI (the app + geai come from the token, never the body,

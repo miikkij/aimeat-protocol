@@ -1,5 +1,7 @@
 /**
  * @file locale-merge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Puts a translated slice back into locales/<tag>.json, in en.json's own shape and key
  *   order, and refuses the merge if the result would be broken.
  *

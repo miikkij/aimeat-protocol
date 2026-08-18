@@ -1,5 +1,7 @@
 /**
  * @file swallowed.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A bounded, inspectable record of failures the frontend deliberately continues past.
  *
  *   Why this exists rather than `console.warn` at every site. The browser code carries ~800 handlers

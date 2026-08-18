@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/agent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository for agent (GAII) records — CRUD plus
  *   morsel-balance debit, with JSON (de)serialization of capabilities/scopes/webhook/platform fields.
  *

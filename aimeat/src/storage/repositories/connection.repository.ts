@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/connection.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for outbound connections, delegations and publish attempts
  *   (TARGET-057, aimeat-connect). The store holds a principal's credential for an EXTERNAL service
  *   so that no app, extension or log ever has to.

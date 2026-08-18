@@ -1,5 +1,7 @@
 /**
  * @file check-js-syntax.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A JavaScript syntax check that FAILS CLOSED — for the one job `node --check` was
  *   being recommended for and is not safe at: verifying an app's inline script before it is
  *   republished over a live app.

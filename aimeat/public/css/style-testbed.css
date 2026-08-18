@@ -1,5 +1,7 @@
 /*
  * @file style-testbed.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Layout/chrome for the dev style-decision testbed
  *   (style-testbed.html). All page chrome uses theme.css tokens so it flips
  *   with the light/dark toggle. The .stb-* prefix avoids colliding with the

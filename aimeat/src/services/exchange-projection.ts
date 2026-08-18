@@ -1,5 +1,7 @@
 /**
  * @file src/services/exchange-projection.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description TARGET-050 — the EXCHANGE listing as a PROJECTION of its source, not a hand-authored
  *   snapshot. Before this, listing a capability was a second authoring step: the provider priced a tool
  *   in the app-catalog and then had to call the listing endpoint again, so the market showed stale prices,

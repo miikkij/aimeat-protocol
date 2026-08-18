@@ -1,5 +1,7 @@
 /**
  * @file embed-viewport.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Keeps the copy of aimeat-viewport.js that is embedded inside other cortex packs
  *   byte-identical to the source. Cortex packs are served live and each declares a single script
  *   tag with no `requires`, so a pack that needs the shared camera cannot simply depend on it —

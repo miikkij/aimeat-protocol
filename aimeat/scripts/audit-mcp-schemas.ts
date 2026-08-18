@@ -1,5 +1,7 @@
 /**
  * @file audit-mcp-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description F10 schema-level drift audit. The name-level audit (audit-mcp-tools.ts) proves the two
  *   MCP surfaces expose the same tool NAMES; this proves they expose the same INPUT SHAPE, and that
  *   the shared catalog's input metadata matches. It works by feeding a fake MCP server to the real

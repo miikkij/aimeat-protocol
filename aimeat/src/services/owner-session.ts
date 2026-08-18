@@ -1,5 +1,7 @@
 /**
  * @file owner-session.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner (human) login sessions backed by rotating, server-side refresh
  *   tokens delivered as an httpOnly cookie. Decouples session continuity from the
  *   owner keypair so logging in on one device never invalidates another. Provides the

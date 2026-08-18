@@ -1,5 +1,7 @@
 /**
  * @file template-bundles.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Loader + startup seeder for organism "template bundles" — a bundle is a set of
  *   object-type CSMs plus a manifest skeleton that turns a bare organism into a governed
  *   workspace of a given `kind` (the shipped one is `project`). A bundle is pure data:

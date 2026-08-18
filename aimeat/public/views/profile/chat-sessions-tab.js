@@ -1,5 +1,7 @@
 /**
  * @file chat-sessions-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for managing AI chat sessions connected via agents.
  *   Shows active sessions, allows creating new ones via prompt copy, and
  *   removing existing sessions.

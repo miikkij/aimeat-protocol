@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/knowledge.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service layer for knowledge packages — wraps the /v1/knowledge and
  *   related endpoints for import, CRUD, links, sharing, discovery, cloning, and reputation.
  *

@@ -1,5 +1,7 @@
 /**
  * @file auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Authentication routes for challenge signing, JWT issuance,
  *   refresh, revocation, and session OTK flows.
  * @structure

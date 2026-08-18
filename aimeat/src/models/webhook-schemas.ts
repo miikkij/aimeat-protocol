@@ -1,5 +1,7 @@
 /**
  * @file webhook-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation schemas for AIMEAT webhook v1 payloads.
  *   These schemas define the vendor contract for webhook event payloads.
  *   All field names use snake_case. Breaking changes require a version bump.

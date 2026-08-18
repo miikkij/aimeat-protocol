@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/template-listings.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Template-listing domain for the Postgres+Kysely backend (TemplateListing / TemplateReview /
  *   TemplateDiscussion): the social/discovery layer over package groups. Listing CRUD with
  *   category/featured/status/tag filtering + sort + pagination, install-count bump, moderation queue,

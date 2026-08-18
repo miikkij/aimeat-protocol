@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/capability.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage repository interface for agent capabilities: CRUD, listing/filtering,
  *   invocation stats, execution logs, operator overrides, and trust/vouch tracking. Each
  *   backend (SQLite/MongoDB/PostgreSQL) implements this contract.

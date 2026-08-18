@@ -1,5 +1,7 @@
 /**
  * @file aimeat-marketplace-package.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Installable package "aimeat-marketplace" — a MULTI-SELLER marketplace. Delivered as
  *   a package (like aimeat-iam): installing it registers a per-instance scoped extension + app
  *   (`aimeat-marketplace-{owner}-{shortId}-…`), so each install is an independent storefront.

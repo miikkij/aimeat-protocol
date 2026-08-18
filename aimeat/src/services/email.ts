@@ -1,5 +1,7 @@
 /**
  * @file email.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Email service -- SMTP-based email delivery with retry logic, template support,
  *   and privacy-first logging (never logs email addresses). Supports verification codes,
  *   magic links, notifications, match suggestions, and raw HTML emails.

@@ -1,5 +1,7 @@
 /**
  * @file admin-memory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin sub-router for memory management. Provides operator-only
  *   endpoints to list all memory keys across all owners and delete individual keys.
  * @version-history

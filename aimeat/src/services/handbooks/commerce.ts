@@ -1,5 +1,7 @@
 /**
  * @file commerce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operating handbook for the v2 `commerce` surface (/v2/mcp/commerce): selling and
  *   getting paid — the seller's own payment rails, priced app-tool manifests, offer pricing,
  *   checkout, and the memory/storage a listing lives in. Self-contained; the tool list mirrors

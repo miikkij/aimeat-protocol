@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/oauth.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic storage interface for OAuth state — the persistence contract each
  *   provider implements for registered OAuth clients, refresh tokens, and remembered consent approvals,
  *   including bulk deletes by client, GAII, and owner.

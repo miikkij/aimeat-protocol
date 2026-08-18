@@ -1,5 +1,7 @@
 /**
  * @file src/routes/instances/install.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Package install route — installs a package as an instance (dry_run validation,
  *   real component registration via native storage APIs, @activate-cron firing, rollback on failure).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.

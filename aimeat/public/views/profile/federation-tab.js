@@ -1,5 +1,7 @@
 /**
  * @file federation-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab showing federated peer nodes and their online/offline status.
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial federation tab

@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-trusted-keys.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The gate for Rule 10 invariant 2: a memory key the server reads and ACTS ON must be
  *   unreachable by a scoped app or agent. The reason is the whole H-2 grant model: an app-grant
  *   token resolves to the owner's GHII, so its writes land in the owner's namespace by design. That

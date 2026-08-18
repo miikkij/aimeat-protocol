@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/generator.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AI / paste generator for organism workspaces — reused for a fresh workspace AND
  *   for "restructure" (where, via showRegenerate, it passes the current manifest so the AI EXTENDS
  *   it additively). Owns its own draft/paste state; the parent still owns the shared `genBusy` flag

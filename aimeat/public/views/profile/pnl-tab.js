@@ -1,5 +1,7 @@
 /**
  * @file pnl-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab: the P&L period summary (tuloslaskelma-kooste) from
  *   GET /v1/finance/pnl — income and expenses from booked vouchers grouped by source,
  *   the result before taxes, the period's VAT payable, internal transfers as an info

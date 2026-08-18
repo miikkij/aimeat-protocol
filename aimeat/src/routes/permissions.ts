@@ -1,5 +1,7 @@
 /**
  * @file permissions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Consent/permission inspection routes: rules summary, access-check
  *   simulation, and per-key effective rules (the UI's sharing-rules popover).
  * @structure permissionsRouter() — GET /v1/permissions/summary, /check, /memory/:key

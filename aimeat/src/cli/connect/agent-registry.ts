@@ -1,5 +1,7 @@
 /**
  * @file agent-registry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description In-memory registry of loaded agents for the connector. One MCP
  *   server process can hold N agents; tool handlers receive the registry and
  *   call `resolve(agent_name?)` to pick the right credential per request.

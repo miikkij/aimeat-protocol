@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Top-level admin router — operator authentication (timing-safe password, ephemeral
  *   in-memory sessions) and composition of the domain-split admin sub-routers.
  *

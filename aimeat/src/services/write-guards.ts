@@ -1,5 +1,7 @@
 /**
  * @file write-guards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Per-namespace write guards for workspace records (TARGET-009 S1): the workspace
  *   manifest can declare, per objectType, `create_only: true` (an append-only space — publishing
  *   over an existing record, or deleting one, is refused) and/or `requires_expected_version: true`

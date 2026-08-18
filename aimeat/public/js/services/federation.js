@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/federation.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service wrapper for the federation directory API; fetches the
  *   list of federated peer nodes for display in the SPA.
  *

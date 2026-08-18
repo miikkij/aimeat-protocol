@@ -1,5 +1,7 @@
 /**
  * @file metrics.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reading back how a published item is doing (TARGET-057). One function per provider,
  *   behind one interface, mirroring publish.ts.
  *

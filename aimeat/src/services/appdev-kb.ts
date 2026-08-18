@@ -1,5 +1,7 @@
 /**
  * @file appdev-kb.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared service layer of the learned AppDev knowledge base — the one place that
  *   knows the storage conventions of learned pitfalls (reserved knowledge package
  *   `packages/appdev-pitfalls/{category}/{slug}`, owner-scope aggregation, manifest upkeep)

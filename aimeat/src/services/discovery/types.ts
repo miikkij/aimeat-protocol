@@ -1,5 +1,7 @@
 /**
  * @file types.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Core types for the unified cross-domain "master directory" discovery system.
  *   Defines the normalized `DiscoveryEntry` shape every domain maps into, the `DiscoverySource`
  *   adapter interface (the extension seam — adding a content type = registering one adapter), the

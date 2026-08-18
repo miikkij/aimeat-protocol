@@ -1,5 +1,7 @@
 /**
  * @file organisms.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AIMEAT Organisms Service — organism CRUD, membership, join requests, and the
  *   manifest-driven workspace (a "project" is just an organism with a meta.manifest): apply a
  *   template, generate a workspace with AI, read the workspace, write/publish drafts, and

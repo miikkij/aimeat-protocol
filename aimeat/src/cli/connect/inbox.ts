@@ -1,5 +1,7 @@
 /**
  * @file inbox.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI subcommand: check message inbox
  * @structure Loads connector credentials, fetches pending inbound messages, and prints them as JSON.
  * @usage Called by `aimeat connect inbox`.

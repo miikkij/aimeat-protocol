@@ -1,5 +1,7 @@
 /**
  * @file public/components/PromptCard.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The prompt block: a label, a one-click copy, and — where it makes sense — a corner
  *   menu with the two things a person actually wants next.
  *

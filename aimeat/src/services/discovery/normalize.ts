@@ -1,5 +1,7 @@
 /**
  * @file normalize.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure normalization helpers that collapse each domain's divergent fields into the
  *   canonical `DiscoveryEntry` vocabulary (design §5): visibility enums → one ladder, `tags[]` /
  *   `interests[]` → one deduped tag list, and any bare-name / GHII / GAII owner → a full

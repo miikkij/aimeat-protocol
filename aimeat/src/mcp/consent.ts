@@ -1,5 +1,7 @@
 /**
  * @file consent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP consent tools and resource registrations. Provides 3 tools for consent
  *   management (grant, list, revoke) and 1 resource template for reading consent records
  *   via the MCP resource protocol.

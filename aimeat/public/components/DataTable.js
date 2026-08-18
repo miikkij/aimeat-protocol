@@ -4,6 +4,8 @@ const html = htm.bind(h);
 
 /**
  * @file DataTable.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical generic table primitive — renders a plain
  *   `<table class="data-table ${className}">` (optionally inside a `.scrollable`
  *   wrapper) backed by the shared `.data-table` block in theme.css, so the table

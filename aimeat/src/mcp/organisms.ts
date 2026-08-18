@@ -1,5 +1,7 @@
 /**
  * @file organisms.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP organisms tools and resource registrations. Provides 5 tools for organism
  *   management (list, get, join, leave, members) and 1 resource template for reading organism
  *   details + members via the MCP resource protocol.

@@ -1,5 +1,7 @@
 /**
  * @file agent-caps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for reporting agent capabilities and
  *   viewing activity statistics.
  * @version-history

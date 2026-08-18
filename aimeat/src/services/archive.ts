@@ -1,5 +1,7 @@
 /**
  * @file archive.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism ARCHIVE service — flag an organism, a workspace, a record-table/document-space,
  *   or a single record as read-only + archived so it drops out of every AI-facing material assembly
  *   (structure overview, workspace read, organism search) yet stays resolvable by key and findable via

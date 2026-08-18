@@ -1,5 +1,7 @@
 /**
  * @file src/routes/outbound.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The outbound door's REST surface: recipient registry CRUD, the policied
  *   send, the append-only send log, bounce marking, and the PUBLIC token-based
  *   unsubscribe (the one endpoint here that must work without any authentication —

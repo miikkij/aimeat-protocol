@@ -1,5 +1,7 @@
 /**
  * @file sqlite/schema-tables-4.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite CREATE TABLE/INDEX DDL — part 4 (company-in-a-box: the finance
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.

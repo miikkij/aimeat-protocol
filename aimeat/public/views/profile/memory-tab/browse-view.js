@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/memory-tab/browse-view.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cross-node / public-discovery browse panel for the Memory tab and its handlers —
  *   browse the home node or a remote peer's shared memory, pull entries (single/all), and discover
  *   public memories to copy. Extracted verbatim from memory-tab.js; handlers and the render function

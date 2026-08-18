@@ -1,5 +1,7 @@
 /**
  * @file src/services/config-provenance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Config Provenance Registry — tracks which source layer each config dot-path came
  *   from (defaults → env → file → consul → database), built at startup and updated on runtime writes.
  *

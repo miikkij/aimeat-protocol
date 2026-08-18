@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps/catalogue-admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-catalog listing + operator moderation routes: GET /v1/apps, GET /v1/admin/apps,
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.

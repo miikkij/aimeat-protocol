@@ -1,5 +1,7 @@
 /**
  * @file workspace-list.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace list for an organism — an organism contains many independent workspaces.
  *   Lists discovered workspaces (with this user's access status + per-row enrichment), supports
  *   create / open / delete / request-access / export / import, an access-request inbox and an

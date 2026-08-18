@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/ai-provenance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The stored form of an AI provenance record — the ADDRESSABLE half of the two-layer
  *   design. The other half is ATTACHED: `MemoryRecord.aiProvenanceId` points at a row here, so the
  *   statement travels with the item as well as living outside it. Both exist deliberately: strip the

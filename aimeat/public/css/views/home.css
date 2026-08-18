@@ -1,5 +1,7 @@
 /**
  * @file home.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for KOTI, the home path (koti- prefix): the welcome, the numbered step list
  *   with exactly one step open and the rest named-but-dimmed, the prompt block, the paste box and
  *   its error state. Theme tokens only — no hardcoded colours, no rgba(255,255,255,…).

@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/scheduler-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Scheduler tab — lists scheduled jobs with summary stats and lets the
  *   operator run a job now, toggle enabled/disabled, or delete it.
  *

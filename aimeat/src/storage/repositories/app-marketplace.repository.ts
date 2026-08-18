@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/app-marketplace.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for the app marketplace: records and queries app-purchase
  *   transactions and checks whether a buyer holds a valid (single/lifetime) license for a seller's app.
  *

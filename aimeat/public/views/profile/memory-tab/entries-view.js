@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/memory-tab/entries-view.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Renderer for the Memory tab "entries" sub-tab — quota bar, data tools (load/export/
  *   import), content search + filters, sort, bulk bar, tag cloud, and the collapsible grouped list
  *   of memory rows with per-row visibility/rules/cart/federation controls. Extracted verbatim from

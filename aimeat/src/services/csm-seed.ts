@@ -1,5 +1,7 @@
 /**
  * @file src/services/csm-seed.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Startup seeder for CSM (Content Structure Model) templates — reads `.csm.yaml` files
  *   from docs/csm-examples/, validates them, generates JSON Schemas, and registers both the locked
  *   schema and the CSM record in storage. Idempotent: skips any CSM already registered by name.

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/service-manifest.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository for service manifests — CSM (Consumer Service Model)
  *   and MSM (Machine Service Manifest) records, with JSON (de)serialization and federate flag handling.
  *

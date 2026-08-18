@@ -1,5 +1,7 @@
 /**
  * @file tab-integration.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Integration tab for agent detail view. Shows onboarding checklist
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.

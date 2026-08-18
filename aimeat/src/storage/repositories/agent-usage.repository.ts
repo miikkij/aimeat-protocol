@@ -1,5 +1,7 @@
 /**
  * @file agent-usage.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for the agent LLM usage ledger (LEDGER / TARGET-016):
  *   append-only per-call usage events + upsert-incremented daily aggregates. Raw events
  *   are the source of truth (billing audit, TARGET-019); daily rows are a derived rollup

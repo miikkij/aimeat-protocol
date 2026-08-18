@@ -1,5 +1,7 @@
 /**
  * @file librarian.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Tier-1 "librarian" retrieval: a single ranked full-text search fanned across ALL of
  *   a viewer's own memory (their GHII + every agent + every ecosystem app), so one query reaches
  *   every organism they have contributed to plus their personal notebook content. Built on the

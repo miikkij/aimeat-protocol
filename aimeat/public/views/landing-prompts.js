@@ -1,5 +1,7 @@
 /**
  * @file landing-prompts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two COPY-A-PROMPT sections of the landing page, extracted from landing.js to
  *   satisfy max-file-lines: "build an agent" (crewaimeat fleet on a local Ollama model) and
  *   "ask your own AI what AIMEAT is". Both are self-contained: a constant prompt text and a

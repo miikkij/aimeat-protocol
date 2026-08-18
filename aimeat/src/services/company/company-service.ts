@@ -1,5 +1,7 @@
 /**
  * @file src/services/company/company-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Company lifecycle: create (slug claim), read, update, set the front page,
  *   delete. Every legality rule lives here; routes stay thin.
  *

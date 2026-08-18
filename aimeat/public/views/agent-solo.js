@@ -1,5 +1,7 @@
 /**
  * @file agent-solo.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Standalone single-agent view, served at /v1/profile?solo=<name>.
  *   Opened in its own window by the agent "pop out" button so the owner can
  *   place several agents side by side. Reuses the AgentCard component in

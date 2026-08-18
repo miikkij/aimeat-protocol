@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository functions for the auth data plane — one-time keys
  *   (OTK), RFC 8628 device-authorization records, and OAuth client/refresh-token/approval records.
  *   Each function takes the Database handle and performs a single prepared-statement operation.

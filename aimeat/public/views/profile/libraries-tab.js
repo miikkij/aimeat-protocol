@@ -1,5 +1,7 @@
 /**
  * @file libraries-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab: the full client-library catalogue with AI-acceleration maturity. Lists
  *   EVERY library pack the node serves — SDK wrappers (auth/data/ai/storage…), vendored third-party
  *   libs (pixi/three/chartjs/p5/phaser/styling/mermaid) AND ready-made cortex UI — from

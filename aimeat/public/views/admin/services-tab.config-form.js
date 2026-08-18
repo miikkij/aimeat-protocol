@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/services-tab.config-form.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared input-style constants, JSON-schema default builder, and schema-driven ConfigForm for the admin Services tab. Extracted from services-tab.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from services-tab.js (max-file-lines)

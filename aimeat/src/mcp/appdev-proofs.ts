@@ -1,5 +1,7 @@
 /**
  * @file appdev-proofs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description aimeat_appdev_proof_attach — self-reported acceleration proofs on community
  *   contributions (AppDev KB Phase 8): a per-model pass/fail run record attached to either a
  *   community library pack (append-only public memory record `libpack.proofs.{packId}`, owner

@@ -1,5 +1,7 @@
 /**
  * @file shared.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin Dashboard shared UI helpers — the admin design system's own
  *   primitives (Badge, StatCard, StatsGrid, Spinner, Empty, ErrorBox, DataTable,
  *   ExpandableHelp, useToast/Toast, EconRow/HealthRow) + formatters. Admin is a

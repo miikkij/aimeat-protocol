@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/membership.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism membership + roster routes: members listing, join-request review, admin
  *   promote/demote, member removal/ban/unban, ownership transfer, name-based invitations (with
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent

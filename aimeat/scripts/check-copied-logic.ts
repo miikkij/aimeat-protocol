@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-copied-logic.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The same decision, written out in two files.
  *
  *   WHY. "One capability, one implementation, whatever the interface" is the architecture, and the

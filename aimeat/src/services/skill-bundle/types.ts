@@ -1,5 +1,7 @@
 /**
  * @file types.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared types for the skill bundle generator and runtime adapters.
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase A

@@ -1,5 +1,7 @@
 /**
  * @file src/services/auth-audit.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The refusal log: one line per request this node turned away at the door, written to
  *   a file an operator can read, grep and keep.
  *

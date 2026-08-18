@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/finvoice.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Finvoice 3.0 XML generation from an InvoiceRecord. The output validates
  *   against the official Finanssiala schema (vendored at resources/finvoice/Finvoice3.0.xsd;
  *   the E2E golden-file suite runs xmllint against it), so any operator or bank channel

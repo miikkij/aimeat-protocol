@@ -1,5 +1,7 @@
 /**
  * @file living-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile "Living Documents" tab (Phase 0). Two areas: a personal TEMPLATE collection
  *   (create/edit/delete reusable charter+template skeletons) and the DEPLOYED instances (a template
  *   deployed into a workspace, rendered as living markdown). Phase 0 has no background pulse — content

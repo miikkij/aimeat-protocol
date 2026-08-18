@@ -1,5 +1,7 @@
 /**
  * @file init-wizard.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Interactive `aimeat init` wizard using @clack/prompts. Guides users
  *   through node configuration with use-case-based defaults; reads existing .env /
  *   config values so users see their current settings; writes .env / .ini / .json.

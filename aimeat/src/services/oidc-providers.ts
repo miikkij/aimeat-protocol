@@ -1,5 +1,7 @@
 /**
  * @file oidc-providers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Registry of social-login OIDC providers (Google, Casdoor, Microsoft Entra ID) —
  *   the single source of truth for AIMEAT's configurable sign-in providers. Each provider is a
  *   thin descriptor over the generic {@link OidcClient}: it carries its config-gated enabled flag,

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-peer/lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history

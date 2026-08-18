@@ -1,5 +1,7 @@
 /**
  * @file auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Device authorization flow for agent registration.
  * @structure Prompts for connection details, starts RFC 8628 device auth, stores the issued token, and downloads the skill bundle.
  * @usage Called by `aimeat connect`.

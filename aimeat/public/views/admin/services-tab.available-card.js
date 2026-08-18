@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/services-tab.available-card.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Available (bundled) extension card with disk-script editor + add-action for the admin Services tab. Extracted from services-tab.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from services-tab.js (max-file-lines)

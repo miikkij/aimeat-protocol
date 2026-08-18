@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/notebook-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile Notebook tab — the ONE call behind
  *   GET /v1/notebook. The tab mounts a 3-request fan-out: the inbox notes (loadInbox loaded the WHOLE
  *   owner-scope memory list and filtered client-side to the `notebook.inbox.` prefix) + organism names +

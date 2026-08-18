@@ -1,5 +1,7 @@
 /**
  * @file src/services/file-text/xlsx.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A spreadsheet, as the CSV a person would have exported by hand.
  *
  *   WHY CSV AND NOT PROSE. This text is read by a model that is usually being asked to do one of two

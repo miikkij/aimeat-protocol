@@ -1,5 +1,7 @@
 /**
  * @file src/services/sync-health.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Monitors federation sync infrastructure health (queue depth, average duration,
  *   failure rate, active syncs, throttle state) and computes per-peer priority scores for sync
  *   ordering. Per RFC v1.6 §32.6.3 (throttling) and §32.6.4 (peer priority).

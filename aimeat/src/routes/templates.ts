@@ -1,5 +1,7 @@
 /**
  * @file templates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Template gallery API routes — discovery/social layer for AIMEAT packages.
  *   Manages gallery listings, reviews, threaded discussions, and featured promotions.
  * @structure

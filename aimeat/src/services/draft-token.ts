@@ -1,5 +1,7 @@
 /**
  * @file draft-token.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Draft-preview token generation and verification. A draft-preview token is a
  *   short-lived signed JWT that authorizes READING an app's unpublished draft for preview on
  *   the isolated app origin (which carries no session/cookie — see H-2). The owner mints one

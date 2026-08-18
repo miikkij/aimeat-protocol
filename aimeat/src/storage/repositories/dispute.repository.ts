@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/dispute.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface segment for disputes — the CRUD + audit-log contract each backend
  *   implements for work disputes (create/get/lookup-by-tracking-code, update, append audit entries, list).
  *

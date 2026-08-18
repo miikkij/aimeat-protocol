@@ -1,5 +1,7 @@
 /**
  * @file src/services/board-post.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Posting to a board, once, for every surface that can post.
  *
  *   WHY THIS FILE EXISTS. `POST /v1/boards/:boardId/posts` loads the board and rules on the post

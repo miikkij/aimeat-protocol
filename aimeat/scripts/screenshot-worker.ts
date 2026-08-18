@@ -1,5 +1,7 @@
 /**
  * @file screenshot-worker.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Dev wrapper for `pnpm screenshot:worker`. The implementation lives in
  *   src/cli/screenshot-worker.ts and ships to npm users as the `aimeat screenshot-worker`
  *   subcommand; this just invokes it with the current argv for local dev runs.

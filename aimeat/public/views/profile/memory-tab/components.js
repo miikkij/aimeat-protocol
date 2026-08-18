@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/memory-tab/components.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Standalone sub-components for the Memory tab — public-memory discovery preview,
  *   the collection cart tray (URL list / ZIP / send-to-workspace), the create-memory form, the
  *   universal file preview modal, the drag-and-drop upload form, and the edit-memory modal.

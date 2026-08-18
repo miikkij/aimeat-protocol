@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/color-picker.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The optional color-tag dot + inline swatch palette used by workspace sections,
  *   documents and records. Self-contained (a small fixed palette of theme tokens). Extracted from
  *   workspace.js to satisfy max-file-lines with no behaviour change.

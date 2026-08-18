@@ -1,5 +1,7 @@
 /**
  * @file src/services/exchange-proposals.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Contract RENEGOTIATION for EXCHANGE (TARGET-045). A live contract (metered entitlement) can be
  *   renegotiated instead of blindly revoked + re-accepted: either party PROPOSES new terms (a new per-call
  *   price and/or a new budget cap + a note — e.g. "the upstream API got pricier"), a message is delivered to

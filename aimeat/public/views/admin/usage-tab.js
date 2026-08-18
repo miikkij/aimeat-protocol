@@ -1,5 +1,7 @@
 /**
  * @file usage-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Usage" tab — the unified operator-wide view of node LLM usage. It
  *   renders TWO clearly-labeled, never-summed sections, each a different system counting different
  *   call paths:

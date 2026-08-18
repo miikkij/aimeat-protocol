@@ -1,5 +1,7 @@
 /**
  * @file wallet-ext.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registration for wallet transaction history.
  * @version-history
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)

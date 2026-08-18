@@ -1,5 +1,7 @@
 /**
  * @file client.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Thin AIMEAT REST client for the SynthTraces harness. Implements
  *   the programmatic setup recipe proven in test/api-full.ts (register owner ->
  *   owner token -> register agent -> agent token) plus the memory / message /

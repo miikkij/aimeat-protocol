@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/x402.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description x402 payment challenge body (TARGET-033 phase 5, TARGET-042): every 402 response from a
  *   commerce adapter carries an `accepts` array telling the paying agent HOW it could settle. Two
  *   layers live here:

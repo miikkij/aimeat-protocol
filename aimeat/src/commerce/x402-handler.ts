@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/x402-handler.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The x402 stablecoin PaymentHandler (TARGET-042): settles a MONEY checkout session
  *   with the stablecoin that matches its currency — USD with USDC, EUR with EURC — via the x402
  *   `exact` scheme, NON-CUSTODIAL. It registers in the same registry as io.aimeat.morsels and

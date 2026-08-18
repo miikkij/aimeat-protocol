@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/usage.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for usage telemetry's three layers: the hot call stream, the
  *   archive sweep, and the discriminated serving rollup with its fold watermark.
  *   Design: docs/internal/telemetria/02-design.md

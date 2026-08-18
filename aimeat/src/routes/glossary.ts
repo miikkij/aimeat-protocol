@@ -1,5 +1,7 @@
 /**
  * @file glossary.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves the AIMEAT vocabulary (src/data/glossary.ts) in the three shapes its readers
  *   want: JSON for a program, markdown for an agent, and JSON-LD (schema.org DefinedTermSet) for
  *   anything that indexes structured data. The human page is the SPA view at /v1/glossary, which

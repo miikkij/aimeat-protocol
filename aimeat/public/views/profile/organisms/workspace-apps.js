@@ -1,5 +1,7 @@
 /**
  * @file workspace-apps.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace "Apps" strip — the apps pinned to this workspace (the `…meta.apps` binding
  *   record), rendered as launch cards like the landing wall, plus a creator/admin picker to pin/unpin
  *   published apps. Launching passes the workspace context in the URL FRAGMENT

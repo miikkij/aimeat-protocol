@@ -1,5 +1,7 @@
 /**
  * @file theme.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Dark/light theme controller for the AIMEAT SPA. Owns the
  *   `data-theme` attribute on <html>, persists the user's explicit choice to
  *   localStorage (`aimeat-theme`), and — until the user makes an explicit

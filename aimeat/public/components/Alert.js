@@ -1,5 +1,7 @@
 /**
  * @file public/components/Alert.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reusable inline notification banner (Preact + HTM) rendering a typed
  *   alert (success/error/info/warn) with an icon, message, and optional dismiss button.
  *

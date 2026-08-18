@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/knowledge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Knowledge domain for the Postgres+Kysely backend: memory links (KnowledgeLink) + operator
  *   package reviews (KnowledgeReview). Translated 1:1 from the Prisma implementation. findBrokenLinks
  *   walks the contributor's links and checks both endpoints via getMemory.

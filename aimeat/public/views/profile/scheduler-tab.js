@@ -1,5 +1,7 @@
 /**
  * @file scheduler-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile › Scheduler — the master view of every recurring schedule
  *   the owner has running: AIMEAT-managed (ai / agent_task / extension), the
  *   owner's extension cron jobs, and each agent's self-reported internal

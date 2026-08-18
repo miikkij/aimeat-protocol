@@ -1,5 +1,7 @@
 /**
  * @file instance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Instance-scoped provider support (TARGET-057): normalising a user-supplied instance
  *   address, and registering this node as an application at that instance on first contact.
  *

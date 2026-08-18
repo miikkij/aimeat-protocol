@@ -1,5 +1,7 @@
 /**
  * @file tracked-responses.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service for Tracked Responses — the Memory Contract that owes a (possibly
  *   federated) reply to an inbox message once a watched workspace record satisfies a condition.
  *   Thin wrappers over /v1/tracked-responses; plus message-importance flags stored as owner memory

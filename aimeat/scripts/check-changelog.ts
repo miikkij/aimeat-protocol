@@ -1,5 +1,7 @@
 /**
  * @file check-changelog.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Guard for public/changelog.json — the node's change log, which the landing page
  *   fetches and renders. A malformed file fails in the quietest possible way: the fetch rejects,
  *   the component renders nothing, and the front page simply stops announcing anything. Since the

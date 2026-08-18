@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The write half of an extension's life: storing an install or a redeploy, switching one
  *   on, switching it off, and removing it together with everything it left behind.
  *

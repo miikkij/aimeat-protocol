@@ -1,5 +1,7 @@
 /**
  * @file src/services/metered-settlement.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Moving the value for one authorised metered call — the half of the chokepoint that
  *   touches wallets. `metered-access.ts` decides; this settles what it decided.
  *

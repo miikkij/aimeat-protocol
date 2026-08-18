@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/errors.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Typed error for the finance domain, mapped to HTTP by the routes
  *   (same shape as CommerceError / ContactsError so route error handling stays uniform).
  * @usage throw new FinanceError('FISCAL_YEAR_LOCKED', 409, 'Fiscal year 2025 is locked');

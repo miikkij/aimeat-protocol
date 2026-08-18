@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-shared-implementation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description How far the MCP surface still is from calling what REST calls.
  *
  *   THE RULE (CLAUDE.md, Backend): one capability, one implementation, whatever the interface. An MCP

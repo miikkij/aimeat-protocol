@@ -1,5 +1,7 @@
 /**
  * @file views/portfolio/prompt.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Portfolio prompt builder — composes the self-contained HTML-builder
  *   prompt from the user's selected content, style, and auth gates. Extracted from
  *   portfolio.js to satisfy max-file-lines.

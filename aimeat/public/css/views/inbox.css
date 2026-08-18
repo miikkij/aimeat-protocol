@@ -1,5 +1,7 @@
 /**
  * @file inbox.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the profile Inbox tab (human↔human direct messaging): a two-pane messenger
  *   — conversation/request list + thread pane with chat bubbles, avatars, date dividers, delivery
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).

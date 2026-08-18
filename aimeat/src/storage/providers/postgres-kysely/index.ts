@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description PostgreSQL + Kysely storage provider — the Prisma-free backend chosen by the Phase-4
  *   benchmark (dev-organism doc-s4hgvp5 / doc-ve32ack). Mirrors the SQLite provider's shape: a class
  *   holding the Kysely instance + pg pool, a `ready` promise that runs the SQL migrations on first boot,

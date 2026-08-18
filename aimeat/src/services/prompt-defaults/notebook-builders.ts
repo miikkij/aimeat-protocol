@@ -1,5 +1,7 @@
 /**
  * @file src/services/prompt-defaults/notebook-builders.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extracted from prompt-defaults.ts (max-file-lines). Builders group — notebook placement classifier/planner/distributor + living-document author.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.

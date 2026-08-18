@@ -1,5 +1,7 @@
 /**
  * @file portfolio.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registration for the person's OWN welcome page — parity with the
  *   server MCP (src/mcp/portfolio.ts) so `aimeat connect serve --surface agent` exposes it the same
  *   way /v2/mcp/agent does. A thin proxy over PUT /v1/portfolio/upload, so the size cap and the

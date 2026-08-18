@@ -1,5 +1,7 @@
 /**
  * @file eslint.config.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description ESLint flat config for AIMEAT project. Includes TypeScript-ESLint recommended
  *   rules plus custom AIMEAT rules for file headers and file size limits.
  *

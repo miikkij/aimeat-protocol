@@ -1,5 +1,7 @@
 /**
  * @file cortex.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP cortex lifecycle tools. Provides 5 tools for cortex extension management:
  *   list, install, activate, deactivate, and delete cortex extensions via the MCP protocol.
  * @structure

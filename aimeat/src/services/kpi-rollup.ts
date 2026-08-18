@@ -1,5 +1,7 @@
 /**
  * @file kpi-rollup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Compute a measurability KPI's current value from a workspace's OWN published records —
  *   the `source: { from:'records', ... }` aggregation of the organism-measurability convention. PURE
  *   (no IO): the caller passes the already-listed workspace records + the manifest objectTypes, so the

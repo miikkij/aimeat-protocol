@@ -1,5 +1,7 @@
 /**
  * @file agent-schedules.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools letting an agent create and manage its own recurring
  *   schedules. The server owns the clock: create, update and delete go through
  *   services/schedule-write.ts, the same service the /v1/schedules routes use, which

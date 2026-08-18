@@ -1,5 +1,7 @@
 /**
  * @file src/services/schedule-gate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What a caller must hold before a schedule is created, for every surface that creates
  *   one.
  *

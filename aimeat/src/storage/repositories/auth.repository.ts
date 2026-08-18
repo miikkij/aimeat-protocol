@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/auth.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage interface segment for auth token revocation — the contract every backend
  *   implements to persist a revoked-token denylist keyed by token hash, with expiry-based cleanup.
  *

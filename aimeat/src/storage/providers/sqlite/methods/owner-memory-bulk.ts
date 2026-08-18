@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/owner-memory-bulk.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite memory BULK primitives (data-access redesign) — batched key read, bulk upsert (one
  *   transaction), and the delete family (subtree / prefix-wipe / explicit-ref). Split out of ./owner.ts
  *   to keep that file ≤800 lines (max-file-lines); method bodies are verbatim, bound to SqliteStorage via

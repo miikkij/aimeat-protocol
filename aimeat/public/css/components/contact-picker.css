@@ -1,5 +1,7 @@
 /**
  * @file public/css/components/contact-picker.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared ContactPicker component — input + suggestion dropdown (contacts, directory
  *   hits, email-resolve action). Theme-variable driven; loaded globally from spa.html.
  * @version-history

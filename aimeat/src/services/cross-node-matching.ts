@@ -1,5 +1,7 @@
 /**
  * @file src/services/cross-node-matching.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cross-node community matching service. Produces anonymized interest/location
  *   profiles (only for GHIIs that granted community-discovery consent) and scores similarity
  *   between two profiles, for privacy-preserving federated match discovery.

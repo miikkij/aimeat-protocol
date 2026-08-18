@@ -1,5 +1,7 @@
 /**
  * @file src/routes/instances/manage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Instance management routes — list instances, live-hash component status,
  *   check-update diff, instance details, and instance removal (optional component cleanup).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.

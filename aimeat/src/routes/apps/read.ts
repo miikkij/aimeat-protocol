@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps/read.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-catalog read routes: version list, fork list, lineage, screenshot GET/POST/DELETE,
  *   and the app download (GET /v1/apps/:owner/:filename incl. draft preview + H-2 app-origin redirect +
  *   copy-protection). Extracted from src/routes/apps.ts to satisfy max-file-lines.

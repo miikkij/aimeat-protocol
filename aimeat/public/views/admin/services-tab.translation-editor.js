@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/services-tab.translation-editor.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Instance translation editor + AI-prompt builder + per-extension key patterns for the admin Services tab. Extracted from services-tab.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from services-tab.js (max-file-lines)

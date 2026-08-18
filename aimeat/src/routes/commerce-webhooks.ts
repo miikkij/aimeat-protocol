@@ -1,5 +1,7 @@
 /**
  * @file src/routes/commerce-webhooks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Stripe webhook endpoint → accounting vouchers. Per-seller path
  *   (/v1/commerce/webhooks/stripe/:owner) because every seller runs their OWN Stripe
  *   account (no Connect, no node-level key): each endpoint verifies against that

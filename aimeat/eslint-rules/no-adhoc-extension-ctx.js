@@ -1,5 +1,7 @@
 /**
  * @file no-adhoc-extension-ctx.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint rule: an `ExtensionCtx` is built by services/extension-ctx.ts, never by
  *   hand at a call site. Reports an object literal typed as `ExtensionCtx`.
  *

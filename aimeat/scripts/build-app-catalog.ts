@@ -1,5 +1,7 @@
 /**
  * @file build-app-catalog.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Build step for the app-catalog page. Bundles the modular ES sources under
  *   src/static/app-catalog/ (js/main.js entry + its imports) with esbuild into one IIFE, inlines
  *   the CSS, and injects both into _template.html — producing the served, self-contained

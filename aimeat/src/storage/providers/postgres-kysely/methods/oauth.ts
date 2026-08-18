@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/oauth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description OAuth domain for the Postgres+Kysely backend (OAuthClient / OAuthRefreshToken /
  *   OAuthApproval): registered OAuth 2.1 clients, rotating refresh tokens, and remembered consent
  *   approvals, plus the bulk deletes by client, GAII, and owner. Approvals are keyed by the unique

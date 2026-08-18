@@ -1,5 +1,7 @@
 /**
  * @file scripts/carousel/slides.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The slide markup and styling, in one place. make.mjs prints it to PDF and
  *   preview.mjs shoots it to PNG; sharing the module is what makes the preview evidence about
  *   the PDF rather than a lookalike. (The first version copied the CSS as text and the

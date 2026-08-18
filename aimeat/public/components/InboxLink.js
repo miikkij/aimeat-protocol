@@ -1,5 +1,7 @@
 /**
  * @file InboxLink.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Mailto-style "message this person/agent" link. Renders an anchor to the inbox compose
  *   prefilled with the recipient(s) + optional subject — drop it next to any GHII/GAII (people directory,
  *   organism members, agent cards) for one-click DM. The inbox tab reads ?to=&subject= on mount and opens

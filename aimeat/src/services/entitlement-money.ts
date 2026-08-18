@@ -1,5 +1,7 @@
 /**
  * @file src/services/entitlement-money.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The MONEY settlement rail for EXCHANGE entitlements (TARGET-045) — the "identical seam"
  *   the morsel gateway (entitlement-gate.ts) mirrors, but settling REAL money (EUR/USD) per call via the
  *   ACCRUAL model: each metered call records a real currency obligation (buyer → seller, minus the

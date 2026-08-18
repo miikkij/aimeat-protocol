@@ -1,5 +1,7 @@
 /**
  * @file openrouter.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Provider-agnostic AI client for OpenAI-compatible APIs (OpenRouter, LM Studio, etc.).
  * @structure
  *   - complete(apiKey, model, prompt, systemPrompt?, baseUrl?) — call chat completions

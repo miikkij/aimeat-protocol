@@ -1,5 +1,7 @@
 /**
  * @file apps-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Applications tab — operator moderation surface for
  *   every published app on the node. Lists all apps (across all owners, including
  *   parked + operator-hidden), with a hide/restore control. Hiding removes the app

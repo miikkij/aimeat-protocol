@@ -1,5 +1,7 @@
 /**
  * @file apps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App Catalog routes -- single-file HTML apps with manifest, version
  *   history, search, screenshot, and access-code-gated download. Apps are stored
  *   in the dedicated apps table. Each publish auto-increments the version number;

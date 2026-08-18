@@ -1,6 +1,8 @@
 #!/usr/bin/env tsx
 /**
  * @file scripts/kill-test-servers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pre-flight cleanup for the E2E runner — kill a wedged test server left behind by a
  *   previous run (timed-out, crashed, or Ctrl-C'd before teardown) and remove a stale/corrupt SQLite
  *   test DB so the next run starts clean. Deliberately targets ONLY the E2E test port (default 40251,

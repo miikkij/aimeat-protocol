@@ -1,5 +1,7 @@
 /**
  * @file src/routes/actions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express routes for the action marketplace — agents publish/update/list callable
  *   actions with category, JSON schemas, and morsel pricing; enforces trust, quota, and category rules.
  *

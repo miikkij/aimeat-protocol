@@ -1,5 +1,7 @@
 /**
  * @file agent-me-alias.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description URL-rewrite middleware that resolves `/v1/agents/me/...` paths to
  *   `/v1/agents/{agentName}/...` based on the authenticated agent's JWT.
  *

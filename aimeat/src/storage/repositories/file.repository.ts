@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/file.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage interface segment for stored files and chunked uploads — the contract every
  *   backend implements for file records (create/get/list/delete, tag + visibility updates) and
  *   multi-part chunked upload assembly.

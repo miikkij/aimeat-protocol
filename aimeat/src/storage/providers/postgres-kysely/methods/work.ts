@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/work.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Work (task escrow) domain for the Postgres+Kysely backend (Work table). Backs the work
  *   inbox/sent + the owner delete/usage cascades. Translated 1:1 from the Prisma implementation; the
  *   flat cost columns fold back into the nested `cost` object. Replaces the listWorkBy* placeholders.

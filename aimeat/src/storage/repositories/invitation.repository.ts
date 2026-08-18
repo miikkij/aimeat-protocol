@@ -1,5 +1,7 @@
 /**
  * @file invitation.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage contract for email invitations to people who are NOT yet in the system.
  *   A creator/admin invites an external email into an organism (+ selected workspaces with a
  *   role). The invite carries a single-use, time-limited token in an emailed link; on accept the

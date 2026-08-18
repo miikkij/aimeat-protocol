@@ -1,5 +1,7 @@
 /**
  * @file app-agent-deploy.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-Bundled Apps (Slice 1) — materialize the deploy/undeploy handshake task on
  *   the OWNER'S OWN fleet. The node NEVER executes a crew-def: it creates an AIMEAT task on the
  *   owner's crew-forge/task-runner agent whose scope carries a POINTER (app_id + agent_name),

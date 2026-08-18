@@ -1,5 +1,7 @@
 /**
  * @file agent-footer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Appends the node's agent-facing link block to a served HTML page: glossary, site
  *   map, llms.txt, AGENTS.md and the API contract.
  *

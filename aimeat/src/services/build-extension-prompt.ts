@@ -1,5 +1,7 @@
 /**
  * @file build-extension-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The canonical "build an AIMEAT server extension" prompt, served from the node so
  *   every consumer gets one non-drifting source of truth: the profile Extensions tab, an agentic
  *   coder over GET /v1/prompts/build-extension, the aimeat-extension-builder skill, llms.txt.

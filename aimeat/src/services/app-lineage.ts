@@ -1,5 +1,7 @@
 /**
  * @file app-lineage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Fork lineage for a published app — the data behind the catalog's
  *   "forks" list and lineage view. Descendants are walked from the append-only
  *   app_forks event log (so the chain survives a child being parked or deleted),

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/actions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Action (offers/services) domain for the Postgres+Kysely backend (Action table). Backs the
  *   provider-owned action definitions + the owner delete/usage cascades. Translated 1:1 from the Prisma
  *   implementation: the flat pricing columns fold back into the nested `pricing` object, the JSON columns

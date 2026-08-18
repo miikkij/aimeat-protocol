@@ -1,5 +1,7 @@
 /**
  * @file cortex.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cortex library packs — the node-bundled cortex UI extensions served at
  *   /v1/cortex/<name>/libs/<name>.js (seeded on boot from public/cortex-bundled/*.yaml+js).
  *   `version` MUST match the cortex YAML's spec.version (enforced by the library-packs E2E

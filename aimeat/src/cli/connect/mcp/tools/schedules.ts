@@ -1,5 +1,7 @@
 /**
  * @file schedules.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the agent schedule tools — parity with the server
  *   MCP (src/mcp/agent-schedules.ts) so `aimeat connect serve --surface agent` exposes the same
  *   scheduling tools locally. Thin REST wrappers over /v1/schedules; aimeat_schedule_report_internal

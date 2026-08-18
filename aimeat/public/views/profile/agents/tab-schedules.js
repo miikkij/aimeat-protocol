@@ -1,5 +1,7 @@
 /**
  * @file tab-schedules.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent detail › Schedules sub-tab. Shows this agent's schedules in
  *   two groups: AIMEAT-dispatched (server-managed; full controls) and Agent
  *   internal (the agent's self-reported mirror, read-only). Lets the owner create

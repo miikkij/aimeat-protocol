@@ -1,5 +1,7 @@
 /**
  * @file ledger-budget.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Budget tracking for the usage ledger (LEDGER / TARGET-017): computes an owner's
  *   actual daily LLM spend from the ledger daily aggregates and compares it to their
  *   `daily_budget_usd`, producing a status (ok / warn ≥80% / over ≥100%) with a per-agent

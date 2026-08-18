@@ -1,5 +1,7 @@
 /**
  * @file version.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Resolve the running AIMEAT software version (from aimeat/package.json) at runtime,
  *   cached. Used to advertise the node's version to the federation (well-known, heartbeat, node-card)
  *   so peers can see which AIMEAT each other runs and infer feature gaps. Tries the candidate paths

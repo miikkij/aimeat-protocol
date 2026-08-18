@@ -1,5 +1,7 @@
 /**
  * @file src/cli/config-export.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI command `aimeat config export` — serializes the current AimeatConfig into
  *   env, ini, json, or writes mutable values to Consul KV, using CONFIG_FIELDS metadata.
  *

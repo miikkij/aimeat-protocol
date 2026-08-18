@@ -1,5 +1,7 @@
 /**
  * @file memory-namespace-hints.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The guidance the memory tools return when a caller runs into the same-owner
  *   namespace model. Memory is keyed by the WRITER: an app writes as the owner's GHII, an agent
  *   writes as its own GAII, and owner-scope reads resolve GHII-first.

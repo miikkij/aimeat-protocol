@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/ecosystem.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Ecosystem-application (GEAI) domain for the Postgres+Kysely backend: the EcosystemApp
  *   principal CRUD, the "hello integration" handshake (EcoAuth — the eco twin of device-auth), and the
  *   per-(owner, app) automation recipes (EcoAutomationRecipe, feature B4). Translated 1:1 from the

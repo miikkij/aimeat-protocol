@@ -1,5 +1,7 @@
 /**
  * @file screenshot-worker.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator screenshot worker, shipped as the `aimeat screenshot-worker` subcommand.
  *   Lists published apps with no screenshot, renders each headless, captures a JPEG, and uploads it
  *   via POST /v1/apps/:owner/:filename/screenshot. Uses `playwright-core` (no bundled browser

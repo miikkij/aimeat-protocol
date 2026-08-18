@@ -1,5 +1,7 @@
 /**
  * @file notebook-helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Small pure helpers + constants shared by the Notebook tab (notebook-tab.js) and the
  *   per-note organizer card (notebook-card.js): relative-time formatting, the collapsed one-line view,
  *   best-effort note-value-to-text, and the placement "new" sentinel / classify progress-step keys /

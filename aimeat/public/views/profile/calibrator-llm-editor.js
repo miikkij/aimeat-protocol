@@ -1,5 +1,7 @@
 /**
  * @file calibrator-llm-editor.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description LLM configuration editor component for the Prompt Calibrator.
  *   Supports OpenRouter, LM Studio, and custom providers.
  * @version-history

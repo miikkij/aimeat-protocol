@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/messaging-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Composite Application DB Service for the owner's direct-message conversations list — the
  *   ONE call behind GET /v1/messages/conversations. It resolves the owner's agent fleet a SINGLE time,
  *   then batches the conversations read for the owner AND every agent into ONE storage call

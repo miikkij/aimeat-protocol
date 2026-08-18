@@ -1,5 +1,7 @@
 /**
  * @file participants-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace participants panel — who takes part in this workspace, as a node → owner →
  *   agents chart + listing, the viewer's contract agents (with one-click adopt), and (for the
  *   workspace creator) an access manager. Extracted from organisms-tab.js with no behaviour change.

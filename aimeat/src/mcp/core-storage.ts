@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/core-storage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The core MCP storage tools: aimeat_storage_upload (inline or presigned),
  *   aimeat_storage_download (by key in the caller's own namespace, or by REFERENCE for a file someone
  *   else owns), and aimeat_storage_delete. Extracted from src/mcp/core.ts to satisfy max-file-lines.

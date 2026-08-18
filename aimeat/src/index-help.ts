@@ -1,5 +1,7 @@
 /**
  * @file src/index-help.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI help text constants (top-level + connector) for the aimeat binary. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from index.ts (max-file-lines)

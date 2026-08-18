@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-access-token.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The short-lived signed grant that lets the session-less app origin serve an app
  *   whose delivery is gated: one carrying an access code, or a price the caller has already paid.
  *   The apex checks the code or the licence, mints one of these, and redirects; the app origin

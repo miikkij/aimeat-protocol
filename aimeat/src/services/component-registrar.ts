@@ -1,5 +1,7 @@
 /**
  * @file component-registrar.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Service for registering, deleting, and fetching package components
  *   via native AIMEAT storage APIs. Adapts PackageComponent content strings into
  *   the format each storage repository expects. Used by the install, migration,

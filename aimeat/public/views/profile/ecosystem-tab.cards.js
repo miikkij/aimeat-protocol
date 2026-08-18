@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/ecosystem-tab.cards.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Presentational sub-cards of an expanded GEAI card — <EcoDataEntry> ("Data this app
  *   wrote" row), <EcoSetupGuide> (the app's own bilingual Markdown setup guide), <EcoAskInClaude>
  *   (the separate MCP "Ask in Claude" section), and <EcoTechDetails> (the collapsed "Technical

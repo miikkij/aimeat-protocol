@@ -1,5 +1,7 @@
 /**
  * @file sd-jwt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SD-JWT decode and cryptographic signature verification for EUDIW VP tokens.
  *   Uses @sd-jwt/decode for token parsing and jose for signature validation.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file ai-image.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Image generation on the owner's key, with the result landing in storage rather than
  *   in anyone's context.
  *

@@ -1,5 +1,7 @@
 /**
  * @file signal-eval.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure, deterministic-first evaluator for the Agent Workflows signal grammar
  *   (workflow-schemas.ts §Signal). Given a signal tree and an injected I/O context (memory reads,
  *   {var} params, an optional node-OpenRouter `llm` judge, and an optional JSON-schema validator),

@@ -1,5 +1,7 @@
 /**
  * @file agent-skill-bundle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for skill bundle download and version check.
  *   Agents download runtime-specific skill bundles as ZIP files, and check
  *   for updates via a lightweight version endpoint.

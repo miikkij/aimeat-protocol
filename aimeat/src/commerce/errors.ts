@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/errors.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The commerce core's typed error — carried from resolvers/session service up to the
  *   protocol adapters, which map { code, statusCode, message } straight onto their envelopes.
  *   Extracted from session-service.ts so sellable-resolvers can throw it without a circular import.

@@ -1,5 +1,7 @@
 /**
  * @file src/utils/env-config/sections-node.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node identity, storage, security, modes, economy, features, quota config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)

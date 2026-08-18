@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/session-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The checkout-session lifecycle of the commerce core (TARGET-033): resolve line
  *   items through the sellable-resolver registry (agent offers in core, org offerings in EE),
  *   create/read/update/cancel sessions, and complete a session — collect the gross from the buyer

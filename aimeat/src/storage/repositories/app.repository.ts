@@ -1,5 +1,7 @@
 /**
  * @file app.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage contract for the App Catalog — versioned single-file HTML
  *   apps. Each publish inserts a new row with an incremented versionNumber; old
  *   versions are retained and queryable via listAppVersions. Implemented by the

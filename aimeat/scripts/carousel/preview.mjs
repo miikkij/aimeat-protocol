@@ -1,5 +1,7 @@
 /**
  * @file scripts/carousel/preview.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Renders the same slide markup make.mjs prints, one PNG per page, so the pages can
  *   actually be looked at before anything is published. A PDF nobody has seen is a guess.
  * @usage node scripts/carousel/preview.mjs scripts/carousel/slides.origami.json

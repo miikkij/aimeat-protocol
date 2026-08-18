@@ -1,5 +1,7 @@
 /**
  * @file ledger-admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only cross-user aggregation of the agent LLM usage ledger (LEDGER /
  *   TARGET-016): node-wide totals, a per-day series with a per-model split, per-user "top spenders",
  *   per-agent and per-model breakdowns.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/exchange-odps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Projects an EXCHANGE offering into an **Open Data Product Specification v4.1** document
  *   (opendataproducts.org, Linux Foundation, Apache-2.0) — the interoperable, machine-parsable descriptor a
  *   negotiating agent or an outside catalogue can read without knowing AIMEAT. This is a PROJECTION, exactly

@@ -1,5 +1,7 @@
 /**
  * @file outbound-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Record types for the outbound messaging door: the recipient registry
  *   (outbound contacts) and the append-only send log. The registry is the structural
  *   anti-spam device — /v1/outbound/send takes a contact id, never a free address, so

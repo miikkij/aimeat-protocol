@@ -1,5 +1,7 @@
 /**
  * @file organism-ownership-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The operator's break-glass over an organism's ownership, on a screen. Look up an
  *   organism by id, see who holds it and who made it, and add an owner to one whose own owners can
  *   no longer be reached.

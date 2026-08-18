@@ -1,5 +1,7 @@
 /**
  * @file offers.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the Agent Offers "Do" surface (offers-tab.js). Prefix `of-`. Uses theme.css
  *   variables only (no hardcoded colors / no rgba(255,255,255)).
  * @version-history

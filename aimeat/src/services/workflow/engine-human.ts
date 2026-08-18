@@ -1,5 +1,7 @@
 /**
  * @file src/services/workflow/engine-human.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Human-input step completion helpers — answer validation against the PINNED question
  *   and answer application (memory write + step green). Pure of engine state: the engine calls these
  *   under the run lock (onHumanAnswer / the sweep's on_timeout='default' path) and ticks afterwards.

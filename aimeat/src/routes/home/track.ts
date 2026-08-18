@@ -1,5 +1,7 @@
 /**
  * @file src/routes/home/track.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The switch between the new home and the old profile (aimeat_remake/08-kytkin.md).
  *
  *   GET /v1/home/ui-track — which side this person lands on.

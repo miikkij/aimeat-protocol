@@ -1,5 +1,7 @@
 /**
  * @file src/services/trust.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Trust scoring service — computes an agent's trust score (0–100) from a weighted blend
  *   of delivery success rate (0.30), positive ratings (0.25), account age (0.15), volume (0.15), and
  *   disputes lost (0.15), with anti-manipulation diversity tracking over unique counterparties.

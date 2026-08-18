@@ -1,5 +1,7 @@
 /**
  * @file agent-tasks.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for agent task operations.
  *   Provides CRUD, lifecycle (start/complete/fail), and event log access
  *   for the agent task queue system.

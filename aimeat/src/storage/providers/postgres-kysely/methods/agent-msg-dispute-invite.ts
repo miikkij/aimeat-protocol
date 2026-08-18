@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/agent-msg-dispute-invite.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Three small domains for the Postgres+Kysely backend: agent messages (AgentMessage —
  *   agent↔owner dashboard inbox/threads), work disputes (Dispute + append-only DisputeAudit ledger),
  *   and email/code organism invitations (Invitation). Translated 1:1 from the Prisma implementation

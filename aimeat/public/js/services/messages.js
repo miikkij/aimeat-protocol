@@ -1,5 +1,7 @@
 /**
  * @file messages.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service for human↔human direct messaging (GHII↔GHII): send, inbox,
  *   conversations/threads, read receipts, delete, the first-contact request gate (requests/accept/
  *   block), plus small storage helpers used to upload and resolve message attachments.

@@ -1,5 +1,7 @@
 /**
  * @file tab-tasks.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Tasks tab wrapper for agent detail tab-view.
  *   Delegates to the existing AgentTasksSubtab component.
  * @version-history

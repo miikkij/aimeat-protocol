@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/home-dashboard-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Composite Application DB Service for the profile Home dashboard — the ONE call that
  *   replaces the profile shell's 8-request stats-bar fan-out plus the Usage and Agents cards' separate
  *   polls. It does not re-implement any domain's logic: it COMPOSES the per-domain services/functions

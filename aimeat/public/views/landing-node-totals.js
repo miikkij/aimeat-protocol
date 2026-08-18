@@ -1,5 +1,7 @@
 /**
  * @file landing-node-totals.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Landing-page "Happening on this node" panel. Replaces the previously
  *   often-empty 3-tab activity feed with cumulative, never-empty node counters:
  *   public apps, public organisms, connected agents (+ online now), public knowledge

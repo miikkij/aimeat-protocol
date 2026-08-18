@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/landing-page.helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Time, tab-navigation, and number/byte format helpers. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)

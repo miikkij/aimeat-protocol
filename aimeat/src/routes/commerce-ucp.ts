@@ -1,5 +1,7 @@
 /**
  * @file src/routes/commerce-ucp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description UCP checkout adapter (TARGET-033 phase 4): Universal Commerce Protocol (2026-04-08)
  *   shaped endpoints over the protocol-agnostic session service. Implements the conformance
  *   basics — `ucp.version` + `ucp.capabilities` echoed in every response, capability intersection

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/action.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface segment for action definitions — the CRUD contract each backend
  *   must implement for provider-owned actions (create, get, list, delete, list/delete by provider, update).
  *

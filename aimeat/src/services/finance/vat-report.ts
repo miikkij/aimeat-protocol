@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/vat-report.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description VAT period summary (ALV-kausikooste) computed from booked vouchers —
  *   the basis for the owner's OmaVero self-assessment. Nothing is filed anywhere from
  *   here in v1; this is only the truth of the bookings, grouped by VAT code.

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/flag.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository functions for content-moderation flags and
  *   AI-generated match records — row (de)serialization plus CRUD/query helpers over the `flags` and
  *   `matches` tables.

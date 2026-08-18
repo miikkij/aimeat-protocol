@@ -1,5 +1,7 @@
 /**
  * @file organism-export.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Export a whole organism as one ZIP — its settings + every workspace the exporter can
  *   read, each under workspaces/{ws}/ (workspace.json + images/), plus a top-level organism.json.
  *   Reuses collectWorkspace() so a workspace is captured identically whether exported alone or in a

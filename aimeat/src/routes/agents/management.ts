@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agents/management.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
  *   v1.2.0 — 2026-08-13 — DELETE /v1/agents/:name accepts an AGENT caller under three conditions:

@@ -1,5 +1,7 @@
 /**
  * @file ToggleSwitch.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical on/off toggle switch (checkbox styled as a sliding pill).
  *   Relocated from profile/shared.js (where it was a mis-placed generic primitive)
  *   and de-`pf-`-prefixed. Renders the themed .toggle* classes so it flips with

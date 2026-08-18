@@ -1,5 +1,7 @@
 /**
  * @file appdev.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description API service for the profile AppDev tab — the human-facing window into the
  *   AppDev knowledge base: learned pitfalls (list/share/outdated/delete), agent-proposed
  *   template proposals (list/get/delete), the curated pitfall registry, and the copyable

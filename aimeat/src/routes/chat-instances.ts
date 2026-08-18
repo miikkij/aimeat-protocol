@@ -1,5 +1,7 @@
 /**
  * @file src/routes/chat-instances.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Routes for registering and tracking chat sessions (AI-chat/app instances) tied to an
  *   owner's GHII — each session gets a deterministic chat-instance id and can be listed and updated
  *   (last-seen) as memory is written from that session.

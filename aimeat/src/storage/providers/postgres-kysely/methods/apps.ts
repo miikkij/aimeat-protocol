@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/apps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App Catalog domain for the Postgres+Kysely backend: versioned single-file HTML apps
  *   (App), the one-per-(owner,filename) draft slot (AppDraft), download counters (AppDownload), and
  *   append-only fork lineage (AppFork). Translated 1:1 from the Prisma implementation against the same

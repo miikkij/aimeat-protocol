@@ -1,5 +1,7 @@
 /**
  * @file generator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Core skill bundle generator. Produces shared references/ markdown
  *   documents from node config + agent record + directives. Runtime adapters wrap
  *   these references with runtime-specific SKILL.md, scripts, and config files.

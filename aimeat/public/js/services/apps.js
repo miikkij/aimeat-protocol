@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/apps.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service layer for the hosted-app catalogue: list, upload,
  *   delete, and patch metadata of the owner's published HTML apps via the /v1/apps API.
  *

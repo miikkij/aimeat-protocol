@@ -1,5 +1,7 @@
 /**
  * @file task-runner.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Subprocess-based task runner for AIMEAT connector agents that
  *   are configured with a `runner` block in their per-agent config. When a
  *   queued task arrives for such an agent, the connector launches the

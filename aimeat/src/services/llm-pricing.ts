@@ -1,5 +1,7 @@
 /**
  * @file llm-pricing.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Versioned LLM price table for the usage ledger (LEDGER / TARGET-016).
  *   Turns (model, provider, tokens) into a USD cost locked at record time, stamped with
  *   a price_ref so historical events are never recomputed when prices change.

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/setup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description First-run node setup routes — serves the setup wizard, reports whether the node still
  *   needs an initial owner, and creates the first owner account (keypair, hashed password, owner JWT)
  *   before any owners exist; guarded by an optional setup-IP allowlist.

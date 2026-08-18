@@ -1,5 +1,7 @@
 /**
  * @file admin-security.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only security incident management. Lists incidents recorded by
  *   services/security-incident.ts (e.g. a rejected/quarantined ZIP upload — what, who, when, code),
  *   lets an operator download the quarantined payload for inspection, mark an incident resolved, or

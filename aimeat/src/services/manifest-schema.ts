@@ -1,5 +1,7 @@
 /**
  * @file manifest-schema.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The generic "manifest-format" JSON Schema and its idempotent startup seed.
  *   An organism becomes a governed workspace (project, research-study, campaign, anything)
  *   by storing a manifest at `organism.{id}.meta.manifest`. The manifest is a self-describing

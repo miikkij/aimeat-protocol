@@ -1,5 +1,7 @@
 /**
  * @file start.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the /v1/start diagnosis page (st- prefix): hero,
  *   question cards with big option buttons, the answer trail, the verdict card,
  *   the playbook checklist (code blocks, prompt block, doors) and print rules

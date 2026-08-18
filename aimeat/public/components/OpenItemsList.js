@@ -1,5 +1,7 @@
 /**
  * @file public/components/OpenItemsList.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The open items list: what you are going to do here, and the one prompt that takes the
  *   whole thing into your AI chat.
  *

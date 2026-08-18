@@ -1,5 +1,7 @@
 /**
  * @file src/services/config-loader.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Unified config loader that reads raw config values from environment variables and
  *   config files (aimeat.ini / aimeat.json / .env), normalizing each source to a dot-path keyed
  *   string map; typed parsing happens later via parseConfigValue().

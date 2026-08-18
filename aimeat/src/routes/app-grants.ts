@@ -1,5 +1,7 @@
 /**
  * @file app-grants.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Explicit, scoped, user-approved grants that let a user-published app (running on
  *   the isolated app origin, `*.apps.<apex>`) access the granting owner's data with a narrow,
  *   revocable token instead of the ambient session (closes H-2's "apps get the session" half).

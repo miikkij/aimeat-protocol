@@ -1,5 +1,7 @@
 /**
  * @file hello-mcp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Hello MCP: the one observable sign that a user's MCP connection actually works.
  *   The connection fails SILENTLY today. No error, no warning: the AI drifts out of sync and the
  *   user concludes the product is mediocre. Three of three successful onboardings needed the

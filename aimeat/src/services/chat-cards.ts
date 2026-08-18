@@ -1,5 +1,7 @@
 /**
  * @file src/services/chat-cards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Turning a finished tool call into something the person can OPEN.
  *
  *   The work log proves what happened; it does not hand anything over. An agent that publishes a

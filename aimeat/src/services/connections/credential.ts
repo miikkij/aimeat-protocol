@@ -1,5 +1,7 @@
 /**
  * @file credential.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Sealing and opening an outbound connection's credential (TARGET-057). The one place
  *   a token is turned into ciphertext and back, so there is exactly one place to audit.
  *

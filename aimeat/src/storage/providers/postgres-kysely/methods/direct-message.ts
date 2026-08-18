@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/direct-message.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Direct-message domain for the Postgres+Kysely backend (DirectMessage / ContactConsent /
  *   MessageDeliveryLog). Backs human↔human (GHII) messaging + federation: the classic mailbox model
  *   (each side stores its own copy sharing mid/conversationId), inbox/conversation/thread listing,

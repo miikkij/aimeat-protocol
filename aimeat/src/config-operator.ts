@@ -1,5 +1,7 @@
 /**
  * @file src/config-operator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two operator-identity helpers pulled out of config.ts by PURE EXTRACTION (no
  *   behaviour change) when that file crossed the 800-line limit. They belong together: both answer
  *   "who is the data controller of this node, and is that answer complete enough to publish?".

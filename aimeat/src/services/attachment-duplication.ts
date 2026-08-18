@@ -1,5 +1,7 @@
 /**
  * @file attachment-duplication.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Duplicates a direct message's media attachments into the recipient's own storage so
  *   the recipient co-owns their copy (DECISION #3: always duplicate). Same-node attachments are
  *   copied directly; cross-node attachments are pulled from the origin via the signed federation

@@ -1,5 +1,7 @@
 /**
  * @file src/services/memory-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Writing one memory record, once, for every surface that can write one.
  *
  *   WHY THIS FILE EXISTS. `aimeat_memory_write` and `POST /v1/memory` do the same thing, and the same

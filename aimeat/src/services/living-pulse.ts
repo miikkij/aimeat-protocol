@@ -1,5 +1,7 @@
 /**
  * @file living-pulse.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Living Documents — SERVER-SIDE unattended pulse (Phase 3). The client "Pulse now"
  *   (living.js) handles the full pulse incl. agent delegation while the page is open; this runs the
  *   self-fulfilled path UNATTENDED on a schedule: for each due instance, per non-agent section it

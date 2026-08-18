@@ -4,6 +4,8 @@ const html = htm.bind(h);
 
 /**
  * @file SearchBar.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical search-bar shell — a flex row wrapping a single
  *   `type="search"` input that reuses the canonical `.input-field` (theme.css)
  *   for its styling. Provides one place to define the search-toolbar layout so

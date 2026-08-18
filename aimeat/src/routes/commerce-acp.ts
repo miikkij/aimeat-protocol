@@ -1,5 +1,7 @@
 /**
  * @file src/routes/commerce-acp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description ACP merchant surface (TARGET-033 phase 5): Agentic Commerce Protocol -shaped
  *   product feed + checkout endpoints over the same session service the native and UCP adapters
  *   use. The feed lists every PUBLIC, priced agent offer on the node as an ACP-ish product entry

@@ -1,5 +1,7 @@
 /**
  * @file src/models/odps-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ODPS (Open Data Product Specification, Linux Foundation) authoring contract for an
  *   EXCHANGE offering. AIMEAT derives most of an ODPS v4.1 document from what the node already knows
  *   (title, price, plans, licence, provider, observed usage — see services/exchange-odps.ts); these are the

@@ -1,5 +1,7 @@
 /**
  * @file company.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository contract for the company registry. Same discipline as the
  *   finance repository: no method applies authorization (routes compare ownerGhii against
  *   resolveIdentity), and the slug uniqueness is enforced by a unique index rather than a

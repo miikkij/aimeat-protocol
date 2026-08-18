@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/otk.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic repository interface for one-time keys (OTK) — create, single-use
  *   consume (with optional grace window), and session-scoped listing/expiry that storage providers implement.
  *

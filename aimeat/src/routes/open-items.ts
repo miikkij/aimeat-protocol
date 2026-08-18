@@ -1,5 +1,7 @@
 /**
  * @file open-items.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The REST surface for open items — the one list of what the owner is going to do here.
  *   A thin HTTP layer over services/open-items.ts.
  *

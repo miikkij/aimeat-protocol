@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/messaging.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-message, Direct-message, Onboarding, Telemetry, Webhook-log methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.2.0 — 2026-07-16 — Wire getDirectMessagesByIds (Phase 3 batch) through to the repo.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-ctx.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ONE builder for the sandbox capability object. Every road into
  *   `executeExtensionAction` gets its `ExtensionCtx` from here, so the guards are part of the
  *   context rather than something each caller has to remember.

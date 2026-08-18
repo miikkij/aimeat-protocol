@@ -1,5 +1,7 @@
 /**
  * @file public/views/portal-classic.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Classic card-based landing portal (Preact + HTM): a live Welcome Board plus three
  *   expandable groups (For Me/apps, My AI Agents, For Builders) that each surface a copy-pasteable
  *   mega-prompt for building apps, agent workflows, or connecting an agent runtime.

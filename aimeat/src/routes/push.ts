@@ -1,5 +1,7 @@
 /**
  * @file push.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Web-push subscription routes: register a device for the caller's owner, remove one
  *   device or all of them, send a self-targeted test notification, and expose the public VAPID key
  *   for client subscription.

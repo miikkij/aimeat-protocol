@@ -1,5 +1,7 @@
 /**
  * @file src/services/welcome-mat-parse.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reading a welcome mat out of whatever the person pasted (aimeat_remake/
  *   03-welcome-mat.md). The paste comes from a chat window, so it arrives wrapped in whatever the
  *   model said around it — "Here's your welcome mat! Let me know if you want changes." The box

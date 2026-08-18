@@ -1,5 +1,7 @@
 /**
  * @file src/services/home-feed.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The home's feed (aimeat_remake/06-koti-feed-suostumus.md): what has happened on this
  *   account, newest first.
  *

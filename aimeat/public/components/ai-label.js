@@ -1,5 +1,7 @@
 /**
  * @file public/components/ai-label.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE visible AI label (TARGET-058 Phase 3) — Article 50(5) made concrete: clear,
  *   distinguishable, at first exposure, accessible. One component; no surface hand-rolls a badge.
  *   If it is awkward to use somewhere, fix it here rather than forking it.

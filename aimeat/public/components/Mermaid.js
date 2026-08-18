@@ -1,5 +1,7 @@
 /**
  * @file Mermaid.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Renders a Mermaid diagram from its source text. Lazy-loads the vendored single-file
  *   Mermaid build (public/lib/mermaid/, MIT) only when a chart is first shown — it's ~3MB, so it
  *   must never be in the initial bundle. securityLevel:'strict' (no click handlers, sanitised). On

@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-automation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The ecosystem-app automation-recipe trigger (feature B4). Observed at the memory-write
  *   site (the same hook as the ecosystem event plane): when a memory key is written for an owner, this
  *   checks the owner's ENABLED automation recipes and, for every recipe whose `trigger.keyGlob` matches

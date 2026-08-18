@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/federation.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for federation persistence: federation peers, peering
  *   requests, registered personal (home) nodes, per-node mailbox items, and genesis-peer records —
  *   implemented per backend (SQLite/Prisma).

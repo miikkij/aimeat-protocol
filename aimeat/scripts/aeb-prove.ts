@@ -1,5 +1,7 @@
 /**
  * @file aeb-prove.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AEB proof scaffolder — `pnpm aeb:prove <pack> [--model <id>] [--url <nodeUrl>]`.
  *   Turns the 4-step "add a proof" loop (tools/aeb/acceleration-tiers.md) into one command: it
  *   builds the controlled A/B build-prompt pair for a pack (A = capability packs stripped, B = the

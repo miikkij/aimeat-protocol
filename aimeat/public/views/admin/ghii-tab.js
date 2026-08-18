@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/ghii-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for managing GHII human users — lists accounts with
  *   verification level, email, TOTP status and timestamps, and lets the operator change
  *   verification level, remove an attached email, or delete a GHII.

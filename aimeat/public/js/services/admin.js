@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/admin.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard API service layer — thin wrappers over the shared api.js
  *   HTTP helpers that map every admin operation to its `/v1/admin/*` (and related) endpoint.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/storage-factory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage backend factory — lazily imports and instantiates the requested Storage
  *   provider (PostgreSQL+Kysely or SQLite; default in-memory SQLite), and printing actionable
  *   guidance if the SQLite native bindings fail to load. The removed Prisma backends (mongodb,

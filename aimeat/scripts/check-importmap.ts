@@ -1,5 +1,7 @@
 /**
  * @file check-importmap.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Verifies the spa.html importmap stays in sync with the frontend's absolute-path
  *   imports. Every first-party module imported by an absolute specifier (/js/…, /components/…,
  *   /views/…) needs an identity entry in the importmap so portal.ts can stamp it with

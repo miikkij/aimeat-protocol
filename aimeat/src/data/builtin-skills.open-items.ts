@@ -1,5 +1,7 @@
 /**
  * @file src/data/builtin-skills.open-items.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The `aimeat-open-items` built-in skill: how an agent works someone's open-items list
  *   with them.
  *

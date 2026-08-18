@@ -1,5 +1,7 @@
 /**
  * @file agent-activity.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for agent activity stats and history.
  *   Provides access to activity statistics (tasks completed, tokens used,
  *   success rate), daily activity history, and event log entries.

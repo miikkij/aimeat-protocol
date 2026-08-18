@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/organisms.workspace-gen.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Manifest-driven workspace generator — the shipped "project" template (object types,
  *   schemas, manifest), the one-shot Workspace Architect prompt, and the parse/validate/apply
  *   pipeline that turns an AI response into a locked workspace. Extracted from organisms.js.

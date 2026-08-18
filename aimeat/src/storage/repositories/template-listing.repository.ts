@@ -1,5 +1,7 @@
 /**
  * @file template-listing.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Template listing repository interface — social/discovery layer on top of
  *   packages. Manages gallery listings, reviews (separate table), and threaded discussions
  *   (separate table). One listing per package group.

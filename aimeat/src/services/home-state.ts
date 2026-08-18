@@ -1,5 +1,7 @@
 /**
  * @file src/services/home-state.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Where an account stands on the new path (aimeat_remake/06-koti-feed-suostumus.md).
  *   One computed answer, read by every remake surface — the home view, the welcome-mat endpoint,
  *   the feed and the funnel — so none of them can disagree about whether a home exists.

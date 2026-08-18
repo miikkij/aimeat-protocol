@@ -1,5 +1,7 @@
 /**
  * @file password-validation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared password strength validation used by GHII registration and admin setup.
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Extracted from ghii.ts for reuse in admin.ts

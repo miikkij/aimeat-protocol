@@ -1,5 +1,7 @@
 /**
  * @file src/utils/env-config/sections-federation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation, work-queue, and rate-limit config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
  *   v1.1.0 — 2026-07-14 — AIMEAT_WEB_BOT_AUTH_SIGN in the Federation section (Web Bot Auth)

@@ -1,5 +1,7 @@
 /**
  * @file _registry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared helpers for MCP tool registrations in multi-agent mode.
  *   Every tool's input schema gets `agent_name: agentNameSchema` and every
  *   handler calls `pickAgent(registry, agent_name)` to get the right client +

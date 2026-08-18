@@ -1,5 +1,7 @@
 /**
  * @file no-direct-auth.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint rule: frontend code reads the session through /js/services/auth.js,
  *   not through window.AIMEAT.auth. Reports any member access of `.auth` on the AIMEAT global.
  *

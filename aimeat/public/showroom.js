@@ -1,5 +1,7 @@
 /**
  * @file showroom.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Comprehensive demo logic for the AIMEAT Cortex Library Showroom. Loads the
  *   7 bundled cortex UI libraries (with a /v1/cortex → /cortex-bundled fallback) and
  *   exercises EVERY exported component, on top of self-hosted Tailwind v4 + daisyUI 5.

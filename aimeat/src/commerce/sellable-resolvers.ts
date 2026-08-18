@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/sellable-resolvers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Sellable-resolver registry (TARGET-033 phase 4): pluggable sources of "things for
  *   sale" the checkout core can price and fulfill. Core registers the `offer` resolver (agent
  *   offers), `app-tool` (priced tools on a published app) and `ext-call` (priced raw extension

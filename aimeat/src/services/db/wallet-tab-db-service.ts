@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/wallet-tab-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile Wallet tab — the ONE call behind
  *   GET /v1/wallet/overview. The tab mounts a 5-request fan-out: the tab itself (wallet + transactions),
  *   plus two child sections (SellingSection → /v1/commerce/payout; MoneyActivity → checkout-sessions +

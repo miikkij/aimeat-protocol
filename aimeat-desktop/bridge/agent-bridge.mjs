@@ -1,5 +1,7 @@
 /**
  * @file agent-bridge.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "liaison" bridge for the AIMEAT Desktop Ollama Chat. Connects to an
  *   AIMEAT node's MCP surface AS A REGISTERED AGENT (Bearer agent-token), exposes its
  *   tools to a local Ollama model, and runs the tool-calling loop:

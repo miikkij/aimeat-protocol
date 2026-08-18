@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/finance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Postgres+Kysely implementation of the finance domain (invoices, vouchers,
  *   VAT codes, fiscal years, counters). Schema: migrations/0026_finance.sql.
  *

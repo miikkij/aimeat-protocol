@@ -1,5 +1,7 @@
 /**
  * @file admin-agent-integration.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description API service for admin agent integration endpoints.
  * @version-history
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Governance Phase C

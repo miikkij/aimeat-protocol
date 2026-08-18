@@ -1,5 +1,7 @@
 /**
  * @file fonts.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Self-hosted display fonts for AIMEAT apps (the `fonts` capability pack).
  *   Baloo 2 (variable 400-800, chunky-rounded) + Bangers (400, arcade/comic), latin +
  *   latin-ext subsets (Finnish ä/ö covered). Both SIL Open Font License 1.1 — see

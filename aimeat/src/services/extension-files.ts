@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The file half of the extension sandbox: ctx.files.read / ctx.files.write. An
  *   extension could hold memory records and make outbound text requests, and had no way to touch a
  *   stored FILE — so every capability that works on bytes (an image, a PDF, an audio clip) had to

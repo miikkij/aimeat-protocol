@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/panels.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure (hook-free) render panels for the profile Inbox tab: ListPanel (conversation/request
  *   list + grouped person rows), ThreadPanel (the open thread pane — head, bubbles, awaiting-draft
  *   bubbles, command bar/fill, composer), TrackedPanel (the Tracked Responses dashboard) and ResultsPanel

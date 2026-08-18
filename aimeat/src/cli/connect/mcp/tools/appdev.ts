@@ -1,5 +1,7 @@
 /**
  * @file appdev.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the AppDev research KB + app-template + IAM tools —
  *   parity with the server MCP (src/mcp/appdev-overview.ts, appdev-pitfalls.ts, appdev-proofs.ts,
  *   app-template-proposals.ts, services/iam) so `aimeat connect serve --surface appdev|agent` exposes

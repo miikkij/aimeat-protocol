@@ -1,5 +1,7 @@
 /**
  * @file bootstrap.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Bootstrap and discovery routes: GET / (node discovery JSON for AI agents and
  *   assistants), /llms.txt, /favicon, /v1/help/prompt, and /v1/health. The two sitemaps moved to
  *   ./sitemaps.ts when this file passed the line ceiling.

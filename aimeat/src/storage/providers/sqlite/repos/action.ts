@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/action.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository for action records — CRUD over the `actions`
  *   table with JSON (de)serialization of schemas, pricing, tags, and semantic metadata.
  *

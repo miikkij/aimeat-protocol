@@ -1,5 +1,7 @@
 /**
  * @file install-chip.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The install suggestion on a published app's own origin. Injected into served app
  *   HTML by the head-meta pass (app-head-meta.ts), the same way the manifest link is: the browser
  *   never proposes installing on its own, so when it hands over an install offer

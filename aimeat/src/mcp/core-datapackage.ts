@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/core-datapackage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The agent-facing half of the data-package contract: publish one, and get a resource
  *   in the shape a target program expects.
  *

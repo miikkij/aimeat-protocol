@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps-cost.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description G3 — the per-app COST & CONTRACTS surface for EXCHANGE (TARGET-045). One owner-scoped read
  *   that composes an app's priced dependencies so the app-catalog can show, per app: its active EXCHANGE
  *   contracts (entitlements), live consumption (spend + calls against each budget), an estimated

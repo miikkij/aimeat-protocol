@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/accountant-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The accountant role: an owner grants another LOCAL owner read-only access
  *   to their finance area (invoices, vouchers, VAT reports, exports) — nothing else, and
  *   never write. Storage is a two-sided memory-record pair, same discipline as the

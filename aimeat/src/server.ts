@@ -1,5 +1,7 @@
 /**
  * @file src/server.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express application factory — createServer() assembles the whole HTTP stack: trust-proxy
  *   config, compression (excluding SSE streams), CORS, auth, rate-limiting and other middleware, then
  *   delegates config/service init, guard setup, and route mounting to the server-bootstrap modules.

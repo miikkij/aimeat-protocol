@@ -1,5 +1,7 @@
 /**
  * @file workspace-provision.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Create a NEW workspace inside an organism from a manifest + per-namespace JSON schemas:
  *   generate a ws id, lock each records schema (strict), write the manifest + readme, and register the
  *   workspace in the organism's registry. Extracted so BOTH the MCP tool (aimeat_workspace_create) and

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/invite-accept.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The PUBLIC invitation token flow: GET /v1/invitations/:token (what this link is)
  *   and POST /v1/invitations/:token/accept (redeem it — sign in or create the account).
  *

@@ -1,5 +1,7 @@
 /**
  * @file chat-threads.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Where a chat conversation lives: the person's own memory, under `chat.`.
  *
  *   Goose keeps its own session store, and it is a cache. The conversation is the person's, so the

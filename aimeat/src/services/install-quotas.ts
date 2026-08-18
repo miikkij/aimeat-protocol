@@ -1,5 +1,7 @@
 /**
  * @file src/services/install-quotas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description How many of a thing one node and one owner may hold.
  *
  *   Three ceilings, and each of them was written out twice for a while: once in the HTTP route and

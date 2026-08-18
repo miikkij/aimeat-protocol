@@ -1,5 +1,7 @@
 /**
  * @file src/utils/env-config/sections-features.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Indexing, personal-node, site, consent, push, email, TOTP, matching, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
  *   v1.3.0 — 2026-08-01 — AI Transparency section gains AIMEAT_AI_LABEL_PUBLIC and

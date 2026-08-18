@@ -1,5 +1,7 @@
 /**
  * @file src/routes/spec.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves the canonical OpenAPI contract and interactive API docs — GET /v1/spec returns
  *   openapi.yaml as text/yaml; GET /v1/docs renders a Swagger UI page (with a relaxed CSP for the
  *   unpkg.com-hosted assets) pointed at /v1/spec.

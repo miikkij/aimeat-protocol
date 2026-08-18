@@ -1,5 +1,7 @@
 /**
  * @file message-provenance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Which model wrote a message, resolved for a page of messages in one query.
  *
  *   Every message already carries `aiProvenanceId` (TARGET-058), and the record behind it holds the

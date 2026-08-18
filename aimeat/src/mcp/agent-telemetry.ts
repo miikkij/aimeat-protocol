@@ -1,5 +1,7 @@
 /**
  * @file agent-telemetry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for agent telemetry reporting on the public /v1/mcp surface.
  *   This mirrors the connector bridge telemetry tool so Hello Integration can be
  *   completed by remote MCP clients and local connector clients alike.

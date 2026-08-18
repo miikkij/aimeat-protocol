@@ -1,5 +1,7 @@
 /**
  * @file pull.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description rest-connector `pull` action. Reads the per-instance secret API key (decrypted by
  *   the host from `{ encrypted }` at rest into a plaintext string), optionally fetches a configured
  *   endpoint via ctx.fetch (which enforces the SSRF guard), and caches a summary into ext: memory

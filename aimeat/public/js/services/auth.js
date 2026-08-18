@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/auth.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE frontend session source of truth. Every read of "who is signed in" and every
  *   subscription to that changing goes through this module — nothing in public/ touches
  *   window.AIMEAT.auth directly (enforced by the `aimeat/no-direct-auth` lint rule, which allows

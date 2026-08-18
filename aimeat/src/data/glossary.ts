@@ -1,5 +1,7 @@
 /**
  * @file glossary.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AIMEAT vocabulary as ONE registry. AIMEAT's terms are dense and several of them
  *   are near-homophones for each other — GHII/GAII/GEAI differ by one letter and mean three
  *   different principals; memory, record and document are three storage shapes; skill, capability

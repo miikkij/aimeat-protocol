@@ -1,5 +1,7 @@
 /**
  * @file knowledge-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Knowledge packages tab for the profile view. Manages importing,
  *   exporting, cloning, and sharing knowledge packages. Displays owned packages,
  *   organism-shared packages, and discoverable packages from the catalog.

@@ -1,5 +1,7 @@
 /**
  * @file src/services/work-lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Accepting and delivering one work item, once, for every surface that can do it.
  *
  *   WHY THIS FILE EXISTS. `POST /v1/work/:tc/accept` and `POST /v1/work/:tc/deliver` were one

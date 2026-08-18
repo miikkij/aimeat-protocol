@@ -1,5 +1,7 @@
 /**
  * @file driver.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Transport abstraction for the agent's in-session AIMEAT actions.
  *   The self-play loop and tool dispatcher are transport-agnostic; only the
  *   driver knows whether an action goes out as a REST call or an MCP tool call.

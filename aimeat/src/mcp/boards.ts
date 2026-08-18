@@ -1,5 +1,7 @@
 /**
  * @file boards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP board tools and resource registrations. Provides 7 tools for board
  *   management (list, create, subscribe, react, reply, manage members, delete) and 1
  *   resource template for reading board posts via the MCP resource protocol.

@@ -1,5 +1,7 @@
 /**
  * @file federation-availability.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Heartbeat-derived uptime/availability for federation peers (Phase B).
  *   The heartbeat job records each ping outcome (ok/fail) per peer; this module keeps
  *   lifetime counters plus a compact 30-day daily-bucket ring on the peer record and

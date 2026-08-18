@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/shared.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared context type + small pure helpers for the memory route group modules. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
  *   v1.1.0 — 2026-08-01 — memoryContentBytes(): the one definition of "which bytes a memory value's

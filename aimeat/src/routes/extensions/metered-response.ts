@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/metered-response.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Turning one {@link MeteredOutcome} into an HTTP response.
  *
  *   The decision is made once, in `services/metered-access.ts`. This is the other side of that split:

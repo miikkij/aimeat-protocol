@@ -1,5 +1,7 @@
 /**
  * @file public/components/OpenItemsButton.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The header's open-items button: how many things you are going to do here, from
  *   wherever you happen to be.
  *

@@ -1,5 +1,7 @@
 /**
  * @file message-send.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The core "create + deliver a direct message" path, extracted from the POST /v1/messages
  *   route so it can be called server-side (no HTTP session) — e.g. by the Tracked Response evaluator
  *   when it sends an automated federated reply. Builds the sender's outbound copy, enforces the

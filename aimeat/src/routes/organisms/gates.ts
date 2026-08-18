@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/gates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Gate primitive routes (Phase 4): approval request/inbox, draft publish (with the
  *   publish-gate + change-guard), revert-to-draft, and human approval resolution. Extracted from
  *   src/routes/organisms.ts to satisfy max-file-lines.

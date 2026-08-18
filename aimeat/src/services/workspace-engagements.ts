@@ -1,5 +1,7 @@
 /**
  * @file workspace-engagements.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description First-class "contract engagement" records — the missing link between an agent's
  *   contract CAPABILITY (its `workspace-contract` + `contract.<id>` tags) and a workspace's derived
  *   "active here" (record traces). One engagement = (agent × contract × workspace) with an

@@ -1,5 +1,7 @@
 /**
  * @file readiness-gate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Middleware that checks agent readiness level before allowing operations.
  *   Readiness levels (basic/standard/full/expert) determine what the agent can do.
  *   Owners always bypass readiness gates.

@@ -1,5 +1,7 @@
 /**
  * @file public/views/admin/work-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab listing work items — a read-only table of tracking code, status,
  *   action, requester/provider GAIIs, morsel cost, and creation time.
  *

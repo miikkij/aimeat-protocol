@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/memory-tab-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile Memory tab — the ONE call behind
  *   GET /v1/memory/tab. The tab mounts a 6-request fan-out: agents + owner-scope memory (metadata-only) +
  *   files + consent + sharing-groups + organisms. This composes all six in ONE read scope. The memory

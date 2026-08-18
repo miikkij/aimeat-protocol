@@ -1,5 +1,7 @@
 /**
  * @file portal-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Portal tab — landing-page template editor,
  *   site memory keys, KV pairs, AI prompt, and changelog (with LB-mode banner).
  * @structure PortalTab (default)

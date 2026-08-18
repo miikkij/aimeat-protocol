@@ -1,5 +1,7 @@
 /**
  * @file memory-extended.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP memory extended tools. Provides 2 tools that extend the core memory
  *   capability: full-text search across own memory, and reading another agent's public
  *   memory entries.

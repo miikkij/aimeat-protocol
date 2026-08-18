@@ -1,5 +1,7 @@
 /**
  * @file src/routes/cortex/activation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cortex extension activation/deactivation logic — materialises (and tears down)
  *   schemas, ontologies, prompts, actions, boards, seed-data and lib registrations. Extracted
  *   from src/routes/cortex.ts to satisfy max-file-lines.

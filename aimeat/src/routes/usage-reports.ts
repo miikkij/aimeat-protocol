@@ -1,5 +1,7 @@
 /**
  * @file src/routes/usage-reports.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The owner's own usage reports, read entirely from the precomputed serving layer.
  *   Design: docs/internal/telemetria/02-design.md
  *

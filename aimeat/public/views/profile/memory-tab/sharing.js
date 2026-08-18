@@ -1,5 +1,7 @@
 /**
  * @file views/profile/memory-tab/sharing.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Key-space sharing for the Memory tab, as one hook. Extracted from memory-tab.js to
  *   satisfy max-file-lines; behaviour unchanged.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/odata.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The OData v4 feed for a data package — the surface Excel, Power BI and Tableau
  *   connect to natively and then REFRESH BY THEMSELVES.
  *

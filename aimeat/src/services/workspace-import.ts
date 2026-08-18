@@ -1,5 +1,7 @@
 /**
  * @file workspace-import.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Restore a workspace export ZIP as a NEW workspace in a target organism. Unzips with
  *   yauzl, remaps the organism/workspace ids in every key (record + document IDS ARE PRESERVED, so
  *   [[wiki-links]] and cross-references stay valid), re-locks the JSON schemas, re-creates the image

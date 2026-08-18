@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/x402-facilitator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The x402 network registry, wire types, and facilitator client for the non-custodial
  *   stablecoin settlement handler (TARGET-042). The heavy crypto (EIP-3009 signing by the buyer's wallet,
  *   signature + onchain verification, the settling transfer) lives in the buyer's wallet and in the

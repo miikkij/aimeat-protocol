@@ -1,5 +1,7 @@
 /**
  * @file check-no-max-tokens.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pre-commit / CI guard: fails if a hardcoded `max_tokens` / `maxTokens` cap appears on an
  *   AI call anywhere in the shipped app (src/ + public/). A token cap silently truncates model output and
  *   breaks long generations (workspace manifests, strategy JSON, etc.) — the project rule is to leave

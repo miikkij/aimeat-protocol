@@ -1,5 +1,7 @@
 /**
  * @file agent-onboarding-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Onboarding step definitions and Zod validation schemas for
  *   Hello Integration step confirmation payloads.
  * @structure

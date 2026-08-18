@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/calibrator-detail-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile Calibrator "project detail" view — the
  *   ONE read behind GET /v1/calibrator/:id/detail. Opening a project fired a 4-request waterfall:
  *   getProject (project + dimensions), listVersions, getVersion(current), and listBatches — each awaited

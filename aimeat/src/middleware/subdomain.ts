@@ -1,5 +1,7 @@
 /**
  * @file subdomain.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Resolves the request's subdomain label into `req.subdomain`.
  *              In production nginx proxies all `<sub>.<apex>` requests to this
  *              backend with an `X-Subdomain: <sub>` header (apex requests carry

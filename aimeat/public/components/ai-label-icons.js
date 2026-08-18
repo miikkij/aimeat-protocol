@@ -1,5 +1,7 @@
 /**
  * @file public/components/ai-label-icons.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The EU-icon truth table, on the browser side. A PURE module: no imports, no DOM, no
  *   i18n — which is what lets a unit test load it under node and compare it, row by row, against the
  *   normative server adapter (src/services/ai-provenance-adapters.ts `toEuIcon`).

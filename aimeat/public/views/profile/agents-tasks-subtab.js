@@ -1,5 +1,7 @@
 /**
  * @file agents-tasks-subtab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Task queue sub-tab for agent detail view.
  *   Shows queued, active, and completed tasks with todo plans,
  *   "Start this task" approval button, and progress tracking.

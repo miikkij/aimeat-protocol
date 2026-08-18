@@ -1,5 +1,7 @@
 /**
  * @file wallet-extended.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP wallet extended tools. Provides 1 tool that extends the core wallet
  *   capability: paginated transaction history retrieval.
  * @structure

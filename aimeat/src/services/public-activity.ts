@@ -1,5 +1,7 @@
 /**
  * @file public-activity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Records public, landing-page-visible activity events (app publishes,
  *   public organism / workspace publishes, agent materials & knowledge packages).
  *   Each event is persisted as a PUBLIC memory entry under the reserved system

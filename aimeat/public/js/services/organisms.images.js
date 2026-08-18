@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/organisms.images.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Document/image storage helpers for organism workspaces — blob→base64/dataURL, upload
  *   to private storage, session-token fetch, per-image visibility, and the markdown embed rewriter
  *   (public → /v1/pub, otherwise → /v1/storage). Extracted from organisms.js.

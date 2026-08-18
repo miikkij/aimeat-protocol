@@ -1,5 +1,7 @@
 /**
  * @file task-stall-detector.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Background job that detects stalled agent tasks and agent-level
  *   connectivity issues (unreachable, webhook_down).
  * @structure

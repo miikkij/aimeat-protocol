@@ -1,5 +1,7 @@
 /**
  * @file inline-panels.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Inline preview panels for the profile landing page.
  *   Expand below menu sections to show quick previews of agents, memory,
  *   boards, and packages. Each panel fetches data lazily and listens for

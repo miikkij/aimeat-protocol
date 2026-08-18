@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/device-auth.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for RFC 8628 device-authorization records — the backend-agnostic
  *   repository shape each provider (SQLite/Prisma) implements for the agent device-auth flow.
  *

@@ -1,5 +1,7 @@
 /**
  * @file encryption.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description General-purpose AES-256-GCM encryption/decryption service.
  *   Provides encrypt() and decrypt() for storing secrets at rest.
  *   Key loaded from AIMEAT_ENCRYPTION_KEY or AIMEAT_TOTP_ENCRYPTION_KEY (fallback).

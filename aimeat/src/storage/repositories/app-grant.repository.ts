@@ -1,5 +1,7 @@
 /**
  * @file app-grant.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for app grants (app_grants). A grant is a
  *              long-lived authorization issued to an in-page app so it can mint
  *              agent tokens that resolve to the granting owner's GHII. The

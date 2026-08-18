@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-maintenance.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only admin routes for extension hooks and maintenance mode:
  *   list/set/clear the action lists bound to lifecycle hooks, and read/toggle the
  *   node's maintenance state (persisted to storage and mirrored in an in-memory cache).

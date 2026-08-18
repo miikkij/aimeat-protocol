@@ -1,5 +1,7 @@
 /**
  * @file msm-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard MSM (Marketplace Service Manifest) tab — list,
  *   detail, create, edit and typed-name delete of registered service manifests.
  * @structure default export MsmTab({ data, reload }); internal renderDeleteModal,

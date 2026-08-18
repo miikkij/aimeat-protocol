@@ -1,5 +1,7 @@
 /**
  * @file src/services/memory-replication.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Memory Replication Service — consent-based replication of public memory
  *   entries to federation peers (RFC v1.6 §13.11.4 protocol, §13.11.5 queue). Only
  *   entries that are public and covered by an active `federation`-scope consent are

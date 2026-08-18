@@ -1,5 +1,7 @@
 /**
  * @file lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Keeps a workflow's TRIGGERS in sync with its definition — shared by the REST route
  *   and the MCP tools so both author workflows identically. A `schedule` trigger gets a backing
  *   type:'workflow' ScheduledJobRecord (the scheduler fires it → engine.startRun); an `event`

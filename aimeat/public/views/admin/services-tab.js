@@ -1,5 +1,7 @@
 /**
  * @file services-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin Dashboard — Services Tab. Manage installed service
  *   extensions and their instances, install bundled extensions one-click,
  *   edit action scripts and instance translations.

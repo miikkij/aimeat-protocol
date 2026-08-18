@@ -1,5 +1,7 @@
 /**
  * @file rate-modal.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared "rate a deliverable" modal — 1–5 stars, quality context,
  *   an optional "checked against sources" flag, and a comment. Submits the
  *   POST /v1/agents/:name/tasks/:id/rate body shape. Used by both the Tasks

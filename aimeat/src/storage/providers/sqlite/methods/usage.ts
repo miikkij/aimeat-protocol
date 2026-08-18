@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/usage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite method group for usage telemetry (UsageRepository). Thin async wrappers over
  *   ../repos/usage.ts, which holds the SQL. Its own group rather than an addition to
  *   capability-agents.ts: usage telemetry is a domain, and that file is already near the

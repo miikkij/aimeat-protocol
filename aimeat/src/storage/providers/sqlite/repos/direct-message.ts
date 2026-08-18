@@ -1,5 +1,7 @@
 /**
  * @file direct-message.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation of the DirectMessageRepository — human↔human direct messages
  *   (mailbox-model rows), inbox/conversation listing, delivery + read state, and per-pair contact
  *   consent (the first-contact gate).

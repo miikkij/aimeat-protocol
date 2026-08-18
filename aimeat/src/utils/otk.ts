@@ -1,5 +1,7 @@
 /**
  * @file src/utils/otk.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-time-key (OTK) generator utility — produces random, prefixed OTK strings.
  *   (OTK/Tier 0.5 is a deprecated mechanism per the v4.0 spec.)
  *

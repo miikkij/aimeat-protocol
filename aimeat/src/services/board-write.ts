@@ -1,5 +1,7 @@
 /**
  * @file src/services/board-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Every board write except the post, once, for every surface that performs it.
  *
  *   WHY THIS FILE EXISTS. src/mcp/boards.ts carried its own copy of five writes that

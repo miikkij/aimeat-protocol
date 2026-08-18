@@ -1,5 +1,7 @@
 /**
  * @file cli/connect/tool-call-defs-exchange.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description EXCHANGE marketplace connect-call tool definitions — the shell fallback (`aimeat connect
  *   call`) for the two-sided data-service market. Thin REST proxies over /v1/exchange/* (src/routes/
  *   exchange.ts + exchange-market.ts): browse offerings, offering detail, accept a contract, list +

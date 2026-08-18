@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-event-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod schemas + builder for the bidirectional GEAI (ecosystem app) event envelope —
  *   the sibling of webhook-schemas.ts with `agent_gaii` renamed to `geai`. Events flow two ways:
  *   OUTBOUND (AIMEAT → a subscribed GEAI, e.g. memory.write) and INBOUND (a GEAI → AIMEAT, e.g.

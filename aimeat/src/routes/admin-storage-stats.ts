@@ -1,5 +1,7 @@
 /**
  * @file admin-storage-stats.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator storage-growth telemetry for the admin Database tab. Serves the LIVE per-table
  *   row counts (so the current picture is always fresh) plus the recent hourly snapshots captured by the
  *   `storage-stats-snapshot` core job, from which the frontend derives per-table growth over time. The

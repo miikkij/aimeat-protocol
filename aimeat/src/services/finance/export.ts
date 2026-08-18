@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/export.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Accountant-facing exports: voucher and invoice CSVs (semicolon-separated,
  *   comma decimals — the format Finnish bookkeeping software imports without a mapping
  *   step) and a ZIP bundle of Finvoice XML documents. The ZIP is a hand-rolled STORE-only

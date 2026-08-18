@@ -1,5 +1,7 @@
 /**
  * @file app-templates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves the authoring-template registry (the "booster kit") so the app-prompt
  *   builders (app-catalog + landing) can inject a curated starting scaffold instead of having
  *   the AI build from scratch. GET /v1/app-templates returns the index (no content);

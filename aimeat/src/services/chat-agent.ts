@@ -1,5 +1,7 @@
 /**
  * @file chat-agent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The person's built-in chat agent: `chat#<owner>@<node>`, a real GAII principal like
  *   any other, and the short-lived MCP token one chat session hands to goose.
  *

@@ -1,5 +1,7 @@
 /**
  * @file workspace-versions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Value-free helpers for workspace record VERSION HISTORY (`{base}.version.N` rows).
  *   Every publish appends a full-copy `.version.N` snapshot, so a long-lived record drags an
  *   ever-growing tail of history rows behind it. These helpers let the publish paths work with that

@@ -1,5 +1,7 @@
 /**
  * @file sse.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Server-Sent Events transport for live UI updates. Exposes
  *   POST /v1/events/ticket (exchange JWT for a single-use connection ticket)
  *   and GET /v1/events?ticket=... (the event stream). Forwards event-bus

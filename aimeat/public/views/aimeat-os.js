@@ -1,5 +1,7 @@
 /**
  * @file aimeat-os.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AIMEAT-OS landing page — guides users to build their own app
  *   with any AI chat. Shows a 3-step flow: download guide, give to AI, upload app.
  * @structure

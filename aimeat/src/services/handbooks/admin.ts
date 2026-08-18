@@ -1,5 +1,7 @@
 /**
  * @file admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operating handbook for the v2 `admin` surface (/v2/mcp/admin). Self-contained; tool
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — most tools require operator role and
  *   are runtime-gated (a non-operator caller will get "Operator role required").

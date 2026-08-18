@@ -1,5 +1,7 @@
 /**
  * @file src/services/datapackage/store.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Publishing and reading an AIMEAT Data Package — the one implementation the three
  *   bindings (ctx.datapackage, the browser library, the MCP tools) all reach.
  *

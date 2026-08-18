@@ -1,5 +1,7 @@
 /**
  * @file consent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Consent decision engine for non-public reads: recipient matching, read
  *   authorization (visibility + group + private consent + organism-member resolution),
  *   audit-entry writing, and the consent-expiry background job. Used by the shared

@@ -1,5 +1,7 @@
 /**
  * @file living-author-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source of truth for the Living Document AUTHOR prompt. Imported by the author
  *   service (fallback when the managed prompt is missing) and by prompt-defaults.ts (seed), so the
  *   operator-editable managed prompt `living-author` and the code fallback never drift. Turns a user's

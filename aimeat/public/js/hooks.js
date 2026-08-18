@@ -1,5 +1,7 @@
 /**
  * @file public/js/hooks.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reusable Preact hooks for the SPA. Provides useApiCall, which fetches
  *   an AIMEAT /v1/* endpoint and tracks loading/error/data state with a reload trigger.
  *

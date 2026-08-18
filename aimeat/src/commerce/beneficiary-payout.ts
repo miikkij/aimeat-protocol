@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/beneficiary-payout.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The last leg: money actually reaching a beneficiary, onchain, without the node ever
  *   holding it.
  *

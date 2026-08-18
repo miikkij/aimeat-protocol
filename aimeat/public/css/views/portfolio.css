@@ -1,5 +1,7 @@
 /**
  * @file portfolio.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the Portfolio view — builder wizard (.portfolio-container
  *   column) and full-bleed public viewer (.portfolio-viewer-full).
  * @usage Loaded by spa.html; classes consumed by public/views/portfolio.js.

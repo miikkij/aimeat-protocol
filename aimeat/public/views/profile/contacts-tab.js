@@ -1,5 +1,7 @@
 /**
  * @file contacts-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile → Contacts tab — the owner's address book. Two groups: SAVED contacts
  *   (explicitly added; removable) and MESSAGED people (DM conversation peers / gate rows; one
  *   click saves them). An add box takes an owner name, a member-directory pick, or an email

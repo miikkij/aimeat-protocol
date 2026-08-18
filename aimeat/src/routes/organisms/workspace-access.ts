@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/workspace-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace discovery + per-workspace access control (request/list/decision/grant/revoke),
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.

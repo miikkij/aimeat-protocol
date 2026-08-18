@@ -1,5 +1,7 @@
 /**
  * @file public/views/portal-dev.shared.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared constants + helpers for the portal-dev view (html binding, NODE_URL,
  *   dt() i18n wrapper, formatBytes, GOAL_LIST, CopyBtn). Extracted from portal-dev.js to
  *   satisfy max-file-lines.

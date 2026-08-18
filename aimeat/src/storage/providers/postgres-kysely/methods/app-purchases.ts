@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/app-purchases.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-marketplace purchases (AppPurchase table) for the Postgres+Kysely backend: the signed
  *   purchase receipt a buyer holds for a paid app, plus the license-validity check the fork/download gate
  *   uses. Translated 1:1 from the SQLite/Prisma implementations — appManifest is a jsonb column.

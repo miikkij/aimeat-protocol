@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 /**
  * @file telemetry-prune.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Measure and prune the raw agent telemetry store (TelemetryEvent collection /
  *   telemetry_events table). Raw telemetry is no longer written by the server (see
  *   services/telemetry-buffer.ts), so any existing rows are legacy backlog that only takes

@@ -1,5 +1,7 @@
 /**
  * @file knowledge-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Knowledge tab — operator view to create system
  *   knowledge packages, review/moderate packages, and manage flags.
  * @structure KnowledgeAdminTab (default)

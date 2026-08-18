@@ -1,5 +1,7 @@
 /**
  * @file agent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operating handbook for the v2 `agent` surface (/v2/mcp/agent · `aimeat connect serve
  *   --surface agent`). Self-contained — one role, one handbook (kept separate from prompt-defaults.ts
  *   and the other surface handbooks so they never get tangled). Tool list mirrors

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/identity.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic storage interface for human identity — the persistence contract each
  *   provider implements for GHII records (incl. lookups by owner, email hash, Google sub, and external
  *   OIDC id), chat instances, and email verifications.

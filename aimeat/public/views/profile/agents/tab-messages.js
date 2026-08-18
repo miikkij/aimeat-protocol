@@ -1,5 +1,7 @@
 /**
  * @file tab-messages.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history

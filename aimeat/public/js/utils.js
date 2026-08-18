@@ -1,6 +1,8 @@
 import { swallowed } from '/js/swallowed.js';
 /**
  * @file public/js/utils.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared browser helpers used across all portal/SPA views — HTML/attribute escaping and
  *   entity decoding, relative-time and byte formatting, clipboard copy, locale detection/persistence,
  *   a whitelist HTML sanitizer, star-field generation, and a broken-image SVG fallback handler.

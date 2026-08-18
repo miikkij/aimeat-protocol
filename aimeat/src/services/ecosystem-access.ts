@@ -1,5 +1,7 @@
 /**
  * @file ecosystem-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Data-area allowlist enforcement for ecosystem-app (GEAI) reads AND writes. A GEAI works
  *   freely in its OWN eco: namespace (flat keys) — that needs no grant — but crossing into the OWNER's
  *   shared areas (organism workspaces) must be covered by an owner-granted data-area (the consent grants

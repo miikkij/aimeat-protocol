@@ -1,5 +1,7 @@
 /**
  * @file mindmap.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Interactive, DETERMINISTIC structure map for an organism or a single workspace, with
  *   selectable chart types — **mindmap** (radial, the default; most compact / best at-a-glance),
  *   **flowchart LR** and **flowchart TD** (familiar tree views). Reuses the offers "Kartta" pattern:

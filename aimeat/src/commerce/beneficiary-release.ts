@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/beneficiary-release.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The gate between "owed" and "paid" for a beneficiary share, and the release itself.
  *
  *   ACCRUING AND PAYING ARE DIFFERENT ACTS, and only one of them is safe to do automatically. A share

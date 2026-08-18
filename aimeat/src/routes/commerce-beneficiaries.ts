@@ -1,5 +1,7 @@
 /**
  * @file src/routes/commerce-beneficiaries.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The REST surface for beneficiary revenue splitting — declaring who shares a
  *   capability's earnings, reading what has accrued to whom, and releasing it.
  *

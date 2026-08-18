@@ -1,5 +1,7 @@
 /**
  * @file contacts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic per-owner CONTACTS (address book) REST API — a thin HTTP layer over the
  *   shared core in services/contacts.ts (also used by the MCP tools, so both surfaces behave
  *   identically). The address book is a PROJECTION over three sources: contact-consent rows (the

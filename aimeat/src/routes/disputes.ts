@@ -1,5 +1,7 @@
 /**
  * @file src/routes/disputes.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Work dispute routes — opening disputes, counter-disputes, partial offers, and
  *   operator rulings, backed by a hash-chained tamper-evident audit log and morsel escrow
  *   settlement/return on resolution.

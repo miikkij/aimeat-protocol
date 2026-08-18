@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/stats.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express middleware that feeds the StatsCollector — counts every request,
  *   its HTTP method, and (on response finish) its status code.
  *

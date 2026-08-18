@@ -1,5 +1,7 @@
 /**
  * @file index.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Custom ESLint plugin for AIMEAT project rules.
  *   Provides file-header enforcement and max-file-lines checks.
  *

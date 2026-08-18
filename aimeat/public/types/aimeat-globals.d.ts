@@ -1,5 +1,7 @@
 /**
  * @file aimeat-globals.d.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Ambient type declarations for the no-build frontend. Covers browser globals that
  *   arrive via <script> tags or build-time injection (not ES-module imports), plus the
  *   conventional fields the api.js fetch wrapper attaches to thrown Errors. This lets

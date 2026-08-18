@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agent-tasks/create-read.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
  *   v1.3.0 — 2026-08-11 — The create WRITE moves to services/agent-task-write.ts, so aimeat_task_create

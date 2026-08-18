@@ -1,5 +1,7 @@
 /**
  * @file connect-tunnel.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Read-only operator route exposing ConnectTunnelManager metrics
  *   for the Connector Forward Tunnel. The WS endpoint itself (`/v1/connect/
  *   tunnel`) is handled at the HTTP upgrade in `index.ts`, not here — this

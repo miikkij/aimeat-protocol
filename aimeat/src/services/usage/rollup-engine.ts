@@ -1,5 +1,7 @@
 /**
  * @file src/services/usage/rollup-engine.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The fold: raw usage rows in, precomputed UsageRollup deltas out, incrementally and
  *   exactly once. Design: docs/internal/telemetria/02-design.md
  *

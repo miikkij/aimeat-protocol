@@ -1,5 +1,7 @@
 /**
  * @file src/utils/app-mobile-lint.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Conservative, NON-BLOCKING static lint of a published app's HTML for the recurring
  *   "it overflows / looks tiny on a phone" class of bug. Returns human-readable hints (never blocks
  *   a publish) that the publish routes surface in the response, so the builder fixes them before

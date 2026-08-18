@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/connections.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation of the outbound connection store (TARGET-057). Mirrors the
  *   Postgres provider; the two concurrency primitives are the parts worth reading.
  *

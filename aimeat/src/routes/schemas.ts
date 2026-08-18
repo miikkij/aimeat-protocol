@@ -1,5 +1,7 @@
 /**
  * @file src/routes/schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Schema-locking API for memory keys: owners/operators attach a JSON Schema (with
  *   apply_to scope + mode) to a key, with lock ownership enforced so only the locking principal (or
  *   an operator) can overwrite it, and validator cache invalidation on replace.

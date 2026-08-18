@@ -1,5 +1,7 @@
 /**
  * @file tracked-response.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Tracked Response — the reference implementation of the Memory Contract pattern
  *   (docs/coding-guidelines/memory-contracts.md; shape in docs/specs/tracked-response-contract.md).
  *   A Tracked Response is one self-describing owner-memory record binding an inbound message ↔ a

@@ -1,5 +1,7 @@
 /**
  * @file commerce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the commerce tools — parity with the server MCP
  *   (src/mcp/commerce.ts) so `aimeat connect serve --surface service|agent` exposes seller PSP
  *   credentials, sellable app-tool manifests, offer pricing and buyer checkout locally. Thin REST

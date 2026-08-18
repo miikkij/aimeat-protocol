@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/settings-dialog.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The home's settings dialog: everything a person actually adjusts, in four tabs,
  *   reached from one button in the home header.
  *

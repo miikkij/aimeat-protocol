@@ -1,5 +1,7 @@
 /**
  * @file organism-privacy.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Member-roster visibility for organisms — THE one policy every surface consults
  *   (REST detail/list/members, MCP organism_get/_members). An organism's `memberVisibility`
  *   decides who may see the roster: 'public' (anyone, deliberate opt-in), 'authenticated'

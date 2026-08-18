@@ -1,5 +1,7 @@
 /**
  * @file src/services/core-jobs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Defines and registers the node's built-in scheduled job handlers on the Scheduler —
  *   pure async functions (no setInterval) for daily allowance, work/dispute timeouts, TTL cleanups,
  *   consent expiry/prune, capability aggregation, task-stall detection, and the living-document pulse.

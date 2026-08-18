@@ -1,5 +1,7 @@
 /**
  * @file definitions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared metadata catalog for AIMEAT tools. The catalog is transport-neutral:
  *   public MCP, local connector MCP, and shell CLI fallback can read the same names,
  *   descriptions, input metadata, and visibility flags while keeping their execution

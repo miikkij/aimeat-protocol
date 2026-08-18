@@ -1,5 +1,7 @@
 /**
  * @file src/services/cache-cleanup.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cache Cleanup Service — prevents unbounded storage growth from federated data by
  *   scanning each agent's memory for federation key prefixes (federated:, replica:, genesis:,
  *   _conflict_, expiring:) and deleting entries older than their respective TTLs. Runs hourly.

@@ -1,5 +1,7 @@
 /**
  * @file skills.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for the skills registry (dedicated system — NOT knowledge packages).
  *   Five tools: publish (inline SKILL.md or presigned skill-dir ZIP upload), list (library /
  *   linked / mine views — the "which scopes am I working with, what can I load" surface), get

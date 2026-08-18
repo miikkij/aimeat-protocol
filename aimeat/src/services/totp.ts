@@ -1,5 +1,7 @@
 /**
  * @file src/services/totp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description TOTP (RFC 6238) two-factor auth helpers: generates a secret + otpauth URI + QR data
  *   URL and backup codes on setup, validates codes/backup codes (timing-safe), and encrypts the
  *   secret at rest with AES-256-GCM.

@@ -1,5 +1,7 @@
 /**
  * @file skill-seeds.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Seeds the built-in node-scope skills (data/builtin-skills.ts) into the
  *   skills registry at startup. Create-if-missing ONLY: a skill whose manifest already
  *   exists under system@{nodeId} is left untouched, so operator edits and deliberate

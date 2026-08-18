@@ -1,5 +1,7 @@
 /**
  * @file tools/perf-bench/bench-backends.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Phase 4 BACKEND COMPARISON — runs identical memory-domain operation CHAINS through the
  *   SAME {@link ../../src/storage/adapter/memory-adapter.js MemoryStorageAdapter} contract over each
  *   candidate backend (SQLite, MongoDB-Prisma, Postgres-Prisma, Postgres-Kysely) and reports per-chain

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/bulk.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
  *   v1.1.0 — 2026-08-10 — Security audit H-11: export and bundle enforce memory:read, matching the

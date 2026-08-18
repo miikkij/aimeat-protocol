@@ -1,5 +1,7 @@
 /**
  * @file portal-dev.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Portal Dev view module — developer onboarding wizard (select
  *   platform → variant → connection type → share app). Composes background,
  *   panels, and upload sub-modules (extracted to satisfy max-file-lines).

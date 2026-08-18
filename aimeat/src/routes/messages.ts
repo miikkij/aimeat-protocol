@@ -1,5 +1,7 @@
 /**
  * @file messages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for human↔human direct messaging (GHII↔GHII). Send (owner / agent /
  *   ecosystem sender → human recipient), inbox, conversation threads, read receipts, delete, plus
  *   the first-contact consent gate (requests / accept / block). This layer handles SAME-NODE (local)

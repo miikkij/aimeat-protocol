@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-monitoring.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only admin routes for monitoring and federation control — listing all work
  *   items, inspecting federation peers/peering requests, and initiating a federation join
  *   (key exchange) with a genesis/target node.

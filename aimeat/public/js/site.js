@@ -1,5 +1,7 @@
 /**
  * @file site.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reader for this node's own public-page links (window.__SITE, injected by
  *   serveSpa from config.siteLinks). The marketing pages point at apps and contacts that
  *   belong to whoever runs the node, so nothing here is guaranteed to exist: a fresh clone

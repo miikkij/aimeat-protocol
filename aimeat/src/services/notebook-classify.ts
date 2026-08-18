@@ -1,5 +1,7 @@
 /**
  * @file notebook-classify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Notebook slice B — AI placement classifier. Given a free-text note and the user's
  *   organism/workspace structure, asks the user's own OpenRouter model to suggest WHERE the note
  *   belongs (organism → workspace → document-space) and to draft a clean document title + markdown

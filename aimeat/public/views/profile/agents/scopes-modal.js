@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/agents/scopes-modal.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Scope-management modal for an agent: template presets + advanced per-domain
  *   permission checkboxes, read-only view for non-owners. Extracted from ../agents-tab.js
  *   to satisfy max-file-lines.

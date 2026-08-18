@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps/publish.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-catalog publish route: POST /v1/apps — the INLINE door (base64 body), plus the
  *   presigned-mode handshake that mints an upload URL for the other one. Everything the three
  *   publish doors share now lives in services/app-publish.ts; what stays here is the inline door's

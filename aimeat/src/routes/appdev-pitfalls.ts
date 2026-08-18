@@ -1,5 +1,7 @@
 /**
  * @file appdev-pitfalls.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves the curated appdev-pitfall registry (data/appdev-pitfalls.ts) —
  *   platform-level "what bites app builders" knowledge for AI agents building apps ON AIMEAT.
  *   GET /v1/appdev/pitfalls returns a paginated index with facet counts;

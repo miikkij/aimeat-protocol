@@ -1,5 +1,7 @@
 /**
  * @file notify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description In-app notification inbox — server-side creation of notification records. A
  *   notification is a small memory record stored under the RECIPIENT's identity (so they read it
  *   via the owner-scoped memory path / the /v1/notifications route). Events (e.g. a workspace

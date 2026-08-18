@@ -1,5 +1,7 @@
 /**
  * @file workspace-comments.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Comment thread on one workspace object (record or document). Members read + add
  *   comments; an author (or org admin) deletes. Supports an optional quote anchor and threaded
  *   replies. Extracted from organisms-tab.js with no behaviour change.

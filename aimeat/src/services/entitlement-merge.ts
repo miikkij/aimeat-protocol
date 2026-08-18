@@ -1,5 +1,7 @@
 /**
  * @file src/services/entitlement-merge.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one-off migration for rights minted before they were keyed to the owner who pays.
  *
  *   Only a human holds a balance — `debitBalance` resolves every agent to its owner — so a right keyed

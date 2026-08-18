@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-artifact-lint.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What the node checks about an app's BYTES at publish, and the two findings it
  *   refuses to publish over.
  *

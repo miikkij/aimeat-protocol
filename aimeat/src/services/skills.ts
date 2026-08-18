@@ -1,5 +1,7 @@
 /**
  * @file skills.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The skills registry — a dedicated system (NOT knowledge packages) that stores
  *   SKILL.md packs as memory records under scoped namespaces and resolves them for consumers.
  *   Core principle: skill (content) ≠ registry (scope) ≠ attachment (consumer).

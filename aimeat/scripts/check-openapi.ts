@@ -1,5 +1,7 @@
 /**
  * @file check-openapi.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pre-commit / CI guard for `openapi.yaml`. Rule 3 makes the spec the canonical API
  *   contract, but nothing verified it was still machine-readable — and it had quietly stopped being
  *   so in two different ways, both found live on main:

@@ -1,5 +1,7 @@
 /**
  * @file workflow-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The shared contract for Agent Workflows — the signal grammar and the workflow
  *   descriptor types. A "signal" is a tree evaluated against owner memory (deterministic-first,
  *   with a sparingly-used node-OpenRouter `llm` leaf); both an agent's offer (success_signal /

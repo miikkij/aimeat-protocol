@@ -1,5 +1,7 @@
 /**
  * @file node-descriptor.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds a node's self-descriptor for the federation: its AIMEAT software version,
  *   node type, enabled feature capabilities, and a CURATED set of federation behaviour settings
  *   (no internal limits or secrets). Shared by the well-known document, the heartbeat payload, and

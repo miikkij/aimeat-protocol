@@ -1,5 +1,7 @@
 /**
  * @file src/storage/schema-lock-cache.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Process-level cache of ALL schema locks. `findApplicableSchema` runs on EVERY memory
  *   write (validateMemoryWrite) and otherwise loads the full prefix-schema set + probes several exact
  *   keys against the DB per call (~8 round-trips). Schema locks change only when a workspace/schema is

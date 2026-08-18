@@ -1,5 +1,7 @@
 /**
  * @file agent-task-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation schemas for agent task CRUD and lifecycle operations
  * @version-history
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1

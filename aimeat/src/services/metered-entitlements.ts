@@ -1,5 +1,7 @@
 /**
  * @file src/services/metered-entitlements.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description G1 — the durable METERED ENTITLEMENT primitive (EXCHANGE / TARGET-045). Generalises the
  *   single-use `ext-pay-token` into a lasting, budget-capped, contract-bound right: "consumer C may call
  *   provider P's capability (ext/action) at price X, under contract K, until budget B is spent." This is

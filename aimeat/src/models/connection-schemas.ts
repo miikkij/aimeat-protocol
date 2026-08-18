@@ -1,5 +1,7 @@
 /**
  * @file connection-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Types for outbound connections (TARGET-057, aimeat-connect): a principal's own
  *   account at an EXTERNAL service, held by the node so nothing else has to hold it.
  *

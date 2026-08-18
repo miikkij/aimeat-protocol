@@ -1,5 +1,7 @@
 /**
  * @file src/routes/micro-memory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Micro-memory (`/v1/mm/*`) routes — a lightweight, URL-based key/value memory surface
  *   with visibility levels and per-owner quotas, supporting plain and base64 (`value64`) values plus
  *   batched key/value pairs in query params. (Deprecated per RFC v4.0; retained for compatibility.)

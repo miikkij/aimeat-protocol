@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/key.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
  *   v1.3.0 — 2026-08-11 — The cross-owner read resolves the accessor's identity instead of passing

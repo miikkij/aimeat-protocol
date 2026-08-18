@@ -1,5 +1,7 @@
 /**
  * @file src/services/welcome-message.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The message the operator sends every new account, so the mailbox is not empty on the
  *   day the person arrives.
  *

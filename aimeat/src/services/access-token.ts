@@ -1,5 +1,7 @@
 /**
  * @file access-token.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared resolution for owner-created Personal Access Tokens (PATs). Maps a
  *   raw token to the identity + roles it grants (revoked/expired checked, roles re-read from
  *   the owner's CURRENT roles so a token never grants more than the owner holds). Used by the

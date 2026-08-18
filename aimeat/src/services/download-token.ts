@@ -1,5 +1,7 @@
 /**
  * @file download-token.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Presigned download token generation and verification. Tokens are time-limited
  *   JWTs that authorize GET /v1/download/:token to stream ONE specific stored file (owner + key
  *   baked into the token) without the caller carrying an agent JWT. Mirrors upload-token.ts but

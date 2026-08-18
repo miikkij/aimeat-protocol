@@ -1,5 +1,7 @@
 /**
  * @file annotations.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source of truth for MCP tool annotations across the public
  *   server MCP surface (`aimeat/src/mcp/*.ts`) and the local connector MCP surface
  *   (`aimeat/src/cli/connect/mcp/tools/*.ts`). Provides a `title` plus

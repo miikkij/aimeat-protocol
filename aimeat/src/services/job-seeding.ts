@@ -1,5 +1,7 @@
 /**
  * @file src/services/job-seeding.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Idempotently seeds the core scheduled-job records (with cron expressions) into storage
  *   at startup, creating each only if absent so restarts don't duplicate them; feature-gated jobs are
  *   seeded per config (consent, personal nodes, verification nonce cleanup).

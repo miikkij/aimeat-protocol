@@ -1,5 +1,7 @@
 /**
  * @file html-inject.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared "inject a snippet before the closing </body>" transform used by every
  *   serve-time HTML injector (app badge, copy-protection domainLock/watermark). The one rule
  *   that matters: target the LAST </body> occurrence, never the first. App JavaScript routinely

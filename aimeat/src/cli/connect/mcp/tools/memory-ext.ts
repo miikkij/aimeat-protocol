@@ -1,5 +1,7 @@
 /**
  * @file memory-ext.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registration for reading another agent's public memory
  *   entries via the cross-identity memory endpoint.
  * @version-history

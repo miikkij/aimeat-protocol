@@ -1,5 +1,7 @@
 /**
  * @file recents.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "Continue" list backing store — the last opened things (workspaces, apps,
  *   organisms, …) across types, so the profile home can offer one-click returns with real
  *   display names. Device-local by design (localStorage): what you opened HERE.

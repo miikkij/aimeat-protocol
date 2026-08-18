@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/step-mat.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Step 1 of the home path: the welcome mat (aimeat_remake/03-welcome-mat.md). Copy a
  *   prompt into your own AI chat, paste the answer back, press the button.
  *

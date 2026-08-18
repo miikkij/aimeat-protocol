@@ -1,5 +1,7 @@
 /**
  * @file messages-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard "Messages" tab — operator visibility into direct-message (user↔user)
  *   delivery: total + 24h counts by status (delivered / queued / failed / undeliverable), the busiest
  *   target nodes, and a recent-attempts table. Privacy by design: shows NO message content and NO

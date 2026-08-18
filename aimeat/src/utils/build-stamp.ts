@@ -1,5 +1,7 @@
 /**
  * @file build-stamp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Read the stamp that `pnpm build` writes into dist/, and answer one question: is the
  *   artifact we are executing older than the source it was built from? The CLI daemon consumers
  *   spawn (`aimeat connect serve`) runs from dist/, and a stale dist does not fail — it silently

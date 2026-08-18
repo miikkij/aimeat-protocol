@@ -1,5 +1,7 @@
 /**
  * @file src/services/site-sync.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pulls site content from the load-balancer origin into this node's local storage — the
  *   public site template, portal memory keys (with deletions), KV values, and system board posts — so
  *   mirror/edge nodes serve fresh site content. Tracks last-sync/last-error/syncing state and syncs deltas

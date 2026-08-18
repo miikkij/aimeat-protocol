@@ -1,5 +1,7 @@
 /**
  * @file oauth-login.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Social login (sign-in) via external OIDC providers — Google, Casdoor, and Microsoft
  *   Entra ID. A single generic, config-gated sign-in path for HUMAN owners that reuses the shared
  *   OIDC relying-party client (src/services/oidc-client.ts) via the provider registry

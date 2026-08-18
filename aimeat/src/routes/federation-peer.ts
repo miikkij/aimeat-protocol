@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-peer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation peer routes — the public peer directory and node-to-node handshake surface:
  *   signed introduction, Ed25519 key exchange, heartbeat/presence, service-summary aggregation,
  *   peering-request CRUD, tier promotion/auto-admit policy evaluation, and the federation node book.

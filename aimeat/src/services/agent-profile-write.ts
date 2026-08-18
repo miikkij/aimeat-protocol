@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-profile-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Writing the owner-managed and self-reported fields of an agent record: tags, mode,
  *   capabilities, and the platform an agent reports about itself.
  *

@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/agents.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service layer for agent management — lists/deletes agents, edits scopes,
  *   CORS, and concurrency; agent groups; chat sessions/instances; and workspace-contract tagging +
  *   one-click contract adoption tasks.

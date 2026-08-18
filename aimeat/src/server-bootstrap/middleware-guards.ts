@@ -1,5 +1,7 @@
 /**
  * @file src/server-bootstrap/middleware-guards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Installs early request guards during server bootstrap: maintenance-mode gating
  *   (503 + a styled HTML page for browsers), node-type guards for relay/mirror nodes, and a
  *   first-run redirect that serves the setup wizard when no owners exist yet.

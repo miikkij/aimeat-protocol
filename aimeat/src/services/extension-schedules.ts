@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-schedules.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Registering the schedules an extension's manifest declares, and saying WHOSE they are.
  *
  *   A manifest-declared schedule is built in four places — activate (services/extension-lifecycle.ts),

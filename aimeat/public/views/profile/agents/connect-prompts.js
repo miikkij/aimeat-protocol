@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/agents/connect-prompts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Copy-pasteable agent connection prompts (device-auth, CrewAI task-runner,
  *   MCP onboarding) + per-platform Node.js setup instructions. Extracted from
  *   ../agents-tab.js to satisfy max-file-lines.

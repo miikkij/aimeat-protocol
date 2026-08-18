@@ -1,5 +1,7 @@
 /**
  * @file sign.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Ed25519 signing helper for AIMEAT auth challenges, mirroring the
  *   proven recipe in test/api-full.ts. Owners sign `owner + nodeId + timestamp`;
  *   agents sign `gaii + timestamp`. The node verifies against the stored public key.

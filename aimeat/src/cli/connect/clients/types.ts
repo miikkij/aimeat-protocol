@@ -1,5 +1,7 @@
 /**
  * @file types.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared contract for `aimeat connect client <id>` — the one command that points a
  *   chat client (Goose, Claude Code, Cursor, VS Code, Claude Desktop) at this node's MCP surface.
  *   Each client is one adapter: where its config lives, how an MCP server is spelled in it, and how

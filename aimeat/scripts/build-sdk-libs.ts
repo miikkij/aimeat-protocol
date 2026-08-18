@@ -1,5 +1,7 @@
 /**
  * @file build-sdk-libs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Build step for the served browser SDK libraries. Bundles each componentized,
  *   JSDoc-typed ESM source under src/static/sdk-libs/ (one entry per library, sharing _core/)
  *   with esbuild into a classic IIFE, and writes it to src/static/sdk-libs/dist/aimeat-<name>.js.

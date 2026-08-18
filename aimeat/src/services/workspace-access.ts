@@ -1,5 +1,7 @@
 /**
  * @file workspace-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The single shared read-authorization gate for an organism workspace. A workspace is
  *   SHARED: authorization is at the workspace level (the manifest record is the one gate), not per
  *   record — see GET /v1/organisms/:id/workspace. This module extracts that exact two-stage check

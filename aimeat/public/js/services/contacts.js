@@ -1,5 +1,7 @@
 /**
  * @file contacts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AIMEAT Contacts Service — the owner's address book (/v1/contacts): the merged list
  *   (saved identities ∪ DM conversation peers ∪ saved PEOPLE, with display names), saving either
  *   shape, editing what the owner knows about a person, gate-safe remove, exact-match email

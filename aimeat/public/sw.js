@@ -1,5 +1,7 @@
 /**
  * @file public/sw.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AIMEAT push-notification service worker. Displays incoming Web Push messages and
  *   routes clicks to the right SPA view, preferring an already-open window on the same path.
  *

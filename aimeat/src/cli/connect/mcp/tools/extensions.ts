@@ -1,5 +1,7 @@
 /**
  * @file extensions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tool registrations for extension lifecycle management --
  *   listing, installing, invoking actions, activating, deactivating, and deleting.
  * @version-history

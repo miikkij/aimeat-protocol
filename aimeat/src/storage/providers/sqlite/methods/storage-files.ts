@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/storage-files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Stored-file methods for the SQLite backend: create, read (whole / metadata / one byte
  *   range), list, delete, and the tag + visibility updates.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/owner-cascade.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The per-identity cascade delete, extracted from methods/owner.ts by pure move when
  *   that file passed the 800-line limit. Bodies verbatim; merged onto the SqliteStorage prototype
  *   the same way every other method group is.

@@ -1,5 +1,7 @@
 /**
  * @file public/contact-picker.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The apex contact picker (TARGET-063 phase 3). An app opens this page as a POPUP; the
  *   owner picks one person; the node mints a handle bound to (this owner, this app, that contact)
  *   and the handle plus a label goes back to the opener. The list itself never leaves this page.

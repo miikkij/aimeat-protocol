@@ -1,5 +1,7 @@
 /**
  * @file src/services/task-resume.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Bringing a stalled task back when its agent shows up again.
  *
  *   The stall detector marks a task 'stalled' after a quiet period. If the agent then posts an event

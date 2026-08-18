@@ -1,5 +1,7 @@
 /**
  * @file EmptyState.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical empty-state placeholder — a centered muted message with an
  *   optional icon, bold title, and action row. Replaces the per-view clones
  *   (pf-empty / mk-empty / hb-empty / agd-empty / pkg-empty …) and the bare

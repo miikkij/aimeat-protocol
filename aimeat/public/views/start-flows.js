@@ -1,5 +1,7 @@
 /**
  * @file start-flows.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Data + logic for the /v1/start diagnosis page: entrance configs
  *   (per LinkedIn-post angle, selected via ?from=), diagnostic questions with
  *   scores, verdict tiers, the build questions (path / tool / need / automation)

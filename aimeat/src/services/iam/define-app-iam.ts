@@ -1,5 +1,7 @@
 /**
  * @file define-app-iam.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description P5 slice 3: the "AI-accelerated app-permission design" core behind the MCP
  *   aimeat_iam_define tool. Validates a proposed app IAM design — a level schema (BBS ordinal levels →
  *   app capabilities) + a command manifest (commands → capability + mutation tier) — against the shared

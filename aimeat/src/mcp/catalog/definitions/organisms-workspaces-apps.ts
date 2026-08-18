@@ -1,5 +1,7 @@
 /**
  * @file organisms-workspaces-apps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file gate-expiry.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Durable-pause expiry for gate PendingApprovals. A pending approval may carry a
  *   `deadline`; once it passes, the default escalation is **abort** (fail-closed): the approval is
  *   marked `rejected` with note "expired" so nothing auto-proceeds on a stale, undecided gate

@@ -1,5 +1,7 @@
 /**
  * @file src/services/federation-helpers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation shared helpers used across the federation routers
  *   (peer, sync, genesis, settlements): keyword/location matching for cross-catalogue
  *   filtering, a TTL peer-key cache for signature verification, and outbound key exchange.

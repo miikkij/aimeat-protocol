@@ -1,5 +1,7 @@
 /**
  * @file budget-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AI spend panel: today's total against the daily budget, per-app caps, and a
  *   30-day stacked chart. Moved out of openrouter-settings.js during the settings rework and
  *   translated — every string in it used to be hardcoded English, which made this the one part of

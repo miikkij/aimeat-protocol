@@ -1,5 +1,7 @@
 /**
  * @file capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Capability Layer REST API: discovery, CRUD, invoke proxy, telemetry, vouch, test.
  * @structure
  *   - discovery: GET /v1/capabilities and /:id, with the private-row rules

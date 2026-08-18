@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/shared.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared helpers for the organism route modules. Extracted from src/routes/organisms.ts
  *   to satisfy max-file-lines. `createOrganismHelpers(config, storage)` returns the closure-bound
  *   helpers (membership/role checks, workspace registry lookups, draft publish/revert, share meta,

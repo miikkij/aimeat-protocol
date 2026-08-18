@@ -1,5 +1,7 @@
 /**
  * @file config-types-ai.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AI half of the node's configuration: which key pays, how much of it one person
  *   may use, which model each role gets, and how often an app may be rendered.
  *

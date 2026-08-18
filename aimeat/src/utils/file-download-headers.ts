@@ -1,5 +1,7 @@
 /**
  * @file src/utils/file-download-headers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The response headers a STORED file is served with, in one place: the content type,
  *   whether a browser may render it, and what it is allowed to do if it does.
  *

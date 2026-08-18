@@ -1,5 +1,7 @@
 /**
  * @file members.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism Members tab — roster first (avatar rows with role badge, per-workspace
  *   access line, joined date, "…" menu for admin-promote/demote, access editing, make-creator,
  *   remove, block), a unified "+ Add people" panel (direct add / invitation / email invitation,

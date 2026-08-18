@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/federation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federated memory browsing routes: pull, push-home, list-home (federated sessions) + list-remote, pull-remote (home users). Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
  *   v1.1.0 — 2026-08-10 — Security audit H-15: list-home and list-remote sign the peer memory-list request

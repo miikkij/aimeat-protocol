@@ -1,5 +1,7 @@
 /**
  * @file workspace-meta.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Update a workspace's definition IN PLACE — its name, readme, and/or its whole
  *   structure (the manifest: objectTypes/spaces, policy/gate, settings) plus record schemas — without
  *   changing its id or orphaning references. Editing structure is just editing the manifest, so the

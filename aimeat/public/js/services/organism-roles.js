@@ -1,5 +1,7 @@
 /**
  * @file organism-roles.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Who holds an organism and who may act in it: owners (add, remove, hand over),
  *   admins, member removal and bans. Extracted from organisms.js when that file passed 800 lines;
  *   the calls are unchanged and organisms.js re-exports every one of them.

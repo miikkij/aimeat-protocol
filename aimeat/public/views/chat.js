@@ -1,5 +1,7 @@
 /**
  * @file public/views/chat.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The chat page: the person's first agent, reachable without connecting anything.
  *
  *   Everything else on this node assumes a person has already wired their own AI tool to it over

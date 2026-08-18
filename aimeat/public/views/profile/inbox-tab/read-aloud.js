@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/read-aloud.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Read-aloud controls for the profile Inbox thread — the same "listen instead of read"
  *   affordance the (L)AIMEAT Sanomat app gives its articles, brought to direct messages. Two
  *   self-contained components (they own their own hooks, so the pure ThreadPanel stays hook-free):

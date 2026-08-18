@@ -1,5 +1,7 @@
 /**
  * @file extensions-tab.maturity.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AI-acceleration maturity badge for the Cortex Libraries cards — joins each
  *   library card onto the node's library-pack registry (GET /v1/library-packs) so a user browsing
  *   their libraries sees how mature/measured each is: its tier (any | frontier | needs-doc) and the

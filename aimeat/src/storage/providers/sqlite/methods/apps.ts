@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/apps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Token-revocation, App-catalog, Subdomain, App-grant, App-draft, App-marketplace, Config, Knowledge-link methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)

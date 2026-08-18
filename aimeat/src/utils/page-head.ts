@@ -1,5 +1,7 @@
 /**
  * @file page-head.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Stamps a served HTML page's `<head>` with the metadata that describes THAT page:
  *   title, meta description, og:*, canonical, the markdown alternate link and JSON-LD, all from
  *   the shared public-page registry.

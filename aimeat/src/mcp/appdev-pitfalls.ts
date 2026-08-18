@@ -1,5 +1,7 @@
 /**
  * @file appdev-pitfalls.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for the LEARNED appdev-pitfall knowledge base — what AI builders
  *   learn while building apps ON AIMEAT, model-attributed and owner-scoped with per-entry
  *   opt-in platform sharing. Entries live in the reserved knowledge package

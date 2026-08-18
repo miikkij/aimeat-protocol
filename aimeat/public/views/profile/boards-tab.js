@@ -1,5 +1,7 @@
 /**
  * @file boards-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for discussion boards — create, subscribe, browse, post, react, delete, member management.
  * @version-history
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes

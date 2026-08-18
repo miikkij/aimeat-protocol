@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/payable-book.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The seller's payable book: one memory record per settled money sale
  *   (`commerce.payable.{trackingCode}` under the seller's GHII) listing what they are owed or have
  *   received and on which rail. AIMEAT never holds the money — this is bookkeeping the receipt and

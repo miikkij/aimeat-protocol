@@ -1,5 +1,7 @@
 /**
  * @file instances.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Package instance API routes — install packages, track instances,
  *   check for updates, generate migration prompts, and apply migrations.
  *   Includes real component registration via native storage APIs, rollback on

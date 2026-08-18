@@ -1,5 +1,7 @@
 /**
  * @file check-ai-disclosure.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The gate that keeps TARGET-058 true after everyone stops paying attention.
  *
  *   Eight phases of care are worth nothing if phase nine of somebody else's work quietly drops a

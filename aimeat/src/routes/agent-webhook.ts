@@ -1,5 +1,7 @@
 /**
  * @file agent-webhook.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for agent webhook CRUD (register, get, delete, test, delivery log).
  *   Owners can manage webhooks for any of their agents; agents can manage their own.
  * @structure

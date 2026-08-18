@@ -1,5 +1,7 @@
 /**
  * @file packages-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for managing package instances, browsing available packages,
  *   and exploring the template gallery. Displays three sub-views: My Instances (installed
  *   packages with status/update/remove), Browse Packages (search/filter/install), and

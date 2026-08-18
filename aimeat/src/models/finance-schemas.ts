@@ -1,5 +1,7 @@
 /**
  * @file finance-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Record types for the generic finance domain: sales invoices, accounting
  *   vouchers, the VAT-code registry and fiscal years. This is NOT a bookkeeping program —
  *   the goal is a complete, VAT-itemized audit trail (tositeketju) and clean export for an

@@ -1,5 +1,7 @@
 /**
  * @file activity-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace activity panel — a GitHub-style contribution heatmap (every day split 2×2
  *   into documents vs records × draft vs published) plus the recent activity log. Built from the
  *   workspace activity feed (derived from version history). Extracted from organisms-tab.js, no

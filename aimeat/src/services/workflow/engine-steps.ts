@@ -1,5 +1,7 @@
 /**
  * @file src/services/workflow/engine-steps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workflow-engine side-effect helpers — step/inspector dispatch (agent + ecosystem),
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.

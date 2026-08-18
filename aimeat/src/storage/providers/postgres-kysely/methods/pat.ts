@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/pat.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Personal Access Token domain for the Postgres+Kysely backend (PersonalAccessToken table).
  *   The raw token is never stored — only its SHA-256 hash. Translated 1:1 from the Prisma provider.
  * @version-history

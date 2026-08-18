@@ -1,5 +1,7 @@
 /**
  * @file mcp/catalog/definitions/packages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Catalog entries for the component-package tools (/v1/packages).
  *
  *   These are NOT the single-file web apps. Until 2026-08-16 the aimeat_app_* tools on both

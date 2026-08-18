@@ -1,5 +1,7 @@
 /**
  * @file agents-messages-subtab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Messages sub-tab for agent detail view.
  *   Shows conversation threads, message history with chat bubbles,
  *   proposed task handling, and a chat input area.

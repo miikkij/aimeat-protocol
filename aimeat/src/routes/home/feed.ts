@@ -1,5 +1,7 @@
 /**
  * @file src/routes/home/feed.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GET /v1/home/feed — what has happened on this account (aimeat_remake/
  *   06-koti-feed-suostumus.md, phase 6), and POST /v1/home/room — which of the four rooms the
  *   person went into first.

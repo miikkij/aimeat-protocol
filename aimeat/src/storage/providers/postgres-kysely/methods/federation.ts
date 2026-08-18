@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/federation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation domain for the Postgres+Kysely backend: approved-peer registry
  *   (FederationPeer, PK = nodeId), peering-request lifecycle (PeeringRequest, business key
  *   `requestId` ↔ record `id`), personal-node registration + per-node mailbox store-and-forward

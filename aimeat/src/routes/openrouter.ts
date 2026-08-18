@@ -1,5 +1,7 @@
 /**
  * @file openrouter.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for AI provider settings management and completions.
  *   Supports OpenRouter, LM Studio, and custom OpenAI-compatible providers.
  *   All endpoints require owner authentication. API keys are encrypted at rest

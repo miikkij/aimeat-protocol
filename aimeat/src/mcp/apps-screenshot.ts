@@ -1,5 +1,7 @@
 /**
  * @file apps-screenshot.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The MCP tool that lets an agent look at an app it published.
  *
  *   It exists because of something measured rather than assumed: given the draft tools and a node to

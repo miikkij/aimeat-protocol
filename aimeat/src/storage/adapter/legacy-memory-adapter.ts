@@ -1,5 +1,7 @@
 /**
  * @file src/storage/adapter/legacy-memory-adapter.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Phase 0 memory adapter: implements {@link MemoryStorageAdapter} by delegating to the
  *   existing fat `Storage` provider. This is the coexistence bridge — the new
  *   Service → Repository → Adapter stack runs on top of the SAME storage the routes use today, so the

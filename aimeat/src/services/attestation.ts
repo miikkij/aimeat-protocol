@@ -1,5 +1,7 @@
 /**
  * @file src/services/attestation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Dual-signed attestations (TINKI phase 1): an append-only record two to four
  *   principals co-sign with their REGISTERED Ed25519 keys — the trade-deed primitive ("both
  *   agents signed this exact payload"), generic for any co-signed fact (a deed, a contract

@@ -1,5 +1,7 @@
 /**
  * @file sharing-groups-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for browsing all sharing groups across all owners.
  *   Shows group name, owner, member count, entry count, and creation date.
  * @version-history

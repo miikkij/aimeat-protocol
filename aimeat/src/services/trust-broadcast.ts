@@ -1,5 +1,7 @@
 /**
  * @file src/services/trust-broadcast.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Trust Advisory Broadcast Service (RFC v1.5 §13.5) — signs a trust advisory
  *   (warning/suspend/ban) with the node's Ed25519 key and POSTs it to every active federation peer,
  *   with each outbound URL validated by safeFetch-style URL checks, returning a per-peer delivery report.

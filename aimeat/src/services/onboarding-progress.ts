@@ -1,5 +1,7 @@
 /**
  * @file src/services/onboarding-progress.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Re-evaluating an agent's onboarding, and completing it when the last required step
  *   passes.
  *

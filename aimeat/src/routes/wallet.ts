@@ -1,5 +1,7 @@
 /**
  * @file wallet.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Wallet routes for the morsel economy — balance check, transaction history,
  *   and morsel request. All endpoints resolve to the owner's single GHII-based balance;
  *   the storage layer handles GAII-to-GHII identity resolution internally.

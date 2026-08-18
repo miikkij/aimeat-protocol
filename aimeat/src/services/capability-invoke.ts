@@ -1,5 +1,7 @@
 /**
  * @file capability-invoke.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Invoke proxy: routes capability invocations to the correct underlying system
  *   (extension localhost fetch, manual webhook, or — new — an ecosystem app over the connect-tunnel).
  * @version-history

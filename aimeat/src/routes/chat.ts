@@ -1,5 +1,7 @@
 /**
  * @file src/routes/chat.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The chat surface: the person's conversations, and one turn streamed as it happens.
  *
  *   A turn takes minutes when the agent is building something, so the answer cannot be one JSON

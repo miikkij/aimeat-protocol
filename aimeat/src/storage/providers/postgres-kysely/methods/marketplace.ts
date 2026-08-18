@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/marketplace.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Marketplace domain for the Postgres+Kysely backend (Listing / Purchase). Listing CRUD +
  *   filtered/paginated list, and purchase create/get/update with buyer/seller lookups. Translated 1:1
  *   from the Prisma implementation: category/status/sellerOwner + price-range filters happen in-DB,

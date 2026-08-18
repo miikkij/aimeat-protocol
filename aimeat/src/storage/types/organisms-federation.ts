@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/organisms-federation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
  *   v1.2.0 — 2026-08-01 — KnowledgeSynthesisLevel now aliases AiProvenanceLevel rather than

@@ -1,5 +1,7 @@
 /**
  * @file src/services/workspace-write-guards.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two limits a workspace write answers to, extracted from mcp/workspaces.ts when
  *   that file passed the 800-line limit. Bodies verbatim.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/services/capability-record.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Writing a capability, once, for whichever door is doing the writing.
  *
  *   WHY THIS FILE EXISTS. `POST/PUT/DELETE /v1/capabilities`, the vouch and invoke routes, and the

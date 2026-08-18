@@ -1,5 +1,7 @@
 /**
  * @file src/routes/appeals.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Moderation appeals API. Lets a content owner appeal a flag against their
  *   content, lists appeals, and lets moderators review (dismiss/action) them. Resolves the
  *   flagged content's owner across memory, board posts, actions, and agents.

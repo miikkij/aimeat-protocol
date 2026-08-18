@@ -1,5 +1,7 @@
 /**
  * @file scripts/check-storage-parity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The static half of the storage contract: every table with an owner-scoped column is
  *   named in the deletion cascade of BOTH providers, or is on a written exemption list. The dynamic
  *   half is test/unit/storage-conformance.test.ts, which runs the same scenario against both and

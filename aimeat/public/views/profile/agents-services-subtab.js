@@ -1,5 +1,7 @@
 /**
  * @file agents-services-subtab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Services sub-tab for agent detail view.
  *   Shows published services (actions) that this agent offers on the work exchange.
  *   Displays service name, description, cost, visibility, and call count.

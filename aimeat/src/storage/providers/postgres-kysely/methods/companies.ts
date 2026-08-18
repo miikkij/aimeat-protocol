@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/companies.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Postgres+Kysely implementation of the company registry.
  *   Schema: migrations/0028_companies.sql. Slug lookups compare lower-cased, matching the
  *   unique index — the column keeps the display casing, resolution is case-insensitive.

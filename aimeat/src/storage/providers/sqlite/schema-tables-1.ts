@@ -1,5 +1,7 @@
 /**
  * @file sqlite/schema-tables-1.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite CREATE TABLE/INDEX DDL — part 1 of 3 (owners … site_changelog). Extracted from sqlite/schema.ts
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.

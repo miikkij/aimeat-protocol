@@ -1,5 +1,7 @@
 /**
  * @file access-guard.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared read-authorization core for identity-owned resources (memory + file
  *   storage). Wraps the consent decision (`checkConsentForRead`) and the audit write
  *   (`auditDataAccess`) into a single `authorizeRead()` call so every read path applies the

@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/memory-version-lock.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The optimistic lock for memory writes over MCP: compare the version the caller read
  *   against the record the write will actually land on, and refuse rather than overwrite.
  *

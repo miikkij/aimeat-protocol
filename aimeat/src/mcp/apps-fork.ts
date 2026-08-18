@@ -1,5 +1,7 @@
 /**
  * @file apps-fork.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description aimeat_app_fork, moved out of mcp/apps.ts by pure extraction when that file passed
  *   the 800-line limit. What is left here is the tool's own business: its two gates, and the answer
  *   it renders. The copy itself is services/app-lifecycle.ts.

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/micro-memory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Micro-memory sets for the Postgres+Kysely backend (MicroMemory table, jsonb entries,
  *   keyed by (gaii, setName)). A deprecated feature kept for parity; the usage summary reads its byte
  *   total. Translated 1:1 from the Prisma implementation.

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ai-transparency.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node's machine-readable AI transparency statement (TARGET-058) — what this node
  *   marks, how, in which posture, and who operates it. The agent-native equivalent of a transparency
  *   page, and the document a regulator, a researcher or a buyer's compliance officer reads first.

@@ -1,5 +1,7 @@
 /**
  * @file service-init.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Server bootstrap step that initializes runtime services after
  *   storage is ready: scheduler + core job handlers, federation heartbeat/peer
  *   recovery, directory indexing, personal-node tunnels, anonymous mode, mailbox

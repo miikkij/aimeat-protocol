@@ -1,5 +1,7 @@
 /**
  * @file apps-backup-export.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Export the owner's whole app catalog as one ZIP: EVERY published
  *   app with EVERY stored version (the version history is part of the property),
  *   plus the owner's installed cortex extensions (manifest + lib files). Mirrors

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agents/device-auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)

@@ -1,5 +1,7 @@
 /**
  * @file src/services/perf-trace.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Opt-in per-request storage profiler. Gated by config.perfTrace (env AIMEAT_PERF_TRACE,
  *   read through loadConfig() like every other flag — NOT a bespoke process.env read here). When on,
  *   the Storage instance is wrapped in a Proxy that times and counts every top-level method call,

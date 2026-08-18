@@ -1,5 +1,7 @@
 /**
  * @file realtime.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AimeatRealtime — browser client for AIMEAT P2P realtime rooms (WS rooms +
  *   WebRTC data channels + Yjs CRDT sync) and SharedClock (network-synced timeline).
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file offer-card-view.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Single source for the agent-offer card presentation. Exports small presentational
  *   pieces (badges, example, requirements, deliverable + sample) shared by every surface that shows
  *   an offer — the profile Offers feed AND the company catalog — so the format is identical and lives

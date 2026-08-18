@@ -1,5 +1,7 @@
 /**
  * @file src/data/app-templates/use-cases.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Full working-scaffold use-case template bodies for the authoring-template registry.
  *   Pure data — each composes app-shells + components into a complete, customisable app.
  *   {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII. Consumed by ../app-templates.ts.

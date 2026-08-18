@@ -1,5 +1,7 @@
 /**
  * @file src/services/directory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Directory service — builds and searches the public people/organism directory:
  *   filtering by type, location (city/area/country and geo radius), and interests, with facet
  *   aggregation (cities, interests) over the indexed directory entries.

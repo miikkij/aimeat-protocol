@@ -1,5 +1,7 @@
 /**
  * @file src/services/moderation-flags.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Raising a moderation flag, once, for every surface that can raise one.
  *
  *   WHY THIS FILE EXISTS. `POST /v1/flags` and `aimeat_flag_report` both wrote a FlagRecord, and the

@@ -1,5 +1,7 @@
 /**
  * @file offer-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation for an agent's published "offers" — the human-readable face of the
  *   agent's machine contract ("here's what I can do for you, with an example, the outcome, and a
  *   sample deliverable"). An agent publishes `agents.{name}.offers`; the profile Offers surface renders

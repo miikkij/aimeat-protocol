@@ -1,5 +1,7 @@
 /**
  * @file prompts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP handbook tool registration. Provides 1 tool for retrieving the agent
  *   operating handbook or managed prompts by tier. No resource -- fetched on-demand.
  * @structure

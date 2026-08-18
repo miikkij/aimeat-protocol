@@ -1,5 +1,7 @@
 /**
  * @file structure-overview.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Deterministic OKF-style (Open Knowledge Format) STRUCTURE OVERVIEW of an organism or a
  *   single workspace, rendered as Markdown + YAML frontmatter. It is a *projection of live state* —
  *   never persisted as a record — so it cannot drift: the same workspace content always yields the

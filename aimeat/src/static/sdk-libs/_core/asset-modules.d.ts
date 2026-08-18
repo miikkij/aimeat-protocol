@@ -1,5 +1,7 @@
 /**
  * @file asset-modules.d.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Types for the non-JS things an SDK library imports at bundle time. esbuild inlines a
  *   `.css` import as a string (the `.css: text` loader in scripts/build-sdk-libs.ts) and a `.json`
  *   import as a module with one named export per top-level key, tree-shaken to what is used. TypeScript

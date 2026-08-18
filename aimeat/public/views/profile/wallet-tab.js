@@ -1,5 +1,7 @@
 /**
  * @file wallet-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for morsel wallet: balance overview, lifetime stats,
  *   morsel request form, and transaction history with expandable details.
  * @version-history

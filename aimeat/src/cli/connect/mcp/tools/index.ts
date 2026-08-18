@@ -1,5 +1,7 @@
 /**
  * @file index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Registry that wires all MCP tool modules to an McpServer instance.
  *   Each module receives the AgentRegistry; tool handlers call
  *   `registry.resolve(agent_name?)` per request to pick which loaded agent's

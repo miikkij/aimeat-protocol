@@ -1,5 +1,7 @@
 /**
  * @file src/services/open-items-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The prompt a person copies out of the header to work their open items in their own
  *   AI chat.
  *

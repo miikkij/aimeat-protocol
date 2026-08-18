@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-peer/introduce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history

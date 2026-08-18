@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/history.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The whole record: the live window in full, and the archive behind it. The home card
  *   shows a glance and this page is where the glance leads. Design:
  *   docs/internal/telemetria/04-account-events.md

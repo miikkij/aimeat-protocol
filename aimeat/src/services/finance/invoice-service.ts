@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/invoice-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Invoice lifecycle: draft → sent → paid/overdue, credit notes, and the
  *   voucher that a payment books. Routes stay thin; every legality rule lives here.
  *

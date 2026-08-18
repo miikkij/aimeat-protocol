@@ -1,5 +1,7 @@
 /**
  * @file ManagedEnvNote.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The managed-environment note shown ABOVE every copyable prompt on the public
  *   pages: what a company-managed AI tool's "prompt injection / untrusted source" notice means,
  *   why it comes from the environment rather than from the prompt, and the three routes round it

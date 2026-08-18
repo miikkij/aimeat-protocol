@@ -1,5 +1,7 @@
 /**
  * @file app-grant-vocabulary.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The scope vocabulary an app may ask an owner for, each with the sentence the consent
  *   screen falls back to when a locale has no line for it. Moved out of routes/app-grants.ts by pure
  *   extraction when that file passed 800 lines; nothing else changed, and the route still owns every

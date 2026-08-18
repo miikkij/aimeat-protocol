@@ -1,5 +1,7 @@
 /**
  * @file security-incident.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Security incident log + quarantine. When an untrusted upload (e.g. a ZIP) fails a
  *   safety check, the handler records an incident (what, who attempted it, when, machine code +
  *   detail) and — if small enough — quarantines the rejected bytes for an operator to inspect,

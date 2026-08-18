@@ -1,5 +1,7 @@
 /**
  * @file offer-prereqs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Evaluate an offer's PREREQUISITES so the Offers card can show a runnable / blocked
  *   state with the reason — without running the offer. A prerequisite is either an UPSTREAM OFFER
  *   (met when that offer's deliverable.location.key is non-empty in owner-scope memory) or a SIGNAL

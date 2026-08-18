@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agent-tasks/completion.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
  *   v1.5.0 — 2026-08-14 — /complete and /fail are now nothing but the door: the state gate, the

@@ -1,5 +1,7 @@
 /**
  * @file timeline-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism STRUCTURE TIMELINE ("Kehitys") — how the organism's shape grew over time.
  *   Reads GET /v1/organisms/:id/structure/history (the trackable structure fingerprint's current
  *   value + archived prior versions) and lists each change chronologically with its diff summary and

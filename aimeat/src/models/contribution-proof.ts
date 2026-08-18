@@ -1,5 +1,7 @@
 /**
  * @file contribution-proof.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared proof-of-acceleration record attached to community contributions
  *   (owner template proposals, community library packs). Structurally compatible with the
  *   curated registry's PackProof (src/data/library-packs.ts) so a proven contribution can be

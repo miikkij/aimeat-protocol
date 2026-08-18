@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/catalogue.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic repository interface for the catalogue layer — CRUD contracts for
  *   CSM (Community Schema Model) and MSM records that storage providers implement.
  *

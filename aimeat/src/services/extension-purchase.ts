@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-purchase.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description `ctx.buy` — an extension buying a capability from ANOTHER provider, on its own owner's
  *   account. The publisher leg of the supply chain.
  *

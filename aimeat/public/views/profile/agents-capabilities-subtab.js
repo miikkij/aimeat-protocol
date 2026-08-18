@@ -1,5 +1,7 @@
 /**
  * @file agents-capabilities-subtab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Capabilities sub-tab for agent detail view.
  *   Shows technical skills with type/verification badges,
  *   domain knowledge with language tags, and action queue support

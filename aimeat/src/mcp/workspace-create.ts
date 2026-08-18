@@ -1,5 +1,7 @@
 /**
  * @file workspace-create.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description aimeat_workspace_create, moved out of mcp/workspaces.ts by pure extraction when that
  *   file passed the 800-line limit. What is left here is the door: the tool's parameters, the
  *   JSON-string tolerance MCP clients need, the membership check and the text answer. The

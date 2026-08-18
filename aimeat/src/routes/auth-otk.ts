@@ -1,5 +1,7 @@
 /**
  * @file src/routes/auth-otk.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The Tier 0.5 one-time-key routes: POST /v1/auth/otk mints a key, GET /v1/otk/:key
  *   executes it with NO authentication, and POST /v1/auth/connectivity-key mints the registration
  *   key an agent onboards with (it sits between them in the original file and travels with them —

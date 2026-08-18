@@ -1,5 +1,7 @@
 /**
  * @file src/services/system-fault-report.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description When the node breaks, the node says so — to the people who run it, without asking
  *   the user to describe anything.
  *

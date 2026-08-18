@@ -1,5 +1,7 @@
 /**
  * @file ledger.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-scoped read API for the agent LLM usage ledger (LEDGER / TARGET-016).
  *   Reads the daily aggregate rollup (fast, UI-facing) and the raw event stream (per-run
  *   drill-down to a deliverable). Every route scopes to `${req.auth.owner}@nodeId` — the human

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/knowledge/helpers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared closures for the knowledge package routes — identity resolution and the
  *   owner-scope memory lookup (GHII + all agents). Extracted from src/routes/knowledge.ts so the
  *   split route-group modules can share them. Extracted to satisfy max-file-lines.

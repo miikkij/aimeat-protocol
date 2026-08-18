@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/voice-parts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The voice-message pieces of a message bubble: the in-place audio player and the
  *   transcript row under it. Extracted from components.js purely to keep that file under the
  *   max-file-lines rule; behaviour is unchanged.

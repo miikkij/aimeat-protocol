@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/crud.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Core memory CRUD routes: POST /v1/memory (write), GET /v1/memory (list), GET /v1/memory/search. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
  *   v1.1.0 — 2026-08-10 — POST /v1/memory calls services/memory-write.ts, the same function the MCP

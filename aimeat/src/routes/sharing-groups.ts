@@ -1,5 +1,7 @@
 /**
  * @file sharing-groups.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for Sharing Group CRUD and member management
  * @structure
  *   - POST   /v1/groups              -- Create group

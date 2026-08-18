@@ -1,5 +1,7 @@
 /**
  * @file src/utils/tracking-code.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Small helpers that mint unique, human-readable identifiers using crypto random bytes —
  *   tracking codes for work/disputes and short request IDs.
  *

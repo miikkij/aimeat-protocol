@@ -1,5 +1,7 @@
 /**
  * @file state-detector.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Presentation for an agent's state — the default tab and the colour. It does NOT
  *   decide the state any more: the server does, in src/services/agent-health.ts, and every agent in
  *   /v1/agents carries a `health` object.

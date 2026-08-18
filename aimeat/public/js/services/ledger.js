@@ -1,5 +1,7 @@
 /**
  * @file ledger.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-scoped reads of the agent LLM usage ledger (LEDGER / TARGET-016):
  *   priced per-call usage aggregated by a chosen dimension, plus per-run drill-down. Backs
  *   the agent detail "Usage" tab. Read-only; every call is gated server-side to the owner.

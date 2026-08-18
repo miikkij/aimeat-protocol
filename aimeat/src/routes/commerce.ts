@@ -1,5 +1,7 @@
 /**
  * @file src/routes/commerce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Native REST adapter of the commerce core (TARGET-033): checkout sessions over the
  *   protocol-agnostic session service. Create → (update/cancel) → complete with a payment handler;
  *   completion fulfills each line item as an agent TASK on the offer-ask path. Auth mirrors the

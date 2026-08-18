@@ -1,5 +1,7 @@
 /**
  * @file agent-messages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for agent message inbox and sending responses
  * @structure
  *   - registerAgentMessageTools() -- registers aimeat_message_inbox and aimeat_message_send

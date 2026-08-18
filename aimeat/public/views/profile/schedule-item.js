@@ -1,5 +1,7 @@
 /**
  * @file schedule-item.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared, editable card for one managed schedule — used by both the
  *   Profile › Scheduler master view and the per-agent Schedules sub-tab. Shows the
  *   schedule meta (kind, cron, timezone, agent, last/next run, runs), the full

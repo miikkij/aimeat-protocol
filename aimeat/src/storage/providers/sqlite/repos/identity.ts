@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/identity.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) implementation of the identity repository — CRUD for GHII
  *   records (incl. lookups by owner, email hash, and Google sub), chat instances, and email
  *   verifications, with row (de)serialization between DB columns and the record types.

@@ -1,5 +1,7 @@
 /**
  * @file agent-statistics.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Recomputes an agent's quality statistics from its tasks: a
  *   performance rollup (task counts, success rate, completion durations by
  *   context) and a per-context peer-review rollup (stars, distribution,

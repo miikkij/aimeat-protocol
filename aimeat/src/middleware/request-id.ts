@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/request-id.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Express middleware that assigns a request ID to every HTTP request (honoring an
  *   incoming X-Request-Id header for tracing) and runs the handler chain inside an
  *   AsyncLocalStorage context so all log entries carry the requestId and caller GAII.

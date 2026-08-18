@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/owner-target.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "Write this into the OWNER's namespace, not mine" — the one place that decides
  *   whether an agent's write is redirected, so POST and PUT cannot drift apart.
  *

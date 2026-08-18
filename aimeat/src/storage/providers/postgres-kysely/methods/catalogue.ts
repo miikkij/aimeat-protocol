@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/catalogue.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CSM / MSM catalogue domain for the Postgres+Kysely backend (Csm / Msm tables). CSM =
  *   Content Service Manifest, MSM = MCP Service Manifest; both keyed by unique `name`. Backs the CSM/MSM
  *   registration + the startup template seeding. Translated to match the Prisma provider.

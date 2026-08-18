@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/extensions-tab.constants.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Static lookup tables for the Extensions tab — component-type icons/tag CSS classes
  *   and the bundled ready-made extensions list. Extracted from extensions-tab.js to satisfy
  *   max-file-lines.

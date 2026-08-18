@@ -1,5 +1,7 @@
 /**
  * @file tool-call.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shell fallback for connector tools. Provides `aimeat connect tools`,
  *   `aimeat connect schema`, and `aimeat connect call` for runtimes that can run
  *   commands but cannot use MCP directly.

@@ -1,5 +1,7 @@
 /**
  * @file flags.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP flags tool registration. Provides 1 tool for content moderation
  *   (reporting content for review). No resource — flag status is read-only and
  *   operator-managed. The write itself is services/moderation-flags.ts, which POST /v1/flags

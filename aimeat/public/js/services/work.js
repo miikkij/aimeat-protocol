@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/work.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service layer for the Work API — wrappers over /v1/work* covering the
  *   work inbox/sent lists and the accept/reject/deliver/progress/rate lifecycle actions.
  *

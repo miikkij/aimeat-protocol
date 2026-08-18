@@ -1,5 +1,7 @@
 /**
  * @file workspaces.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for organism WORKSPACES — the manifest-driven document/record spaces an
  *   organism holds (organism.{id}.w.{ws}.*). Makes the feature first-class for agents instead of
  *   requiring them to hand-construct memory keys: list workspaces, read a workspace (manifest +

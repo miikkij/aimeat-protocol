@@ -1,5 +1,7 @@
 /**
  * @file admin-agent-integration.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard endpoints for agent integration management.
  *   Platform registry, onboarding overview, readiness distribution,
  *   and skill bundle management.

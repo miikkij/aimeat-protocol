@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/record-helpers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The organism/workspace helpers that need no config and no closure: the namespace write
  *   rule, the role ladder, the freshest-copy tie-break, the member-GHII normaliser and the fork
  *   collapse. Extracted from ./shared.ts by pure move on 2026-08-11 when that file passed the

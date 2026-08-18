@@ -1,5 +1,7 @@
 /**
  * @file living.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the profile Living Documents tab (pf-ld-* prefix): template cards, the
  *   template editor (slot rows), the deploy panel, and the deployed-instance viewer. Dark-theme only —
  *   all colors/spacing via theme.css variables. Reuses several pf-nb-* helpers from notebook.css.

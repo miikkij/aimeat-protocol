@@ -1,5 +1,7 @@
 /**
  * @file src/schemas/knowledge-package.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description JSON Schema definitions for Knowledge Package content — the manifest and entry
  *   shapes used to lock schemas on `packages/{uuid}/{entry}` memory keys.
  *

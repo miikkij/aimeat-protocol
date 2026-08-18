@@ -1,5 +1,7 @@
 /**
  * @file install-cta.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "install this as an app" suggestion card (components/InstallCta.js): a slim,
  *   dismissible row on Home and in the chat. Theme tokens only; the compact variant tightens it
  *   for the chat column.

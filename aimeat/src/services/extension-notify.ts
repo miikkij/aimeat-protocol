@@ -1,5 +1,7 @@
 /**
  * @file src/services/extension-notify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cross-owner extension notification, consent-gated: `ctx.notify(message, { to })`
  *   reaches ANOTHER owner's bell + web push only when that owner holds an active consent grant
  *   `purpose: 'extension_notify'` whose data_pattern names this extension (`ext:{name}`) —

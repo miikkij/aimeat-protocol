@@ -1,5 +1,7 @@
 /**
  * @file agent-docs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The node's agent-facing orientation documents, served as markdown: `/sitemap.md`
  *   (what exists on this node and where) and `/AGENTS.md` (how a coding agent uses this node).
  *   Both are generated from the same sources as everything else — the public-page registry, the

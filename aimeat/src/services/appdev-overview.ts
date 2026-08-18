@@ -1,5 +1,7 @@
 /**
  * @file appdev-overview.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "big picture" research surface for AI agents building apps ON AIMEAT —
  *   one call returns compact INDEXES of everything relevant to framing a build: the owner's
  *   existing apps (best templates), library packs (with per-model AEB proof summaries),

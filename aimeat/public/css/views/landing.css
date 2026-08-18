@@ -1,5 +1,7 @@
 /**
  * @file landing.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Logged-out landing + pricing pages (ld- prefix). Theme tokens only;
  *   path cards stack on mobile, ticker truncates to one line.
  * @version-history

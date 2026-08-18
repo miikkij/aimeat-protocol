@@ -1,5 +1,7 @@
 /**
  * @file src/routes/apps/drafts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App-catalog draft (staging) routes: PUT /v1/apps/:owner/:filename/draft, POST .../draft/
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.

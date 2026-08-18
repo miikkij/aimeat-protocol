@@ -1,5 +1,7 @@
 /**
  * @file src/services/realtime-types.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Wire + internal type definitions for the realtime WebSocket room manager —
  *   the message envelope, per-peer connection, room, room-create options, and stats shapes.
  *   Consumed by ./realtime-manager.ts (which re-exports them) and its callers.

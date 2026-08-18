@@ -1,5 +1,7 @@
 /**
  * @file agents-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for managing AI agents -- Shared Agent Board,
  *   expandable agent cards with Two-Zone Header + 8-tab interface,
  *   device auth flow, scope management modal.

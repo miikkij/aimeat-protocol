@@ -1,5 +1,7 @@
 /**
  * @file src/cli/init-wizard/steps-operator.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-info wizard step (privacy-policy fields rendered into /v1/privacy) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)

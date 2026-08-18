@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/knowledge.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Backend-agnostic repository interface for the knowledge layer — CRUD contracts for
  *   memory links (the knowledge graph) and operator package reviews that storage providers implement.
  *

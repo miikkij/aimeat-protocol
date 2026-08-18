@@ -1,5 +1,7 @@
 /**
  * @file app-template-proposals.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-proposed app templates — after building/publishing an app, an agent
  *   records what generalizes so the owner's NEXT build starts from it (fork the source app or
  *   scaffold from the reuse notes). Mirrors the skills-registry substrate 1:1: one manifest

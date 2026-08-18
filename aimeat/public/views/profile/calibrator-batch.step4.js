@@ -1,5 +1,7 @@
 /**
  * @file views/profile/calibrator-batch.step4.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Step 4 (Synthesis) render block for the Prompt Calibrator V2 batch card — grouped
  *   proposals, A/B/C options, recommendation, apply/copy actions and paste-back. Extracted
  *   verbatim from calibrator-batch.js to satisfy max-file-lines. Holds no hooks of its own; all

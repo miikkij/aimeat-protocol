@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/agent-tasks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent-task domain for the Postgres+Kysely backend (AgentTask / AgentTaskEvent). Backs the
  *   Agent Dashboard: task CRUD, the append-only event log, the per-agent / per-owner status rollups, and
  *   stall detection. Translated 1:1 from the Prisma (mongodb) implementation — the JSON columns

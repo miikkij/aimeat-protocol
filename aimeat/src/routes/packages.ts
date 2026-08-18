@@ -1,5 +1,7 @@
 /**
  * @file packages.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Package API routes — CRUD, versioning, export/import for AIMEAT packages.
  *   Packages are versioned bundles of AIMEAT components (CSM, Extension, Cortex, App, MSM, Memory, Translation).
  * @structure

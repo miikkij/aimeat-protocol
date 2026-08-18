@@ -1,5 +1,7 @@
 /**
  * @file build-app-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The canonical "build an AIMEAT app" prompt — the SAME text the app-catalog's
  *   Create-new-app button copies, served from the node so every consumer (app-catalog UI,
  *   agentic coders via GET /v1/prompts/build-app, llms.txt readers) gets one non-drifting

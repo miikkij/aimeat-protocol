@@ -1,5 +1,7 @@
 /**
  * @file notifications.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description In-app notification inbox API. A notification is a small memory record under the
  *   recipient's owner GHII (created server-side by events via services/notify.ts). These routes let
  *   the recipient list their notifications + unread count (for the header bell), mark them read,

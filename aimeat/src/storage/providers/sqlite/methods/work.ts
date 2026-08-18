@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/work.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Action, Work, Wallet, Board, OTK, Node-key, Dispute, Micro-memory methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.3.0 — 2026-08-17 — pruneExpiredBoardPosts: one cross-board TTL DELETE for the cleanup job

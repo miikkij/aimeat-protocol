@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/permissions.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extension write/manage permission helpers — role/scope gates and ownership guard.
  *   Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history

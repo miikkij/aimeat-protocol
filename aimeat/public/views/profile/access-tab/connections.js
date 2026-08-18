@@ -1,5 +1,7 @@
 /**
  * @file views/profile/access-tab/connections.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connected Accounts section (TARGET-057) — the accounts the owner holds at external
  *   services, and the one place they can all be seen and taken away.
  *

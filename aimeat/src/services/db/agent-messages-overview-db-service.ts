@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/agent-messages-overview-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the agent-card **Messages** subtab — the ONE call
  *   behind GET /v1/agents/:name/messages/overview. The subtab mounted three requests: the agent's command
  *   palette (a memory read), the thread list (with per-thread task-title enrichment), and the message

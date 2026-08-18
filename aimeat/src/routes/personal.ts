@@ -1,5 +1,7 @@
 /**
  * @file src/routes/personal.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Routes for anchoring and operating "personal nodes" against an operator node —
  *   anchor/status/list/update/deregister, mailbox stats, web-push subscriptions, and per-node
  *   notification preferences (REQ-007).

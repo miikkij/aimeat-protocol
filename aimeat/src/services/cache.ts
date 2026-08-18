@@ -1,5 +1,7 @@
 /**
  * @file cache.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Tiny process-local TTL cache with tag-based invalidation, for the handful of hot
  *   READ paths that recompute the same expensive result on every page load / poll (owner usage
  *   summary, memory counts, catalogue scans, …). The node is a single Express process — there is no

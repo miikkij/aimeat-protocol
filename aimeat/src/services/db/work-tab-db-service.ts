@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/work-tab-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile **Work** tab — the ONE call behind
  *   GET /v1/work/overview. The tab mounted two sequential requests (GET /v1/work/inbox + GET /v1/work/sent),
  *   each of which, for an owner session, resolved the owner's agents (getAgentsByOwner) and ran a batched

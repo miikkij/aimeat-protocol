@@ -1,5 +1,7 @@
 /**
  * @file hello-mcp-panel.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Hello MCP: the panel that removes the founder from onboarding. The MCP connection
  *   fails silently today, so this makes one observable sign of it, as early as possible.
  *

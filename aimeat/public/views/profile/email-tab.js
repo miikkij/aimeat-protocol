@@ -1,5 +1,7 @@
 /**
  * @file email-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for email verification and management.
  *   Allows users to verify their email address with a 6-digit code,
  *   view verification status, and change their email.

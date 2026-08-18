@@ -1,5 +1,7 @@
 /**
  * @file appdev-overview.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GET /v1/appdev/overview — the authenticated "big picture" research surface for
  *   building apps ON AIMEAT (services/appdev-overview.ts). Query params: ?model= (indicative
  *   model filter for proofs + learned pitfalls), ?sections=apps,library_packs,... (partial

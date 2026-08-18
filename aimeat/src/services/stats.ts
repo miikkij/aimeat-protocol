@@ -1,5 +1,7 @@
 /**
  * @file stats.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description StatsCollector service -- tracks request counters, tunnel/mailbox stats,
  *   typed counters (name:type grouping), daily history, and optional persistence via Storage.
  * @structure

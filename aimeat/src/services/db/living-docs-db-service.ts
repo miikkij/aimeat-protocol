@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/living-docs-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile **Living Docs** tab — the ONE call
  *   behind GET /v1/living-docs. The tab mounted three requests, TWO of which were identical full owner-memory
  *   scans: listTemplates() and listInstances() each fetched GET /v1/memory and filtered client-side, plus

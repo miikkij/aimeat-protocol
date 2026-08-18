@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/reference-number.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Payment reference generation and validation: the Finnish national
  *   reference (viitenumero, 7-3-1 check digit) and the international RF creditor
  *   reference (ISO 11649, mod-97). Pure functions, no I/O.

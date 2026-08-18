@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-scheduler.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only routes for managing the scheduled-job engine — list/inspect jobs, manually
  *   trigger a run, enable/disable or change a job's cron, delete jobs, and read execution history. All
  *   routes require an authenticated operator and emit a 'scheduler' change event on mutation.

@@ -1,5 +1,7 @@
 /**
  * @file check-commit-msg.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Guard for the commit MESSAGE, run from the `commit-msg` hook.
  *
  *   WHY THIS EXISTS. On 2026-08-13 three commits landed on main whose subject line was the single

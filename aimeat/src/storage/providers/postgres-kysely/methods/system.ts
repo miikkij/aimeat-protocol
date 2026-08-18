@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/system.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node-wide system methods for the Postgres+Kysely backend: config persistence, maintenance
  *   mode, the node keypair, and the stats counters/daily-history — the group the server touches during
  *   boot (config-init) and the stats flusher. Translated 1:1 from the Prisma implementations against the

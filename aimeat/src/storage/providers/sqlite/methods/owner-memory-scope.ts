@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/owner-memory-scope.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-scope memory reads (SQLite): the value-free ?include=meta projection and the
  *   single-query cross-identity list/meta variants. Split out of owner.ts to keep every method-group
  *   file <=800 lines; bound to SqliteStorage via prototype merge (same as the other method groups).

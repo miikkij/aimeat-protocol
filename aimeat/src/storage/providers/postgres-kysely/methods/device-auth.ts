@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/device-auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Device-authorization (RFC 8628) domain for the Postgres+Kysely backend (DeviceAuth table).
  *   Backs the agent-connect flow: agent requests a device+user code, owner approves, agent polls. The
  *   minted credentials live in the jsonb `agentCredentials`. Translated 1:1 from the Prisma provider.

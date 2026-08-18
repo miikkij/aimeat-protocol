@@ -1,5 +1,7 @@
 /**
  * @file scripts/vendor-libs.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Fetch the vendored /lib/ assets that are too large to keep in git, listed in
  *   public/lib/vendored-assets.json, and verify each against its pinned sha256. Idempotent: an
  *   asset that is already present and correct is left alone, so running this on every install,

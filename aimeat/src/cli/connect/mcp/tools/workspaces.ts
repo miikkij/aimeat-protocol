@@ -1,5 +1,7 @@
 /**
  * @file workspaces.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP tools for organism WORKSPACES — the local `aimeat connect serve`
  *   counterpart to the server's src/mcp/workspaces.ts. Thin wrappers over the node's REST API
  *   (the routes enforce membership, schema validation, and the publish gate), so crewaimeat-style

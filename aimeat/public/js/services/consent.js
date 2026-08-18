@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/consent.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API-service wrapper for the consent, permissions, audit, and GDPR-export
  *   endpoints — thin fetch helpers that unwrap the response envelope for SPA views.
  *

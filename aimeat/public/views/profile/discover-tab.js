@@ -1,5 +1,7 @@
 /**
  * @file discover-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab for the master directory — a faceted browse over GET /v1/discover. One
  *   surface to find anything on the node across every domain (capabilities, workflows, knowledge,
  *   decisions, research, material, companies + offerings, documents, apps, memory). Scope toggle

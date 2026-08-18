@@ -1,5 +1,7 @@
 /**
  * @file cortex-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for managing Cortex extensions at the node level.
  *   Lists all installed cortex extensions, allows activate/deactivate/uninstall,
  *   and shows component breakdowns.

@@ -1,5 +1,7 @@
 /**
  * @file chat.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service for the built-in chat agent: the conversations, and one turn read
  *   as it arrives.
  *

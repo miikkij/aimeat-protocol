@@ -1,5 +1,7 @@
 /**
  * @file prompts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Routes for serving tiered system prompts (tier0 through tier2, anonymous,
  *   openclaw, package-builder) and prompt packages. Each tier provides progressively
  *   more context to AI agents based on their authentication level.

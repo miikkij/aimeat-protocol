@@ -1,5 +1,7 @@
 /**
  * @file agent-task.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation for agent task CRUD, events, and stall detection
  * @version-history
  *   2026-08-15 — createdBy on insert and read (migration 0037).

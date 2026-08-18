@@ -1,5 +1,7 @@
 /**
  * @file index.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Barrel re-export for the canonical design-system primitives in
  *   /components. Prefer importing shared primitives from here (e.g.
  *   `import { Modal, ConfirmDialog, Markdown } from '/components/index.js'`)

@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/invoice-handler.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The manual-invoice PaymentHandler: completes a MONEY checkout without any payment
  *   service provider by booking what the buyer owes and letting the seller collect it out of band
  *   (invoice, bank transfer, an existing customer agreement). Nothing is captured online, so the

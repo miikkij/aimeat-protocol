@@ -1,5 +1,7 @@
 /**
  * @file src/services/datapackage/odps.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The product sheet, as a projection of the descriptor. `odps.yaml` is generated into
  *   every published version so a package is describable to a buyer without anyone authoring a second
  *   document about it.

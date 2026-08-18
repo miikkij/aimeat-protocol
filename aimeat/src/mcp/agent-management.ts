@@ -1,5 +1,7 @@
 /**
  * @file agent-management.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public MCP tools for owner-managed agent attributes (mode, tags, console address).
  *   Mirrors the connector-side module at src/cli/connect/mcp/tools/agent-management.ts
  *   so Claude Desktop and other public MCP clients have parity with what

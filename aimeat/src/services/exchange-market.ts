@@ -1,5 +1,7 @@
 /**
  * @file src/services/exchange-market.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two-sided EXCHANGE marketplace records (TARGET-045 Phase C) — the DEMAND + SUPPLY sides
  *   that sit above the metered entitlement (the contract). Three public, memory-backed record types the
  *   marketplace app + agents read/write; matching + negotiation live in the app/agent layer (this service

@@ -1,5 +1,7 @@
 /**
  * @file packages-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard tab for managing packages, template listings, instances,
  *   and template moderation queue. Shows overview stats, recent packages, instance
  *   distribution, pending review queue, and moderation history.

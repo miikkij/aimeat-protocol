@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/workspace-ops.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Workspace operations: contract engagements, activity/participant feeds, the in-place
  *   workspace update, public document sharing (+ share meta + password unlock), workspace/organism
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to

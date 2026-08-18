@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The CAPABILITY LAYER record types — a capability, what it exports, what it depends
  *   on, how far it is trusted, and the filter the discovery list is read through.
  *

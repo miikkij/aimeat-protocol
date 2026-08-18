@@ -1,5 +1,7 @@
 /**
  * @file src/storage/types/usage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Record types for usage telemetry: the hot call stream, the archive rows, and the
  *   discriminated serving rollup with its fold watermark. Design and rationale:
  *   docs/internal/telemetria/02-design.md

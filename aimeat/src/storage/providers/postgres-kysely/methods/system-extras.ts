@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/system-extras.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description System prompts (SystemPrompt + SystemPromptVersion) and the federation replication queue
  *   (ReplicationQueue) for the Postgres+Kysely backend. Translated to match the Prisma provider.
  * @version-history

@@ -1,5 +1,7 @@
 /**
  * @file network-policy.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation network-policy document (Phase B governance). A declarative,
  *   versioned, genesis-signed doc with a FIXED set of measurable criteria (no DSL):
  *   auto-admit conditions for visiting peers, hard permission caps for the visiting tier,

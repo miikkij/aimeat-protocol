@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/wallet.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend wallet service — thin API-layer helpers for reading morsel balance,
  *   listing transactions, and requesting a daily allowance top-up.
  *

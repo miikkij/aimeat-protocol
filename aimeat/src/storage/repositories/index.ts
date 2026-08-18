@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Barrel module re-exporting every per-domain storage repository interface
  *   (owner, agent, memory, action, work, wallet, organism, app, capability, …). Provides
  *   a single import point for the repository contracts that compose the Storage interface.

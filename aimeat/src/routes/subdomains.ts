@@ -1,5 +1,7 @@
 /**
  * @file subdomains.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Subdomain routing: serves operator-mapped subdomains
  *              (`<sub>.<apex>` → published app HTML or 301 redirect) and the
  *              operator-only management CRUD under /v1/admin/subdomains.

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/instances.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extension instance REST routes — create, list, get, update (PATCH), delete, and
  *   public per-instance translations. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history

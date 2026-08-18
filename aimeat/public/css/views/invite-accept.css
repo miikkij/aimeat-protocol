@@ -1,5 +1,7 @@
 /**
  * @file invite-accept.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the public email-invitation accept page (/v1/invite). A single centered
  *   card: invitation summary + either a register-and-join form or an accept-as-me button.
  * @usage loaded by spa.html; classes prefixed inv-.

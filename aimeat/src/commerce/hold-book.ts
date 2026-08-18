@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/hold-book.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The hold lifecycle of the commerce core (TINKI phase 1): a hold is money
  *   authorized on the BUYER's instrument toward one SELLER without moving — the covered bid and
  *   the escrow-by-deferred-capture primitive. Created through a payment handler's `authorize`,

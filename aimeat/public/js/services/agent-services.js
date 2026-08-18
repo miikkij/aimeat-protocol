@@ -1,5 +1,7 @@
 /**
  * @file agent-services.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend API service for agent published services (actions).
  *   Fetches actions from the work exchange and filters by agent name.
  * @version-history

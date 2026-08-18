@@ -1,5 +1,7 @@
 /**
  * @file src/routes/admin-features.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-only admin API surface — GHII user administration, email/notification
  *   templates and sending, directory rebuild, matching-engine control, push config, and genesis
  *   peering management. All routes gated by requireAuth() + requireRole('operator').

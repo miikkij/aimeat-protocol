@@ -1,5 +1,7 @@
 /**
  * @file admin-agent-tasks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin endpoints for cross-owner agent task overview.
  *   Lists all agent tasks on the node for operator dashboards.
  * @version-history

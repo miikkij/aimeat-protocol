@@ -1,5 +1,7 @@
 /**
  * @file appdev-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile → AppDev — the human-facing window into the AppDev knowledge base:
  *   (1) copyable start prompts (the research-first flow prompt for Claude Code/OpenHands +
  *   the canonical build-app prompt), (2) learned pitfalls with share/outdated/delete

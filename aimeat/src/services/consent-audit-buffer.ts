@@ -1,5 +1,7 @@
 /**
  * @file consent-audit-buffer.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description In-memory write buffer for consent-audit entries. The consent layer used to
  *   write one ConsentAudit row synchronously on EVERY data-access check (read/list/search),
  *   on the request hot path — which both slowed every read and grew the collection without

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/adapter/memory-adapter.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The THIN, workload-shaped storage-adapter contract for the memory domain — the bottom
  *   layer of the data-access redesign (see dev-organism notes doc-id925fp / doc-nswlymr). An adapter
  *   exposes ONLY the primitives that are unavoidably backend-specific (indexed prefix reads,

@@ -1,5 +1,7 @@
 /**
  * @file src/services/scheduler-remote-jobs.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Scheduled `ai`, `workflow`, and `eco-capability` job executors — the non-extension,
  *   non-core, non-agent_task kinds. Extracted from scheduler.ts to satisfy max-file-lines.
  * @version-history

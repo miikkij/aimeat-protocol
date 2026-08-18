@@ -1,5 +1,7 @@
 /**
  * @file probe-mcp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-off probe: boots an embedded node, sets up an agent, then
  *   connects an MCP client to POST /v1/mcp with the agent's Bearer JWT and lists
  *   the tool surface + schemas. Confirms a plain agent JWT authenticates over

@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/helpers.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pure helpers + constants for the profile Inbox tab: peer/owner grouping, time/day
  *   formatting, WhatsApp-style delivery ticks, markdown body preparation (cid: resolution + tracking-
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +

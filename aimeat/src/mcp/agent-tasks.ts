@@ -1,5 +1,7 @@
 /**
  * @file agent-tasks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP tools for agent task management (list, get, propose todos, event, todo, complete, fail)
  * @structure
  *   - registerAgentTaskTools() -- registers all agent task tools on an McpServer instance

@@ -1,5 +1,7 @@
 /**
  * @file index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Registry of the v2 per-surface handbooks. Each role has its OWN handbook file (kept
  *   deliberately separate from prompt-defaults.ts and from each other so they never get tangled).
  *   Served via GET /v1/agents/me/handbook/surface/:role and the MCP aimeat_handbook_get(surface=...).

@@ -1,5 +1,7 @@
 /**
  * @file app-members.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The member roster for an app, as a node capability rather than something each app
  *   rebuilds. Six apps on this node had built their own and disagreed six ways; the deciding reason
  *   to move it here is that three of the jobs cannot be done from an app at all. Telling the

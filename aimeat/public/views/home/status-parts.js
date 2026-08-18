@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/status-parts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The finished home's status pieces: the mailbox row, the fleet line, the chat door,
  *   what you have made (with stars and a fold), your apps, and the achievements strip. Split out of
  *   index.js when the status view grew past what one file should hold; index.js stays the

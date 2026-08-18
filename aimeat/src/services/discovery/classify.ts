@@ -1,5 +1,7 @@
 /**
  * @file classify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The classifier — the "different perspectives" engine (design §4.2). Maps a memory key
  *   pattern (and, as a fallback, a `kind:` tag convention) to a `DiscoveryType` + `segment`. This is
  *   the single place new memory-keyed content types are taught to the directory: add a pattern here

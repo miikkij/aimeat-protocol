@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/__tests__/x402-registry.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Unit tests for the currency-aware x402 network registry (TARGET-042). These guard THE
  *   rule the whole EURC extension hangs on: ADVERTISE ONLY WHAT CAN SETTLE. A currency reaches a
  *   buyer only when the configured network has a real asset for it, so the decisive case here is the

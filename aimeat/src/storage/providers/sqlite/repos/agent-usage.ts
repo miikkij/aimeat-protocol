@@ -1,5 +1,7 @@
 /**
  * @file agent-usage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation of the agent LLM usage ledger (LEDGER / TARGET-016):
  *   append-only usage events + upsert-incremented daily aggregates, plus owner-scoped reads.
  * @version-history

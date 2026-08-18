@@ -1,5 +1,7 @@
 /**
  * @file src/services/cortex-lifecycle.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Installing, activating, deactivating and uninstalling a cortex extension. One
  *   implementation of each, for the HTTP door and the MCP tool.
  *

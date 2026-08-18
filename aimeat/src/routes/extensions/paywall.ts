@@ -1,5 +1,7 @@
 /**
  * @file src/routes/extensions/paywall.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Per-call paywall for raw extension invokes (design: dev-organism notes doc-r6tyr3o,
  *   roadmap rm-commercial-raw-calls). Enforced by the NODE (not the sandbox) before the action runs,
  *   because only the node sees both wallets + the PSP handlers. Governing invariants:

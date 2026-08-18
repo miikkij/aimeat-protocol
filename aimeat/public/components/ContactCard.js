@@ -1,5 +1,7 @@
 /**
  * @file ContactCard.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared "Talk to a human" contact card — used on /v1/business and
  *   /v1/pricing ONLY (one implementation, no copied text). tel: + mailto: links.
  *   Name, email and phone come from this node's siteLinks config, so another

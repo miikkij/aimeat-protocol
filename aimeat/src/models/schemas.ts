@@ -1,5 +1,7 @@
 /**
  * @file src/models/schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Central Zod request-body schemas for every AIMEAT API domain (identity, auth, memory,
  *   actions, work queue, disputes, boards, federation, admin, wallet, storage, schema-locking, consent,
  *   TOTP), plus the `validateBody()` Express middleware factory that enforces them and returns the

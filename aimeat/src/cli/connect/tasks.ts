@@ -1,5 +1,7 @@
 /**
  * @file tasks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI subcommand: list assigned tasks
  * @structure Loads connector credentials, fetches agent tasks, and prints them as JSON.
  * @usage Called by `aimeat connect tasks`.

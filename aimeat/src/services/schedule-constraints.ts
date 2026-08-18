@@ -1,5 +1,7 @@
 /**
  * @file schedule-constraints.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Extensible, opt-in budget/run guards for recurring schedules.
  *   Each guard is a registry entry implementing a pre-fire check() (and optional
  *   post-run hook). Guards are stored on ScheduledJobRecord.constraints as a JSON

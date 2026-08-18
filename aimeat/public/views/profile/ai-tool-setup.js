@@ -1,5 +1,7 @@
 /**
  * @file ai-tool-setup.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Fetches the per-tool setup table from the node. The table itself lives in
  *   src/services/ai-tool-setup.ts, because the other consumer cannot import from here: the
  *   Experience Center is a standalone published app on its own origin. Two copies would drift,

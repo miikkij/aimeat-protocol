@@ -1,5 +1,7 @@
 /**
  * @file email-templates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Clean, minimal HTML email templates with AIMEAT branding. Supports 'en' (default)
  *   and 'fi' locales. Templates: verification code, magic link, notification, match suggestion,
  *   organism invitation, and provisioned-code access-key invitation.

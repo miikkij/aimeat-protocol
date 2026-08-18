@@ -1,5 +1,7 @@
 /**
  * @file apps-draft-edit.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The four MCP tools that let an agent build and iterate on an app the way it would on
  *   a filesystem: write a piece at a time, replace an exact passage, read a line range, and copy a
  *   published version back into the draft slot.

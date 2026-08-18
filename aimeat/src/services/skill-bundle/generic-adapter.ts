@@ -1,5 +1,7 @@
 /**
  * @file generic-adapter.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic fallback runtime adapter for skill bundle generation.
  *   Produces aimeat-agent bundle with minimal SKILL.md + references only.
  *   Used for runtimes without a dedicated adapter (e.g. crewai, langgraph,

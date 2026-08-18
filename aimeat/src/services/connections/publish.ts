@@ -1,5 +1,7 @@
 /**
  * @file publish.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The recipes that actually put something on a provider (TARGET-057 phase 7b). One
  *   function per provider, behind one interface, driven by the gate in publish-gate.ts.
  *

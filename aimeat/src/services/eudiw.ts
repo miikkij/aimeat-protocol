@@ -1,5 +1,7 @@
 /**
  * @file eudiw.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description EUDIW (EU Digital Identity Wallet) service for OpenID4VP verification.
  *   Generates authorization requests and verifies VP tokens using real SD-JWT
  *   cryptographic verification against trusted issuer public keys.

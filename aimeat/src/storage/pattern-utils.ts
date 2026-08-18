@@ -1,5 +1,7 @@
 /**
  * @file pattern-utils.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Glob-style pattern matchers used across schema locking, consent, and federation.
  * @structure
  *   - matchWildcardPattern() — dot-segment matcher for schema key patterns

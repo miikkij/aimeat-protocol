@@ -1,5 +1,7 @@
 /**
  * @file notebook-ai.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared owner-model plumbing for the notebook AI features (classify, plan, triage, the
  *   living author). Resolves the caller's own model from their per-owner settings and runs the
  *   completion through THE chokepoint, `services/ai-completion.ts`, mapping its failures to stable

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/companies.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) implementation of the company registry.
  *   Schema: schema-tables-4.ts. Slug lookups compare lower-cased, matching the unique index.
  * @structure companyMethods — CRUD + slug resolution

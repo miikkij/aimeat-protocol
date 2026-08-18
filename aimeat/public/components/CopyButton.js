@@ -1,5 +1,7 @@
 /**
  * @file CopyButton.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical clipboard button — copies `text` and shows a brief
  *   "copied" confirmation. Replaces the ~80 hand-rolled clipboard sites; the
  *   actual copy is delegated to /js/utils.js copyToClipboard.

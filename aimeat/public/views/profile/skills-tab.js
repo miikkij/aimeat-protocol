@@ -1,5 +1,7 @@
 /**
  * @file skills-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile Skills tab — manage the owner's user-scope skills registry
  *   (SKILL.md packs: create/edit, visibility, delete) and browse the node-wide
  *   skill library. Skills are a dedicated system, distinct from knowledge packages;

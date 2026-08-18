@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/inbox-tab/ai-actions.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds the config objects behind the Inbox thread-head AI actions, so InboxTab's handlers
  *   stay one-liners (and the file stays under max-file-lines). Two families:
  *     - Reply with AI (TARGET-031): buildConversationReplyProps / buildMessageReplyProps → { title, build }

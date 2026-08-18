@@ -1,5 +1,7 @@
 /**
  * @file appdev-flow-prompt.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The paste-able "research-first" flow prompt served at GET /v1/prompts/appdev-flow —
  *   what a user gives Claude Code / OpenHands / any MCP-connected coding agent to make it build
  *   AIMEAT apps the accelerated way (research → frame → propose → build → finish) instead of

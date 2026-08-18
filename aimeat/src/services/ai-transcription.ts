@@ -1,5 +1,7 @@
 /**
  * @file ai-transcription.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Speech-to-text for a single owner, using their own encrypted provider key. The
  *   sibling of ai-completion.ts and deliberately its mirror image: same preflight (provider
  *   allowlist, app allowlist, key decrypt, daily budget), same usage record, same typed error. One

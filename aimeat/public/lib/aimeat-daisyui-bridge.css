@@ -1,5 +1,7 @@
 /*
  * @file aimeat-daisyui-bridge.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Theme-compat layer so the bundled cortex UI libraries cohere with daisyUI.
  *   (0) Pulls in the AIMEAT daisyUI theme (aimeat-theme.css) so any app already loading this
  *       bridge gets the house palette — coral primary, the designed dark surface ramp and

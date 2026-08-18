@@ -1,5 +1,7 @@
 /**
  * @file sse-domain-scopes.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Authorization for the SSE live-update stream: which change DOMAINS a given
  *   principal may be told about. The stream carries no payload (only domain names), but a
  *   domain name plus its timing is still metadata: an app granted `memory:read` must not

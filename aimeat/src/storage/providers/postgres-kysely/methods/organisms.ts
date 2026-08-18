@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/organisms.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Organism / workspace governance domain for the Postgres+Kysely backend: organisms,
  *   memberships, join requests, pending approvals (the Gate primitive), and reputation. Translated 1:1
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /

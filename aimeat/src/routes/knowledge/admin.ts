@@ -1,5 +1,7 @@
 /**
  * @file src/routes/knowledge/admin.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Operator-facing knowledge package routes — list all packages for review, import
  *   system knowledge, delete a package, submit an operator review, plus the per-package reviews
  *   list. Extracted from src/routes/knowledge.ts to satisfy max-file-lines.

@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/community.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite (better-sqlite3) repository for community/organism data — CRUD for organisms,
  *   memberships, join requests, and organism reputation, plus row deserialization (JSON columns → records).
  *

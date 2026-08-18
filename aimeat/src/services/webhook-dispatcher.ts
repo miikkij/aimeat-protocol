@@ -1,5 +1,7 @@
 /**
  * @file webhook-dispatcher.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Webhook delivery service for the AIMEAT push layer.
  *   Loads an agent's webhook configuration, validates the target URL,
  *   signs the payload with HMAC-SHA256, and fires HTTP POST with retry.

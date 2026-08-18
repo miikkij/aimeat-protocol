@@ -1,5 +1,7 @@
 /**
  * @file chat.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the chat page: the conversation list, the turns, the work log under each
  *   one, and the composer. Two panes on a desktop, one at a time on a phone.
  *

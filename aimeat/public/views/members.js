@@ -1,5 +1,7 @@
 /**
  * @file members.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node members showcase — registered owners who have PUBLISHED a portfolio. A public grid
  *   (avatar + name + bio) that links each member to their portfolio (/v1/portfolio/<username>). Data from
  *   GET /v1/portfolio/members. "Discover the people on this node."

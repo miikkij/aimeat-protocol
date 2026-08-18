@@ -1,5 +1,7 @@
 /**
  * @file public/components/FormField.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Preact + HTM presentational component that wraps a labeled form
  *   input group (label + child control + optional hint text) using the shared
  *   .form-group/.form-label/.form-hint CSS classes.

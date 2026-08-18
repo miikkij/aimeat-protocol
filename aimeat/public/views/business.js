@@ -1,5 +1,7 @@
 /**
  * @file business.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description "For your business" page: night-shift hero, then cases grouped by how far
  *   up the value ladder they sit — work happens without you, the company runs here, the
  *   company earns here — a sovereignty section (the reason a regulated buyer signs), a

@@ -1,5 +1,7 @@
 /**
  * @file direct-message.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Repository interface for human↔human direct messages (GHII messaging + federation):
  *   message CRUD, inbox, conversations/threads, delivery + read state, and per-pair contact consent.
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.

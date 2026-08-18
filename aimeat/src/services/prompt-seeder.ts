@@ -1,5 +1,7 @@
 /**
  * @file src/services/prompt-seeder.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Seeds managed system prompts into storage on startup from the factory
  *   defaults (PROMPT_SEEDS). New prompts are inserted at version 1; existing prompts get
  *   metadata refreshed but admin-edited content is preserved — except code-owned groups

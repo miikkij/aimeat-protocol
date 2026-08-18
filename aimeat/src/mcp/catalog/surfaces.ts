@@ -1,5 +1,7 @@
 /**
  * @file surfaces.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description v2 MCP "surfaces" — purpose-scoped projections of the canonical tool catalog. Each
  *   surface is a focused product for one kind of agent in one kind of setup, so the wrong tools
  *   simply aren't present and the agent can't misfire into the wrong context (audit doc 11):

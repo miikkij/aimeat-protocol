@@ -1,5 +1,7 @@
 /**
  * @file memory.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description AIMEAT Memory Service — key-value memory CRUD, search, file management.
  * @version-history
  *   v1.1.0 — 2026-06-10 — Add getMemory(key) single-entry read (GET /v1/memory/:key).

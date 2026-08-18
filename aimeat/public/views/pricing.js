@@ -1,5 +1,7 @@
 /**
  * @file pricing.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Pricing ladder: Try it (0 €) → Own node (49 €/mo) → Own node Pro (99 €/mo)
  *   → Done for you (setup + monthly) → Enterprise (contact). No payment integration at
  *   this stage — CTAs are mailto links. #packages anchors the Done-for-you section

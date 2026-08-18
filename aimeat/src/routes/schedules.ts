@@ -1,5 +1,7 @@
 /**
  * @file schedules.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-facing REST API for recurring agent/profile schedules. The
  *   server owns the clock (reuses the Scheduler + ScheduledJobRecord); this
  *   router lets the owner (and same-owner agents) create/list/edit/pause/cancel

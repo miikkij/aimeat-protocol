@@ -1,5 +1,7 @@
 /**
  * @file tracked-responses.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic REST surface for Tracked Responses — the Memory Contract that owes a (possibly
  *   federated) reply to an inbox message once a watched memory key satisfies a condition. Protocol-only:
  *   it reads/writes owner memory + reads direct messages; no service-specific logic. Create authoritatively

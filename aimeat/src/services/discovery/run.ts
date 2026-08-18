@@ -1,5 +1,7 @@
 /**
  * @file run.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The discovery orchestrator — the domain-agnostic core of `/v1/discover`. It iterates a
  *   `DiscoveryRegistry`, fans `enumerate()` across every registered source, maps rows to
  *   `DiscoveryEntry` via each source's `toEntry()`, applies the gating pass (§6 — Phase 1 covers

@@ -1,5 +1,7 @@
 /**
  * @file src/services/consul-config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Consul KV config service — loads, watches, and writes runtime config from HashiCorp
  *   Consul. Values are dot-path keyed under a prefix; only mutable fields are applied (immutable ignored).
  *

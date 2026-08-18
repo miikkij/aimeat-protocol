@@ -1,5 +1,7 @@
 /**
  * @file src/services/federation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation service — resolves which peer node hosts a GAII (with a 5-minute cache),
  *   runs the background heartbeat, and tracks per-peer health/availability across federated nodes.
  *

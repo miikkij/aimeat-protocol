@@ -1,5 +1,7 @@
 /**
  * @file public/views/home/feed.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What has happened on this home (aimeat_remake/06-koti-feed-suostumus.md).
  *
  *   The feed reads the same markers the operator funnel reads, so the screen and the numbers cannot

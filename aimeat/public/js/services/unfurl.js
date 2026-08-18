@@ -1,5 +1,7 @@
 /**
  * @file public/js/services/unfurl.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Frontend service for link previews (unfurls). `fetchPreview(url)` asks the node for a
  *   pasted link's OpenGraph/Twitter-card metadata; `fetchPreviewImageUrl(imageUrl)` pulls the preview
  *   image THROUGH the node (same-origin, auth'd) into a `blob:` object URL — the SPA's CSP forbids remote

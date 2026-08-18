@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/agent-misc.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Four small agent-support domains for the Postgres+Kysely backend, grouped into one
  *   module: agent directives + owner defaults (AgentDirective / OwnerAgentDefault), agent activity
  *   counters (AgentActivity — an upsert-accumulate on the [agentGaii,date,hour,metric] unique key),

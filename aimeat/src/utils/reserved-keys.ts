@@ -1,5 +1,7 @@
 /**
  * @file reserved-keys.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reserved owner-namespace memory-key prefixes that the SERVER reads and TRUSTS for
  *   behavior, plus the write gate that stops a scoped H-2 app-grant principal (role 'app') from
  *   poisoning them. An app-grant token's `sub` is the OWNER's GHII, so its `memory:write` lands in the

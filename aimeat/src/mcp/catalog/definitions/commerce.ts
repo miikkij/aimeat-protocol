@@ -1,5 +1,7 @@
 /**
  * @file commerce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Catalog definitions for the MCP commerce tools (TARGET-033/034 over MCP): seller
  *   PSP credential management (masked — the secret NEVER returns), app-tool manifest publishing +
  *   pricing, agent-offer money pricing, and buyer-side checkout sessions. Every tool wraps an

@@ -1,5 +1,7 @@
 /**
  * @file src/routes/knowledge/packages-core.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Core knowledge package routes — import, get manifest, and link CRUD
  *   (create/list/delete/broken-links). Extracted from src/routes/knowledge.ts to satisfy
  *   max-file-lines.

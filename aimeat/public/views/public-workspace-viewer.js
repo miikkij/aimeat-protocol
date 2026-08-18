@@ -1,5 +1,7 @@
 /**
  * @file public-workspace-viewer.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public, no-login viewer for an organism workspace's shared document-space pages.
  *   Reads the no-auth endpoint GET /v1/organisms/:id/workspace/public/documents?ws=… (which serves
  *   only PUBLISHED docs the workspace's meta.share marks public) and renders each page's markdown with

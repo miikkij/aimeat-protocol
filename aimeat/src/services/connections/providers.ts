@@ -1,5 +1,7 @@
 /**
  * @file providers.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Registry of OUTBOUND connection providers (TARGET-057) — the services a principal
  *   can connect their own account at. Mirrors the shape of services/oidc-providers.ts, which is the
  *   inbound half, and is deliberately a separate registry: signing IN with Google and PUBLISHING to

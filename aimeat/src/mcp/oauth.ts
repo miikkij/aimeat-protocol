@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/oauth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP OAuth 2.1 endpoints (Dynamic Client Registration, authorize, browser consent,
  *   approval check, token exchange/refresh, revocation, RFC 8414/9728 metadata). Extracted from
  *   src/mcp/index.ts to satisfy max-file-lines. Authorization codes stay in-memory (short-lived,

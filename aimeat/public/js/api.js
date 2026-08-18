@@ -1,5 +1,7 @@
 /**
  * @file public/js/api.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Session-aware fetch wrapper for AIMEAT /v1/* endpoints. Attaches (and refreshes) the
  *   JWT from the auth session, parses the AIMEAT response envelope, throws on `ok:false`, and retries
  *   429/5xx/network failures with exponential backoff and a per-call timeout/retry override.

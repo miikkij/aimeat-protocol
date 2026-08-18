@@ -1,5 +1,7 @@
 /**
  * @file access-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab displaying session info, public key, owner key,
  *   MCP endpoint details, federation access management, sharing groups,
  *   and owner-level agent defaults.

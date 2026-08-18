@@ -1,5 +1,7 @@
 /**
  * @file Toast.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Canonical toast hook — floating auto-dismissing notification pill
  *   rendered bottom-center. Styling lives in theme.css (.toast + .toast-success/
  *   -error/-info/-warn, tokens --toast-*).

@@ -1,5 +1,7 @@
 /**
  * @file config.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Configuration for the AIMEAT connector. Two layers:
  *
  *   - **Global** at `~/.aimeat/config.yaml` -- shared defaults (default node URL,

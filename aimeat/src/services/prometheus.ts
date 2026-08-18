@@ -1,5 +1,7 @@
 /**
  * @file src/services/prometheus.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Prometheus metrics registry — defines all AIMEAT metrics (tunnel connections/messages,
  *   mailbox, auth failures, rate-limit hits, scope denials) plus Node.js process metrics, exposed as
  *   a singleton for the /metrics endpoint and auth middleware to record against.

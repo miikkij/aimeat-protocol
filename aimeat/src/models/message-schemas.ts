@@ -1,5 +1,7 @@
 /**
  * @file message-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation schemas for human↔human direct messaging — sending a message
  *   (markdown body + optional media attachment descriptors), the interactive-message payload
  *   (a federated AskUserQuestion: the question spec one way, the human's answers the other), and

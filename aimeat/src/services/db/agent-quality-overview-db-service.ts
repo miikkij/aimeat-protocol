@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/agent-quality-overview-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the agent-card **Quality** subtab — the ONE call
  *   behind GET /v1/agents/:name/quality/overview. The subtab mounted a 2-request fan-out: getAgentStatistics
  *   (recompute performance + per-context review rollups from tasks, cache them, read custom metrics) and

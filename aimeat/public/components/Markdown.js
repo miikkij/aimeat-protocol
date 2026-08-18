@@ -1,5 +1,7 @@
 /**
  * @file Markdown.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Minimal, safe GitHub-flavored-Markdown renderer for untrusted,
  *   agent-authored (often LLM-generated) content. Renders to Preact vnodes via
  *   `h` — never innerHTML — so there is no raw-HTML / <script> / <iframe> XSS

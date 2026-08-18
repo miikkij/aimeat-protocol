@@ -1,5 +1,7 @@
 /**
  * @file src/utils/inline-script-parse.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Parsing a single-file app's inline `<script>` bodies without running any of them —
  *   the shared core behind both the `pnpm check:js-syntax` CLI and the publish-time artifact check.
  *

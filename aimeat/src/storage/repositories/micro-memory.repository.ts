@@ -1,5 +1,7 @@
 /**
  * @file src/storage/repositories/micro-memory.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage-interface contract for micro-memory sets — the backend-agnostic repository shape
  *   each provider implements for the (deprecated) access-code-addressable micro-memory feature.
  *

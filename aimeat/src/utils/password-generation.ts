@@ -1,5 +1,7 @@
 /**
  * @file password-generation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generate a clean, human-transcribable password that is GUARANTEED to pass
  *   validatePasswordStrength (>= 8 chars, at least one uppercase, one lowercase, one digit,
  *   not a common weak password). Used when the system issues a login credential the user did

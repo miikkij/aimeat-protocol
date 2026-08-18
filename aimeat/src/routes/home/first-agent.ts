@@ -1,5 +1,7 @@
 /**
  * @file src/routes/home/first-agent.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description POST /v1/home/first-agent — the funnel marker for "this person's first agent is
  *   in" (aimeat_remake/05-mittaus.md). Called by the home right after an approval.
  *

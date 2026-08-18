@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/repos/account-events.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SQLite implementation of the per-owner event window and its archive.
  * @structure append / list / listArchive / countArchive / trim
  * @version-history

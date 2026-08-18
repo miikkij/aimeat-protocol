@@ -1,5 +1,7 @@
 /**
  * @file capabilities-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile tab showing all node capabilities (auto-aggregated from extensions,
  *   cortex, actions) plus capability policy settings and optional manual creation.
  * @version-history

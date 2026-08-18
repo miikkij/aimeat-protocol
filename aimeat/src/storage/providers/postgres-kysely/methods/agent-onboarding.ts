@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/agent-onboarding.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent onboarding records for the Postgres+Kysely backend (AgentOnboarding table, keyed by
  *   agentGaii). Agent registration creates one, so this unblocks POST /v1/agents. Translated 1:1 from the
  *   Prisma implementation.

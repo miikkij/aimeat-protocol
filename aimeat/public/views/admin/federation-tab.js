@@ -1,5 +1,7 @@
 /**
  * @file federation-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Admin dashboard Federation tab — peer management, peering
  *   requests, network directory, auth policy, and federation bus overview.
  * @structure FederationTab (default)

@@ -1,5 +1,7 @@
 /**
  * @file usage-summary.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Owner-scoped usage + quota + count summary for the profile Home dashboard.
  *   Aggregates the EXPENSIVE-to-compute usage figures (memory byte-sum, storage byte-sum,
  *   micro-memory byte-sum — each a full scan) together with cheap counts (agents, organisms,

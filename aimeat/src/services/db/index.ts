@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/index.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Factory + barrel for the Application DB Service layer. `createMemoryDbService(storage,
  *   config)` assembles the full stack — wraps the existing `Storage` in a
  *   {@link ../../storage/adapter/legacy-memory-adapter.js LegacyMemoryAdapter}, layers the

@@ -1,5 +1,7 @@
 /**
  * @file seed-digital-signage.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Seeds example packages via the admin API. Uses admin password
  *   from .env (AIMEAT_ADMIN_PASSWORD) to authenticate without needing a JWT.
  * @usage

@@ -1,5 +1,7 @@
 /**
  * @file send.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description CLI subcommand: send a message
  * @structure Validates message flags and posts an agent message through the authenticated connector client.
  * @usage Called by `aimeat connect send --body <message>`.

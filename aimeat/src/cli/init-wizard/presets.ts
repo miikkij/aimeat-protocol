@@ -1,5 +1,7 @@
 /**
  * @file src/cli/init-wizard/presets.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Use-case preset defaults and CONFIG_DEFAULTS map for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)

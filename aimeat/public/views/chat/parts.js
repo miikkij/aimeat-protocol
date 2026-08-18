@@ -1,5 +1,7 @@
 /**
  * @file public/views/chat/parts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description What the chat page is made of: the conversation list, one turn, the work log, and
  *   the box a person types into.
  *

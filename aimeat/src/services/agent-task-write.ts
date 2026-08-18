@@ -1,5 +1,7 @@
 /**
  * @file src/services/agent-task-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The task WRITES themselves, in one place, for every door: creating a task, appending
  *   an event, accepting a proposed plan, and ticking a todo.
  *

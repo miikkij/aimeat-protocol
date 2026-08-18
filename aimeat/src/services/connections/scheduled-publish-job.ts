@@ -1,5 +1,7 @@
 /**
  * @file scheduled-publish-job.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The scheduler kind that publishes to a connection when its time comes (LÄHETIN).
  *
  *   WHY THERE IS NO QUEUE TABLE HERE. The node already owns a clock, a durable job row, DST-correct

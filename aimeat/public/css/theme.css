@@ -1,5 +1,7 @@
 /* ═══════════════════════════════════════════════════════
    @file theme.css
+   @author Jouni Miikki
+   SPDX-License-Identifier: MIT
    @description AIMEAT Unified Theme — single source of truth for all portal
      CSS variables (tokens), base styles, animations, and shared components.
      Defines the light theme in :root, a dark override in [data-theme="dark"],

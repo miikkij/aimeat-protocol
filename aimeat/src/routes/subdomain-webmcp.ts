@@ -1,5 +1,7 @@
 /**
  * @file src/routes/subdomain-webmcp.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The WebMCP tool surface on an APP ORIGIN. An agent that finds an app lands on
  *   `<app>.apps.<node>`, and that origin already serves the page, `llms.txt`, the MCP server card
  *   and the RFC 9728 resource document. The tools themselves lived only on the apex, so the app's

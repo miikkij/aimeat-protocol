@@ -1,5 +1,7 @@
 /**
  * @file src/services/db/access-tab-db-service.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Purpose-built Application DB Service for the profile Access tab — the ONE call behind
  *   GET /v1/access/overview. The tab mounts a 6-request fan-out (parent: consent + ghii-public-key;
  *   four child sections: app-grants + access-tokens + sharing-groups + agent-defaults); this composes

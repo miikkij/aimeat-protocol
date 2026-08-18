@@ -1,5 +1,7 @@
 /**
  * @file workflows.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for Profile › Workflows (workflows-tab.js): the list of workflows with a
  *   health sparkline, the blueprint graph + recent runs detail, and the single-run per-step
  *   timeline. Prefix: wf-. Theme-token driven (no hardcoded colors) so it flips with dark/light.

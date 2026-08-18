@@ -1,5 +1,7 @@
 /**
  * @file exchange.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Catalog definitions for the MCP EXCHANGE marketplace tools (TARGET-045 over MCP): the
  *   two-sided data-service market — browse OFFERINGs, read one offering's full detail (I/O schema +
  *   call-recipe + usage stats), ACCEPT a contract → mint a metered entitlement, list/pause/revoke the

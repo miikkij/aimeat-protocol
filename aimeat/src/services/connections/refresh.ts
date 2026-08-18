@@ -1,5 +1,7 @@
 /**
  * @file refresh.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Keeping a connection's credential usable, and taking it away (TARGET-057).
  *
  *   SINGLE FLIGHT, AND WHY. Several providers invalidate the old refresh token as part of issuing a

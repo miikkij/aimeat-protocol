@@ -1,5 +1,7 @@
 /**
  * @file public/js/app-sandbox.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Open a user-published app from anywhere in the SPA. Apps always open TOP-LEVEL
  *   in a new tab via the apex `?mode=inline` URL — a clean, full-screen page (no overlay/X).
  *   The server decides isolation:

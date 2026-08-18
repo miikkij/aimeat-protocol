@@ -1,5 +1,7 @@
 /**
  * @file discovery.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Unit tests for the Phase 0 discovery building blocks: normalizer (visibility/tags/
  *   owner/text), classifier (key patterns + kind: tags), registry, and facet/filter helpers.
  *   Pure-function coverage — no server, no storage. Run with `pnpm test` (vitest).

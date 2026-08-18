@@ -1,5 +1,7 @@
 /**
  * @file oauth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The authorization round for an outbound connection (TARGET-057): start it, and
  *   complete it when the provider redirects back.
  *

@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/commerce.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description MCP commerce tools (TARGET-033/034 over MCP): the agent-facing surface for
  *   managing its owner's SELLING (PSP credentials — masked, the secret never returns; app-tool
  *   manifests; offer money pricing) and for BUYING through checkout sessions. Every tool wraps an

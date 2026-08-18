@@ -1,5 +1,7 @@
 /**
  * @file stats.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Storage repository for persisting stats counters and daily history, plus the operator
  *   storage-growth telemetry: per-table row counts (backend-specific) captured as hourly snapshots.
  * @version-history

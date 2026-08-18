@@ -1,5 +1,7 @@
 /**
  * @file scripts/lib/locale-files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The one reader of locales/*.json that every locale tool shares: which languages the
  *   node ships, how a nested file flattens to the dotted keys t() actually resolves, how a dotted
  *   key finds its way back into en.json's own shape, and what counts as a defect in a translation.

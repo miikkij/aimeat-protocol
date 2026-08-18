@@ -1,5 +1,7 @@
 /**
  * @file agent-message-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation schemas for agent message creation and status updates
  * @version-history
  *   Text limits raised — 2026-07-30 — content to 200 000, tool descriptions to 10 000.

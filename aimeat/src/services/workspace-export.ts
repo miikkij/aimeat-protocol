@@ -1,5 +1,7 @@
 /**
  * @file workspace-export.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Full-fidelity export of an organism workspace as a ZIP (a `workspace.json` with all
  *   data + an `images/` folder of the real image binaries — no base64 inlining). The data captures
  *   the manifest, locked schemas, document sections, sources, and every object record (draft /

@@ -1,5 +1,7 @@
 /**
  * @file messages-ai-prompts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds the copy-pasteable / MCP prompts behind the Inbox "Reply with AI" feature
  *   (TARGET-031). The user drives their own AI chat (Claude, …) to craft a reply to an AIMEAT
  *   Postilaatikko conversation — with the AI able to reach INTO their AIMEAT (organisms, memory,

@@ -1,5 +1,7 @@
 /**
  * @file src/cli/federation-join.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description `aimeat join [url]` CLI wizard (@clack/prompts) — guided federation join: discovery →
  *   role selection → signed introduce → approval polling → Ed25519 key exchange → .env update. Persists
  *   a resumable pending-join file so an interrupted operator approval can be resumed later.

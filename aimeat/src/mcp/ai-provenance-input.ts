@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/ai-provenance-input.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The `ai_provenance` parameter every MCP write tool accepts, defined ONCE (TARGET-058
  *   Phase 4). One zod fragment, one description, one mapping to the internal shape — so the eight
  *   write tools that carry it cannot end up describing three slightly different parameters to the

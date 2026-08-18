@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/organisms/workspace/record-space.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description A record-space tab for organism workspaces: the schema-form add/edit and the draft +
  *   published record lists (with inline field view, color tags, archive/reopen/delete, and comments).
  *   Pure render functions driven by a ctx bag assembled by the parent Workspace. Extracted from

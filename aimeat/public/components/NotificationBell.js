@@ -1,5 +1,7 @@
 /**
  * @file NotificationBell.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Header notification bell — shows the unread count and a dropdown of the user's
  *   in-app notifications (GET /v1/notifications). Opening the dropdown marks them read. Refreshes on
  *   the SSE `aimeat-live-update` event and a 45s poll, so a workspace-access approval (or request)

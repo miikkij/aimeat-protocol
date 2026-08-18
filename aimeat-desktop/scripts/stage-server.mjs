@@ -1,5 +1,7 @@
 /**
  * @file stage-server.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds the AIMEAT Node.js server and stages it (plus a
  *   production-only node_modules including the native better-sqlite3 binary)
  *   into src-tauri/resources/server/, which Tauri's

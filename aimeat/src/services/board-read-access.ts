@@ -1,5 +1,7 @@
 /**
  * @file src/services/board-read-access.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Who may READ a board's posts, once, for every surface that serves them.
  *
  *   The sweep that produced this file asked what a WRITE owes. This is the other half: what a READ

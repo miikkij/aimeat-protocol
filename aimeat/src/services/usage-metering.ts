@@ -1,5 +1,7 @@
 /**
  * @file usage-metering.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Records one agent LLM call into the usage ledger (LEDGER / TARGET-016):
  *   prices it (llm-pricing), writes the append-only event (source of truth), increments
  *   the daily rollup (derived), and emits the `agent-usage` SSE domain so FLEET updates

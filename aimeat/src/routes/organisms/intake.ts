@@ -1,5 +1,7 @@
 /**
  * @file src/routes/organisms/intake.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public Intake — a GENERIC capability for anonymous → owner-space submissions. An owner
  *   defines an "intake form" (server-trusted config in the workspace's own meta namespace) that pins an
  *   exact destination (org/ws/namespace) + an allow-list of fields; anyone may then POST to that form

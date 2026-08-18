@@ -1,5 +1,7 @@
 /**
  * @file apps-backup-import.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Parse, inspect and selectively restore an app-catalog backup ZIP
  *   (produced by apps-backup-export). Two-phase UX mirrors the organism import:
  *   parse/inspect first WITHOUT writing anything, then restore only the selected

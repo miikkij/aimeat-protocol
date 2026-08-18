@@ -1,5 +1,7 @@
 /**
  * @file auth-md.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds the /auth.md document (workos.com/auth.md convention): step-by-step
  *   agent-registration instructions for THIS node, generated from config so every endpoint,
  *   scope default, and identity format is real — never boilerplate. Documents the actual

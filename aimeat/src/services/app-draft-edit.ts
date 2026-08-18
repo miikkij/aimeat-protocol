@@ -1,5 +1,7 @@
 /**
  * @file app-draft-edit.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Incremental editing of an app's draft slot, so an agent can build and iterate on a
  *   400 kB app without a filesystem and without pushing the whole file through its context.
  *

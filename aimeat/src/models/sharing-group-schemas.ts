@@ -1,5 +1,7 @@
 /**
  * @file sharing-group-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Zod validation schemas for sharing group CRUD operations
  * @version-history
  *   Text limits raised — 2026-07-30 — group descriptions to 10 000.

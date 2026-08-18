@@ -1,5 +1,7 @@
 /**
  * @file vendor-duckdb-wasm.mjs
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reproducible builder for the vendored `duckdb-wasm` bundle: downloads the PINNED
  *   @duckdb/duckdb-wasm release from npm, bundles its browser entry into ONE classic IIFE exposing
  *   `window.duckdb`, and copies the worker beside it. The 34 MB `duckdb-eh.wasm` is NOT written

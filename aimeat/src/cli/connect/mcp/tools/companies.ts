@@ -1,5 +1,7 @@
 /**
  * @file companies.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Connector MCP registrations for the OWNER's companies — parity with the server MCP
  *   (src/mcp/companies.ts) so `aimeat connect serve --surface agent` exposes the same five tools
  *   locally. Thin proxies over the shared /v1/companies routes, so both surfaces enforce the same

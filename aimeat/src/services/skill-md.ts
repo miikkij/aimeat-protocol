@@ -1,5 +1,7 @@
 /**
  * @file skill-md.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description SKILL.md parser + validator for the skills registry. A skill is a directory
  *   `skill-name/` with a required SKILL.md (YAML frontmatter + markdown body) plus optional
  *   `scripts/` `references/` `assets/` files. This module enforces the cross-repo shared

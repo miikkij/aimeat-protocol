@@ -1,5 +1,7 @@
 /**
  * @file skill-install.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description `aimeat skill install <ref>` — fetch a skill from an AIMEAT node's skills
  *   registry and materialize it as a local Anthropic agent skill (the SKILL.md contract is
  *   the same format), so Claude Code / Claude Desktop Cowork pick it up natively.

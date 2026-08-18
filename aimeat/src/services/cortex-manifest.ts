@@ -1,5 +1,7 @@
 /**
  * @file cortex-manifest.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Parses and validates Cortex extension manifests (YAML): apiVersion/kind/metadata/spec,
  *   per-component validation (schema, prompt, action, board-template, ontology, seed-data, lib),
  *   static safety warnings for lib code, and namespace ownership checks.

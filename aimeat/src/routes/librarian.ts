@@ -1,5 +1,7 @@
 /**
  * @file librarian.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The "librarian" retrieval route — natural-language full-text search fanned across
  *   every organism the caller has contributed to plus their personal memory, in one ranked call.
  *   Backed by the generic `storage.searchText()` FTS primitive via the librarian service. Generic

@@ -1,5 +1,7 @@
 /**
  * @file eval.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Offline evaluator for SynthTraces JSONL. Derives protocol-
  *   correctness metrics from recorded tool calls + native task state — this is
  *   what turns the traces into both a benchmark ("can this model drive AIMEAT?")

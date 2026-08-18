@@ -1,5 +1,7 @@
 /**
  * @file src/routes/knowledge/templates.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Prompt-template routes served alongside knowledge packages —
  *   knowledge-packager (human/agent) and chat-session (human/quick). Extracted from
  *   src/routes/knowledge.ts to satisfy max-file-lines.

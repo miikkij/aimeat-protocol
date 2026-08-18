@@ -1,5 +1,7 @@
 /**
  * @file eval-context.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Builds the SignalEvalCtx the workflow engine hands to the pure signal evaluator —
  *   binding memory reads to OWNER-SCOPE (the owner GHII + every one of the owner's agents, the same
  *   aggregation as GET /v1/memory?owner_scope=true; +a sandbox keyPrefix), exposing the run's {var}

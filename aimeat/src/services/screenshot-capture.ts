@@ -1,5 +1,7 @@
 /**
  * @file screenshot-capture.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Node-internal auto-screenshot job. On an interval it finds published apps that have
  *   no screenshot, renders each one headless (playwright-core, lazily imported, driving the machine's
  *   own Edge/Chrome via a channel — no browser download), and stores a JPEG thumbnail DIRECTLY in

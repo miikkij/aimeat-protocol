@@ -1,5 +1,7 @@
 /**
  * @file markdown-mirrors.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Serves `<path>.md` for every public page, and answers `Accept: text/markdown` on the
  *   page's own URL. Two ways to the same document on purpose: content negotiation serves the agent
  *   that can set a header, the `.md` suffix serves the one that copies a link and appends an

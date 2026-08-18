@@ -1,5 +1,7 @@
 /**
  * @file glossary.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The glossary page: the AIMEAT vocabulary grouped by area, with a filter box.
  *   Reads /v1/glossary.json, which renders the same registry the markdown and JSON-LD surfaces
  *   render, so the page cannot drift from what an agent is told.

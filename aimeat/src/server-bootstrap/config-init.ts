@@ -1,5 +1,7 @@
 /**
  * @file src/server-bootstrap/config-init.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Server bootstrap step that initializes storage, builds the config-provenance registry,
  *   layers in Consul and DB-persisted config overrides, and wires storage into the auth subsystems.
  *

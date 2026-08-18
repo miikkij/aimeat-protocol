@@ -1,5 +1,7 @@
 /**
  * @file agent-tasks.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description REST endpoints for agent task CRUD, lifecycle, and event log.
  *   Supports creating tasks for agents, transitioning status (draft->queued->active->done|failed),
  *   appending event logs, and listing task events. Callers: owner sessions, same-owner agents, and

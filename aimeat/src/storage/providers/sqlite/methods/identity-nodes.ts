@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/sqlite/methods/identity-nodes.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description File, Peering, Chunked-upload, GHII, Chat-instance, Email-verify, Personal-node, Mailbox, Maintenance methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)

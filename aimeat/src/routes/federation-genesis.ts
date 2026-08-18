@@ -1,5 +1,7 @@
 /**
  * @file src/routes/federation-genesis.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Cross-federation "genesis" routes — genesis peering CRUD, the aggregated
  *   cross-federation catalogue, signed catalogue ingest, cross-genesis memory read/routing with
  *   consent + caching, prefix subscriptions, network stats, and organism reputation.

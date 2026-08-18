@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/otk.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description One-Time-Key domain for the Postgres+Kysely backend (Otk table). Backs the OTK auth flow
  *   with the initial-key (timer-on-first-use) + post-use grace window semantics. Translated 1:1 from the
  *   Prisma provider (migration 0004 added the `initial` column the canonical PG schema was missing).

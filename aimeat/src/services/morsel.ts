@@ -1,5 +1,7 @@
 /**
  * @file src/services/morsel.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Morsel economy service — escrow, settlement, and allowance logic for work requests.
  *   Uses atomic debit/credit storage ops to avoid TOCTOU double-spend and splits network fees
  *   across provider/requester/relay/registry nodes per RFC §10.11/§16.2.

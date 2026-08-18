@@ -1,5 +1,7 @@
 /**
  * @file appdev-pitfalls.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Curated registry of pitfalls for building apps ON AIMEAT (app-catalog apps,
  *   extensions, cortexes — what an AI builder agent does over MCP). Platform-level knowledge,
  *   distilled from real builds. This registry covers ONLY app development on the platform —

@@ -1,5 +1,7 @@
 /**
  * @file public/css/components/ai-label.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styling for the ONE visible AI label (TARGET-058 Phase 3, components/ai-label.js).
  *   Every colour, radius and space is a theme.css token, so the badge flips with the theme and
  *   carries no hardcoded brand hex. Nothing here is `rgba(255,255,255,…)`, which reads correctly

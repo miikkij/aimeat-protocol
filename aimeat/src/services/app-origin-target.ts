@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-origin-target.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Origin → grant target: which published thing is running at `<sub>.apps.<apex>` or
  *   `<username>.portfolio.<apex>`, and who owns it.
  *

@@ -1,5 +1,7 @@
 /**
  * @file glossary.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Styles for the glossary page (/v1/glossary). Definition-list layout grouped by
  *   area, with a filter box. Colours, spacing and type come from theme.css variables so the page
  *   follows the active palette in both light and dark.

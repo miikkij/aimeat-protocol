@@ -1,5 +1,7 @@
 /**
  * @file landing-page.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile landing page. Navigation is a PERSISTENT, grouped sidebar
  *   (every tab always visible — no activity-based hiding) plus a content column
  *   showing either the selected tab or the home dashboard (ProfileCard +

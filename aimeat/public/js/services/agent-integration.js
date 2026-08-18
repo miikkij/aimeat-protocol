@@ -1,5 +1,7 @@
 /**
  * @file agent-integration.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description API service for agent integration endpoints: onboarding, webhook,
  *   telemetry, skill bundle, and delivery log.
  * @version-history

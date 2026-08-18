@@ -1,5 +1,7 @@
 /**
  * @file src/services/app-spec-gate.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Did whoever is publishing this app read the build spec that is in force now?
  *
  *   THE CASE THIS EXISTS FOR (aimeat.io, 2026-08-11). An agent built and published an app without

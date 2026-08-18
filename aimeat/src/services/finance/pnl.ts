@@ -1,5 +1,7 @@
 /**
  * @file src/services/finance/pnl.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The P&L period summary (tuloslaskelma-kooste): income and expenses from
  *   booked vouchers grouped by source, the result before taxes, the period's VAT payable,
  *   and the owner's AI spend from the LEDGER. No forecasts — only the truth of the

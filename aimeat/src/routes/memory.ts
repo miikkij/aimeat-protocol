@@ -1,5 +1,7 @@
 /**
  * @file memory.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Memory CRUD routes, file storage, search, and federated memory
  *   browsing (pull/push/list across nodes). Route handlers live in sibling modules
  *   under src/routes/memory/ (crud, bulk, federation, files, key); this file wires

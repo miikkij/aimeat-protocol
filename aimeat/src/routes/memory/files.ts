@@ -1,5 +1,7 @@
 /**
  * @file src/routes/memory/files.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history

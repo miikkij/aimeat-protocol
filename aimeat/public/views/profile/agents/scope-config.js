@@ -1,5 +1,7 @@
 /**
  * @file public/views/profile/agents/scope-config.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent scope labels for the agents tab and the scope-management modal, over the
  *   pure scope model in ./scope-model.js (re-exported here so both consumers keep one import).
  * @version-history

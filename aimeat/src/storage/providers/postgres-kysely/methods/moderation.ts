@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/moderation.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Moderation domain for the Postgres+Kysely backend: content flags, appeals, and profile
  *   matches. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/governance.ts)
  *   against the same tables. Covers flag CRUD + per-target summary aggregation, the appeal ledger, and

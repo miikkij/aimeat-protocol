@@ -1,5 +1,7 @@
 /**
  * @file src/storage/providers/postgres-kysely/methods/capabilities.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Capability domain for the Postgres+Kysely backend (Capability / CapabilityLog): agent
  *   capability CRUD, listing/filtering with pagination, invocation stats, execution logs, operator
  *   overrides, and trust/vouch tracking. `stats`, `trust`, `operatorOverride` (and the schema/exports/

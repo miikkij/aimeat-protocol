@@ -1,5 +1,7 @@
 /**
  * @file src/services/home-rooms.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The rooms (aimeat_remake/07-nelja-huonetta.md), and the check that decides whether
  *   each one is actually there.
  *

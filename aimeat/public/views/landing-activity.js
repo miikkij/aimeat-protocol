@@ -1,5 +1,7 @@
 /**
  * @file landing-activity.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Public activity feed for the logged-out landing page. Three tabs —
  *   Apps / Organisms / Agents — each a live list of recent public events (app
  *   publishes, public organism + workspace publishes, agent materials & knowledge

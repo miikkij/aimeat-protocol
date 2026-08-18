@@ -1,5 +1,7 @@
 /**
  * @file app-agent-surfaces.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The per-origin agent documents a published app serves on its own host: llms.txt,
  *   AGENTS.md and sitemap.md. All three are built from the same three inputs — the app record, its
  *   tool manifest, the node config — so they cannot describe different apps, and there is no

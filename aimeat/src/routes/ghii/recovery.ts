@@ -1,5 +1,7 @@
 /**
  * @file src/routes/ghii/recovery.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description GHII email-verification, password reset/change, and account recovery routes:
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.

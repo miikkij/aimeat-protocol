@@ -1,5 +1,7 @@
 /**
  * @file presence.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Generic presence/availability API. Lets an owner read & set their
  *   own presence config (manual/auto status + who-can-see visibility) and lets any
  *   authenticated viewer read the viewer-scoped status of one or many identities.

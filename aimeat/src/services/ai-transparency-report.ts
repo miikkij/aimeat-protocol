@@ -1,5 +1,7 @@
 /**
  * @file src/services/ai-transparency-report.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The documentation duty, answered from data instead of from a spreadsheet
  *   (TARGET-058 Phase 8). Section 2, Commitment 2 of the GPAI Code of Practice asks a provider to
  *   keep documentation of what it marks and how; this rolls that up out of the provenance records

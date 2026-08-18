@@ -1,5 +1,7 @@
 /**
  * @file src/utils/app-content-type.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The `Content-Type` a published AIMEAT app is served with, in one place — because the
  *   charset parameter has to be on ALL of them or the bug comes back on whichever one was missed.
  *

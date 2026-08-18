@@ -1,5 +1,7 @@
 /**
  * @file push.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Web push notification service -- manages VAPID-based push subscriptions
  *   and sends notifications to individual users or broadcasts to organism members.
  * @structure

@@ -1,5 +1,7 @@
 /**
  * @file calibrator.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description API service layer for the Prompt Calibrator.
  * @structure
  *   - Project CRUD: listProjects, createProject, getProject, getProjectDetail, updateProject, deleteProject

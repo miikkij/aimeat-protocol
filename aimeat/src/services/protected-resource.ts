@@ -1,5 +1,7 @@
 /**
  * @file protected-resource.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description RFC 9728 Protected Resource Metadata, answered for the ORIGIN the client actually
  *   used. This node serves three families of origin from one process: the apex (`aimeat.io`), the
  *   per-app origins (`<sub>.apps.<apex>`, H-2 app-origin isolation), and the portfolio origins

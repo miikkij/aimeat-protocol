@@ -1,5 +1,7 @@
 /**
  * @file vendored.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Vendored library packs — self-hosted third-party assets served at /lib/*
  *   (see public/lib/VENDORED.md for the vendoring + major-pin version policy). These are the
  *   "capability packs" the build-app prompt indexes: an AI includes one line and fetches the

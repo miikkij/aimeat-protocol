@@ -1,5 +1,7 @@
 /**
  * @file calibrator-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Prompt Calibrator V2 — list and detail views for calibration projects.
  *   Uses batch-based 4-step flow: Generation, Analysis, Reflection (dual), Synthesis.
  * @structure

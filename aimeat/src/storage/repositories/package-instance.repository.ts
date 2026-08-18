@@ -1,5 +1,7 @@
 /**
  * @file package-instance.repository.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Package instance repository interface — tracks installed copies of packages.
  *   Each instance links to a package group and version, and records the real components
  *   created during installation with their original content hashes for customization detection.

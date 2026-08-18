@@ -1,5 +1,7 @@
 /**
  * @file src/services/chat-instance-write.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Registering a chat session and marking it alive, once, for every surface that can do it.
  *
  *   WHY THIS FILE EXISTS. A chat instance is the row that answers "which chats has this person got

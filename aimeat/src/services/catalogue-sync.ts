@@ -1,5 +1,7 @@
 /**
  * @file src/services/catalogue-sync.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Catalogue Sync Service — outbound diff-based catalogue push to
  *   federation peers (RFC v1.6 §13.11.3 delta sync, §13.11.6 triggering). Tracks
  *   per-peer sync state, computes catalogue hashes, and signs payloads with the node

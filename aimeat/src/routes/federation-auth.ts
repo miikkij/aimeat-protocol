@@ -1,5 +1,7 @@
 /**
  * @file federation-auth.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Federation authentication endpoint -- allows remote nodes to verify
  *   credentials for users who have their home identity on this node. A requesting
  *   node sends the username + password, and this node verifies them locally, checks

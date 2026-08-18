@@ -1,5 +1,7 @@
 /**
  * @file membership-notify.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Tells someone they were let into an app, or that it was taken back. This is the one
  *   half of in-app membership that an app CANNOT build for itself, and the reason is structural, not
  *   an oversight: `ctx.notify` in the extension sandbox writes to the CALLER's owner, so at approval

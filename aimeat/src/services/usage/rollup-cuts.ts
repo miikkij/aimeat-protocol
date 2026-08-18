@@ -1,5 +1,7 @@
 /**
  * @file src/services/usage/rollup-cuts.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description THE EXTENSION POINT. A "cut" is one named dimension set the fold materialises, and
  *   adding a report to this system means adding an entry here plus a backfill. No migration, no
  *   repository method, no provider pair, no new route.

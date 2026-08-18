@@ -1,5 +1,7 @@
 /**
  * @file tab-contracts.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent detail › Contracts sub-tab. Makes the agent's workspace-contract engagements
  *   visible from the AGENT side (previously only the workspace knew, and only as a derived record
  *   trace). Shows what the agent OFFERS (its contract.* capability tags) and, first-class, WHERE each

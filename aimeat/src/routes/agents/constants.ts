@@ -1,5 +1,7 @@
 /**
  * @file src/routes/agents/constants.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Shared constants for the agents route modules (mode enum, device-auth TTL). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
  *   v1.1.0 — 2026-08-13 — Device-auth window 30 min -> 2 h, and DEVICE_AUTH_EXPIRY_SECONDS beside

@@ -1,5 +1,7 @@
 /**
  * @file src/models/ai-provenance-schemas.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The frozen `aimeat.provenance/v1` record — AIMEAT's CANONICAL statement about how much
  *   of a piece of content a model wrote, and how much a person did. It is the stored form; every
  *   external vocabulary (IPTC digitalSourceType, the W3C `ai-disclosure` attribute, the IETF

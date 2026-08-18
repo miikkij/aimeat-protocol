@@ -1,5 +1,7 @@
 /**
  * @file src/middleware/system-fault.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Notices when a response says the node broke, and reports it to whoever runs the node.
  *
  *   ONE PLACE, NOT 108. `INTERNAL_ERROR` is written at 108 call sites and the other fault codes at a

@@ -1,5 +1,7 @@
 /**
  * @file notebook-tab.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Profile "Notebook" tab — free-text CAPTURE (saved to the notebook inbox), the LIBRARIAN
  *   read-head (GET /v1/librarian/search, ranked full-text across every organism you have contributed to
  *   plus your personal notes), and the per-owner trust toggles. Each captured note's organize workflow

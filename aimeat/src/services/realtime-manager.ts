@@ -1,5 +1,7 @@
 /**
  * @file src/services/realtime-manager.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description In-memory WebSocket room manager for realtime apps — rooms, peers, presence/signal
  *   relay, Yjs collaborative-doc sync, echat chat with history cache, per-peer rate limiting,
  *   idle cleanup, metrics, and cross-node federation relays.

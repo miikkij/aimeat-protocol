@@ -1,5 +1,7 @@
 /**
  * @file agent-integration.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Agent inbox, integration kit, and long poll endpoints.
  *   Provides a consolidated view of pending work for agents and a machine-readable
  *   integration kit describing how to interact with the task system.

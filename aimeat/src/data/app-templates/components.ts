@@ -1,5 +1,7 @@
 /**
  * @file src/data/app-templates/components.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Reusable component-template bodies (snippets + their lib deps) for the
  *   authoring-template registry. Pure data — patterns the AI drops into an app-shell.
  *   {{app}} = the app's memory namespace. Consumed by ../app-templates.ts.

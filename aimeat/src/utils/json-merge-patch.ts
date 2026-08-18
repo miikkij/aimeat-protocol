@@ -1,5 +1,7 @@
 /**
  * @file src/utils/json-merge-patch.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description JSON Merge Patch (RFC 7386) — the merge semantics behind PATCH /v1/memory/:key.
  *
  *   The reason this exists: a record written by several principals at once. Six Sanomat agents each

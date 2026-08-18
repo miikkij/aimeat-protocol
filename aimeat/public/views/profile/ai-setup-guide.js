@@ -1,5 +1,7 @@
 /**
  * @file ai-setup-guide.js
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The two surfaces built on the per-tool setup table: McpSetupGuide (how to attach
  *   this node to a given AI tool) and InstructionsDialog (the instruction block plus, for the
  *   tool the reader actually uses, the exact place to paste it).

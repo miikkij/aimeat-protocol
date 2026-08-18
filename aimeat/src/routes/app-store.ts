@@ -1,5 +1,7 @@
 /**
  * @file app-store.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description App Store routes — purchase flow, license verification, purchase history.
  *   Handles morsel-based app purchases with immutable receipts and cryptographic proofs.
  *

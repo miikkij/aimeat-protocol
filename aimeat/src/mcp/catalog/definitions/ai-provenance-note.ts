@@ -1,5 +1,7 @@
 /**
  * @file src/mcp/catalog/definitions/ai-provenance-note.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description The AI-transparency sentence appended to every write tool's description, and the two
  *   catalog input fields that go with it (TARGET-058 Phase 4). One copy, imported by each tool-group
  *   module — nine hand-written variants of "declare your provenance" would teach nine slightly

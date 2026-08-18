@@ -1,5 +1,7 @@
 /**
  * @file src/commerce/__tests__/beneficiary-split.test.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
  * @description Unit tests for the second rake's arithmetic (src/commerce/beneficiary-split.ts). The
  *   property that matters is CONSERVATION: across every amount, every percent and every set of
  *   weights, `price === platformFee + providerNet + Σ beneficiaryCuts` — no micro-unit invented, none
