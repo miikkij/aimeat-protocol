@@ -3041,7 +3041,24 @@
       "apps": "Aplicaciones",
       "organisms": "Espacios compartidos",
       "memory": "Notas y registros",
-      "files": "Archivos"
+      "files": "Archivos",
+      "knowledge": "Paquetes de conocimiento"
+    },
+    "ai": {
+      "viaMcp": "{names} está conectado como tu agente por MCP.",
+      "houseModel": "El chat de la casa responde con {model}."
+    },
+    "ach": {
+      "title": "Logros",
+      "mat": "Felpudo puesto",
+      "agent": "Agente en casa",
+      "chat": "Primera conversación",
+      "mcp": "Tu propia IA conectada",
+      "ownkey": "Tu propia clave de IA",
+      "app": "Aplicación publicada",
+      "space": "En un espacio compartido",
+      "knowledge": "Paquete de conocimiento hecho",
+      "experience": "Experience Center visitado"
     },
     "step1": "Tu felpudo de bienvenida",
     "step2": "Conecta tu primer agente",
@@ -3227,6 +3244,7 @@
       "open": "Configuración",
       "title": "Configuración",
       "tabGeneral": "General",
+      "showAch": "Mostrar los logros en el inicio",
       "tabOpenRouter": "OpenRouter",
       "tabAccess": "Acceso",
       "tabWallet": "Cartera"

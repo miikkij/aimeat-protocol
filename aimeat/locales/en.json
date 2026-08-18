@@ -3041,7 +3041,24 @@
       "apps": "Apps",
       "organisms": "Shared spaces",
       "memory": "Notes and records",
-      "files": "Files"
+      "files": "Files",
+      "knowledge": "Knowledge packages"
+    },
+    "ai": {
+      "viaMcp": "{names} is connected as your agent over MCP.",
+      "houseModel": "The house chat answers with {model}."
+    },
+    "ach": {
+      "title": "Achievements",
+      "mat": "Welcome mat up",
+      "agent": "Agent home",
+      "chat": "First conversation",
+      "mcp": "Your own AI connected",
+      "ownkey": "Your own AI key",
+      "app": "App published",
+      "space": "In a shared space",
+      "knowledge": "Knowledge package made",
+      "experience": "Experience Center visited"
     },
     "step1": "Your welcome mat",
     "step2": "Connect your first agent",
@@ -3228,6 +3245,7 @@
       "open": "Settings",
       "title": "Settings",
       "tabGeneral": "General",
+      "showAch": "Show achievements on the home",
       "tabOpenRouter": "OpenRouter",
       "tabAccess": "Access",
       "tabWallet": "Wallet"

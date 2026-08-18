@@ -14,6 +14,12 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v2.2.0 — 2026-08-18 — The home shows what is RELEVANT TO YOU: the shared spaces you belong to
+ *     and the knowledge packages you made, by name; which mind answers in the chat (your own AI
+ *     over MCP when one is connected, the house model otherwise); and an achievements strip
+ *     derived from the account's real state — the funnel markers, the counts, the chat status —
+ *     with the Experience Center chip as the one self-marking door. home.prefs.hideAchievements
+ *     (the settings toggle) hides the strip.
  *   v2.1.0 — 2026-08-18 — Things({usage}): what the person has made (apps, shared spaces, notes,
  *     files), each count a door to its surface, between the agent card and the feed. Reads the
  *     cached /v1/owner/usage summary the profile already uses.
@@ -33,7 +39,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
+import { api, apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
 import { swallowed } from '/js/swallowed.js';
@@ -87,38 +93,108 @@ function Welcome() {
  * does not render, and when everything is zero the whole section stays away: an empty inventory
  * reads as broken, and the feed below already says what has actually happened.
  */
-function Things({ usage }) {
-  if (!usage) return null;
+function Things({ usage, orgs, packages }) {
   const rows = [
-    { n: usage.counts?.apps?.used, key: 'home.things.apps', fallback: 'Apps', href: '/v1/profile?tab=apps' },
-    { n: usage.counts?.organisms, key: 'home.things.organisms', fallback: 'Shared spaces', href: '/v1/profile?tab=organisms' },
-    { n: usage.memory?.used_keys, key: 'home.things.memory', fallback: 'Notes and records', href: '/v1/profile?tab=memory' },
-    { n: usage.storage?.used_files, key: 'home.things.files', fallback: 'Files', href: '/v1/profile?tab=memory' },
+    { n: usage?.counts?.apps?.used, key: 'home.things.apps', fallback: 'Apps', href: '/v1/profile?tab=apps' },
+    { n: usage?.memory?.used_keys, key: 'home.things.memory', fallback: 'Notes and records', href: '/v1/profile?tab=memory' },
+    { n: usage?.storage?.used_files, key: 'home.things.files', fallback: 'Files', href: '/v1/profile?tab=memory' },
   ].filter((r) => typeof r.n === 'number' && r.n > 0);
-  if (!rows.length) return null;
+  const hasNamed = (orgs && orgs.length > 0) || (packages && packages.length > 0);
+  if (!rows.length && !hasNamed) return null;
   return html`
     <section class="koti-things">
       <h2 class="koti-feed-title">${tr('home.things.title', 'What you have made')}</h2>
-      <div class="koti-things-row">
-        ${rows.map((r) => html`
-          <a class="koti-thing" key=${r.key} href=${r.href}>
-            <span class="koti-thing-n">${r.n}</span>
-            <span class="koti-thing-label">${tr(r.key, r.fallback)}</span>
-          </a>`)}
-      </div>
+      ${rows.length > 0 && html`
+        <div class="koti-things-row">
+          ${rows.map((r) => html`
+            <a class="koti-thing" key=${r.key} href=${r.href}>
+              <span class="koti-thing-n">${r.n}</span>
+              <span class="koti-thing-label">${tr(r.key, r.fallback)}</span>
+            </a>`)}
+        </div>`}
+      ${/* The spaces the person is PART OF and the packages they made, by NAME: a count says you
+            have things somewhere, a name says which ones — and a home is made of names. */''}
+      ${orgs && orgs.length > 0 && html`
+        <div class="koti-things-row koti-things-named">
+          <span class="koti-things-cat">${tr('home.things.organisms', 'Shared spaces')}</span>
+          ${orgs.map((o) => html`
+            <a class="koti-thing koti-thing--named" key=${o.id} href="/v1/profile?tab=organisms">
+              <span class="koti-thing-label">${o.name}</span>
+              ${typeof o.workspace_count === 'number' && o.workspace_count > 0
+                && html`<span class="koti-thing-n">${o.workspace_count}</span>`}
+            </a>`)}
+        </div>`}
+      ${packages && packages.length > 0 && html`
+        <div class="koti-things-row koti-things-named">
+          <span class="koti-things-cat">${tr('home.things.knowledge', 'Knowledge packages')}</span>
+          ${packages.map((p) => html`
+            <a class="koti-thing koti-thing--named" key=${p.key} href="/v1/profile?tab=knowledge">
+              <span class="koti-thing-label">${p.name}</span>
+            </a>`)}
+        </div>`}
     </section>`;
 }
 
-/** One clear door to where the work actually happens. The home reports; the chat does. */
-function ChatDoor() {
+/**
+ * One clear door to where the work actually happens, and WHICH MIND answers there. A person whose
+ * own AI (Claude, ChatGPT...) is connected over MCP is told that; otherwise the house chat's model
+ * is named, because "some AI" is exactly the vagueness people distrust.
+ */
+function ChatDoor({ chatStatus, mcpNames }) {
+  const ai = mcpNames && mcpNames.length > 0
+    ? tr('home.ai.viaMcp', '{names} is connected as your agent over MCP.')
+        .replace('{names}', mcpNames.join(', '))
+    : (chatStatus?.enabled && chatStatus?.model
+        ? tr('home.ai.houseModel', 'The house chat answers with {model}.').replace('{model}', chatStatus.model)
+        : '');
   return html`
     <section class="koti-chatdoor">
-      <p class="koti-chatdoor-lede">
-        ${tr('home.chatDoor.lede', 'Your agent is in the chat. Say what you need, and it gets to work.')}
-      </p>
+      <div class="koti-chatdoor-text">
+        <p class="koti-chatdoor-lede">
+          ${tr('home.chatDoor.lede', 'Your agent is in the chat. Say what you need, and it gets to work.')}
+        </p>
+        ${ai && html`<p class="koti-chatdoor-ai">${ai}</p>`}
+      </div>
       <a class="btn-primary koti-chatdoor-cta" href="/v1/chat">
         ${tr('home.chatDoor.cta', 'Continue in the chat')}
       </a>
+    </section>`;
+}
+
+/**
+ * What has been tried here, and the doors to what has not. Every row is DERIVED from the account's
+ * real state (the funnel markers, the usage counts, the chat status) rather than stored — an
+ * achievement that can drift from the thing it celebrates is a lie waiting to happen. The one
+ * exception is the Experience Center, which the node cannot observe: its chip marks itself when
+ * the person goes. Hidden entirely by the settings toggle (home.prefs.hideAchievements).
+ */
+function Achievements({ state, usage, markers, chatStatus, orgs, packages, prefs, onTried }) {
+  if (prefs?.hideAchievements) return null;
+  const has = (k) => !!markers?.has(k);
+  const list = [
+    { id: 'mat', done: !!state.mat?.done, key: 'home.ach.mat', fallback: 'Welcome mat up', href: '/v1/home' },
+    { id: 'agent', done: !!state.agent, key: 'home.ach.agent', fallback: 'Agent home', href: '/v1/profile?tab=agents' },
+    { id: 'chat', done: has('onboarding.first_chat_turn'), key: 'home.ach.chat', fallback: 'First conversation', href: '/v1/chat' },
+    { id: 'mcp', done: has('onboarding.first_mcp_call') || has('onboarding.hello_mcp'), key: 'home.ach.mcp', fallback: 'Your own AI connected', href: '/v1/profile?tab=mcp' },
+    { id: 'ownkey', done: !!chatStatus?.has_own_key, key: 'home.ach.ownkey', fallback: 'Your own AI key', href: '/v1/profile?tab=generator' },
+    { id: 'app', done: (usage?.counts?.apps?.used ?? 0) > 0, key: 'home.ach.app', fallback: 'App published', href: '/app-catalog.html' },
+    { id: 'space', done: (orgs?.length ?? 0) > 0, key: 'home.ach.space', fallback: 'In a shared space', href: '/v1/profile?tab=organisms' },
+    { id: 'knowledge', done: (packages?.length ?? 0) > 0, key: 'home.ach.knowledge', fallback: 'Knowledge package made', href: '/v1/profile?tab=knowledge' },
+    { id: 'experience', done: !!prefs?.tried?.experience, key: 'home.ach.experience', fallback: 'Experience Center visited',
+      href: 'https://experience-center.apps.aimeat.io', external: true },
+  ];
+  return html`
+    <section class="koti-ach">
+      <h2 class="koti-feed-title">${tr('home.ach.title', 'Achievements')}</h2>
+      <div class="koti-things-row">
+        ${list.map((a) => html`
+          <a class="koti-ach-chip ${a.done ? 'koti-ach-chip--done' : ''}" key=${a.id} href=${a.href}
+             target=${a.external ? '_blank' : undefined} rel=${a.external ? 'noopener' : undefined}
+             onClick=${a.id === 'experience' && !a.done ? () => onTried('experience') : undefined}>
+            <span class="koti-ach-mark" aria-hidden="true">${a.done ? '✓' : '·'}</span>
+            ${tr(a.key, a.fallback)}
+          </a>`)}
+      </div>
     </section>`;
 }
 
@@ -127,6 +203,12 @@ export default function HomeView({ navigate }) {
   const [state, setState] = useState(null);
   const [feed, setFeed] = useState([]);
   const [usage, setUsage] = useState(null);
+  const [orgs, setOrgs] = useState([]);
+  const [packages, setPackages] = useState([]);
+  const [chatStatus, setChatStatus] = useState(null);
+  const [mcpNames, setMcpNames] = useState([]);
+  const [markers, setMarkers] = useState(null);
+  const [prefs, setPrefs] = useState(null);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -153,17 +235,44 @@ export default function HomeView({ navigate }) {
       } catch (e) {
         swallowed('home: feed', e);
       }
-      // Same standing as the feed: the page works without it, a silent failure is still recorded.
-      try {
-        const u = await apiGet('/v1/owner/usage');
-        if (u?.data) setUsage(u.data);
-      } catch (e) {
-        swallowed('home: usage', e);
+      // The status view's extra reads, all best-effort and all in one round: the page works
+      // without any of them, and every failure is recorded rather than swallowed. Only fetched for
+      // a FINISHED home — the onboarding steps need none of this.
+      if (r.data.state?.initialized) {
+        const grab = (path, fn, label) =>
+          apiGet(path).then((x) => fn(x?.data)).catch((e) => swallowed('home: ' + label, e));
+        await Promise.all([
+          grab('/v1/owner/usage', (d) => { if (d) setUsage(d); }, 'usage'),
+          grab(`/v1/organisms?member=${encodeURIComponent(r.data.state.owner)}&include=counts`,
+            (d) => setOrgs((d?.organisms ?? d?.items ?? []).map((o) => ({
+              id: o.id, name: o.name || o.id, workspace_count: o.workspace_count,
+            }))), 'organisms'),
+          grab('/v1/knowledge/tab', (d) => setPackages((d?.packages ?? [])
+            .filter((p) => String(p.key || '').endsWith('/manifest'))
+            .map((p) => ({ key: p.key, name: p.value?.name || p.value?.title || p.key.split('/')[1] }))), 'knowledge'),
+          grab('/v1/chat/status', (d) => { if (d) setChatStatus(d); }, 'chat status'),
+          grab('/v1/chat-instances', (d) => setMcpNames([...new Set((d?.chat_instances ?? [])
+            .filter((i) => String(i.id || '').startsWith('mcp-'))
+            .map((i) => String(i.platform || '').replace(/^mcp-/, '')).filter(Boolean)
+            .map((p) => p.charAt(0).toUpperCase() + p.slice(1)))]), 'chat instances'),
+          grab('/v1/memory?prefix=onboarding.', (d) => setMarkers(new Set(
+            (d?.items ?? d?.entries ?? []).map((m) => m.key))), 'markers'),
+          grab('/v1/memory/home.prefs?soft=1', (d) =>
+            setPrefs(d?.exists === false ? {} : (d?.value ?? {})), 'prefs'),
+        ]);
       }
     } catch (e) {
       setLoadError(e.message || String(e));
     }
   }, []);
+
+  // The one achievement the node cannot observe marks itself the moment the person goes.
+  const markTried = useCallback(async (what) => {
+    const next = { ...(prefs ?? {}), tried: { ...(prefs?.tried ?? {}), [what]: new Date().toISOString() } };
+    setPrefs(next);
+    await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'home.prefs', value: next, visibility: 'private' }) })
+      .catch((e) => swallowed('home: prefs write', e));
+  }, [prefs]);
 
   useEffect(() => { if (session) load(); }, [session, load]);
 
@@ -226,9 +335,11 @@ export default function HomeView({ navigate }) {
               <a href=${matUrl} target="_blank" rel="noopener">${matUrl.replace(/^https?:\/\//, '')}</a>
             </p>`}
         </header>
-        <${ChatDoor} />
+        <${ChatDoor} chatStatus=${chatStatus} mcpNames=${mcpNames} />
         <${AgentCard} agent=${state.agent} />
-        <${Things} usage=${usage} />
+        <${Things} usage=${usage} orgs=${orgs} packages=${packages} />
+        <${Achievements} state=${state} usage=${usage} markers=${markers} chatStatus=${chatStatus}
+          orgs=${orgs} packages=${packages} prefs=${prefs} onTried=${markTried} />
         <${HomeFeed} items=${feed} />
         <${OpenItemsList} maxAgeDays=${7} />
         <${InstallCta} />

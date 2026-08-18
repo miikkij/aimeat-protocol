@@ -7,6 +7,9 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v2.2.0 — 2026-08-18 — .koti-things-named (spaces and packages by name), .koti-ach* (the
+ *     achievements strip: dashed = a door still to open, solid + green tick = done), and
+ *     .koti-chatdoor-ai (which mind answers in the chat).
  *   v2.1.0 — 2026-08-18 — The feed becomes a timeline: a trunk line behind category-coloured dots
  *     (.koti-feed-item--made/agent/trouble/money/access/system), the live row pulsing on top of
  *     its colour. Also .koti-things: the what-you-have-made chip row above the feed.
@@ -314,6 +317,31 @@
 .koti-thing:hover { border-color: var(--accent); }
 .koti-thing-n { font-size: 1.05rem; font-weight: 700; color: var(--accent); }
 .koti-thing-label { font-size: 0.88rem; color: var(--text-dim); }
+/* The named rows: which spaces, which packages. The category word sits as a quiet prefix. */
+.koti-things-named { margin-top: 0.6rem; align-items: center; }
+.koti-things-cat { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+.koti-thing--named { padding: 0.4rem 0.75rem; }
+.koti-thing--named .koti-thing-label { color: var(--text); }
+.koti-thing--named .koti-thing-n { font-size: 0.85rem; }
+
+/* ── Achievements: what has been tried, and doors to what has not. ── */
+.koti-ach { margin-top: 2rem; }
+.koti-ach-chip {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px dashed var(--border); border-radius: var(--radius-full);
+  font-size: 0.85rem; color: var(--text-dim); text-decoration: none;
+  transition: border-color .15s;
+}
+.koti-ach-chip:hover { border-color: var(--accent); }
+.koti-ach-chip--done { border-style: solid; color: var(--text); }
+.koti-ach-chip--done .koti-ach-mark { color: var(--success); }
+.koti-ach-mark { font-weight: 700; color: var(--muted); }
+
+/* The second line on the chat door: which mind answers. */
+.koti-chatdoor-text { min-width: 0; }
+.koti-chatdoor-ai { margin: 0.3rem 0 0; font-size: 0.82rem; color: var(--text-dim); }
+.koti-ach-toggle { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
 
 /* ── The feed: what has happened. Quiet by design — it reports, it does not compete. ── */
 .koti-feed { margin-top: 2.5rem; }

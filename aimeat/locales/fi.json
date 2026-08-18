@@ -3041,7 +3041,24 @@
       "apps": "Appit",
       "organisms": "Jaetut tilat",
       "memory": "Muistiinpanot ja tietueet",
-      "files": "Tiedostot"
+      "files": "Tiedostot",
+      "knowledge": "Tietopaketit"
+    },
+    "ai": {
+      "viaMcp": "{names} on kytketty agenttinasi MCP:n yli.",
+      "houseModel": "Talon chat vastaa mallilla {model}."
+    },
+    "ach": {
+      "title": "Saavutukset",
+      "mat": "Tervetuloamatto pystyssä",
+      "agent": "Agentti kotona",
+      "chat": "Ensimmäinen keskustelu käyty",
+      "mcp": "Oma äly kytketty",
+      "ownkey": "Oma AI-avain",
+      "app": "Appi julkaistu",
+      "space": "Jaetussa tilassa mukana",
+      "knowledge": "Tietopaketti tehty",
+      "experience": "Experience Center koettu"
     },
     "step1": "Tervetuloamattosi",
     "step2": "Yhdistä kotiisi ensimmäinen agenttisi",
@@ -3228,6 +3245,7 @@
       "open": "Asetukset",
       "title": "Asetukset",
       "tabGeneral": "Yleiset",
+      "showAch": "Näytä saavutukset kotona",
       "tabOpenRouter": "OpenRouter",
       "tabAccess": "Pääsy",
       "tabWallet": "Lompakko"

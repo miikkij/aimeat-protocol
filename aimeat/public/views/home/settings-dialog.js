@@ -26,10 +26,12 @@
  *     the old profile's Home view, so the two sides cannot say different things.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { api, apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 import { Modal } from '/components/Modal.js';
 import { HomeUiSwitch } from '/components/HomeUiSwitch.js';
 import { OpenRouterSettings } from '/views/profile/openrouter-settings.js';
@@ -51,6 +53,33 @@ const TABS = [
   { id: 'wallet', key: 'home.settings.tabWallet', fallback: 'Wallet' },
 ];
 
+/**
+ * Whether the achievements strip shows on the home. Stored in the home.prefs memory record the
+ * home itself reads, so the strip and this switch cannot disagree about where the truth lives.
+ */
+function AchievementsToggle() {
+  const [prefs, setPrefs] = useState(null);
+  useEffect(() => {
+    apiGet('/v1/memory/home.prefs?soft=1')
+      .then((r) => setPrefs(r?.data?.exists === false ? {} : (r?.data?.value ?? {})))
+      .catch((e) => { swallowed('home settings: prefs', e); setPrefs({}); });
+  }, []);
+  if (prefs === null) return null;
+  const hidden = !!prefs.hideAchievements;
+  const flip = async () => {
+    const next = { ...prefs, hideAchievements: !hidden };
+    setPrefs(next);
+    await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'home.prefs', value: next, visibility: 'private' }) })
+      .catch((e) => swallowed('home settings: prefs write', e));
+    window.dispatchEvent(new Event('aimeat-live-update'));
+  };
+  return html`
+    <label class="koti-settings-switch koti-ach-toggle">
+      <input type="checkbox" checked=${!hidden} onChange=${flip} />
+      ${tr('home.settings.showAch', 'Show achievements on the home')}
+    </label>`;
+}
+
 export function HomeSettingsDialog({ open, onClose, session, showToast }) {
   const [tab, setTab] = useState('general');
 
@@ -71,6 +100,7 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
 
         <div class="koti-settings-panel">
           ${tab === 'general' && html`
+            <${AchievementsToggle} />
             <${NotificationsTab} session=${session} showToast=${showToast} />
             ${/* The SAME control the old profile mounts — one switch, two places, so the wording
                   and the behaviour cannot drift apart. */''}
