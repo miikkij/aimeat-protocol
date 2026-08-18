@@ -13,9 +13,9 @@ owner handle, secrets).
 
 **aimeat-protocol** = the **AIMEAT protocol** (v4.0 two-layer spec — `docs/AIMEAT-RFC-v4.0-Core-full.md` +
 `docs/AIMEAT-RFC-v4.0-Platform-full.md` + `openapi.yaml`) **and its reference node** in `aimeat/` — a
-Node.js 24 / TypeScript / Express 5 server. AIMEAT (AI Memory Exchange and Action Transfer) is a digital
-agency where people, AI, agents and apps work under one roof — **persistent identity (GHII/GAII/GEAI),
-consent-governed memory, organisms/workspaces, an economy of meters (morsels + USD metering), apps +
+Node.js 24 / TypeScript / Express 5 server. AIMEAT (AI Memory Exchange and Action Transfer) is an open,
+federated, self-hosted AI operating system — **persistent identity (GHII/GAII/GEAI), consent-governed
+memory, organisms/workspaces, an economy of meters (morsels + USD metering), apps +
 extensions, federation, and an MCP surface** — and everyone owns their own data. Plain HTTP + JSON.
 
 Running this repo gives the user **their own AIMEAT node** on port **40050** — with a profile/portal UI, an

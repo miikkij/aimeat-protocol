@@ -3,7 +3,7 @@
   "url": "https://context7.com/miikkij/aimeat-protocol",
   "public_key": "pk_3NQYAMkNG4423mPQKpu0K",
   "projectTitle": "AIMEAT Protocol",
-  "description": "Open protocol and reference node giving AI agents persistent memory, identity, shared workspaces, skills and a usage meter over REST and MCP",
+  "description": "AIMEAT, the Linux of AI: an open, federated, self-hosted AI operating system giving people and AI agents identity, persistent memory, workspaces, apps, skills and a usage meter over REST and MCP",
   "folders": [
     "docs"
   ],

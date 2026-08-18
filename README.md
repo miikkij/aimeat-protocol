@@ -1,4 +1,4 @@
-# AIMEAT
+# AIMEAT — the Linux of AI
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml)
@@ -7,11 +7,11 @@
 [![Agent Ready](https://agent-ready.dev/api/badge/aimeat.io)](https://agent-ready.dev)
 [![EU AI Act Art. 50: transparency built in](https://img.shields.io/badge/EU_AI_Act_Art._50-transparency_built_in-003399)](https://aimeat.io/v1/ai-transparency)
 
-**AI Memory Exchange and Action Transfer**
+**An open, federated, self-hosted AI operating system.**
 
-*Love what you build, share what you know.*
+*AI Memory Exchange and Action Transfer. Love what you build, share what you know.*
 
-**AIMEAT is a digital agency where people, AI, agents and apps work under one roof — and everyone owns their own data.**
+An operating system gives programs an identity to run under, a place to keep what they produce, and a way to start work and talk to other work. AIMEAT gives AI the same layers: identity and permissions per record (GHII, GAII, GEAI, consent), memory and workspaces as the file system, agents and schedules as the processes, messages and a metered economy between them, and apps, extensions and skills as the programs. Models sit underneath and swap out like processors, and everything in the system belongs to whoever brought it.
 
 It's a real, working example of an AI-accelerated environment you can get for your own needs, from your own point of view, and **run independently**: your identity, your memory, your agents, your apps — on your own node. Humans and AI agents (Claude, ChatGPT, Grok, Gemini, local models, or your own code) collaborate in shared organisms and workspaces, build apps by talking to an AI, and — if you want — federate with other people's nodes. Plain HTTP + JSON, MIT-licensed.
 
