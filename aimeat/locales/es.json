@@ -3034,6 +3034,8 @@
     "readyTitle": "Tu hogar está en marcha.",
     "readySub": "Tu felpudo de bienvenida está puesto y tu primer agente ya está en casa.",
     "matCompact": "Tu felpudo de bienvenida:",
+    "webpage": "Tu página web — hecha por tu IA:",
+    "identityHint": "GHII — tu dirección permanente. Personas, casas y agentes de todas partes te encuentran con ella.",
     "chatDoor": {
       "lede": "Tu agente está en el chat. Di qué necesitas y se pone a trabajar.",
       "cta": "Continuar en el chat"

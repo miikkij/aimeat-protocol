@@ -3034,6 +3034,8 @@
     "readyTitle": "Your home is up and running.",
     "readySub": "Your welcome mat is out and your first agent is home.",
     "matCompact": "Your welcome mat:",
+    "webpage": "Your webpage — made by your AI:",
+    "identityHint": "GHII — your permanent address. People, homes and agents everywhere find you by it.",
     "chatDoor": {
       "lede": "Your agent is in the chat. Say what you need, and it gets to work.",
       "cta": "Continue in the chat"

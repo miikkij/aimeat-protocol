@@ -15,6 +15,11 @@
  * @structure MailboxRow · FleetLine · ChatDoor · Things · FavoriteApps · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   v1.1.0 — 2026-08-19 — Jouni's prod round: the mailbox opens ?tab=messages (tab=inbox was a
+ *     guessed id that 404-redirected — a link I shipped unchecked), app chips say the app's NAME
+ *     with the .html stripped, and FavoriteApps reads the complete own-apps list (index.js now
+ *     paginates via services/apps listApps) so a >200-app node cannot page the owner's own apps
+ *     out of existence.
  *   v1.0.0 — 2026-08-18 — Extracted ChatDoor/Things/Achievements from index.js; added the mailbox
  *     row (flag up when unread waits), the fleet line replacing the single-agent hero card, stars +
  *     fold on spaces and packages, the plain-language knowledge framing, and the favourite-apps row
@@ -40,7 +45,7 @@ export function MailboxRow({ mail }) {
   if (!mail) return null;
   const unread = mail.unread ?? 0;
   return html`
-    <a class="koti-mailbox ${unread > 0 ? 'koti-mailbox--full' : ''}" href="/v1/profile?tab=inbox">
+    <a class="koti-mailbox ${unread > 0 ? 'koti-mailbox--full' : ''}" href="/v1/profile?tab=messages">
       <span class="koti-mailbox-icon" aria-hidden="true">${unread > 0 ? '📬' : '📪'}</span>
       <span class="koti-mailbox-text">
         ${unread > 0
@@ -206,6 +211,9 @@ export function FavoriteApps({ apps, favorites, owner, prefs, onMode }) {
   const mode = prefs?.appsRecency === 'used' ? 'used' : 'saved';
   const favRefs = favorites?.refs ?? [];
   const appUrl = (o, f) => `/v1/apps/${encodeURIComponent(o)}/${encodeURIComponent(f)}?mode=inline`;
+  // A chip says the app's NAME. "archimate.html" on a chip reads as a file listing, not a home.
+  const appName = (a, filename) =>
+    String(a?.manifest?.name || a?.name || a?.title || filename || '').replace(/.html?$/i, '');
   let rows;
   let title = tr('home.apps.title', 'Your apps');
   if (favRefs.length > 0) {
@@ -223,7 +231,7 @@ export function FavoriteApps({ apps, favorites, owner, prefs, onMode }) {
     });
   } else {
     rows = byUpdated((apps ?? []).filter((a) => (a.owner || a.owner_name) === owner)
-      .map((a) => ({ id: `${owner}/${a.filename}`, name: a.name || a.title || a.filename, updatedAt: a.updated_at || a.created_at, href: appUrl(owner, a.filename) })))
+      .map((a) => ({ id: `${owner}/${a.filename}`, name: appName(a, a.filename), updatedAt: a.updated_at || a.created_at, href: appUrl(owner, a.filename) })))
       .slice(0, 6);
   }
   if (!rows.length) return null;

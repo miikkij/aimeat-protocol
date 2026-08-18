@@ -3034,6 +3034,8 @@
     "readyTitle": "Kotisi on valmis.",
     "readySub": "Tervetuloamattosi on paikallaan ja ensimmäinen agenttisi on kotona.",
     "matCompact": "Tervetuloamattosi:",
+    "webpage": "Verkkosivusi — tekoälysi tekemä:",
+    "identityHint": "GHII — pysyvä osoitteesi. Ihmiset, kodit ja agentit kaikkialla löytävät sinut sillä.",
     "chatDoor": {
       "lede": "Agenttisi on chatissa. Sano mitä tarvitset, niin se ryhtyy töihin.",
       "cta": "Jatka keskustelua"

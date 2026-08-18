@@ -16,6 +16,11 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v2.4.0 — 2026-08-19 — Prod round: the "Your home is up and running" hero is gone (this is the
+ *     dashboard; the nameplate already says who and the pieces say what), the mat line calls the
+ *     thing what it is (your AI-made webpage), the nameplate carries the person's GHII address
+ *     with a plain-words explainer, own apps come from the paginated listApps() so a big node
+ *     cannot page them away, and a prefs write can no longer stomp a not-yet-loaded record.
  *   v2.3.0 — 2026-08-18 — The status pieces moved to status-parts.js and the view answers Jouni's
  *     round on his real account: the mailbox with its flag, the fleet as one line instead of a
  *     worst-agent hero card, stars + folds on the chip lists, the favourite-apps row, the avatar
@@ -49,6 +54,7 @@ import { api, apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
 import { swallowed } from '/js/swallowed.js';
+import { listApps } from '/js/services/apps.js';
 import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent } from '/views/home/step-agent.js';
 import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
@@ -162,7 +168,9 @@ export default function HomeView({ navigate }) {
           grab('/v1/messages/inbox?per_page=1', (d) => setMail({ unread: d?.unread ?? 0 }), 'mail'),
           grab('/v1/memory/app-catalog.favorites?soft=1', (d) =>
             setFavorites(d?.exists === false ? { refs: [] } : (d?.value ?? { refs: [] })), 'app favorites'),
-          grab('/v1/apps?limit=200', (d) => setOwnApps(d?.apps ?? []), 'apps'),
+          // The full list, paginated (services/apps): one 200-row page let a busy node page the
+          // owner's own apps out of the row entirely — Jouni watched his six vanish on a click.
+          listApps().then((all) => setOwnApps(all)).catch((e) => swallowed('home: apps', e)),
         ]);
       }
     } catch (e) {
@@ -172,21 +180,28 @@ export default function HomeView({ navigate }) {
 
   // home.prefs is ONE record (a record, not a cell): the achievements toggle, the self-marked
   // tries, the stars and the apps-row choice all live in it, written whole on every change.
-  const writePrefs = useCallback(async (next) => {
+  const writePrefs = useCallback(async (patch) => {
+    // Merge over what is KNOWN. Before the record has loaded, the known copy is the server's — a
+    // click in the first second must not overwrite the stars with an empty object.
+    let base = prefs;
+    if (base === null) {
+      base = await apiGet('/v1/memory/home.prefs?soft=1')
+        .then((r) => (r?.data?.exists === false ? {} : (r?.data?.value ?? {})))
+        .catch((e) => { swallowed('home: prefs read-before-write', e); return {}; });
+    }
+    const next = { ...base, ...patch };
     setPrefs(next);
     await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'home.prefs', value: next, visibility: 'private' }) })
       .catch((e) => swallowed('home: prefs write', e));
-  }, []);
+  }, [prefs]);
   const markTried = useCallback((what) =>
-    writePrefs({ ...(prefs ?? {}), tried: { ...(prefs?.tried ?? {}), [what]: new Date().toISOString() } }),
+    writePrefs({ tried: { ...(prefs?.tried ?? {}), [what]: new Date().toISOString() } }),
   [prefs, writePrefs]);
   const toggleStar = useCallback((id) => {
     const stars = prefs?.stars ?? [];
-    return writePrefs({ ...(prefs ?? {}),
-      stars: stars.includes(id) ? stars.filter((x) => x !== id) : [...stars, id] });
+    return writePrefs({ stars: stars.includes(id) ? stars.filter((x) => x !== id) : [...stars, id] });
   }, [prefs, writePrefs]);
-  const setAppsMode = useCallback((mode) =>
-    writePrefs({ ...(prefs ?? {}), appsRecency: mode }), [prefs, writePrefs]);
+  const setAppsMode = useCallback((mode) => writePrefs({ appsRecency: mode }), [writePrefs]);
 
   useEffect(() => { if (session) load(); }, [session, load]);
 
@@ -237,18 +252,12 @@ export default function HomeView({ navigate }) {
     const matUrl = state.mat?.standaloneUrl || state.mat?.url || '';
     return html`
       <div class="koti">
-        <${HomeHeader} name=${name} owner=${state.owner} onOpenSettings=${() => setSettingsOpen(true)} />
-        <header class="koti-welcome">
-          <h1 class="koti-h1">${tr('home.readyTitle', 'Your home is up and running.')}</h1>
-          <p class="koti-welcome-sub">
-            ${tr('home.readySub', 'Your welcome mat is out and your first agent is home.')}
-          </p>
-          ${matUrl && html`
-            <p class="koti-matline">
-              ${tr('home.matCompact', 'Your welcome mat:')}${' '}
-              <a href=${matUrl} target="_blank" rel="noopener">${matUrl.replace(/^https?:\/\//, '')}</a>
-            </p>`}
-        </header>
+        <${HomeHeader} name=${name} owner=${state.owner} identity=${typeof session?.ghii === 'string' ? session.ghii : (session?.ghii?.ghii ?? null)} onOpenSettings=${() => setSettingsOpen(true)} />
+        ${matUrl && html`
+          <p class="koti-matline">
+            ${tr('home.webpage', 'Your webpage — made by your AI:')}${' '}
+            <a href=${matUrl} target="_blank" rel="noopener">${matUrl.replace('https://', '').replace('http://', '')}</a>
+          </p>`}
         <${MailboxRow} mail=${mail} />
         <${ChatDoor} chatStatus=${chatStatus} mcpNames=${mcpNames} />
         <${FleetLine} agent=${state.agent} />
