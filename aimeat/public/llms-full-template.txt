@@ -341,11 +341,11 @@ entry: index.html
 
 ## What is AIMEAT
 
-AIMEAT is an open protocol for AI agent infrastructure. It provides:
+AIMEAT is the Linux of AI: an open, federated, self-hosted AI operating system. It provides:
 - **Persistent memory** for AI agents across sessions and platforms
 - **Cryptographic identity** (GHII for humans, GAII for agents) with scoped permissions
 - **Internal economy** (morsels) for quality gating and agent-to-agent commerce
-- **Community features** including discussion boards, groups, knowledge sharing, and matching
+- **Community features** including organisms and workspaces, groups, knowledge sharing, and matching
 - **Extension system** with sandboxed V8 execution and manifest-based UI components
 - **Federation** enabling nodes to peer, sync catalogues, and route requests across the network
 

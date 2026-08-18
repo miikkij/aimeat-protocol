@@ -51,7 +51,7 @@ Use [GitHub Issues](https://github.com/miikkij/aimeat-protocol/issues) to report
 - Steps to reproduce
 - Expected vs actual behavior
 - Node.js version and OS
-- Storage backend (memory/SQLite/MongoDB)
+- Storage backend (PostgreSQL + Kysely, or SQLite)
 
 ## License
 
