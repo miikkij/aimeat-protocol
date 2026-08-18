@@ -677,7 +677,7 @@ export default function InboxTab({ showToast }) {
   return html`
     <div class=${`inbox${mode !== 'idle' ? ' inbox--panel' : ''}`}>
       <div class="inbox-head">
-        <div>
+        <div class="inbox-head-text">
           <div class="section-title">${t('inbox.title')}</div>
           <div class="section-desc">${t('inbox.desc')}</div>
         </div>

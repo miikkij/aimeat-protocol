@@ -49,6 +49,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
+
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
@@ -58,7 +59,7 @@ import { AiInteractionNotice } from '/components/ai-label.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
-import { loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
+import { composerHeight, loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
 import { BubbleSpeakButton } from './read-aloud.js';
 import { AudioAttachment, fmtClock, stopOtherAudio } from './voice-parts.js';
 import { VoiceRecorder } from '/components/VoiceRecorder.js';
@@ -434,7 +435,11 @@ export function Composer({
       if (!containerRef.current) return;
       inst = new Editor({
         el: containerRef.current,
-        height: '160px',
+        // 160px left about 68px to type in: the toolbar and the markdown/preview tab row take 92px of
+        // it between them. Writing the message is the point of this screen, so on a desktop window the
+        // box gets a share of the height instead of a constant. A phone keeps the small default — its
+        // composer is the auto-growing single line, and the keyboard owns the bottom half anyway.
+        height: composerHeight() + 'px',
         initialEditType: 'markdown',     // open in markdown mode; the built-in toggle switches to WYSIWYG
         previewStyle: 'tab',
         initialValue: seeded,            // seed from a saved draft / suggested reply (remounts via key)
@@ -493,9 +498,16 @@ export function Composer({
   // JS, so a CSS class can't reach it — the fallback/simple textareas are sized by `.inbox-composer--tall`
   // in CSS instead). `160px` matches the construction default.
   useEffect(() => {
-    if (mode !== 'rich' || !editorRef.current?.setHeight) return;
-    const tall = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 400;
-    try { editorRef.current.setHeight(expanded ? tall + 'px' : '160px'); } catch (err) { swallowed('components: handleImagePaste', err); }
+    if (mode !== 'rich' || !editorRef.current?.setHeight) return undefined;
+    const apply = () => {
+      const tall = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 400;
+      try { editorRef.current.setHeight(expanded ? tall + 'px' : composerHeight() + 'px'); } catch (err) { swallowed('components: composer resize', err); }
+    };
+    apply();
+    // The editor holds whatever height it was built with, so a window that gets shorter would keep a
+    // composer sized for the taller one and squeeze the conversation instead.
+    window.addEventListener('resize', apply);
+    return () => window.removeEventListener('resize', apply);
   }, [expanded, mode]);
 
   // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread. When

@@ -150,7 +150,7 @@ export function ThreadPanel({
       <div class="inbox-thread-head">
         <${Avatar} seed=${activeConv.peerGhii} size=${36} />
         <div class="inbox-thread-id">
-          <div class="inbox-name">${escHtml(peerDisplay(activeConv.peerGhii))} ${activeConv.groupAlias ? null : html`<${PresenceDot} ghii=${activeConv.peerGhii} label=${true} />`}</div>
+          <div class="inbox-name" title=${activeConv.peerGhii}>${escHtml(peerDisplay(activeConv.peerGhii))} ${activeConv.groupAlias ? null : html`<${PresenceDot} ghii=${activeConv.peerGhii} label=${true} />`}</div>
           ${activeConv.subject ? html`<div class="inbox-thread-subject">🏷 ${escHtml(activeConv.subject)}</div>` : null}
           ${viaAgentName ? html`<div class="inbox-thread-via">🤖 ${t('inbox.sentByAgent')} ${escHtml(viaAgentName)}</div>` : null}
           <div class="inbox-sub">${escHtml(activeConv.peerGhii)}${activeConv.groupAlias && activeConv.groupAlias !== activeConv.peerGhii

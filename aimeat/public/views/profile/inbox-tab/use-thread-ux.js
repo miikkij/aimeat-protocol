@@ -8,6 +8,9 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.6.0 — 2026-08-18 — useMobileComposerKeyboard also measures the DESKTOP pane: --inbox-desk-avail
+ *     is the real distance from the messenger top edge to the bottom of the window, so the pane stops
+ *     guessing how much shell sits above it.
  *   v1.5.0 — 2026-08-04 — Add useAttachmentUrlRefresh: while a thread is open, a 15 min tick re-mints
  *     presigned attachment URLs approaching their 1 h token expiry — a download click in a long-open
  *     tab hit a dead token (410 → the browser's bare "Couldn't download"). useRecentBroadcasts moved
@@ -155,7 +158,22 @@ export function useMobileComposerKeyboard(mode) {
     const isNarrow = () => window.matchMedia('(max-width: 760px)').matches;
     const sync = () => {
       const body = document.querySelector('.inbox-body');
-      if (!vv || !body || !isNarrow() || !body.classList.contains('inbox-body--panel')) {
+      if (!body) { root.style.removeProperty('--inbox-avail'); root.style.removeProperty('--inbox-desk-avail'); return; }
+
+      // DESKTOP: the messenger used to be `100vh - 300px`, a guess at how much shell sits above it.
+      // Measured on a 1280x900 window it left 94px of dead space below the pane AND still scrolled the
+      // page, while the conversation itself got 229px. The distance to the top edge is a thing the
+      // browser knows, so ask it instead of guessing: everything below the pane is the pane's.
+      if (!isNarrow()) {
+        root.style.removeProperty('--inbox-avail');
+        const top = body.getBoundingClientRect().top;
+        // The gap that keeps the pane off the bottom edge, matching .pf-content's own padding.
+        const avail = Math.max(320, Math.round(window.innerHeight - top - 20));
+        root.style.setProperty('--inbox-desk-avail', `${avail}px`);
+        return;
+      }
+      root.style.removeProperty('--inbox-desk-avail');
+      if (!vv || !body.classList.contains('inbox-body--panel')) {
         root.style.removeProperty('--inbox-avail');
         return;
       }

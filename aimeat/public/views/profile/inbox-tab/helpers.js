@@ -296,3 +296,25 @@ export function tallyPoll(spec, recipients) {
   }
   return out;
 }
+
+/**
+ * How tall the rich composer opens.
+ *
+ * The Toast UI editor sizes itself in JS, so a CSS rule cannot reach it. Its old constant, 160px,
+ * spent 92px on the toolbar and the markdown/preview tabs and left about 68px for the message —
+ * the smallest element on a screen whose whole purpose is writing one. A desktop window gives it a
+ * share of the height with a floor; ≤760px keeps the old constant, because there the composer is the
+ * auto-growing single-line chat input and the on-screen keyboard owns the bottom of the screen.
+ */
+export function composerHeight() {
+  if (typeof window === 'undefined') return 160;
+  if (window.matchMedia('(max-width: 760px)').matches) return 160;
+  // A share of the window, and never more than a share of the MESSENGER PANE — the two are different
+  // numbers on a short window, and the pane is the one that decides whether the conversation still
+  // has room. Measured at 1280x460 with the window rule alone: the editor kept the 338px it was built
+  // with on a tall window and squeezed the messages to 32px; with the pane rule the messages keep
+  // their share at every height.
+  const paneVar = getComputedStyle(document.documentElement).getPropertyValue('--inbox-desk-avail');
+  const pane = parseInt(paneVar, 10) || window.innerHeight;
+  return Math.min(420, Math.max(120, Math.min(Math.round(window.innerHeight * 0.3), Math.round(pane * 0.38))));
+}

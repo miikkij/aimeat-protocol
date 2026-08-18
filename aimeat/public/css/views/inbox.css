@@ -5,6 +5,12 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.12.0 -- 2026-08-18 -- Desktop space. The pane height was `100vh - 300px`, a guess at the shell
+ *     above it: measured at 1280x900 it left 94px dead below AND still scrolled the page, while the
+ *     conversation got 229px of 900. The height is now MEASURED (--inbox-desk-avail), the tab heading
+ *     and its description are gone (the breadcrumb two rows up already says "Messages"), and the thread
+ *     header puts name and subject on one line instead of stacking three. 229px -> 326px for the
+ *     messages, 143px -> 53px for the header, 94px -> 19px of dead space.
  *   v1.10.0 -- 2026-08-03 -- .inbox-thread-older: the "Show full history (N messages)" pill at the top
  *     of a thread showing only its newest page.
  *   v1.9.0 -- 2026-08-03 -- Mobile thread header space fix: ≤760px flattens the id column
@@ -42,22 +48,37 @@
  *       joins --on: the component stamps `copied` itself.
  */
 
-.inbox { display: flex; flex-direction: column; gap: 14px; }
+.inbox { display: flex; flex-direction: column; gap: 8px; }
 
+/* The title sits ON the button row rather than above it, and the description is dropped on desktop:
+   the breadcrumb over this pane already says "Messages", so the heading said it a second time and the
+   sentence under it explained a screen the person is already looking at. Measured before: the header
+   block was 76px and the shell above it 114px, against 229px for the conversation itself. */
 .inbox-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
 }
+/* The shell's own `.pf-content-head` breadcrumb already reads "Messages" two rows above this one, and
+   the sidebar entry is highlighted besides — so the tab's heading was the third label for one screen.
+   The row keeps its actions and gives the height back to the conversation. */
+.inbox-head-text { display: none; }
+.inbox-head-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 
-/* Two-pane messenger with its own internal scroll. */
+/* Two-pane messenger with its own internal scroll.
+
+   The height is MEASURED, not guessed. `100vh - 300px` was a stand-in for the shell above the pane;
+   on a 1280x900 window it left 94px of dead space below it and still scrolled the page. The hook in
+   inbox-tab/use-thread-ux.js publishes the real distance from the pane's top edge to the bottom of
+   the window as --inbox-desk-avail, and the old expression stays as the fallback for the first paint
+   before the measurement lands. */
 .inbox-body {
   display: grid;
   grid-template-columns: minmax(260px, 340px) 1fr;
-  height: calc(100vh - 300px);
-  min-height: 480px;
+  height: var(--inbox-desk-avail, calc(100vh - 300px));
+  min-height: 320px;
   border: 1px solid var(--card-border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -289,11 +310,37 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 16px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--border-subtle);
   flex: none;
 }
-.inbox-thread-id { min-width: 0; flex: 1; }
+
+/* ONE line for who and what, on desktop.
+   Measured before: the id column stacked name, a three-line wrapped subject and the raw GHII into
+   118px, which made the header 143px — more than half of what the conversation itself got. Name and
+   subject now share a row and truncate; the address is a hover title on the name rather than a line
+   of its own, since it is an identifier nobody reads twice. The phone keeps its stacked layout
+   (the ≤760px block below), where a wrapped subject costs nothing. */
+.inbox-thread-id {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.inbox-thread-id > * { min-width: 0; }
+/* The name never shrinks: truncating WHO you are talking to to "ka…" to make room for a button is the
+   wrong trade. The subject gives way instead — it is already in the list on the left. */
+.inbox-thread-id .inbox-name { flex: 0 0 auto; white-space: nowrap; }
+.inbox-thread-id .inbox-thread-subject {
+  flex: 1 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.inbox-thread-id .inbox-thread-via { flex: none; white-space: nowrap; }
+/* The address line: still in the DOM for anyone who needs it, out of the way of the conversation. */
+.inbox-thread-id > .inbox-sub { display: none; }
 /* The "Reply with AI" pill in the thread header stays on one line (icon + label). */
 .inbox-ai-btn { flex: none; white-space: nowrap; }
 
