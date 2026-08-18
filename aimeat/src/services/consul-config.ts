@@ -3,7 +3,8 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Consul KV config service — loads, watches, and writes runtime config from HashiCorp
- *   Consul. Values are dot-path keyed under a prefix; only mutable fields are applied (immutable ignored).
+ *   Consul. Values are dot-path keyed under a prefix; only mutable fields are applied (immutable and
+ *   host-sealed paths ignored).
  *
  * @structure
  *   - ConsulConfigService interface: loadAll / startWatching / stopWatching / set / health
@@ -11,12 +12,17 @@
  *   - polling watcher hashes loadAll() output to detect and dispatch config changes
  *
  * @version-history
+ *   v1.1.0 — 2026-08-18 — applyConsulValues skips a path the node's host sealed. One edit covers
+ *     three callers, and the third is the one nobody had listed: the boot-time load, the import
+ *     route, and the LIVE WATCH LOOP, which re-applies whatever the KV store says on every change
+ *     without anybody asking. docs/plans/sealed-config-plan.md
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
 import Consul from 'consul';
 import type { AimeatConfig } from '../config.js';
 import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue } from './config-schema.js';
+import { isSealed } from './config-sealing.js';
 import { logger } from '../utils/logger.js';
 
 export interface ConsulConfigService {
@@ -108,15 +114,20 @@ export function createConsulConfigService(config: AimeatConfig): ConsulConfigSer
 
 /**
  * Apply Consul values to runtime config.
- * Used both at startup and by the watch callback.
+ *
+ * Used at startup, by the watch callback and by POST /v1/admin/consul/import, which is why the
+ * sealed check belongs here rather than at the import door: the watch callback fires on its own, so
+ * a rule enforced at that door only would be enforced on one of the three roads in.
  */
 export function applyConsulValues(
   config: AimeatConfig,
   values: Record<string, string>,
-): { applied: string[]; skipped: string[] } {
+): { applied: string[]; skipped: string[]; sealed: string[] } {
   const applied: string[] = [];
   const skipped: string[] = [];
+  const sealed: string[] = [];
   for (const [dotPath, rawValue] of Object.entries(values)) {
+    if (isSealed(config, dotPath)) { sealed.push(dotPath); continue; }
     const field = MUTABLE_CONFIG_MAP[dotPath];
     if (!field) { skipped.push(dotPath); continue; }
     try {
@@ -127,5 +138,5 @@ export function applyConsulValues(
       // eslint-disable-next-line aimeat/no-silent-catch -- not silent: the key is reported to the caller in the returned `skipped` list
     } catch { skipped.push(dotPath); }
   }
-  return { applied, skipped };
+  return { applied, skipped, sealed };
 }

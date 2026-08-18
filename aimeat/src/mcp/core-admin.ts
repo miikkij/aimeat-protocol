@@ -12,6 +12,11 @@
  *   import { registerCoreAdminTools } from './core-admin.js';
  *   registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.3.0 — 2026-08-18 — aimeat_admin_config reports the settings this node's host sealed, with
+ *     their values. The flat payload here shows twelve fields and none of the sealed classes, so
+ *     an operator asking their AI what their limits are got an answer that did not contain them.
+ *     The connector tool and the CLI dispatch entry proxy GET /v1/admin/config and inherit it.
+ *     docs/plans/sealed-config-plan.md
  *   v1.2.0 — 2026-08-15 — Two organism-ownership tools: the operator's read of who holds an
  *     organism, and the break-glass that installs an owner on one whose creator account is
  *     unreachable. Both call services/organism-ownership.ts, the same function the HTTP door calls.
@@ -28,6 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
+import { hasSealedKeys, sealedView } from '../services/config-sealing.js';
 import { descriptionFor } from './catalog/shape.js';
 import { mintMorsels } from '../services/morsel.js';
 import { addOrganismOwner, organismOwners } from '../services/organism-ownership.js';
@@ -143,6 +149,15 @@ export function registerCoreAdminTools(
                         mcp_card_commerce_tools: config.mcpCardCommerceTools,
                         content_signal: config.contentSignal,
                         web_bot_auth_sign: config.webBotAuthSign,
+                        // Settings whoever runs this node set, which this operator can read and
+                        // cannot change. They belong here rather than only on the HTTP door: an
+                        // operator who asks their AI what their limits are is asking the same
+                        // question, and the flat payload above shows none of the sealed classes
+                        // (quotas, rate limits, metrics). services/config-sealing.ts.
+                        ...(hasSealedKeys(config) ? {
+                            sealed: sealedView(config),
+                            sealed_note: 'Set by whoever runs this node. Readable here, changed by asking them.',
+                        } : {}),
                     }, null, 2),
                 }],
             };

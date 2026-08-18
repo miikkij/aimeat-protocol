@@ -15,6 +15,11 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.8.0 — 2026-08-18 — sealedConfigKeys: the settings whoever STARTED this node nominated as
+ *     read-only, for a node one party runs on behalf of another. Empty on a self-hosted node and
+ *     behaviour there is unchanged. Pure extraction of applyConfigOverrides to config-overrides.ts
+ *     at the same time (max-file-lines), re-exported from here so no importer changes.
+ *     docs/plans/sealed-config-plan.md
  *   v1.0.0 -- pre-2026-05 -- Initial central config module
  *   v1.1.0 -- 2026-05-29 -- Add OperatorConfig section + helpers. Required for
  *     privacy policy template substitution per CLAUDE.md self-host architecture.
@@ -45,8 +50,8 @@ import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts
 import { parseSiteContacts } from './config-site-contacts.js';
 import { securityDoorDefaults } from './config-security.js';
 import { loadFileSource } from './services/config-loader.js';
-import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
-import type { ConfigProvenance } from './services/config-provenance.js';
+import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config-schema.js';
+import { sealedKeysFromEnv } from './services/config-sealing.js';
 
 export type {
   ExtensionHooks,
@@ -67,8 +72,6 @@ import type {
   NodeType,
   FederationRole,
   OperatorType,
-  RateLimitsConfig,
-  RateLimitTier,
   LoadConfigOptions,
   LoadConfigResult,
 } from './config-types.js';
@@ -224,6 +227,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
+    // Settings the party who STARTED this node nominated as read-only, for a node one party
+    // runs on behalf of another. Empty on an ordinary self-hosted node, where every door then
+    // behaves exactly as it did. Throws on an unknown path: services/config-sealing.ts says why.
+    sealedConfigKeys: sealedKeysFromEnv(process.env.AIMEAT_SEALED_CONFIG_KEYS),
     dbUrl: process.env.DATABASE_URL ?? null,
     // Accept `postgres` / `postgresql` as aliases for `postgres-kysely` (the only Postgres
     // backend since the Prisma providers were removed). `mongodb` is passed through so the
@@ -724,74 +731,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   return { config, envKeys, fileKeys, cliKeys, fileName: fileSource?.name ?? null };
 }
 
-// ── Database Config Overrides ──
-
-import type { Storage } from './storage/interface.js';
-import { logger } from './utils/logger.js';
-
-/**
- * Apply config overrides from database (called after storage is initialized).
- * Only applies to mutable fields — immutable fields are ignored.
- * Updates provenance registry.
- */
-export async function applyConfigOverrides(
-  config: AimeatConfig,
-  storage: Storage,
-  provenance: ConfigProvenance,
-): Promise<{ applied: string[]; skipped: string[] }> {
-  if (!storage.supportsConfigPersistence()) {
-    return { applied: [], skipped: [] };
-  }
-
-  const dbValues = await storage.getAllConfigValues();
-  const applied: string[] = [];
-  const skipped: string[] = [];
-
-  for (const [dotPath, rawValue] of Object.entries(dbValues)) {
-    if (isImmutable(dotPath)) {
-      skipped.push(dotPath);
-      continue;
-    }
-    const field = MUTABLE_CONFIG_MAP[dotPath];
-    if (!field) { skipped.push(dotPath); continue; }
-
-    try {
-      const value = parseConfigValue(field, rawValue);
-      if (!field.validate(value)) { skipped.push(dotPath); continue; }
-      (config as unknown as Record<string, unknown>)[field.key] = value;
-      applied.push(dotPath);
-    } catch (err) {
-      logger.warn('config: suppressed failure, continuing', { error: String(err) });
-      skipped.push(dotPath);
-    }
-  }
-
-  // Sync rl* individual keys back to rateLimits tiers
-  const rlKeys: Array<{ key: keyof AimeatConfig; tier: keyof Omit<RateLimitsConfig, 'roleMultipliers'> }> = [
-    { key: 'rlGlobal', tier: 'global' },
-    { key: 'rlAuth', tier: 'auth' },
-    { key: 'rlWork', tier: 'work' },
-    { key: 'rlMemory', tier: 'memory' },
-    { key: 'rlBoards', tier: 'boards' },
-    { key: 'rlOwners', tier: 'owners' },
-    { key: 'rlGhii', tier: 'ghii' },
-    { key: 'rlFlags', tier: 'flags' },
-    { key: 'rlAppeals', tier: 'appeals' },
-    { key: 'rlAdminSetup', tier: 'adminSetup' },
-    { key: 'rlFederation', tier: 'federation' },
-    { key: 'rlCatalogue', tier: 'catalogue' },
-    { key: 'rlAuthChallenge', tier: 'authChallenge' },
-  ];
-  for (const { key, tier } of rlKeys) {
-    const val = config[key] as number;
-    if (typeof val === 'number' && val >= 1) {
-      (config.rateLimits[tier] as RateLimitTier).max = val;
-    }
-  }
-
-  if (applied.length > 0) provenance.markDatabase(applied);
-  return { applied, skipped };
-}
+// Pure extraction (2026-08-18, max-file-lines): applyConfigOverrides moved to config-overrides.ts
+// so the sealed-path skip had room to be explained. Re-exported here so every existing importer
+// is unaffected.
+export { applyConfigOverrides } from './config-overrides.js';
 
 // Pure extraction (2026-08-01, max-file-lines): the operator-identity helpers moved to
 // config-operator.ts. Re-exported here so every existing `from './config.js'` importer is unaffected.

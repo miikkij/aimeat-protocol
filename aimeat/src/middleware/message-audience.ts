@@ -30,6 +30,8 @@
  *   import { audienceOf } from '../middleware/message-audience.js';
  *   if (audienceOf(code) === 'person') { ...it must read like a sentence... }
  * @version-history
+ *   v1.1.0 — 2026-08-18 — SEALED_CONFIG has somewhere to go. The person hitting it is a customer
+ *     looking at their own admin screen, so "View API documentation" would be the wrong floor.
  *   v1.0.0 — 2026-08-16 — Initial, from the classification of all 297 codes.
  */
 
@@ -165,6 +167,7 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     TOO_MANY_ATTEMPTS: 'Wait a few minutes and try again.',
     // Switched off here
     FEATURE_DISABLED: 'Ask whoever runs this node whether it can be turned on.',
+    SEALED_CONFIG: 'Ask whoever runs this node to change it. You can still see what it is set to.',
     EXTENSION_INACTIVE: 'Turn it on in Profile → Extensions, then try again.',
     USAGE_TERMS_REQUIRED: 'Read the terms and accept them, then this will go through.',
     NOT_FEDERATED: 'This node does not talk to that one yet.',

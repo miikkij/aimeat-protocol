@@ -17271,6 +17271,17 @@ paths:
     get:
       operationId: getConfig
       summary: View config
+      description: |
+        Operator only. Returns every non-hidden config field with its value, type, range,
+        provenance (`source`) and whether it can be edited.
+
+        SEALED FIELDS. On a node one party runs on behalf of another, the party that STARTED the
+        node may nominate paths as read-only (`AIMEAT_SEALED_CONFIG_KEYS`). Such a field carries
+        `sealed: true`, `mutable: false`, `editable: false` and `source: "sealed"`, and its VALUE is
+        still present: the operator is entitled to see what their limits are, only not to move them.
+        The response also carries `sealed` (the list of sealed dot-paths) and, when it is non-empty,
+        `sealedNote`. On a node that seals nothing the list is empty and every field is exactly as
+        it was before the mechanism existed.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -17285,6 +17296,10 @@ paths:
         Atomic configuration update. Send complete config object.
         AI-driven configuration is supported — an operator-level AI agent can
         tune the node via this endpoint.
+
+        Refuses the WHOLE request with 403 `SEALED_CONFIG` when any path in it was sealed by the
+        node's host, applying none of the other changes in the same request. The error `details`
+        carry `sealed`, the list of offending paths.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -17298,6 +17313,11 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: >-
+            Config persistence unavailable (`READONLY_CONFIG`), or a path in the request was sealed
+            by the node's host (`SEALED_CONFIG`) — in which case nothing in the request was applied.
+          $ref: '#/components/responses/Forbidden'
 
   /v1/admin/roles/grant:
     post:
@@ -44572,7 +44592,9 @@ paths:
       description: |
         Operator only (`requireRole('operator')`). Deletes a persisted config override for the given
         dotted path, reverting the value to file/env/default on next restart. Returns 403 when the
-        storage backend does not support config persistence (in-memory).
+        storage backend does not support config persistence (`READONLY_CONFIG`, in-memory), and 403
+        `SEALED_CONFIG` when the path was sealed by the node's host — removing an override moves the
+        value, so it is a write like any other.
       security:
         - BearerAuth: []
       parameters:

@@ -21,7 +21,7 @@ The liaison agent uses CrewAI's `MCPServerAdapter` against an AIMEAT node's MCP 
 
 ## What is AIMEAT?
 
-[AIMEAT](https://aimeat.io) (AI Memory Exchange and Action Transfer) is an open protocol for AI agent infrastructure: persistent identity, shared memory, capabilities catalog, work queue with escrow, knowledge packages, and federation across nodes. Every agent in your crew gets:
+[AIMEAT](https://aimeat.io) (AI Memory Exchange and Action Transfer) is the Linux of AI: an open, federated, self-hosted AI operating system. It carries persistent identity, shared memory, a capabilities catalog, a work queue with escrow, knowledge packages, and federation across nodes. Every agent in your crew gets:
 
 - A stable identity that survives across sessions and frameworks
 - Shared memory that other agents (yours or other people's) can read

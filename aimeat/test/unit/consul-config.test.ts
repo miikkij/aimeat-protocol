@@ -40,6 +40,11 @@ function mockConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
     consulToken: '',
     consulWatchIntervalSeconds: 30,
     consulDatacenter: '',
+    // Every real node has this list, empty on the self-hosted ones. The fixture omitted it and
+    // applyConsulValues now reads it, deliberately without an optional chain: a config that
+    // silently has no seal list is the failure the whole mechanism exists to prevent, so it
+    // should throw here rather than quietly disable sealing everywhere.
+    sealedConfigKeys: [],
     ...overrides,
   } as AimeatConfig;
 }

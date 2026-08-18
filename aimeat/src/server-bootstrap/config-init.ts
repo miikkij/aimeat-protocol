@@ -11,6 +11,10 @@
  *     applies Consul + DB overrides, and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.1.0 — 2026-08-18 — Report the DB rows the seal refused, by name. A sealed path that a
+ *     previous operator had already written sits in the database forever, inert; without this line
+ *     the only evidence of it is a value that quietly does not match the row.
+ *     docs/plans/sealed-config-plan.md
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { AimeatConfig, HookName } from '../config.js';
@@ -101,10 +105,17 @@ export async function initializeConfig(
     }
   }
 
-  // Apply DB overrides (highest precedence — applied after env/file/consul)
-  const { applied: dbApplied, skipped: dbSkipped } = await applyConfigOverrides(config, storage, provenance);
+  // Apply DB overrides (highest precedence — applied after env/file/consul, and NOT above the
+  // paths this node's host sealed: services/config-sealing.ts).
+  const { applied: dbApplied, skipped: dbSkipped, sealed: dbSealed } = await applyConfigOverrides(config, storage, provenance);
+  if (config.sealedConfigKeys.length > 0) {
+    logger.info(`${config.sealedConfigKeys.length} setting(s) sealed by this node's host: ${config.sealedConfigKeys.join(', ')}`);
+  }
   if (dbApplied.length > 0) {
     logger.info(`Applied ${dbApplied.length} config override(s) from database: ${dbApplied.join(', ')}`);
+  }
+  if (dbSealed.length > 0) {
+    logger.warn(`Ignored ${dbSealed.length} database config value(s) on sealed path(s): ${dbSealed.join(', ')}`);
   }
   if (dbSkipped.length > 0) {
     logger.warn(`Skipped ${dbSkipped.length} invalid DB config value(s): ${dbSkipped.join(', ')}`);

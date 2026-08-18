@@ -1312,6 +1312,8 @@
     "noChanges": "No changes to save",
     "savedChanges": "Changes saved",
     "cfgReadOnlyBanner": "This node uses in-memory storage. Config editing is disabled.",
+    "cfgSealed": "(set by whoever runs this for you)",
+    "cfgSealedBanner": "Some settings here are set by whoever runs this for you. You can see what they are; changing them is a conversation with them.",
     "cfgReadOnlyHelpTitle": "Why is config read-only?",
     "cfgReadOnlyHelpDetail": "Config persistence requires a database (PostgreSQL or SQLite). In-memory nodes lose all changes on restart. Configure this node via .env file, aimeat.ini, aimeat.json, or CLI arguments (aimeat start --db sqlite).",
     "cfgHelpTitle": "Help",

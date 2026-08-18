@@ -242,8 +242,58 @@ Full list of all 80+ environment variables: see `.env.example` in the `aimeat/` 
 Complete schema documentation: see `docs/b-config.md`.
 
 Configuration priority (highest to lowest):
-1. CLI arguments (`--db postgres-kysely`)
-2. Config file (`--config production.ini`)
-3. Environment variables (`AIMEAT_*`)
-4. Consul (centralized config)
-5. Defaults in `src/config.ts`
+1. **Values persisted in the node's own database** (`PUT /v1/admin/config`), re-applied at every
+   boot by `applyConfigOverrides()`. This is the layer that decides what a node actually runs on,
+   and the one most often forgotten: a value set here beats the environment, permanently, across a
+   restart and an image swap.
+2. Consul KV, where it is enabled: loaded at boot and re-applied by a watch loop on every change
+3. CLI arguments (`--db postgres-kysely`)
+4. Config file (`--config production.ini`)
+5. Environment variables (`AIMEAT_*`)
+6. Defaults in `src/config.ts`
+
+Two classes sit above all of it: fields marked `immutable: true` in `CONFIG_FIELDS`, and the paths
+a node's host sealed at boot (next section).
+
+---
+
+## Running nodes for other people
+
+Everything above assumes the person who runs the machine and the person who operates the node are
+the same person, which is true of every self-hosted node. When they are not — a hosting provider, a
+university running one node per department, a company running one per team — there is a set of
+settings the operator must be able to READ and must not be able to CHANGE: resource quotas, rate
+limits, whether metrics are collected, how far a federated request may relay.
+
+Putting those in the container environment does not hold on its own, because of priority 1 above.
+Nominate them instead:
+
+```bash
+# Set by whoever STARTS the node. Names paths, not values.
+AIMEAT_SEALED_CONFIG_KEYS=quota.memory_mb,quota.storage_mb,rate_limits.global,metrics.enabled
+
+# The values still come from the ordinary variables.
+AIMEAT_MEMORY_QUOTA_MB=1024
+AIMEAT_STORAGE_QUOTA_MB=2048
+AIMEAT_RL_GLOBAL=500
+AIMEAT_METRICS_ENABLED=true
+```
+
+What that buys, and what it deliberately does not:
+
+- The operator **sees** every sealed value on `GET /v1/admin/config`, marked `sealed: true` with
+  `source: "sealed"`, and on the admin Config tab with a badge and a line saying who set it. Sealing
+  is not hiding.
+- `PUT /v1/admin/config` and `DELETE /v1/admin/config/:path` refuse a sealed path with 403
+  `SEALED_CONFIG`, and a `PUT` carrying one sealed path applies **none** of its other changes.
+- A value already persisted in the node's database on a sealed path is ignored at boot and logged
+  by name. Consul does not move one either, on any of its three roads in (boot, watch loop,
+  `POST /v1/admin/consul/import`), and `aimeat config import` reports it rather than writing it.
+- **An unknown path refuses the boot.** A typo would otherwise produce a node that looks sealed and
+  is not, which nothing would report.
+- Unset — the default, and the right value for every self-hosted node — nothing changes. The
+  operator owns all of these settings, as they should.
+
+There is no new role and no new credential: the seal is a property of how the process was started,
+which is the trust boundary the deployment already has. Design and the reasoning against the
+alternative: `docs/plans/sealed-config-plan.md`. Implementation: `src/services/config-sealing.ts`.

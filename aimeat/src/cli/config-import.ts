@@ -3,15 +3,18 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description CLI command `aimeat config import` — loads config values from a file or Consul KV,
- *   classifies them as mutable/immutable/unknown, and writes only the valid mutable ones into the
- *   persistent database after operator confirmation.
+ *   classifies them as mutable/immutable/sealed/unknown, and writes only the valid mutable ones into
+ *   the persistent database after operator confirmation.
  *
  * @structure
- *   - classifyValues: splits incoming dot-path values into mutable/immutable/unknown via the config schema
+ *   - classifyValues: splits incoming dot-path values into mutable/immutable/sealed/unknown via the config schema
  *   - confirm: readline Y/n prompt
  *   - runConfigImport(config, options): orchestrates source load → classify → confirm → storage.setConfigValue
  *
  * @version-history
+ *   v1.1.0 — 2026-08-18 — A path the node's host sealed is reported and not written. The write
+ *     would have been inert anyway (boot ignores a sealed row), and telling somebody you imported
+ *     a value you are going to ignore is its own defect. docs/plans/sealed-config-plan.md
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -19,6 +22,7 @@ import { existsSync } from 'node:fs';
 import * as readline from 'node:readline';
 import { loadFileSource } from '../services/config-loader.js';
 import { MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/config-schema.js';
+import { isSealed } from '../services/config-sealing.js';
 import { createConsulConfigService } from '../services/consul-config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import type { AimeatConfig } from '../config.js';
@@ -27,15 +31,20 @@ import { logger } from '../utils/logger.js';
 interface ImportStats {
   mutable: string[];
   immutable: string[];
+  sealed: string[];
   unknown: string[];
 }
 
-function classifyValues(values: Record<string, string>): ImportStats {
+export function classifyValues(values: Record<string, string>, config: AimeatConfig): ImportStats {
   const mutable: string[] = [];
   const immutable: string[] = [];
+  const sealed: string[] = [];
   const unknown: string[] = [];
 
   for (const dotPath of Object.keys(values)) {
+    // Sealed first: the path IS mutable in the schema, which is the whole point of the mechanism,
+    // so a mutable-first classification would put it straight in the write list.
+    if (isSealed(config, dotPath)) { sealed.push(dotPath); continue; }
     const field = MUTABLE_CONFIG_MAP[dotPath];
     if (field) {
       // Validate the value can be parsed
@@ -57,7 +66,7 @@ function classifyValues(values: Record<string, string>): ImportStats {
     }
   }
 
-  return { mutable, immutable, unknown };
+  return { mutable, immutable, sealed, unknown };
 }
 
 async function confirm(message: string): Promise<boolean> {
@@ -116,11 +125,14 @@ export async function runConfigImport(
   }
 
   // Classify values
-  const stats = classifyValues(values);
+  const stats = classifyValues(values, config);
 
   console.log(`\nFound ${Object.keys(values).length} config values:`);
   console.log(`  ${stats.mutable.length} mutable → will import to database`);
   console.log(`  ${stats.immutable.length} immutable → will skip (${stats.immutable.slice(0, 3).join(', ')}${stats.immutable.length > 3 ? ', ...' : ''})`);
+  if (stats.sealed.length > 0) {
+    console.log(`  ${stats.sealed.length} set by whoever runs this node → will skip (${stats.sealed.join(', ')})`);
+  }
   console.log(`  ${stats.unknown.length} unknown/invalid → will skip`);
 
   if (stats.mutable.length === 0) {
@@ -152,5 +164,5 @@ export async function runConfigImport(
     }
   }
 
-  console.log(`\nImported ${imported} values to database (${stats.immutable.length + stats.unknown.length} skipped)`);
+  console.log(`\nImported ${imported} values to database (${stats.immutable.length + stats.sealed.length + stats.unknown.length} skipped)`);
 }

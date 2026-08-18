@@ -12,6 +12,10 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.3.0 — 2026-08-18 — The node.sealed_config_keys row. Its `immutable: true` is load-bearing
+ *     rather than descriptive: it is what stops the seal list from being sealed or unsealed
+ *     through applyConfigOverrides(), which is the door the mechanism exists to close.
+ *     docs/plans/sealed-config-plan.md
  *   v1.2.0 — 2026-08-16 — The `ai.` group: whose key pays, which model answers each role, the
  *     free allowance, and the chat agent's binary/provider/model. Every one of them decides what
  *     the node spends and every one of them was .env-and-restart only, so an operator could not
@@ -62,6 +66,14 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'dbUrl', dotPath: 'database_url', envVar: 'DATABASE_URL', type: 'string', validate: () => true, immutable: true, description: 'Database connection URL', adminDisplay: 'hidden' },
   { key: 'sqlitePath', dotPath: 'sqlite_path', envVar: 'AIMEAT_SQLITE_PATH', type: 'string', validate: () => true, immutable: true, description: 'SQLite database file path', adminDisplay: 'hidden' },
   { key: 'adminPassword', dotPath: 'admin_password', envVar: 'AIMEAT_ADMIN_PASSWORD', type: 'string', validate: () => true, immutable: true, description: 'Operator admin password', adminDisplay: 'hidden' },
+  // Sealed configuration. `immutable: true` is doing real work here rather than describing a
+  // boot-time-only value: it is what stops the seal list from being sealed or unsealed through
+  // applyConfigOverrides(), which is the door the whole mechanism exists to close. Visible, not
+  // hidden, because an operator who cannot change a setting is still entitled to know which of
+  // their settings those are. See services/config-sealing.ts.
+  { key: 'sealedConfigKeys', dotPath: 'node.sealed_config_keys', envVar: 'AIMEAT_SEALED_CONFIG_KEYS', type: 'object',
+    validate: v => Array.isArray(v) && v.every(item => typeof item === 'string'), immutable: true,
+    description: 'Settings whoever runs this node set and nobody here can change. Readable, not writable. Empty on a node that runs itself' },
 
   // ── Morsel Policy (mutable) ──
   { key: 'welcomeBonus', dotPath: 'morsel_policy.welcome_bonus', envVar: 'AIMEAT_WELCOME_BONUS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsels granted to new agents', range: '0-10000' },

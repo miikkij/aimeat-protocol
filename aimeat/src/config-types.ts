@@ -7,11 +7,14 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.1.0 — 2026-08-18 — SealedConfig mixed in: the settings whoever runs this node set and its
+ *     operator cannot change. The field lives with its rule in services/config-sealing.ts.
  *   v1.1.0 — 2026-07-14 — mcpCardCommerceTools: MCP card commerce_tools mode (TARGET-034 phase D)
  *   v1.0.0 — 2026-07-13 — Extracted from config.ts (max-file-lines)
  */
 
 import type { SecurityDoorConfig } from './config-security.js';
+import type { SealedConfig } from './services/config-sealing.js';
 
 export interface ExtensionHooks {
   pre_owner_registration: string[];
@@ -173,7 +176,7 @@ export interface SiteLinksConfig {
 
 import type { AiCapabilityConfig } from './config-types-ai.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig {
   port: number;
   baseUrl: string;
   /**

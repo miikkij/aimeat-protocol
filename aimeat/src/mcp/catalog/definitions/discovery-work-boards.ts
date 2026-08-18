@@ -207,7 +207,7 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_admin_config',
-        description: 'Operator-only. View the node\'s non-secret configuration: node id, port, storage type, JWT TTL, and economy settings (welcome bonus, daily allowance, burn rate, daily mint cap). Returns an operator-role error for non-operators. Read-only — this tool does not change settings.',
+        description: 'Operator-only. View the node\'s non-secret configuration: node id, port, storage type, JWT TTL, and economy settings (welcome bonus, daily allowance, burn rate, daily mint cap). On a node run by somebody else, also lists the settings that party set and this node cannot change, with their values. Returns an operator-role error for non-operators. Read-only — this tool does not change settings.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {},

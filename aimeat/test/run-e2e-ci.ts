@@ -27,6 +27,10 @@
  *   v1.15.0 -- 2026-08-14 -- Add e2e-organism-scope-gate.ts (August 2026 audit: organism:write on the
  *            three organism write doors, plus the boot migration that keeps an existing agent from
  *            losing the capability).
+ *   v1.15.0 -- 2026-08-18 -- Add e2e-sealed-config.ts (settings the node's host set and its
+ *            operator cannot move). It owns its server because sealing is a boot-time decision,
+ *            and it follows the runner's backend rather than hardcoding sqlite like the other
+ *            four self-spawning suites, so what it proves it proves on both.
  *   v1.14.0 -- 2026-08-14 -- Fix the instrument, in the three ways the August 2026 audit measured.
  *            (1) The database is emptied before the FIRST suite, not only between suites: the clean
  *            sat under `if (i > 0 …)`, so a solo run started on whatever the last run left, and
@@ -357,6 +361,10 @@ const ALL_SUITES = [
     // was written, which is also why 13 `assert(status < 500)` lines survived inside it.
     'test/e2e-profile-tabs.ts',
     'test/e2e-security.ts',
+    // Owns its server, twice: sealing is decided at boot from the environment, so it cannot be
+    // switched on against the shared node here. It follows THIS runner's backend rather than
+    // hardcoding sqlite, so the both-backends claim is real.
+    'test/e2e-sealed-config.ts',
     'test/e2e-memory-namespaces.ts',
     'test/e2e-presigned-meta.ts',
     'test/e2e-memory-file-presigned.ts',

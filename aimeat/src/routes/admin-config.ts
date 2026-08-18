@@ -6,12 +6,24 @@
  *   (types, ranges, descriptions, provenance/source, editability) and applies mutations to
  *   persistable fields, integrating with Consul-sourced values and provenance tracking.
  *
+ *   SEALED PATHS. On a node one party runs on behalf of another, the host nominates settings the
+ *   operator may read and may not change (services/config-sealing.ts). Here that means: the value
+ *   stays VISIBLE on GET, marked `sealed`, and every write door refuses it. The refusal names the
+ *   setting and says who set it, because the person reading it is a customer looking at their own
+ *   admin screen and a bare 403 reads as a bug in our software.
+ *
  * @structure
  *   - adminConfigRouter(config, storage, provenance?, consulService?): builds the router
  *   - GET /v1/admin/config: dynamic schema from CONFIG_FIELDS incl. secret "_configured" flags
  *   - mutation routes: validate + persist mutable config, emit change events
  *
  * @version-history
+ *   v1.1.0 — 2026-08-18 — Sealed configuration on all four doors: GET reports `sealed`, PUT and
+ *     DELETE refuse with 403 SEALED_CONFIG, and the Consul export stops pushing a sealed value
+ *     into a KV store where it would look editable. PUT refuses the WHOLE request when any path
+ *     in it is sealed, before applying any of it: partial application across a security boundary
+ *     leaves the operator working out which three of their four changes landed.
+ *     docs/plans/sealed-config-plan.md
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -20,6 +32,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, DOT_PATH_TO_ENV, serializeConfigValue } from '../services/config-schema.js';
+import { isSealed, sealRefusal } from '../services/config-sealing.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
@@ -41,7 +54,7 @@ export function adminConfigRouter(
         type SchemaEntry = {
             value: unknown; type: string; description: string; range?: string;
             mutable: boolean; editable: boolean; path: string;
-            source?: string; canReset?: boolean;
+            source?: string; canReset?: boolean; sealed?: boolean;
         };
         const schema: Record<string, SchemaEntry> = {};
 
@@ -67,17 +80,23 @@ export function adminConfigRouter(
 
             // Normal field — show actual value
             const typeStr = field.type === 'number' ? 'integer' : field.type;
-            const src = provenance?.getSource(field.dotPath) ?? 'default';
+            // A sealed path answers "where did this come from" with the seal rather than with
+            // whether the host happened to pass it as env or as file: the seal is the operative
+            // fact, and it is what the admin tab badges. The VALUE is untouched and present — the
+            // operator is entitled to see what their limits are, only not to move them.
+            const sealed = isSealed(config, field.dotPath);
+            const src = sealed ? 'sealed' : (provenance?.getSource(field.dotPath) ?? 'default');
             schema[field.dotPath] = {
                 value: config[field.key],
                 type: typeStr,
                 description: field.description,
                 ...(field.range ? { range: field.range } : {}),
-                mutable: !field.immutable,
-                editable: editable && !field.immutable,
+                mutable: !field.immutable && !sealed,
+                editable: editable && !field.immutable && !sealed,
                 path: field.dotPath,
                 source: src,
                 canReset: src === 'database',
+                ...(sealed ? { sealed: true } : {}),
             };
         }
 
@@ -97,6 +116,10 @@ export function adminConfigRouter(
             editable,
             storageType: config.storageProvider,
             note: editable ? undefined : 'In-memory storage detected. Config is read-only. Use .env or aimeat.ini to configure this node.',
+            sealed: config.sealedConfigKeys,
+            sealedNote: config.sealedConfigKeys.length > 0
+                ? 'Some settings here are set by whoever runs this node. You can see them; changing them is a conversation with them.'
+                : undefined,
             schema,
         }));
     });
@@ -116,6 +139,24 @@ export function adminConfigRouter(
         if (!Array.isArray(changes) || changes.length === 0) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
                 'Body must contain "changes" array with [{path, value}] entries'));
+            return;
+        }
+
+        // Refuse before you write. The sealed scan runs over the WHOLE batch first, so a request
+        // carrying one sealed path applies none of it — including the paths that were fine. Letting
+        // the rest through would answer a refusal with "we applied three of your four changes" and
+        // leave the operator to work out which, on the one boundary where that is least acceptable.
+        const sealedPaths = (changes as Array<{ path?: unknown }>)
+            .map(c => c?.path)
+            .filter((p): p is string => typeof p === 'string' && isSealed(config, p));
+        if (sealedPaths.length > 0) {
+            const refusal = sealRefusal(sealedPaths[0]);
+            res.status(403).json(error(config.nodeId, refusal.code,
+                sealedPaths.length === 1
+                    ? refusal.message
+                    : `${sealedPaths.join(', ')} are set by whoever runs this node and cannot be changed here. Nothing in this request was applied.`,
+                undefined, { sealed: sealedPaths },
+                [{ description: 'Ask whoever runs this node to change it.', method: 'GET', url: '/v1/admin/config' }]));
             return;
         }
 
@@ -172,6 +213,14 @@ export function adminConfigRouter(
         }
 
         const path = req.params.path as string;
+        // Removing a DB override moves the value back to whatever env/file says, so it is a write,
+        // and it is refused before storage is touched.
+        if (isSealed(config, path)) {
+            const refusal = sealRefusal(path);
+            res.status(403).json(error(config.nodeId, refusal.code, refusal.message, undefined, undefined,
+                [{ description: 'Ask whoever runs this node to change it.', method: 'GET', url: '/v1/admin/config' }]));
+            return;
+        }
         const field = MUTABLE_CONFIG_MAP[path];
         if (!field) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND',
@@ -231,7 +280,11 @@ export function adminConfigRouter(
         }
 
         let exported = 0;
+        let sealedSkipped = 0;
         for (const [dotPath, field] of Object.entries(MUTABLE_CONFIG_MAP)) {
+            // A sealed value pushed into the KV store looks editable there, gets edited, and is
+            // then discarded on the next import without anyone being told. Leave it out.
+            if (isSealed(config, dotPath)) { sealedSkipped++; continue; }
             try {
                 const value = (config as unknown as Record<string, unknown>)[field.key];
                 await consulService.set(dotPath, serializeConfigValue(value));
@@ -239,7 +292,10 @@ export function adminConfigRouter(
             } catch (err) { logger.warn('value: skip individual failures', { error: String(err) }); }
         }
 
-        res.json(success(config.nodeId, { exported, total: Object.keys(MUTABLE_CONFIG_MAP).length }));
+        res.json(success(config.nodeId, {
+            exported, total: Object.keys(MUTABLE_CONFIG_MAP).length,
+            ...(sealedSkipped > 0 ? { sealed_skipped: sealedSkipped } : {}),
+        }));
         emitChange('config');
     });
 
@@ -251,7 +307,9 @@ export function adminConfigRouter(
         }
 
         const values = await consulService.loadAll();
-        const { applied } = applyConsulValues(config, values);
+        // applyConsulValues drops sealed paths itself (it is also the boot loader and the watch
+        // callback), so `applied` cannot contain one and nothing sealed reaches the database here.
+        const { applied, sealed } = applyConsulValues(config, values);
 
         // Persist to DB if available
         if (storage.supportsConfigPersistence()) {
@@ -261,7 +319,10 @@ export function adminConfigRouter(
             if (provenance) provenance.markDatabase(applied);
         }
 
-        res.json(success(config.nodeId, { imported: applied.length, total: Object.keys(values).length }));
+        res.json(success(config.nodeId, {
+            imported: applied.length, total: Object.keys(values).length,
+            ...(sealed.length > 0 ? { sealed } : {}),
+        }));
         emitChange('config');
     });
 

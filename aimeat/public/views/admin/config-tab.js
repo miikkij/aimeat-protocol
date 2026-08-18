@@ -27,6 +27,11 @@
  *   - FieldRow — one field's label, source badge and editor
  *   - ConfigTab (default)
  * @version-history
+ *   v1.5.0 -- 2026-08-18 -- Sealed settings read as sealed. On a node somebody else runs, some of
+ *     these values are theirs: the value stays on screen, the editor does not appear, and a badge
+ *     plus one banner line says who set it. Without that the row is indistinguishable from an
+ *     immutable boot-time field, and the operator's question is not "why is this read-only" but
+ *     "who do I ask". docs/plans/sealed-config-plan.md
  *   v1.4.0 -- 2026-08-16 -- A grouped table of contents, and a sticky pending-changes bar that
  *     names each change as old → new. Both for the same reason: the page had grown past the point
  *     where "it is at the top" is an answer.
@@ -56,6 +61,9 @@ const SOURCE_BADGE = {
   file: 'private',
   consul: 'watch',
   default: 'idle',
+  // Set by whoever runs this node. Deliberately not one of the four provenance colours: for a
+  // sealed row, where the value came from is not the answer the operator is after.
+  sealed: 'critical',
 };
 
 /**
@@ -176,8 +184,8 @@ function FieldRow({ path: p, entry: e, editable, pending, onChange, onReset }) {
       <span>
         ${!e.mutable
           ? (typeof e.value === 'boolean'
-            ? html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}`
-            : html`<code>${escHtml(String(e.value))}</code> <span class="adm-text-dim adm-text-xs">${t('dashboard.readOnly')}</span>`)
+            ? html`${e.value ? html`<${Badge} type="healthy" /> ${t('dashboard.yesLabel')}` : html`<${Badge} type="critical" /> ${t('dashboard.noLabel')}`}${e.sealed ? html` <span class="adm-text-dim adm-text-xs">${t('dashboard.cfgSealed')}</span>` : null}`
+            : html`<code>${escHtml(String(e.value))}</code> <span class="adm-text-dim adm-text-xs">${e.sealed ? t('dashboard.cfgSealed') : t('dashboard.readOnly')}</span>`)
           : e.type === 'boolean'
             ? html`<label style="cursor:pointer"><input type="checkbox" checked=${val} onChange=${ev => onChange(p, ev.target.checked)} disabled=${!editable} /> ${val ? t('dashboard.enabled') : t('dashboard.disabled')}</label>`
             : e.type === 'integer'
@@ -294,6 +302,12 @@ export default function ConfigTab({ data, reload }) {
         <${ExpandableHelp} title=${t('dashboard.cfgReadOnlyHelpTitle')}>
           <p>${t('dashboard.cfgReadOnlyHelpDetail')}</p>
         </${ExpandableHelp}>
+      </div>
+    `}
+
+    ${s.sealed && s.sealed.length > 0 && html`
+      <div class="adm-config-readonly-banner">
+        <p>${t('dashboard.cfgSealedBanner')}</p>
       </div>
     `}
 
