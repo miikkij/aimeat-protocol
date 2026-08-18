@@ -483,6 +483,15 @@ await test('site.front_page: demo serves the showroom at /, classic restores the
         assert(fi.text.includes('Kokeile kaikkea'), 'a Finnish reader gets the Finnish sibling');
         const jsonRoot = await (await fetch(`${BASE}/?format=json`)).json();
         assert(jsonRoot.protocol === 'aimeat', 'the JSON bootstrap is untouched by the switch');
+        const putOs = await json('/v1/admin/config', authed({
+            method: 'PUT',
+            body: JSON.stringify({ changes: [{ path: 'site.front_page', value: 'os' }] }),
+        }));
+        assert(putOs.status === 200, `flip to os: ${putOs.status} ${JSON.stringify(putOs.body)}`);
+        const os = await html();
+        assert(os.text.includes('fos-boot'), 'the OS page serves at / when the switch says os');
+        const osFi = await html({ 'Accept-Language': 'fi-FI,fi;q=0.9' });
+        assert(osFi.text.includes('tekoälyn Linux'), 'a Finnish reader gets the Finnish OS sibling');
     } finally {
         // Flip back whatever happened, so the suite leaves the node as it found it.
         await json('/v1/admin/config', authed({

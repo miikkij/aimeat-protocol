@@ -33,9 +33,10 @@ export interface SitePresenceConfig {
   webBotAuthSign: boolean;
   /**
    * Which front page the root serves to a browser: 'classic' is the SPA landing, 'demo' is the
-   * static showroom page (public/front-demo.html, .fi sibling by language). One switch, so the
-   * new front can be staged, flipped on, and flipped back without touching anything else. The
-   * demo page stays directly reachable at /front-demo.html either way.
+   * static showroom page (public/front-demo.html) and 'os' is the static OS page
+   * (public/front-os.html), each with a .fi sibling by language. One switch, so a new front can
+   * be staged, flipped on, and flipped back without touching anything else. The static pages
+   * stay directly reachable at their own paths either way.
    */
-  frontPage: 'classic' | 'demo';
+  frontPage: 'classic' | 'demo' | 'os';
 }

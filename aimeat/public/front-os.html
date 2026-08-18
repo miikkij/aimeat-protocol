@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<!--
+  @file front-os.html
+  @description The OS front page, v1 static: AIMEAT presented as the Linux of AI — the page does
+    not describe an operating system, it boots one. Skippable sub-2s boot sequence (first visit
+    only), a hero that IS a running desktop with real apps read live from this node, a proof
+    strip (live counts + baked, dated facts), the locked problem sentence with three true
+    stories, an app carousel, and pricing where the 0 € self-host card leads. Served at / when
+    site.front_page=os (src/routes/bootstrap.ts); always previewable at /front-os.html. The
+    24h demo node is v2 and deliberately absent: a half-built demo must not block this hero.
+    Finnish sibling: front-os.fi.html. All behaviour in /front-os.js (same-origin, CSP-clean).
+  @version-history
+    v1.0.0 - 2026-08-19 - First version per the storefront spec: boot, desktop hero, proof
+      strip, problem block, carousel, pricing with the 0 € card, footer.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIMEAT — the Linux of AI</title>
+  <meta name="description" content="An open, self-hosted AI operating system. Your agents, your apps, your memory, on a node you own. The OS is free; we sell you a well-run node." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=VT323&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="/front-os.js" defer></script>
+  <style>
+    :root {
+      --bg: #0a0e12;
+      --panel: #10161c;
+      --line: #22303b;
+      --green: #3dff9c;
+      --amber: #ffb000;
+      --coral: #E8564A;
+      --text: #d9e2e8;
+      --dim: #7d8f9a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace; background: var(--bg); color: var(--text); overflow-x: hidden; }
+    a { color: var(--green); }
+
+    /* ---------- boot overlay ---------- */
+    .fos-boot {
+      position: fixed; inset: 0; z-index: 50;
+      background: #05080b; color: var(--green);
+      font-size: 0.95rem; line-height: 1.7;
+      padding: 3rem 1.5rem; cursor: pointer;
+    }
+    .fos-boot.fos-boot-off { display: none; }
+    .fos-boot-lines { max-width: 44rem; margin: 0 auto; white-space: pre-wrap; }
+    .fos-boot-skip { position: absolute; bottom: 1.2rem; right: 1.5rem; color: var(--dim); font-size: 0.8rem; }
+
+    /* ---------- top ---------- */
+    .fos-top {
+      position: absolute; top: 1rem; right: 1rem; z-index: 5;
+      display: flex; gap: 0.5rem; align-items: center; font-size: 0.8rem;
+    }
+    .fos-top a { text-decoration: none; border: 1px solid var(--line); padding: 0.25rem 0.6rem; color: var(--dim); }
+    .fos-top a:hover { color: var(--green); border-color: var(--green); }
+    .fos-top a.fos-lang-on { color: var(--bg); background: var(--green); border-color: var(--green); }
+
+    /* ---------- hero ---------- */
+    .fos-hero { position: relative; padding: 4.5rem 1.25rem 3rem; text-align: center; }
+    .fos-prompt { color: var(--dim); font-size: 0.9rem; margin-bottom: 0.8rem; }
+    .fos-prompt b { color: var(--green); font-weight: 400; }
+    .fos-hero h1 {
+      font-family: 'VT323', 'IBM Plex Mono', monospace;
+      font-size: clamp(3rem, 9vw, 6.5rem); line-height: 1;
+      color: var(--green); text-shadow: 0 0 18px rgba(61, 255, 156, 0.35);
+      margin-bottom: 0.8rem; font-weight: 400;
+    }
+    .fos-sub { max-width: 44rem; margin: 0 auto 1.8rem; font-size: 1.02rem; line-height: 1.6; color: var(--text); }
+    .fos-cta-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 3rem; }
+    .fos-btn {
+      display: inline-block; padding: 0.8rem 1.6rem; text-decoration: none;
+      font-size: 0.95rem; font-weight: 700; letter-spacing: 0.02em;
+      border: 2px solid var(--green); color: var(--green);
+    }
+    .fos-btn:hover { background: rgba(61, 255, 156, 0.12); }
+    .fos-btn-hot { background: var(--green); color: var(--bg); }
+    .fos-btn-hot:hover { background: #6dffb4; }
+
+    /* ---------- the desktop ---------- */
+    .fos-desktop {
+      position: relative;
+      max-width: 62rem; margin: 0 auto; text-align: left;
+      background: var(--panel);
+      border: 2px solid var(--line); border-radius: 10px;
+      box-shadow: 0 0 60px rgba(61, 255, 156, 0.08), 0 24px 60px rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+    }
+    .fos-desktop::after {
+      content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 3px);
+    }
+    .fos-menubar {
+      display: flex; gap: 1.2rem; align-items: center;
+      padding: 0.45rem 1rem; font-size: 0.8rem;
+      background: #0c1116; border-bottom: 1px solid var(--line); color: var(--dim);
+    }
+    .fos-menubar b { color: var(--green); font-weight: 700; }
+    .fos-menubar .fos-clock { margin-left: auto; }
+    .fos-windows {
+      display: grid; grid-template-columns: 1.2fr 1fr; gap: 1rem;
+      padding: 1.2rem; min-height: 21rem;
+    }
+    .fos-win { border: 1px solid var(--line); background: #0c1218; border-radius: 6px; display: flex; flex-direction: column; }
+    .fos-win-title {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.4rem 0.7rem; font-size: 0.78rem; color: var(--dim);
+      border-bottom: 1px solid var(--line);
+    }
+    .fos-win-dots { display: inline-flex; gap: 4px; }
+    .fos-win-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+    .fos-win-body { padding: 0.7rem 0.9rem; font-size: 0.84rem; line-height: 1.65; flex: 1; }
+    .fos-win-body .g { color: var(--green); }
+    .fos-win-body .a { color: var(--amber); }
+    .fos-win-body .d { color: var(--dim); }
+    #fos-win-apps li { list-style: none; padding: 0.15rem 0; }
+    #fos-win-apps li b { color: var(--text); font-weight: 500; }
+    #fos-win-apps li span { color: var(--dim); }
+    .fos-col { display: flex; flex-direction: column; gap: 1rem; }
+    .fos-dock {
+      display: flex; gap: 0.6rem; justify-content: center;
+      padding: 0.6rem; border-top: 1px solid var(--line); background: #0c1116;
+    }
+    .fos-dock i {
+      width: 30px; height: 30px; border: 1px solid var(--line); border-radius: 6px;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-style: normal; font-size: 0.75rem; color: var(--dim);
+    }
+    .fos-dock i:first-child { color: var(--green); border-color: var(--green); }
+
+    /* ---------- proof strip ---------- */
+    .fos-proof {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 0.8rem 2.4rem;
+      padding: 1.4rem 1rem; margin-top: 3rem;
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      background: #0c1116; font-size: 0.9rem; text-align: center;
+    }
+    .fos-proof b { color: var(--amber); font-size: 1.15rem; margin-right: 0.3rem; font-weight: 700; }
+    .fos-proof a { color: inherit; text-decoration: none; }
+    .fos-proof a:hover { color: var(--green); }
+    .fos-proof .fos-proof-note { flex-basis: 100%; color: var(--dim); font-size: 0.75rem; }
+
+    /* ---------- problem block ---------- */
+    .fos-problem { max-width: 52rem; margin: 0 auto; padding: 4.5rem 1.25rem 3.5rem; text-align: center; }
+    .fos-problem h2 {
+      font-family: 'VT323', monospace; font-weight: 400;
+      font-size: clamp(1.7rem, 4.2vw, 2.8rem); line-height: 1.25; color: var(--text);
+    }
+    .fos-problem h2 em { color: var(--green); font-style: normal; }
+    .fos-stories {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;
+      margin-top: 2.2rem; text-align: left;
+    }
+    .fos-story { border: 1px solid var(--line); background: var(--panel); padding: 1rem 1.1rem; font-size: 0.88rem; line-height: 1.6; }
+    .fos-story b { color: var(--green); display: block; margin-bottom: 0.35rem; font-weight: 700; }
+
+    /* ---------- carousel ---------- */
+    .fos-carousel { padding: 1rem 0 4rem; overflow: hidden; }
+    .fos-carousel h2 { text-align: center; font-size: 1rem; color: var(--dim); font-weight: 400; margin-bottom: 1.2rem; }
+    .fos-carousel h2 b { color: var(--amber); }
+    .fos-track { display: flex; gap: 0.8rem; width: max-content; animation: fos-scroll 60s linear infinite; padding: 0 0.8rem; }
+    .fos-track:hover { animation-play-state: paused; }
+    @keyframes fos-scroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .fos-card {
+      flex: 0 0 auto; width: 15rem;
+      border: 1px solid var(--line); background: var(--panel);
+      padding: 0.8rem 0.9rem; font-size: 0.82rem; line-height: 1.5;
+      text-decoration: none; color: var(--text);
+    }
+    .fos-card:hover { border-color: var(--green); }
+    .fos-card b { color: var(--green); display: block; font-weight: 700; }
+    .fos-card span { color: var(--dim); }
+
+    /* ---------- pricing ---------- */
+    .fos-pricing { max-width: 68rem; margin: 0 auto; padding: 0 1.25rem 4rem; text-align: center; }
+    .fos-pricing h2 { font-family: 'VT323', monospace; font-weight: 400; font-size: clamp(1.6rem, 3.5vw, 2.4rem); margin-bottom: 0.5rem; }
+    .fos-pricing .fos-price-line { color: var(--dim); margin-bottom: 2rem; }
+    .fos-price-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.9rem; text-align: left; }
+    .fos-tier { border: 1px solid var(--line); background: var(--panel); padding: 1.1rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+    .fos-tier-free { border-color: var(--green); }
+    .fos-tier h3 { font-size: 0.95rem; font-weight: 700; }
+    .fos-tier .fos-price { font-family: 'VT323', monospace; font-size: 1.9rem; color: var(--amber); }
+    .fos-tier-free .fos-price { color: var(--green); }
+    .fos-tier p { font-size: 0.8rem; color: var(--dim); line-height: 1.55; flex: 1; }
+    .fos-tier a { font-size: 0.82rem; }
+
+    /* ---------- footer ---------- */
+    .fos-footer {
+      border-top: 1px solid var(--line); background: #0c1116;
+      padding: 2.2rem 1.25rem; text-align: center; font-size: 0.85rem; color: var(--dim);
+    }
+    .fos-footer nav { display: flex; gap: 1.6rem; justify-content: center; flex-wrap: wrap; margin-bottom: 0.9rem; }
+    .fos-footer a { text-decoration: none; }
+    .fos-footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 900px) { .fos-price-grid { grid-template-columns: repeat(2, 1fr); } .fos-stories { grid-template-columns: 1fr; } }
+    @media (max-width: 760px) { .fos-windows { grid-template-columns: 1fr; min-height: 0; } }
+    @media (max-width: 560px) { .fos-price-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <div class="fos-boot" id="fos-boot" aria-hidden="true">
+    <div class="fos-boot-lines" id="fos-boot-lines"></div>
+    <span class="fos-boot-skip">click or press any key to skip</span>
+  </div>
+
+  <header class="fos-hero">
+    <nav class="fos-top">
+      <a href="/v1/portal">sign in</a>
+      <a class="fos-lang-on" href="/front-os.html" aria-current="true">EN</a>
+      <a href="/front-os.fi.html" lang="fi">FI</a>
+    </nav>
+    <p class="fos-prompt">$ <b>uname -a</b></p>
+    <h1>AIMEAT, the Linux of AI</h1>
+    <p class="fos-sub">
+      An open, self-hosted AI operating system. Your agents, your apps, your memory,
+      on a node you own.
+    </p>
+    <div class="fos-cta-row">
+      <a class="fos-btn fos-btn-hot" href="/v1/portal">Try the OS</a>
+      <a class="fos-btn" href="https://github.com/miikkij/aimeat-protocol" rel="noopener">Self-host free</a>
+    </div>
+
+    <div class="fos-desktop" aria-label="A running AIMEAT desktop">
+      <div class="fos-menubar">
+        <b>AIMEAT</b><span>apps</span><span>agents</span><span>memory</span>
+        <span class="fos-clock" id="fos-clock">--:--</span>
+      </div>
+      <div class="fos-windows">
+        <div class="fos-win">
+          <div class="fos-win-title"><span class="fos-win-dots"><i></i><i></i><i></i></span> applications — live from this node</div>
+          <ul class="fos-win-body" id="fos-win-apps">
+            <li><span class="d">$ aimeat apps --live · if this line stays, open the door above and look yourself</span></li>
+          </ul>
+        </div>
+        <div class="fos-col">
+          <div class="fos-win">
+            <div class="fos-win-title"><span class="fos-win-dots"><i></i><i></i><i></i></span> node status</div>
+            <div class="fos-win-body" id="fos-win-status"><span class="d">$ aimeat status</span><br />connecting…</div>
+          </div>
+          <div class="fos-win">
+            <div class="fos-win-title"><span class="fos-win-dots"><i></i><i></i><i></i></span> the deal</div>
+            <div class="fos-win-body">
+              <span class="g">license:</span> MIT, the whole thing<br />
+              <span class="g">spec:</span> AIMEAT RFC v4.0, open<br />
+              <span class="g">your data:</span> on your node, full stop
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="fos-dock"><i>A</i><i>♥</i><i>~</i><i>#</i><i>»</i></div>
+    </div>
+
+    <div class="fos-proof">
+      <span><b id="fos-p-apps">130</b> apps running live</span>
+      <span><b id="fos-p-agents">148</b> agents connected</span>
+      <span><b>3,870</b> commits</span>
+      <span><a href="https://github.com/miikkij/aimeat-protocol/tree/main/docs" rel="noopener"><b>RFC</b> v4.0</a></span>
+      <span><a href="https://github.com/miikkij/aimeat-protocol/blob/main/LICENSE" rel="noopener"><b>MIT</b> licensed</a></span>
+      <span class="fos-proof-note" id="fos-proof-note">Counts read from this node; commits counted from the repository on 2026-08-19.</span>
+    </div>
+  </header>
+
+  <section class="fos-problem">
+    <h2>
+      AI made one-person software possible. But what you build in a chat
+      <em>dies with the chat</em>. AIMEAT is where it survives.
+    </h2>
+    <div class="fos-stories">
+      <div class="fos-story">
+        <b>The CRM that replaced HubSpot</b>
+        Built by describing it, runs a real company's pipeline today. Mobile-first,
+        versioned, on the owner's node.
+      </div>
+      <div class="fos-story">
+        <b>Agents that run without you</b>
+        A weekly open-source digest and a daily morning brief have shipped on schedule
+        for months. Nobody presses a button.
+      </div>
+      <div class="fos-story">
+        <b>Tools with real users</b>
+        Non-coders here have published apps that other people open every day. The app
+        wall below is not a mockup.
+      </div>
+    </div>
+  </section>
+
+  <section class="fos-carousel">
+    <h2><b id="fos-c-count">130</b> real apps on this node — built by talking, kept forever</h2>
+    <div class="fos-track" id="fos-track"></div>
+  </section>
+
+  <section class="fos-pricing">
+    <h2>The OS is free. We sell you a well-run node.</h2>
+    <p class="fos-price-line">The Linux deal: run it yourself for nothing, or pay for a node that is somebody's job.</p>
+    <div class="fos-price-grid">
+      <div class="fos-tier fos-tier-free">
+        <h3>Self-host</h3>
+        <span class="fos-price">0 €</span>
+        <p>The whole OS, MIT licensed, on your own hardware. No trial, no tiers, no catch.</p>
+        <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">git clone →</a>
+      </div>
+      <div class="fos-tier">
+        <h3>Own node</h3>
+        <span class="fos-price">49 €/mo</span>
+        <p>Your instance, run for you, on an address with your name on it.</p>
+        <a href="/v1/pricing">Details →</a>
+      </div>
+      <div class="fos-tier">
+        <h3>Own node Pro</h3>
+        <span class="fos-price">99 €/mo</span>
+        <p>The same, with more room and more headroom.</p>
+        <a href="/v1/pricing">Details →</a>
+      </div>
+      <div class="fos-tier">
+        <h3>Done for you</h3>
+        <span class="fos-price">990 €+</span>
+        <p>Set up, migrated and handed over running. Plus a monthly node.</p>
+        <a href="/v1/pricing">Details →</a>
+      </div>
+      <div class="fos-tier">
+        <h3>Enterprise</h3>
+        <span class="fos-price">let's talk</span>
+        <p>Federation, fleets and contracts across company lines.</p>
+        <a href="/v1/pricing">Details →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="fos-footer">
+    <nav>
+      <a href="/v1/pricing">Pricing</a>
+      <a href="/v1/privacy">Privacy</a>
+      <a href="/v1/terms">Terms</a>
+      <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">GitHub</a>
+      <a href="/v1/help">Contact</a>
+    </nav>
+    <p>Built and hosted in the EU. Your data stays where you put it.</p>
+  </footer>
+
+</body>
+</html>

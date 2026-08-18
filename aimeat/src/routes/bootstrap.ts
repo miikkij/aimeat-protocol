@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.3.0 — 2026-08-19 — The switch grows a third value: AIMEAT_FRONT_PAGE=os serves the static
+ *     OS page (public/front-os.html, .fi sibling), same rules as demo.
  *   v1.2.0 — 2026-08-19 — AIMEAT_FRONT_PAGE=demo: the root's HTML answer becomes the static
  *     showroom page (public/front-demo.html, .fi sibling by ?lang / Accept-Language). One config
  *     switch, browsers only: JSON, markdown and plain-text negotiation are untouched, and an
@@ -210,19 +212,20 @@ export function bootstrapRouter(
         res.type('text/html').send(injectCspNonce(customHtml, res.locals.cspNonce as string | undefined));
         return;
       }
-      // The demo front page, behind one switch (AIMEAT_FRONT_PAGE=demo). Finnish readers get
-      // the Finnish sibling; the ?lang override beats the header so the page's own EN/FI links
-      // work. Falls through to the SPA when the file is missing, so a broken deploy shows the
-      // classic front rather than nothing.
-      if (config.frontPage === 'demo') {
+      // The static front pages, behind one switch (AIMEAT_FRONT_PAGE=demo|os). Finnish readers
+      // get the Finnish sibling; the ?lang override beats the header so each page's own EN/FI
+      // links work. Falls through to the SPA when the file is missing, so a broken deploy shows
+      // the classic front rather than nothing.
+      if (config.frontPage === 'demo' || config.frontPage === 'os') {
         res.vary('Accept-Language');
+        const base = config.frontPage === 'os' ? 'front-os' : 'front-demo';
         const langParam = typeof _req.query.lang === 'string' ? _req.query.lang.toLowerCase() : '';
         const wantsFi = langParam === 'fi'
           || (langParam === '' && /^fi\b/i.test((_req.headers['accept-language'] as string | undefined) ?? ''));
-        const demoPath = resolvePublicFile(wantsFi ? 'front-demo.fi.html' : 'front-demo.html');
-        if (demoPath) {
+        const staticPath = resolvePublicFile(wantsFi ? `${base}.fi.html` : `${base}.html`);
+        if (staticPath) {
           res.set('Cache-Control', 'no-cache');
-          res.type('html').send(readFileSync(demoPath, 'utf-8'));
+          res.type('html').send(readFileSync(staticPath, 'utf-8'));
           return;
         }
       }
