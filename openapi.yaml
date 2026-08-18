@@ -17553,14 +17553,36 @@ paths:
       operationId: listAllAgents
       summary: List all agents (operator)
       description: |
-        Returns all agents on the node. Response includes `allowed_origins`
-        field for CORS override visibility.
+        Returns all agents on the node. Response includes `allowed_origins` for CORS override
+        visibility and `default_scopes` — the scopes their owner approved, which is what decides
+        whether a new scope gate would refuse an existing agent.
       tags: [Admin]
       security:
         - BearerAuth: []
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/admin/app-grants:
+    get:
+      operationId: adminListAppGrants
+      summary: List every live app grant, against what each app asks for today (operator)
+      description: |
+        A grant is written from the app's `<meta name="aimeat-scopes">` at the moment of the
+        handshake. `extra_scopes` names the words a grant still carries that its app no longer
+        declares — the drift an owner-scoped listing cannot show, because `GET /v1/app-grants`
+        answers for one account.
+
+        `declared_scopes` is null when the app declares nothing at all: that is a different state
+        from asking for nothing, and the one case where a wide grant is not evidence of drift.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
 
   /v1/admin/organisms/{id}/ownership:
     get:

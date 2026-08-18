@@ -435,6 +435,87 @@ async function main() {
         assert(r.status === 200, `expected 200 with memory:read, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
     });
 
+    /**
+     * The operator's view of the same facts.
+     *
+     * Every question about tightening a gate — would this refuse an app that is alive today? — needed
+     * a list nobody could produce: GET /v1/app-grants answers for ONE owner, and no operator surface
+     * carried scopes at all. Measured on aimeat.io on 2026-08-18, that gap made the decision a guess
+     * taken on whichever account happened to be logged in: 108 grants readable, and 29 other owners'
+     * grants invisible.
+     */
+    console.log('\nPhase 6: The operator can see the whole node');
+
+    await test('an operator lists every app grant beside what each app declares today', async () => {
+        // This suite's owner is the first on a cleared database, so it is the node operator.
+        const r = await json('/v1/admin/app-grants', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(r.status === 200, `admin grants: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+        const rows = r.body.data.grants as any[];
+        const mine = rows.find(g => g.app === `${owner}/${FILENAME}`);
+        assert(!!mine, `this suite's grant must be listed: ${JSON.stringify(rows.map(g => g.app))}`);
+        assert(Array.isArray(mine.scopes) && mine.scopes.length > 0, `the grant carries its scopes: ${JSON.stringify(mine)}`);
+        // The fixture app declares no <meta name="aimeat-scopes">, and that is its own answer: null,
+        // not the empty list, so a wide grant on it is not reported as drift.
+        assert(mine.declared_scopes === null, `an app that declares nothing must read as null, got ${JSON.stringify(mine.declared_scopes)}`);
+        assert(mine.extra_scopes.length === 0, `nothing to call drift without a declaration, got ${JSON.stringify(mine.extra_scopes)}`);
+        assert(typeof r.body.data.drifted === 'number' && typeof r.body.data.undeclared === 'number',
+            `the two counts an operator acts on must be there: ${JSON.stringify(r.body.data).slice(0, 200)}`);
+    });
+
+    await test('a grant WIDER than its app now declares is named as drift', async () => {
+        // Give the live grant two permissions first — the drift is the DIFFERENCE, so a grant that
+        // already matches the new declaration proves nothing either way.
+        await grantAppToken('memory:read storage:read');
+        const declared = '<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="memory:read"></head><body>grant</body></html>';
+        const pub = await json('/v1/apps', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ filename: FILENAME, content: b64(declared), name: 'Grant Demo', description: 'grant demo app', category: 'utility' }),
+        });
+        assert(pub.status === 201 || pub.status === 200, `republish: ${pub.status} ${JSON.stringify(pub.body).slice(0, 160)}`);
+
+        const r = await json('/v1/admin/app-grants', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const mine = (r.body.data.grants as any[]).find(g => g.app === `${owner}/${FILENAME}`);
+        assert(!!mine, 'the grant is still listed after the republish');
+        assert(JSON.stringify(mine.declared_scopes) === JSON.stringify(['memory:read']),
+            `the declaration must be read from the app itself, got ${JSON.stringify(mine.declared_scopes)}`);
+        assert(mine.extra_scopes.length > 0,
+            `a grant carrying words the app no longer asks for must be named: ${JSON.stringify(mine)}`);
+        assert(!mine.extra_scopes.includes('memory:read'), 'a declared scope is not drift');
+        assert(r.body.data.drifted >= 1, `the drift count must see it: ${r.body.data.drifted}`);
+    });
+
+    await test('the agent listing carries the scopes their owner approved', async () => {
+        const ag = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'grantscopebot', owner, capabilities: ['memory'], scopes: ['memory:read'] }),
+        });
+        assert(ag.status === 201, `register agent: ${ag.status} ${JSON.stringify(ag.body.error)}`);
+        const r = await json('/v1/admin/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(r.status === 200, `admin agents: ${r.status}`);
+        const row = (r.body.data.agents as any[]).find(x => x.gaii === ag.body.data.agent.gaii);
+        assert(!!row, 'the agent is listed');
+        assert(JSON.stringify(row.default_scopes) === JSON.stringify(['memory:read']),
+            `the operator must see what the owner approved, got ${JSON.stringify(row.default_scopes)}`);
+    });
+
+    await test('a plain owner is refused both operator listings, and so is a caller with none', async () => {
+        const plain = `grantplain${Date.now() % 100000}`;
+        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: plain, public_key: 'placeholder' }) });
+        assert(reg.status === 201, `register: ${reg.status}`);
+        const ts = new Date().toISOString();
+        const sig = await signMsg(reg.body.data.private_key, plain + NODE_ID + ts);
+        const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: plain, timestamp: ts, signature: sig }) });
+        const plainToken = tok.body.data.token;
+
+        const g = await json('/v1/admin/app-grants', { headers: { Authorization: `Bearer ${plainToken}` } });
+        assert(g.status === 403, `app-grants expected 403, got ${g.status}`);
+        const a = await json('/v1/admin/agents', { headers: { Authorization: `Bearer ${plainToken}` } });
+        assert(a.status === 403, `agents expected 403, got ${a.status}`);
+        const anon = await json('/v1/admin/app-grants');
+        assert(anon.status === 401, `no credential expected 401, got ${anon.status}`);
+    });
+
+
     console.log('\n─────────────────────────────────────');
     console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
     if (failed === 0) console.log('✅ All tests passed!');
