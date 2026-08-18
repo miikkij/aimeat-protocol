@@ -11,6 +11,10 @@
  *
  * @version-history
  *   v1.0.0 — 2026-03-13 — Initial implementation
+ *   v1.1.0 — 2026-08-19 — Count lines the way wc -l does. ESLint 10.6+ made
+ *     sourceCode.lines include the empty string after a file's final newline, so every
+ *     file read as one line longer and a file sitting exactly on the limit failed. The
+ *     limit counts real lines, so a single trailing empty entry is discounted.
  */
 
 /** @type {import('eslint').Rule.RuleModule} */
@@ -42,7 +46,9 @@ export const maxFileLines = {
     return {
       Program(node) {
         const sourceCode = context.sourceCode ?? context.getSourceCode();
-        const lines = sourceCode.lines.length;
+        const raw = sourceCode.lines;
+        // A file ending in a newline yields a final empty entry; wc -l does not count it.
+        const lines = raw.length > 0 && raw[raw.length - 1] === '' ? raw.length - 1 : raw.length;
 
         if (lines > max) {
           context.report({
