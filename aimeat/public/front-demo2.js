@@ -95,17 +95,44 @@
     });
 
   /**
-   * Founding members (TARGET-066). The flag is OFF, and stays off until the store ships.
+   * Founding members (TARGET-066). The flag is OFF until the operator opens the programme;
+   * sessionStorage 'aimeat.founding' = '1' turns it on for browser verification only.
    *
-   * TODO(store): point readFoundingState() at the SAME data source the store sells from — the
-   * store prompt owns that choice, and nothing here invents a parallel one. Contract: resolve
-   * { sold, cap, members: [{ label, url? }] } (members are the opt-in honor-wall rows: a name
-   * or a node id, with an optional link) or null. Rendering requires the flag AND sold >= 1,
-   * so the zero-sold fixture renders nothing even with the flag on.
+   * THE DATA SOURCE IS THE STORE'S OWN, read here by the same address (decision recorded in
+   * evt-t066-shop-live-20260819): one public memory record, ext:shop key `founders`, shape
+   * { total, taken, founders: [{ n, name?, url? }] } — the full ledger stays in the store's
+   * private key, and this page sees only what the wall shows. One source, two surfaces.
+   *
+   * TODO(store): the record lives on the shop node today; when the store deploys, the same
+   * data must be reachable from THIS origin (mirror or proxy), because the page CSP allows
+   * same-origin fetches only. A missing key (?soft=1) or taken = 0 renders nothing even with
+   * the flag on, which is the zero-sold fixture.
    */
   var FOUNDING_ENABLED = false;
-  function readFoundingState() { return Promise.resolve(null); }
-  if (FOUNDING_ENABLED) {
+  function foundingOn() {
+    if (FOUNDING_ENABLED) return true;
+    try { return sessionStorage.getItem('aimeat.founding') === '1'; }
+    catch (err) { console.warn('[front-demo2] founding override not readable:', err.message); return false; }
+  }
+  function readFoundingState() {
+    return fetch('/v1/memory/ext%3Ashop/founders?soft=1')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var v = j && j.data && (j.data.value !== undefined ? j.data.value : j.data);
+        if (!v || typeof v !== 'object') return null;
+        return {
+          sold: Number(v.taken) || 0,
+          cap: Number(v.total) || 50,
+          members: (v.founders || []).map(function (f) {
+            return {
+              label: (FI ? 'Perustaja #' : 'Founder #') + f.n + (f.name ? ' · ' + f.name : ''),
+              url: f.url || null,
+            };
+          }),
+        };
+      });
+  }
+  if (foundingOn()) {
     readFoundingState().then(function (st) {
       if (!st || !(st.sold >= 1)) return;
       var banner = document.getElementById('fd-founding');
