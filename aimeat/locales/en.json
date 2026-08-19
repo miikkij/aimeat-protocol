@@ -601,6 +601,13 @@
   "biz.trans1": "Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app sits on: content a model produced carries a record of how it was made, a person reading it on the node’s own surfaces sees a label, and the operator’s legal identity and supervisory authority sit at a fixed machine-readable address your compliance officer can fetch without asking us. Content the node served can be checked by anyone, byte for byte, with no account.",
   "biz.trans2": "What stays yours: the obligations that come with what you publish. Running on AIMEAT does not discharge them, and we would rather say so here than have you discover it later. What the platform does is make marking, labelling and the record the default path instead of a project.",
   "biz.transCta": "How AI content is marked here →",
+  "biz.payTitle": "Sell to people and to their agents, through one checkout",
+  "biz.pay0": "Cards, through your own payment provider. The money is yours from the start: your account, your payouts, and no platform sitting between you and it.",
+  "biz.pay1": "Stablecoin, settled straight to an address you hold. A price stays in euros or dollars; the coin is only how it is paid, and nobody custodies it on the way.",
+  "biz.pay2": "Agents buying on somebody's behalf, through the same checkout as a person with a card. An AI doing the shopping is a customer here, not an edge case somebody will support later.",
+  "biz.pay3": "The parts that make it a business rather than a payment button: money held until you deliver, captured when you do, and revenue split automatically with whoever helped make the thing.",
+  "biz.pay4": "A shop is an app your AI writes and publishes on your own address. Building it is a conversation, and the whole thing is yours the moment it exists.",
+  "biz.payCta": "A marketplace running on exactly this →",
   "biz.transTitle": "AI transparency your compliance officer can read",
   "capabilities": {
     "title": "Capabilities",

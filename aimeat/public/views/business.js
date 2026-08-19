@@ -198,6 +198,24 @@ export default function Business({ navigate }) {
         </ul>
       </section>
 
+      <!-- Money. The capability nobody was told about: three ways to be paid, one checkout, and
+           the agent-to-agent case that has no equivalent on a normal shop platform. Every claim
+           here names a payment handler that is registered and running, and the proof link only
+           appears on a node that actually has the app. -->
+      <section class="ld-sovereignty">
+        <h2 class="ld-casegroup-title">${tr('biz.payTitle', 'Sell to people and to their agents, through one checkout')}</h2>
+        <ul class="ld-sov-list">
+          <li>${tr('biz.pay0', 'Cards, through your own payment provider. The money is yours from the start: your account, your payouts, and no platform sitting between you and it.')}</li>
+          <li>${tr('biz.pay1', 'Stablecoin, settled straight to an address you hold. A price stays in euros or dollars; the coin is only how it is paid, and nobody custodies it on the way.')}</li>
+          <li>${tr('biz.pay2', "Agents buying on somebody's behalf, through the same checkout as a person with a card. An AI doing the shopping is a customer here, not an edge case somebody will support later.")}</li>
+          <li>${tr('biz.pay3', 'The parts that make it a business rather than a payment button: money held until you deliver, captured when you do, and revenue split automatically with whoever helped make the thing.')}</li>
+          <li>${tr('biz.pay4', 'A shop is an app your AI writes and publishes on your own address. Building it is a conversation, and the whole thing is yours the moment it exists.')}</li>
+        </ul>
+        ${hasSite('exchange') ? html`
+          <a class="ld-path-cta" href=${siteLink('exchange')} target="_blank" rel="noopener">
+            ${tr('biz.payCta', 'A marketplace running on exactly this →')}</a>` : ''}
+      </section>
+
       <!-- The paragraph a buyer forwards to their own compliance officer. It names what they get
            AND what stays theirs, in that order, because a caveat found later is the thing that
            discredits everything above it. -->

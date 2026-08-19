@@ -601,6 +601,13 @@
   "biz.trans1": "El artículo 50 del Reglamento de IA de la UE se aplica desde el 2 de agosto de 2026. Lo que tienes aquí es una plataforma hecha en la UE, autoalojable, en la que la procedencia de la IA es un elemento básico de la capa sobre la que se apoya cada aplicación: el contenido que produjo un modelo lleva un registro de cómo se hizo, quien lo lee en las superficies del propio nodo ve una etiqueta, y la identidad legal de quien opera y su autoridad de vigilancia están en una dirección fija legible por máquina que tu responsable de cumplimiento puede consultar sin preguntarnos. El contenido que sirvió el nodo lo puede comprobar cualquiera, byte a byte, sin necesidad de cuenta.",
   "biz.trans2": "Lo que sigue siendo tuyo: las obligaciones que trae lo que tú publicas. Correr sobre AIMEAT no te libra de ellas, y preferimos decírtelo aquí a que lo descubras después. Lo que hace la plataforma es que marcar, etiquetar y dejar el registro sea el camino por defecto en vez de un proyecto.",
   "biz.transCta": "Cómo se marca aquí el contenido hecho con IA →",
+  "biz.payTitle": "Vende a las personas y a sus agentes, por una misma caja",
+  "biz.pay0": "Tarjetas, por tu propio proveedor de pagos. El dinero es tuyo desde el principio: tu cuenta, tus pagos, y ninguna plataforma en medio.",
+  "biz.pay1": "Stablecoin, directa a una dirección cuyas claves tienes tú. El precio sigue en euros o dólares; la moneda es solo cómo se paga, y nadie la custodia por el camino.",
+  "biz.pay2": "Agentes que compran en nombre de alguien, por la misma caja que una persona con tarjeta. Una IA haciendo la compra aquí es un cliente, no un caso raro que alguien atenderá algún día.",
+  "biz.pay3": "Lo que hace de esto un negocio y no un botón de pago: el dinero se retiene hasta que entregas, se cobra cuando lo haces, y los ingresos se reparten solos con quien ayudó a hacerlo.",
+  "biz.pay4": "Una tienda es una aplicación que tu IA escribe y publica en tu propia dirección. Construirla es una conversación, y es tuya entera desde que existe.",
+  "biz.payCta": "Un mercado funcionando exactamente con esto →",
   "biz.transTitle": "Transparencia de la IA que tu responsable de cumplimiento puede leer",
   "capabilities": {
     "title": "Capacidades",

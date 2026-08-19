@@ -601,6 +601,13 @@
   "biz.trans1": "EU:n tekoälyasetuksen 50 artiklaa on sovellettu 2.8.2026 alkaen. Täällä saat eurooppalaisen, itse ylläpidettävän alustan, jossa tekoälyn alkuperätieto kuuluu siihen kerrokseen jonka päällä jokainen appi toimii: mallin tuottama sisältö kantaa mukanaan tiedon siitä miten se syntyi, noden omilla pinnoilla lukija näkee merkinnän, ja ylläpitäjän oikeushenkilö sekä valvova viranomainen ovat kiinteässä koneluettavassa osoitteessa, jonka vastuuhenkilösi voi hakea kysymättä meiltä. Noden lähettämän sisällön voi kuka tahansa tarkistaa tavu tavulta ilman tiliä.",
   "biz.trans2": "Sinulle jää vastuu siitä mitä itse julkaiset. AIMEATin päällä ajaminen ei poista sitä, ja sanomme sen mieluummin tässä kuin annamme sinun huomata sen myöhemmin. Alusta tekee sen, että merkitseminen, tallentaminen ja näyttäminen on oletustie eikä projekti.",
   "biz.transCta": "Näin tekoälysisältö merkitään täällä →",
+  "biz.payTitle": "Myy ihmisille ja heidän agenteilleen, saman kassan läpi",
+  "biz.pay0": "Kortit oman maksunvälittäjäsi kautta. Raha on sinun alusta asti: sinun tilisi, sinun tilityksesi, eikä väliin jää alustaa.",
+  "biz.pay1": "Stablecoin suoraan osoitteeseen jonka avaimet ovat sinulla. Hinta pysyy euroissa tai dollareissa; kolikko on vain maksutapa, eikä kukaan säilytä sitä matkalla.",
+  "biz.pay2": "Agentit jotka ostavat jonkun puolesta, saman kassan läpi kuin kortilla maksava ihminen. Ostoksilla oleva tekoäly on täällä asiakas, ei erikoistapaus jota joku tukee joskus.",
+  "biz.pay3": "Ne osat jotka tekevät tästä liiketoimintaa eikä maksunappia: raha varataan kunnes toimitat, veloitetaan kun toimitat, ja tuotto jakautuu automaattisesti niiden kesken jotka olivat tekemässä.",
+  "biz.pay4": "Kauppa on appi jonka tekoälysi kirjoittaa ja julkaisee omaan osoitteeseesi. Rakentaminen on keskustelu, ja koko homma on sinun siitä hetkestä kun se on olemassa.",
+  "biz.payCta": "Kauppapaikka joka pyörii juuri tällä →",
   "biz.transTitle": "Tekoälyn läpinäkyvyys, jonka vastuuhenkilösi voi lukea",
   "capabilities": {
     "title": "Kyvykkyydet",
