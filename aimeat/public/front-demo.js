@@ -32,8 +32,8 @@
       txt('fd-n-agents', fmt(d.agents));
       txt('fd-n-online', fmt(d.agents_online));
       txt('fd-strip-note', FI
-        ? 'Laskettu tältä samalta koneelta juuri äsken. Luvut vain kasvavat.'
-        : 'Counted on this very machine just now. They only go up.');
+        ? 'Laskettu täältä juuri äsken. Luvut vain kasvavat.'
+        : 'Counted right here just now. They only go up.');
     })
     .catch(function (err) { console.warn('[front-demo] totals not refreshed, the baked-in numbers stand:', err.message); });
 
