@@ -23,6 +23,8 @@
  *   v1.1.0 — 2026-08-11 — Push subscriptions join the seed and the cascade check, and get a case of
  *     their own: one row per device, refresh in place, prune one endpoint (audit H-8).
  *   v1.0.0 — 2026-08-10 — Initial (August 2026 audit, step 5c / systemic pattern 5).
+ *   v1.2.0 — 2026-08-19 — A catalogue listing carries no app bytes: the case that fails the
+ *     moment a provider starts reading the payload column for a listing again.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { randomUUID } from 'node:crypto';
@@ -394,6 +396,44 @@ describe('storage providers agree on what they do, not just on their signatures'
 
             expect(await storage.getMemory(ghii, 'tx.doomed'), `${name}: the rolled-back write survived`).toBeNull();
             expect(await storage.getMemory(ghii, 'tx.outsider'), `${name}: an unrelated write was rolled back with it`).not.toBeNull();
+
+            await storage.deleteOwner(owner);
+        }
+    }, 60_000);
+    it('a catalogue listing carries no app bytes, and asking for them is a different method', async () => {
+        // listApps used to SELECT the payload column of every version row of every app before it
+        // deduplicated or paginated. Nothing observable changed at the route — the handler never put
+        // `data` in its response — so the cost was invisible from an E2E test while the production
+        // catalogue sat at a flat 3.5 s per request whatever `limit` said. This is the assertion that
+        // fails the moment a provider starts reading the payload for a listing again.
+        for (const { name, storage } of provs) {
+            const owner = `conflist${Date.now()}${Math.floor(Math.random() * 1000)}`;
+            const { ghii } = await seedOwner(storage, owner);
+            const now = new Date().toISOString();
+            const body = Buffer.from('<html><body>a whole app</body></html>');
+
+            for (const version of [1, 2]) {
+                await storage.createApp({
+                    ownerGaii: ghii, ownerName: owner, filename: 'listing-probe.html', versionNumber: version,
+                    manifest: {
+                        name: 'Listing probe', description: 'proves the listing is metadata-only',
+                        version: `1.0.${version}`, author: owner, category: 'tool', tags: ['conformance'],
+                    } as never,
+                    mimeType: 'text/html', size: body.length, data: body, createdAt: now,
+                });
+            }
+
+            const { apps, total } = await storage.listApps({ ownerGaii: ghii });
+            expect(total, `${name}: the seeded app is listed`).toBe(1);
+            expect(apps[0].versionNumber, `${name}: the listing shows the LATEST version`).toBe(2);
+            expect(apps[0].manifest.name, `${name}: the listing still carries the metadata it renders`).toBe('Listing probe');
+            expect(apps[0].size, `${name}: ...including the size, which is what the card shows`).toBe(body.length);
+            expect('data' in apps[0], `${name}: a listing must not carry the app's bytes`).toBe(false);
+
+            // The other door exists precisely so the operator copy-scan can still compare content.
+            const withContent = await storage.listAppsWithContent({ ownerGaii: ghii });
+            expect(withContent.apps[0].data?.toString('utf8'), `${name}: listAppsWithContent carries them`)
+                .toBe(body.toString('utf8'));
 
             await storage.deleteOwner(owner);
         }

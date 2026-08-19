@@ -7,12 +7,15 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-07-25 — Add getAppGrantByOwnerAndApp for the one-live-grant-per-(owner, app)
  *     invariant (schema.ts dedupes + enforces it with a partial unique index).
+ *   v1.2.0 — 2026-08-19 — listApps names its columns instead of SELECT a.*, so a listing no longer carries each
+ *     app's bytes; the query itself moved to apps-listing.ts (max-file-lines).
  */
 import type {
-  AppRecord, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
+  AppRecord, AppSummaryRecord, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
   AppProtection, SubdomainSiteRecord, AppGrantRecord, MemoryLinkRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { SUMMARY_COLUMNS, runAppListing } from './apps-listing.js';
 
 export const appsMethods = {
   // ── Token Revocation ──
@@ -77,76 +80,14 @@ export const appsMethods = {
     return row ? this.deserializeApp(row) : null;
   },
 
-  async listApps(this: SqliteStorage, opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
-    // Get latest version of each app
-    let query = `SELECT a.* FROM apps a
-      INNER JOIN (SELECT ownerGaii, filename, MAX(versionNumber) as maxVer FROM apps GROUP BY ownerGaii, filename) latest
-      ON a.ownerGaii = latest.ownerGaii AND a.filename = latest.filename AND a.versionNumber = latest.maxVer`;
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-
-    if (opts?.ownerGaii) {
-      conditions.push(`a.ownerGaii = ?`);
-      params.push(opts.ownerGaii);
-    }
-    if (opts?.category) {
-      conditions.push(`json_extract(a.manifest, '$.category') = ?`);
-      params.push(opts.category);
-    }
-    if (opts?.tag) {
-      conditions.push(`a.manifest LIKE ?`);
-      params.push(`%"${opts.tag}"%`);
-    }
-    if (opts?.q) {
-      conditions.push(`(a.filename LIKE ? OR json_extract(a.manifest, '$.name') LIKE ? OR json_extract(a.manifest, '$.description') LIKE ?)`);
-      const like = `%${opts.q}%`;
-      params.push(like, like, like);
-    }
-    if (opts?.freeOnly) {
-      conditions.push(`(json_extract(a.manifest, '$.priceMorsels') IS NULL OR json_extract(a.manifest, '$.priceMorsels') = 0)`);
-    }
-    // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner
-    // (viewerGhii) — decided purely from who is authenticated. The owner sees their
-    // own (operator-hidden ones carry operator_hidden=true so the client can badge
-    // them); everyone else does not. An explicit ownerGaii filter already scopes to
-    // one owner, so skip the clause there. adminView sees EVERYTHING.
-    if (!opts?.ownerGaii && !opts?.adminView) {
-      if (opts?.viewerGhii) {
-        conditions.push(`(a.parked = 0 OR a.ownerGaii = ?)`);
-        params.push(opts.viewerGhii);
-        conditions.push(`(a.operatorHidden = 0 OR a.ownerGaii = ?)`);
-        params.push(opts.viewerGhii);
-      } else {
-        conditions.push(`a.parked = 0`);
-        conditions.push(`a.operatorHidden = 0`);
-      }
-    }
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    // Count total before pagination
-    const countQuery = query.replace('SELECT a.*', 'SELECT COUNT(*) as cnt');
-    const countRow = this.db.prepare(countQuery).get(...params) as { cnt: number };
-    const total = countRow.cnt;
-
-    // Sort
-    if (opts?.sort === 'popular') {
-      query += ` ORDER BY (SELECT COALESCE(d.downloads, 0) FROM app_downloads d WHERE d.ownerGaii = a.ownerGaii AND d.filename = a.filename) DESC, a.createdAt DESC`;
-    } else {
-      query += ' ORDER BY a.createdAt DESC';
-    }
-
-    // Pagination
-    const limit = opts?.limit ?? 50;
-    const offset = opts?.offset ?? 0;
-    query += ' LIMIT ? OFFSET ?';
-    params.push(limit, offset);
-
-    const rows = this.db.prepare(query).all(...params) as Record<string, unknown>[];
-    return { apps: rows.map(r => this.deserializeApp(r)), total };
+  async listApps(this: SqliteStorage, opts?: AppListOptions): Promise<{ apps: AppSummaryRecord[]; total: number }> {
+    return runAppListing(this, SUMMARY_COLUMNS, opts, r => this.deserializeAppSummary(r));
   },
+
+  async listAppsWithContent(this: SqliteStorage, opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
+    return runAppListing(this, 'a.*', opts, r => this.deserializeApp(r));
+  },
+
 
   async listAppVersions(this: SqliteStorage, ownerGaii: string, filename: string): Promise<AppRecord[]> {
     const rows = this.db.prepare('SELECT * FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC')
@@ -553,6 +494,34 @@ export const appsMethods = {
     });
     tx();
     return reKeyed;
+  },
+
+  /**
+   * A listing row → AppSummaryRecord. Same fields as deserializeApp minus `data`, because
+   * listApps never selects the payload column (see SUMMARY_COLUMNS).
+   */
+  deserializeAppSummary(this: SqliteStorage, row: Record<string, unknown>): AppSummaryRecord {
+    const record: AppSummaryRecord = {
+      ownerGaii: row.ownerGaii as string,
+      ownerName: row.ownerName as string,
+      filename: row.filename as string,
+      versionNumber: row.versionNumber as number,
+      manifest: JSON.parse((row.manifest as string) || '{}'),
+      mimeType: row.mimeType as string,
+      size: row.size as number,
+      createdAt: row.createdAt as string,
+    };
+    if (row.accessCode) record.accessCode = row.accessCode as string;
+    if (row.parked) record.parked = true;
+    if (row.forkable) record.forkable = true;
+    if (row.operatorHidden) {
+      record.operatorHidden = true;
+      if (row.operatorHiddenBy) record.operatorHiddenBy = row.operatorHiddenBy as string;
+      if (row.operatorHiddenAt) record.operatorHiddenAt = row.operatorHiddenAt as string;
+      if (row.operatorHideReason) record.operatorHideReason = row.operatorHideReason as string;
+    }
+    if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
+    return record;
   },
 
   deserializeApp(this: SqliteStorage, row: Record<string, unknown>): AppRecord {

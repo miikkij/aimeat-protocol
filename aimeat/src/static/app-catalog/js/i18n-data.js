@@ -617,7 +617,11 @@ export const I18N = {
       'empty.noAppsDesc': 'Add your first app using the + button above',
       'empty.formats': 'Supports: HTML files and ZIP packages',
       'empty.noMatch': 'No matches',
-      'empty.noMatchDesc': 'No apps match the current filter. Try a different search term or tag.'
+      'empty.noMatchDesc': 'No apps match the current filter. Try a different search term or tag.',
+      // Shown while the first listing is still on the wire. Without it the grid renders
+      // "No apps yet" for as long as the request takes, which reads as an answer, not a wait.
+      'loading.apps': 'Loading apps…',
+      'loading.appsHint': 'Fetching the catalogue from this node.'
     },
     fi: {
       'header.title': 'Omat sovellukset',
@@ -1230,6 +1234,8 @@ export const I18N = {
       'empty.noAppsDesc': 'Lisää ensimmäinen sovellus yllä olevalla +-painikkeella',
       'empty.formats': 'Tukee: HTML-tiedostot ja ZIP-paketit',
       'empty.noMatch': 'Ei osumia',
-      'empty.noMatchDesc': 'Mikään sovellus ei vastaa nykyistä suodatinta. Kokeile eri hakusanaa tai tunnistetta.'
+      'empty.noMatchDesc': 'Mikään sovellus ei vastaa nykyistä suodatinta. Kokeile eri hakusanaa tai tunnistetta.',
+      'loading.apps': 'Haetaan sovelluksia…',
+      'loading.appsHint': 'Noudetaan luetteloa tästä nodesta.'
     }
   };

@@ -158,7 +158,9 @@
     }
 
     /* ── Dark theme ── overrides every token + native controls. Surfaces that
-       hardcode light colors are converted to these vars throughout the CSS. */
+       hardcode light colors are converted to these vars throughout the CSS.
+    v2.16.0 — 2026-08-19 — .cat-spinner — the ring the loading state shows in the empty-state icon slot.
+  */
     [data-theme="dark"] {
       color-scheme: dark;
       --bg: #14141C;
@@ -690,6 +692,25 @@
       padding: 72px 24px;
       text-align: center;
       color: var(--text-dim);
+    }
+
+    /* The wait, in the empty state's own slot: it replaces the icon, so the block does not
+       resize when the listing lands. `prefers-reduced-motion` gets a still ring rather than
+       nothing — the shape is the message, the rotation is only the reassurance. */
+    .empty-state .cat-spinner {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 20px;
+      border: 3px solid var(--border-subtle);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: cat-spin .9s linear infinite;
+    }
+
+    @keyframes cat-spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .empty-state .cat-spinner { animation: none; }
     }
 
     .empty-state .empty-icon {
@@ -2424,6 +2445,14 @@
     <div id="community-grid" class="published-grid"></div>
   </div>
 
+  <!-- The wait, for the Community view. Without it the empty state below claims "no community apps
+       on this node yet" for the whole fetch, which is an answer rather than a wait. -->
+  <div id="community-loading" data-view="community" class="view-empty" style="display:none">
+    <div class="cat-spinner" role="status" aria-live="polite" style="margin:0 auto 16px"></div>
+    <p data-i18n="loading.apps">Loading apps…</p>
+    <p class="view-empty-hint" data-i18n="loading.appsHint">Fetching the catalogue from this node.</p>
+  </div>
+
   <!-- Empty state for the Community view (shown only when the community view is active and has no apps) -->
   <div id="community-empty" data-view="community" class="view-empty" style="display:none">
     <p data-i18n="view.communityEmpty">No community apps on this node yet.</p>
@@ -3416,7 +3445,11 @@
       "empty.noAppsDesc": "Add your first app using the + button above",
       "empty.formats": "Supports: HTML files and ZIP packages",
       "empty.noMatch": "No matches",
-      "empty.noMatchDesc": "No apps match the current filter. Try a different search term or tag."
+      "empty.noMatchDesc": "No apps match the current filter. Try a different search term or tag.",
+      // Shown while the first listing is still on the wire. Without it the grid renders
+      // "No apps yet" for as long as the request takes, which reads as an answer, not a wait.
+      "loading.apps": "Loading apps…",
+      "loading.appsHint": "Fetching the catalogue from this node."
     },
     fi: {
       "header.title": "Omat sovellukset",
@@ -4029,7 +4062,9 @@
       "empty.noAppsDesc": "Lisää ensimmäinen sovellus yllä olevalla +-painikkeella",
       "empty.formats": "Tukee: HTML-tiedostot ja ZIP-paketit",
       "empty.noMatch": "Ei osumia",
-      "empty.noMatchDesc": "Mikään sovellus ei vastaa nykyistä suodatinta. Kokeile eri hakusanaa tai tunnistetta."
+      "empty.noMatchDesc": "Mikään sovellus ei vastaa nykyistä suodatinta. Kokeile eri hakusanaa tai tunnistetta.",
+      "loading.apps": "Haetaan sovelluksia…",
+      "loading.appsHint": "Noudetaan luetteloa tästä nodesta."
     }
   };
 
@@ -8632,8 +8667,10 @@
   var generateId4;
   var renderApps3;
   var refreshAll2;
+  var setListingLoaded;
+  var isListingLoaded;
   function initServerIo(deps) {
-    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId4, renderApps: renderApps3, refreshAll: refreshAll2 } = deps);
+    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId4, renderApps: renderApps3, refreshAll: refreshAll2, setListingLoaded, isListingLoaded } = deps);
   }
   var lastAllServerApps = [];
   var lastAimeatUrl = "";
@@ -8813,10 +8850,13 @@
   function updateCommunityEmpty() {
     var empty = document.getElementById("community-empty");
     if (!empty) return;
+    var loading = document.getElementById("community-loading");
     var grid = document.getElementById("community-grid");
     var hasApps = !!grid && grid.children.length > 0;
     var inCommunity = document.body.getAttribute("data-active-view") === "community";
-    empty.style.display = !hasApps && inCommunity ? "block" : "none";
+    var waiting = !hasApps && inCommunity && !isListingLoaded();
+    if (loading) loading.style.display = waiting ? "block" : "none";
+    empty.style.display = !hasApps && inCommunity && !waiting ? "block" : "none";
   }
   function getSessionRoles() {
     try {
@@ -9290,6 +9330,7 @@
     }
     Promise.all([getAllApps(), loadFavorites(), loadPromoted()]).then(function() {
       if (!aimeatUrl) {
+        setListingLoaded(true);
         setOwnServerApps([]);
         renderApps3();
         if (communitySection) communitySection.style.display = "none";
@@ -9314,6 +9355,7 @@
         lastAllServerApps = serverApps;
         lastAimeatUrl = aimeatUrl;
         return loadSubdomainSites().then(function() {
+          setListingLoaded(true);
           setOwnServerApps(currentOwner ? ownApps : []);
           renderApps3();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
@@ -9321,6 +9363,7 @@
           applyServerFilter();
         });
       }).catch(function() {
+        setListingLoaded(true);
         setOwnServerApps([]);
         renderApps3();
         if (communitySection) communitySection.style.display = "none";
@@ -9666,6 +9709,16 @@
   var ownAppProtection = {};
   var ownAppAccessCodes = {};
   var serverAppManifests = {};
+  var listingLoaded = false;
+  function setListingLoaded2(v) {
+    listingLoaded = !!v;
+  }
+  function isListingLoaded2() {
+    return listingLoaded;
+  }
+  function loadingStateHtml() {
+    return '<div class="empty-state"><div class="cat-spinner" role="status" aria-live="polite"></div><h3>' + t("loading.apps") + "</h3><p>" + t("loading.appsHint") + "</p></div>";
+  }
   function aiPostureMarkers(e) {
     var p = e.aiPosture;
     if (!p) return "";
@@ -9847,7 +9900,9 @@
         if (localCount) localCount.textContent = "(" + entries.length + ")";
       }
       if (filtered.length === 0) {
-        if (!getActiveTag2() && !getSearchQuery2() && entries.length === 0) {
+        if (!listingLoaded) {
+          grid.innerHTML = loadingStateHtml();
+        } else if (!getActiveTag2() && !getSearchQuery2() && entries.length === 0) {
           grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🚀</div><h3>' + t("empty.noApps") + "</h3><p>" + t("empty.noAppsDesc") + '</p><span class="empty-formats">' + t("empty.formats") + "</span></div>";
         } else {
           grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🔍</div><h3>' + t("empty.noMatch") + "</h3><p>" + t("empty.noMatchDesc") + "</p></div>";
@@ -9860,7 +9915,7 @@
         grid.innerHTML = html;
       }
       var statsEl = document.getElementById("stats");
-      statsEl.textContent = entries.length + " " + t("stats.apps");
+      statsEl.textContent = listingLoaded ? entries.length + " " + t("stats.apps") : "";
       renderTags();
     });
   }
@@ -10404,7 +10459,9 @@
       },
       generateId,
       renderApps: renderApps4,
-      refreshAll: refreshAll3
+      refreshAll: refreshAll3,
+      setListingLoaded: setListingLoaded2,
+      isListingLoaded: isListingLoaded2
     });
     initRender({
       getMainApps: function() {

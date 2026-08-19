@@ -16,6 +16,7 @@
  *     can show a generative marker. The publish check's GAP is owner-only and is stripped for
  *     everyone else — including inside `manifest`, which is where it would otherwise have travelled
  *     to the whole public listing unnoticed.
+ *   v1.5.0 — 2026-08-19 — the copy-scan reads listAppsWithContent; the plain listing no longer carries bytes.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -222,7 +223,9 @@ export function registerCatalogueAdminRoutes(
     router.get('/v1/admin/apps/similar', requireAuth(), requireRole('operator'), async (req, res) => {
         const thresholdRaw = parseFloat(req.query.threshold as string);
         const threshold = Number.isFinite(thresholdRaw) ? Math.min(1, Math.max(0.1, thresholdRaw)) : 0.7;
-        const { apps } = await storage.listApps({ adminView: true, limit: 1000, sort: 'newest' });
+        // listAppsWithContent, not listApps: this scan COMPARES the apps' bytes, and the plain
+        // listing deliberately no longer carries them.
+        const { apps } = await storage.listAppsWithContent({ adminView: true, limit: 1000, sort: 'newest' });
         const result = scanCatalogForCopies(apps, config, { threshold });
         res.json(success(config.nodeId, {
             ...result,

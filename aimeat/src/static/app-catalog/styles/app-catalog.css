@@ -150,7 +150,9 @@
     }
 
     /* ── Dark theme ── overrides every token + native controls. Surfaces that
-       hardcode light colors are converted to these vars throughout the CSS. */
+       hardcode light colors are converted to these vars throughout the CSS.
+    v2.16.0 — 2026-08-19 — .cat-spinner — the ring the loading state shows in the empty-state icon slot.
+  */
     [data-theme="dark"] {
       color-scheme: dark;
       --bg: #14141C;
@@ -682,6 +684,25 @@
       padding: 72px 24px;
       text-align: center;
       color: var(--text-dim);
+    }
+
+    /* The wait, in the empty state's own slot: it replaces the icon, so the block does not
+       resize when the listing lands. `prefers-reduced-motion` gets a still ring rather than
+       nothing — the shape is the message, the rotation is only the reassurance. */
+    .empty-state .cat-spinner {
+      width: 40px;
+      height: 40px;
+      margin-bottom: 20px;
+      border: 3px solid var(--border-subtle);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: cat-spin .9s linear infinite;
+    }
+
+    @keyframes cat-spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      .empty-state .cat-spinner { animation: none; }
     }
 
     .empty-state .empty-icon {

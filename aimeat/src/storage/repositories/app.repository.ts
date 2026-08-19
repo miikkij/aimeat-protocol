@@ -31,8 +31,10 @@
  *     primitives (collapse the per-app metric fan-out in the catalogue listing).
  *   v1.7.0 — 2026-07-16 — Add listAppDraftFilenames() so the catalogue listing can
  *     badge an owner's apps that have a pending staging draft in one query.
+ *   v1.8.0 — 2026-08-19 — listApps returns AppSummaryRecord (no payload) and listAppsWithContent is the
+ *     separate door for the operator copy-scan, the one caller that compares bytes.
  */
-import type { AppRecord, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
+import type { AppRecord, AppSummaryRecord, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
 
 export interface AppRepository {
     createApp(record: AppRecord): Promise<AppRecord>;
@@ -56,7 +58,18 @@ export interface AppRepository {
     listAppDraftFilenames(ownerGaii: string): Promise<string[]>;
     getApp(ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null>;
     getAppByOwnerName(ownerName: string, filename: string, version?: number): Promise<AppRecord | null>;
-    listApps(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }>;
+    /**
+     * Catalogue listing: the latest version of each app, WITHOUT its bytes. A listing renders
+     * names, descriptions and badges, so `data` is not selected at all — reading it turned the
+     * production catalogue into a fixed 3.5 s query. Need an app's content? getApp().
+     */
+    listApps(opts?: AppListOptions): Promise<{ apps: AppSummaryRecord[]; total: number }>;
+    /**
+     * The same listing WITH each app's bytes — for content analysis (the operator copy-detection
+     * scan), never for a catalogue. Reading the payload of every listed app is exactly the cost
+     * listApps was changed to stop paying, so a caller has to ask for it by name.
+     */
+    listAppsWithContent(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }>;
     listAppVersions(ownerGaii: string, filename: string): Promise<AppRecord[]>;
     getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number>;
     deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean>;

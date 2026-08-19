@@ -17,6 +17,8 @@
  *     merge), drop drag-reorder + Recently-Opened + the local-only card affordances + byte stats.
  *   v2.1.0 — 2026-08-17 — The card menu's Delete goes to the node for a published app instead of
  *     emptying the page-session record, which left the app published and the card in place.
+ *   v2.2.0 — 2026-08-19 — a "Loading apps…" state until the first listing lands. An empty grid used to say
+ *     "No apps yet. Add your first app", which is an answer, for the whole fetch.
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
@@ -197,6 +199,23 @@ export let ownAppProtection = {};
 // the unlock page (UX-remake v3, P6). Other people's apps are never in this map.
 export let ownAppAccessCodes = {};
 export let serverAppManifests = {}; // moved out of server-io: SSOT for the owner-app manifest cache (detail reads via getServerManifests)
+
+// Has the FIRST listing come back yet? Until it has, an empty grid means "we have not asked and
+// answered", not "you own nothing" — and the catalogue used to render "No apps yet. Add your first
+// app" for the whole wait, which on the production node is several seconds and reads as the answer.
+// Flipped once, by loadPublishedApps, on success AND on failure: a failed fetch has still finished.
+let listingLoaded = false;
+export function setListingLoaded(v) { listingLoaded = !!v; }
+export function isListingLoaded() { return listingLoaded; }
+
+/** The grid's "still fetching" block — the same shape as the empty state, so nothing jumps. */
+function loadingStateHtml() {
+  return '<div class="empty-state">' +
+      '<div class="cat-spinner" role="status" aria-live="polite"></div>' +
+      '<h3>' + t('loading.apps') + '</h3>' +
+      '<p>' + t('loading.appsHint') + '</p>' +
+    '</div>';
+}
 
 /**
  * The card's AI markers (TARGET-058).
@@ -384,7 +403,9 @@ function renderApps() {
     }
 
     if (filtered.length === 0) {
-      if (!getActiveTag() && !getSearchQuery() && entries.length === 0) {
+      if (!listingLoaded) {
+        grid.innerHTML = loadingStateHtml();
+      } else if (!getActiveTag() && !getSearchQuery() && entries.length === 0) {
         grid.innerHTML =
           '<div class="empty-state">' +
             '<div class="empty-icon">\u{1F680}</div>' +
@@ -409,8 +430,9 @@ function renderApps() {
     }
 
     // Stats: app count only — the catalog is server-only, so there is no local footprint to report.
+    // "0 apps" before the first listing lands is a claim we cannot make yet, so hold the line blank.
     var statsEl = document.getElementById('stats');
-    statsEl.textContent = entries.length + ' ' + t('stats.apps');
+    statsEl.textContent = listingLoaded ? (entries.length + ' ' + t('stats.apps')) : '';
 
     renderTags();
   });

@@ -5,6 +5,7 @@
  * @description SqliteInternals — signatures of the private deserialize/helper methods shared across SqliteStorage method groups. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-08-19 — declare deserializeAppSummary (the listing row mapper, payload-free).
  */
 import type {
   OwnerRecord, AgentRecord, MemoryRecord, ActionRecord, WorkRecord, WalletTransaction,
@@ -13,7 +14,7 @@ import type {
   MsmRecord, EmailVerificationRecord, FlagRecord, MatchRecord, OrganismRecord, OrganismMembershipRecord,
   JoinRequestRecord, PendingApprovalRecord, AppealRecord, ListingRecord, PurchaseRecord, TrustedIssuerRecord,
   GenesisPeerRecord, ChatInstanceRecord, RealtimeRoomRecord, ExtensionRecord, EscrowHoldRecord, BoardSubscriptionRecord,
-  CortexExtensionRecord, PersonalPushSubscriptionRecord, NotificationPreferences, AppRecord, AppPurchaseRecord, SubdomainSiteRecord,
+  CortexExtensionRecord, PersonalPushSubscriptionRecord, NotificationPreferences, AppRecord, AppSummaryRecord, AppPurchaseRecord, SubdomainSiteRecord,
   AppGrantRecord, NotificationTemplateRecord, ScheduledJobRecord, ExtensionInstanceRecord, ReplicationQueueEntry, DeviceAuthorizationRecord,
   SystemPromptRecord, SystemPromptVersionRecord, ExecutionLogEntry, PackageRecord, TemplateListingRecord, TemplateReview,
   TemplateDiscussion, PackageInstanceRecord, CapabilityRecord, AgentOnboardingRecord
@@ -70,6 +71,7 @@ export interface SqliteInternals {
   deserializeSubdomainSite(row: Record<string, unknown>): SubdomainSiteRecord ;
   deserializeAppGrant(row: Record<string, unknown>): AppGrantRecord ;
   deserializeApp(row: Record<string, unknown>): AppRecord ;
+  deserializeAppSummary(row: Record<string, unknown>): AppSummaryRecord ;
   deserializeAppPurchase(row: Record<string, unknown>): AppPurchaseRecord ;
   deserializeScheduledJob(row: Record<string, unknown>): ScheduledJobRecord ;
   deserializeExecutionLog(row: Record<string, unknown>): ExecutionLogEntry ;

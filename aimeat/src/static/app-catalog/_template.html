@@ -106,6 +106,14 @@
     <div id="community-grid" class="published-grid"></div>
   </div>
 
+  <!-- The wait, for the Community view. Without it the empty state below claims "no community apps
+       on this node yet" for the whole fetch, which is an answer rather than a wait. -->
+  <div id="community-loading" data-view="community" class="view-empty" style="display:none">
+    <div class="cat-spinner" role="status" aria-live="polite" style="margin:0 auto 16px"></div>
+    <p data-i18n="loading.apps">Loading apps…</p>
+    <p class="view-empty-hint" data-i18n="loading.appsHint">Fetching the catalogue from this node.</p>
+  </div>
+
   <!-- Empty state for the Community view (shown only when the community view is active and has no apps) -->
   <div id="community-empty" data-view="community" class="view-empty" style="display:none">
     <p data-i18n="view.communityEmpty">No community apps on this node yet.</p>

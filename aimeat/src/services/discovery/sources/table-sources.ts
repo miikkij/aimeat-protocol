@@ -16,9 +16,10 @@
  * @usage registry.register(createCapabilitiesSource(storage, config)); …
  * @version-history
  *   v0.1.0 — 2026-06-23 — Phase 2: capabilities / apps / agent-task adapters (design doc 2026-06-23).
+ *   v0.2.0 — 2026-08-19 — the apps source takes AppSummaryRecord — it reads identity and manifest, never content.
  */
 import type { AimeatConfig } from '../../../config.js';
-import type { Storage, CapabilityRecord, AppRecord, AgentTaskRecord } from '../../../storage/interface.js';
+import type { Storage, CapabilityRecord, AppSummaryRecord, AgentTaskRecord } from '../../../storage/interface.js';
 import { parseGaiiLoose } from '../../../utils/gaii.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
 import { normalizeTags, normalizeVisibility, parkedToVisibility, toFullOwner } from '../normalize.js';
@@ -69,8 +70,8 @@ export function createCapabilitiesSource(storage: Storage, config: AimeatConfig)
 
 // ── Apps ───────────────────────────────────────────────────────────────────────
 /** Keep one row per app (owner+filename), preferring the highest version number. */
-function latestApps(apps: AppRecord[]): AppRecord[] {
-  const best = new Map<string, AppRecord>();
+function latestApps(apps: AppSummaryRecord[]): AppSummaryRecord[] {
+  const best = new Map<string, AppSummaryRecord>();
   for (const a of apps) {
     const key = `${a.ownerGaii}/${a.filename}`;
     const cur = best.get(key);
@@ -94,7 +95,7 @@ export function createAppsSource(storage: Storage, config: AimeatConfig): Discov
       return latestApps(apps).map(a => ({ sourceId: APPS_SOURCE_ID, record: a, score: 0 }));
     },
     toEntry(raw: RawHit): DiscoveryEntry {
-      const a = raw.record as AppRecord;
+      const a = raw.record as AppSummaryRecord;
       return {
         type: 'app',
         segment: a.manifest.category || null,

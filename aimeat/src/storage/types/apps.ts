@@ -13,6 +13,8 @@
  *   v1.2.0 — 2026-08-01 — AppManifest gains `aiPosture` (TARGET-058 Phase 5): the app's own AI
  *     transparency statement plus the publish check's finding. On the manifest, so it needs no
  *     storage migration and survives a fork.
+ *   v1.4.0 — 2026-08-19 — AppSummaryRecord — an app as a LISTING sees it, without its bytes. The field is
+ *     omitted rather than emptied so a caller needing content fails to compile.
  */
 import type { SemanticAnnotation, SemanticContext } from './common.js';
 import type { AppAiPosture } from '../../services/app-ai-posture.js';
@@ -137,6 +139,19 @@ export interface AppRecord {
    */
   aiProvenanceId?: string;
 }
+
+/**
+ * One app as a LISTING sees it: everything except the bytes.
+ *
+ * `listApps` returned the full record until 2026-08-19, so serving the catalogue meant reading the
+ * `data` column of every version row of every app before deduplicating, filtering or paginating —
+ * a fixed 3.5 s on the production node whether the caller asked for 1 app or 200.
+ *
+ * The field is OMITTED rather than filled with an empty Buffer on purpose: a caller that actually
+ * needs an app's bytes gets a compile error pointing it at `getApp()`, instead of a zero-length
+ * file at runtime.
+ */
+export type AppSummaryRecord = Omit<AppRecord, 'data'>;
 
 /**
  * A single, unpublished DRAFT of an app — the staging slot. At most one draft

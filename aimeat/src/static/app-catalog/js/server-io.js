@@ -13,6 +13,8 @@
  *   v2.1.0 — 2026-08-17 — deleteServerApp reports its outcome (true only when the node confirmed)
  *     and names the app rather than the file when the caller knows the name, so the detail view and
  *     the card menu can route their Delete here instead of dropping a page-session record.
+ *   v2.2.0 — 2026-08-19 — loadPublishedApps reports when the first listing has finished — on success, on failure,
+ *     and when there is no node to ask — so the grid can show a wait instead of an empty answer.
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
 import { getAllApps, saveApp } from './db.js';
@@ -27,9 +29,9 @@ import { loadPromoted } from './promote.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
 // (which stays main-owned), plus a few main-local fns.
-let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll;
+let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded;
 export function initServerIo(deps) {
-  ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll } = deps);
+  ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll, setListingLoaded, isListingLoaded } = deps);
 }
 
 // Cache of the last full server-app list (own + community) + base URL, so a favourite toggle can
@@ -245,10 +247,15 @@ function switchView(view) {
 function updateCommunityEmpty() {
   var empty = document.getElementById('community-empty');
   if (!empty) return;
+  var loading = document.getElementById('community-loading');
   var grid = document.getElementById('community-grid');
   var hasApps = !!grid && grid.children.length > 0;
   var inCommunity = document.body.getAttribute('data-active-view') === 'community';
-  empty.style.display = (!hasApps && inCommunity) ? 'block' : 'none';
+  // Three states, not two: still fetching, fetched and empty, fetched and full. Before the first
+  // listing lands "no community apps yet" would be a claim we cannot make.
+  var waiting = !hasApps && inCommunity && !isListingLoaded();
+  if (loading) loading.style.display = waiting ? 'block' : 'none';
+  empty.style.display = (!hasApps && inCommunity && !waiting) ? 'block' : 'none';
 }
 
 // Owner-match: an app belongs to the logged-in user when the bare owner names
@@ -813,6 +820,7 @@ function loadPublishedApps() {
   // session (also refreshes them on an auth change, which routes through here via refreshAll).
   Promise.all([getAllApps(), loadFavorites(), loadPromoted()]).then(function() {
     if (!aimeatUrl) {
+      setListingLoaded(true);   // nothing to fetch — an empty grid here is the answer, not a wait
       setOwnServerApps([]);
       renderApps();
       if (communitySection) communitySection.style.display = 'none';
@@ -851,6 +859,7 @@ function loadPublishedApps() {
         return loadSubdomainSites().then(function () {
           // Kirjasto grid: the owner's server apps (published + parked). Logged out → none
           // (a visitor browses everything under Community).
+          setListingLoaded(true);
           setOwnServerApps(currentOwner ? ownApps : []);
           renderApps();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
@@ -859,6 +868,9 @@ function loadPublishedApps() {
         });
       })
       .catch(function() {
+        // A failed fetch has still FINISHED: leaving the spinner up would promise a result that is
+        // not coming. The grid falls back to its empty state.
+        setListingLoaded(true);
         setOwnServerApps([]);
         renderApps();
         if (communitySection) communitySection.style.display = 'none';

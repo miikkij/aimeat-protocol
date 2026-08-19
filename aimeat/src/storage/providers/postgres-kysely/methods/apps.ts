@@ -11,11 +11,15 @@
  *   mergeForkedAppBuckets) replicate the Prisma migration logic exactly.
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: app catalog on Postgres+Kysely.
+ *   v1.1.0 — 2026-08-19 — listApps stops reading the payload column. It used to SELECT every version row of every
+ *     app, bytes included, and dedupe in JS — a flat 3.5 s per catalogue request on the
+ *     production node whatever `limit` said. DISTINCT ON dedupes in SQL, the select names the
+ *     metadata columns, and listAppsWithContent is the separate door for the copy-scan.
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type {
-  AppRecord, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection,
+  AppRecord, AppSummaryRecord, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection,
 } from '../../../interface.js';
 import type { App, AppDraft, AppFork } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -35,6 +39,42 @@ function toApp(r: Selectable<App>): AppRecord {
     mimeType: r.mimeType,
     size: r.size,
     data: Buffer.from(r.data),
+    accessCode: r.accessCode ?? undefined,
+    parked: r.parked ? true : undefined,
+    forkable: r.forkable ? true : undefined,
+    operatorHidden: r.operatorHidden ? true : undefined,
+    operatorHiddenBy: r.operatorHiddenBy ?? undefined,
+    operatorHiddenAt: isoOpt(r.operatorHiddenAt),
+    operatorHideReason: r.operatorHideReason ?? undefined,
+    aiProvenanceId: r.aiProvenanceId ?? undefined,
+    createdAt: iso(r.createdAt),
+  };
+}
+
+/**
+ * The columns a LISTING needs — every field of AppRecord except `data`.
+ *
+ * `data` is the whole app's bytes. Selecting it here meant a catalogue request read the payload of
+ * every version row of every app on the node before it deduplicated or paginated: 3.5 s and tens of
+ * megabytes on the production node, for the same 130 names whether the caller asked for 1 or 200.
+ */
+const SUMMARY_COLUMNS = [
+  'ownerGaii', 'ownerName', 'filename', 'versionNumber', 'manifest', 'mimeType', 'size',
+  'accessCode', 'parked', 'forkable', 'operatorHidden', 'operatorHiddenBy', 'operatorHiddenAt',
+  'operatorHideReason', 'aiProvenanceId', 'createdAt',
+] as const;
+
+type AppSummaryRow = Pick<Selectable<App>, (typeof SUMMARY_COLUMNS)[number]>;
+
+function toAppSummary(r: AppSummaryRow): AppSummaryRecord {
+  return {
+    ownerGaii: r.ownerGaii,
+    ownerName: r.ownerName,
+    filename: r.filename,
+    versionNumber: r.versionNumber,
+    manifest: r.manifest as unknown as AppManifest,
+    mimeType: r.mimeType,
+    size: r.size,
     accessCode: r.accessCode ?? undefined,
     parked: r.parked ? true : undefined,
     forkable: r.forkable ? true : undefined,
@@ -73,6 +113,53 @@ function toFork(r: Selectable<AppFork>): AppForkRecord {
     forkedByGaii: r.forkedByGaii,
     forkedAt: iso(r.forkedAt),
   };
+}
+
+/**
+ * The half of a listing that is the same whether or not the rows carry their bytes: manifest
+ * filters, the parked/operator-hidden visibility rules, the sort and the page slice.
+ *
+ * Generic over the row shape so listApps (summaries) and listAppsWithContent (full records) share
+ * one implementation — the two differ only in which columns the query selected.
+ */
+async function finishAppListing<T extends AppSummaryRecord>(
+  self: PostgresKyselyStorage,
+  rows: T[],
+  opts?: AppListOptions,
+): Promise<{ apps: T[]; total: number }> {
+  let apps = rows;
+  if (opts?.category) apps = apps.filter(a => a.manifest.category === opts.category);
+  if (opts?.tag) apps = apps.filter(a => a.manifest.tags.includes(opts.tag!));
+  if (opts?.q) {
+    const query = opts.q.toLowerCase();
+    apps = apps.filter(a => a.filename.toLowerCase().includes(query) || a.manifest.name.toLowerCase().includes(query) || a.manifest.description.toLowerCase().includes(query));
+  }
+  if (opts?.freeOnly) apps = apps.filter(a => !a.manifest.priceMorsels);
+  // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner (viewerGhii). A scoped
+  // ownerGaii query already returns only that owner's apps, so skip the filters there. adminView sees all.
+  if (!opts?.ownerGaii && !opts?.adminView) {
+    apps = apps.filter(a => !a.parked || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
+    apps = apps.filter(a => !a.operatorHidden || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
+  }
+  const total = apps.length;
+  // 'popular' was accepted and then ignored here: every caller asking for it got the newest
+  // apps instead, silently. SQLite has always ordered by the download count, so the two
+  // backends disagreed about what the same query means. One row per downloaded app makes the
+  // whole counter table cheap to read, and it has to be read before the slice or the ordering
+  // would only shuffle whichever page the newest-first cut happened to produce.
+  if (opts?.sort === 'popular') {
+    const counts = new Map<string, number>();
+    const rows = await self.db.selectFrom('AppDownload').select(['ownerGaii', 'filename', 'count']).execute();
+    for (const r of rows) counts.set(`${r.ownerGaii} ${r.filename}`, r.count ?? 0);
+    const of = (a: T) => counts.get(`${a.ownerGaii} ${a.filename}`) ?? 0;
+    // Newest first among apps nobody has opened yet, so the tail stays meaningful.
+    apps.sort((a, b) => (of(b) - of(a)) || b.createdAt.localeCompare(a.createdAt));
+  } else {
+    apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
+  const offset = opts?.offset ?? 0;
+  const limit = opts?.limit ?? 50;
+  return { apps: apps.slice(offset, offset + limit), total };
 }
 
 export const appMethods = {
@@ -135,49 +222,34 @@ export const appMethods = {
     return r ? toApp(r) : null;
   },
 
-  async listApps(this: PostgresKyselyStorage, opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
-    // Fetch (optionally owner-scoped) rows, then deduplicate to latest version per owner+filename.
-    let q = this.db.selectFrom('App').selectAll();
+  async listApps(this: PostgresKyselyStorage, opts?: AppListOptions): Promise<{ apps: AppSummaryRecord[]; total: number }> {
+    // Latest version per (owner, filename), WITHOUT the bytes — see SUMMARY_COLUMNS. DISTINCT ON
+    // does the deduplication in the database: this used to read every version row of every app into
+    // memory (payload included) and pick the latest in JS, which cost the production node a flat
+    // 3.5 s per catalogue request regardless of `limit`.
+    let q = this.db.selectFrom('App')
+      .select([...SUMMARY_COLUMNS])
+      .distinctOn(['ownerGaii', 'filename']);
     if (opts?.ownerGaii) q = q.where('ownerGaii', '=', opts.ownerGaii);
-    const allRows = await q.orderBy('versionNumber', 'desc').execute();
-    const latestMap = new Map<string, Selectable<App>>();
-    for (const r of allRows) {
-      const key = `${r.ownerGaii}:${r.filename}`;
-      if (!latestMap.has(key)) latestMap.set(key, r);
-    }
-    let apps = Array.from(latestMap.values()).map(toApp);
-    if (opts?.category) apps = apps.filter(a => a.manifest.category === opts.category);
-    if (opts?.tag) apps = apps.filter(a => a.manifest.tags.includes(opts.tag!));
-    if (opts?.q) {
-      const query = opts.q.toLowerCase();
-      apps = apps.filter(a => a.filename.toLowerCase().includes(query) || a.manifest.name.toLowerCase().includes(query) || a.manifest.description.toLowerCase().includes(query));
-    }
-    if (opts?.freeOnly) apps = apps.filter(a => !a.manifest.priceMorsels);
-    // Parked + operator-hidden apps are hidden from everyone EXCEPT their owner (viewerGhii). A scoped
-    // ownerGaii query already returns only that owner's apps, so skip the filters there. adminView sees all.
-    if (!opts?.ownerGaii && !opts?.adminView) {
-      apps = apps.filter(a => !a.parked || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
-      apps = apps.filter(a => !a.operatorHidden || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
-    }
-    const total = apps.length;
-    // 'popular' was accepted and then ignored here: every caller asking for it got the newest
-    // apps instead, silently. SQLite has always ordered by the download count, so the two
-    // backends disagreed about what the same query means. One row per downloaded app makes the
-    // whole counter table cheap to read, and it has to be read before the slice or the ordering
-    // would only shuffle whichever page the newest-first cut happened to produce.
-    if (opts?.sort === 'popular') {
-      const counts = new Map<string, number>();
-      const rows = await this.db.selectFrom('AppDownload').select(['ownerGaii', 'filename', 'count']).execute();
-      for (const r of rows) counts.set(`${r.ownerGaii} ${r.filename}`, r.count ?? 0);
-      const of = (a: AppRecord) => counts.get(`${a.ownerGaii} ${a.filename}`) ?? 0;
-      // Newest first among apps nobody has opened yet, so the tail stays meaningful.
-      apps.sort((a, b) => (of(b) - of(a)) || b.createdAt.localeCompare(a.createdAt));
-    } else {
-      apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    }
-    const offset = opts?.offset ?? 0;
-    const limit = opts?.limit ?? 50;
-    return { apps: apps.slice(offset, offset + limit), total };
+    // DISTINCT ON requires the leading ORDER BY terms to match its expressions; versionNumber DESC
+    // then decides WHICH row of each group survives. The presentation sort happens below.
+    const latestRows = await q
+      .orderBy('ownerGaii')
+      .orderBy('filename')
+      .orderBy('versionNumber', 'desc')
+      .execute();
+    return finishAppListing(this, latestRows.map(toAppSummary), opts);
+  },
+
+  async listAppsWithContent(this: PostgresKyselyStorage, opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }> {
+    let q = this.db.selectFrom('App').selectAll().distinctOn(['ownerGaii', 'filename']);
+    if (opts?.ownerGaii) q = q.where('ownerGaii', '=', opts.ownerGaii);
+    const latestRows = await q
+      .orderBy('ownerGaii')
+      .orderBy('filename')
+      .orderBy('versionNumber', 'desc')
+      .execute();
+    return finishAppListing(this, latestRows.map(toApp), opts);
   },
 
   async listAppVersions(this: PostgresKyselyStorage, ownerGaii: string, filename: string): Promise<AppRecord[]> {
