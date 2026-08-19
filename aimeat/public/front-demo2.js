@@ -7,6 +7,11 @@
  *   the most-opened real apps. The Experience Center renders even when this node's API does
  *   not list it, by its public address. Everything still degrades to the baked-in HTML.
  * @version-history
+ *   v1.1.0 - 2026-08-19 - Publish order (TARGET-066): counters are API-only (no baked numbers,
+ *     a counting line until the answer lands, dashes on failure), fill cards refuse developer
+ *     jargon and untranslated descriptions (LÄHETIN joined the curated list), and the founding
+ *     banner + honor wall render behind a flag that is OFF — and even on, only when the store's
+ *     founding data source reports at least one member sold.
  *   v1.0.0 - 2026-08-19 - Initial: curated bilingual grid + junk filter; strip and chip as before.
  */
 (function () {
@@ -41,7 +46,15 @@
     { match: 'universe', name: 'UNIVERSE',
       en: 'Persistent 3D worlds your agents build and keep alive.',
       fi: 'Pysyviä 3D-maailmoja, joita agenttisi rakentavat ja pitävät elossa.' },
+    { match: 'lähetin', name: 'LÄHETIN',
+      en: 'Team social posting: one shared space, per-channel texts, calendar scheduling — and the numbers come back to you.',
+      fi: 'Tiimin somejulkaisut: yhteinen tila, kanavakohtaiset tekstit, ajastus kalenterista, ja luvut palaavat sinulle.' },
   ];
+
+  /** A fill card must speak the customer's language. Developer vocabulary (version stamps,
+   *  library talk, verify jargon) marks a description as internal, and those apps wait for a
+   *  composed description before they get floor space. */
+  var JARGON = /v\d+\.\d+|local verify|shared indicator|library|sdk|cortex\b|api\b/i;
 
   /** Local test debris has no place on a sales floor. */
   function isJunk(a) {
@@ -71,7 +84,56 @@
         ? 'Laskettu täältä juuri äsken. Luvut vain kasvavat.'
         : 'Counted right here just now. They only go up.');
     })
-    .catch(function (err) { console.warn('[front-demo2] totals not refreshed, the baked-in numbers stand:', err.message); });
+    .catch(function (err) {
+      // No baked numbers to fall back on (publish order, item 5): the strip says the count is
+      // inside rather than showing a stale figure as if it were live.
+      console.warn('[front-demo2] totals not readable:', err.message);
+      ['fd-n-apps', 'fd-n-opens', 'fd-n-agents', 'fd-n-online'].forEach(function (id) { txt(id, '–'); });
+      txt('fd-strip-note', FI
+        ? 'Elävä laskuri on oven takana: astu demoon ja laske itse.'
+        : 'The live count is one door away: step into the demo and count for yourself.');
+    });
+
+  /**
+   * Founding members (TARGET-066). The flag is OFF, and stays off until the store ships.
+   *
+   * TODO(store): point readFoundingState() at the SAME data source the store sells from — the
+   * store prompt owns that choice, and nothing here invents a parallel one. Contract: resolve
+   * { sold, cap, members: [{ label, url? }] } (members are the opt-in honor-wall rows: a name
+   * or a node id, with an optional link) or null. Rendering requires the flag AND sold >= 1,
+   * so the zero-sold fixture renders nothing even with the flag on.
+   */
+  var FOUNDING_ENABLED = false;
+  function readFoundingState() { return Promise.resolve(null); }
+  if (FOUNDING_ENABLED) {
+    readFoundingState().then(function (st) {
+      if (!st || !(st.sold >= 1)) return;
+      var banner = document.getElementById('fd-founding');
+      if (banner) {
+        banner.textContent = (FI ? 'Founding-jäsenet: ' : 'Founding members: ')
+          + st.sold + '/' + (st.cap || 50) + (FI ? ' varattu' : ' taken');
+        banner.hidden = false;
+      }
+      var wall = document.getElementById('fd-founding-wall');
+      var rows = (st.members || []).filter(function (m) { return m && m.label; });
+      if (wall && rows.length > 0) {
+        var h = document.createElement('h2');
+        h.textContent = FI ? 'Kunniaseinä' : 'The honor wall';
+        var ul = document.createElement('ul');
+        rows.forEach(function (m) {
+          var li = document.createElement('li');
+          var el = document.createElement(m.url ? 'a' : 'span');
+          if (m.url) { el.setAttribute('href', m.url); el.setAttribute('rel', 'noopener'); el.setAttribute('target', '_blank'); }
+          el.textContent = m.label;
+          li.appendChild(el);
+          ul.appendChild(li);
+        });
+        wall.appendChild(h);
+        wall.appendChild(ul);
+        wall.hidden = false;
+      }
+    }).catch(function (err) { console.warn('[front-demo2] founding state not readable, nothing renders:', err.message); });
+  }
 
   fetch('/v1/apps?sort=popular&limit=60')
     .then(function (r) { return r.json(); })
@@ -120,7 +182,10 @@
         }
       });
 
-      apps.filter(function (a) { return used.indexOf(a) === -1 && !isJunk(a); })
+      apps.filter(function (a) {
+        var dd = (a.manifest || {}).description || '';
+        return used.indexOf(a) === -1 && !isJunk(a) && dd.length > 20 && !JARGON.test(dd);
+      })
         .slice(0, Math.max(0, GRID_SIZE - cards.length))
         .forEach(function (a) {
           var m = a.manifest || {};

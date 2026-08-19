@@ -16,6 +16,10 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v1.6.0 — 2026-08-19 — The session cost cap (TARGET-066): when the node pays and the session
+ *     passes ~50k estimated tokens, the composer stands down with a managed landing and two ways
+ *     forward (own key, own place). Request-level; the server-side setting is a TODO by the cap
+ *     constant. sessionStorage 'aimeat.chat.cap' overrides the cap for browser verification.
  *   v1.5.0 — 2026-08-17 — One trust sentence under the welcome (chat.welcomeTrust): what a person
  *     makes here is theirs and stays private until they publish. The first screen asked for a
  *     request without saying where the result would live.
@@ -87,6 +91,33 @@ const STARTERS = [
     { id: 'connect', key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it here so it can do this work?',
       label: 'chat.starterConnect', labelFallback: 'Connect my own AI' },
 ];
+
+/**
+ * The free ride has a ceiling. A chat turn runs on the node's own key (status.pays === 'node'),
+ * and an uncapped session on somebody else's money is an invoice with no top. The ceiling is
+ * enforced HERE, at request level: past it the composer stands down and the person is offered
+ * the two honest ways forward — their own key, or their own place. Never a silent cutoff.
+ *
+ * TODO(server): the authoritative cap belongs next to the payer — a config setting (e.g.
+ * AIMEAT_CHAT_SESSION_TOKEN_CAP, with a CONFIG_FIELDS row) read by POST /v1/chat/threads/:id/turn
+ * in src/routes/chat.ts — and the cheapest-capable-model choice with it: the session model is
+ * AIMEAT_GOOSE_MODEL, operator-set, and this file cannot pick it. Until that lands, this
+ * request-level guard is the cap.
+ *
+ * Four characters per token is the coarse rule of thumb; the job is a ceiling with a managed
+ * landing, not billing-grade accounting. The sessionStorage override exists so the landing can
+ * be VERIFIED in a browser without first spending 50k tokens of somebody's money.
+ */
+const SESSION_TOKEN_CAP = 50_000;
+function sessionTokenCap() {
+    try {
+        const t = parseInt(sessionStorage.getItem('aimeat.chat.cap') ?? '', 10);
+        if (Number.isFinite(t) && t > 0) return t;
+    } catch (err) { console.warn('[chat] cap override not readable:', err.message); }
+    return SESSION_TOKEN_CAP;
+}
+const sessionTokensOf = (turns) =>
+    Math.ceil((turns ?? []).reduce((n, turn) => n + (turn.text || '').length, 0) / 4);
 
 /** Close enough to the bottom to count as "following the conversation". */
 const BOTTOM_SLACK_PX = 48;
@@ -256,6 +287,9 @@ export default function ChatView() {
     const send = useCallback(async (retryText, starterId) => {
         const text = (retryText ?? draft).trim();
         if (!text || busy) return;
+        // The session cap holds at the send door too, so a stale render cannot slip one more
+        // turn onto the node's tab. The composer above is already showing the managed landing.
+        if (status?.pays === 'node' && sessionTokensOf(thread?.turns) >= sessionTokenCap()) return;
         // Inside the tap, because that is the only moment iOS will accept it. Without this, reading
         // an answer aloud later is a silent no-op with nothing in the console to find.
         primeSpeech();
@@ -343,7 +377,7 @@ export default function ChatView() {
                 }
             }
         }
-    }, [draft, busy, thread, startThread, loadThreads, attachments]);
+    }, [draft, busy, thread, startThread, loadThreads, attachments, status]);
 
     const stop = useCallback(() => { abortRef.current?.abort(); }, []);
 
@@ -466,6 +500,9 @@ export default function ChatView() {
     if (loading) return html`<div class="chat-view"><${Spinner} /></div>`;
 
     const turns = thread?.turns ?? [];
+    // Capped only when the NODE pays: a person on their own key spends their own money, and this
+    // ceiling is about the shared tab, never about them.
+    const capped = status?.pays === 'node' && turns.length > 0 && sessionTokensOf(turns) >= sessionTokenCap();
     // Offered by the LAST agent turn only, and only while nothing is running: a fork the agent
     // named three answers ago has been overtaken by everything said since.
     const lastAgentTurn = [...turns].reverse().find((t) => t.role !== 'user');
@@ -547,6 +584,16 @@ export default function ChatView() {
                         ${tr('chat.jumpLatest', 'Jump to the latest')}
                     </button>`}
 
+                ${capped ? html`
+                    <div class="chat-cap">
+                        <p class="chat-cap-title">${tr('chat.capTitle', 'This conversation has used up its free ride.')}</p>
+                        <p class="chat-cap-body">${tr('chat.capBody', "Chat here runs on the house's own AI budget, and this session has reached its share (about 50,000 tokens). The conversation stays right here — nothing is lost. Two ways to keep going:")}</p>
+                        <div class="chat-cap-actions">
+                            <a class="btn-primary" href="/v1/profile?tab=generator">${tr('chat.capOwnKey', 'Bring your own key →')}</a>
+                            ${/* TODO(store): point at the store when it ships; /v1/pricing is the door until then. */''}
+                            <a class="btn-outline" href="/v1/pricing">${tr('chat.capOwnPlace', 'Get your own place →')}</a>
+                        </div>
+                    </div>` : html`
                 <${Composer}
                     value=${draft}
                     onInput=${setDraft}
@@ -559,7 +606,7 @@ export default function ChatView() {
                     listening=${listening}
                     busy=${busy}
                     disabled=${disabled}
-                    note=${disabled ? (status?.note ?? '') : ''} />
+                    note=${disabled ? (status?.note ?? '') : ''} />`}
 
                 <${GooseCredit} />
             </section>

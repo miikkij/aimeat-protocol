@@ -11,6 +11,8 @@
  *
  *   NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.6.0 — 2026-08-19 — .chat-cap: the session cost cap's managed landing, standing where the
+ *     composer stood (TARGET-066).
  *   v1.5.0 — 2026-08-18 — A phone could not LEAVE: the chat owns the whole screen and hides the
  *     site nav, and nothing led back out (found by Jouni on his phone). .chat-back is the door,
  *     mobile-only. Plus air: roomier scroll padding and turn gap, the long model id ellipsized to
@@ -415,6 +417,19 @@
   box-shadow: var(--shadow-sm);
 }
 .chat-main { position: relative; }
+
+/* The session cap's managed landing: stands where the composer stood, so the conversation ends
+   in a door rather than a dead input. */
+.chat-cap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 1rem 1.2rem;
+  margin-top: 0.5rem;
+}
+.chat-cap-title { margin: 0 0 0.4rem; font-weight: 700; }
+.chat-cap-body { margin: 0 0 0.8rem; font-size: 0.92rem; color: var(--text-dim); line-height: 1.55; }
+.chat-cap-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; }
 
 .chat-copy { padding: 0 4px; }
 .chat-copy-all { margin-left: auto; font-size: 0.75rem; padding: 2px 8px; }

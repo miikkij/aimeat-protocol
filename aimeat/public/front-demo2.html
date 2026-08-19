@@ -10,6 +10,11 @@
     AIMEAT is built with AIMEAT. Preview at /front-demo2.html; not wired into the front-page
     switch until a winner is picked. Finnish sibling: front-demo2.fi.html; JS: /front-demo2.js.
   @version-history
+    v1.2.0 - 2026-08-19 - Publish order (TARGET-066): the old price ladder (49/99/990) is gone
+      and the dictated tiers stand alone (Solo 19 · Team 5 59 · Team 10 99 · Team 20 179 €/mo,
+      yearly = 2 months free) with ONE price door; the positioning line under the H1 (the Linux
+      of AI); counters carry no baked numbers; founding banner + honor wall slots behind an
+      off-by-default flag in the JS.
     v1.1.0 - 2026-08-19 - The payment rails sold by name: Stripe (UCP) for cards, x402 for
       agent-to-agent money, live proof links to exchange.apps and noste.apps, and the
       built-in-Finland EU line on the trust bar.
@@ -81,6 +86,11 @@
       font-size: clamp(2.2rem, 7.5vw, 5rem); line-height: 1.04;
       margin: 1.4rem auto 1rem; max-width: 18ch;
       text-shadow: 4px 4px 0 var(--shadow), 8px 8px 0 rgba(26, 11, 31, 0.35);
+    }
+    .fd-position {
+      font-family: 'Bungee', 'Archivo', sans-serif; text-transform: uppercase;
+      font-size: clamp(0.8rem, 1.6vw, 1rem); letter-spacing: 0.04em;
+      margin: -0.2rem auto 1rem; opacity: 0.95;
     }
     .fd-hero .fd-sub {
       max-width: 48rem; margin: 0 auto 1.4rem;
@@ -200,6 +210,25 @@
     .fd-trust-link { text-align: center; margin-top: 1.4rem; font-size: 0.9rem; }
     .fd-trust-link a { color: var(--sun); }
 
+    /* ---------- founding members (hidden until flag + sold >= 1) ---------- */
+    .fd-founding {
+      background: var(--sun); color: var(--shadow);
+      border-top: 3px solid var(--shadow); border-bottom: 3px solid var(--shadow);
+      padding: 0.7rem 1rem; text-align: center;
+      font-family: 'Bungee', 'Archivo', sans-serif; text-transform: uppercase; font-size: 0.95rem;
+    }
+    .fd-founding-wall { padding: 3rem 1.25rem; text-align: center; }
+    .fd-founding-wall h2 {
+      font-family: 'Bungee'; text-transform: uppercase; color: var(--purple);
+      font-size: clamp(1.3rem, 3vw, 1.9rem); margin-bottom: 1.2rem;
+    }
+    .fd-founding-wall ul { list-style: none; display: flex; flex-wrap: wrap; gap: 0.6rem; justify-content: center; max-width: 60rem; margin: 0 auto; }
+    .fd-founding-wall li a, .fd-founding-wall li span {
+      display: inline-block; border: 2px solid var(--shadow); border-radius: 8px;
+      padding: 0.4rem 0.8rem; background: #fff; color: var(--ink);
+      text-decoration: none; font-weight: 700; box-shadow: 3px 3px 0 var(--teal);
+    }
+
     /* ---------- the dogfood strip ---------- */
     .fd-dogfood {
       background: linear-gradient(160deg, #fdeadd, #ffd9e8);
@@ -243,6 +272,7 @@
     </nav>
     <span class="fd-kicker">This whole place is a demo, and everything in it is real</span>
     <h1>Try everything. Then own it.</h1>
+    <p class="fd-position">AIMEAT — the Linux of AI. An open, self-hosted AI operating system.</p>
     <p class="fd-sub">
       aimeat.io is a fully working AIMEAT you can drive today, free. Build a whole working
       system in an hour, bring every AI you already use under one roof, and let agents carry
@@ -265,13 +295,20 @@
     <img class="fd-hero-img" src="/img/frontdemo/hero.jpg" alt="A grand-opening showroom: a beaming host cuts a giant ribbon while people and retro robots celebrate among glowing machines" />
   </header>
 
+  <!-- The counters carry no baked numbers: all four render from the live API in every
+       environment (item 5 of the publish order), and until the answer lands the strip says it
+       is counting rather than showing a stale figure. -->
   <div class="fd-strip">
-    <span><b id="fd-n-apps">130</b> wishes running as apps</span>
-    <span><b id="fd-n-opens">10,224</b> times opened</span>
-    <span><b id="fd-n-agents">148</b> AI helpers on the payroll</span>
-    <span><b id="fd-n-online">52</b> awake right now</span>
-    <span class="fd-strip-note" id="fd-strip-note">Counted right here on 2026-08-19. They only go up.</span>
+    <span><b id="fd-n-apps">…</b> wishes running as apps</span>
+    <span><b id="fd-n-opens">…</b> times opened</span>
+    <span><b id="fd-n-agents">…</b> AI helpers on the payroll</span>
+    <span><b id="fd-n-online">…</b> awake right now</span>
+    <span class="fd-strip-note" id="fd-strip-note">Counting right here, live…</span>
   </div>
+
+  <!-- Founding members (TARGET-066): hidden until the feature flag in front-demo2.js is ON and
+       the store's founding data source reports at least one member sold. Renders nothing today. -->
+  <div class="fd-founding" id="fd-founding" hidden></div>
 
   <section class="fd-section">
     <div class="fd-arcade-head">
@@ -327,7 +364,7 @@
     <div class="fd-section-inner">
       <div class="fd-art">
         <img src="/img/frontdemo/ownbox.jpg" alt="An overjoyed person carries a glowing boxed computer out of a store while retro robots cheer" loading="lazy" />
-        <span class="fd-sticker">From 49 €/mo</span>
+        <span class="fd-sticker">From 19 €/mo</span>
       </div>
       <div class="fd-copy">
         <h2>Loved the demo? Take one home</h2>
@@ -340,9 +377,11 @@
           <li>Every AI you use — Claude, ChatGPT, local models — under one roof, working on the same memory.</li>
           <li>Keeping your own stuff is a joy. Nobody takes it, rents it back to you, or peeks at it.</li>
           <li>Sell what you build: payment rails and agent-to-agent commerce come with the house.</li>
-          <li>Own place 49 €/mo · Pro 99 €/mo · Done for you from 990 € · Enterprise by conversation.</li>
+          <li>Solo 19 · Team 5 59 · Team 10 99 · Team 20 179 €/mo · yearly = 2 months free.</li>
         </ul>
         <div class="fd-cta-row" style="justify-content:flex-start">
+          <!-- TODO(store): this is the page's ONLY price door; point it at the store the moment
+               the store ships, and keep every other price claim off this page (TARGET-066). -->
           <a class="fd-btn fd-btn-cool" href="/v1/pricing">Step into the store →</a>
         </div>
       </div>
@@ -394,6 +433,10 @@
       </div>
     </div>
   </section>
+
+  <!-- Founding honor wall (TARGET-066): opt-in rows (name or node id + link) from the same
+       data source as the banner above. Hidden on the same terms. -->
+  <section class="fd-founding-wall" id="fd-founding-wall" hidden></section>
 
   <div class="fd-dogfood">
     <p>
