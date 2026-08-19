@@ -8474,6 +8474,14 @@ paths:
 
         Requires the ACCOUNT HOLDER's own session: an agent token inherits its owner's roles on this
         node, so agent, ecosystem and app-grant principals are refused here.
+
+        For a FINISHED home the answer also carries `playbooks`: the named outcomes this node can
+        actually deliver (a shop that settles cards, stablecoin and agent purchases; connected
+        publishing accounts; an own page; an own instance), each with its prompt id, its step count
+        and whatever live proof exists HERE. A playbook whose capability is switched off on this
+        node is absent rather than offered, and proof links resolve from this node's own subdomain
+        mappings — no node advertises another node's apps. The human words are locale keys
+        (`home.playbooks.<id>.*`) the client resolves.
       tags:
         - Portal
       security:
@@ -9210,6 +9218,33 @@ paths:
           description: Neither answer was supplied
         '403':
           description: Not the account holder's own session
+
+  /v1/prompts/playbook/{id}:
+    get:
+      operationId: getPlaybookPrompt
+      summary: The recipe behind one playbook
+      description: >-
+        The prompt that walks one playbook (the ids come from GET /v1/home/state `playbooks`): a
+        person takes it to their own AI, or the node's chat agent runs it. Served from the managed
+        prompt record, so an operator edits it in the admin without a deploy, and in the reader's
+        own language when a translation exists.
+
+        The id is checked against the node's playbook list rather than passed through to the prompt
+        store: this serves playbooks only and can never become a generic reader of the operator's
+        other prompts. Public — onboarding guidance, not a secret. `?format=txt` returns plain text.
+      tags:
+        - Portal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/prompts/hello-mcp:
     get:

@@ -3079,6 +3079,56 @@
       "saved": "Últimas guardadas",
       "used": "Últimas abiertas"
     },
+    "playbooks": {
+      "title": "¿Qué te gustaría montar?",
+      "lead": "Cada uno es algo que este sitio hace de verdad, con los pasos y el prompt que lo consigue.",
+      "ask": "Pídeselo a mi agente",
+      "copy": "Copiar para mi propia IA",
+      "copied": "Copiado — pégalo en tu chat de IA",
+      "proof": "Ya funcionando aquí:",
+      "tour": "¿No sabes qué se puede hacer? Haz el recorrido →",
+      "marketplace": {
+        "title": "Una tienda que cobra con tarjetas, monedas y agentes",
+        "lead": "Una caja que acepta una tarjeta, una stablecoin o el dinero de otro agente — y te paga a ti.",
+        "ask": "Quiero montar una tienda que acepte tarjetas, stablecoin y compras de agentes. Guíame.",
+        "step1": "Di qué vendes: una cosa, un servicio o el trabajo que tus agentes hacen para otros.",
+        "step2": "Conecta el dinero. Las tarjetas van por tu proveedor de pagos; USDC y EURC llegan directas a tu dirección.",
+        "step3": "Tu agente publica la tienda como una aplicación con su propia dirección web.",
+        "step4": "Las ventas se retienen, se cobran y se te pagan — y puedes repartir lo ganado con quien te ayudó."
+      },
+      "accounts": {
+        "title": "Tus cuentas, conectadas",
+        "lead": "Conecta las cuentas en las que ya publicas y tu agente publicará en ellas por ti.",
+        "ask": "Quiero conectar las cuentas en las que ya publico, para que mi agente publique en ellas.",
+        "step1": "Elige una cuenta. Inicias sesión en su web, nunca aquí.",
+        "step2": "Di cuál de tus agentes puede publicar, y dónde.",
+        "step3": "El agente escribe, tú lo lees, y sale solo cuando dices que sí.",
+        "step4": "Cada publicación queda en tu registro, y con un clic la cuenta vuelve a soltarse."
+      },
+      "page": {
+        "title": "Tu propia página",
+        "lead": "Una dirección web de verdad que es tuya, escrita y cambiada pidiéndolo en vez de rellenando un formulario.",
+        "ask": "Publica mi propia página y dame la dirección.",
+        "step1": "Dile a tu agente quién eres y qué debe decir la página.",
+        "step2": "La publica y te da la dirección.",
+        "step3": "Cámbiala pidiéndolo — no hay editor que aprender.",
+        "step4": "Añade las partes que solo verán algunas personas, cuando quieras."
+      },
+      "instance": {
+        "title": "Tu propia instancia",
+        "lead": "Todo esto en tu máquina o tu nube: tus reglas, tus datos, tus costes.",
+        "ask": "Estoy pensando en ejecutar AIMEAT en mi propia máquina. Ayúdame a decidir y luego instálalo.",
+        "step1": "Piensa qué quieres que este sitio no te da.",
+        "step2": "Instálalo — un comando, y responde en tu propia dirección.",
+        "step3": "Llévate tus cosas: memoria, archivos, espacios y agentes se exportan e importan.",
+        "step4": "Decide tus propias reglas, y federa con otros solo si quieres."
+      }
+    },
+    "trust": {
+      "ai": "El contenido hecho con IA lleva aquí su etiqueta, como pide el Reglamento de IA de la UE.",
+      "data": "Tus datos son tuyos: expórtalos o bórralos, y nada se comparte hasta que tú lo compartes.",
+      "more": "Cómo funciona →"
+    },
     "ach": {
       "title": "Logros",
       "mat": "Felpudo puesto",

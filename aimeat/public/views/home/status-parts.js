@@ -12,9 +12,12 @@
  *   spills: the person stars what matters, the rest folds away, and the fold says how much it
  *   holds. The first version showed every chip it had, which on the developer's own account was
  *   the wall of noise this file exists to prevent.
- * @structure MailboxRow · FleetLine · ChatDoor · Things · FavoriteApps · Achievements
+ * @structure MailboxRow · FleetLine · ChatDoor · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   v1.2.0 — 2026-08-19 — Playbooks (folded outcomes with steps, live proof and both roads: the
+ *     agent or your own AI) and TrustLine (AI labelling + data ownership, stated as what the
+ *     system does).
  *   v1.1.0 — 2026-08-19 — Jouni's prod round: the mailbox opens ?tab=messages (tab=inbox was a
  *     guessed id that 404-redirected — a link I shipped unchecked), app chips say the app's NAME
  *     with the .html stripped, and FavoriteApps reads the complete own-apps list (index.js now
@@ -31,6 +34,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { listRecents } from '/js/recents.js';
+import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -251,6 +255,98 @@ export function FavoriteApps({ apps, favorites, owner, prefs, onMode }) {
               onClick=${() => onMode('used')}>${tr('home.apps.used', 'Last opened')}</button>
           </span>`}
       </div>
+    </section>`;
+}
+
+/**
+ * The playbooks: named outcomes, folded away until asked for.
+ *
+ * FOLDED IS THE POINT. The four rooms this replaces sat open at the top of the home and were
+ * removed for it; a menu of things you have not done is noise until you go looking for one. So the
+ * section is a heading and a row of names, and only the one you open shows its steps, its proof and
+ * its two roads: hand it to the agent in the chat, or take the prompt to your own AI.
+ *
+ * The words come from locale keys the server never sees (home.playbooks.<id>.*), the availability
+ * from the server (a playbook this node cannot deliver never arrives), and the proof links from the
+ * node's own subdomain mappings.
+ */
+export function Playbooks({ playbooks, tour }) {
+  const [open, setOpen] = useState(null);
+  const [copied, setCopied] = useState(null);
+  if (!playbooks?.length) return null;
+  const askAgent = (pb) => {
+    const ask = tr(`home.playbooks.${pb.id}.ask`, tr(`home.playbooks.${pb.id}.title`, pb.id));
+    // eslint-disable-next-line aimeat/no-silent-catch -- storage blocked only costs the pre-filled line
+    try { sessionStorage.setItem('aimeat.wish', ask); } catch { /* the chat simply opens empty */ }
+    window.location.href = '/v1/chat';
+  };
+  const copyPrompt = async (pb) => {
+    try {
+      const r = await fetch(`/v1/prompts/playbook/${encodeURIComponent(pb.id)}?format=txt`);
+      await navigator.clipboard.writeText(await r.text());
+      setCopied(pb.id);
+      setTimeout(() => setCopied(null), 2500);
+    } catch (e) { swallowed('playbooks: copy', e); }
+  };
+  return html`
+    <section class="koti-pb">
+      <h2 class="koti-feed-title">${tr('home.playbooks.title', 'What would you like to set up?')}</h2>
+      <p class="koti-pb-lead">${tr('home.playbooks.lead', 'Each one is a real thing you can do here, with the steps and the prompt that gets it done.')}</p>
+      <div class="koti-things-row">
+        ${playbooks.map((pb) => html`
+          <button type="button" key=${pb.id}
+            class="koti-fold ${open === pb.id ? 'koti-fold--on' : ''}"
+            aria-expanded=${open === pb.id}
+            onClick=${() => setOpen(open === pb.id ? null : pb.id)}>
+            ${tr(`home.playbooks.${pb.id}.title`, pb.id)}
+          </button>`)}
+        ${tour && html`<a class="koti-pb-tour" href=${tour} target="_blank" rel="noopener">
+          ${tr('home.playbooks.tour', 'Not sure what this can do? Take the tour →')}</a>`}
+      </div>
+      ${playbooks.filter((pb) => pb.id === open).map((pb) => html`
+        <div class="koti-pb-open" key=${pb.id}>
+          <p class="koti-pb-what">${tr(`home.playbooks.${pb.id}.lead`, '')}</p>
+          <ol class="koti-pb-steps">
+            ${Array.from({ length: pb.steps }, (_, i) => tr(`home.playbooks.${pb.id}.step${i + 1}`, ''))
+              .filter(Boolean)
+              .map((step, i) => html`<li key=${i}>${step}</li>`)}
+          </ol>
+          ${pb.proof?.length > 0 && html`
+            <p class="koti-pb-proof">
+              ${tr('home.playbooks.proof', 'Already running here:')}${' '}
+              ${pb.proof.map((pr, i) => html`
+                <${'span'} key=${pr.name}>${i > 0 ? ' · ' : ''}<a href=${pr.url} target="_blank" rel="noopener">${pr.name}</a><//>`)}
+            </p>`}
+          <div class="koti-pb-actions">
+            ${/* The wish rail the landing page already uses (sessionStorage 'aimeat.wish'): the chat
+                  drains it INTO THE COMPOSER and the person presses send themselves. A ?ask= query
+                  param would have been a second contract, and the chat reads no such thing — a
+                  button that navigates somewhere unprepared is the defect this avoids. */''}
+            <button type="button" class="btn-primary" onClick=${() => askAgent(pb)}>
+              ${tr('home.playbooks.ask', 'Ask my agent')}
+            </button>
+            <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
+              ${copied === pb.id
+                ? tr('home.playbooks.copied', 'Copied — paste it in your AI chat')
+                : tr('home.playbooks.copy', 'Copy for my own AI')}
+            </button>
+          </div>
+        </div>`)}
+    </section>`;
+}
+
+/**
+ * Two facts about how this place treats a person, at the bottom where a footer belongs: AI-made
+ * content is labelled, and their data stays theirs. Stated as what the system DOES rather than as
+ * a compliance badge — the claim we can prove is the stronger one anyway, and each half links to
+ * the page that proves it.
+ */
+export function TrustLine() {
+  return html`
+    <section class="koti-trust">
+      <p>${tr('home.trust.ai', 'AI-made content carries its label here, as the EU AI Act asks.')}
+        <a href="/v1/transparency">${tr('home.trust.more', 'How this works →')}</a></p>
+      <p>${tr('home.trust.data', 'Your data is yours: export it or delete it, and nothing is shared until you share it.')}</p>
     </section>`;
 }
 

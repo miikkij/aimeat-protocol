@@ -12,6 +12,9 @@
  * @structure registerHomeStateRoutes(router, ctx): GET /v1/home/state
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.1.0 — 2026-08-19 — The response carries `playbooks`: the named outcomes this node can
+ *     actually deliver (services/home-playbooks.ts), each with its prompt, step count and whatever
+ *     live proof the node has. Only for a finished home.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  */
 import type { Router } from 'express';
@@ -20,6 +23,7 @@ import { success } from '../../middleware/envelope.js';
 import { readHomeState, HOME_STEPS } from '../../services/home-state.js';
 import { aiClientQuestionOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-setup.js';
 import { openRooms } from '../../services/home-rooms.js';
+import { openPlaybooks } from '../../services/home-playbooks.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
@@ -54,9 +58,15 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
             ? await openRooms(storage, config, resolveIdentity(req.auth!, config.nodeId))
             : [];
 
+        // The playbooks this node can actually deliver. Only for a FINISHED home: somebody still
+        // putting their page up is being asked one thing at a time, and a menu of outcomes beside
+        // that is the noise the rooms were removed for.
+        const playbooks = state.initialized ? await openPlaybooks(storage, config) : [];
+
         res.json(success(config.nodeId, {
             state,
             rooms,
+            playbooks,
             /** The three steps in order, so the view can name the ones still ahead. */
             steps: HOME_STEPS,
             /** What still needs asking, if anything. */

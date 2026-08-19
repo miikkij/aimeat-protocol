@@ -3079,6 +3079,56 @@
       "saved": "Last saved",
       "used": "Last opened"
     },
+    "playbooks": {
+      "title": "What would you like to set up?",
+      "lead": "Each one is a real thing you can do here, with the steps and the prompt that gets it done.",
+      "ask": "Ask my agent",
+      "copy": "Copy for my own AI",
+      "copied": "Copied — paste it in your AI chat",
+      "proof": "Already running here:",
+      "tour": "Not sure what this can do? Take the tour →",
+      "marketplace": {
+        "title": "A shop that takes cards, coins and agents",
+        "lead": "One checkout that accepts a card, a stablecoin or another agent's money — and pays out to you.",
+        "ask": "I want to set up a shop that takes cards, stablecoin and agent purchases. Walk me through it.",
+        "step1": "Say what you sell: a thing, a service, or work your agents do for people.",
+        "step2": "Connect the money. Cards go through your payment provider; USDC and EURC settle straight to your address.",
+        "step3": "Your agent publishes the shop as an app with its own web address.",
+        "step4": "Sales are held, captured and paid out to you — and you can split the takings with whoever helped."
+      },
+      "accounts": {
+        "title": "Your accounts, connected",
+        "lead": "Attach the accounts you already publish to, and your agent posts to them for you.",
+        "ask": "I want to connect the accounts I already publish to, so my agent can post to them.",
+        "step1": "Pick an account to attach. You sign in at their site, never here.",
+        "step2": "Say which of your agents may publish, and where.",
+        "step3": "Your agent writes, you read it, and it goes out only when you say yes.",
+        "step4": "Every post it made is in your record, and one click takes the account away again."
+      },
+      "page": {
+        "title": "Your own page",
+        "lead": "A real web address that is yours, written and changed by asking rather than by filling a form.",
+        "ask": "Put up my own page and give me the address.",
+        "step1": "Tell your agent who you are and what the page should say.",
+        "step2": "It publishes the page and hands you the address.",
+        "step3": "Change it by asking — there is no editor to learn.",
+        "step4": "Add the parts only certain people may see, whenever you want them."
+      },
+      "instance": {
+        "title": "Your own instance",
+        "lead": "The whole thing on your own machine or cloud: your rules, your data, your costs.",
+        "ask": "I am thinking about running AIMEAT on my own machine. Help me decide, then install it.",
+        "step1": "Work out what you want that this place does not give you.",
+        "step2": "Install it — one command, and it answers on your own address.",
+        "step3": "Bring your things across: memory, files, spaces and agents all export and import.",
+        "step4": "Decide your own rules, and federate with others only if you want to."
+      }
+    },
+    "trust": {
+      "ai": "AI-made content carries its label here, as the EU AI Act asks.",
+      "data": "Your data is yours: export it or delete it, and nothing is shared until you share it.",
+      "more": "How this works →"
+    },
     "ach": {
       "title": "Achievements",
       "mat": "Welcome mat up",

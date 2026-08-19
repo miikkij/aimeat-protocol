@@ -16,6 +16,7 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v2.5.0 — 2026-08-19 — Playbooks (folded, from /v1/home/state) and the trust line at the foot.
  *   v2.4.0 — 2026-08-19 — Prod round: the "Your home is up and running" hero is gone (this is the
  *     dashboard; the nameplate already says who and the pieces say what), the mat line calls the
  *     thing what it is (your AI-made webpage), the nameplate carries the person's GHII address
@@ -57,7 +58,7 @@ import { swallowed } from '/js/swallowed.js';
 import { listApps } from '/js/services/apps.js';
 import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent } from '/views/home/step-agent.js';
-import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
+import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Playbooks, TrustLine, Achievements } from '/views/home/status-parts.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { StepBranchB } from '/views/home/step-branch-b.js';
 import { HomeFeed } from '/views/home/feed.js';
@@ -66,6 +67,9 @@ import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { InstallCta } from '/components/InstallCta.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/** The guided tour, offered beside the playbooks: the one place that answers "what IS this". */
+const EXPERIENCE_CENTER = 'https://experience-center.apps.aimeat.io';
 
 /** The steps, named. `better-app` exists only on branch B; on A there are two, not three. */
 const STEP_TITLES = {
@@ -114,6 +118,7 @@ export default function HomeView({ navigate }) {
   const [mail, setMail] = useState(null);
   const [favorites, setFavorites] = useState(null);
   const [ownApps, setOwnApps] = useState([]);
+  const [playbooks, setPlaybooks] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -130,6 +135,8 @@ export default function HomeView({ navigate }) {
     try {
       const r = await apiGet('/v1/home/state');
       setState(r.data.state);
+      // Only what this node can actually deliver — the server has already dropped the rest.
+      setPlaybooks(Array.isArray(r.data.playbooks) ? r.data.playbooks : []);
       setLoadError('');
       // The feed is secondary to the steps: if it fails the page still works, but the failure is
       // recorded rather than swallowed, because a feed that silently never loads looks identical
@@ -263,11 +270,13 @@ export default function HomeView({ navigate }) {
         <${FleetLine} agent=${state.agent} />
         <${Things} usage=${usage} orgs=${orgs} packages=${packages} prefs=${prefs} onStar=${toggleStar} />
         <${FavoriteApps} apps=${ownApps} favorites=${favorites} owner=${state.owner} prefs=${prefs} onMode=${setAppsMode} />
+        <${Playbooks} playbooks=${playbooks} tour=${EXPERIENCE_CENTER} />
         <${Achievements} state=${state} usage=${usage} markers=${markers} chatStatus=${chatStatus}
           orgs=${orgs} packages=${packages} prefs=${prefs} onTried=${markTried} />
         <${HomeFeed} items=${feed} />
         <${OpenItemsList} maxAgeDays=${7} />
         <${InstallCta} />
+        <${TrustLine} />
         <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
           session=${session} showToast=${showToast} />
       </div>`;

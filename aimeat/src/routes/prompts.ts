@@ -9,6 +9,9 @@
  *   v1.0.0 -- 2026-03-01 -- Initial tiered prompts (0, 1, 2, anonymous)
  *   v1.1.0 -- 2026-05-21 -- Extend tier1 response with directives, task queue, and agent endpoints
  *   v1.2.0 -- 2026-05-22 -- Add GET /v1/prompts/tier1/:module for modular prompt system
+ *   v1.9.0 -- 2026-08-19 -- GET /v1/prompts/playbook/:id: the recipe behind one playbook, over an
+ *     allowlist (services/home-playbooks.ts) so it can never become a generic reader of the
+ *     operator's prompts.
  *   v1.3.0 -- 2026-05-27 -- Add /v1/agents/me/handbook routes, 301 redirects from old tier1 paths
  *   v1.3.1 -- 2026-05-28 -- Add neutral handbook content aliases and stop advertising owner-only task start to agents
  *   v1.4.0 -- 2026-05-30 -- Add GET /v1/agents/me/handbook/surface/:role serving the v2 per-role surface handbooks
@@ -35,6 +38,7 @@ import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt, buildAppSpecToken } from '../services/build-app-prompt.js';
+import { PLAYBOOKS } from '../services/home-playbooks.js';
 import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
@@ -384,6 +388,27 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Approve the request when it appears', method: 'POST', url: '/v1/agents/verify' },
       { description: 'Where your home stands', method: 'GET', url: '/v1/home/state' },
     ]));
+  });
+
+  // GET /v1/prompts/playbook/:id — the recipe behind one playbook (services/home-playbooks.ts).
+  //
+  // ONE route for the family, and an ALLOWLIST rather than a generic prompt reader: PLAYBOOKS is
+  // the whole set of ids this serves, so a guessed id can never turn this into a door onto the
+  // operator's other prompts. The content is the managed record, so an operator edits a playbook in
+  // the admin without a deploy, and `resolvePromptContent` gives the reader their own language.
+  // MUST be registered before /v1/prompts/:tier, which would otherwise swallow the path.
+  router.get('/v1/prompts/playbook/:id', optionalAuth(), async (req, res) => {
+    const id = String(req.params.id);
+    const def = PLAYBOOKS.find(p => p.id === id);
+    if (!def) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such playbook.')); return; }
+    const record = await storage.getSystemPrompt(def.prompt);
+    if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available')); return; }
+    const content = substituteVariables(
+      resolvePromptContent(record, req.headers['accept-language'] as string),
+      { node_url: config.baseUrl, node_id: config.nodeId },
+    );
+    if (req.query.format === 'txt') { res.type('text/plain; charset=utf-8').send(content); return; }
+    res.json(success(config.nodeId, { id, prompt: content, name: record.name, description: record.description }));
   });
 
   // GET /v1/prompts/hello-mcp — the proof prompt. Running it in the user's own AI chat writes

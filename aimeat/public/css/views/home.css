@@ -9,6 +9,8 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v2.3.0 — 2026-08-19 — .koti-pb* (the folded playbooks and the one that opens) and .koti-trust
+ *     (the AI-labelling and data-ownership line at the foot).
  *   v2.2.0 — 2026-08-18 — .koti-things-named (spaces and packages by name), .koti-ach* (the
  *     achievements strip: dashed = a door still to open, solid + green tick = done), and
  *     .koti-chatdoor-ai (which mind answers in the chat).
@@ -382,6 +384,34 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
   font-family: var(--font-mono); font-size: 0.72rem; color: var(--muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help;
 }
+
+/* ── Playbooks: folded outcomes. Closed they are a row of names; open, one shows its steps. ── */
+.koti-pb { margin-top: 2rem; }
+.koti-pb-lead { margin: -0.4rem 0 0.8rem; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; }
+.koti-pb-tour { font-size: 0.85rem; color: var(--accent); text-decoration: none; align-self: center; }
+.koti-pb-tour:hover { text-decoration: underline; }
+.koti-pb-open {
+  margin-top: 0.8rem; padding: 1.1rem 1.2rem;
+  border: 1px solid var(--accent-border, var(--border)); border-radius: var(--radius);
+  background: var(--card);
+}
+.koti-pb-what { margin: 0 0 0.7rem; font-size: 0.95rem; line-height: 1.55; }
+.koti-pb-steps { margin: 0; padding-left: 1.2rem; font-size: 0.9rem; color: var(--text-dim); line-height: 1.6; }
+.koti-pb-steps li { margin-bottom: 0.3rem; }
+.koti-pb-proof { margin: 0.8rem 0 0; font-size: 0.85rem; color: var(--text-dim); }
+.koti-pb-proof a { color: var(--accent); text-decoration: none; }
+.koti-pb-proof a:hover { text-decoration: underline; }
+.koti-pb-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 1rem; }
+.koti-pb-actions .btn-primary { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* The two facts at the foot: what happens to AI content, and whose the data is. */
+.koti-trust {
+  margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border);
+  font-size: 0.82rem; color: var(--muted); line-height: 1.6;
+}
+.koti-trust p { margin: 0 0 0.3rem; }
+.koti-trust a { color: var(--accent); text-decoration: none; }
+.koti-trust a:hover { text-decoration: underline; }
 
 /* ── Achievements: what has been tried, and doors to what has not. ── */
 .koti-ach { margin-top: 2rem; }

@@ -3079,6 +3079,56 @@
       "saved": "Viimeksi tallennetut",
       "used": "Viimeksi avatut"
     },
+    "playbooks": {
+      "title": "Mitä haluaisit perustaa?",
+      "lead": "Jokainen näistä on oikeasti tehtävissä täällä, ja mukana tulevat askeleet ja kehote joka vie perille.",
+      "ask": "Pyydä agenttiani",
+      "copy": "Kopioi omalle tekoälylleni",
+      "copied": "Kopioitu — liitä se tekoälychattiisi",
+      "proof": "Täällä pyörii jo:",
+      "tour": "Etkö ole varma mihin tämä pystyy? Käy kierroksella →",
+      "marketplace": {
+        "title": "Kauppa jossa maksavat kortit, kolikot ja agentit",
+        "lead": "Yksi kassa joka ottaa vastaan kortin, stablecoinin tai toisen agentin rahat — ja tilittää sinulle.",
+        "ask": "Haluan perustaa kaupan joka ottaa vastaan kortit, stablecoinin ja agenttiostot. Opasta minut läpi.",
+        "step1": "Kerro mitä myyt: tavaraa, palvelua vai työtä jonka agenttisi tekevät toisille.",
+        "step2": "Kytke raha. Kortit kulkevat maksunvälittäjäsi kautta, USDC ja EURC tilittyvät suoraan osoitteeseesi.",
+        "step3": "Agenttisi julkaisee kaupan appina, jolla on oma verkko-osoite.",
+        "step4": "Myynti varataan, veloitetaan ja tilitetään sinulle — ja voit jakaa tuoton niiden kesken jotka olivat mukana."
+      },
+      "accounts": {
+        "title": "Tilisi kytkettyinä",
+        "lead": "Liitä ne tilit joihin jo julkaiset, niin agenttisi kirjoittaa niihin puolestasi.",
+        "ask": "Haluan kytkeä ne tilit joihin jo julkaisen, niin että agenttini voi kirjoittaa niihin.",
+        "step1": "Valitse liitettävä tili. Kirjaudut heidän sivullaan, et koskaan täällä.",
+        "step2": "Kerro kuka agenteistasi saa julkaista ja minne.",
+        "step3": "Agentti kirjoittaa, sinä luet, ja se lähtee vasta kun sanot kyllä.",
+        "step4": "Jokainen julkaisu näkyy kirjauksissasi, ja yhdellä klikkauksella tili irtoaa taas."
+      },
+      "page": {
+        "title": "Oma sivusi",
+        "lead": "Oikea verkko-osoite joka on sinun, kirjoitettuna ja muutettuna pyytämällä eikä lomaketta täyttämällä.",
+        "ask": "Laita oma sivuni pystyyn ja anna minulle osoite.",
+        "step1": "Kerro agentillesi kuka olet ja mitä sivun pitäisi sanoa.",
+        "step2": "Se julkaisee sivun ja antaa sinulle osoitteen.",
+        "step3": "Muuta sitä pyytämällä — mitään editoria ei tarvitse opetella.",
+        "step4": "Lisää ne osat jotka näkyvät vain valituille, silloin kun haluat."
+      },
+      "instance": {
+        "title": "Oma instanssisi",
+        "lead": "Koko homma omalla koneellasi tai pilvessäsi: omat sääntösi, oma datasi, omat kulusi.",
+        "ask": "Mietin AIMEATin ajamista omalla koneellani. Auta päättämään, ja asenna se sitten.",
+        "step1": "Mieti mitä haluat, mitä tämä paikka ei sinulle anna.",
+        "step2": "Asenna se — yksi komento, ja se vastaa omassa osoitteessasi.",
+        "step3": "Tuo tavarasi mukana: muistit, tiedostot, tilat ja agentit kaikki siirtyvät.",
+        "step4": "Päätä omat sääntösi, ja federoi muiden kanssa vain jos haluat."
+      }
+    },
+    "trust": {
+      "ai": "Tekoälyn tekemä sisältö kantaa täällä merkintänsä, kuten EU:n tekoälyasetus edellyttää.",
+      "data": "Tietosi ovat sinun: vie ne pois tai poista ne, eikä mitään jaeta ennen kuin itse jaat.",
+      "more": "Näin se toimii →"
+    },
     "ach": {
       "title": "Saavutukset",
       "mat": "Tervetuloamatto pystyssä",
