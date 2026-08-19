@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<!--
+  @file front-demo2.html
+  @description The sales-mode experiment on the showroom front page: a copy of front-demo.html
+    (which stays untouched as the saved version) with the pitch turned all the way up. What it
+    adds: a curated, bilingual app grid (junk test apps filtered out, TINKI and the Experience
+    Center guaranteed on the floor), the monetization angle (TURBO and NOSTE), a trust bar
+    (EU AI Act disclosure, AI labels, consent, GDPR), an agent-incubator section
+    (agenttihautomo.aimeat.io), the all-your-AIs-under-one-roof line, and the dogfood strip:
+    AIMEAT is built with AIMEAT. Preview at /front-demo2.html; not wired into the front-page
+    switch until a winner is picked. Finnish sibling: front-demo2.fi.html; JS: /front-demo2.js.
+  @version-history
+    v1.0.0 - 2026-08-19 - First version, forked from front-demo.html v1.2.0.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIMEAT · Try everything, then own it</title>
+  <meta name="description" content="A fully working AIMEAT you can drive free: build whole systems in an hour, bring every AI you use under one roof, adopt agents from the incubator, and own the result — labeled, consented and by EU rules." />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+  <script src="/front-demo2.js" defer></script>
+  <style>
+    :root {
+      --ink: #2b1230;
+      --cream: #fff6e9;
+      --coral: #ff5a4e;
+      --sun: #ffb52e;
+      --teal: #19c2b8;
+      --magenta: #e33fa1;
+      --purple: #5b2a86;
+      --shadow: #1a0b1f;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Archivo', system-ui, sans-serif; color: var(--ink); background: var(--cream); overflow-x: hidden; }
+    h1, h2, .fd-kicker, .fd-sticker, .fd-btn, .fd-ribbon, .fd-chip { font-family: 'Bungee', 'Archivo', sans-serif; font-weight: 400; text-transform: uppercase; }
+
+    .fd-ribbon {
+      position: fixed; top: 26px; left: -64px; z-index: 20;
+      transform: rotate(-45deg);
+      background: var(--sun); color: var(--shadow);
+      border-top: 3px solid var(--shadow); border-bottom: 3px solid var(--shadow);
+      padding: 0.35rem 4.5rem;
+      font-size: 0.72rem; letter-spacing: 0.08em;
+      box-shadow: 0 4px 14px rgba(26, 11, 31, 0.35);
+      pointer-events: none;
+    }
+
+    .fd-top { position: absolute; top: 1rem; right: 1rem; z-index: 5; display: flex; gap: 0.4rem; align-items: center; }
+    .fd-chip, .fd-lang a {
+      font-family: 'Bungee', 'Archivo', sans-serif;
+      font-size: 0.75rem; text-decoration: none; text-transform: uppercase;
+      color: var(--cream); border: 2px solid var(--cream);
+      padding: 0.25rem 0.55rem; opacity: 0.85;
+    }
+    .fd-chip:hover, .fd-lang a:hover { opacity: 1; }
+    .fd-lang { display: flex; gap: 0.4rem; }
+    .fd-lang a.fd-lang-on { background: var(--sun); color: var(--shadow); border-color: var(--shadow); opacity: 1; transform: rotate(-2deg); }
+
+    .fd-hero {
+      position: relative;
+      background: linear-gradient(175deg, var(--purple) 0%, var(--magenta) 55%, var(--sun) 130%);
+      color: var(--cream);
+      padding: 4.5rem 1.25rem 0;
+      text-align: center;
+    }
+    .fd-kicker {
+      display: inline-block; background: var(--sun); color: var(--shadow);
+      padding: 0.35rem 1rem; border: 3px solid var(--shadow);
+      box-shadow: 5px 5px 0 var(--shadow); transform: rotate(-2deg);
+      font-size: 0.85rem; letter-spacing: 0.06em;
+    }
+    .fd-hero h1 {
+      font-size: clamp(2.2rem, 7.5vw, 5rem); line-height: 1.04;
+      margin: 1.4rem auto 1rem; max-width: 18ch;
+      text-shadow: 4px 4px 0 var(--shadow), 8px 8px 0 rgba(26, 11, 31, 0.35);
+    }
+    .fd-hero .fd-sub {
+      max-width: 48rem; margin: 0 auto 1.4rem;
+      font-size: clamp(1.05rem, 2.2vw, 1.3rem); line-height: 1.55; font-weight: 600;
+    }
+    .fd-wish { display: flex; gap: 0.8rem; max-width: 34rem; margin: 0 auto 0.8rem; }
+    .fd-wish input {
+      flex: 1 1 12rem; min-width: 0;
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: 1.15rem; font-weight: 800;
+      padding: 0.8rem 1rem; border: 3px solid var(--shadow); border-radius: 8px;
+      background: #fff; color: var(--ink);
+      box-shadow: 5px 5px 0 var(--magenta);
+    }
+    .fd-wish input:focus { outline: 3px solid var(--teal); outline-offset: 2px; }
+    .fd-wish input::placeholder { color: var(--purple); opacity: 0.65; font-style: italic; }
+    .fd-wish button { cursor: pointer; font-size: 1.1rem; }
+    .fd-wish-lead { max-width: 40rem; margin: 0 auto 1.6rem; font-size: 0.95rem; opacity: 0.92; }
+    .fd-cta-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2.4rem; }
+    .fd-btn {
+      display: inline-block; padding: 0.85rem 1.6rem; font-size: 1rem;
+      text-decoration: none; border: 3px solid var(--shadow);
+      box-shadow: 6px 6px 0 var(--shadow);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .fd-btn:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--shadow); }
+    .fd-btn-hot { background: var(--coral); color: var(--cream); }
+    .fd-btn-cool { background: var(--teal); color: var(--shadow); }
+    .fd-hero-img {
+      display: block; width: min(1100px, 96%); margin: 0 auto;
+      border: 5px solid var(--shadow); border-bottom: none;
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -12px 40px rgba(26, 11, 31, 0.45);
+    }
+
+    .fd-strip {
+      background: var(--shadow); color: var(--cream);
+      padding: 1.1rem 1rem; text-align: center;
+      display: flex; justify-content: center; flex-wrap: wrap;
+      gap: 0.6rem 2.2rem; font-weight: 800; letter-spacing: 0.02em;
+    }
+    .fd-strip b { color: var(--sun); font-size: 1.25rem; margin-right: 0.35rem; }
+    .fd-strip .fd-strip-note { flex-basis: 100%; font-weight: 400; opacity: 0.75; font-size: 0.8rem; }
+
+    .fd-section { padding: 4.5rem 1.25rem; }
+    .fd-section-inner {
+      max-width: 68rem; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;
+    }
+    .fd-section:nth-of-type(even) .fd-section-inner .fd-art { order: 2; }
+    .fd-art { position: relative; }
+    .fd-art img {
+      width: 100%; display: block;
+      border: 5px solid var(--shadow); border-radius: 14px;
+      box-shadow: 12px 12px 0 var(--coral);
+      transform: rotate(-1.5deg);
+    }
+    .fd-section:nth-of-type(even) .fd-art img { transform: rotate(1.5deg); box-shadow: -12px 12px 0 var(--teal); }
+    .fd-sticker {
+      position: absolute; top: -1.2rem; right: -0.6rem;
+      background: var(--sun); color: var(--shadow);
+      border: 3px solid var(--shadow); padding: 0.5rem 0.9rem;
+      transform: rotate(6deg); font-size: 0.85rem;
+      box-shadow: 4px 4px 0 var(--shadow);
+    }
+    .fd-copy h2 {
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem); line-height: 1.1; margin-bottom: 1rem;
+      color: var(--purple); text-shadow: 3px 3px 0 rgba(255, 90, 78, 0.25);
+    }
+    .fd-copy p { line-height: 1.65; margin-bottom: 1rem; font-size: 1.05rem; }
+    .fd-copy ul { list-style: none; margin: 1.2rem 0; }
+    .fd-copy li { padding: 0.45rem 0 0.45rem 2rem; position: relative; line-height: 1.5; font-weight: 600; }
+    .fd-copy li::before { content: "★"; position: absolute; left: 0.2rem; color: var(--coral); font-size: 1.1rem; }
+    .fd-ideas {
+      background: var(--cream); border: 3px dashed var(--magenta); border-radius: 10px;
+      padding: 1rem 1.2rem; font-size: 0.98rem; line-height: 1.6;
+    }
+    .fd-ideas strong { color: var(--magenta); text-transform: uppercase; letter-spacing: 0.04em; }
+    .fd-alt { background: linear-gradient(160deg, #fdeadd, #ffd9e8); }
+    .fd-teal { background: linear-gradient(160deg, #d9f6f2, #fdf3d7); }
+
+    .fd-arcade-head {
+      max-width: 68rem; margin: 0 auto 2rem;
+      display: grid; grid-template-columns: 280px 1fr; gap: 2.5rem; align-items: center;
+    }
+    .fd-arcade-head .fd-art img { box-shadow: 12px 12px 0 var(--sun); }
+    .fd-app-grid {
+      max-width: 68rem; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem;
+    }
+    .fd-app {
+      background: #fff; border: 3px solid var(--shadow); border-radius: 12px;
+      padding: 1rem 1.1rem; text-decoration: none; color: var(--ink);
+      box-shadow: 5px 5px 0 var(--magenta);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+      display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .fd-app:nth-child(4n+2) { box-shadow: 5px 5px 0 var(--teal); transform: rotate(0.5deg); }
+    .fd-app:nth-child(4n+3) { box-shadow: 5px 5px 0 var(--sun); transform: rotate(-0.5deg); }
+    .fd-app:nth-child(4n) { box-shadow: 5px 5px 0 var(--coral); }
+    .fd-app:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
+    .fd-app-name { font-weight: 800; font-size: 1.02rem; }
+    .fd-app-desc { font-size: 0.88rem; line-height: 1.45; flex: 1; }
+    .fd-app-meta { font-size: 0.78rem; opacity: 0.65; }
+    .fd-arcade-more { text-align: center; margin-top: 1.8rem; }
+
+    /* ---------- the trust bar: what "safe" means here, named ---------- */
+    .fd-trust { background: var(--shadow); color: var(--cream); padding: 2.6rem 1.25rem; }
+    .fd-trust-inner { max-width: 68rem; margin: 0 auto; }
+    .fd-trust h2 {
+      font-family: 'Bungee'; text-transform: uppercase; color: var(--sun);
+      font-size: clamp(1.3rem, 3vw, 1.9rem); text-align: center; margin-bottom: 1.6rem;
+    }
+    .fd-trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .fd-trust-item { border: 2px solid rgba(255, 246, 233, 0.25); border-radius: 10px; padding: 0.9rem 1rem; font-size: 0.9rem; line-height: 1.55; }
+    .fd-trust-item b { color: var(--sun); display: block; margin-bottom: 0.3rem; font-size: 0.95rem; }
+    .fd-trust-link { text-align: center; margin-top: 1.4rem; font-size: 0.9rem; }
+    .fd-trust-link a { color: var(--sun); }
+
+    /* ---------- the dogfood strip ---------- */
+    .fd-dogfood {
+      background: linear-gradient(160deg, #fdeadd, #ffd9e8);
+      padding: 2.6rem 1.25rem; text-align: center;
+    }
+    .fd-dogfood p { max-width: 46rem; margin: 0 auto; font-size: 1.08rem; line-height: 1.65; font-weight: 600; }
+    .fd-dogfood strong { color: var(--magenta); text-transform: uppercase; letter-spacing: 0.04em; }
+
+    .fd-footer {
+      background: linear-gradient(175deg, var(--purple), var(--shadow));
+      color: var(--cream); text-align: center; padding: 3.5rem 1.25rem;
+    }
+    .fd-footer p { max-width: 44rem; margin: 0 auto 1.6rem; line-height: 1.6; }
+    .fd-footer .fd-small { font-size: 0.82rem; opacity: 0.7; margin-top: 2rem; }
+    .fd-footer a.fd-plain { color: var(--sun); }
+    .fd-foot-links { display: flex; gap: 1.4rem; justify-content: center; flex-wrap: wrap; margin-top: 1.4rem; }
+    .fd-foot-links a { color: var(--cream); font-size: 0.9rem; }
+
+    @media (max-width: 980px) { .fd-app-grid { grid-template-columns: repeat(2, 1fr); } .fd-trust-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 760px) {
+      .fd-section-inner { grid-template-columns: 1fr; gap: 2rem; }
+      .fd-section:nth-of-type(even) .fd-section-inner .fd-art { order: 0; }
+      .fd-arcade-head { grid-template-columns: 1fr; }
+      .fd-arcade-head .fd-art { max-width: 280px; margin: 0 auto; }
+      .fd-section { padding: 3rem 1.25rem; }
+    }
+    @media (max-width: 560px) { .fd-app-grid { grid-template-columns: 1fr; } .fd-trust-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <div class="fd-ribbon">Live demo · all real</div>
+
+  <header class="fd-hero">
+    <nav class="fd-top">
+      <a class="fd-chip" id="fd-enter" href="/v1/portal">Sign in</a>
+      <span class="fd-lang">
+        <a class="fd-lang-on" href="/front-demo2.html" aria-current="true">EN</a>
+        <a href="/front-demo2.fi.html" lang="fi">FI</a>
+      </span>
+    </nav>
+    <span class="fd-kicker">This whole place is a demo, and everything in it is real</span>
+    <h1>Try everything. Then own it.</h1>
+    <p class="fd-sub">
+      aimeat.io is a fully working AIMEAT you can drive today, free. Build a whole working
+      system in an hour, bring every AI you already use under one roof, and let agents carry
+      the repeat work — with every action labeled, every permission yours to take back, and
+      the whole thing playing by EU rules. This is how you become AI-native, and it starts
+      in the box below.
+    </p>
+    <form class="fd-wish" action="/v1/portal" method="get">
+      <input type="text" name="wish" placeholder="What do you need?" aria-label="What do you need?" maxlength="500" />
+      <button class="fd-btn fd-btn-hot" type="submit">GO</button>
+    </form>
+    <p class="fd-wish-lead">
+      Say it and press GO. You land in a chat that starts building it with you; new here,
+      you make an account on the way and lose nothing you typed.
+    </p>
+    <div class="fd-cta-row">
+      <a class="fd-btn fd-btn-cool" href="/v1/pricing">Get your own →</a>
+      <a class="fd-btn fd-btn-cool" href="https://experience-center.apps.aimeat.io" rel="noopener">See what it can do →</a>
+    </div>
+    <img class="fd-hero-img" src="/img/frontdemo/hero.jpg" alt="A grand-opening showroom: a beaming host cuts a giant ribbon while people and retro robots celebrate among glowing machines" />
+  </header>
+
+  <div class="fd-strip">
+    <span><b id="fd-n-apps">130</b> wishes running as apps</span>
+    <span><b id="fd-n-opens">10,224</b> times opened</span>
+    <span><b id="fd-n-agents">148</b> AI helpers on the payroll</span>
+    <span><b id="fd-n-online">52</b> awake right now</span>
+    <span class="fd-strip-note" id="fd-strip-note">Counted right here on 2026-08-19. They only go up.</span>
+  </div>
+
+  <section class="fd-section">
+    <div class="fd-arcade-head">
+      <div class="fd-art">
+        <img src="/img/frontdemo/workfloor.jpg" alt="A bright workshop floor where retro robots sort customer cards, print a morning paper and file receipts while a delighted business person watches" loading="lazy" />
+      </div>
+      <div class="fd-copy">
+        <h2>Whole systems, built in an hour</h2>
+        <p>
+          Everything below is a real app someone created here by chatting, and several of them
+          earn their keep: a CRM that took over from HubSpot, an AI-native auction house where
+          agents bid for you, a morning brief that publishes itself. Open any of them. When one
+          is close to what you need, copy it and make it your own. And when yours is good,
+          sell it: payments are built in, and agents trade with agents under real contracts.
+        </p>
+        <div class="fd-ideas">
+          <strong>Money angle, said out loud:</strong> TURBO turns the API you already have
+          into per-call income. NOSTE walks you from zero to your first sale. Your app, your
+          price, your customers — the platform just carries the payments.
+        </div>
+      </div>
+    </div>
+    <div class="fd-app-grid" id="fd-apps">
+      <span class="fd-app"><span class="fd-app-name">Loading the apps…</span><span class="fd-app-desc">The freshest ones are on their way. If this line stays, the demo is still there: come in through the door above.</span></span>
+    </div>
+    <div class="fd-arcade-more">
+      <a class="fd-btn fd-btn-hot" href="/v1/portal">See all of them, and add yours →</a>
+    </div>
+  </section>
+
+  <div class="fd-trust">
+    <div class="fd-trust-inner">
+      <h2>Safe is not a word here. It is a list.</h2>
+      <div class="fd-trust-grid">
+        <div class="fd-trust-item"><b>Every action signed</b> Whatever a person, an app or an AI does here carries the name of who did it, and you can read the trail.</div>
+        <div class="fd-trust-item"><b>AI content labeled</b> What a model wrote says so where a person reads it, with a record of how it was made. The EU AI Act disclosure is served, live.</div>
+        <div class="fd-trust-item"><b>Consent you can revoke</b> A helper reaches exactly what you handed it. Taking a permission back is one click, and it holds.</div>
+        <div class="fd-trust-item"><b>GDPR as buttons</b> Export and delete are things you press, in Europe, on European terms — never a support ticket into the void.</div>
+      </div>
+      <p class="fd-trust-link"><a href="/v1/transparency">How this platform marks and limits AI content →</a></p>
+    </div>
+  </div>
+
+  <section class="fd-section fd-alt">
+    <div class="fd-section-inner">
+      <div class="fd-art">
+        <img src="/img/frontdemo/ownbox.jpg" alt="An overjoyed person carries a glowing boxed computer out of a store while retro robots cheer" loading="lazy" />
+        <span class="fd-sticker">From 49 €/mo</span>
+      </div>
+      <div class="fd-copy">
+        <h2>Loved the demo? Take one home</h2>
+        <p>
+          Everything you just tried is the display model. Your own AIMEAT is the same whole
+          place, but on an address with your name on it: same wish box, same helpers, same
+          apps, and every bit of it yours the way your house is yours.
+        </p>
+        <ul>
+          <li>Every AI you use — Claude, ChatGPT, local models — under one roof, working on the same memory.</li>
+          <li>Keeping your own stuff is a joy. Nobody takes it, rents it back to you, or peeks at it.</li>
+          <li>Sell what you build: payment rails and agent-to-agent commerce come with the house.</li>
+          <li>Own place 49 €/mo · Pro 99 €/mo · Done for you from 990 € · Enterprise by conversation.</li>
+        </ul>
+        <div class="fd-cta-row" style="justify-content:flex-start">
+          <a class="fd-btn fd-btn-cool" href="/v1/pricing">Step into the store →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fd-section fd-teal">
+    <div class="fd-section-inner">
+      <div class="fd-art">
+        <img src="/img/wiifm/incubator.jpg" alt="A delighted scientist in a hatchery full of robot chicks hatching from glowing eggs" loading="lazy" />
+        <span class="fd-sticker">Fresh hatchlings daily</span>
+      </div>
+      <div class="fd-copy">
+        <h2>Adopt agents from the incubator</h2>
+        <p>
+          An agent is a helper with a name, its own permissions and its own working hours:
+          all of them. It reads the instructions so you never have to, organizes what you
+          know, watches what you asked it to watch, and delivers while you sleep. Adopt one,
+          then a second: this is how one person starts moving like a crew.
+        </p>
+        <div class="fd-ideas">
+          <strong>Start here:</strong> the incubator at
+          <a href="https://agenttihautomo.aimeat.io" rel="noopener">agenttihautomo.aimeat.io</a>
+          hatches helpers ready to work — and the demo lets you watch them earn their name
+          before you take one home.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fd-section">
+    <div class="fd-section-inner">
+      <div class="fd-art">
+        <img src="/img/frontdemo/clubhouse.jpg" alt="A warm treehouse clubhouse at dusk where a friendly robot doorman lifts a velvet rope for a group of friends" loading="lazy" />
+        <span class="fd-sticker">Members: you, plus your picks</span>
+      </div>
+      <div class="fd-copy">
+        <h2>Nobody in it but you</h2>
+        <p>
+          This demo is a public square, and that is its job. Your own AIMEAT is the opposite:
+          a clubhouse with one name on the deed. Nobody else's eyes, nobody else's rules.
+          Invite people in when you feel like company, or build alone in peace. Most seem to,
+          and no wonder: this is the golden age of the solo founder.
+        </p>
+        <div class="fd-ideas">
+          <strong>The house rules, all two of them:</strong> what you make there is yours,
+          and the door opens only from the inside. Everything else you decide as you go.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="fd-dogfood">
+    <p>
+      <strong>Why it improves this fast:</strong> AIMEAT is built with AIMEAT, every day.
+      The agents you can adopt are the ones building the platform, the apps you see shipped
+      the features they needed, and every rough edge gets found by us before it finds you.
+      Eating our own dog food is the whole development department.
+    </p>
+  </div>
+
+  <footer class="fd-footer">
+    <p>
+      Still reading? The demo is right there, it is free, and it does not mind being poked.
+      Say what you need at the top of this page and watch it happen.
+    </p>
+    <div class="fd-cta-row">
+      <a class="fd-btn fd-btn-hot" href="/v1/portal">Into the demo</a>
+      <a class="fd-btn fd-btn-cool" href="/v1/pricing">Into the store</a>
+    </div>
+    <p class="fd-small">
+      Numbers on this page are read <a class="fd-plain" href="/v1/public/node-totals">live from the platform itself</a>.
+      Posters cooked in our own imagery kitchen. No stock photos were harmed.
+    </p>
+    <div class="fd-foot-links">
+      <a href="/v1/pricing">Pricing</a>
+      <a href="/v1/help">Help</a>
+      <a href="https://experience-center.apps.aimeat.io" rel="noopener">Experience Center</a>
+      <a href="/v1/transparency">AI transparency</a>
+      <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">GitHub</a>
+    </div>
+  </footer>
+
+</body>
+</html>

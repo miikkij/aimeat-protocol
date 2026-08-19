@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<!--
+  @file front-demo2.fi.html
+  @description The sales-mode experiment on the showroom front page: a copy of front-demo.html
+    (which stays untouched as the saved version) with the pitch turned all the way up. What it
+    adds: a curated, bilingual app grid (junk test apps filtered out, TINKI and the Experience
+    Center guaranteed on the floor), the monetization angle (TURBO and NOSTE), a trust bar
+    (EU AI Act disclosure, AI labels, consent, GDPR), an agent-incubator section
+    (agenttihautomo.aimeat.io), the all-your-AIs-under-one-roof line, and the dogfood strip:
+    AIMEAT is built with AIMEAT. Preview at /front-demo2.html; not wired into the front-page
+    switch until a winner is picked. Finnish sibling: front-demo2.fi.html; JS: /front-demo2.js.
+  @version-history
+    v1.0.0 - 2026-08-19 - First Finnish version, matching front-demo2.html v1.0.0. Composed
+      in Finnish rather than translated.
+-->
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIMEAT · Kokeile kaikkea, omista sitten</title>
+  <meta name="description" content="Täysin toimiva AIMEAT, jota saat ajaa ilmaiseksi: rakenna kokonainen järjestelmä tunnissa, tuo jokainen AI:si saman katon alle, adoptoi agentteja hautomosta ja omista lopputulos — merkittynä, luvitettuna ja EU:n säännöillä." />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bungee&family=Archivo:ital,wght@0,400;0,600;0,800;1,400&display=swap" rel="stylesheet" />
+  <script src="/front-demo2.js" defer></script>
+  <style>
+    :root {
+      --ink: #2b1230;
+      --cream: #fff6e9;
+      --coral: #ff5a4e;
+      --sun: #ffb52e;
+      --teal: #19c2b8;
+      --magenta: #e33fa1;
+      --purple: #5b2a86;
+      --shadow: #1a0b1f;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Archivo', system-ui, sans-serif; color: var(--ink); background: var(--cream); overflow-x: hidden; }
+    h1, h2, .fd-kicker, .fd-sticker, .fd-btn, .fd-ribbon, .fd-chip { font-family: 'Bungee', 'Archivo', sans-serif; font-weight: 400; text-transform: uppercase; }
+
+    .fd-ribbon {
+      position: fixed; top: 26px; left: -64px; z-index: 20;
+      transform: rotate(-45deg);
+      background: var(--sun); color: var(--shadow);
+      border-top: 3px solid var(--shadow); border-bottom: 3px solid var(--shadow);
+      padding: 0.35rem 4.5rem;
+      font-size: 0.72rem; letter-spacing: 0.08em;
+      box-shadow: 0 4px 14px rgba(26, 11, 31, 0.35);
+      pointer-events: none;
+    }
+
+    .fd-top { position: absolute; top: 1rem; right: 1rem; z-index: 5; display: flex; gap: 0.4rem; align-items: center; }
+    .fd-chip, .fd-lang a {
+      font-family: 'Bungee', 'Archivo', sans-serif;
+      font-size: 0.75rem; text-decoration: none; text-transform: uppercase;
+      color: var(--cream); border: 2px solid var(--cream);
+      padding: 0.25rem 0.55rem; opacity: 0.85;
+    }
+    .fd-chip:hover, .fd-lang a:hover { opacity: 1; }
+    .fd-lang { display: flex; gap: 0.4rem; }
+    .fd-lang a.fd-lang-on { background: var(--sun); color: var(--shadow); border-color: var(--shadow); opacity: 1; transform: rotate(-2deg); }
+
+    .fd-hero {
+      position: relative;
+      background: linear-gradient(175deg, var(--purple) 0%, var(--magenta) 55%, var(--sun) 130%);
+      color: var(--cream);
+      padding: 4.5rem 1.25rem 0;
+      text-align: center;
+    }
+    .fd-kicker {
+      display: inline-block; background: var(--sun); color: var(--shadow);
+      padding: 0.35rem 1rem; border: 3px solid var(--shadow);
+      box-shadow: 5px 5px 0 var(--shadow); transform: rotate(-2deg);
+      font-size: 0.85rem; letter-spacing: 0.06em;
+    }
+    .fd-hero h1 {
+      font-size: clamp(2.2rem, 7.5vw, 5rem); line-height: 1.04;
+      margin: 1.4rem auto 1rem; max-width: 18ch;
+      text-shadow: 4px 4px 0 var(--shadow), 8px 8px 0 rgba(26, 11, 31, 0.35);
+    }
+    .fd-hero .fd-sub {
+      max-width: 48rem; margin: 0 auto 1.4rem;
+      font-size: clamp(1.05rem, 2.2vw, 1.3rem); line-height: 1.55; font-weight: 600;
+    }
+    .fd-wish { display: flex; gap: 0.8rem; max-width: 34rem; margin: 0 auto 0.8rem; }
+    .fd-wish input {
+      flex: 1 1 12rem; min-width: 0;
+      font-family: 'Archivo', system-ui, sans-serif;
+      font-size: 1.15rem; font-weight: 800;
+      padding: 0.8rem 1rem; border: 3px solid var(--shadow); border-radius: 8px;
+      background: #fff; color: var(--ink);
+      box-shadow: 5px 5px 0 var(--magenta);
+    }
+    .fd-wish input:focus { outline: 3px solid var(--teal); outline-offset: 2px; }
+    .fd-wish input::placeholder { color: var(--purple); opacity: 0.65; font-style: italic; }
+    .fd-wish button { cursor: pointer; font-size: 1.1rem; }
+    .fd-wish-lead { max-width: 40rem; margin: 0 auto 1.6rem; font-size: 0.95rem; opacity: 0.92; }
+    .fd-cta-row { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: 2.4rem; }
+    .fd-btn {
+      display: inline-block; padding: 0.85rem 1.6rem; font-size: 1rem;
+      text-decoration: none; border: 3px solid var(--shadow);
+      box-shadow: 6px 6px 0 var(--shadow);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+    }
+    .fd-btn:hover { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--shadow); }
+    .fd-btn-hot { background: var(--coral); color: var(--cream); }
+    .fd-btn-cool { background: var(--teal); color: var(--shadow); }
+    .fd-hero-img {
+      display: block; width: min(1100px, 96%); margin: 0 auto;
+      border: 5px solid var(--shadow); border-bottom: none;
+      border-radius: 18px 18px 0 0;
+      box-shadow: 0 -12px 40px rgba(26, 11, 31, 0.45);
+    }
+
+    .fd-strip {
+      background: var(--shadow); color: var(--cream);
+      padding: 1.1rem 1rem; text-align: center;
+      display: flex; justify-content: center; flex-wrap: wrap;
+      gap: 0.6rem 2.2rem; font-weight: 800; letter-spacing: 0.02em;
+    }
+    .fd-strip b { color: var(--sun); font-size: 1.25rem; margin-right: 0.35rem; }
+    .fd-strip .fd-strip-note { flex-basis: 100%; font-weight: 400; opacity: 0.75; font-size: 0.8rem; }
+
+    .fd-section { padding: 4.5rem 1.25rem; }
+    .fd-section-inner {
+      max-width: 68rem; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center;
+    }
+    .fd-section:nth-of-type(even) .fd-section-inner .fd-art { order: 2; }
+    .fd-art { position: relative; }
+    .fd-art img {
+      width: 100%; display: block;
+      border: 5px solid var(--shadow); border-radius: 14px;
+      box-shadow: 12px 12px 0 var(--coral);
+      transform: rotate(-1.5deg);
+    }
+    .fd-section:nth-of-type(even) .fd-art img { transform: rotate(1.5deg); box-shadow: -12px 12px 0 var(--teal); }
+    .fd-sticker {
+      position: absolute; top: -1.2rem; right: -0.6rem;
+      background: var(--sun); color: var(--shadow);
+      border: 3px solid var(--shadow); padding: 0.5rem 0.9rem;
+      transform: rotate(6deg); font-size: 0.85rem;
+      box-shadow: 4px 4px 0 var(--shadow);
+    }
+    .fd-copy h2 {
+      font-size: clamp(1.6rem, 3.5vw, 2.4rem); line-height: 1.1; margin-bottom: 1rem;
+      color: var(--purple); text-shadow: 3px 3px 0 rgba(255, 90, 78, 0.25);
+    }
+    .fd-copy p { line-height: 1.65; margin-bottom: 1rem; font-size: 1.05rem; }
+    .fd-copy ul { list-style: none; margin: 1.2rem 0; }
+    .fd-copy li { padding: 0.45rem 0 0.45rem 2rem; position: relative; line-height: 1.5; font-weight: 600; }
+    .fd-copy li::before { content: "★"; position: absolute; left: 0.2rem; color: var(--coral); font-size: 1.1rem; }
+    .fd-ideas {
+      background: var(--cream); border: 3px dashed var(--magenta); border-radius: 10px;
+      padding: 1rem 1.2rem; font-size: 0.98rem; line-height: 1.6;
+    }
+    .fd-ideas strong { color: var(--magenta); text-transform: uppercase; letter-spacing: 0.04em; }
+    .fd-alt { background: linear-gradient(160deg, #fdeadd, #ffd9e8); }
+    .fd-teal { background: linear-gradient(160deg, #d9f6f2, #fdf3d7); }
+
+    .fd-arcade-head {
+      max-width: 68rem; margin: 0 auto 2rem;
+      display: grid; grid-template-columns: 280px 1fr; gap: 2.5rem; align-items: center;
+    }
+    .fd-arcade-head .fd-art img { box-shadow: 12px 12px 0 var(--sun); }
+    .fd-app-grid {
+      max-width: 68rem; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.2rem;
+    }
+    .fd-app {
+      background: #fff; border: 3px solid var(--shadow); border-radius: 12px;
+      padding: 1rem 1.1rem; text-decoration: none; color: var(--ink);
+      box-shadow: 5px 5px 0 var(--magenta);
+      transition: transform 120ms ease, box-shadow 120ms ease;
+      display: flex; flex-direction: column; gap: 0.4rem;
+    }
+    .fd-app:nth-child(4n+2) { box-shadow: 5px 5px 0 var(--teal); transform: rotate(0.5deg); }
+    .fd-app:nth-child(4n+3) { box-shadow: 5px 5px 0 var(--sun); transform: rotate(-0.5deg); }
+    .fd-app:nth-child(4n) { box-shadow: 5px 5px 0 var(--coral); }
+    .fd-app:hover { transform: translate(2px, 2px); box-shadow: 2px 2px 0 var(--shadow); }
+    .fd-app-name { font-weight: 800; font-size: 1.02rem; }
+    .fd-app-desc { font-size: 0.88rem; line-height: 1.45; flex: 1; }
+    .fd-app-meta { font-size: 0.78rem; opacity: 0.65; }
+    .fd-arcade-more { text-align: center; margin-top: 1.8rem; }
+
+    /* ---------- the trust bar: what "safe" means here, named ---------- */
+    .fd-trust { background: var(--shadow); color: var(--cream); padding: 2.6rem 1.25rem; }
+    .fd-trust-inner { max-width: 68rem; margin: 0 auto; }
+    .fd-trust h2 {
+      font-family: 'Bungee'; text-transform: uppercase; color: var(--sun);
+      font-size: clamp(1.3rem, 3vw, 1.9rem); text-align: center; margin-bottom: 1.6rem;
+    }
+    .fd-trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .fd-trust-item { border: 2px solid rgba(255, 246, 233, 0.25); border-radius: 10px; padding: 0.9rem 1rem; font-size: 0.9rem; line-height: 1.55; }
+    .fd-trust-item b { color: var(--sun); display: block; margin-bottom: 0.3rem; font-size: 0.95rem; }
+    .fd-trust-link { text-align: center; margin-top: 1.4rem; font-size: 0.9rem; }
+    .fd-trust-link a { color: var(--sun); }
+
+    /* ---------- the dogfood strip ---------- */
+    .fd-dogfood {
+      background: linear-gradient(160deg, #fdeadd, #ffd9e8);
+      padding: 2.6rem 1.25rem; text-align: center;
+    }
+    .fd-dogfood p { max-width: 46rem; margin: 0 auto; font-size: 1.08rem; line-height: 1.65; font-weight: 600; }
+    .fd-dogfood strong { color: var(--magenta); text-transform: uppercase; letter-spacing: 0.04em; }
+
+    .fd-footer {
+      background: linear-gradient(175deg, var(--purple), var(--shadow));
+      color: var(--cream); text-align: center; padding: 3.5rem 1.25rem;
+    }
+    .fd-footer p { max-width: 44rem; margin: 0 auto 1.6rem; line-height: 1.6; }
+    .fd-footer .fd-small { font-size: 0.82rem; opacity: 0.7; margin-top: 2rem; }
+    .fd-footer a.fd-plain { color: var(--sun); }
+    .fd-foot-links { display: flex; gap: 1.4rem; justify-content: center; flex-wrap: wrap; margin-top: 1.4rem; }
+    .fd-foot-links a { color: var(--cream); font-size: 0.9rem; }
+
+    @media (max-width: 980px) { .fd-app-grid { grid-template-columns: repeat(2, 1fr); } .fd-trust-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 760px) {
+      .fd-section-inner { grid-template-columns: 1fr; gap: 2rem; }
+      .fd-section:nth-of-type(even) .fd-section-inner .fd-art { order: 0; }
+      .fd-arcade-head { grid-template-columns: 1fr; }
+      .fd-arcade-head .fd-art { max-width: 280px; margin: 0 auto; }
+      .fd-section { padding: 3rem 1.25rem; }
+    }
+    @media (max-width: 560px) { .fd-app-grid { grid-template-columns: 1fr; } .fd-trust-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+
+  <div class="fd-ribbon">Live-demo · kaikki totta</div>
+
+  <header class="fd-hero">
+    <nav class="fd-top">
+      <a class="fd-chip" id="fd-enter" href="/v1/portal">Kirjaudu</a>
+      <span class="fd-lang">
+        <a href="/front-demo2.html" lang="en">EN</a>
+        <a class="fd-lang-on" href="/front-demo2.fi.html" aria-current="true">FI</a>
+      </span>
+    </nav>
+    <span class="fd-kicker">Koko paikka on demo, ja kaikki siinä on totta</span>
+    <h1>Kokeile kaikkea. Omista sitten.</h1>
+    <p class="fd-sub">
+      aimeat.io on täysin toimiva AIMEAT, jota saat ajaa tänään ilmaiseksi. Rakenna
+      kokonainen toimiva järjestelmä tunnissa, tuo jokainen käyttämäsi AI saman katon alle
+      ja anna agenttien kantaa toistotyö — niin, että jokainen teko on merkitty, jokainen
+      lupa on peruttavissasi ja koko talo pelaa EU:n säännöillä. Näin sinusta tulee
+      AI-natiivi, ja se alkaa alla olevasta laatikosta.
+    </p>
+    <form class="fd-wish" action="/v1/portal" method="get">
+      <input type="text" name="wish" placeholder="Mitä sä tarvitset?" aria-label="Mitä sä tarvitset?" maxlength="500" />
+      <button class="fd-btn fd-btn-hot" type="submit">GO</button>
+    </form>
+    <p class="fd-wish-lead">
+      Sano se ja paina GO. Päädyt chattiin, joka alkaa rakentaa sitä kanssasi; uusi kävijä
+      tekee tilin matkalla, eikä kirjoittamasi katoa.
+    </p>
+    <div class="fd-cta-row">
+      <a class="fd-btn fd-btn-cool" href="/v1/pricing">Hanki omasi →</a>
+      <a class="fd-btn fd-btn-cool" href="https://experience-center.apps.aimeat.io" rel="noopener">Katso mihin tämä pystyy →</a>
+    </div>
+    <img class="fd-hero-img" src="/img/frontdemo/hero.jpg" alt="Avajaiset näyttelytilassa: säteilevä isäntä leikkaa jättinauhaa ihmisten ja retrorobottien juhliessa hehkuvien koneiden keskellä" />
+  </header>
+
+  <div class="fd-strip">
+    <span><b id="fd-n-apps">130</b> toivetta pyörii appeina</span>
+    <span><b id="fd-n-opens">10,224</b> avausta</span>
+    <span><b id="fd-n-agents">148</b> AI-apuria palkkalistoilla</span>
+    <span><b id="fd-n-online">52</b> hereillä juuri nyt</span>
+    <span class="fd-strip-note" id="fd-strip-note">Laskettu täältä 2026-08-19. Luvut vain kasvavat.</span>
+  </div>
+
+  <section class="fd-section">
+    <div class="fd-arcade-head">
+      <div class="fd-art">
+        <img src="/img/frontdemo/workfloor.jpg" alt="Valoisa verstas, jossa retrorobotit lajittelevat asiakaskortteja, painavat aamulehteä ja arkistoivat kuitteja liikemiehen katsellessa riemuissaan" loading="lazy" />
+      </div>
+      <div class="fd-copy">
+        <h2>Kokonaisia järjestelmiä, tunnissa</h2>
+        <p>
+          Kaikki alla oleva on oikeita sovelluksia, jotka joku teki täällä juttelemalla, ja
+          osa niistä tienaa jo elantonsa: CRM, joka otti HubSpotin paikan, AI-natiivi
+          huutokauppa, jossa agentit huutavat puolestasi, ja aamukatsaus, joka julkaisee
+          itsensä. Avaa mikä tahansa. Kun jokin on lähellä tarvettasi, kopioi se ja tee siitä
+          omasi. Ja kun omasi on hyvä, myy se: maksut ovat talossa valmiina, ja agentit
+          käyvät kauppaa agenttien kanssa oikeilla sopimuksilla.
+        </p>
+        <div class="fd-ideas">
+          <strong>Rahakulma ääneen sanottuna:</strong> TURBO muuttaa nykyisen API:si
+          kutsukohtaisiksi tuloiksi. NOSTE saattaa sinut nollasta ensimmäiseen kauppaan.
+          Sinun sovelluksesi, sinun hintasi, sinun asiakkaasi: alusta vain kantaa maksut.
+        </div>
+      </div>
+    </div>
+    <div class="fd-app-grid" id="fd-apps">
+      <span class="fd-app"><span class="fd-app-name">Sovellukset latautuvat…</span><span class="fd-app-desc">Tuoreimmat ovat juuri tulossa näkyviin. Jos tämä rivi jää, demo on silti tallella: astu sisään yllä olevasta ovesta.</span></span>
+    </div>
+    <div class="fd-arcade-more">
+      <a class="fd-btn fd-btn-hot" href="/v1/portal">Katso kaikki ja lisää omasi →</a>
+    </div>
+  </section>
+
+  <div class="fd-trust">
+    <div class="fd-trust-inner">
+      <h2>Turvallinen ei ole täällä sana. Se on lista.</h2>
+      <div class="fd-trust-grid">
+        <div class="fd-trust-item"><b>Jokainen teko allekirjoitettu</b> Mitä ikinä ihminen, sovellus tai AI täällä tekee, siinä on tekijänsä nimi, ja jäljen voi lukea.</div>
+        <div class="fd-trust-item"><b>AI-sisältö merkitty</b> Se, minkä malli kirjoitti, kertoo sen siinä, missä ihminen lukee, ja mukana on tieto, miten se syntyi. EU:n AI-asetuksen seloste on esillä, livenä.</div>
+        <div class="fd-trust-item"><b>Peruttava suostumus</b> Apuri ylettyy täsmälleen siihen, minkä sille annoit. Luvan pois ottaminen on yksi klikkaus, ja se pitää.</div>
+        <div class="fd-trust-item"><b>GDPR nappeina</b> Vienti ja poisto ovat nappeja, joita painat, Euroopassa ja Euroopan ehdoilla, ei koskaan tukipyyntö tyhjyyteen.</div>
+      </div>
+      <p class="fd-trust-link"><a href="/v1/transparency">Miten tämä alusta merkitsee ja rajaa AI-sisällön →</a></p>
+    </div>
+  </div>
+
+  <section class="fd-section fd-alt">
+    <div class="fd-section-inner">
+      <div class="fd-art">
+        <img src="/img/frontdemo/ownbox.jpg" alt="Riemuissaan oleva ihminen kantaa hehkuvaa konepakettia ulos kaupasta retrorobottien hurratessa" loading="lazy" />
+        <span class="fd-sticker">Alk. 49 €/kk</span>
+      </div>
+      <div class="fd-copy">
+        <h2>Ihastuitko demoon? Vie oma kotiin</h2>
+        <p>
+          Kaikki, mitä juuri kokeilit, on esittelykappale. Oma AIMEAT on sama koko paikka,
+          mutta osoitteessa, jossa lukee sinun nimesi: sama toivelaatikko, samat apurit, samat
+          sovellukset, ja joka sentti sinun, niin kuin oma talo on.
+        </p>
+        <ul>
+          <li>Jokainen käyttämäsi AI, Claude, ChatGPT ja paikalliset mallit, saman katon alla ja saman muistin äärellä.</li>
+          <li>Omien juttujen pitäminen on ilo. Kukaan ei vie niitä, ei vuokraa niitä takaisin sinulle eikä nuuski niitä.</li>
+          <li>Myy se, minkä rakennat: maksukiskot ja agenttien välinen kaupankäynti kuuluvat taloon.</li>
+          <li>Oma tila 49 €/kk · Pro 99 €/kk · Avaimet käteen alkaen 990 € · Enterprise: jutellaan.</li>
+        </ul>
+        <div class="fd-cta-row" style="justify-content:flex-start">
+          <a class="fd-btn fd-btn-cool" href="/v1/pricing">Astu kauppaan →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fd-section fd-teal">
+    <div class="fd-section-inner">
+      <div class="fd-art">
+        <img src="/img/wiifm/incubator.jpg" alt="Riemuissaan oleva tiedemies hautomossa, jossa robottitipuja kuoriutuu hehkuvista munista" loading="lazy" />
+        <span class="fd-sticker">Tuoreita tipuja joka päivä</span>
+      </div>
+      <div class="fd-copy">
+        <h2>Adoptoi agentteja hautomosta</h2>
+        <p>
+          Agentti on apuri, jolla on nimi, omat oikeudet ja oma työaika: kaikki vuorokauden
+          tunnit. Se lukee ohjeet puolestasi, järjestää tietosi, vahtii sitä, mitä pyysit
+          vahtimaan, ja toimittaa sillä aikaa, kun nukut. Adoptoi yksi, sitten toinen: näin
+          yksi ihminen alkaa liikkua kuin porukka.
+        </p>
+        <div class="fd-ideas">
+          <strong>Aloita tästä:</strong> hautomo osoitteessa
+          <a href="https://agenttihautomo.aimeat.io" rel="noopener">agenttihautomo.aimeat.io</a>
+          kuorii apureita valmiina töihin, ja demossa näet niiden ansaitsevan nimensä ennen
+          kuin viet yhden kotiin.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="fd-section">
+    <div class="fd-section-inner">
+      <div class="fd-art">
+        <img src="/img/frontdemo/clubhouse.jpg" alt="Lämmin puumajaklubi hämärässä, ystävällinen robottiovimies nostaa samettiköyttä kaveriporukalle" loading="lazy" />
+        <span class="fd-sticker">Jäsenet: sinä ja valitsemasi</span>
+      </div>
+      <div class="fd-copy">
+        <h2>Ei ketään muita kuin sinä</h2>
+        <p>
+          Tämä demo on tori, ja se on sen tehtävä. Oma AIMEAT on vastakohta: klubitalo,
+          jonka kauppakirjassa on yksi nimi. Kukaan muu ei kurki, eikä kukaan muu määrää.
+          Kutsu porukkaa kylään, kun siltä tuntuu, tai väkerrä omiasi ihan rauhassa. Moni
+          tekee mieluiten yksin, eikä ihme: nyt on soolofounderien kulta-aika.
+        </p>
+        <div class="fd-ideas">
+          <strong>Talon säännöt, molemmat kaksi:</strong> se, minkä siellä teet, on sinun,
+          ja ovi aukeaa vain sisältäpäin. Kaiken muun päätät matkan varrella.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="fd-dogfood">
+    <p>
+      <strong>Miksi tämä paranee näin nopeasti:</strong> AIMEATia rakennetaan AIMEATilla,
+      joka päivä. Agentit, joita voit adoptoida, ovat samoja, jotka rakentavat alustaa,
+      näkemäsi sovellukset shippasivat tarvitsemansa ominaisuudet, ja jokainen terävä kulma
+      löytää meidät ennen kuin se löytää sinut. Oman koiranruoan syöminen on koko
+      kehitysosastomme.
+    </p>
+  </div>
+
+  <footer class="fd-footer">
+    <p>
+      Vieläkö luet? Demo on tuossa, se on ilmainen, eikä se pahastu tökkimisestä.
+      Sano sivun yläreunassa, mitä tarvitset, ja katso, kun se tapahtuu.
+    </p>
+    <div class="fd-cta-row">
+      <a class="fd-btn fd-btn-hot" href="/v1/portal">Demoon</a>
+      <a class="fd-btn fd-btn-cool" href="/v1/pricing">Kauppaan</a>
+    </div>
+    <p class="fd-small">
+      Tämän sivun luvut luetaan <a class="fd-plain" href="/v1/public/node-totals">suoraan alustalta itseltään</a>.
+      Julisteet kokattiin omassa kuvakeittiössämme. Yhtään kuvapankkikuvaa ei vahingoitettu.
+    </p>
+    <div class="fd-foot-links">
+      <a href="/v1/pricing">Hinnat</a>
+      <a href="/v1/help">Ohjeet</a>
+      <a href="https://experience-center.apps.aimeat.io" rel="noopener">Experience Center</a>
+      <a href="/v1/transparency">AI-läpinäkyvyys</a>
+      <a href="https://github.com/miikkij/aimeat-protocol" rel="noopener">GitHub</a>
+    </div>
+  </footer>
+
+</body>
+</html>
