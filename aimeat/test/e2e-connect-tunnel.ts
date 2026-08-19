@@ -260,6 +260,42 @@ await test('13. Reconnect after an abrupt drop; forward still works', async () =
   await t2.close();
 });
 
+// ─── Phase 4: the ack dedup set is bounded ───
+console.log('\nPhase 4 — In-session ack dedup is capped');
+
+async function tunnelStats(): Promise<any> {
+  const { status, body } = await json('/v1/connect/tunnel/stats', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(status === 200, `stats status ${status}: ${JSON.stringify(body)}`);
+  return body.data.stats;
+}
+
+await test('13. A long-lived socket cannot grow its ack set without limit', async () => {
+  // The dedup set used to hold every id acked on the socket and clear only on disconnect, so a
+  // serve daemon that stays connected for a day grew it forever (memory trace 2026-08-19: this was
+  // the node's largest growing structure). 700 acks on ONE socket must leave at most the window.
+  const t = await TunnelClient.connect(BASE, fullAgentToken);
+  const before = await tunnelStats();
+  for (let i = 0; i < 700; i++) t.ack(`fake-delivery-${i}-${Date.now()}`);
+  await sleep(1500);   // frames are fire-and-forget; let the server drain them
+
+  const after = await tunnelStats();
+  assert(after.acksTotal - before.acksTotal >= 700, `server saw the acks (${before.acksTotal} → ${after.acksTotal})`);
+  assert(typeof after.ackDedupEntries === 'number', 'stats report ackDedupEntries');
+  // Old code: 700. The cap is 500, and one other socket may hold a few entries of its own.
+  assert(after.ackDedupEntries <= 520, `ack dedup set must stay capped, got ${after.ackDedupEntries}`);
+  await t.close();
+});
+
+await test('14. The dedup set is released when the socket closes', async () => {
+  const t = await TunnelClient.connect(BASE, fullAgentToken);
+  for (let i = 0; i < 50; i++) t.ack(`closing-${i}`);
+  await sleep(800);
+  await t.close();
+  await sleep(500);
+  const s = await tunnelStats();
+  assert(s.ackDedupEntries === 0, `no entries remain once every socket is closed, got ${s.ackDedupEntries}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owner', async () => {

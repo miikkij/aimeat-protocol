@@ -4724,8 +4724,10 @@ paths:
       operationId: connectTunnelStats
       summary: Connector tunnel metrics (operator)
       description: |
-        Read-only live metrics for the connector forward tunnel: active
-        connection count and lifetime forward/deliver/ack counters. Operator only.
+        Read-only live metrics for the connector forward tunnel: active connection count,
+        lifetime forward/deliver/ack counters, and the size of the two per-socket structures
+        (`ackDedupEntries`, `subscriptionEntries`) so growth is readable here rather than from a
+        heap snapshot. Operator only.
       tags: [Connector Tunnel]
       security:
         - BearerAuth: []
@@ -4752,6 +4754,15 @@ paths:
                               deliveriesTotal: { type: integer }
                               acksTotal: { type: integer }
                               malformedFramesTotal: { type: integer }
+                              ackDedupEntries:
+                                type: integer
+                                description: >-
+                                  Delivery ids currently held for in-session dedup, summed over every live
+                                  socket and capped per socket. Watch this instead of taking a heap
+                                  snapshot: a serve daemon can hold a socket open for days.
+                              subscriptionEntries:
+                                type: integer
+                                description: Space subscriptions currently held, summed over every live socket.
         '403':
           description: Operator role required.
         '503':

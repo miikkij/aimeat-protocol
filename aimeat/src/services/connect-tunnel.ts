@@ -25,6 +25,15 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v1.10.0 -- 2026-08-19 -- Pure extraction: the wire contract (ConnectFrame, WorkspaceSpaceRef,
+ *     ConnectTunnelStats) and its three pure helpers moved to ./connect-tunnel-wire.ts when this
+ *     file passed the 800-line cap, and are re-exported here. Bodies verbatim.
+ *   v1.9.0 -- 2026-08-19 -- The in-session ack dedup set is capped at ACK_DEDUP_WINDOW recent ids
+ *     per socket. It used to grow for the life of the socket and clear only on disconnect, which is
+ *     bounded only while sessions are short -- 68 serve daemons stayed connected for 21 hours and
+ *     these sets became the node's largest growing structure. getStats() now reports
+ *     ackDedupEntries and subscriptionEntries so the number is readable from
+ *     GET /v1/connect/tunnel/stats instead of from a heap snapshot.
  *   v1.0.0 — 2026-06-10 — Phase 1: forward tunnel (agent→server) + welcome +
  *     heartbeat + malformed-frame rejection + single-socket registry + stats.
  *   v1.1.0 — 2026-06-10 — Phase 2: realtime reverse delivery — `deliver` fan-out
@@ -62,91 +71,12 @@ import { resolveIdentity } from '../utils/gaii.js';
 export const CONNECT_TUNNEL_PROTOCOL_VERSION = '1.0';
 export const CONNECT_TUNNEL_PATH = '/v1/connect/tunnel';
 
-/** A single tunnel wire frame. JSON-encoded, id-correlated where applicable. */
-export interface ConnectFrame {
-  type:
-    | 'welcome'
-    | 'heartbeat'
-    | 'heartbeat_ack'
-    | 'request'
-    | 'response'
-    | 'deliver'
-    | 'ack'
-    | 'invoke'         // S→C: server invokes a capability ON the connected principal (a GEAI)
-    | 'invoke_result'  // C→S: the principal's reply to an invoke, correlated by id
-    | 'subscribe'      // C→S: subscribe to workspace record events for one or more (organism, ws, space)
-    | 'subscribed'     // S→C: subscribe ack — which space refs were accepted vs rejected
-    | 'auth_revoked'   // S→C: the connected principal's bearer was revoked — stop + re-auth
-    | 'backlog'        // S→C: on-connect snapshot of queued+active tasks + pending messages
-    | 'disconnect'
-    | 'error';
-  /** Correlation id (request↔response, heartbeat↔ack, deliver↔ack, invoke↔invoke_result, subscribe↔subscribed). */
-  id?: string;
-  // ── request (C→S) ──
-  method?: string;
-  path?: string;
-  query?: Record<string, string>;
-  headers?: Record<string, string>;
-  body?: unknown;
-  // ── response (S→C) ──
-  status?: number;
-  // ── deliver (S→C) ──
-  kind?: string;
-  payload?: unknown;
-  // ── invoke (S→C) / invoke_result (C→S) ──
-  capability?: string;       // invoke: the capability id/name to run on the principal
-  input?: unknown;           // invoke: the input payload
-  caller?: string;           // invoke: the AIMEAT caller GHII (the principal maps this to its account)
-  ok?: boolean;              // invoke_result: whether the principal handled it successfully
-  result?: unknown;          // invoke_result: the capability output
-  // ── subscribe (C→S) ──
-  spaces?: WorkspaceSpaceRef[];  // the (organism_id, ws, space) tuples to subscribe to
-  // ── error (S→C) ──
-  code?: string;
-  message?: string;
-  timestamp?: string;
-}
+// The wire contract (frames, space refs, stats) and its pure helpers live in the sibling module
+// and are re-exported here, so every existing importer of this file is untouched.
+export type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
+import type { ConnectFrame, WorkspaceSpaceRef, ConnectTunnelStats } from './connect-tunnel-wire.js';
+import { parseWorkspaceRecordKey, spaceKeyOf, coerceSpaceRef } from './connect-tunnel-wire.js';
 
-/** One workspace records-space an agent can subscribe to for record-write push. */
-export interface WorkspaceSpaceRef {
-  organism_id: string;
-  ws: string;
-  /** The key segment for the records space (the manifest objectType's `namespace`), e.g. 'task'. */
-  space: string;
-}
-
-interface ParsedRecordKey { organismId: string; ws: string; rest: string }
-
-/**
- * Parse a workspace record memory key `organism.{orgId}.w.{ws}.{rest}` into (orgId, ws, rest), or null
- * if it is not a workspace-scoped key (legacy `organism.{id}.…` roots without `.w.{ws}.`, or any
- * non-organism key). `orgId` and `ws` carry no dots so positional split is safe; `rest` is
- * `{namespace}.{instanceId}[.role]` and is matched by PREFIX against a subscription's space
- * (the manifest objectType namespace can be multi-segment, e.g. `shared.tasks`).
- */
-function parseWorkspaceRecordKey(key: string): ParsedRecordKey | null {
-  const seg = key.split('.');
-  if (seg.length < 6 || seg[0] !== 'organism' || seg[2] !== 'w') return null;
-  const organismId = seg[1], ws = seg[3];
-  if (!organismId || !ws) return null;
-  return { organismId, ws, rest: seg.slice(4).join('.') };
-}
-
-/** Stable composite key for the (organism, ws, space) subscription index. Ids carry no '|'. */
-function spaceKeyOf(organismId: string, ws: string, space: string): string {
-  return `${organismId}|${ws}|${space}`;
-}
-
-/** Validate one subscribe-frame entry into a WorkspaceSpaceRef, or null if malformed. */
-function coerceSpaceRef(raw: unknown): WorkspaceSpaceRef | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const r = raw as Record<string, unknown>;
-  const organism_id = typeof r.organism_id === 'string' ? r.organism_id : '';
-  const ws = typeof r.ws === 'string' ? r.ws : '';
-  const space = typeof r.space === 'string' ? r.space : '';
-  if (!organism_id || !ws || !space) return null;
-  return { organism_id, ws, space };
-}
 
 interface ConnectConnection {
   principal: string;
@@ -157,15 +87,6 @@ interface ConnectConnection {
   lastHeartbeat: number;
 }
 
-export interface ConnectTunnelStats {
-  activeConnections: number;
-  connectionsTotal: number;
-  forwardRequestsTotal: number;
-  forwardErrorsTotal: number;
-  deliveriesTotal: number;
-  acksTotal: number;
-  malformedFramesTotal: number;
-}
 
 /**
  * Only these client-supplied request headers are forwarded on the loopback
@@ -178,11 +99,28 @@ const FORWARDABLE_HEADERS = new Set(['content-type', 'accept', 'idempotency-key'
 /** Forward dispatch only accepts these HTTP methods. */
 const FORWARDABLE_METHODS = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
+/**
+ * How many recent delivery ids ONE live socket remembers for in-session dedup.
+ *
+ * The set used to hold every id the agent had ever acked on that socket, cleared only when the
+ * socket closed. That is bounded only while sessions are short, and they are not: 68 serve daemons
+ * sat connected for 21 hours on production and these sets became the largest growing structure on
+ * the node (memory trace 2026-08-19 — a Set's backing store is what the heap snapshot reports as
+ * `<array>`, the top grower in two separate snapshots).
+ *
+ * A recent window is all the dedup needs. It suppresses a re-push of the SAME delivery event,
+ * which arrives within seconds of the first; an id a thousand deliveries ago cannot be re-pushed
+ * because the event that would push it is long gone. The backlog is computed from storage and
+ * never from this set, so eviction cannot lose a task either.
+ */
+const ACK_DEDUP_WINDOW = 500;
+
 export class ConnectTunnelManager {
   private connections = new Map<string, ConnectConnection>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private readonly loopbackBase: string;
-  /** Per-agent set of deliver ids the agent has acked — excluded from later backlogs. */
+  /** Per-agent set of RECENT deliver ids the agent has acked (in-session dedup only, capped at
+   *  ACK_DEDUP_WINDOW — see that constant for why the cap exists). */
   private ackedDeliveries = new Map<string, Set<string>>();
   /** Server-initiated invokes awaiting an `invoke_result` reply, keyed by correlation id. */
   private pendingInvokes = new Map<string, { resolve: (f: ConnectFrame) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>();
@@ -200,6 +138,9 @@ export class ConnectTunnelManager {
     deliveriesTotal: 0,
     acksTotal: 0,
     malformedFramesTotal: 0,
+    // Both are recomputed from the live maps on every getStats() read; these are placeholders.
+    ackDedupEntries: 0,
+    subscriptionEntries: 0,
   };
 
   constructor(
@@ -467,6 +408,14 @@ export class ConnectTunnelManager {
     let set = this.ackedDeliveries.get(principal);
     if (!set) { set = new Set(); this.ackedDeliveries.set(principal, set); }
     set.add(frame.id);
+    // Evict oldest-first past the window (a JS Set iterates in insertion order). See
+    // ACK_DEDUP_WINDOW: without this the set grew for the life of the socket, and a socket that
+    // never closes is exactly what a serve daemon is.
+    while (set.size > ACK_DEDUP_WINDOW) {
+      const oldest = set.values().next().value;
+      if (oldest === undefined) break;
+      set.delete(oldest);
+    }
     this.stats.acksTotal++;
   }
 
@@ -707,7 +656,11 @@ export class ConnectTunnelManager {
   }
 
   getStats(): ConnectTunnelStats {
-    return { ...this.stats, activeConnections: this.connections.size };
+    let ackDedupEntries = 0;
+    for (const set of this.ackedDeliveries.values()) ackDedupEntries += set.size;
+    let subscriptionEntries = 0;
+    for (const set of this.subscriptions.values()) subscriptionEntries += set.size;
+    return { ...this.stats, activeConnections: this.connections.size, ackDedupEntries, subscriptionEntries };
   }
 
   private send(ws: WebSocket, frame: ConnectFrame): void {
