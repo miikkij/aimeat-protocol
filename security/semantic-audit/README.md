@@ -35,12 +35,21 @@ Numbers are the invariants in `docs/coding-guidelines/security-development-dna.m
 | Invariant | Checked by | Rule |
 |---|---|---|
 | 1 — authorize against the resolved identity | ast-grep rule + Semgrep taint | `resolve-identity` |
+| 6 — optionalAuth is not a gate (`if (!req.auth)`) | ast-grep rule | `optional-auth-not-a-gate` |
 | 11 — the owner name is not a principal | ast-grep rule (review-level) | `owner-name-is-not-a-principal` |
 | 15 — a permission word is enforced on every door | ast-grep rule | `permission-word-on-every-door` |
+| 2 — server-read keys unreachable by scoped principals | audit-gate ratchet | `check:trusted-keys` |
+| 3 — non-constant outbound HTTP via safeFetch | audit-gate ratchet | `check:outbound-fetch` |
+| 4 — every mutating route gated | audit-gate ratchet | `check:route-scopes` |
+| 9 — cross-owner / cross-scope denial tests | audit-gate ratchet + guard tier | `check:denial-coverage` |
+| "one capability, one implementation" | audit-gate ratchet | `check:shared-impl` |
+| MCP name + parameter parity across surfaces | ratchet + unit test | `check:mcp-tools`, `check:mcp-schemas`, `cli-tool-param-forwarding.test` |
+| pypi liaison ↔ node schema parity | audit-gate ratchet | `check:liaison-surface` |
 | 12 — a role is granted, never inherited at mint | guard tier + mint-list diff | `e2e-account-security-gate`; review when adding a mint |
-| 13 — a gate reads the normalized value | partial / review | header-and-body-as-authz is too broad to gate cleanly; caught by review and the origin-marker tests |
-| 14 — refuse before you write | NOT static | an ordering property (write-before-check); covered by tests and code review, not a rule |
-| 16 — deprecated is not removed | NOT static | a policy property (a deprecation must name flag+default+version); covered by review |
+| 5 — federation verify is unconditional | NOT a clean rule | the conditional-around-verify shape has legitimate forms; review + `e2e-federation` |
+| 13 — a gate reads the normalized value | NOT a clean rule | a credential header (fine) and an isolation-claim header (a bug) are structurally identical; review + the subdomain Host-derivation |
+| 14 — refuse before you write | NOT static | an ordering property (write-before-check); tests + code review |
+| 16 — deprecated is not removed | NOT static | a policy property (a deprecation must name flag+default+version); review |
 
 ### The three rules that exist
 
@@ -52,16 +61,34 @@ Numbers are the invariants in `docs/coding-guidelines/security-development-dna.m
   A review prompt: if the guarded door changes the ACCOUNT itself, it needs `requireOwnerPrincipal()`.
 - **permission-word-on-every-door** — `requireRoleOrScope('agent', <scope>)`, where the agent role is
   admitted before the scope, so the scope word is decorative on that door.
+- **optional-auth-not-a-gate** — `if (!req.auth)` used as a gate in a route. optionalAuth injects a
+  (possibly anonymous) identity, so this admits the anonymous principal; use requireAuth().
+
+## One pane — every audit signal on the Security tab
+
+The audit is not only the three ast-grep rules. Two other families already run, and CI mirrors all of
+them onto the same GitHub code-scanning Security tab so "what is checked, and what is currently
+regressed" is one view rather than twelve log tails (`.github/workflows/semantic-audit.yml`):
+
+- **ast-grep semantic rules** (this directory) — category `semantic-audit`.
+- **audit-gate ratchets + MCP parity** (`checks-to-sarif.mjs` wraps `check:route-scopes`,
+  `check:trusted-keys`, `check:shared-impl`, `check:liaison-surface`, `check:mcp-tools`,
+  `check:mcp-schemas`, and the rest) — category `audit-gates`. These also gate ci.yml; the Security
+  tab is their visibility, not their enforcement.
+
+Both are advisory in this workflow (continue-on-error): a finding surfaces without blocking a merge.
+The ratchets still block ci.yml on a NEW violation, which is where enforcement lives.
 
 ### Proof-of-concept result (2026-08-21)
 
-First run over `src/routes`: 19 findings across the three rules.
+First run over `src/routes`: 22 findings across the four rules.
 
 | Rule | Findings | After triage |
 |---|---|---|
 | resolve-identity | 12 | 0 real — all agent-session branches, attribution fields, or inline GHII construction |
 | owner-name-is-not-a-principal | 3 | 2 to confirm (`owners.ts`, `owners/export.ts`), 1 legitimate (instance ownership) |
 | permission-word-on-every-door | 4 | 4 to confirm (`organism:invite` doors) |
+| optional-auth-not-a-gate | 3 | 3 to confirm (`apps/read.ts`, `stats.ts`) — is requireAuth also present, or is `if (!req.auth)` the only gate? |
 
 No confirmed live defect from the resolve-identity pass — the cross-owner boundary is handled
 correctly today. The owner-name and permission-word hits are review candidates, not automatic

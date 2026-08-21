@@ -46,3 +46,33 @@ jobs:
         with:
           sarif_file: semantic-audit.sarif
           category: semantic-audit
+
+  # The existing audit-gate ratchets and MCP surface-parity checks already gate ci.yml; this job
+  # mirrors their state onto the same Security tab so every audit signal shares one pane. Advisory.
+  audit-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: aimeat/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: aimeat
+        run: pnpm install --frozen-lockfile
+
+      - name: Run audit gates and emit SARIF
+        working-directory: aimeat
+        continue-on-error: true
+        run: node ../security/semantic-audit/checks-to-sarif.mjs audit-gates.sarif
+
+      - name: Upload results to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: aimeat/audit-gates.sarif
+          category: audit-gates
