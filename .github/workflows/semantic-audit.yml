@@ -1,0 +1,48 @@
+# Semantic security audit: the security-development-dna invariants that can be checked as
+# source -> sink / structural rules, run on every change and tracked on the Security tab.
+#
+# The rules live in security/semantic-audit/ast-grep and are run with ast-grep (a native binary,
+# same tool the developer runs locally on Windows). Findings are uploaded to GitHub code scanning so
+# each one becomes a tracked alert with a history, not a line in a log.
+#
+# Advisory for now (continue-on-error): the rules over-report by design and each hit is a review
+# prompt, so a finding surfaces on the Security tab without blocking a merge. Tighten a rule with
+# per-line `// ast-grep-ignore` once its false positives are understood, then make it blocking.
+
+name: Semantic security audit
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  ast-grep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Run semantic security rules (ast-grep)
+        continue-on-error: true
+        run: >
+          npx -y -p @ast-grep/cli@0.45.1 ast-grep scan
+          -c security/semantic-audit/sgconfig.yml
+          aimeat/src --format sarif > semantic-audit.sarif
+
+      - name: Normalize SARIF for GitHub code scanning
+        run: node security/semantic-audit/normalize-sarif.mjs semantic-audit.sarif
+
+      - name: Upload results to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semantic-audit.sarif
+          category: semantic-audit
