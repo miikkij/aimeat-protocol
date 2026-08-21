@@ -202,3 +202,6 @@ aimeat/locales/.todo-*.json
 # since v1.2.0 and is untracked as of this rule.
 aimeat/static/
 aimeat/.aimeat-manifest.json
+
+# Machine-generated security audit reports (pnpm audit:report)
+secaudit/
