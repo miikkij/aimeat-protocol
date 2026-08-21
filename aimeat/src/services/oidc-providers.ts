@@ -8,15 +8,23 @@
  *   its (lazily discovered) client, the scopes to request, the verification-nonce type used to
  *   isolate its login state, a pure `mapClaims()` that normalises the IdP's ID-token claims into a
  *   common {@link MappedClaims} shape, and an optional `validateClaims()` gate (used by Entra to
- *   enforce single-tenant sign-in). oauth-login.ts loops over this list to register identical
+ *   admit only the tenants this node accepts). oauth-login.ts loops over this list to register identical
  *   authorize/callback/finalize routes per provider, so adding a fourth provider is a few lines here.
  * @structure
  *   buildOidcProviders(config): OidcProvider[]  — creates + initialises the clients (boot-time).
  *   listEnabledProviderMeta(config): {id,label,i18nKey}[] — PURE, no client creation; baked into
  *     the browser auth lib so the sign-in modal can render one button per enabled provider.
- *   mapGoogleClaims/mapCasdoorClaims/makeEntraMapper/makeEntraValidator — pure, exported for tests.
+ *   entraTenantGate/mapGoogleClaims/mapCasdoorClaims/makeEntraMapper/makeEntraValidator — pure, exported for tests.
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   v1.1.0 — 2026-08-21 — Entra tenant ALLOWLIST (AIMEAT_ENTRA_ALLOWED_TENANTS): several approved
+ *     organisations sign in, every other tenant and every personal account is refused. Needs a
+ *     multi-tenant app registration (`AIMEAT_ENTRA_OAUTH_TENANT=organizations`), whose discovery
+ *     document carries the literal issuer `https://login.microsoftonline.com/{tenantid}/v2.0`.
+ *     That placeholder is not ours to work around: openid-client v6 detects the Entra origin and
+ *     substitutes the token's `tid` when it validates the ID token's `iss` (build/index.js,
+ *     `kEntraId`), so the generic OidcClient needs no Entra special case. Verified against the
+ *     live metadata on 2026-08-21.
  *   v1.0.0 — 2026-07-01 — Initial registry: Google (folded in from oauth-login.ts) + Casdoor + Entra.
  */
 
@@ -79,6 +87,25 @@ export function isTenantGuid(tenant: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant.trim());
 }
 
+/**
+ * Which Entra tenants may sign in, lowercased — or null when Entra sign-in is not tenant-gated.
+ * Two ways to be gated, and the allowlist wins when both are set:
+ *   - `entraAllowedTenants` names the organisations that may in (multi-tenant app registration,
+ *     `AIMEAT_ENTRA_OAUTH_TENANT=organizations`). This is the shape for a node shared with
+ *     approved partner companies.
+ *   - a GUID in `AIMEAT_ENTRA_OAUTH_TENANT` alone admits that one tenant (single-tenant app).
+ * `common`/`organizations`/`consumers` with no allowlist gate nothing, which is the default and
+ * lets any Microsoft account through — the registration mode is what stops that being a door.
+ *
+ * A malformed entry is KEPT in the set rather than dropped: it can never equal a `tid`, so a typo
+ * refuses a tenant instead of quietly widening who may sign in. buildOidcProviders() warns about it.
+ */
+export function entraTenantGate(tenant: string, allowedTenants: string[] = []): Set<string> | null {
+  const listed = allowedTenants.map(t => t.trim().toLowerCase()).filter(Boolean);
+  if (listed.length) return new Set(listed);
+  return isTenantGuid(tenant) ? new Set([tenant.trim().toLowerCase()]) : null;
+}
+
 // ── Claim mappers (pure; exported so tests exercise the real mapping) ──
 
 /** Google: honours `email_verified`; display name from name → given_name → email-local. */
@@ -106,33 +133,37 @@ export function mapCasdoorClaims(claims: Record<string, unknown>): MappedClaims 
 
 /**
  * Entra: email may arrive as `email`, `preferred_username`, or `upn`. The email is only treated as
- * verified (auto-linkable) when signing into a PINNED single tenant — for the multi-tenant/personal
- * (`common`/`organizations`/`consumers`) modes we can't vouch for the address, so new users go
- * through the username-choice step and are never silently linked.
+ * verified (auto-linkable) when the sign-in passed a TENANT GATE — a pinned single tenant, or a
+ * tenant on the allowlist. Ungated (`common`/`organizations`/`consumers` with no allowlist) we
+ * can't vouch for the address, so new users go through the username-choice step and are never
+ * silently linked.
  */
-export function makeEntraMapper(tenant: string): (claims: Record<string, unknown>) => MappedClaims | null {
-  const pinned = isTenantGuid(tenant);
+export function makeEntraMapper(tenant: string, allowedTenants: string[] = []): (claims: Record<string, unknown>) => MappedClaims | null {
+  const gated = entraTenantGate(tenant, allowedTenants) !== null;
   return function mapEntraClaims(claims: Record<string, unknown>): MappedClaims | null {
     const sub = str(claims.sub);
     if (!sub) return null;
     const email = str(claims.email) || str(claims.preferred_username) || str(claims.upn) || null;
-    const emailVerified = pinned && !!email && email.includes('@');
+    const emailVerified = gated && !!email && email.includes('@');
     const displayName = str(claims.name) || str(claims.preferred_username) || email?.split('@')[0] || 'AIMEAT User';
     return { sub, email, emailVerified, displayName };
   };
 }
 
 /**
- * Entra tenant gating: when a concrete tenant GUID is configured, require the token's `tid` to
- * match it (blocks users from other tenants / personal accounts). Returns undefined for the
- * non-pinned modes (no gating possible), so the router applies no extra validation there.
+ * Entra tenant gating: require the token's `tid` to name one of the allowed tenants (blocks users
+ * from every other organisation and every personal account). Returns undefined when nothing is
+ * gated, so the router applies no extra validation there.
+ *
+ * The gate is the `tid` claim of the verified ID token, never the email domain: a domain is
+ * whatever the tenant admin added to the tenant, while `tid` is which directory issued the token.
  */
-export function makeEntraValidator(tenant: string): ((claims: Record<string, unknown>) => string | null) | undefined {
-  if (!isTenantGuid(tenant)) return undefined;
-  const want = tenant.trim().toLowerCase();
+export function makeEntraValidator(tenant: string, allowedTenants: string[] = []): ((claims: Record<string, unknown>) => string | null) | undefined {
+  const allowed = entraTenantGate(tenant, allowedTenants);
+  if (!allowed) return undefined;
   return function validateEntraTenant(claims: Record<string, unknown>): string | null {
     const tid = str(claims.tid)?.toLowerCase();
-    return tid === want ? null : 'ENTRA_WRONG_TENANT';
+    return tid && allowed.has(tid) ? null : 'ENTRA_WRONG_TENANT';
   };
 }
 
@@ -199,6 +230,18 @@ export function buildOidcProviders(config: AimeatConfig): OidcProvider[] {
   {
     const enabled = config.entraOAuthEnabled && !!config.entraOAuthClientId && !!config.entraOAuthClientSecret;
     const tenant = config.entraOAuthTenant || 'common';
+    const allowedTenants = config.entraAllowedTenants ?? [];
+    if (enabled && allowedTenants.length) {
+      // Two ways to configure this into something that refuses everyone, both of them silent at
+      // runtime (every sign-in just answers ENTRA_WRONG_TENANT), so they are named at boot.
+      const malformed = allowedTenants.filter(t => !isTenantGuid(t));
+      if (malformed.length) {
+        logger.warn('AIMEAT_ENTRA_ALLOWED_TENANTS contains values that are not tenant GUIDs — they can never match a token and will refuse that organisation', { malformed });
+      }
+      if (isTenantGuid(tenant) && allowedTenants.some(t => t !== tenant.trim().toLowerCase())) {
+        logger.warn('AIMEAT_ENTRA_OAUTH_TENANT is pinned to one tenant GUID while AIMEAT_ENTRA_ALLOWED_TENANTS names others — a single-tenant app registration cannot sign anyone else in. Set the tenant to `organizations` and register the app as multi-tenant.', { tenant, allowedTenants });
+      }
+    }
     let client: OidcClient | null = null;
     if (enabled) {
       client = createOidcClient({
@@ -213,7 +256,9 @@ export function buildOidcProviders(config: AimeatConfig): OidcProvider[] {
     }
     providers.push({
       id: 'entra', ...PROVIDER_META.entra, enabled, client, scopes: OIDC_SCOPES,
-      nonceType: 'entra_login', mapClaims: makeEntraMapper(tenant), validateClaims: makeEntraValidator(tenant),
+      nonceType: 'entra_login',
+      mapClaims: makeEntraMapper(tenant, allowedTenants),
+      validateClaims: makeEntraValidator(tenant, allowedTenants),
     });
   }
 

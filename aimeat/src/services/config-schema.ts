@@ -92,6 +92,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
 
   // ── Auth (mutable) ──
   { key: 'jwtTtlSeconds', dotPath: 'auth.jwt_ttl_seconds', envVar: 'AIMEAT_JWT_TTL', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 60, immutable: false, description: 'JWT token time-to-live in seconds', range: '60-86400' },
+  // Immutable on purpose, and not only because the loader would hand this string-typed door a
+  // string where the node reads a list: which organisations may sign in is a decision that belongs
+  // to whoever runs the node, not to an operator session that could widen it in one PUT.
+  { key: 'entraAllowedTenants', dotPath: 'auth.entra_allowed_tenants', envVar: 'AIMEAT_ENTRA_ALLOWED_TENANTS', type: 'string', validate: () => true, immutable: true, description: 'Microsoft Entra tenant GUIDs allowed to sign in (comma-separated). Empty = the gate comes from AIMEAT_ENTRA_OAUTH_TENANT alone: a GUID there admits that one tenant, common/organizations admit any Microsoft account.' },
 
   // ── Features (mutable) ──
   { key: 'keyedBrowseEnabled', dotPath: 'features.keyed_browse_enabled', envVar: 'AIMEAT_KEYED_BROWSE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow browsing with API keys' },
@@ -357,7 +361,7 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'mcpSessionIdleMinutes', dotPath: 'mcp.session_idle_minutes', envVar: 'AIMEAT_MCP_SESSION_IDLE_MINUTES', type: 'number', validate: v => typeof v === 'number' && (v as number) >= 0.05 && (v as number) <= 1440, immutable: false, description: 'Close an MCP session after this many minutes without a request (fractions allowed; a reaped client re-initializes)', range: '0.05-1440' },
 
   // ── Registration (mutable) ──
-  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', validate: v => ['open', 'invite', 'closed'].includes(v as string), immutable: false, description: 'Who may get a new account: open (everyone), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
+  { key: 'registrationMode', dotPath: 'registration.mode', envVar: 'AIMEAT_REGISTRATION_MODE', type: 'string', validate: v => ['open', 'oauth', 'invite', 'closed'].includes(v as string), immutable: false, description: 'Who may get a new account: open (everyone), oauth (first sign-in through a configured identity provider, or an invitation — no password registration), invite (member-minted invitations only), closed (nobody). Existing accounts always sign in.' },
 
   // ── Scoped Agent Capabilities (mutable) ──
   { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Default agent capability scopes (comma-separated)' },
