@@ -1,11 +1,14 @@
 /**
  * @file e2e-registration-mode.ts
- * @description E2E for AIMEAT_REGISTRATION_MODE (open|invite|closed). Flips the mode at runtime
+ * @description E2E for AIMEAT_REGISTRATION_MODE (open|oauth|invite|closed). Flips the mode at runtime
  *   through the operator config door and proves each account-creating door answers the mode:
  *   closed refuses everything (and a refused invitation is NOT consumed), invite refuses the
  *   direct doors while a member-minted invitation still creates the account, open restores all.
  *   Also: the config door itself is operator-only, and GET / discovery reports the current mode.
  * @version-history
+ *   v1.1.0 -- 2026-08-21 -- The `oauth` mode: password doors refused, invitation still creates the
+ *     account. The identity-provider door itself needs an IdP, so the rule table behind it is
+ *     asserted in test/unit/registration-gate.test.ts.
  *   v1.0.0 -- 2026-08-18 -- Initial: the whole mode matrix over live HTTP.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=registration-mode
@@ -124,6 +127,32 @@ await test('INVITE: the member-minted invitation still creates the account', asy
     assert(accept.body.data.created_account === true, 'a new account was created through the invitation');
     invitedUserToken = accept.body.data.token;
     assert(typeof invitedUserToken === 'string' && invitedUserToken.length > 0, 'invited user got a session');
+});
+
+await test('OAUTH: the password doors are refused and discovery reports the mode', async () => {
+    const r = await setMode(opToken, 'oauth');
+    assert(r.status === 200, `set oauth: ${r.status}: ${JSON.stringify(r.body.error)}`);
+
+    const owners = await registerAndToken(`rmoa1${Date.now()}`);
+    assert(owners.status === 403 && owners.body.error?.code === 'REGISTRATION_CLOSED', `/v1/owners: ${owners.status} ${owners.body.error?.code}`);
+    const ghii = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `rmoa2${Date.now()}`, display_name: 'x', password: 'OauthMode123' }) });
+    assert(ghii.status === 403 && ghii.body.error?.code === 'REGISTRATION_CLOSED', `/v1/ghii: ${ghii.status} ${ghii.body.error?.code}`);
+    const web = await json('/v1/ghii/register-web', { method: 'POST', body: JSON.stringify({ username: `rmoa3${Date.now()}`, display_name: 'x' }) });
+    assert(web.status === 403 && web.body.error?.code === 'REGISTRATION_CLOSED', `register-web: ${web.status} ${web.body.error?.code}`);
+    const selfServe = await json('/v1/registration-invites', { method: 'POST', body: JSON.stringify({ email: 'nobody3@example.com', agent: { model: 'test-model' } }) });
+    assert(selfServe.status === 403 && selfServe.body.error?.code === 'REGISTRATION_CLOSED', `registration-invites: ${selfServe.status} ${selfServe.body.error?.code}`);
+
+    const disc = await json('/?format=json');
+    assert(JSON.stringify(disc.body).includes('"registration_mode":"oauth"'), 'discovery shows oauth');
+});
+
+await test('OAUTH: a member-minted invitation still creates the account', async () => {
+    const invitee = `rmoainv${Date.now()}`;
+    const inv = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(opToken), body: JSON.stringify({ email: `${invitee}@example.com`, orgRole: 'member', workspaces: [{ ws: WS, role: 'contributor' }] }) });
+    assert(inv.status === 201 || inv.status === 200, `invite mint: ${inv.status}: ${JSON.stringify(inv.body.error)}`);
+    const accept = await json(`/v1/invitations/${tokenFrom(inv.body.data.accept_url)}/accept`, { method: 'POST', body: JSON.stringify({ username: invitee, password: 'OauthInvite123', display_name: 'Invited In Oauth' }) });
+    assert(accept.status === 200, `accept: ${accept.status}: ${JSON.stringify(accept.body.error)}`);
+    assert(accept.body.data.created_account === true, 'the invitation created the account while the password doors were shut');
 });
 
 await test('The config door is operator-only: the invited member cannot reopen registration', async () => {

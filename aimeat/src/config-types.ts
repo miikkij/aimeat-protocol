@@ -7,6 +7,9 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.3.0 — 2026-08-21 — SocialLoginConfig mixed in (config-types-social-login.ts): the Google,
+ *     Casdoor and Entra sign-in blocks moved verbatim when the Entra tenant allowlist took this
+ *     file over the 800-line ceiling again.
  *   v1.2.0 — 2026-08-19 — SitePresenceConfig mixed in (config-site-presence.ts): contentSignal,
  *     aiTraining and webBotAuthSign extracted verbatim, frontPage added there — this file had
  *     crossed the 800-line ceiling.
@@ -179,8 +182,9 @@ export interface SiteLinksConfig {
 
 import type { AiCapabilityConfig } from './config-types-ai.js';
 import type { SitePresenceConfig } from './config-site-presence.js';
+import type { SocialLoginConfig } from './config-types-social-login.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig {
   port: number;
   baseUrl: string;
   /**
@@ -402,12 +406,15 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   // Security limits (configurable per security audit)
   /**
    * Who may get a NEW account on this node. 'open' (default) keeps every registration door
-   * working; 'invite' refuses the direct doors (API/web registration, OAuth first sign-in, the
+   * working; 'oauth' refuses the password doors while a first sign-in through a configured
+   * identity provider still creates the account (the organisation-node shape: the IdP's own
+   * allowlist decides who exists, and nobody arrives with a password they chose themselves);
+   * 'invite' refuses the direct doors (API/web registration, OAuth first sign-in, the
    * self-service invite request) while member-minted invitations still create accounts; 'closed'
    * refuses account creation everywhere. Existing accounts always sign in. Enforced at the doors
    * AND inside provisionOwner, so a door added later cannot forget it.
    */
-  registrationMode: 'open' | 'invite' | 'closed';
+  registrationMode: 'open' | 'oauth' | 'invite' | 'closed';
   loginRateLimitMax: number;
   loginRateLimitWindowMs: number;
   registrationRateLimitMax: number;
@@ -560,25 +567,7 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   nonceTtlSeconds: number;
   nationalEidPidClaim: string;
 
-  // Social login — Google OAuth/OIDC sign-in (generic, config-gated)
-  googleOAuthEnabled: boolean;
-  googleOAuthClientId: string;
-  googleOAuthClientSecret: string;
-  googleOAuthRedirectUri: string;  // empty = derive from baseUrl
-
-  // Social login — Casdoor OAuth/OIDC sign-in (open-source IdP, config-gated)
-  casdoorOAuthEnabled: boolean;
-  casdoorOAuthEndpoint: string;      // Casdoor server URL, e.g. https://casdoor.example.com
-  casdoorOAuthClientId: string;
-  casdoorOAuthClientSecret: string;
-  casdoorOAuthRedirectUri: string;   // empty = derive from baseUrl
-
-  // Social login — Microsoft Entra ID OAuth/OIDC sign-in (enterprise IdP, config-gated)
-  entraOAuthEnabled: boolean;
-  entraOAuthTenant: string;          // tenant GUID (single-tenant gating) | common | organizations | consumers
-  entraOAuthClientId: string;
-  entraOAuthClientSecret: string;
-  entraOAuthRedirectUri: string;     // empty = derive from baseUrl
+  // Social login (Google, Casdoor, Entra ID) → SocialLoginConfig in config-types-social-login.ts
 
   // ── OUTBOUND connections (TARGET-057, aimeat-connect) ──
   // The other direction entirely from the sign-in blocks above, and deliberately its own client:

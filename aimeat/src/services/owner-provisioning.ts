@@ -10,6 +10,10 @@
  * @structure ProvisionEmailTakenError; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.3.0 — 2026-08-21 — The 'oauth' registration mode: a first sign-in through a configured
+ *     identity provider creates the account, the password doors stay refused. The mode an
+ *     organisation node wants — who exists is decided in the IdP (for Entra, the tenant allowlist
+ *     in oidc-providers.ts), not by who found the registration form.
  *   v1.2.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): registrationRefusal() is the
  *     one rule table, every ProvisionOwnerOpts carries a required `via`, and provisionOwner throws
  *     RegistrationClosedError as the backstop behind the per-door checks.
@@ -62,6 +66,7 @@ export class RegistrationClosedError extends Error {
  *
  *              direct   oauth   invitation
  *   open        yes      yes      yes
+ *   oauth       no       yes      yes
  *   invite      no       no       yes
  *   closed      no       no       no
  */
@@ -70,6 +75,9 @@ export function registrationRefusal(config: AimeatConfig, via: RegistrationVia):
   if (mode === 'closed') return 'This node does not accept new accounts.';
   if (mode === 'invite' && via !== 'invitation') {
     return 'This node creates new accounts by invitation only. Ask a member of this node to send you an invitation.';
+  }
+  if (mode === 'oauth' && via === 'direct') {
+    return 'This node creates new accounts by signing in with an approved identity provider, or by invitation. Registering with a username and password is not available here.';
   }
   return null;
 }

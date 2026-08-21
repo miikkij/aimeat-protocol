@@ -6298,7 +6298,7 @@ paths:
       summary: Register owner
       description: >-
         Create a new human identity on this node. No auth required. On a node whose
-        registration mode is `invite` or `closed` this door answers 403 REGISTRATION_CLOSED
+        registration mode is `oauth`, `invite` or `closed` this door answers 403 REGISTRATION_CLOSED
         (see the `registration_mode` field in the GET / discovery document).
       tags: [Identity]
       requestBody:
@@ -6311,7 +6311,7 @@ paths:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '403':
-          description: REGISTRATION_CLOSED — this node is invite-only or closed to new accounts
+          description: REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by invitation only, or not at all
         '409':
           description: Owner name already taken
 
@@ -8742,7 +8742,8 @@ paths:
         '403':
           description: >-
             REGISTRATION_CLOSED — this self-service door is refused when the node's registration
-            mode is `invite` or `closed` (member-minted invitations are a different door).
+            mode is `oauth`, `invite` or `closed` (member-minted invitations are a different door,
+            and so is a first sign-in through a configured identity provider).
         '429':
           description: Too many calls from this IP
 
@@ -22204,7 +22205,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
-          description: REGISTRATION_CLOSED — this node is invite-only or closed to new accounts
+          description: REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by invitation only, or not at all
         '409':
           description: Username already taken
           content:
@@ -43357,7 +43358,7 @@ paths:
         '400':
           description: INVALID_INPUT for a bad username or display_name, WEAK_PASSWORD when the password fails a strength rule, or EMAIL_REQUIRED when the node's email gate is on and no email was supplied
         '403':
-          description: REGISTRATION_CLOSED — this node is invite-only or closed to new accounts
+          description: REGISTRATION_CLOSED — this node takes new accounts by identity-provider sign-in only, by invitation only, or not at all
         '409':
           description: NAME_TAKEN, or EMAIL_TAKEN when the email is already verified on another account
     put:
