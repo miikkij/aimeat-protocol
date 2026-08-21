@@ -55,7 +55,30 @@ Entra Overview page in their tenant, and it is not a secret. Do not accept an em
 a domain is whatever a tenant admin added to a directory, while `tid` is which directory issued the
 token.
 
-## 3. Configure the node
+## 3. Each organisation approves the app once
+
+A multi-tenant app does not work in an organisation until an administrator of THAT organisation has
+approved it. Most companies switch off a user's ability to consent to apps themselves, so the first
+person to try signing in sees "Approval required" and gets no further. This is Entra working as
+designed, and it is the partner organisation's half of the agreement: they approve the app, you add
+their tenant GUID to the allowlist. Neither half admits anyone on its own.
+
+An administrator grants it either way:
+
+- Sign in to the node with an administrator account. The consent screen then offers *Consent on
+  behalf of your organization*.
+- Or in Entra: Enterprise applications → the app → Permissions → Grant admin consent.
+
+What they are approving is `openid`, `profile` and `email`: the name and address needed to sign in.
+No Microsoft Graph permissions, no mailbox, no offline tokens, and nothing that reads anything in
+their tenant. Say so when you ask, because the consent screen also says the publisher is unverified
+and that is what an administrator reacts to.
+
+Publisher verification removes that warning. It needs a Microsoft Partner Network account with the
+app registration linked to it. Sign-in works without it, but some tenants are configured to refuse
+unverified publishers outright, and then verification is the only way in.
+
+## 4. Configure the node
 
 ```bash
 AIMEAT_ENTRA_OAUTH_ENABLED=true
@@ -78,7 +101,7 @@ because widening who may sign in should take a deploy rather than one call from 
 `PUT /v1/admin/config` with `registration.mode`, which is how you open a node for an afternoon and
 close it again.
 
-## 4. Check that it works
+## 5. Check that it works
 
 Boot the node and read the log. Two misconfigurations are silent at runtime, so they are named at
 startup: a value in the allowlist that is not a GUID, and a pinned tenant GUID that contradicts the
@@ -98,7 +121,7 @@ A gated sign-in also lets the node vouch for the email address, which is what ma
 account link to its Entra identity on the first sign-in instead of dead-ending at "username taken".
 Ungated Entra sign-in (`common` or `organizations` with no allowlist) does not vouch for it.
 
-## 5. What the gate does not cover
+## 6. What the gate does not cover
 
 - **Other sign-in providers.** The tenant allowlist gates Entra only. If Google or Casdoor is also
   enabled, that is a second front door with its own answer to "who may sign in", and under mode
@@ -116,7 +139,7 @@ Ungated Entra sign-in (`common` or `organizations` with no allowlist) does not v
   and workspace access all remain. Removing an organisation is therefore reversible, and it is not
   the same thing as deleting anyone.
 
-## 6. Where this lives in the code
+## 7. Where this lives in the code
 
 | What | Where |
 |---|---|
