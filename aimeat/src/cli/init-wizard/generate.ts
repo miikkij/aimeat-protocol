@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description .env / .json / .ini config-file generators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-21 — Add the "Security (encryption at rest)" .env section for the two
+ *     per-instance secrets (AIMEAT_TOTP_ENCRYPTION_KEY, AIMEAT_KEY_PASSPHRASE) the wizard now
+ *     auto-generates, each with a never-change-on-a-live-instance warning.
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
  */
 
@@ -41,6 +44,13 @@ export function generateEnvContent(settings: Record<string, string>): string {
       title: 'Operator / Admin',
       vars: [
         { key: 'AIMEAT_ADMIN_PASSWORD', comment: 'Auto-generated on startup if not set' },
+      ],
+    },
+    {
+      title: 'Security (encryption at rest)',
+      vars: [
+        { key: 'AIMEAT_TOTP_ENCRYPTION_KEY', comment: 'Per-instance AES-256-GCM key for stored 2FA secrets (64 hex chars). Auto-generated once by `aimeat init`. Never change it on a live instance — a new key cannot decrypt already-stored TOTP secrets.' },
+        { key: 'AIMEAT_KEY_PASSPHRASE', comment: 'Per-instance passphrase that encrypts the node identity key on disk. Auto-generated once by `aimeat init`. Never change it on a live instance — a new passphrase cannot decrypt the existing node key.' },
       ],
     },
     {

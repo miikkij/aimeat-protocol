@@ -7,7 +7,14 @@
  *   config values so users see their current settings; writes .env / .ini / .json.
  *   Presets, helpers, generators, and per-section wizard steps live in
  *   ./init-wizard/*; this file orchestrates them.
- * @version-history v1.25.3 — 2026-07-13 — Split into ./init-wizard/* sibling modules
+ * @version-history
+ *   v1.26.0 — 2026-08-21 — Per-instance at-rest encryption secrets: the wizard now auto-generates
+ *     AIMEAT_TOTP_ENCRYPTION_KEY (64-hex AES-256-GCM) and AIMEAT_KEY_PASSPHRASE once and writes them
+ *     to the config, so a sold/provisioned instance never ships with plaintext 2FA secrets, an
+ *     unencrypted node key, or a shared template key. Existing values are preserved, never
+ *     regenerated (a new value would strand the data it protects). ensureEncryptionSecrets() is
+ *     exported and unit-tested in test/unit/init-wizard-secrets.test.ts.
+ *   v1.25.3 — 2026-07-13 — Split into ./init-wizard/* sibling modules
  *   (presets, helpers, generate, steps-core, steps-operator, steps-advanced) to
  *   satisfy max-file-lines; pure extraction, no behavior change.
  * @version-history v1.25.2 — 2026-06-20 — Add App Origin Isolation (H-2) prompt to
@@ -16,6 +23,7 @@
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as p from '@clack/prompts';
@@ -31,6 +39,29 @@ import { askAllAdvancedSettings, askEconomySettings } from './init-wizard/steps-
 
 // Package root: from dist/src/cli/init-wizard.js -> go up 3 levels to aimeat/
 const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+
+/** Setting keys that hold a secret and must be masked in the on-screen summary, never printed raw. */
+const SECRET_SETTING_KEYS = new Set([
+  'AIMEAT_ADMIN_PASSWORD',
+  'AIMEAT_TOTP_ENCRYPTION_KEY',
+  'AIMEAT_KEY_PASSPHRASE',
+]);
+
+/**
+ * Fill in the two at-rest encryption secrets for this instance, generating a fresh value only when
+ * one is not already present. The order is deliberate: a value the operator typed this run wins,
+ * then a value already in the loaded environment (an existing instance being re-configured), and
+ * only a genuinely absent secret is generated. This is what makes re-running `aimeat init` safe —
+ * regenerating either secret would strand the data it protects (stored 2FA secrets, the encrypted
+ * node key). AIMEAT_TOTP_ENCRYPTION_KEY is 32 bytes as 64 hex chars (AES-256-GCM, the length
+ * config.ts expects); AIMEAT_KEY_PASSPHRASE is 32 random bytes, url-safe.
+ */
+export function ensureEncryptionSecrets(settings: Record<string, string>, env: Record<string, string>): void {
+  settings.AIMEAT_TOTP_ENCRYPTION_KEY =
+    settings.AIMEAT_TOTP_ENCRYPTION_KEY || env.AIMEAT_TOTP_ENCRYPTION_KEY || randomBytes(32).toString('hex');
+  settings.AIMEAT_KEY_PASSPHRASE =
+    settings.AIMEAT_KEY_PASSPHRASE || env.AIMEAT_KEY_PASSPHRASE || randomBytes(32).toString('base64url');
+}
 
 // ── Main wizard ─────────────────────────────────────────────────────
 
@@ -110,6 +141,16 @@ export async function runInitWizard(config: AimeatConfig): Promise<void> {
     }
   }
 
+  // Step 4.5: Per-instance encryption secrets. These protect data AT REST — the TOTP key
+  // (AES-256-GCM) encrypts stored 2FA secrets, and the passphrase encrypts the node's Ed25519
+  // identity key on disk. Every instance needs its OWN, or a shared/template value would let one
+  // operator decrypt another instance's secrets. Generated ONCE and persisted into the config:
+  // NEVER regenerate an existing value (a new TOTP key cannot decrypt already-stored 2FA secrets,
+  // a new passphrase cannot decrypt the existing node key), so any value already in the environment
+  // is carried forward untouched. This is unlike AIMEAT_ADMIN_PASSWORD, which is a login secret the
+  // node may safely regenerate on boot.
+  ensureEncryptionSecrets(settings, env);
+
   // Step 5: Summary
   const changedEntries = Object.entries(settings).filter(
     ([key, val]) => CONFIG_DEFAULTS[key] !== val,
@@ -118,7 +159,7 @@ export async function runInitWizard(config: AimeatConfig): Promise<void> {
   if (changedEntries.length > 0) {
     const summaryLines = changedEntries
       .map(([key, val]) => {
-        const display = key === 'AIMEAT_ADMIN_PASSWORD'
+        const display = SECRET_SETTING_KEYS.has(key)
           ? val.slice(0, 2) + '*'.repeat(Math.max(0, val.length - 4)) + val.slice(-2)
           : val;
         return `  ${key} = ${display}`;

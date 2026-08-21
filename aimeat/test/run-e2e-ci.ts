@@ -9,6 +9,9 @@
  *   node --import tsx test/run-e2e-ci.ts --test=e2e-mcp
  *   node --import tsx test/run-e2e-ci.ts --guards
  * @version-history
+ *   v1.21.0 -- 2026-08-21 -- Add e2e-static-hardening.ts to ALL_SUITES and the guard tier: the node
+ *            refuses any dotfile path (.env, .env~, .git/) with a 403 before every static handler,
+ *            so a leftover secrets backup cannot be read even without the apex nginx dotfile deny.
  *   v1.20.0 -- 2026-08-17 -- Add e2e-living-pulse.ts (the due-scan on the meta projection).
  *   v1.19.0 -- 2026-08-17 -- Add e2e-auth-refusals.ts (the refusal log's operator surface),
  *            with AIMEAT_AUTH_LOG_PATH pinned to a test-local file in run-e2e-server.
@@ -327,6 +330,7 @@ const ALL_SUITES = [
     'test/e2e-organism-archive.ts',
     'test/e2e-workspace-export-import.ts',
     'test/e2e-zip-security.ts',
+    'test/e2e-static-hardening.ts',
     'test/e2e-workspace-activity.ts',
     'test/e2e-workspace-update.ts',
     'test/e2e-workspace-kpi.ts',
@@ -494,6 +498,7 @@ const GUARD_SUITES = [
     'test/e2e-storage-visibility.ts',       // private, shared and public files, and who may fetch which
     'test/e2e-money-audit.ts',              // no path mints, double-spends or bills the wrong account
     'test/e2e-zip-security.ts',             // an uploaded archive cannot write outside where it was unpacked
+    'test/e2e-static-hardening.ts',         // a dotfile (.env, .env~, .git/) is refused before any static handler
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone
