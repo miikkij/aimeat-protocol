@@ -20,6 +20,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.12.0 -- 2026-08-22 -- scopesForProfile warns when it is handed a profile name that is not in
+ *     the table. The name it silently swallowed was `agent`, from the built-in chat agent, and the
+ *     fallback left the person's own chat holding memory read and write on their own node.
  *   v1.11.0 -- 2026-08-16 -- the four incremental app-draft tools (write/replace/read/seed) all take app:write, including the read.
  *     Reading your own unpublished draft is part of editing it, not a separate authority, and a
  *     narrower scope would let an owner grant edits whose result the agent could not check.
@@ -62,6 +65,7 @@
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 3 (F1): tool->scope map + wildcard check + scope profiles
  */
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Tool -> required scope, mirroring the REST requireScope() gate for the SAME operation.
@@ -466,7 +470,22 @@ export const MCP_SCOPE_PROFILES: Record<string, string[]> = {
     workstation: ['*'],
 };
 
-/** Scope bundle for an agent mode/profile; falls back to a conservative read+write memory set. */
+/**
+ * Scope bundle for an agent mode/profile; falls back to a conservative read+write memory set.
+ *
+ * A NAME THAT IS NOT IN THE TABLE IS SAID OUT LOUD. The fallback is right for a caller that has no
+ * mode to offer, and it is a defect for a caller that names one: the built-in chat agent asked for
+ * a profile called `agent`, got the fallback, and shipped able to read and write memory and to do
+ * nothing else on the person's own node for six days. Nothing failed, nothing logged, and the
+ * missing capability looked like a design decision. The return value is unchanged — a warning, not
+ * a refusal, because the fallback is still the safe answer to a question nobody can parse.
+ */
 export function scopesForProfile(mode: string | undefined): string[] {
-    return (mode && MCP_SCOPE_PROFILES[mode]) || ['memory:read', 'memory:write'];
+    const known = mode ? MCP_SCOPE_PROFILES[mode] : undefined;
+    if (mode && !known) {
+        logger.warn('scopesForProfile: unknown profile, falling back to memory read+write', {
+            profile: mode, known: Object.keys(MCP_SCOPE_PROFILES).join(', '),
+        });
+    }
+    return known || ['memory:read', 'memory:write'];
 }

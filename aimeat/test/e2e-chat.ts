@@ -191,6 +191,45 @@ await test('Starting a conversation provisions the chat agent as a real agent', 
     assert(names.includes(`chat#${ownerAName}@`), 'the chat agent is listed with the others');
 });
 
+await test('The chat agent may do what a connected agent may do', async () => {
+    // The permission set is the WHOLE of what separates the person's own chat from the Claude
+    // Desktop they connected themselves, because /v1/mcp registers tools against this list. It shipped
+    // holding memory read and write and nothing else: an interview that could not publish an app,
+    // install a package or create an organism, on the person's own node.
+    const { body } = await json('/v1/agents', aAuthed());
+    const chat = (body.data?.agents as any[]).find(a => a.gaii === `chat#${ownerAName}@${NODE_ID}`);
+    assert(!!chat, 'the chat agent is in the list');
+    assert(chat.mode === 'interactive', `it registers as interactive, got ${chat.mode}`);
+    assert(Array.isArray(chat.default_scopes) && chat.default_scopes.includes('*'),
+        `it holds the interactive profile, got ${JSON.stringify(chat.default_scopes)}`);
+});
+
+await test('The owner can narrow the chat agent from the same place as any other', async () => {
+    // The point of it being a real agent: one permission model, one editor. What the owner sets here
+    // is what the tool surface reads on the next session.
+    const patch = await json(`/v1/agents/chat/scopes`, aAuthed({
+        method: 'PATCH', body: JSON.stringify({ scopes: ['memory:read'] }),
+    }));
+    assert(patch.status === 200, `narrowing is accepted, got ${patch.status}: ${JSON.stringify(patch.body?.error)}`);
+
+    const { body } = await json('/v1/agents', aAuthed());
+    const chat = (body.data?.agents as any[]).find(a => a.gaii === `chat#${ownerAName}@${NODE_ID}`);
+    assert(JSON.stringify(chat.default_scopes) === JSON.stringify(['memory:read']),
+        `the owner's choice stands, got ${JSON.stringify(chat.default_scopes)}`);
+
+    // And a later chat does not quietly hand it back. The repair only ever touches the exact list the
+    // broken fallback produced, and this is not it.
+    const { status } = await json('/v1/chat/status', aAuthed());
+    assert(status === 200, `status ${status}`);
+    const after = await json('/v1/agents', aAuthed());
+    const again = (after.body.data.agents as any[]).find(a => a.gaii === `chat#${ownerAName}@${NODE_ID}`);
+    assert(JSON.stringify(again.default_scopes) === JSON.stringify(['memory:read']),
+        `it is still the owner's choice, got ${JSON.stringify(again.default_scopes)}`);
+
+    // Put it back, so the suite leaves the account as it found it.
+    await json(`/v1/agents/chat/scopes`, aAuthed({ method: 'PATCH', body: JSON.stringify({ scopes: ['*'] }) }));
+});
+
 await test('A second owner cannot read the first owner\'s conversation', async () => {
     const { status } = await json(`/v1/chat/threads/${threadId}`, bAuthed());
     assert(status === 404, `another owner gets 404, got ${status}`);
