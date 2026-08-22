@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-22",
+      "kind": "feature",
+      "title": {
+        "en": "Your AI can tell you what else is possible here",
+        "fi": "Tekoälysi voi kertoa mitä täällä muutakin voisi tehdä"
+      },
+      "body": {
+        "en": "Most people use a fraction of what their account can do, because finding the rest means already knowing what to ask for. Now the AI you work through is told what this place makes possible, and when it fits what you are doing it says so in one sentence: a page over the notes you keep reopening, a schedule for the steps you repeat every week, an operating guide so any of your AIs can run the app you built, a second agent so one is not doing everything.\n\nIt picks the moment, and it is meant to pick it rarely. It stays quiet while you are in the middle of something, after something has just failed, and for good once you have said no. One mention is the whole attempt.\n\nIt starts on and it is yours to end. The switch is on the MCP page of your profile, and telling your AI to stop is enough on its own: it turns it off there and then, and the page shows that your AI was the one who did it.",
+        "fi": "Useimmat käyttävät murto-osan siitä mitä tilillään voisi tehdä, koska lopun löytäminen vaatii tietämään etukäteen mitä kysyä. Nyt tekoäly, jonka kautta työskentelet, tietää mitä täällä on mahdollista, ja kun se sopii siihen mitä olet tekemässä, se sanoo sen yhdellä lauseella: sivu niistä muistiinpanoista joita avaat yhä uudelleen, ajastus niille askelille jotka toistat joka viikko, käyttöohje jotta mikä tahansa tekoälysi osaa ajaa rakentamaasi appia, toinen agentti ettei yksi tee kaikkea.\n\nHetken valitsee se, ja sen on tarkoitus valita harvoin. Se on hiljaa kun sinulla on jokin kesken, kun jokin juuri epäonnistui, ja lopullisesti sen jälkeen kun olet sanonut ei. Yksi maininta on koko yritys.\n\nSe on alkuun päällä ja sinun lopetettavissasi. Kytkin on profiilisi MCP-sivulla, ja pelkkä tekoälylle sanominen riittää: se sulkee sen siinä hetkessä, ja sivu näyttää että sen teki tekoälysi."
+      }
+    },
+    {
       "date": "2026-08-16",
       "kind": "feature",
       "title": {
