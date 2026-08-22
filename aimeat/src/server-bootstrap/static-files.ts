@@ -38,6 +38,12 @@
  *     fetches are CORS-gated even between our own subdomains, so published apps on
  *     <name>.apps.<domain> could never load /lib/fonts/* from the apex and silently fell back
  *     to system faces (visible since the fonts pack; blocking for the theme-system faces).
+ *   v1.10.0 -- 2026-08-21 -- Explicit dotfile guard: 403 any request with a dotfile path segment
+ *     (.env/.env~/.git/.htpasswd/...) before every static handler and route, plus dotfiles:'deny'
+ *     on all three static mounts as config hygiene. serve-static's own 'deny' 403 is swallowed by
+ *     the default fallthrough (calls next() -> JSON 404), so refusal is enforced in the guard where
+ *     it is visible and testable. /.well-known/* (agent discovery, ACME) is the one allowed exception.
+ *     Defense-in-depth for a node run without the apex nginx dotfile deny, or a mis-scoped static root.
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -132,6 +138,32 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     if (config.baseUrl?.startsWith('https://')) {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
+    next();
+  });
+
+  // Refuse any request whose path has a dotfile segment (.env, .env~, .git/config, .htpasswd, ...)
+  // with an explicit 403, before the static handlers. This is the node's own answer to the
+  // leftover-.env~ leak class: the apex nginx already 403s these, but a personal node run without
+  // that proxy, or behind a mis-scoped static root, would otherwise fall through to the JSON 404 and
+  // rely entirely on the proxy. serve-static's own dotfiles:'deny' cannot do this: its 403 is
+  // swallowed by the default fallthrough (it calls next() and the request lands on the 404), so the
+  // refusal is made here where it is visible and testable.
+  //
+  // Scope: static assets only. The API namespaces (/v1, /local) do their own, more specific
+  // validation -- e.g. /v1/apps returns 400 INVALID_FILENAME for a `../` traversal -- and this
+  // guard would otherwise mask that with a generic 403 (a dot-segment also matches `..`). /.well-known
+  // is a legitimate dotfile path (agent discovery, ACME). The guard matches a dot only at the start
+  // of a path component, so /js/app.js.map and a filename that merely contains a dot are unaffected.
+  app.use((req, res, next) => {
+    const p = req.path;
+    if (p.startsWith('/v1/') || p.startsWith('/local/') || p.startsWith('/.well-known/')) {
+      next();
+      return;
+    }
+    if (/\/\.[^/]/.test(p)) {
+      res.status(403).type('txt').send('Forbidden');
+      return;
     }
     next();
   });
@@ -268,6 +300,10 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       maxAge: '7d',
       etag: true,
       lastModified: true,
+      // Never serve a dotfile from the static root. The visible 403 is enforced by the dotfile guard
+      // registered above (serve-static's own 'deny' 403 is swallowed by fallthrough); this keeps the
+      // option correct as config hygiene so the static layer never treats a dotfile as a real file.
+      dotfiles: 'deny',
       setHeaders: (res, filePath) => {
         if (/\.(js|css|html)$/.test(filePath)) {
           res.setHeader('Cache-Control', 'no-cache');
@@ -299,7 +335,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
   ];
   const localeDir = localeCandidates.find(p => existsSync(p));
   if (localeDir) {
-    app.use('/locales', express.static(localeDir, { maxAge: '1h' }));
+    app.use('/locales', express.static(localeDir, { maxAge: '1h', dotfiles: 'deny' }));
   }
 
   // PWA manifest + app-catalog + silent-bridge pages. The service worker is NOT here: /sw.js
@@ -364,6 +400,6 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       });
     }
 
-    app.use(express.static(pwaStaticDir, { maxAge: '1d' }));
+    app.use(express.static(pwaStaticDir, { maxAge: '1d', dotfiles: 'deny' }));
   }
 }

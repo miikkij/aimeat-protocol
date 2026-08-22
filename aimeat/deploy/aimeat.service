@@ -1,0 +1,58 @@
+# AIMEAT node as a systemd service.
+#
+# Why this file exists: on a bare-metal host the node was started by hand in a screen session, and
+# that cost us twice. A reboot left the node down until somebody noticed, and a hand-typed restart
+# dropped the jemalloc preload and the heap ceiling, which turned a healthy 450 MB process into a
+# 2.8 GB one. A unit file is where the launch configuration stops being something to remember.
+#
+# Install (edit User and WorkingDirectory first):
+#   sudo cp deploy/aimeat.service /etc/systemd/system/aimeat.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now aimeat
+#   journalctl -u aimeat -f          # the log, greppable, rotated by journald
+#
+# Requires: libjemalloc2 installed (sudo apt install libjemalloc2) and `pnpm build` already run.
+
+[Unit]
+Description=AIMEAT node
+Documentation=https://github.com/miikkij/aimeat-protocol
+After=network-online.target postgresql.service
+Wants=network-online.target
+# A crash loop backs off instead of spinning: five starts in five minutes and it stops, so a
+# broken build or a full disk is visible as a stopped unit rather than as endless restarts.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=aimeat
+WorkingDirectory=/opt/aimeat/aimeat
+
+# jemalloc returns freed pages to the OS within seconds; glibc's allocator never does, which parks
+# RSS at the boot peak. LD_PRELOAD has to be process environment — the dynamic linker reads it
+# before node starts, so a .env entry arrives too late and is ignored in silence.
+Environment=LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2
+Environment=MALLOC_CONF=background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:10000
+# The V8 heap ceiling lives here and nowhere else (the npm script no longer passes it, because a
+# CLI argument would win over this). --heapsnapshot-signal arms `kill -USR2 <pid>` for the rare
+# case an operator wants a snapshot; taking one costs a pause and a file the size of the heap.
+Environment=NODE_OPTIONS=--max-old-space-size=4096 --heapsnapshot-signal=SIGUSR2
+
+# node directly rather than through pnpm: systemd's PATH is minimal, and this is exactly what
+# `pnpm start` runs. Check the interpreter path with `which node` on the host.
+ExecStart=/usr/bin/node --env-file=.env dist/src/index.js start
+
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# A second net UNDER the machine's memory, above the V8 ceiling: if something outside the JS heap
+# runs away, the unit is throttled and then killed instead of the host going to swap.
+MemoryHigh=6G
+MemoryMax=8G
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

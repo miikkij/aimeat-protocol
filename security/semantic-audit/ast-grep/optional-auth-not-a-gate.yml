@@ -1,0 +1,25 @@
+# Invariant 6 — optionalAuth injects an identity, so `if (!req.auth)` is never a gate.
+#
+# optionalAuth() runs globally and, in anonymous mode, injects a shared anonymous identity, so
+# req.auth is truthy even for an unauthenticated caller. A route that gates on `if (!req.auth)`
+# therefore admits the anonymous principal as if it were authenticated. Require real auth with the
+# requireAuth() middleware; to detect anonymity check `req.auth.anonymous === true`.
+#
+# Scoped to src/routes: inside src/auth/middleware.ts, `if (!req.auth)` IS the correct body of the
+# gate middlewares (requireAuth, requireRole, …), so that file is excluded by the CI config's path,
+# not by this rule. Currently clean in routes — this rule keeps it that way.
+#
+# Run:  npx -p @ast-grep/cli ast-grep scan --rule security/semantic-audit/ast-grep/optional-auth-not-a-gate.yml aimeat/src/routes
+
+id: optional-auth-if-not-req-auth-gate
+language: typescript
+severity: warning
+# src/auth/middleware.ts IS the gate implementation (requireAuth, requireRole, …), where
+# `if (!req.auth)` is correct. Exclude it; the rule is about routes using this as their own gate.
+ignores:
+  - "**/auth/middleware.ts"
+message: "`if (!req.auth)` is not an authentication gate — optionalAuth injects a (possibly anonymous) identity, so req.auth is truthy for anonymous callers. Use requireAuth() middleware, and check req.auth.anonymous === true for anonymity (invariant 6)."
+rule:
+  any:
+    - pattern: if (!req.auth) $$$
+    - pattern: if (!req.auth) { $$$ }

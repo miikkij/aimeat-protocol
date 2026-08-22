@@ -1,0 +1,5 @@
+# ast-grep project config for the semantic security audit. Points at the ast-grep rule directory so
+# `ast-grep scan -c security/semantic-audit/sgconfig.yml <paths>` applies every rule in it at once.
+# The Semgrep taint rules live in ../semgrep and are run by their own engine, not by ast-grep.
+ruleDirs:
+  - ast-grep

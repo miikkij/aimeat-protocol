@@ -351,7 +351,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     federationAvailabilityMinSamples: parseInt(process.env.AIMEAT_FEDERATION_AVAILABILITY_MIN_SAMPLES ?? '288', 10),
 
     // Security limits
-    registrationMode: (['open', 'invite', 'closed'] as const).find(m => m === process.env.AIMEAT_REGISTRATION_MODE) ?? 'open',
+    registrationMode: (['open', 'oauth', 'invite', 'closed'] as const).find(m => m === process.env.AIMEAT_REGISTRATION_MODE) ?? 'open',
     loginRateLimitMax: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_MAX ?? '15', 10),
     loginRateLimitWindowMs: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
     registrationRateLimitMax: parseInt(process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '5', 10),
@@ -502,6 +502,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     casdoorOAuthRedirectUri: process.env.AIMEAT_CASDOOR_OAUTH_REDIRECT_URI ?? '',
     entraOAuthEnabled: process.env.AIMEAT_ENTRA_OAUTH_ENABLED === 'true',
     entraOAuthTenant: process.env.AIMEAT_ENTRA_OAUTH_TENANT ?? 'common',
+    entraAllowedTenants: (process.env.AIMEAT_ENTRA_ALLOWED_TENANTS ?? '')
+      .split(',').map(s => s.trim().toLowerCase()).filter(Boolean),
     entraOAuthClientId: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
     entraOAuthClientSecret: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
     entraOAuthRedirectUri: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',
