@@ -45,7 +45,10 @@ ENV MALLOC_CONF="background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:1000
 
 ENV NODE_ENV=production
 # Cap the V8 heap (container-aware V8 would size it from host RAM) and let an operator take
-# a production heap snapshot with `kill -USR2 <pid>`.
+# a production heap snapshot with `kill -USR2 <pid>`. Since 2026-08-21 this is the ONLY place the
+# ceiling is set for a container — the npm script used to pass it as a CLI argument, which wins
+# over NODE_OPTIONS and made the value unchangeable from the environment. Keep it UNDER the
+# container's --memory limit, or the kernel kills the process instead of V8 collecting garbage.
 ENV NODE_OPTIONS="--max-old-space-size=2048 --heapsnapshot-signal=SIGUSR2"
 ENV AIMEAT_PORT=40050
 EXPOSE 40050
