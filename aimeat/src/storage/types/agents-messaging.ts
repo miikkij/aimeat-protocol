@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-08-22 — DirectMessageRecord.ownerReadAt: has the MAILBOX'S OWNER looked at this row.
+ *     Unread was `direction = 'inbound'`, a stand-in for "somebody other than me wrote it" that
+ *     stopped being true when a group thread put an agent's sent copy in its owner's mailbox. `readAt` on that row is the RECIPIENT's read receipt, so the badge was cleared by somebody else's reading and could not be cleared by the owner's without faking one.
  *   2026-08-15 — AgentTaskRecord.createdBy: who ORDERED the task, beside agentGaii who receives it.
  *   v1.2.0 — 2026-08-01 — The Capability Layer moved to ./capabilities.ts (max-file-lines) and is
  *     re-exported from here, so nothing that imported it has to change. Pure extraction — a
@@ -632,7 +635,16 @@ export interface DirectMessageRecord {
   aiProvenanceId?: string;
   createdAt: string;
   deliveredAt?: string;
+  /** When the RECIPIENT read it — on an outbound row a receipt travelling back, written by
+   *  setMessageReadReceipt. Says nothing about whether this mailbox's owner has looked at the row. */
   readAt?: string;
+  /**
+   * When the mailbox's OWNER looked at this row, which `readAt` above cannot answer: a group thread
+   * puts an agent's sent copy in its owner's mailbox, and the recipient reading it stamps `readAt`
+   * there. Unread is "not written by me and not looked at" — `senderGhii !== ownerGhii` with this
+   * field null — which is what the direction test stood in for until such a copy existed.
+   */
+  ownerReadAt?: string;
 }
 
 /**

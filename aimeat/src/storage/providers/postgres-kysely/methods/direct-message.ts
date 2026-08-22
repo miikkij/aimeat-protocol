@@ -9,6 +9,9 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.4.0 — 2026-08-22 — Unread is ownerReadAt-based: `senderGhii <> ownerGhii AND ownerReadAt IS
+ *     NULL` in all three counts, and markConversationRead stamps it in a SECOND statement so the
+ *     read receipt stays inbound-only. `readAt` on that row is the RECIPIENT's read receipt, so the badge was cleared by somebody else's reading and could not be cleared by the owner's without faking one.
  *   v1.3.0 — 2026-08-22 — lastSenderGhii on both conversation summaries; listDmsAddressedTo honours
  *     groupScope (the thread's rows in this identity's mailbox, minus what it sent itself).
  *   v1.2.0 — 2026-07-16 — Add getDirectMessagesByIds batch (Phase 3): many messages by id under one owner.
@@ -56,6 +59,7 @@ function toDirectMessageRecord(r: Selectable<DirectMessage>): DirectMessageRecor
   if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId;
   if (r.deliveredAt) record.deliveredAt = iso(r.deliveredAt);
   if (r.readAt) record.readAt = iso(r.readAt);
+  if (r.ownerReadAt) record.ownerReadAt = iso(r.ownerReadAt);
   return record;
 }
 
@@ -107,6 +111,7 @@ export const directMessageMethods = {
       origin: record.origin, originNodeId: record.originNodeId, error: record.error ?? null,
       aiProvenanceId: record.aiProvenanceId ?? null, createdAt: new Date(record.createdAt),
       deliveredAt: record.deliveredAt ? new Date(record.deliveredAt) : null, readAt: record.readAt ? new Date(record.readAt) : null,
+      ownerReadAt: record.ownerReadAt ? new Date(record.ownerReadAt) : null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
     return record;
@@ -132,7 +137,7 @@ export const directMessageMethods = {
     const rows = await base.selectAll().orderBy('createdAt', 'desc').limit(perPage).offset((page - 1) * perPage).execute();
     const totalRow = await base.select(this.db.fn.countAll<number>().as('n')).executeTakeFirst();
     const unreadRow = await this.db.selectFrom('DirectMessage').select(this.db.fn.countAll<number>().as('n'))
-      .where('ownerGhii', '=', ownerGhii).where('direction', '=', 'inbound').where('readAt', 'is', null).executeTakeFirst();
+      .where('ownerGhii', '=', ownerGhii).whereRef('senderGhii', '<>', 'ownerGhii').where('ownerReadAt', 'is', null).executeTakeFirst();
     return { messages: rows.map(toDirectMessageRecord), total: Number(totalRow?.n ?? 0), unread: Number(unreadRow?.n ?? 0) };
   },
 
@@ -195,7 +200,7 @@ export const directMessageMethods = {
       const last = await this.db.selectFrom('DirectMessage').select(['body', 'direction', 'senderGhii', 'recipientGhii'])
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).orderBy('createdAt', 'desc').limit(1).executeTakeFirst();
       const unreadRow = await this.db.selectFrom('DirectMessage').select(this.db.fn.countAll<number>().as('n'))
-        .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).where('direction', '=', 'inbound').where('readAt', 'is', null).executeTakeFirst();
+        .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).whereRef('senderGhii', '<>', 'ownerGhii').where('ownerReadAt', 'is', null).executeTakeFirst();
       // Thread subject = the one set on the message that opened it (earliest non-null subject).
       const subj = await this.db.selectFrom('DirectMessage').select('subject')
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).where('subject', 'is not', null).orderBy('createdAt', 'asc').limit(1).executeTakeFirst();
@@ -225,7 +230,7 @@ export const directMessageMethods = {
     const owners = sql.join(ownerGhiis);
     const groups = await sql<{ ownerGhii: string; conversationId: string; messageCount: string | number; updatedAt: Date | string | null; unread: string | number }>`
       SELECT "ownerGhii", "conversationId", COUNT(*) AS "messageCount", MAX("createdAt") AS "updatedAt",
-             SUM(CASE WHEN "direction" = 'inbound' AND "readAt" IS NULL THEN 1 ELSE 0 END) AS "unread"
+             SUM(CASE WHEN "senderGhii" <> "ownerGhii" AND "ownerReadAt" IS NULL THEN 1 ELSE 0 END) AS "unread"
       FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
       GROUP BY "ownerGhii", "conversationId"
     `.execute(this.db);
@@ -271,15 +276,23 @@ export const directMessageMethods = {
   },
 
   async markMessageRead(this: PostgresKyselyStorage, id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
-    const rows = await this.db.updateTable('DirectMessage').set({ status: 'read', readAt: new Date() })
+    const rows = await this.db.updateTable('DirectMessage').set({ status: 'read', readAt: new Date(), ownerReadAt: new Date() })
       .where('id', '=', dmDocId(id, ownerGhii)).returningAll().execute();
     return rows[0] ? toDirectMessageRecord(rows[0]) : null;
   },
 
   async markConversationRead(this: PostgresKyselyStorage, ownerGhii: string, conversationId: string): Promise<number> {
-    const r = await this.db.updateTable('DirectMessage').set({ status: 'read', readAt: new Date() })
+    const now = new Date();
+    // Two statements because they say two different things. The first is the read RECEIPT the sender
+    // is owed, and it belongs to inbound rows only: writing `status: 'read'` on an outbound row means
+    // "the recipient read it", which nobody did.
+    await this.db.updateTable('DirectMessage').set({ status: 'read', readAt: now })
       .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', conversationId).where('direction', '=', 'inbound').where('readAt', 'is', null).executeTakeFirst();
-    return Number(r.numUpdatedRows ?? 0);
+    // The second is this owner having looked at the thread, which covers every row they did not write
+    // themselves — including their own agent's copy in a group thread, the row the badge was blind to.
+    const seen = await this.db.updateTable('DirectMessage').set({ ownerReadAt: now })
+      .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', conversationId).whereRef('senderGhii', '<>', 'ownerGhii').where('ownerReadAt', 'is', null).executeTakeFirst();
+    return Number(seen.numUpdatedRows ?? 0);
   },
 
   async updateMessageDeliveryStatus(this: PostgresKyselyStorage, id: string, status: DirectMessageRecord['status'], extra?: { deliveredAt?: string; error?: string }): Promise<DirectMessageRecord | null> {

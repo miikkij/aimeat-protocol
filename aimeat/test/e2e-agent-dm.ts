@@ -270,6 +270,8 @@ let grpOwner = { token: '', ghii: '' };
 let grpbot = { gaii: '', token: '' };
 let bobbot = { gaii: '', token: '' };
 let supportConv = '';
+let unreadOwner = { token: '', ghii: '' };
+let unreadConv = '';
 
 await test('15. An agent writes to support@operators and gets a conversation id back', async () => {
     grpOwner = await registerOwner(grpOwnerName);
@@ -336,6 +338,8 @@ await test('19. Before the operator answers, the owner\'s row names the agent th
     assert(row !== undefined, 'the owner sees the thread');
     assert(row.lastDirection === 'outbound', `the copy is still the agent's send, got ${row.lastDirection}`);
     assert(row.sentByAgent === bot2.gaii, `the row must name the agent that spoke, got ${JSON.stringify(row.sentByAgent)}`);
+    unreadOwner = owner2;
+    unreadConv = send.body.data.conversation_id;
 });
 
 await test('20. Another owner\'s agent gets nothing from that thread (no leak) ', async () => {
@@ -358,6 +362,69 @@ await test('21. A sibling agent of the same owner is not in the thread and does 
     assert(inbox.status === 200, `agent-inbox ${inbox.status}`);
     const leaked = (inbox.body.data.messages ?? []).find((m: any) => m.conversationId === supportConv);
     assert(leaked === undefined, 'a sibling agent was never named in the thread, so it is not its correspondence');
+});
+
+console.log('\nPhase E — a message your agent sent in your name counts as unread until YOU look');
+// The badge counted `direction = 'inbound'`, which was a stand-in for "somebody other than me wrote
+// it". A group thread put the agent's sent copy in its owner's mailbox marked outbound, so four
+// reports from three agents arrived already read and raised nothing. Unread is now "not written by
+// me, and I have not looked at it", which is a different field from readAt: readAt on that same row
+// is the RECIPIENT's read receipt, so keying the badge on it would let the operator clear it.
+
+async function unreadFor(token: string, conversationId: string): Promise<number> {
+    const { body } = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${token}` } });
+    const row = (body.data.conversations ?? []).find((c: any) => c.conversationId === conversationId);
+    return row ? row.unread : -1;
+}
+
+await test('22. The owner\'s badge counts what their agent sent in their name', async () => {
+    const unread = await unreadFor(unreadOwner.token, unreadConv);
+    assert(unread === 1, `the agent's send must be unread for its owner, got ${unread}`);
+});
+
+await test('23. An OPERATOR reading it does not clear the owner\'s badge', async () => {
+    // The operator's reading stamps readAt on the owner's copy, because that copy is the outbound one
+    // and readAt is the read receipt. If the badge were keyed on readAt it would go to zero here, and
+    // the owner would never learn their agent had written.
+    const read = await json(`/v1/messages/conversations/${encodeURIComponent(unreadConv)}/read`, {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+    });
+    assert(read.status === 200, `operator read ${read.status}: ${JSON.stringify(read.body)}`);
+    const unread = await unreadFor(unreadOwner.token, unreadConv);
+    assert(unread === 1, `somebody else's reading must not clear my badge, got ${unread}`);
+});
+
+await test('24. Opening the thread clears it, and does not fake a read receipt', async () => {
+    const before = await json(`/v1/messages/conversations/${encodeURIComponent(unreadConv)}`, {
+        headers: { Authorization: `Bearer ${unreadOwner.token}` },
+    });
+    const agentRow = before.body.data.messages.find((m: any) => m.direction === 'outbound');
+    assert(agentRow !== undefined, 'the agent\'s copy is in the owner\'s mailbox');
+    const statusBefore = agentRow.status;
+
+    const read = await json(`/v1/messages/conversations/${encodeURIComponent(unreadConv)}/read`, {
+        method: 'POST', headers: { Authorization: `Bearer ${unreadOwner.token}` },
+    });
+    assert(read.status === 200, `owner read ${read.status}`);
+    const unread = await unreadFor(unreadOwner.token, unreadConv);
+    assert(unread === 0, `opening the thread clears the badge, got ${unread}`);
+
+    const after = await json(`/v1/messages/conversations/${encodeURIComponent(unreadConv)}`, {
+        headers: { Authorization: `Bearer ${unreadOwner.token}` },
+    });
+    const agentAfter = after.body.data.messages.find((m: any) => m.id === agentRow.id);
+    assert(agentAfter.status === statusBefore,
+        `reading my own mailbox must not restate delivery on an outbound row (${statusBefore} -> ${agentAfter.status})`);
+});
+
+await test('25. My own sends still never count against me', async () => {
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${unreadOwner.token}` },
+        body: JSON.stringify({ conversation_id: unreadConv, body: 'Kirjoitan itse, joten tämä ei ole minulta lukematta.' }),
+    });
+    assert(send.status === 201, `own reply ${send.status}: ${JSON.stringify(send.body)}`);
+    const unread = await unreadFor(unreadOwner.token, unreadConv);
+    assert(unread === 0, `my own words are not unread for me, got ${unread}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);

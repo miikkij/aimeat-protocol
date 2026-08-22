@@ -12,6 +12,9 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   v1.12.0 — 2026-08-22 — direct_messages.ownerReadAt plus its backfill: inbound copies inherit
+ *     readAt so today's badge is unchanged, everything else is stamped seen so the whole history
+ *     does not light up at once.
  *   v1.11.0 — 2026-08-14 — Usage telemetry: agent_usage_event.appId/.surface for existing databases,
  *     plus the fold's (ts, id) cursor index. Tables themselves are in schema-tables-4.
  *   v1.10.0 — 2026-08-13 — agents.registeredBy for existing databases too.
@@ -321,6 +324,16 @@ export function initializeSchema(db: Database.Database): void {
   // made. Both mailbox copies carry the same id — the statement is about the bytes, not about whose
   // row it is. Mirrors Postgres migration 0019.
   safeAddColumn('direct_messages', 'aiProvenanceId', 'TEXT');
+
+  // Has the mailbox's OWNER looked at this row? `readAt` cannot answer it: a group thread puts an
+  // agent's sent copy in its OWNER's mailbox, and the RECIPIENT reading it stamps readAt there. An
+  // unread count keyed on readAt was therefore cleared by somebody else's reading. Backfill keeps
+  // today's badge exactly: inbound copies inherit readAt, everything else is stamped seen so the
+  // whole history does not light up at once.
+  safeAddColumn('direct_messages', 'ownerReadAt', 'TEXT');
+  db.exec("UPDATE direct_messages SET ownerReadAt = readAt WHERE ownerReadAt IS NULL AND direction = 'inbound'");
+  db.exec("UPDATE direct_messages SET ownerReadAt = createdAt WHERE ownerReadAt IS NULL AND direction <> 'inbound'");
+  db.exec('CREATE INDEX IF NOT EXISTS idx_direct_messages_owner_unread ON direct_messages(ownerGhii, conversationId) WHERE ownerReadAt IS NULL');
   // A board post/reply and an agent message were stamped from Phase 4 onward with nowhere to keep
   // the id, so the record was findable by content hash and a label could not be rendered FROM the
   // item. Mirrors Postgres migration 0020. A public board's posts also join PUBLICLY_LINKED above;

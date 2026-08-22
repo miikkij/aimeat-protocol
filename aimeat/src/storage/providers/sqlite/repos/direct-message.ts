@@ -8,6 +8,8 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.5.0 -- 2026-08-22 -- Unread is ownerReadAt-based in all three counts, and markConversationRead
+ *     stamps it in a SECOND statement so the read receipt stays inbound-only. `readAt` on that row is the RECIPIENT's read receipt, so the badge was cleared by somebody else's reading and could not be cleared by the owner's without faking one.
  *   v1.4.0 -- 2026-08-22 -- lastSenderGhii on both conversation summaries; listDmsAddressedTo honours
  *     groupScope (the thread's rows in this identity's mailbox, minus what it sent itself).
  *   v1.3.0 -- 2026-08-11 -- Group conversations: a thread with more than two participants gets a row
@@ -50,6 +52,7 @@ function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
   if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
   if (row.deliveredAt) record.deliveredAt = row.deliveredAt as string;
   if (row.readAt) record.readAt = row.readAt as string;
+  if (row.ownerReadAt) record.ownerReadAt = row.ownerReadAt as string;
   return record;
 }
 
@@ -73,8 +76,8 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     `INSERT INTO direct_messages
      (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, interactive,
       broadcastId, respondable, kind, status,
-      direction, replyToId, origin, originNodeId, error, aiProvenanceId, createdAt, deliveredAt, readAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      direction, replyToId, origin, originNodeId, error, aiProvenanceId, createdAt, deliveredAt, readAt, ownerReadAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.ownerGhii,
@@ -98,6 +101,7 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     record.createdAt,
     record.deliveredAt ?? null,
     record.readAt ?? null,
+    record.ownerReadAt ?? null,
   );
   return record;
 }
@@ -130,7 +134,7 @@ export function listInbox(
 
   const total = (db.prepare(`SELECT COUNT(*) as cnt FROM direct_messages ${whereSql}`).get(...params) as { cnt: number }).cnt;
   const unread = (db.prepare(
-    "SELECT COUNT(*) as cnt FROM direct_messages WHERE ownerGhii = ? AND direction = 'inbound' AND readAt IS NULL",
+    'SELECT COUNT(*) as cnt FROM direct_messages WHERE ownerGhii = ? AND senderGhii <> ownerGhii AND ownerReadAt IS NULL',
   ).get(ownerGhii) as { cnt: number }).cnt;
 
   const rows = db.prepare(
@@ -231,7 +235,7 @@ export function listConversations(
       'SELECT body, direction, senderGhii, recipientGhii FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? ORDER BY createdAt DESC LIMIT 1',
     ).get(ownerGhii, row.conversationId) as { body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string } | undefined;
     const unread = (db.prepare(
-      "SELECT COUNT(*) as cnt FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND direction = 'inbound' AND readAt IS NULL",
+      'SELECT COUNT(*) as cnt FROM direct_messages WHERE ownerGhii = ? AND conversationId = ? AND senderGhii <> ownerGhii AND ownerReadAt IS NULL',
     ).get(ownerGhii, row.conversationId) as { cnt: number }).cnt;
     // The thread subject is the one set on the message that opened it (earliest non-null subject).
     const subj = db.prepare(
@@ -269,7 +273,7 @@ export function listConversationsForOwners(
   const ph = ownerGhiis.map(() => '?').join(',');
   const groups = db.prepare(
     `SELECT ownerGhii, conversationId, COUNT(*) as messageCount, MAX(createdAt) as updatedAt,
-       SUM(CASE WHEN direction = 'inbound' AND readAt IS NULL THEN 1 ELSE 0 END) as unread
+       SUM(CASE WHEN senderGhii <> ownerGhii AND ownerReadAt IS NULL THEN 1 ELSE 0 END) as unread
      FROM direct_messages WHERE ownerGhii IN (${ph})
      GROUP BY ownerGhii, conversationId`,
   ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; messageCount: number; updatedAt: string; unread: number }>;
@@ -320,16 +324,24 @@ export function markMessageRead(db: Database.Database, id: string, ownerGhii: st
   const existing = getDirectMessage(db, id, ownerGhii);
   if (!existing) return null;
   const now = new Date().toISOString();
-  db.prepare("UPDATE direct_messages SET status = 'read', readAt = ? WHERE id = ? AND ownerGhii = ?").run(now, id, ownerGhii);
+  db.prepare("UPDATE direct_messages SET status = 'read', readAt = ?, ownerReadAt = ? WHERE id = ? AND ownerGhii = ?").run(now, now, id, ownerGhii);
   return getDirectMessage(db, id, ownerGhii);
 }
 
 export function markConversationRead(db: Database.Database, ownerGhii: string, conversationId: string): number {
   const now = new Date().toISOString();
-  const info = db.prepare(
+  // Two statements because they say two different things. The first is the read RECEIPT the sender is
+  // owed, and it belongs to inbound rows only: writing status='read' on an outbound row means "the
+  // recipient read it", which nobody did.
+  db.prepare(
     "UPDATE direct_messages SET status = 'read', readAt = ? WHERE ownerGhii = ? AND conversationId = ? AND direction = 'inbound' AND readAt IS NULL",
   ).run(now, ownerGhii, conversationId);
-  return info.changes;
+  // The second is this owner having looked at the thread, which covers every row they did not write
+  // themselves — including their own agent's copy in a group thread, the row the badge was blind to.
+  const seen = db.prepare(
+    'UPDATE direct_messages SET ownerReadAt = ? WHERE ownerGhii = ? AND conversationId = ? AND senderGhii <> ownerGhii AND ownerReadAt IS NULL',
+  ).run(now, ownerGhii, conversationId);
+  return seen.changes;
 }
 
 export function updateMessageDeliveryStatus(

@@ -964,6 +964,7 @@ export interface DirectMessage {
   originNodeId: string;
   ownerGhii: string;
   readAt: Timestamp | null;
+  ownerReadAt: Timestamp | null;
   recipientGhii: string;
   replyToId: string | null;
   respondable: boolean | null;
