@@ -263,6 +263,9 @@ const ALL_SUITES = [
     // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
     // way e2e-app-origin does: an app's public address only exists when that flag is set.
     'test/e2e-mcp-orientation.ts',
+    // Spawns its own servers: the operator switch is a config flag, so proving it takes a node
+    // started with the feature off.
+    'test/e2e-proactive-mode.ts',
     'test/e2e-mcp-boards.ts',
     'test/e2e-mcp-extensions.ts',
     'test/e2e-mcp-knowledge.ts',

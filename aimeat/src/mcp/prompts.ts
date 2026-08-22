@@ -17,6 +17,9 @@
  *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.4.0 -- 2026-05-30 -- aimeat_handbook_get gains optional `surface` param → returns the v2
  *     per-role surface handbook (handbookForRole); tier now optional (defaults tier1).
+ *   v1.5.0 -- 2026-08-22 -- The surface handbook carries the proactive guidance while the owner
+ *     keeps that setting on (services/proactive-mode.ts). Tier prompts are left alone on purpose:
+ *     that response reports a managed prompt's own content, and appending to it would misreport it.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,12 +29,14 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { handbookForRole } from '../services/handbooks/index.js';
+import { proactiveGuidance } from '../services/proactive-mode.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 
 export function registerPromptsTools(
     mcp: McpServer,
     storage: Storage,
-    _config: AimeatConfig,
-    _getAgentGaii: () => string,
+    config: AimeatConfig,
+    getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
 ): void {
@@ -48,7 +53,17 @@ export function registerPromptsTools(
         async ({ tier, surface }) => {
             // v2 surface handbook short-circuit
             if (surface) {
-                return { content: [{ type: 'text' as const, text: handbookForRole(surface) }] };
+                // The same guidance the handshake carried, for the agent that treats the handbook
+                // as its operating guide and re-reads it when a task is new to it. Appended to the
+                // markdown rather than to a managed prompt's `content`, which has to keep saying
+                // what that prompt actually says.
+                const guidance = await proactiveGuidance(
+                    storage, config, parseGaiiLoose(getAgentGaii()).owner || undefined,
+                );
+                const text = guidance
+                    ? `${handbookForRole(surface)}\n\n${guidance}`
+                    : handbookForRole(surface);
+                return { content: [{ type: 'text' as const, text }] };
             }
             const tierKey = tier ?? 'tier1';
             // Normalize tier aliases used in routes (tier1 → tier-1, etc.)

@@ -15,6 +15,8 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.9.0 — 2026-08-22 — AIMEAT_PROACTIVE_GUIDANCE, defaulting on: an operator opts out rather
+ *     than in, because a node that never offers anything is the state this feature exists to end.
  *   v1.8.0 — 2026-08-18 — sealedConfigKeys: the settings whoever STARTED this node nominated as
  *     read-only, for a node one party runs on behalf of another. Empty on a self-hosted node and
  *     behaviour there is unchanged. Pure extraction of applyConfigOverrides to config-overrides.ts
@@ -414,6 +416,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     matchMaxSuggestions: parseInt(process.env.AIMEAT_MATCH_MAX_SUGGESTIONS ?? '5', 10),
     matchMaxDistanceKm: parseInt(process.env.AIMEAT_MATCH_MAX_DISTANCE_KM ?? '100', 10),
     matchCooldownDays: parseInt(process.env.AIMEAT_MATCH_COOLDOWN_DAYS ?? '7', 10),
+    proactiveGuidanceEnabled: process.env.AIMEAT_PROACTIVE_GUIDANCE !== 'false',
     marketplaceEnabled: process.env.AIMEAT_MARKETPLACE_ENABLED !== 'false',
     marketplaceListingFeeMorsels: parseInt(process.env.AIMEAT_MARKETPLACE_LISTING_FEE ?? '2', 10),
     marketplaceTransactionFeePercent: parseInt(process.env.AIMEAT_MARKETPLACE_TX_FEE_PERCENT ?? '5', 10),

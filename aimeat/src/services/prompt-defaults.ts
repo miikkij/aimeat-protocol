@@ -58,6 +58,7 @@ import { KNOWLEDGE_SEEDS } from './prompt-defaults/knowledge.js';
 import { PLATFORM_SEEDS } from './prompt-defaults/platform.js';
 import { MANIFEST_ARCHITECT_SEEDS } from './prompt-defaults/manifest-architect.js';
 import { PLAYBOOK_SEEDS } from './prompt-defaults/playbooks.js';
+import { PROACTIVE_SEEDS } from './prompt-defaults/proactive.js';
 
 export const PROMPT_SEEDS: PromptSeedEntry[] = [
   ...NOTEBOOK_BUILDER_SEEDS,
@@ -70,4 +71,5 @@ export const PROMPT_SEEDS: PromptSeedEntry[] = [
   ...PLATFORM_SEEDS,
   ...MANIFEST_ARCHITECT_SEEDS,
   ...PLAYBOOK_SEEDS,
+  ...PROACTIVE_SEEDS,
 ];

@@ -7,6 +7,10 @@
  * @version-history
  *   v1.0.0 — 2026-03-16 — Initial MCP tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; fix fallback strings
+ *   v1.2.0 — 2026-08-22 — The proactive-guidance switch lives here, because this is the page about
+ *     the AIs connected to this account and the setting is about how they behave. It reads and
+ *     writes /v1/settings/proactive; an AI asked to stop offering things writes the same setting
+ *     itself, so this switch shows who changed it last.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -14,10 +18,11 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
-import { Spinner } from './shared.js';
+import { Spinner, ToggleSwitch, GlassCard } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listChatInstances, deleteChatInstance } from '/js/services/agents.js';
 import { HelloMcpPanel } from '/views/profile/hello-mcp-panel.js';
+import { apiGet, apiPut } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function McpTab({ session, showToast, onStats }) {
@@ -25,6 +30,8 @@ export default function McpTab({ session, showToast, onStats }) {
   const [connections, setConnections] = useState(null);
   const [expanded, setExpanded] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [proactive, setProactive] = useState(null);
+  const [savingProactive, setSavingProactive] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -33,6 +40,13 @@ export default function McpTab({ session, showToast, onStats }) {
       setConnections(mcp);
       onStats?.({ mcpConnections: mcp.length });
     } catch (err) { swallowed('mcp-tab', err); setConnections([]); }
+    // Read separately: an AI can change this setting between two visits, so it is re-read on every
+    // live update like everything else on this page, and a failure here leaves the connection list
+    // intact rather than blanking the tab.
+    try {
+      const res = await apiGet('/v1/settings/proactive');
+      setProactive(res.data ?? null);
+    } catch (err) { swallowed('mcp-tab: proactive setting', err); }
   }, [onStats]);
 
   useEffect(() => {
@@ -63,6 +77,47 @@ export default function McpTab({ session, showToast, onStats }) {
     }, { danger: true });
   }, [confirm, showToast, loadData]);
 
+  const handleProactive = useCallback(async (enabled) => {
+    // ToggleSwitch has no disabled state, so the guard is here: a second flip while the first is
+    // still in flight would race two writes and show whichever answered last.
+    if (savingProactive) return;
+    setSavingProactive(true);
+    try {
+      const res = await apiPut('/v1/settings/proactive', { enabled });
+      setProactive(res.data ?? null);
+      showToast(enabled ? t('profile.mcp.proactiveOn') : t('profile.mcp.proactiveOff'));
+    } catch (err) {
+      swallowed('mcp-tab: proactive save', err);
+      showToast(t('profile.mcp.proactiveError'), true);
+    } finally { setSavingProactive(false); }
+  }, [showToast, savingProactive]);
+
+  function renderProactive() {
+    if (!proactive) return null;
+    // On a node whose operator turned this off there is nothing to flip, so no switch is drawn: a
+    // control that cannot do anything still reads as a control, and the person tries it.
+    const operatorOff = proactive.available_here === false;
+    return html`
+      <${GlassCard}>
+        <div class="flex-between mb-half">
+          <div class="pf-setting-text">
+            <div class="pf-setting-heading">${t('profile.mcp.proactiveTitle')}</div>
+            <div class="text-caption">${t('profile.mcp.proactiveDesc')}</div>
+          </div>
+          ${operatorOff ? null : html`
+            <${ToggleSwitch} checked=${proactive.enabled}
+              onChange=${e => handleProactive(e.target.checked)} />
+          `}
+        </div>
+        ${operatorOff
+          ? html`<div class="text-caption">${t('profile.mcp.proactiveOperatorOff')}</div>`
+          : proactive.set_by === 'ai'
+            ? html`<div class="text-caption">${t('profile.mcp.proactiveSetByAi')}</div>`
+            : null}
+      </${GlassCard}>
+    `;
+  }
+
   const platformLabel = (p) => {
     const labels = {
       claude: 'Claude', 'claude-code': 'Claude Code', 'claude-desktop': 'Claude Desktop',
@@ -78,6 +133,8 @@ export default function McpTab({ session, showToast, onStats }) {
     <div class="section-desc">${t('profile.mcp.desc')}</div>
 
     <${HelloMcpPanel} />
+
+    ${renderProactive()}
 
     <div class="mcp-hint-box">
       <span>${t('profile.mcp.setupHint')}</span>

@@ -9190,6 +9190,65 @@ paths:
         '403':
           description: Not the account holder's own session
 
+  /v1/settings/proactive:
+    get:
+      operationId: getSettingsProactive
+      summary: Whether this account's AIs offer what else is possible here
+      description: >-
+        When this is on, every AI connected to this account is told what this node makes possible and
+        when saying so helps, so it can raise an idea that fits what the person is doing. The node
+        never decides the moment; it cannot see one. It equips the AI, and the AI, which does see the
+        conversation, picks the moment or stays quiet.
+
+        It is on until somebody turns it off, so `defaulted` is true for an account that has never
+        touched it. `enabled` is what actually happens and `owner_choice` is what this account asked
+        for: the two differ only on a node whose operator switched the feature off for everybody,
+        which `available_here` reports.
+
+        This route is the person's own door and answers only to their session. Their AI has its own
+        way in: the setting is an ordinary owner memory key (`settings.proactive`), so an AI asked to
+        stop suggesting things writes it there and then rather than sending somebody to a settings
+        page. `set_by` says which of the two acted, and is null when the record does not say.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The setting, whether it is still the default, and who last changed it
+        '403':
+          description: Not the account holder's own session
+    put:
+      operationId: putSettingsProactive
+      summary: Turn those ideas on or off
+      description: >-
+        Stores the choice and stamps `set_by` as `person`, because a session is a person clicking a
+        switch. Turning it back on rewrites the record rather than deleting it, so when it was
+        changed and by whom survives the round trip.
+
+        On a node whose operator switched the feature off, the choice is still stored and still
+        returned as `owner_choice`; `enabled` stays false until the operator switches it back on.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled: { type: boolean }
+      responses:
+        '200':
+          description: The stored setting
+        '400':
+          description: enabled must be true or false
+        '403':
+          description: Not the account holder's own session
+
   /v1/home/ai-client:
     post:
       operationId: postHomeAiClient

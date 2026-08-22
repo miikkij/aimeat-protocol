@@ -6952,7 +6952,14 @@
       "remove": "Remove Connection",
       "confirmDelete": "Remove this MCP connection?",
       "deleted": "MCP connection removed",
-      "deleteError": "Failed to remove MCP connection"
+      "deleteError": "Failed to remove MCP connection",
+      "proactiveTitle": "Let your AI suggest what else is possible here",
+      "proactiveDesc": "Your AI is told what you can do here, so it can mention an idea when it fits what you are working on. It picks the moment, and one mention is the whole attempt.",
+      "proactiveOn": "Your AI can suggest things again",
+      "proactiveOff": "Your AI will stop suggesting things",
+      "proactiveError": "That setting did not save. Try again in a moment.",
+      "proactiveSetByAi": "Your AI last changed this for you.",
+      "proactiveOperatorOff": "Whoever runs this place has turned this off for everyone here."
     },
     "boards": {
       "title": "Boards",

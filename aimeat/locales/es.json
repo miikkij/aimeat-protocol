@@ -6943,7 +6943,14 @@
       "remove": "Quitar la conexión",
       "confirmDelete": "¿Quitar esta conexión MCP?",
       "deleted": "Conexión MCP quitada",
-      "deleteError": "No se pudo quitar la conexión MCP"
+      "deleteError": "No se pudo quitar la conexión MCP",
+      "proactiveTitle": "Deja que tu IA te diga qué más puedes hacer aquí",
+      "proactiveDesc": "Tu IA sabe qué se puede hacer aquí, así que puede mencionarte una idea cuando encaje con lo que estás haciendo. Ella elige el momento, y lo menciona una sola vez.",
+      "proactiveOn": "Tu IA vuelve a proponerte cosas",
+      "proactiveOff": "Tu IA dejará de proponerte cosas",
+      "proactiveError": "Ese ajuste no se guardó. Inténtalo de nuevo en un momento.",
+      "proactiveSetByAi": "La última vez lo cambió tu IA por ti.",
+      "proactiveOperatorOff": "Quien gestiona este sitio lo ha desactivado para todos."
     },
     "boards": {
       "title": "Tableros",

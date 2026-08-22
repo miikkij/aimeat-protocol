@@ -6,6 +6,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.24.0 — 2026-08-22 — .pf-setting-heading / .pf-setting-text: the same settings-row rule the
+ *     notifications tab already had, under a name that does not claim the row is a notification.
+ *     The pf-notif-* names stay as they are; nothing about that tab changes.
  *   v2.23.0 — 2026-08-17 — .agc-preset-desc / .agc-boundary: the AgentConsent panel's preset
  *     summary line and the shared boundary sentences. Unscoped on purpose — the panel mounts both
  *     inside .pf (Agents tab) and on the home's koti-step, and the .pf prefix would style one door
@@ -1830,9 +1833,13 @@
 /* Memory tab: sharing rules row */
 .pf .pf-rule-row { display: flex; gap: .5rem; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--border); }
 
-/* Notifications tab helpers */
-.pf .pf-notif-heading  { font-weight: 600; margin-bottom: 4px; }
-.pf .pf-notif-text     { flex: 1; }
+/* A settings row: a label and its explanation on the left, the control on the right. The
+   pf-notif-* names came first and the notifications tab still uses them; pf-setting-* is the
+   same rule under a name that does not claim the row is about notifications. */
+.pf .pf-notif-heading,
+.pf .pf-setting-heading { font-weight: 600; margin-bottom: 4px; }
+.pf .pf-notif-text,
+.pf .pf-setting-text    { flex: 1; }
 .pf .pf-notif-disabled { opacity: .7; }
 .pf .pf-notif-options  { padding-left: 8px; border-left: 2px solid var(--glass-border, #E5E7EB); }
 .pf .pf-notif-option   { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: .9rem; cursor: pointer; }

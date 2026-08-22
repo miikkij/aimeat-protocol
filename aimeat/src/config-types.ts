@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.3.0 — 2026-08-22 — proactiveGuidanceEnabled (services/proactive-mode.ts).
  *   v1.2.0 — 2026-08-19 — SitePresenceConfig mixed in (config-site-presence.ts): contentSignal,
  *     aiTraining and webBotAuthSign extracted verbatim, frontPage added there — this file had
  *     crossed the 800-line ceiling.
@@ -510,6 +511,9 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   matchMaxSuggestions: number;
   matchMaxDistanceKm: number;
   matchCooldownDays: number;
+
+  /** Connected AIs are equipped to offer what this node makes possible; off overrides every owner. */
+  proactiveGuidanceEnabled: boolean;
 
   // Marketplace (Phase 2.6)
   marketplaceEnabled: boolean;

@@ -9,6 +9,9 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.9.0 — 2026-08-22 — Pure extraction of the background-job startup to background-jobs.ts.
+ *     None of it mounted a route, and the file had reached the 800-line ceiling where the next
+ *     router could not be added at all. Also mounts settingsProactiveRouter.
  *   v1.8.0 — 2026-08-16 — backfillExtensionJobOwnerScope() runs before scheduler.start(), so a job
  *     stored before its owner scope was stamped is repaired before the @activate wave reads it.
  *   v1.7.0 — 2026-07-28 — Drop the enterprise-edition seam (single edition): the Stripe and invoice
@@ -173,6 +176,7 @@ import { agentMessagesRouter } from '../routes/agent-messages.js';
 import { messagesRouter } from '../routes/messages.js';
 import { contactsRouter } from '../routes/contacts.js';
 import { openItemsRouter } from '../routes/open-items.js';
+import { settingsProactiveRouter } from '../routes/settings-proactive.js';
 import { attestationsRouter } from '../routes/attestations.js';
 import { trackedResponsesRouter } from '../routes/tracked-responses.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
@@ -206,13 +210,8 @@ import { startSiteSyncJob, triggerSiteSync } from '../services/site-sync.js';
 import { startMatchNotificationJob } from '../services/match-notification.js';
 import { createMatchingEngine, startMatchingScheduler } from '../services/matching.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
-import { createGenesisSyncService } from '../services/genesis-sync.js';
-import { startCacheCleanupJob } from '../services/cache-cleanup.js';
-import { startSyncScheduler } from '../services/sync-scheduler.js';
-import { startMessageRetryJob } from '../services/message-delivery.js';
-import { startTrackedResponseReconciler, evaluateTrackedKey } from '../services/tracked-response.js';
-import { rebuildTrackRegistry, isTracked } from '../services/track-registry.js';
-import { onMemoryWrittenEvent, onChangeEvent } from '../services/event-bus.js';
+import { onChangeEvent } from '../services/event-bus.js';
+import { startBackgroundJobs } from './background-jobs.js';
 import { invalidateTag } from '../services/cache.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { initStats } from '../services/stats.js';
@@ -222,8 +221,6 @@ import { initUsageBuffer } from '../services/usage/usage-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { metricsMiddleware } from '../middleware/metrics.js';
-import { seedCoreScheduledJobs } from '../services/job-seeding.js';
-import { backfillExtensionJobOwnerScope } from '../services/extension-schedules.js';
 
 export interface MountRoutesOptions {
   rejectForRelay: express.RequestHandler;
@@ -460,6 +457,7 @@ export async function mountRoutes(
   app.use(messagesRouter(config, storage, peers));
   app.use(contactsRouter(config, storage));       // Contacts (address book) — generic identity picker source
   app.use(openItemsRouter(config, storage));      // Open items — what the owner is going to do here
+  app.use(settingsProactiveRouter(config, storage));  // Whether this account's AIs offer what else is here
   app.use(attestationsRouter(config, storage));   // Dual-signed attestations (TINKI) — co-signed deeds
   app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));
@@ -727,52 +725,10 @@ export async function mountRoutes(
   app.use(adminSharingGroupsRouter(config, storage));
   app.use(adminOrganismsRouter(config, storage));
 
-  // Seed core scheduled jobs (idempotent — only creates if not already present)
-  seedCoreScheduledJobs(config, storage).catch(err =>
-    logger.error('Failed to seed core scheduled jobs', { error: String(err) }));
-
-  // Wire dispatch + notification deps for ai/agent_task schedules before start.
-  scheduler.setWebhookDispatcher(webhookDispatcher);
-  scheduler.setPushService(pushService);
-
-  // Wire the workflow engine's deps + start its watchdog (advances in-flight runs after restart).
-  workflowEngine.setWebhookDispatcher(webhookDispatcher);
-  workflowEngine.setPushService(pushService);
-  workflowEngine.setEmailService(emailService);
-  workflowEngine.start().catch(err => logger.error('WorkflowEngine start failed', { error: String(err) }));
-
-  // Start the scheduler (loads enabled jobs from storage). The backfill runs FIRST and is awaited:
-  // an extension job stored before its owner scope was stamped refuses at run time, and the first
-  // thing start() does is fire every @activate job on the node.
-  backfillExtensionJobOwnerScope(config, storage)
-    .catch(err => logger.error('Extension job owner-scope backfill failed', { error: String(err) }))
-    .then(() => scheduler.start())
-    .catch(err => logger.error('Scheduler start failed', { error: String(err) }));
-
-  // Genesis Sync Scheduler (Phase 3.4)
-  const genesisSyncService = createGenesisSyncService(config, storage);
-  if (genesisSyncService) {
-    genesisSyncService.start();
-  }
-
-  // Cache Cleanup Scheduler (G.1) — prunes expired federated/replica/genesis memory entries hourly
-  startCacheCleanupJob(config, storage);
-
-  // Sync Scheduler (B.4) — coordinates catalogue sync + memory replication based on syncMode
-  startSyncScheduler(config, storage, peers);
-
-  // Direct-message federation retry — re-attempts queued cross-node messages (DECISION #6)
-  startMessageRetryJob(config, storage, peers);
-
-  // Memory Contracts — Tracked Responses: rebuild the reactive watched-key registry from live
-  // contracts, react to writes on watched keys (event-driven), and run the safety-net reconciler.
-  rebuildTrackRegistry(storage).catch(err => logger.error('Track registry rebuild failed', { error: String(err) }));
-  onMemoryWrittenEvent(evt => {
-    if (!isTracked(evt.key)) return;   // O(1) gate — only watched keys do any work
-    evaluateTrackedKey({ config, storage, peers }, evt.key)
-      .catch(err => logger.warn('tracked-response reactive evaluate failed', { error: String(err) }));
+  // The node's own recurring work: scheduler, workflow watchdog, sync, tracked responses.
+  startBackgroundJobs({
+    config, storage, peers, scheduler, workflowEngine, webhookDispatcher, pushService, emailService,
   });
-  startTrackedResponseReconciler(config, storage, peers);
 
   app.use(specRouter(config));
 

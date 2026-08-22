@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   v1.4.0 — 2026-08-22 — proactive.guidance_enabled: the operator half of the proactive-guidance
+ *     switch, which overrules every owner's own setting when it is off.
  *   v1.3.0 — 2026-08-18 — The node.sealed_config_keys row. Its `immutable: true` is load-bearing
  *     rather than descriptive: it is what stops the seal list from being sealed or unsealed
  *     through applyConfigOverrides(), which is the door the mechanism exists to close.
@@ -160,6 +162,9 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'matchMaxSuggestions', dotPath: 'matching.max_suggestions', envVar: 'AIMEAT_MATCH_MAX_SUGGESTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50, immutable: false, description: 'Max match suggestions per user', range: '1-50' },
   { key: 'matchMaxDistanceKm', dotPath: 'matching.max_distance_km', envVar: 'AIMEAT_MATCH_MAX_DISTANCE_KM', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 50000, immutable: false, description: 'Max geographic distance for matches in km', range: '1-50000' },
   { key: 'matchCooldownDays', dotPath: 'matching.cooldown_days', envVar: 'AIMEAT_MATCH_COOLDOWN_DAYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 365, immutable: false, description: 'Days before re-matching same pair', range: '1-365' },
+
+  // ── Proactive guidance (mutable) ──
+  { key: 'proactiveGuidanceEnabled', dotPath: 'proactive.guidance_enabled', envVar: 'AIMEAT_PROACTIVE_GUIDANCE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Connected AIs are told what this node makes possible, so they can offer it when it fits (each owner still has their own switch; off here is off for everybody)' },
 
   // ── Marketplace (Phase 2.6, mutable) ──
   { key: 'marketplaceEnabled', dotPath: 'marketplace.enabled', envVar: 'AIMEAT_MARKETPLACE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Marketplace feature enabled' },

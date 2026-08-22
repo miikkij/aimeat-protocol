@@ -11,6 +11,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.17.0 -- 2026-08-22 -- The handshake carries the proactive guidance when the owner keeps
+ *     that setting on (services/proactive-mode.ts). createMcpServer takes the owner name and
+ *     reads it here, because a connection is the one moment every client passes through; a
+ *     failed read costs the guidance and never the session.
  *   v1.16.0 -- 2026-08-19 -- MCP sessions expire after config.mcpSessionIdleMinutes without a
  *     request. Each session holds a full McpServer (hundreds of tools, each with its Zod schema
  *     graph) and died only on an explicit client DELETE, which most clients never send -- the
@@ -121,6 +125,7 @@ import { scopeAllowsTool } from './catalog/scopes.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 import { instructionsFor } from './instructions.js';
+import { proactiveGuidance } from '../services/proactive-mode.js';
 import { registerManagedPrompts } from './prompts-managed.js';
 import { registerOAuthRoutes } from './oauth.js';
 import { registerChatInstance, touchChatInstance } from '../services/chat-instance-write.js';
@@ -200,7 +205,12 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         scopes: string[],
         role: SurfaceRole | 'all' = 'all',
         getToken: () => string | undefined = () => undefined,
+        owner?: string,
     ): Promise<McpServer> {
+        // What this account chose about being offered things it did not ask for. Read here because
+        // the handshake is the one moment every client passes through, and never allowed to fail a
+        // connection: proactiveGuidance() answers null on any trouble.
+        const guidance = await proactiveGuidance(storage, config, owner);
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             {
@@ -208,7 +218,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 // The orientation an agent reads before it has called anything. Without it a client
                 // meets a few hundred tool descriptions and no indication of where to start, so the
                 // handbook this text points at was reachable only by guessing it existed.
-                instructions: instructionsFor(role),
+                instructions: instructionsFor(role, { proactiveGuidance: guidance }),
             },
         );
 
@@ -515,7 +525,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         });
 
         const tokenBox: { current: string | undefined } = { current: token };
-        const mcpServer = await createMcpServer(authenticatedGaii, sessionScopes, serverRole, () => tokenBox.current);
+        const mcpServer = await createMcpServer(authenticatedGaii, sessionScopes, serverRole, () => tokenBox.current, sessionOwner);
 
         transport.onclose = () => {
             if (transport.sessionId) {

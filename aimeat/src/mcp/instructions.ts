@@ -10,11 +10,14 @@
  *   and the full operating guide already lives in the per-surface handbooks.
  * @structure
  *   - SURFACE_INTROS — role -> one line naming what that v2 surface is for
- *   - instructionsFor(role) — the served string for /v1/mcp ('all') or a /v2/mcp/:role surface
+ *   - instructionsFor(role, opts) — the served string for /v1/mcp ('all') or a /v2/mcp/:role surface
  * @usage
  *   import { instructionsFor } from './instructions.js';
- *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role) });
+ *   new McpServer({ name, version }, { capabilities, instructions: instructionsFor(role, { guidance }) });
  * @version-history
+ *   v1.1.0 — 2026-08-22 — Optional proactive guidance appended when the owner keeps that setting on
+ *     (services/proactive-mode.ts). Appended rather than woven in: the base text is what every
+ *     agent needs, the guidance is a choice this account made, and a reader can see which is which.
  *   v1.0.0 — 2026-08-09 — Initial: the handshake carried no instructions field, so every agent met
  *     the surface cold. Positive framing per docs/coding-guidelines/prompt-writing.md.
  */
@@ -79,12 +82,23 @@ its operators, so nobody needs to be asked to write a bug report.
 
 Speak to the person in their own language, and reach for the handbook whenever a task is new to you.`;
 
+/** What the handshake may add to the base text for this particular account. */
+export interface InstructionsOptions {
+    /**
+     * The proactive-guidance text, when this owner keeps that setting on. Null or absent leaves the
+     * instructions exactly as they were, with nothing hinting that a switch exists — an agent told
+     * about a capability it does not have would go looking for it.
+     */
+    proactiveGuidance?: string | null;
+}
+
 /**
  * The instructions string for a surface. `all` is /v1/mcp (the full, frozen surface); a
  * SurfaceRole is one of the purpose-scoped /v2/mcp/:role surfaces and gets its purpose named
  * up front, since on those the agent is looking at an allowlist rather than everything.
  */
-export function instructionsFor(role: SurfaceRole | 'all'): string {
-    if (role === 'all') return BASE;
-    return `${SURFACE_INTROS[role]}\n\n${BASE}`;
+export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOptions = {}): string {
+    const base = role === 'all' ? BASE : `${SURFACE_INTROS[role]}\n\n${BASE}`;
+    const guidance = opts.proactiveGuidance?.trim();
+    return guidance ? `${base}\n\n${guidance}` : base;
 }

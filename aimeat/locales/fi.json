@@ -6952,7 +6952,14 @@
       "remove": "Poista yhteys",
       "confirmDelete": "Poista tämä MCP-yhteys?",
       "deleted": "MCP-yhteys poistettu",
-      "deleteError": "MCP-yhteyden poisto epäonnistui"
+      "deleteError": "MCP-yhteyden poisto epäonnistui",
+      "proactiveTitle": "Anna tekoälysi kertoa mitä täällä voisi vielä tehdä",
+      "proactiveDesc": "Tekoälysi tietää mitä täällä voi tehdä, joten se voi mainita idean silloin kun se sopii siihen mitä olet tekemässä. Se valitsee hetken, ja yksi maininta on koko yritys.",
+      "proactiveOn": "Tekoälysi saa taas ehdottaa",
+      "proactiveOff": "Tekoälysi lakkaa ehdottamasta",
+      "proactiveError": "Asetus ei tallentunut. Yritä hetken päästä uudelleen.",
+      "proactiveSetByAi": "Tekoälysi muutti tämän viimeksi puolestasi.",
+      "proactiveOperatorOff": "Tämän paikan ylläpitäjä on kytkenyt tämän pois kaikilta."
     },
     "boards": {
       "title": "Taulut",
