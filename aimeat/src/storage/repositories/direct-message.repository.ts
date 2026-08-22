@@ -7,6 +7,9 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   v1.3.0 -- 2026-08-22 -- ConversationSummary carries lastSenderGhii (a copy in a mailbox is not
+ *     proof the owner wrote it), and listDmsAddressedTo takes an optional groupScope so an identity
+ *     can read the group threads it is a named participant of. A group thread's copies are written to the mailbox each participant resolves to, which for an agent is its OWNER's, and the message is addressed to the thread rather than to a person. So the agent was on none of its own rows: it read 0 messages in a thread it had just opened, and the answer would never have reached it either.
  *   v1.2.0 -- 2026-07-16 -- Add getDirectMessagesByIds batch (Phase 3): many messages by id under one owner.
  *   v1.1.0 -- 2026-07-16 -- Add ConversationSummary type + listConversationsForOwners batch (Phase 3 fan-out→IN).
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
@@ -22,6 +25,11 @@ export type ConversationSummary = {
   subject?: string;
   lastMessage: string;
   lastDirection: 'inbound' | 'outbound';
+  /** Who actually wrote the last message. A copy in this mailbox is not proof the OWNER wrote it: an
+   *  agent's copy in a group thread lands in its owner's mailbox marked `outbound`, so the list read
+   *  "You: …" for something the person never sent. The sender travels with the summary so the caller
+   *  can say who spoke instead of inferring it from the direction. */
+  lastSenderGhii: string;
   messageCount: number;
   unread: number;
   updatedAt: string;
@@ -50,10 +58,16 @@ export interface DirectMessageRepository {
   }): Promise<{ messages: DirectMessageRecord[]; total: number }>;
   /** Messages ADDRESSED TO an agent/eco identity (recipientGhii match), newest first. These physically
    *  live in the owner's mailbox (a reply to an agent is delivered to its owner), so they are NOT found
-   *  by listInbox(agentGaii); this is how an agent reads its own federated DMs. */
+   *  by listInbox(agentGaii); this is how an agent reads its own federated DMs.
+   *
+   *  `groupScope` adds the group threads this identity is a NAMED participant of. A group message is
+   *  addressed to the thread, not to a person, so its `recipientGhii` is the thread's own address and
+   *  the recipient match above finds none of it: an agent that wrote to `support@operators` could not
+   *  read the answer. The caller resolves membership (exact participant match) and passes the ids. */
   listDmsAddressedTo(recipientGhii: string, opts?: {
     page?: number;
     perPage?: number;
+    groupScope?: { mailboxGhii: string; conversationIds: string[] };
   }): Promise<{ messages: DirectMessageRecord[]; total: number }>;
   /** One conversation as an AGENT sees it: its own sent copies (ownerGhii=agent, outbound) + the
    *  inbound copies addressed to it (recipientGhii=agent, inbound). De-duplicated, newest first. */

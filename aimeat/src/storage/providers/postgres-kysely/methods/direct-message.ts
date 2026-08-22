@@ -9,6 +9,8 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.3.0 — 2026-08-22 — lastSenderGhii on both conversation summaries; listDmsAddressedTo honours
+ *     groupScope (the thread's rows in this identity's mailbox, minus what it sent itself).
  *   v1.2.0 — 2026-07-16 — Add getDirectMessagesByIds batch (Phase 3): many messages by id under one owner.
  *   v1.1.0 — 2026-07-16 — Add listConversationsForOwners batch (Phase 3): conversations list for many owners
  *     in 3 window-function queries, collapsing the route's owner + per-agent fan-out.
@@ -143,10 +145,22 @@ export const directMessageMethods = {
     return { messages: rows.map(toDirectMessageRecord), total: Number(totalRow?.n ?? 0) };
   },
 
-  async listDmsAddressedTo(this: PostgresKyselyStorage, recipientGhii: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+  async listDmsAddressedTo(this: PostgresKyselyStorage, recipientGhii: string, opts?: { page?: number; perPage?: number; groupScope?: { mailboxGhii: string; conversationIds: string[] } }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
     const page = opts?.page ?? 1;
     const perPage = opts?.perPage ?? 20;
-    const base = this.db.selectFrom('DirectMessage').where('recipientGhii', '=', recipientGhii).where('direction', '=', 'inbound');
+    const group = opts?.groupScope;
+    // A group message is addressed to the THREAD, so the recipient match below never finds one. When the
+    // caller has established membership, the thread's rows in this identity's mailbox count as addressed
+    // to it — minus what it sent itself, which belongs in a sent view and not in an inbox.
+    const base = this.db.selectFrom('DirectMessage').where(eb => {
+      const direct = eb.and([eb('recipientGhii', '=', recipientGhii), eb('direction', '=', 'inbound')]);
+      if (!group?.conversationIds.length) return direct;
+      return eb.or([direct, eb.and([
+        eb('ownerGhii', '=', group.mailboxGhii),
+        eb('conversationId', 'in', group.conversationIds),
+        eb('senderGhii', '<>', recipientGhii),
+      ])]);
+    });
     const rows = await base.selectAll().orderBy('createdAt', 'desc').limit(perPage).offset((page - 1) * perPage).execute();
     const totalRow = await base.select(this.db.fn.countAll<number>().as('n')).executeTakeFirst();
     return { messages: rows.map(toDirectMessageRecord), total: Number(totalRow?.n ?? 0) };
@@ -171,12 +185,12 @@ export const directMessageMethods = {
     return rows.map(toDirectMessageRecord);
   },
 
-  async listConversations(this: PostgresKyselyStorage, ownerGhii: string): Promise<Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }>> {
+  async listConversations(this: PostgresKyselyStorage, ownerGhii: string): Promise<ConversationSummary[]> {
     const groups = await this.db.selectFrom('DirectMessage')
       .select(['conversationId', this.db.fn.countAll<number>().as('messageCount'), sql<Date | null>`max("createdAt")`.as('updatedAt')])
       .where('ownerGhii', '=', ownerGhii).groupBy('conversationId').execute();
 
-    const results: Array<{ conversationId: string; peerGhii: string; subject?: string; lastMessage: string; lastDirection: 'inbound' | 'outbound'; messageCount: number; unread: number; updatedAt: string }> = [];
+    const results: ConversationSummary[] = [];
     for (const g of groups) {
       const last = await this.db.selectFrom('DirectMessage').select(['body', 'direction', 'senderGhii', 'recipientGhii'])
         .where('ownerGhii', '=', ownerGhii).where('conversationId', '=', g.conversationId).orderBy('createdAt', 'desc').limit(1).executeTakeFirst();
@@ -192,6 +206,7 @@ export const directMessageMethods = {
         subject: subj?.subject ?? undefined,
         lastMessage: last?.body ?? '',
         lastDirection,
+        lastSenderGhii: last?.senderGhii ?? '',
         messageCount: Number(g.messageCount ?? 0),
         unread: Number(unreadRow?.n ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',
@@ -245,6 +260,7 @@ export const directMessageMethods = {
         subject: subjBy.get(ck(g.ownerGhii, g.conversationId)),
         lastMessage: last?.body ?? '',
         lastDirection,
+        lastSenderGhii: last?.senderGhii ?? '',
         messageCount: Number(g.messageCount ?? 0),
         unread: Number(g.unread ?? 0),
         updatedAt: g.updatedAt ? iso(g.updatedAt) : '',

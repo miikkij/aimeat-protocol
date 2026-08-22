@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent-message, Direct-message, Onboarding, Telemetry, Webhook-log methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.3.0 — 2026-08-22 — Pass groupScope through to listDmsAddressedTo.
  *   v1.2.0 — 2026-07-16 — Wire getDirectMessagesByIds (Phase 3 batch) through to the repo.
  *   v1.1.0 — 2026-07-16 — Wire listConversationsForOwners (Phase 3 batch) through to the repo.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
@@ -72,7 +73,7 @@ export const messagingMethods = {
     return directMessageRepo.listConversation(this.db, ownerGhii, conversationId, opts);
   },
 
-  async listDmsAddressedTo(this: SqliteStorage, recipientGhii: string, opts?: { page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
+  async listDmsAddressedTo(this: SqliteStorage, recipientGhii: string, opts?: { page?: number; perPage?: number; groupScope?: { mailboxGhii: string; conversationIds: string[] } }): Promise<{ messages: DirectMessageRecord[]; total: number }> {
     return directMessageRepo.listDmsAddressedTo(this.db, recipientGhii, opts);
   },
 

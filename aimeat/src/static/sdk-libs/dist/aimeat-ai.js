@@ -694,6 +694,33 @@
   var { authFetch: authFetch2 } = makeSession("aimeat-ai.js");
   var _availCache = null;
   var _modelsCache = null;
+  function requiredKeysOf(schema) {
+    if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
+    if (schema.properties && typeof schema.properties === "object") {
+      const declared = Object.keys(schema.properties);
+      const required = Array.isArray(schema.required) ? schema.required.filter((k) => typeof k === "string") : null;
+      return required && required.length ? required : declared;
+    }
+    return Object.keys(schema);
+  }
+  function conform(parsed, want) {
+    if (!want.length) return parsed;
+    const isObj = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+    const has = (v) => isObj(v) && want.every((k) => k in v);
+    if (has(parsed)) return parsed;
+    if (isObj(parsed)) {
+      const keys = Object.keys(parsed);
+      if (keys.length === 1 && has(parsed[keys[0]])) return parsed[keys[0]];
+    }
+    const missing = want.filter((k) => !(isObj(parsed) && k in parsed));
+    const present = isObj(parsed) ? Object.keys(parsed).join(", ") || "(none)" : typeof parsed;
+    const err = (
+      /** @type {Error & { code?: string }} */
+      new Error("missing " + missing.join(", ") + "; got " + present)
+    );
+    err.code = "JSON_SCHEMA_MISMATCH";
+    throw err;
+  }
   var ai = {
     /**
      * Returns true if the user has AI configured (an OpenRouter key, or a keyless
@@ -795,29 +822,51 @@
      * Convenience: complete + JSON.parse. Adds a "return ONLY valid JSON"
      * suffix to systemPrompt. On parse failure, retries ONCE with a stronger
      * instruction. Further failures throw — the user can retry by clicking.
+     *
+     * `schema` states the shape you need back: either a JSON-Schema object
+     * (`{ type: 'object', properties: { … }, required: [ … ] }`) or a plain
+     * example object whose keys are the keys you want. Three build specs have
+     * advertised this parameter since July while no code path read it, because
+     * complete() builds its body from a fixed field list — so it was dropped on
+     * the way in and the caller got an unvalidated 200 under the model's own key
+     * names. That reads as a bug in the app, since nothing points at the library.
+     * The shape now reaches the model, the answer is checked against it, and a
+     * miss is retried once the way a parse failure is. Two misses throw
+     * JSON_SCHEMA_MISMATCH naming the keys that never arrived.
+     *
+     * A model that wraps the answer in one extra key is unwrapped rather than
+     * refused: it is the commonest way a model complies in spirit, and it is what
+     * every app here hand-rolls today.
      */
     async completeJson(opts) {
-      const suffix = "\nReturn ONLY valid JSON, no prose, no markdown fences.";
+      const want = requiredKeysOf(opts && opts.schema);
+      const shape = opts && opts.schema ? "\nReturn an object with exactly this shape, using these key names: " + JSON.stringify(opts.schema) : "";
+      const suffix = "\nReturn ONLY valid JSON, no prose, no markdown fences." + shape;
+      const read = (r) => ({ ...r, parsed: conform(JSON.parse(r.content), want) });
       const first = await ai.complete({
         ...opts,
         systemPrompt: (opts.systemPrompt || "") + suffix
       });
       try {
-        return { ...first, parsed: JSON.parse(first.content) };
+        return read(first);
       } catch {
+        const insist = want.length ? "\nIMPORTANT: your previous attempt did not match the requested shape. Output ONLY the JSON object, starting with { and ending with }, with exactly these top-level keys: " + want.join(", ") + "." : "\nIMPORTANT: your previous attempt was not valid JSON. Output ONLY the JSON object, starting with { and ending with }. No other text.";
         const retry = await ai.complete({
           ...opts,
-          systemPrompt: (opts.systemPrompt || "") + suffix + "\nIMPORTANT: your previous attempt was not valid JSON. Output ONLY the JSON object, starting with { and ending with }. No other text.",
+          systemPrompt: (opts.systemPrompt || "") + suffix + insist,
           temperature: typeof opts.temperature === "number" ? Math.max(0, opts.temperature - 0.3) : 0.2
         });
         try {
-          return { ...retry, parsed: JSON.parse(retry.content) };
-        } catch {
+          return read(retry);
+        } catch (e) {
+          const mismatch = !!e && /** @type {any} */
+          e.code === "JSON_SCHEMA_MISMATCH";
           const err = (
             /** @type {Error & { code?: string }} */
-            new Error("AI returned invalid JSON twice. Original response: " + retry.content.slice(0, 200))
+            new Error(mismatch ? "AI returned JSON without the requested keys twice (" + /** @type {any} */
+            e.message + "). Original response: " + retry.content.slice(0, 200) : "AI returned invalid JSON twice. Original response: " + retry.content.slice(0, 200))
           );
-          err.code = "JSON_PARSE_FAILED";
+          err.code = mismatch ? "JSON_SCHEMA_MISMATCH" : "JSON_PARSE_FAILED";
           throw err;
         }
       }

@@ -8,6 +8,9 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.x — 2026-08-22 — A conversation row whose newest message one of my agents wrote is previewed
+ *     "via <agent>: …" instead of "You: …". The copy lives in my mailbox marked outbound, so the
+ *     list attributed my agent's words to me — the one thing a person needs to be able to check.
  *   v1.x — 2026-08-18 — Conversation and broadcast rows stamp with stampShort (today→time,
  *     yesterday→word, this week→weekday, older→date) with the full moment in the tooltip. A bare
  *     clock time on a week-old row read as "today".
@@ -50,6 +53,9 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
     // An agent-owned conversation the owner aggregates (a DM the agent sent from its own inbox) — labelled
     // "via <agent>" and read-only. The `viaAgent` tag comes from the conversation list aggregation.
     const via = c.viaAgent ? (subThreadLabel(c.viaAgent) || peerName(c.viaAgent)) : null;
+    // The last turn in a thread of MINE that one of my agents spoke. Different from `via`: this thread is
+    // still mine to answer, only the newest message is not my own words. The preview said "You:" over it.
+    const byAgent = c.sentByAgent ? (subThreadLabel(c.sentByAgent) || peerName(c.sentByAgent)) : null;
     // Nested: a subject thread shows its topic; otherwise the agent name / "Direct". Flat: the person.
     const label = via
       ? (nested ? `${t('inbox.viaAgent')} ${via}` : peerDisplay(c.peerGhii))
@@ -66,7 +72,7 @@ export function ListPanel({ requests, conversations, activeConv, peerDisplay, ac
           </div>
           <div class="inbox-conv-line2">
             ${(!nested && c.subject) ? html`<span class="inbox-conv-subject">🏷 ${escHtml(c.subject)}</span>` : ''}
-            <span class="inbox-conv-preview">${c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : ''}${escHtml(c.lastMessage || '')}</span>
+            <span class="inbox-conv-preview">${byAgent ? `${t('inbox.viaAgent')} ${byAgent}: ` : (c.lastDirection === 'outbound' ? `${t('inbox.youPrefix')} ` : '')}${escHtml(c.lastMessage || '')}</span>
             ${c.unread > 0 ? html`<span class="inbox-conv-badge">${c.unread}</span>` : null}
           </div>
         </div>

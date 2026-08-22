@@ -259,5 +259,106 @@ await test('14. Bob (a different owner) does NOT see Alice\'s agent conversation
     assert(leaked === undefined, 'Bob must not see Alice\'s agent-owned conversations');
 });
 
+console.log('\nPhase D — an agent in a GROUP thread (support@operators) can read its own correspondence');
+// A group message is addressed to the THREAD, and every copy is written to the mailbox its participant
+// resolves to — for an agent, its OWNER's. So the agent's identity is on none of the rows: the two
+// predicates that find a 1:1 message (own copy / addressed to me) match nothing, and the agent that had
+// just reported a problem was told its own thread held 0 messages. The owner's mailbox meanwhile showed
+// the agent's words as `outbound`, which the inbox renders as "You:".
+const grpOwnerName = `grpowner${stamp}`;
+let grpOwner = { token: '', ghii: '' };
+let grpbot = { gaii: '', token: '' };
+let bobbot = { gaii: '', token: '' };
+let supportConv = '';
+
+await test('15. An agent writes to support@operators and gets a conversation id back', async () => {
+    grpOwner = await registerOwner(grpOwnerName);
+    grpbot = await createAgent(grpOwnerName, grpOwner.token, 'grpbot', ['messages:send', 'messages:read']);
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${grpbot.token}` },
+        body: JSON.stringify({ to: 'support@operators', subject: 'completeJson drops the schema', body: 'The parameter never leaves the library.' }),
+    });
+    assert(status === 201, `support send ${status}: ${JSON.stringify(body)}`);
+    supportConv = body.data.conversation_id;
+    assert(typeof supportConv === 'string' && supportConv.length > 0, 'a support send returns the thread id');
+    assert(body.data.participants.includes(grpbot.gaii), `the agent is in its own thread, got ${JSON.stringify(body.data.participants)}`);
+    // Alice is the first owner registered on this node, so she carries the operator role.
+    assert(body.data.participants.includes(alice.ghii), `the operator must be a participant, got ${JSON.stringify(body.data.participants)}`);
+});
+
+await test('16. The SAME agent reads that thread back by the id it was just handed', async () => {
+    const { status, body } = await json(`/v1/messages/agent-thread/${encodeURIComponent(supportConv)}`, {
+        headers: { Authorization: `Bearer ${grpbot.token}` },
+    });
+    assert(status === 200, `agent-thread ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.total >= 1, `the agent must see its own report, got total ${body.data.total}`);
+    const mine = body.data.messages.find((m: any) => m.senderGhii === grpbot.gaii && /never leaves the library/.test(m.body));
+    assert(mine !== undefined, `the agent's own message is in the thread, got ${JSON.stringify(body.data.messages.map((m: any) => m.senderGhii))}`);
+});
+
+await test('17. The operator answers, and the answer reaches the agent\'s own inbox', async () => {
+    const reply = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${alice.token}` },
+        body: JSON.stringify({ conversation_id: supportConv, body: 'Confirmed — the library never sent it.' }),
+    });
+    assert(reply.status === 201, `operator reply ${reply.status}: ${JSON.stringify(reply.body)}`);
+
+    const inbox = await json('/v1/messages/agent-inbox', { headers: { Authorization: `Bearer ${grpbot.token}` } });
+    assert(inbox.status === 200, `agent-inbox ${inbox.status}`);
+    const answer = inbox.body.data.messages.find((m: any) => m.conversationId === supportConv && /never sent it/.test(m.body));
+    assert(answer !== undefined, `the agent must see the answer to its own report, got ${JSON.stringify(inbox.body.data.messages.map((m: any) => m.body))}`);
+    const ownEcho = inbox.body.data.messages.find((m: any) => m.senderGhii === grpbot.gaii);
+    assert(ownEcho === undefined, 'an inbox holds what arrived, not what the agent itself sent');
+});
+
+await test('18. The owner sees the thread as a group their AGENT spoke in, not as their own send', async () => {
+    const { status, body } = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${grpOwner.token}` } });
+    assert(status === 200, `conversations ${status}`);
+    const row = (body.data.conversations ?? []).find((c: any) => c.conversationId === supportConv);
+    assert(row !== undefined, 'the owner sees their agent\'s support thread');
+    assert(row.groupAlias === 'support@operators', `the row is a group thread, got ${JSON.stringify(row.groupAlias)}`);
+    assert(row.lastSenderGhii === alice.ghii, `the last word was the operator's, got ${row.lastSenderGhii}`);
+});
+
+await test('19. Before the operator answers, the owner\'s row names the agent that spoke', async () => {
+    // Same shape as 18 at the moment the agent has just written: the newest message is the agent's, the
+    // copy sits in the owner's mailbox marked outbound, and the list said "You:" over it.
+    const owner2 = await registerOwner(`grpowner2${stamp}`);
+    const bot2 = await createAgent(`grpowner2${stamp}`, owner2.token, 'grpbot2', ['messages:send']);
+    const send = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${bot2.token}` },
+        body: JSON.stringify({ to: 'support@operators', subject: 'Second report', body: 'Nobody has answered yet.' }),
+    });
+    assert(send.status === 201, `support send ${send.status}: ${JSON.stringify(send.body)}`);
+
+    const { body } = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${owner2.token}` } });
+    const row = (body.data.conversations ?? []).find((c: any) => c.conversationId === send.body.data.conversation_id);
+    assert(row !== undefined, 'the owner sees the thread');
+    assert(row.lastDirection === 'outbound', `the copy is still the agent's send, got ${row.lastDirection}`);
+    assert(row.sentByAgent === bot2.gaii, `the row must name the agent that spoke, got ${JSON.stringify(row.sentByAgent)}`);
+});
+
+await test('20. Another owner\'s agent gets nothing from that thread (no leak) ', async () => {
+    bobbot = await createAgent(bobName, bob.token, 'bobbot', ['messages:read']);
+    const thread = await json(`/v1/messages/agent-thread/${encodeURIComponent(supportConv)}`, {
+        headers: { Authorization: `Bearer ${bobbot.token}` },
+    });
+    assert(thread.status === 200, `agent-thread ${thread.status}`);
+    assert(thread.body.data.total === 0, `a stranger's agent must see nothing, got ${thread.body.data.total}`);
+
+    const inbox = await json('/v1/messages/agent-inbox', { headers: { Authorization: `Bearer ${bobbot.token}` } });
+    const leaked = (inbox.body.data.messages ?? []).find((m: any) => m.conversationId === supportConv);
+    assert(leaked === undefined, 'a stranger\'s agent must not receive the thread in its inbox');
+});
+
+await test('21. A sibling agent of the same owner is not in the thread and does not read it', async () => {
+    // Membership for the inbox is the EXACT participant match, not "someone in this household is in it".
+    const sibling = await createAgent(grpOwnerName, grpOwner.token, 'grpsibling', ['messages:read']);
+    const inbox = await json('/v1/messages/agent-inbox', { headers: { Authorization: `Bearer ${sibling.token}` } });
+    assert(inbox.status === 200, `agent-inbox ${inbox.status}`);
+    const leaked = (inbox.body.data.messages ?? []).find((m: any) => m.conversationId === supportConv);
+    assert(leaked === undefined, 'a sibling agent was never named in the thread, so it is not its correspondence');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);
