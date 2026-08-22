@@ -21,6 +21,10 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   v1.8.0 -- 2026-08-22 -- agent-inbox and agent-thread go through services/agent-dm-reads.ts, so a
+ *     GROUP thread the agent belongs to is readable by it. A group thread's copies are written to the mailbox each participant resolves to, which for an agent is its OWNER's, and the message is addressed to the thread rather than to a person. So the agent was on none of its own rows: it read 0 messages in a thread it had just opened, and the answer would never have reached it either.
+ *     GET /conversations/:id?agent= gets the same resolution: the list had begun advertising rows
+ *     whose thread that door then returned empty.
  *   v1.3.0 -- 2026-08-15 -- The `conversation` block on GET conversations/:id is served to a
  *     PARTICIPANT only. The message rows were always fenced by the reading identity, so an outsider
  *     saw an empty page — but the block rode along unconditionally, handing anyone who holds the id
@@ -64,6 +68,7 @@ import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { resolveGroupTarget } from '../services/message-alias.js';
 import { sendGroupMessage, isParticipant } from '../services/conversation-group.js';
+import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { withMessageProvenance } from '../services/message-provenance.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { resolveAudience, sendBroadcast, broadcastToFederation } from '../services/message-broadcast.js';
@@ -363,7 +368,13 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       }
       readAs = asAgent;
     }
-    const result = await storage.listConversation(readAs, conversationId, { page, perPage });
+    // `?agent=` reads under the agent, and a GROUP thread's copies live in the owner's mailbox rather
+    // than the agent's — so the plain owner-keyed read returned an empty thread for exactly the rows
+    // the list had just advertised. readAgentDmThread resolves that the same way the agent's own door
+    // does; without the flag this is the owner's own mailbox and unchanged.
+    const result = asAgent
+      ? await readAgentDmThread(storage, asAgent, conversationId, { page, perPage })
+      : await storage.listConversation(readAs, conversationId, { page, perPage });
     // A group thread carries its membership: who else is reading this is part of reading it, and in
     // a support thread it is the answer to "am I talking to one operator or to all of them". That
     // is true FOR A PARTICIPANT and for nobody else. The message rows are already fenced by
@@ -392,7 +403,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const agentGhii = resolve(req);
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string || '20', 10)));
-    const { messages, total } = await storage.listDmsAddressedTo(agentGhii, { page, perPage });
+    const { messages, total } = await readAgentDmInbox(storage, agentGhii, { page, perPage });
     res.json(success(config.nodeId, { messages, total, page, per_page: perPage }));
   });
 
@@ -402,7 +413,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const conversationId = req.params.conversationId as string;
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
-    const { messages, total } = await storage.listAgentDmThread(agentGhii, conversationId, { page, perPage });
+    const { messages, total } = await readAgentDmThread(storage, agentGhii, conversationId, { page, perPage });
     res.json(success(config.nodeId, { messages, total, page, per_page: perPage }));
   });
 

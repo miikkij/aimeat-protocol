@@ -8,6 +8,8 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.4.0 -- 2026-08-22 -- lastSenderGhii on both conversation summaries; listDmsAddressedTo honours
+ *     groupScope (the thread's rows in this identity's mailbox, minus what it sent itself).
  *   v1.3.0 -- 2026-08-11 -- Group conversations: a thread with more than two participants gets a row
  *     (createConversation / getConversation / updateConversation / listConversationsForParticipant).
  *     A pair thread still stores nothing, so no existing conversation changed.
@@ -162,17 +164,27 @@ export function listConversation(
 export function listDmsAddressedTo(
   db: Database.Database,
   recipientGhii: string,
-  opts?: { page?: number; perPage?: number },
+  opts?: { page?: number; perPage?: number; groupScope?: { mailboxGhii: string; conversationIds: string[] } },
 ): { messages: DirectMessageRecord[]; total: number } {
   const page = opts?.page ?? 1;
   const perPage = opts?.perPage ?? 20;
   const offset = (page - 1) * perPage;
+  // A group message is addressed to the THREAD, so the recipient match finds none of it. Where the caller
+  // has established membership, the thread's rows in this identity's mailbox count as addressed to it —
+  // minus what it sent itself, which belongs in a sent view and not in an inbox.
+  const ids = opts?.groupScope?.conversationIds ?? [];
+  const params: unknown[] = [recipientGhii];
+  let where = "(recipientGhii = ? AND direction = 'inbound')";
+  if (ids.length) {
+    where += ` OR (ownerGhii = ? AND conversationId IN (${ids.map(() => '?').join(',')}) AND senderGhii <> ?)`;
+    params.push(opts!.groupScope!.mailboxGhii, ...ids, recipientGhii);
+  }
   const total = (db.prepare(
-    "SELECT COUNT(*) as cnt FROM direct_messages WHERE recipientGhii = ? AND direction = 'inbound'",
-  ).get(recipientGhii) as { cnt: number }).cnt;
+    `SELECT COUNT(*) as cnt FROM direct_messages WHERE ${where}`,
+  ).get(...params) as { cnt: number }).cnt;
   const rows = db.prepare(
-    "SELECT * FROM direct_messages WHERE recipientGhii = ? AND direction = 'inbound' ORDER BY createdAt DESC LIMIT ? OFFSET ?",
-  ).all(recipientGhii, perPage, offset) as Record<string, unknown>[];
+    `SELECT * FROM direct_messages WHERE ${where} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+  ).all(...params, perPage, offset) as Record<string, unknown>[];
   return { messages: rows.map(deserializeMessage), total };
 }
 
@@ -207,16 +219,7 @@ export function listDmsByBroadcast(db: Database.Database, broadcastId: string, o
 export function listConversations(
   db: Database.Database,
   ownerGhii: string,
-): Array<{
-  conversationId: string;
-  peerGhii: string;
-  subject?: string;
-  lastMessage: string;
-  lastDirection: 'inbound' | 'outbound';
-  messageCount: number;
-  unread: number;
-  updatedAt: string;
-}> {
+): ConversationSummary[] {
   const rows = db.prepare(
     `SELECT conversationId, COUNT(*) as messageCount, MAX(createdAt) as updatedAt
      FROM direct_messages WHERE ownerGhii = ?
@@ -246,6 +249,7 @@ export function listConversations(
       subject: subj?.subject,
       lastMessage: last?.body ?? '',
       lastDirection: last?.direction ?? 'inbound',
+      lastSenderGhii: last?.senderGhii ?? '',
       messageCount: row.messageCount,
       unread,
       updatedAt: row.updatedAt,
@@ -302,6 +306,7 @@ export function listConversationsForOwners(
       subject: subjBy.get(ck(g.ownerGhii, g.conversationId)),
       lastMessage: last?.body ?? '',
       lastDirection,
+      lastSenderGhii: last?.senderGhii ?? '',
       messageCount: g.messageCount,
       unread: g.unread,
       updatedAt: g.updatedAt,

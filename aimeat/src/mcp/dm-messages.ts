@@ -12,6 +12,11 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.6.0 -- 2026-08-22 -- aimeat_dm_inbox and aimeat_dm_thread read through
+ *     services/agent-dm-reads.ts rather than calling storage themselves. Both tools reached past the
+ *     route into the storage predicates, so the group-thread fix would have landed on the REST door
+ *     and on the connector while the node's own MCP kept answering 0 -- the one surface the agent
+ *     that reported the fault was actually using.
  *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 8b. aimeat_dm_ask joins its siblings: the intro AND the
  *     questions are hashed, because on this tool the questions are the content a person reads.
  *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 4. aimeat_dm_send and aimeat_dm_send_as_owner accept an
@@ -39,6 +44,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { resolveGroupTarget } from '../services/message-alias.js';
+import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
 import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../models/message-schemas.js';
@@ -370,7 +376,7 @@ export function registerDmMessageTools(
         async ({ page, per_page }) => {
             const agentGaii = getAgentGaii();
             const mailboxOwnerGhii = ownerGhiiOf(agentGaii);
-            const { messages, total } = await storage.listDmsAddressedTo(agentGaii, { page: page ?? 1, perPage: per_page ?? 20 });
+            const { messages, total } = await readAgentDmInbox(storage, agentGaii, { page: page ?? 1, perPage: per_page ?? 20 });
             return {
                 content: [{
                     type: 'text' as const,
@@ -405,7 +411,7 @@ export function registerDmMessageTools(
         async ({ conversation_id, page, per_page }) => {
             const agentGaii = getAgentGaii();
             const mailboxOwnerGhii = ownerGhiiOf(agentGaii);
-            const { messages, total } = await storage.listAgentDmThread(agentGaii, conversation_id, { page: page ?? 1, perPage: per_page ?? 50 });
+            const { messages, total } = await readAgentDmThread(storage, agentGaii, conversation_id, { page: page ?? 1, perPage: per_page ?? 50 });
             // Oldest-first so the agent reads the conversation in order.
             const ordered = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
             // TARGET-058: how each message in the thread was made, in one query. This is the case the
