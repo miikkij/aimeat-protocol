@@ -7,6 +7,13 @@ do and the essentials of working with AIMEAT. Work the checklist top-to-bottom, 
 user**, and **ask only what you genuinely cannot determine** (self-host vs hosted, the storage backend, the
 owner handle, secrets).
 
+**Where this leads.** This file is for the case where you have **no AIMEAT MCP tools yet** — VS Code
+Copilot, a plain chat window, a fresh clone. Standing the node up is the on-ramp, not the destination:
+Step 6 attaches the user's AI tools to it over MCP, and from then on those tools do the work directly
+(`aimeat_app_publish`, `aimeat_memory_*`, and the rest) instead of being walked through shell commands.
+If you are reading this and **already** hold `aimeat_*` tools against a running node, most of Steps 1–5
+do not apply to you — go to Step 6 and Step 7.
+
 ---
 
 ## What this repo is (read first, then act)
@@ -47,8 +54,11 @@ AI agents onto *any* node (theirs, `https://aimeat.io`, or someone else's).
    self-hosting). Paths A/B follow Steps 1–5; C is the installer (no terminal); D skips to Step 6.
 2. **Storage backend** (self-host only): **SQLite** — zero-config, file-based, perfect to start and for
    personal/dev nodes (recommended) — *or* **PostgreSQL** for production (`docker compose up` runs it;
-   schema migrates on boot). *(MongoDB, the legacy Prisma-PG, and the in-memory backend are deprecated;
-   don't use them.)*
+   schema migrates on boot). Those are the only two backends.
+   > **Set it explicitly, and check that you did.** With `AIMEAT_STORAGE` unset the node falls back to an
+   > **in-memory** store: it starts fine, the UI works, and everything the user creates disappears on the
+   > next restart with no warning. That default is for tests. Never leave a node the user will actually
+   > use sitting on it.
 3. **Owner handle** — the account the user logs in as and registers agents under (e.g. `happydude`). The
    **first registered owner automatically becomes the node operator**. Call it `<OWNER>`.
 4. *(Optional)* **Which agents** to connect — a CrewAI crew (via the `aimeat-crewai` liaison), Claude
@@ -71,7 +81,11 @@ pnpm approve-builds   # approve native builds: better-sqlite3, esbuild
 pnpm install          # second pass after approving builds
 ```
 
-## Step 3 — Configure the node (self-host only) — never commit `.env`, never print secret values
+## Step 3 — Configure the node (self-host only) — run inside `aimeat/`, never commit `.env`, never print secret values
+
+**The file must end up at `aimeat/.env`.** The dev server starts with `--env-file=.env` relative to
+`aimeat/`, so a `.env` in the repo root is read by nothing and the node boots on defaults instead —
+which is the in-memory store from Step 0. Stay in the `aimeat/` directory you changed to in Step 2.
 
 The interactive wizard is the friendly path:
 
@@ -82,12 +96,14 @@ npx aimeat@latest init   # generates .env via a guided wizard
 …or copy the template and edit it:
 
 ```
-cp .env.example .env
+cp .env.example .env     # from aimeat/ — the template lives at aimeat/.env.example
 ```
 
-Then set the storage backend in `.env`:
+Then set the storage backend in `.env`. **This line is not optional** — omit it and you get the
+in-memory store:
 - **SQLite:** `AIMEAT_STORAGE=sqlite` (optionally `AIMEAT_SQLITE_PATH=./data/aimeat.db`)
 - **PostgreSQL:** `AIMEAT_STORAGE=postgres-kysely` and `DATABASE_URL=postgresql://user:pass@localhost:5432/aimeat`
+  (`postgres` and `postgresql` are accepted as aliases for the same backend)
 
 For a local dev node, these two are convenient (do **not** use them on a public node):
 `AIMEAT_DEV_MODE=true` and `AIMEAT_ANONYMOUS=true`. Leave `AIMEAT_ADMIN_PASSWORD` unset to let the server
@@ -99,10 +115,20 @@ generate one on startup (it prints it once).
 ## Step 4 — Start the node (self-host only)
 
 ```
-pnpm dev          # from the project root — auto-reload, port 40050
+pnpm dev          # works from the repo root OR from aimeat/ — the root script just proxies. Port 40050.
 ```
 
-Watch the startup banner. It prints the **Node ID**, the **URL** (`http://localhost:40050/`), the **Admin
+Watch the startup banner. **It logs the storage backend — read that line before anything else.** It says
+one of:
+
+```
+Using SQLite (./data/aimeat.db) storage
+Using PostgreSQL (postgresql://<credentials>@localhost:5432/aimeat) storage
+Using in-memory (data will not persist across restarts) storage
+```
+
+If it is the third, `aimeat/.env` was not picked up or `AIMEAT_STORAGE` is unset. Fix it and restart
+**before the user registers an account or creates anything**, or that work is lost on the next restart. It prints the **Node ID**, the **URL** (`http://localhost:40050/`), the **Admin
 Setup** URL, and — if you didn't set `AIMEAT_ADMIN_PASSWORD` — the **Admin Secret** (to stderr, once).
 **Surface the admin secret to the user; never write it into the repo.** Sanity-check the node:
 
@@ -112,8 +138,16 @@ Setup** URL, and — if you didn't set `AIMEAT_ADMIN_PASSWORD` — the **Admin S
 ## Step 5 — Create the operator owner account (self-host only)
 
 Open **`http://localhost:40050/v1/portal`** and register `<OWNER>` — the first owner becomes the node
-**operator**. (Alternatives: the first-run web wizard at `/v1/wizard`, or admin setup at `/v1/admin/setup`
-using the admin secret from Step 4.) On a hosted node, the user signs in at `<NODE_URL>/v1/portal` instead.
+**operator**. On a hosted node, the user signs in at `<NODE_URL>/v1/portal` instead.
+
+Two alternatives:
+- **The first-run web wizard, `/v1/setup/wizard`** (`/wizard.html` 301-redirects there). A node with no
+  owner yet redirects to it on its own, so on a fresh node it is simply what you land on. The page keeps
+  serving afterwards, but the action behind it does not: `POST /v1/setup/init` refuses with
+  `ALREADY_CONFIGURED` (403) once any owner exists. So it provisions the FIRST owner and nothing else —
+  reaching it later is not a recovery route, and `GET /v1/setup/status` is the honest way to ask whether
+  setup is still needed.
+- **Admin setup at `/v1/admin/setup`**, using the admin secret from Step 4.
 
 ## Step 6 — Register + approve agents (owner-gated, device auth / RFC 8628)
 
