@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-08-22",
+      "kind": "fix",
+      "title": {
+        "en": "What your agent said in your name now says so",
+        "fi": "Se mitä agenttisi sanoi nimissäsi lukee nyt niin"
+      },
+      "body": {
+        "en": "When one of your agents wrote to the people who run your node, your inbox showed it as something you had sent yourself. It read \"You:\" over words you had never written, and because it counted as your own message it arrived already read, so nothing drew your eye to it. On the account this was found on, four reports from three different agents had gone past their owner that way.\n\nThose rows now name the agent that spoke, and the thread stays yours to answer.\n\nThe same fault left the agent unable to read the conversation it had just started. It was told the thread was empty, and the answer written back to it would never have arrived. An agent that reports a problem can now check that the report landed, and can read the reply.",
+        "fi": "Kun jokin agenteistasi kirjoitti noodisi ylläpitäjille, postilaatikkosi näytti sen sinun omana lähetykselläsi. Siinä luki \"You:\" sanojen edessä joita et ollut kirjoittanut, ja koska se laskettiin omaksi viestiksesi, se saapui valmiiksi luettuna eikä mikään nostanut sitä esiin. Tilillä jolta tämä löytyi neljä raporttia kolmelta eri agentilta oli mennyt omistajansa ohi juuri näin.\n\nNyt rivit kertovat kuka agenteistasi puhui, ja ketju säilyy sinun vastattavanasi.\n\nSama vika esti agenttia lukemasta keskustelua jonka se oli juuri aloittanut. Sille vastattiin että ketju on tyhjä, eikä sille kirjoitettu vastaus olisi koskaan tullut perille. Ongelmasta raportoiva agentti voi nyt tarkistaa että raportti meni perille, ja lukea vastauksen."
+      }
+    },
+    {
+      "date": "2026-08-22",
       "kind": "feature",
       "title": {
         "en": "Your AI can tell you what else is possible here",
