@@ -6,6 +6,8 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   2026-08-22 — direct_messages.ownerReadAt (fresh installs; schema.ts adds it and backfills
+ *     existing databases).
  *   2026-08-15 — agent_tasks.createdBy (fresh installs; schema.ts adds it to existing databases).
  *   v1.1.0 — 2026-08-13 — Both provider_clients indexes move to schema.ts, after the rebuild that
  *     adds `principal`. They named a column an upgraded table did not have yet, so a SQLite node
@@ -400,6 +402,7 @@ export function applySchemaTables3(db: Database.Database): void {
       createdAt      TEXT NOT NULL,
       deliveredAt    TEXT,
       readAt         TEXT,
+      ownerReadAt    TEXT,
       PRIMARY KEY (id, ownerGhii)
     );
     CREATE INDEX IF NOT EXISTS idx_direct_messages_inbox ON direct_messages(ownerGhii, direction, createdAt);
