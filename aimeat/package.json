@@ -20,7 +20,7 @@
     "postinstall": "node scripts/vendor-libs.mjs --optional",
     "vendor:libs": "node scripts/vendor-libs.mjs",
     "check:vendored": "node scripts/vendor-libs.mjs --check",
-    "dev": "node scripts/vendor-libs.mjs && tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && tsx scripts/build-sdk-libs.ts && node --max-old-space-size=2048 --env-file=.env --import tsx src/index.ts start",
+    "dev": "node scripts/vendor-libs.mjs && tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && tsx scripts/build-sdk-libs.ts && node --env-file=.env --import tsx src/index.ts start",
     "dev:watch": "tsx watch src/index.ts",
     "build": "node scripts/vendor-libs.mjs && tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('docs','dist/docs',{recursive:true});fs.cpSync('src/storage/providers/postgres-kysely/migrations','dist/src/storage/providers/postgres-kysely/migrations',{recursive:true});\" && node scripts/write-build-stamp.mjs",
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
@@ -35,7 +35,7 @@
     "check:packs-doc": "vitest run test/unit/library-packs-doc-truth.test.ts",
     "aeb:prove": "tsx scripts/aeb-prove.ts",
     "aeb:ledger": "tsx scripts/aeb-ledger.ts",
-    "start": "node --max-old-space-size=2048 --env-file=.env dist/src/index.js start",
+    "start": "node --env-file=.env dist/src/index.js start",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
@@ -151,7 +151,8 @@
     "check:copied-logic": "tsx scripts/check-copied-logic.ts --strict",
     "check:liaison-surface": "tsx scripts/check-liaison-surface.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
-    "check:audit-gates": "pnpm check:route-scopes && pnpm check:denial-coverage && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface"
+    "check:audit-gates": "pnpm check:route-scopes && pnpm check:denial-coverage && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface",
+    "audit:report": "node ../security/semantic-audit/generate-report.mjs"
   },
   "keywords": [
     "aimeat",

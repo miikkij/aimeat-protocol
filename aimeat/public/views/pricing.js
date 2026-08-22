@@ -3,11 +3,15 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Pricing ladder: Try it (0 €) → Own node (49 €/mo) → Own node Pro (99 €/mo)
- *   → Done for you (setup + monthly) → Enterprise (contact). No payment integration at
- *   this stage — CTAs are mailto links. #packages anchors the Done-for-you section
- *   (landing path card C links here). Short sentences, no hype adjectives.
+ *   → Done for you (setup + monthly) → Enterprise (contact). #packages anchors the
+ *   Done-for-you section (landing path card C links here). Short sentences, no hype adjectives.
+ *   Checkout: the two node tiers read a Stripe Payment Link from PAYMENT_LINKS below; while a
+ *   link is empty the CTA stays a mailto, so the page ships safely ahead of the Stripe setup
+ *   and turning payments on is pasting two URLs (no code path changes).
  * @usage routed at /v1/pricing by spa.html
  * @version-history
+ *   v1.1.0 — 2026-08-21 — Payment-link readiness: Own node / Pro CTAs become buy links the
+ *     moment PAYMENT_LINKS carries a Stripe Payment Link URL; mailto fallback until then.
  *   v1.0.0 — 2026-06-10 — Initial pricing page (landing/portal split).
  */
 import { h } from 'preact';
@@ -20,6 +24,19 @@ import { ContactCard } from '/components/ContactCard.js';
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 const CONTACT = 'mailto:jouni.miikki@aimeat.io';
+
+// Stripe Payment Links per paid tier. Empty string = no link yet, the CTA falls back to
+// the contact mailto. Fill these from the Stripe dashboard (Payment Links → subscription,
+// 49 €/mo and 99 €/mo) to open self-serve checkout — nothing else needs changing.
+const PAYMENT_LINKS = {
+  ownNode: '',
+  ownNodePro: '',
+};
+
+// A paid tier's CTA: a buy link when the payment link exists, the contact mailto until then.
+const payCta = (link) => link
+  ? { label: tr('pricing.buyCta', 'Buy now →'), href: link }
+  : { label: tr('pricing.contactCta', 'Contact us →'), href: CONTACT };
 
 export default function Pricing() {
   // Honour the #packages anchor on arrival.
@@ -51,12 +68,12 @@ export default function Pricing() {
         ${tier('own-node', tr('pricing.ownName', 'Own node'), '49 €/' + tr('pricing.mo', 'mo'), [
           tr('pricing.own1', 'Your own instance, your data, BYOK.'),
           tr('pricing.own2', 'No backups, community support.'),
-        ], tr('pricing.contactCta', 'Contact us →'), CONTACT)}
+        ], payCta(PAYMENT_LINKS.ownNode).label, payCta(PAYMENT_LINKS.ownNode).href)}
         ${tier('own-node-pro', tr('pricing.proName', 'Own node Pro'), '99 €/' + tr('pricing.mo', 'mo'), [
           tr('pricing.pro1', 'Backups and a bigger instance.'),
           tr('pricing.pro2', 'Ready-made agent packages (CrewAI crew installed).'),
           tr('pricing.pro3', 'Email support.'),
-        ], tr('pricing.contactCta', 'Contact us →'), CONTACT, true)}
+        ], payCta(PAYMENT_LINKS.ownNodePro).label, payCta(PAYMENT_LINKS.ownNodePro).href, true)}
       </div>
 
       <div class="ld-tiers" id="packages">

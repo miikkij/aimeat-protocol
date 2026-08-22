@@ -1,0 +1,19 @@
+# Invariant 15 — a permission word is enforced on every door or it does not exist.
+#
+# requireRoleOrScope('agent', <scope>) admits ANY principal holding the `agent` role BEFORE it looks
+# at the scope, so the scope word is decorative on that door: the owner sees `organism:write` on the
+# MCP surface and believes they control it, while the HTTP route hands a scopeless agent 201 Created.
+# The correct gate for an agent-reachable capability is requireScope(<scope>).
+#
+# requireRoleOrScope('owner', <scope>) is NOT flagged — 'owner' is a legitimate principal class that
+# a scope cannot substitute for (e.g. requireRoleOrScope('owner', 'agent:delete')). Only the 'agent'
+# role short-circuits a scope this way.
+#
+# Run:  npx -p @ast-grep/cli ast-grep scan --rule security/semantic-audit/permission-word-on-every-door.ast-grep.yml aimeat/src/routes
+
+id: role-or-scope-agent-bypasses-scope
+language: typescript
+severity: warning
+message: "requireRoleOrScope('agent', …) admits the agent role before the scope — the scope word is decorative here. Use requireScope(…) so the word is enforced on this door too (invariant 15)."
+rule:
+  pattern: requireRoleOrScope('agent', $$$SCOPES)

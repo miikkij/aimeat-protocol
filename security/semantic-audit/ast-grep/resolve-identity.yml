@@ -1,0 +1,27 @@
+# The same identity invariant as an ast-grep rule — a native binary that runs on Windows (where
+# Semgrep needs WSL/Docker, which this project does not use). ast-grep is structural, not
+# interprocedural: it flags a storage call whose OWN arguments contain req.auth!.sub, inside a
+# handler that never calls resolveIdentity. It cannot follow `const gaii = req.auth!.sub` into a
+# later call — that is where the Semgrep taint rule is stronger — but it is enough to run the check
+# locally and narrow the candidates before a human or the CI taint pass.
+#
+# Run:  npx -p @ast-grep/cli ast-grep scan --rule security/semantic-audit/resolve-identity.ast-grep.yml aimeat/src/routes
+
+id: raw-sub-into-storage-arg-no-resolve
+language: typescript
+severity: warning
+message: "req.auth!.sub passed directly into a storage call argument, in a handler that never resolves identity"
+rule:
+  all:
+    - pattern: $S.$M($$$ARGS)
+    - has: { pattern: "req.auth!.sub", stopBy: end }
+    - inside:
+        stopBy: end
+        any:
+          - kind: arrow_function
+          - kind: function_declaration
+          - kind: method_definition
+        not:
+          has: { pattern: "resolveIdentity($$$R)", stopBy: end }
+constraints:
+  S: { regex: "^storage$" }

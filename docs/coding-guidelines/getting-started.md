@@ -207,12 +207,49 @@ state fell to 250-450 MB with bursts unchanged. This is the production launch li
 sudo apt install libjemalloc2
 LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libjemalloc.so.2 \
 MALLOC_CONF="background_thread:true,dirty_decay_ms:10000,muzzy_decay_ms:10000" \
-NODE_OPTIONS="--heapsnapshot-signal=SIGUSR2" pnpm start
+NODE_OPTIONS="--max-old-space-size=4096 --heapsnapshot-signal=SIGUSR2" pnpm start
 ```
 
 `LD_PRELOAD` must be process environment (launch line or systemd unit), never a `.env` entry —
 the dynamic linker consumes it before node starts, so a `.env` value arrives too late and is
 silently ignored. The Docker image ships with jemalloc preloaded already.
+
+**The V8 heap ceiling belongs in `NODE_OPTIONS`, and only there.** The `start` script used to pass
+`--max-old-space-size=2048` on the command line, which WINS over `NODE_OPTIONS` (node applies the
+CLI argument last), so the ceiling could not be raised or lowered without editing package.json on
+the server, and that edit is then a local modification the next `git pull` fights. It is gone from
+the script; set it where the deployment is described:
+
+- **Docker**: `ENV NODE_OPTIONS` in the image, already 2048. A container's ceiling must stay UNDER
+  its `--memory` limit, or the kernel OOM-kills the process instead of V8 collecting garbage.
+- **Bare metal**: the launch line above. 4096 on a 32 GB host leaves room without inviting a
+  runaway to eat the machine.
+- Unset means V8 sizes the heap from host RAM: wrong in a container, merely generous on a big
+  server.
+
+**Raising the ceiling is not a fix for a leak.** A node that reaches its ceiling under idle traffic
+is retaining something, and a bigger number moves the crash later while the process holds more of
+the machine. Read the growth from `/v1/metrics` (heapUsed) and `GET /v1/connect/tunnel/stats`
+(`ackDedupEntries`, `subscriptionEntries`) before touching the number. Do NOT add
+`--heapsnapshot-near-heap-limit`: it writes a file the size of the heap at the moment the machine
+is already under pressure, and parsing one of those on the same host has taken this server off the
+network once already.
+
+### Keep it running: the systemd unit
+
+`aimeat/deploy/aimeat.service` is the launch configuration as a file: jemalloc preload, heap
+ceiling, `Restart=always`, a cgroup memory ceiling under the machine's, and journald for the log.
+Edit `User` and `WorkingDirectory`, then:
+
+```bash
+sudo cp aimeat/deploy/aimeat.service /etc/systemd/system/aimeat.service
+sudo systemctl daemon-reload && sudo systemctl enable --now aimeat
+journalctl -u aimeat -f
+```
+
+Starting the node by hand works, and it has twice cost an outage: a reboot left it down, and a
+hand-typed restart dropped the preload and the ceiling. The unit is how the configuration stops
+being something to remember.
 
 ### With PostgreSQL
 

@@ -150,7 +150,7 @@ A bare owner name (`alice`) is the account layer: `req.auth!.sub` for owner JWTs
 
 **Every route that stores or retrieves by identity uses `resolveIdentity(req.auth!, config.nodeId)`** from `src/utils/gaii.ts`, never raw `req.auth!.sub`. Owner sessions turn the bare name into a GHII; agent and ecosystem sessions return `sub` as-is. Skip it and owner data lands under bare `alice`, invisible to list, search and update. Compare ownership against the resolved identity.
 
-Morsels: one balance, on `GHIIRecord.morselBalance`. The human pays; agent and ecosystem balances are always 0, and `debit`/`credit`/`transferBalance` resolve any principal to the owner GHII.
+Morsels: one balance, on `GHIIRecord.morselBalance`. **A morsel is a pacer, not a currency and not a credit.** It paces what agents may push into the store, so that what lands is refined and useful rather than dumped, and a large balance is a signal that this person has contributed something worth having. It accrues on its own, including while the owner is idle, and using it is not compulsory. Money is a separate matter with its own rails (Stripe, x402, ACP, UCP); morsels sit beside them and buy nothing. Agent and ecosystem balances are always 0, and `debit`/`credit`/`transferBalance` resolve any principal to the owner GHII, because the pace belongs to the human in whose name the agent acts.
 
 Agents are never created implicitly. Registration creates the owner and GHII only; agents connect later via device authorization (RFC 8628), where the owner approves each one and picks scopes.
 
@@ -250,7 +250,7 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 | [Testing Requirements](docs/coding-guidelines/testing-requirements.md) | E2E rules, multi-backend testing, writing tests |
 | [Security DNA](docs/coding-guidelines/security-development-dna.md) | Trust model, ten invariants, per-change checklist |
 | [Security](docs/coding-guidelines/security.md) | Auth, validation, XSS, rate limiting, GDPR |
-| [Identity Model](docs/coding-guidelines/identity-model.md) | GHII/GAII reference, aggregation, morsel economy |
+| [Identity Model](docs/coding-guidelines/identity-model.md) | GHII/GAII reference, aggregation, morsel pacing |
 | [Storage Sync](docs/coding-guidelines/storage-sync.md) | Adding fields and tables across both providers |
 | [Architecture](docs/coding-guidelines/architecture.md) | System design, storage layer, SSR-removal history |
 | [Code Style](docs/coding-guidelines/code-style.md) | TS/JS conventions, route patterns, i18n |
@@ -266,6 +266,7 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 | [App Developer AI Guide](docs/app-developer-ai-guide.md) | Apps using the user's OpenRouter key via `AIMEAT.ai.complete()` |
 | [Building an Agent](docs/building-an-aimeat-compatible-agent.md) | Offer descriptor, pricing, workflow signals |
 | [Building an Ecosystem App](docs/building-an-aimeat-compatible-ecosystem-app.md) | GEAI, hello→approve→token flow |
+| [Organisation Node Sign-In](docs/organisation-node-sign-in.md) | Entra tenant allowlist + registration mode: one node for your company and the partners you approve |
 | [Getting Started](docs/coding-guidelines/getting-started.md) | Install, setup, dev workflow |
 | [Known Gaps](docs/known_gaps.md) | Deferred technical gaps (developer-approved entries only) |
 

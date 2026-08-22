@@ -1,0 +1,52 @@
+# Identity-resolution invariant, as a Semgrep taint rule.
+#
+# CLAUDE.md / security-development-dna invariant: a route that stores or retrieves owner data by
+# identity must resolve the principal (resolveIdentity, or the equivalent owner-session handling)
+# before it reaches storage. A raw req.auth!.sub is the bare owner name on an OWNER session, so it
+# lands owner data under `alice` instead of `alice@node-id` and breaks the ownership comparison.
+#
+# This is the real, interprocedural version (runs in CI on Linux). Source = req.auth.sub, sink =
+# any storage call, sanitizers = the patterns the codebase actually uses to make sub safe. Tuned
+# from the 2026-08-21 proof-of-concept run: of 172 raw-sub uses, 12 reached a storage argument, and
+# all 12 were false positives once these sanitizers were accounted for.
+#
+# Run locally (Linux/macOS):  semgrep --config security/semantic-audit/semgrep/resolve-identity.yml aimeat/src/routes
+# In CI: upload the SARIF to GitHub code scanning so findings land on the Security tab.
+
+rules:
+  - id: owner-data-must-resolve-identity
+    languages: [typescript]
+    severity: ERROR
+    message: >
+      req.auth!.sub reaches a storage call without being resolved to a full identity. On an owner
+      session sub is the bare owner name, so owner data lands under the wrong key and the ownership
+      check compares the wrong value. Resolve with resolveIdentity(req.auth!, config.nodeId), or
+      handle the owner session explicitly, before the storage call.
+    mode: taint
+    pattern-sources:
+      - pattern: $REQ.auth!.sub
+      - pattern: $REQ.auth.sub
+    pattern-sanitizers:
+      # The canonical resolver.
+      - pattern: resolveIdentity(...)
+      # Inline GHII construction is the same thing by hand (memory/files.ts, work.ts owner branch).
+      - pattern: |
+          `${...}@${...}`
+      # Attribution fields record WHO acted; the raw principal id is correct there, not an owner key.
+      # These are consumed as labels, never as a retrieval key, so treat them as sanitized sinks.
+      - patterns:
+          - pattern-either:
+              - pattern: 'reviewedBy: $X'
+              - pattern: 'lockedBy: $X'
+              - pattern: 'openedBy: $X'
+              - pattern: 'performedBy: $X'
+              - pattern: 'installedBy: $X'
+    pattern-sinks:
+      - patterns:
+          - pattern: $STORAGE.$METHOD(...)
+          - metavariable-regex:
+              metavariable: $STORAGE
+              regex: ^storage$
+    # Known-legitimate agent-session branches (sub IS the agent GAII) are marked at the call with
+    #   // nosemgrep: owner-data-must-resolve-identity
+    # rather than widened here, so each exception is a deliberate, reviewable line.

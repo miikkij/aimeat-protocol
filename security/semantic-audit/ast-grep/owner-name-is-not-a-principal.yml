@@ -1,0 +1,25 @@
+# Invariant 11 — the owner name is not a principal.
+#
+# `req.auth!.owner` carries the human's account name on EVERY principal that belongs to them — an
+# agent JWT, an agent PAT, an app-grant token, an ecosystem app. So `req.auth!.owner !== name` is a
+# cross-owner check and nothing more: it refuses a different person and admits everything acting in
+# this person's name. Adding `&& !roles.includes('operator')` WIDENS the door further, it does not
+# narrow it. A change to the ACCOUNT itself (password, recovery address, 2FA, deletion, export) must
+# sit behind requireOwnerPrincipal() (role `owner` present; `agent`/`ecosystem`/`app` absent).
+#
+# This rule surfaces the exact widening shape for review. It over-reports by design: the same shape
+# is legitimate on a non-account resource (e.g. instance ownership), so a hit is a prompt — "is this
+# an account-mutation door? then it needs requireOwnerPrincipal" — not an automatic defect.
+#
+# Run:  npx -p @ast-grep/cli ast-grep scan --rule security/semantic-audit/owner-name-is-not-a-principal.ast-grep.yml aimeat/src/routes
+
+id: owner-name-cross-owner-widening
+language: typescript
+severity: warning
+message: "req.auth.owner !== name && !roles.includes('operator') is a cross-owner check that admits everything acting in this person's name (agents, apps, ecosystem). If this guards a change to the ACCOUNT itself, use requireOwnerPrincipal() instead (invariant 11)."
+rule:
+  any:
+    - pattern: $P.owner !== $NAME && !$R.roles.includes('operator')
+    - pattern: $P.owner !== $NAME && !$R.includes('operator')
+    - pattern: req.auth!.owner !== $NAME && !req.auth!.roles.includes('operator')
+    - pattern: req.auth!.owner !== $NAME && !$R.includes('operator')

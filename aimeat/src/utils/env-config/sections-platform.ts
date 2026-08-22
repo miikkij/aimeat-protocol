@@ -253,7 +253,7 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
         },
         {
           envVar: 'AIMEAT_REGISTRATION_MODE',
-          description: 'Who may get a new account: open, invite (member invitations only), or closed',
+          description: 'Who may get a new account: open, oauth (identity-provider sign-in or invitation), invite (member invitations only), or closed',
           value: config.registrationMode,
           defaultVal: 'open',
         },

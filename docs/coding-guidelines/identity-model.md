@@ -1,14 +1,14 @@
 # Identity Model — GHII vs GAII (full reference)
 
 > Quick reference (identity table, `resolveIdentity()` rule, key files) lives in `CLAUDE.md`.
-> This doc holds the worked patterns and the morsel-economy detail.
+> This doc holds the worked patterns and the morsel-pacing detail.
 
 ## The two identities
 
 | Identity | Format | Example | What it is |
 |----------|--------|---------|------------|
 | **GHII** | `owner@node-id` | `alice@aimeat-fi-001-genesis` | Human user. Owns everything. Has morsel balance, profile, trust score. |
-| **GAII** | `agent#owner@node-id` | `claude#alice@aimeat-fi-001-genesis` | AI agent. Scoped permissions. Has its own morsel balance and trust score. |
+| **GAII** | `agent#owner@node-id` | `claude#alice@aimeat-fi-001-genesis` | AI agent. Scoped permissions and its own trust score. Its morsel balance is always 0: pacing belongs to the owner. |
 
 There is also a bare **Owner** name (`alice`) which is the account layer. It appears in `req.auth!.sub` for owner JWTs and `req.auth!.owner` for both.
 
@@ -57,9 +57,20 @@ if (isOwnerSession) {
 
 For **single-key** operations (GET/PUT/DELETE by key), `resolveIdentity()` handles it — the owner's data is stored under GHII.
 
-## Morsel economy — single balance (GHII)
+## Morsel pacing — single balance (GHII)
 
-All morsels belong to the owner (GHII), not individual agents. Agents are tools — the human pays.
+**A morsel is a pacer, not a currency and not a credit.** It exists so that nobody can push arbitrary
+volume into the store through agents: what lands should be refined and useful rather than dumped. A
+large balance is therefore a signal that this person has contributed something worth having, and a
+balance accrues on its own, including while the owner is idle. Using morsels is not compulsory.
+
+Money is a separate matter with its own rails (Stripe for cards, x402 for agent payments, ACP and UCP
+for agentic commerce). Morsels sit beside those rails and buy nothing. Do not describe them as
+billing, credits, quota or an economy, and do not compare them to a vendor's credit model: those pace
+by charging you, this paces by usefulness.
+
+All morsels belong to the owner (GHII), not individual agents, because the pace belongs to the human
+in whose name an agent acts.
 
 - **Balance location:** `GHIIRecord.morselBalance` — the only balance in the system
 - **Agent balance field:** `AgentRecord.morselBalance` exists in schema for backward compat but is always 0. Never write to it.
