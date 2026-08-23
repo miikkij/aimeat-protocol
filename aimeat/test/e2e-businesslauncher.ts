@@ -175,6 +175,25 @@ await test('The back office brought its agents with it', async () => {
         `Expected the three shipped crews, got: ${names.join(', ') || '(none)'}`);
 });
 
+// Nothing that spends a token runs unless the person switched it on. The shop ships exactly one
+// clock and it is the zero-token kind: a sandbox action server-side, no model call.
+await test('The shop ships one schedule, and it costs no tokens', async () => {
+    const { status, body } = await json('/v1/schedules', { headers: authed(ownerToken) });
+    assert(status === 200, `Expected 200, got ${status}`);
+    // A manifest-declared job is the extension's rather than the owner's own, so the aggregate
+    // reports it under `extensions` and keeps it out of `managed`.
+    type Job = { id: string; type: string; enabled: boolean };
+    const agg = body.data as unknown as { managed: Job[]; extensions: Job[] };
+    const ext = installed.find(c => c.type === 'extension')!;
+    const mine = (agg.extensions ?? []).filter(j => j.id.startsWith(`ext:${ext.registeredAs}:`));
+    assert(mine.length === 1, `Expected exactly one shipped schedule, got ${mine.length}: ${(agg.extensions ?? []).map(j => j.id).join(', ')}`);
+    assert(mine[0].type === 'extension', `Expected the zero-token kind, got "${mine[0].type}"`);
+    assert(mine[0].enabled === true, 'the sweep is off, so expired holds would never come back');
+    // Nothing that spends tokens arrived with the package, in either bucket.
+    const costly = [...(agg.managed ?? []), ...(agg.extensions ?? [])].filter(j => j.type === 'ai' || j.type === 'agent_task');
+    assert(costly.length === 0, `A token-spending schedule shipped switched on: ${costly.map(j => j.id).join(', ')}`);
+});
+
 await test('A stranger can open the shop front without an account', async () => {
     const shop = installed.find(c => c.componentId === 'app-shop')!;
     const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(shop.registeredAs)}`);
