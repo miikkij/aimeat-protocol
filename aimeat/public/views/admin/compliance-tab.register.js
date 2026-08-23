@@ -27,7 +27,6 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { Empty, DataTable, ExpandableHelp } from './shared.js';
 
 /** Class id → the tone the badge borrows. Unknown ids fall back rather than render unstyled. */
@@ -37,7 +36,7 @@ const TONE = {
 
 export function RiskBadge({ risk }) {
   const tone = TONE[risk?.class] || 'dim';
-  return html`<span class="adm-cmp-risk adm-cmp-risk--${tone}">${escHtml(risk?.label || risk?.class || '—')}</span>`;
+  return html`<span class="adm-cmp-risk adm-cmp-risk--${tone}">${risk?.label || risk?.class || '—'}</span>`;
 }
 
 /** The list of strings behind a comma-separated input, empty entries dropped. */
@@ -54,10 +53,10 @@ function AnswerField({ question, value, onChange }) {
   return html`
     <label class="adm-cmp-q">
       <span class="adm-cmp-q-text">
-        ${escHtml(question.text)}
+        ${question.text}
         ${unanswered && html`<span class="adm-cmp-q-todo">${t('admin.compliance.unanswered')}</span>`}
       </span>
-      ${question.help && html`<span class="adm-cmp-q-help">${escHtml(question.help)}</span>`}
+      ${question.help && html`<span class="adm-cmp-q-help">${question.help}</span>`}
       <select
         value=${current}
         onChange=${(e) => {
@@ -67,7 +66,7 @@ function AnswerField({ question, value, onChange }) {
         }}
       >
         <option value="">${t('admin.compliance.pickAnswer')}</option>
-        ${options.map(o => html`<option key=${o.value} value=${o.value}>${escHtml(o.label)}</option>`)}
+        ${options.map(o => html`<option key=${o.value} value=${o.value}>${o.label}</option>`)}
       </select>
     </label>
   `;
@@ -175,9 +174,9 @@ export function RegisterSection({ usecases, questionnaire, saving, onSave }) {
         <${DataTable}
           headers=${[t('admin.compliance.ucTitle'), t('admin.compliance.risk'), t('admin.compliance.ucModels'), '']}
           rows=${list.map((u) => [
-            escHtml(u.title || u.id),
+            u.title || u.id,
             html`<${RiskBadge} risk=${u.risk} />`,
-            html`<span class="mono adm-cmp-small">${escHtml((u.models || []).join(', ') || '—')}</span>`,
+            html`<span class="mono adm-cmp-small">${(u.models || []).join(', ') || '—'}</span>`,
             html`<button type="button" class="btn-ghost" onClick=${() => setOpenId(openId === u.id ? null : u.id)}>
               ${openId === u.id ? t('admin.compliance.close') : t('admin.compliance.edit')}
             </button>`,
@@ -217,15 +216,15 @@ export function QuestionnaireSection({ questionnaire }) {
     <section class="adm-cmp-section">
       <h3>${t('admin.compliance.qsTitle')}</h3>
       <p class="adm-cmp-note">
-        ${t('admin.compliance.qsNote')} <span class="mono">${escHtml(questionnaire.version)}</span>
+        ${t('admin.compliance.qsNote')} <span class="mono">${questionnaire.version}</span>
       </p>
-      <p class="adm-cmp-note">${escHtml(questionnaire.note || '')}</p>
+      <p class="adm-cmp-note">${questionnaire.note || ''}</p>
       <${ExpandableHelp} title=${t('admin.compliance.qsShow')}>
         <ul class="adm-cmp-qs">
           ${(questionnaire.questions || []).map(q => html`
             <li key=${q.id}>
-              <span class="adm-cmp-q-text">${escHtml(q.text)}</span>
-              <span class="mono adm-cmp-small">${escHtml(q.id)}</span>
+              <span class="adm-cmp-q-text">${q.text}</span>
+              <span class="mono adm-cmp-small">${q.id}</span>
               ${Object.entries(q.implies || {}).length > 0 && html`
                 <span class="adm-cmp-small">
                   ${Object.entries(q.implies).map(([a, c]) => `${a} → ${c}`).join(' · ')}

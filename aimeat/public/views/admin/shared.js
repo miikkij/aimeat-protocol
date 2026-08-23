@@ -98,8 +98,9 @@ export function ErrorBox({ message }) {
 }
 
 /** Expandable/collapsible help section — reusable across all tabs and portal pages */
-export function ExpandableHelp({ title, children }) {
-  return html`<details class="adm-help">
+/** `open` starts it expanded — for a first-run explanation nobody would think to click. */
+export function ExpandableHelp({ title, children, open }) {
+  return html`<details class="adm-help" open=${open || null}>
     <summary class="adm-help-summary">${title}</summary>
     <div class="adm-help-body">${children}</div>
   </details>`;

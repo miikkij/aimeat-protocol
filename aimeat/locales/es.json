@@ -286,7 +286,13 @@
       "period90d": "90 días",
       "period365d": "Un año",
       "print": "Imprimir o guardar como PDF",
-      "csv": "Descargar CSV"
+      "csv": "Descargar CSV",
+      "howTitle": "Cómo empezar",
+      "howStep1": "Anota cada cosa para la que se usa la IA aquí. Una entrada por uso: de qué se trata, con qué modelos funciona y qué aplicaciones publicadas lo acompañan.",
+      "howStep2": "Responde las preguntas de cada entrada. Si dejas una sin responder, esa entrada queda sin clase y sube al inicio. Es a propósito: nada debe parecer aprobado cuando nadie lo ha revisado.",
+      "howStep3": "Lee \"Requiere revisión\". Ahí aparece el modelo que se usó aquí y que ninguna entrada menciona. Esa diferencia es el sentido de esta página: si no hay nada anotado, todo cuenta como no documentado.",
+      "howMonthly": "El informe de cada mes se escribe solo el primer día del mes siguiente y queda guardado. Puedes ejecutarlo antes desde la pestaña Programador, en la tarea Monthly Compliance Report.",
+      "howAgent": "Tu propia IA puede mantener esto al día por ti: dale el permiso \"compliance:read\" para leer el informe y \"compliance:write\" para cambiar lo anotado. Ambos se otorgan por agente en Perfil, y ninguno viene con Acceso total."
     }
   },
   "admin.messages.desc": "Telemetría de entrega de los mensajes entre personas. No se enseña el contenido de ningún mensaje ni quién participa.",

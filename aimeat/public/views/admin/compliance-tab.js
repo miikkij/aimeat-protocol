@@ -31,8 +31,8 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, downloadBlob, toCsvBlob } from '/js/utils.js';
-import { num, StatsGrid, DataTable, Empty, Spinner, ErrorBox, useToast, Toast } from './shared.js';
+import { downloadBlob, toCsvBlob } from '/js/utils.js';
+import { num, StatsGrid, DataTable, Empty, Spinner, ErrorBox, useToast, Toast, ExpandableHelp } from './shared.js';
 import { apiGet, apiPut } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { RegisterSection, QuestionnaireSection } from './compliance-tab.register.js';
@@ -51,6 +51,29 @@ const GAP_LABEL = {
   'app-declares-generation-with-gap': 'admin.compliance.gapAppGap',
 };
 
+/**
+ * How to start, for the operator opening this for the first time.
+ *
+ * An empty register with a green "nothing needs a decision" reads as a finished page, and it is the
+ * opposite: until somebody writes down what AI is used for here, the comparison has nothing on one
+ * side and every model the node used counts as undocumented. The steps say that in order, and they
+ * are collapsed after the first read rather than removed, because the fourth line — that an agent
+ * can keep the register current — is the one nobody discovers on their own.
+ */
+function HowToStart({ empty }) {
+  return html`
+    <${ExpandableHelp} title=${t('admin.compliance.howTitle')} open=${empty}>
+      <ol class="adm-cmp-steps">
+        <li>${t('admin.compliance.howStep1')}</li>
+        <li>${t('admin.compliance.howStep2')}</li>
+        <li>${t('admin.compliance.howStep3')}</li>
+      </ol>
+      <p class="adm-cmp-note">${t('admin.compliance.howMonthly')}</p>
+      <p class="adm-cmp-note">${t('admin.compliance.howAgent')}</p>
+    <//>
+  `;
+}
+
 function GapList({ gaps }) {
   if (!gaps?.length) {
     return html`
@@ -66,8 +89,8 @@ function GapList({ gaps }) {
       <ul class="adm-cmp-gaps">
         ${gaps.map((g, i) => html`
           <li key=${`${g.kind}-${i}`}>
-            <span class="adm-cmp-gap-kind">${t(GAP_LABEL[g.kind]) || escHtml(g.kind)}</span>
-            <span class="adm-cmp-gap-detail">${escHtml(g.detail)}</span>
+            <span class="adm-cmp-gap-kind">${t(GAP_LABEL[g.kind]) || g.kind}</span>
+            <span class="adm-cmp-gap-detail">${g.detail}</span>
           </li>
         `)}
       </ul>
@@ -89,7 +112,7 @@ function NotCovered({ items }) {
       <h3>${t('admin.compliance.limitsTitle')}</h3>
       <p class="adm-cmp-note">${t('admin.compliance.limitsNote')}</p>
       <ul class="adm-cmp-limits">
-        ${(items || []).map((s, i) => html`<li key=${i}>${escHtml(s)}</li>`)}
+        ${(items || []).map((s, i) => html`<li key=${i}>${s}</li>`)}
       </ul>
     </section>
   `;
@@ -205,10 +228,12 @@ export default function ComplianceTab() {
 
       <p class="adm-cmp-scope">
         ${t('admin.compliance.scopeLine')
-          .replace('{node}', report.scope?.node_id || '')
+          .replace('{id}', report.scope?.node_id || '')
           .replace('{from}', (period0.from || '').slice(0, 10))
           .replace('{to}', (period0.to || '').slice(0, 10))}
       </p>
+
+      <${HowToStart} empty=${report.register.usecases.length === 0} />
 
       <${GapList} gaps=${report.gaps} />
       <${NotCovered} items=${report.not_covered} />
@@ -220,7 +245,7 @@ export default function ComplianceTab() {
         ${(report.derived?.ai_usage?.models || []).length > 0 && html`
           <${DataTable}
             headers=${[t('admin.compliance.modelsSeen')]}
-            rows=${report.derived.ai_usage.models.map(m => [html`<span class="mono adm-cmp-small">${escHtml(m)}</span>`])}
+            rows=${report.derived.ai_usage.models.map(m => [html`<span class="mono adm-cmp-small">${m}</span>`])}
           />
         `}
       </section>
