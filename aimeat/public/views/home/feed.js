@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   v2.2.0 — 2026-08-23 — HomeFeed takes `band`: on the finished home it is one of the ruled
+ *     bands (.koti-band), on the onboarding home it keeps its own gap. Title class is the band's.
  *   v2.1.0 — 2026-08-18 — The list becomes a timeline: kindCategory() maps every kind onto six
  *     colours (made / agent work / trouble / money / access / system) and the row carries its
  *     category as a class, so the home card and the history page colour their dots from one rule.
@@ -222,7 +224,8 @@ export function FeedRow({ item }) {
     </li>`;
 }
 
-export function HomeFeed({ items }) {
+/** `band`: on the finished home the feed is one of the ruled bands; the onboarding home has none. */
+export function HomeFeed({ items, band }) {
   if (!items || !items.length) return null;
   // Quiet is information too. The newest event's age decides: past the threshold, the feed opens
   // with an invitation to go make an event instead of a list that ends three days ago.
@@ -230,8 +233,8 @@ export function HomeFeed({ items }) {
   const quiet = newestAt > 0 && (Date.now() - newestAt) > QUIET_AFTER_DAYS * 86400000;
   const shown = items.filter(it => line(it));
   return html`
-    <section class="koti-feed">
-      <h2 class="koti-feed-title">${tr('home.feed.title', 'What has happened')}</h2>
+    <section class="koti-feed ${band ? 'koti-band' : ''}">
+      <h2 class="koti-band-title">${tr('home.feed.title', 'What has happened')}</h2>
       ${quiet && html`
         <a class="koti-feed-quiet" href="/v1/chat">
           ${tr('home.feed.quiet', 'Quiet here lately. Shall we make something happen? Open the chat and say what you need.')}
