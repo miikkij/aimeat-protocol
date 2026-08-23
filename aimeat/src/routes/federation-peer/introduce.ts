@@ -5,6 +5,8 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 14): the outbound-URL check runs
+ *     before consumeLinkInvite, so a 400 INVALID_URL no longer burns the one-time invite token.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
  */
 
@@ -178,6 +180,17 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         // memory-replication/federated-auth rights (deriveTierFlags('visiting')).
         // Reaching 'member' still requires a deliberate local-operator promotion.
         // Network policy may further gate (or disable) auto-admit by domain/protocol.
+        // SSRF: node_url drives the outbound key-exchange below. Checked BEFORE the invite is
+        // consumed — refuse before you write (invariant 14): the consume marks a one-time token
+        // used, so every refusal this handler can still make has to happen first, or a rejected
+        // request burns the invite without creating the link it paid for (audit AI-triage,
+        // 2026-08-23).
+        const urlCheck = await validateOutboundUrl(node_url);
+        if (!urlCheck.valid) {
+            res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'node_url failed validation'));
+            return;
+        }
+
         // An INVITE this node minted earlier. Its tier is this node's own decision quoted back, which
         // is why the tier is read from the stored invite and never from the request body — a door that
         // believes a caller's claim about its own trust level is not a door (the F1 finding in
@@ -189,12 +202,6 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         const policyAdmit = evaluateAutoAdmit({ node_url }, policy);
         if (invited.ok || (config.federationOpenJoin && policyAdmit.allowed)) {
             const admitTier: PeerTier = invited.ok ? invited.tier : 'visiting';
-            // SSRF: node_url drives the outbound key-exchange below.
-            const urlCheck = await validateOutboundUrl(node_url);
-            if (!urlCheck.valid) {
-                res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'node_url failed validation'));
-                return;
-            }
 
             const admittedPeer: PeerInfo = {
                 nodeId: node_id,

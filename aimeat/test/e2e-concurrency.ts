@@ -637,78 +637,58 @@ await test('28. List posts returns created ones', async () => {
     assert(body.data.posts.length <= createdCount, `more posts than created: ${body.data.posts.length} > ${createdCount}`);
 });
 
-// ─── Phase 8: OTK Replay Attack ───
-console.log('\nPhase 8 — OTK Replay Attack');
+// ─── Phase 8: Tier 0.5 OTK routes are removed ───
+// The mint/redeem pair this phase used to exercise (POST /v1/auth/otk, GET /v1/otk/:key, plus
+// POST /v1/auth/initial-otk) was REMOVED on 2026-08-23: Tier 0.5 is deprecated in RFC v4.0, the
+// redeem door executed with no credential by design, and the AI triage of the security audit
+// flagged both mints for storing a raw `sub` as the write target. Deprecated is not removed
+// (security DNA invariant 16) — so the removal itself is what this phase now asserts: a route that
+// answers anything but 404 here has been resurrected and the assertion is the alarm.
+console.log('\nPhase 8 — Tier 0.5 OTK routes are removed');
 
-let otkKey = '';
-
-await test('29. Generate one OTK', async () => {
-    const { status, body } = await json('/v1/auth/otk', {
+await test('29. POST /v1/auth/otk is gone (404)', async () => {
+    const { status } = await json('/v1/auth/otk', {
         method: 'POST',
         headers: { Authorization: `Bearer ${requesterToken}` },
-        body: JSON.stringify({
-            action: 'write_memory',
-            params: { key: 'replay-key', value: 'test-value' },
-        }),
+        body: JSON.stringify({ action: 'write_memory', params: { key: 'replay-key', value: 'test-value' } }),
     });
-    assert(status === 201, `otk: ${status} ${JSON.stringify(body)}`);
-    otkKey = body.data.otk;
-    assert(otkKey, 'has otk key');
+    assert(status === 404, `removed mint answered ${status}`);
 });
 
-let otkReplayResults: { status: number; body: any }[] = [];
-
-await test('30. Use same OTK in 5 parallel requests', async () => {
-    const use = () => jsonNoRetry(`/v1/otk/${encodeURIComponent(otkKey)}`);
-    const results = await Promise.all(Array.from({ length: 5 }, () => use()));
-    otkReplayResults = results;
+await test('30. GET /v1/otk/:key is gone (404 for any key)', async () => {
+    const { status, body } = await json('/v1/otk/no-such-key-after-removal');
+    assert(status === 404, `removed redeem answered ${status}: ${JSON.stringify(body).slice(0, 200)}`);
 });
 
-await test('31. OTK allows re-use within 60s window', async () => {
-    // The OTK has a 60-second post-use window (session-like behavior).
-    // Within this window, parallel requests all succeed — this is by design.
-    const successes = otkReplayResults.filter(r => r.status === 200);
-    const notFound = otkReplayResults.filter(r => r.status === 404);
-    // All should succeed or be a mix (depends on timing)
-    assert(successes.length + notFound.length === 5,
-        `unexpected statuses: ${otkReplayResults.map(r => r.status)}`);
-    console.log(`    ${successes.length} succeeded, ${notFound.length} rejected (60s window)`);
+await test('31. POST /v1/auth/initial-otk is gone (404)', async () => {
+    const { status } = await json('/v1/auth/initial-otk', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 404, `removed initial mint answered ${status}`);
 });
 
-// A8 (E2E test-quality audit). Phase 8 exercises the OTK as a supported write path and asks only
-// about replay timing. What it never asks is who may mint one, and GET /v1/otk/:key executes with NO
-// credential at all by design — so the mint is the only place the question can be asked, and it was
-// requireAuth() alone. A scoped principal minted a write of a key the node writes about the owner
-// (`openrouter.settings` is read by services/ai-completion.ts before it posts the owner's decrypted
-// AI key) and then executed it unauthenticated. Against the pre-fix source both assertions below
-// fail: the mint returns 201 and the unauthenticated execution writes the key.
-await test('32. A scoped app cannot mint an OTK for a key the node writes', async () => {
-    // A memory:read-only agent of the same owner: the narrowest principal that could reach the mint.
-    const reg = await json('/v1/agents', {
-        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ name: 'otkprobe', owner: ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+await test('32. Connectivity-key mint still works (same file, kept on purpose)', async () => {
+    const { status, body } = await json('/v1/auth/connectivity-key', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({}),
     });
-    assert(reg.status === 201, `probe agent ${reg.status}: ${JSON.stringify(reg.body).slice(0, 200)}`);
-    const ts = new Date().toISOString();
-    const gaii = reg.body.data.agent.gaii as string;
-    const sig = await signMsg(reg.body.data.private_key, gaii + ts);
-    const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: sig }) });
-    assert(tk.body.ok === true, `probe token: ${JSON.stringify(tk.body.error)}`);
-    const probeToken = tk.body.data.token;
+    assert(status === 201, `connectivity-key mint broke with the OTK removal (${status}): ${JSON.stringify(body).slice(0, 200)}`);
+    assert(typeof body.data?.connectivity_key === 'string', 'has connectivity_key');
+});
 
-    const mint = await json('/v1/auth/otk', {
-        method: 'POST', headers: { Authorization: `Bearer ${probeToken}` },
-        body: JSON.stringify({
-            action: 'write_memory',
-            params: { key: 'openrouter.settings', value: { baseUrl: 'https://attacker.example' } },
-        }),
+await test('33. Authorization holds under parallel load: five agent PUTs on an operator door, five 403s', async () => {
+    // The denial case this suite owes (the old OTK mint-gate test carried it): an agent principal
+    // hammering an operator-only door concurrently is refused on EVERY request — a race that let
+    // even one through would be a privilege escalation with a timing condition.
+    const hit = () => jsonNoRetry('/v1/federation/peers/aimeat-peer-nope', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${requesterToken}` },
+        body: JSON.stringify({ tier: 'member' }),
     });
-    assert(mint.status === 403, `a memory:read principal minted a write OTK (${mint.status}): ${JSON.stringify(mint.body).slice(0, 200)}`);
-
-    // And the owner's setting is untouched.
-    const read = await json('/v1/memory/openrouter.settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
-    const stored = JSON.stringify(read.body?.data?.value ?? null);
-    assert(!stored.includes('attacker.example'), `the owner's AI settings were rewritten: ${stored.slice(0, 200)}`);
+    const results = await Promise.all(Array.from({ length: 5 }, () => hit()));
+    for (const r of results) assert(r.status === 403, `an agent reached an operator door: ${r.status}`);
 });
 
 // ─── Cleanup ───

@@ -384,7 +384,7 @@ Verification results attach to the GHII and MAY gate sensitive Platform features
 The following are **DEPRECATED** — still mounted and test-covered for backward compatibility, but off the mainline. New integrations MUST NOT rely on them.
 
 - **Legacy Ed25519 challenge-response** (`POST /v1/auth/token`, `GET /v1/auth/challenge`). Survives for pre-registered keypairs and node/federation signing.
-- **One-Time Keys (OTK) / Tier 0.5 keyed-browse** (`POST /v1/auth/otk`, `/initial-otk`, `GET /v1/auth/session`, `GET /v1/auth/otk/:key`). Superseded by device-auth + MCP. Feature-gated (`keyedBrowseEnabled`).
+- **One-Time Keys (OTK) / Tier 0.5 keyed-browse** (`POST /v1/auth/otk`, `/initial-otk`, `GET /v1/auth/session`, `GET /v1/auth/otk/:key`). Superseded by device-auth + MCP. **REMOVED from the reference implementation on 2026-08-23** (`POST /v1/auth/otk`, `POST /v1/auth/initial-otk` and the unauthenticated redeem answer 404; E2E asserts the removal). The connectivity-key mint and micro-memory's `?otk=` consumption are separate mechanisms and remain.
 
 ---
 

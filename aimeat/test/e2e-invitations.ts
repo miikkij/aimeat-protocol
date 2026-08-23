@@ -18,6 +18,9 @@
  *     email → 200 (10), different verified email → 403 EMAIL_MISMATCH + invite stays pending (10b), no
  *     verified email → 403 (10c), GET `viewer` verdict (10d). Part C return_url: allowlisted target
  *     round-trips (10e), non-allowlisted target is dropped to the default redirect (10f).
+ *   v1.4.0 — 2026-08-23 — S1: organism:invite is ENFORCED on the four email-invite doors (invariant
+ *     15). A scopeless agent of the org admin's owner gets 403 on every door; the same owner's agent
+ *     holding the scope passes. Fails against the pre-fix requireRoleOrScope source.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -438,6 +441,46 @@ await test('C7. A non-member cannot mint a key (403)', async () => {
     const r = await json(`/v1/organisms/${orgId}/invitations/code`, { method: 'POST', headers: auth(D.token), body: JSON.stringify({ email: `z.${Date.now()}@example.com`, username: `e2ez${Date.now()}`, code: 'EXC99-ABCD-EFGH-JKLM' }) });
     assert(r.status === 403, `non-member mint expected 403, got ${r.status}`);
     await json(`/v1/owners/${D.name}`, { method: 'DELETE', headers: auth(D.token) });
+});
+
+// Invariant 15 (2026-08-23, audit AI-triage): the four email-invitation doors used
+// requireRoleOrScope('agent', 'organism:invite'), whose role path runs first — so ANY agent passed
+// and the scope word was decorative on HTTP while the MCP surface filtered tools on the same word.
+// Against the pre-fix source the first half of this test fails: the scopeless agent gets 200.
+await test('S1. organism:invite is enforced on the email-invite doors', async () => {
+    const mk = async (agentName: string, scopes: string[]) => {
+        const reg = await json('/v1/agents', {
+            method: 'POST', headers: auth(A.token),
+            body: JSON.stringify({ name: agentName, owner: A.name, capabilities: ['memory'], scopes }),
+        });
+        assert(reg.status === 201, `agent ${agentName}: ${reg.status}`);
+        const ts = new Date().toISOString();
+        const gaii = reg.body.data.agent.gaii as string;
+        const tok = await json('/v1/auth/token', {
+            method: 'POST',
+            body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(reg.body.data.private_key, gaii + ts) }),
+        });
+        assert(tok.body.ok === true, `token ${agentName}: ${JSON.stringify(tok.body.error)}`);
+        return tok.body.data.token as string;
+    };
+
+    // An agent of the ORG ADMIN's owner, without the invite scope: every door refuses with 403.
+    const scopeless = await mk('invprobe', ['memory:read']);
+    const doors: Array<[string, string, string?]> = [
+        ['POST', `/v1/organisms/${orgId}/invitations/email`, JSON.stringify({ email: `p.${Date.now()}@example.com` })],
+        ['GET', `/v1/organisms/${orgId}/invitations/email`],
+        ['PATCH', `/v1/organisms/${orgId}/invitations/email/none`, JSON.stringify({ orgRole: 'admin' })],
+        ['POST', `/v1/organisms/${orgId}/invitations/email/none/cancel`, '{}'],
+    ];
+    for (const [method, path, body] of doors) {
+        const r = await json(path, { method, headers: auth(scopeless), ...(body ? { body } : {}) });
+        assert(r.status === 403, `${method} ${path} let a scopeless agent through: ${r.status}`);
+    }
+
+    // The same owner's agent WITH the scope passes the gate (list door proves the grant works).
+    const scoped = await mk('invprobe2', ['organism:invite']);
+    const ok = await json(`/v1/organisms/${orgId}/invitations/email`, { headers: auth(scoped) });
+    assert(ok.status === 200, `the scoped agent should list invitations, got ${ok.status}`);
 });
 
 await test('Cleanup', async () => {
