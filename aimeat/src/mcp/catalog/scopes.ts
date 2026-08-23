@@ -224,6 +224,14 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_admin_organism_ownership:          'operator:organism-repair',
     aimeat_admin_organism_owner_add:          'operator:organism-repair',
 
+    // The node-wide compliance report and the register behind it. The handler resolves the caller's
+    // OWNER and refuses a non-operator, so the word alone gets nobody in; it is here as well because
+    // a tool is REGISTERED according to this table, and neither word is carried by any wildcard
+    // (SCOPES_OUTSIDE_WILDCARD). Read and write are separate words because they fail differently:
+    // reading discloses every account's AI activity, writing changes what the report says.
+    aimeat_compliance_register_read:          'compliance:read',
+    aimeat_compliance_register_write:         'compliance:write',
+
     // Writes something other people see under the owner's name.
     aimeat_flag_report:                       'social:write',
     aimeat_organism_join:                     'social:write',

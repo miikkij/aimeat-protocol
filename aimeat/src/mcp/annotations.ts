@@ -325,6 +325,11 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_organism_ownership: { title: 'Admin: Organism Ownership', readOnlyHint: true },
     aimeat_admin_organism_owner_add: { title: 'Admin: Add Organism Owner', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     aimeat_admin_config: { title: 'Admin: Read Config', readOnlyHint: true },
+    aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
+    aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
+    // destructiveHint: it REPLACES the document rather than merging into it, so a partial write
+    // silently drops every entry the caller did not resend.
+    aimeat_compliance_register_write: { title: 'Compliance: Replace Register', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 

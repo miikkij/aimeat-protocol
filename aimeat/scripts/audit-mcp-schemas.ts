@@ -59,6 +59,7 @@ import { registerAgentMessageTools } from '../src/mcp/agent-messages.js';
 import { registerAgentOnboardingTools } from '../src/mcp/agent-onboarding.js';
 import { registerAgentTelemetryTools } from '../src/mcp/agent-telemetry.js';
 import { registerAgentManagementTools } from '../src/mcp/agent-management.js';
+import { registerComplianceTools } from '../src/mcp/compliance.js';
 
 // ── Connector register entrypoint ──
 import { registerAllTools } from '../src/cli/connect/mcp/tools/index.js';
@@ -117,6 +118,7 @@ function captureServer(): Map<string, CapturedTool> {
         registerCapabilitiesTools, registerCortexTools, registerAppsTools, registerSharingGroupTools,
         registerAgentTaskTools, registerAgentCapabilityTools, registerAgentMessageTools,
         registerAgentTelemetryTools, registerAgentOnboardingTools, registerAgentManagementTools,
+        registerComplianceTools,
     ];
     for (const fn of reg) fn(mcp, storage, config, gaii, noop, noop);
     return sink;
