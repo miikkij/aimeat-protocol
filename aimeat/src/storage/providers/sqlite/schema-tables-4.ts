@@ -176,6 +176,10 @@ export function applySchemaTables4(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS outbound_messages (
       id         TEXT PRIMARY KEY,
       ownerGhii  TEXT NOT NULL,
+      -- Which company sent it (its organism), null for an owner who has never split theirs.
+      -- A NEW database gets the column here; an EXISTING one gets it from safeAddColumn in
+      -- schema.ts, and both are needed or one of the two roads boots without it.
+      organismId TEXT,
       contactId  TEXT NOT NULL,
       channel    TEXT NOT NULL,
       kind       TEXT NOT NULL,
@@ -188,6 +192,8 @@ export function applySchemaTables4(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_outbound_messages_owner ON outbound_messages(ownerGhii, createdAt);
     CREATE INDEX IF NOT EXISTS idx_outbound_messages_contact ON outbound_messages(contactId, createdAt);
+    -- The daily cap counts this owner's sends in a rolling 24 h, and now optionally one company's.
+    CREATE INDEX IF NOT EXISTS idx_outbound_messages_company ON outbound_messages(ownerGhii, organismId, createdAt);
 
     -- ── Company registry (company-in-a-box) ───────────────────────────────────
     -- A company is a first-class entity like an app; creating one reserves

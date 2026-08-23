@@ -570,6 +570,17 @@ export function initializeSchema(db: Database.Database): void {
       ON connections(providerClientId) WHERE providerClientId IS NOT NULL;
   `);
 
+  // Which company sent an outbound message (TARGET-072). The NEW-database column is in
+  // schema-tables-4.ts; this is the same column for a database that already exists, and BOTH are
+  // needed — a column added in only one of the two places boots fine on one road and throws
+  // "no such column" on the other. The index comes after the column, in the same block, because
+  // an index created before its column has taken down the boot here twice.
+  safeAddColumn('outbound_messages', 'organismId', 'TEXT');
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_outbound_messages_company
+      ON outbound_messages(ownerGhii, organismId, createdAt);
+  `);
+
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
   // searchable text of every memory row (key + JSON value + tags), keyed by memory.rowid. AFTER

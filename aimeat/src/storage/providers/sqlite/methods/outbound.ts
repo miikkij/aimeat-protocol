@@ -47,6 +47,7 @@ function toMessage(r: Row): OutboundMessageRecord {
   return {
     id: r.id as string,
     ownerGhii: r.ownerGhii as string,
+    organismId: (r.organismId as string | null) ?? null,
     contactId: r.contactId as string,
     channel: r.channel as OutboundChannel,
     kind: r.kind as OutboundKind,
@@ -157,10 +158,10 @@ export const outboundMethods: OutboundRepository & ThisType<SqliteStorage> = {
 
   async createOutboundMessage(this: SqliteStorage, row: OutboundMessageRecord): Promise<void> {
     this.db.prepare(`
-      INSERT INTO outbound_messages (id, ownerGhii, contactId, channel, kind, subject, templateId, status, error, invoiceId, createdAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)
+      INSERT INTO outbound_messages (id, ownerGhii, organismId, contactId, channel, kind, subject, templateId, status, error, invoiceId, createdAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
-      row.id, row.ownerGhii, row.contactId, row.channel, row.kind, row.subject,
+      row.id, row.ownerGhii, row.organismId ?? null, row.contactId, row.channel, row.kind, row.subject,
       row.templateId, row.status, row.error, row.invoiceId, row.createdAt,
     );
   },
@@ -180,9 +181,16 @@ export const outboundMethods: OutboundRepository & ThisType<SqliteStorage> = {
     return Number(r.n);
   },
 
-  async countOutboundMessagesSince(this: SqliteStorage, ownerGhii: string, sinceIso: string): Promise<number> {
-    const r = this.db.prepare(`SELECT COUNT(*) AS n FROM outbound_messages WHERE ownerGhii = ? AND status = 'sent' AND createdAt >= ?`)
-      .get(ownerGhii, sinceIso) as { n: number };
+  async countOutboundMessagesSince(this: SqliteStorage, ownerGhii: string, sinceIso: string, organismId?: string | null): Promise<number> {
+    // organismId undefined counts every send this owner made, which is what the cap has always
+    // been. Passed, it counts one company's — so two companies do not share one allowance and one
+    // busy company cannot silence the other.
+    const scoped = organismId !== undefined;
+    const sql = `SELECT COUNT(*) AS n FROM outbound_messages WHERE ownerGhii = ? AND status = 'sent' AND createdAt >= ?${
+      scoped ? (organismId === null ? ' AND organismId IS NULL' : ' AND organismId = ?') : ''}`;
+    const params: unknown[] = [ownerGhii, sinceIso];
+    if (scoped && organismId !== null) params.push(organismId);
+    const r = this.db.prepare(sql).get(...params) as { n: number };
     return Number(r.n);
   },
 };

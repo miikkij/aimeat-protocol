@@ -44,6 +44,12 @@ export interface OutboundRepository {
   createOutboundMessage(row: OutboundMessageRecord): Promise<void>;
   listOutboundMessages(query: OutboundLogQuery): Promise<OutboundMessageRecord[]>;
   countOutboundMessages(query: OutboundLogQuery): Promise<number>;
-  /** The daily-limit gate: sent messages for one owner since an ISO timestamp. */
-  countOutboundMessagesSince(ownerGhii: string, sinceIso: string): Promise<number>;
+  /**
+   * The daily-limit gate: sent messages for one owner since an ISO timestamp.
+   *
+   * `organismId` narrows it to ONE company's sends. Omitted counts every send the owner made,
+   * which is what the cap has always been and what an owner with one company still gets. Passing
+   * null counts the sends that name no company, which is every send made before TARGET-072.
+   */
+  countOutboundMessagesSince(ownerGhii: string, sinceIso: string, organismId?: string | null): Promise<number>;
 }

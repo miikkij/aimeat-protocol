@@ -310,6 +310,7 @@ const ALL_SUITES = [
     'test/e2e-compliance-report.ts',
     'test/e2e-attestations.ts',
     'test/e2e-finance.ts',
+    'test/e2e-finance-per-company.ts',
     'test/e2e-outbound.ts',
     'test/e2e-companies.ts',
     'test/e2e-money-audit.ts',
