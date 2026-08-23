@@ -1,0 +1,39 @@
+metadata:
+  name: company-brain
+  namespace: companybrain
+  description: The company brain's browser surface. Reaches the caretaker extension for the source register and the weekly report; the knowledge itself lives in the owner's own workspace and the app reads it directly.
+  author: operator
+  tags: [company, knowledge, provenance, company-brain]
+components:
+  - type: lib
+    name: company-brain
+    filename: company-brain.js
+    exports:
+      - state
+      - configure
+      - putSource
+      - removeSource
+      - touchSource
+      - sweep
+      - staleness
+    api_surface: |
+      Every call here needs a signed-in session. Unlike a shop, a company brain has no public half:
+      what a company knows, and what it does not, is not a document for passers-by.
+
+      AIMEAT.brain.state(session)
+        -> { brain: { company, org, ws } | null, sources: [...], report: {...} | null }
+        One read for the whole page. Three calls would be three chances to render half of it.
+
+      AIMEAT.brain.configure(session, { company, org, ws })
+      AIMEAT.brain.putSource(session, source)     add or replace one feed, by its id
+      AIMEAT.brain.removeSource(session, id)
+      AIMEAT.brain.touchSource(session, id, error?)  delivered now, or failed with a reason
+      AIMEAT.brain.sweep(session)                 run the weekly check by hand
+
+      AIMEAT.brain.staleness(fact, today?) -> 'anchored' | 'fresh' | 'due' | 'unknown'
+        A PURE FUNCTION, no network. Ageing is decided when the page renders, never swept: an
+        anchored fact points at a document the owner holds and never falls due, an observed one
+        carries review_after and is compared with today. Costs nothing and cannot drift.
+
+      Requires: /v1/libs/aimeat-auth.js. The knowledge records are read with
+      /v1/libs/aimeat-organism.js straight from the owner's workspace, not through here.

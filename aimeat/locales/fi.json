@@ -3212,6 +3212,17 @@
         "step4": "Täytä sen verran kuin jaksat. Takahuone näyttää mitä puuttuu ja missä järjestyksessä.",
         "step5": "Ota kortit käyttöön silloin kun itse haluat. Sitä kysytään erikseen eikä oleteta."
       },
+      "brain": {
+        "title": "Yritys joka muistaa",
+        "lead": "Mitä yrityksesi tietää, mistä kukin tieto on peräisin ja mikä kaipaa tarkistusta. Omat tietosi ovat ensimmäinen asia jonka se tietää.",
+        "ask": "Haluan yritykselleni muistin. Opasta minut läpi.",
+        "step1": "Rekisteröi yritys. Nimi riittää, ja osoite on sinun heti.",
+        "step2": "Täytä tietosi. Ne kaksitoista kenttää ovat sen ensimmäiset faktat, eivätkä ne vanhene koskaan.",
+        "step3": "Näet koko suunnitelman ennen kuin mitään on olemassa, ja sanot kyllä kerran.",
+        "step4": "Se mitä se oppii säilyy omassa tilassasi jota kukaan muu ei voi lukea.",
+        "step5": "Se avautuu yrityksesi omassa osoitteessa, sinulle ja niille jotka päästät sisään.",
+        "step6": "Kerro mikä sitä ruokkii, ja mitä kukin niistä ei kata. Se kertoo kun jokin hiljenee."
+      },
       "marketplace": {
         "title": "Kauppa jossa maksavat kortit, kolikot ja agentit",
         "lead": "Yksi kassa joka ottaa vastaan kortin, stablecoinin tai toisen agentin rahat — ja tilittää sinulle.",
@@ -9753,6 +9764,8 @@
   "chat.jumpLatest": "Hyppää uusimpaan",
   "chat.starterPage": "Tee minulle kotisivu",
   "chat.starterPageAsk": "Laita kotisivuni pystyyn — pidä se yksinkertaisena ja kerro osoite kun se on julkaistu.",
+  "chat.starterCompany": "Ota yritykseni käyttöön",
+  "chat.starterCompanyAsk": "Ota yritykseni käyttöön täällä ja anna sille oma muisti.",
   "chat.starterConnect": "Kytke oma tekoälyni",
   "chat.starterConnectAsk": "Maksan jo tekoälytilauksesta. Miten kytken sen tänne niin että se tekee tämän työn?",
   "chat.card.open": "Avaa",

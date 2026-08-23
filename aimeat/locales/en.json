@@ -3224,6 +3224,17 @@
         "step4": "Fill it in as far as you like. The back office shows what is still missing, in order.",
         "step5": "Take cards when you are ready, asked for separately and never assumed."
       },
+      "brain": {
+        "title": "A company that remembers",
+        "lead": "What your company knows, where each piece came from, and what needs checking again. Your own details are the first thing it knows.",
+        "ask": "I want my company to have a memory. Walk me through it.",
+        "step1": "Register the company. A name is enough, and the address is yours straight away.",
+        "step2": "Fill in your details. Those twelve fields become its first facts, and they never go stale.",
+        "step3": "See the whole plan before anything exists, then say yes once.",
+        "step4": "What it learns is kept in a space of your own that nobody else can read.",
+        "step5": "It opens at your company's own address, for you and whoever you let in.",
+        "step6": "Say what feeds it — and what each of those does not cover. It tells you when one goes quiet."
+      },
       "marketplace": {
         "title": "A shop that takes cards, coins and agents",
         "lead": "One checkout that accepts a card, a stablecoin or another agent's money — and pays out to you.",
@@ -9765,6 +9776,8 @@
   "chat.jumpLatest": "Jump to the latest",
   "chat.starterPage": "Make my welcome page",
   "chat.starterPageAsk": "Put up my welcome page — keep it simple, and tell me the address when it is live.",
+  "chat.starterCompany": "Set up my company",
+  "chat.starterCompanyAsk": "Set up my company here, and give it a memory of its own.",
   "chat.starterConnect": "Connect my own AI",
   "chat.starterConnectAsk": "I already pay for an AI subscription. How do I connect it here so it can do this work?",
   "chat.card.open": "Open",
