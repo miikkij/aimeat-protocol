@@ -8,6 +8,12 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.4.0 — 2026-08-23 — `ctx.extension = { name, owner }`, resolved server-side from the record
+ *     (`installedBy`) and unreachable by anything a caller sends. A script could not tell its own
+ *     owner from any other signed-in stranger, so an owner-only action could not exist and the usual
+ *     workaround is "whoever calls first claims it" — which on a per-owner extension means a shop
+ *     somebody else can take between the install and the owner first opening it. Found by the
+ *     denial-coverage gate, which is exactly the hole that gate is for.
  *   v2.3.0 — 2026-08-23 — Compare-and-swap reaches the sandbox: `ctx.memory.getVersioned` and
  *     `set(..., { ifVersion })`, and `set` RETURNS its verdict instead of resolving to null. Every
  *     extension that counted anything was last-write-wins, so two concurrent calls both read a stock
@@ -146,6 +152,20 @@ export interface ExtensionCtx {
       isAppOwner?: boolean;
     };
     config: Record<string, unknown>;
+    /**
+     * Which extension this is, and WHO IT BELONGS TO — resolved server-side from the record
+     * (`ExtensionRecord.installedBy`), never from anything a caller sends.
+     *
+     * Without it a script cannot tell its owner from any other signed-in stranger, so an
+     * owner-only action could not exist: the usual workaround is "whoever calls first claims it",
+     * and on a per-owner extension that is a shop somebody else can take. Compare against
+     * `caller.owner`, which is the account behind any principal form.
+     */
+    extension?: {
+        name: string;
+        /** Bare account name of the owner, matching `caller.owner`. */
+        owner: string;
+    };
     instance?: {
         id: string;
         config: Record<string, unknown>;
@@ -356,6 +376,7 @@ ${userFnDecl}
             getScore: __trust_getScore ? (async (gaii) => __call(__trust_getScore, [gaii])) : undefined,
         },
         caller: JSON.parse(__callerJson),
+        extension: __extensionJson ? JSON.parse(__extensionJson) : undefined,
         config: JSON.parse(__configJson),
         instance: __instanceJson ? JSON.parse(__instanceJson) : undefined,
         log: Object.assign(
@@ -487,6 +508,9 @@ export async function executeExtensionAction(
         // Captured ONCE here, so ctx.now() is stable across the whole action.
         setStringGlobal(vm, '__runStartedAt', new Date().toISOString());
         setStringGlobal(vm, '__callerJson', JSON.stringify(ctx.caller));
+        // Who this extension BELONGS to, resolved server-side from the record. Nothing a caller
+        // sends can reach it, which is the point: an owner-only action had no way to exist before.
+        setStringGlobal(vm, '__extensionJson', ctx.extension ? JSON.stringify(ctx.extension) : null);
         setStringGlobal(vm, '__configJson', JSON.stringify(ctx.config));
         setStringGlobal(vm, '__instanceJson', ctx.instance ? JSON.stringify(ctx.instance) : null);
 

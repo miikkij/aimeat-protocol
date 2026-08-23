@@ -134,6 +134,7 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
         config,
         storage,
         extMemoryOwner,
+        extension: { name: ext.name, owner: ext.installedBy },
         // 'operator' is what the sandbox reads to decide no human is present. It is the role even
         // when `gaii` names the owner: a workflow step acts in the owner's name, it is not the owner
         // sitting at a screen, and an IAM gate that treats the two the same would let an unattended

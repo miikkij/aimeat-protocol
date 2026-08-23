@@ -31,6 +31,7 @@ import type { PackageRecord, PackageComponent, TemplateListingRecord } from '../
 import { digitalSignagePackage } from './digital-signage-package.js';
 import { aimeatIamPackage } from './aimeat-iam-package.js';
 import { aimeatMarketplacePackage } from './aimeat-marketplace-package.js';
+import { businesslauncherPackage } from './businesslauncher-package.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ function generateVersion(): string {
 
 /** Get all example package definitions. */
 export function getExamplePackages(): ExamplePackageDef[] {
-  return [digitalSignagePackage(), aimeatIamPackage(), aimeatMarketplacePackage()];
+  return [digitalSignagePackage(), aimeatIamPackage(), aimeatMarketplacePackage(), businesslauncherPackage()];
 }
 
 /**

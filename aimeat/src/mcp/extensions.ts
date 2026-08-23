@@ -262,6 +262,7 @@ export function registerExtensionsTools(
             // value and wrote public regardless, no email, and no paywall above.
             const ctx: ExtensionCtx = buildExtensionCtx({
                 config, storage, extMemoryOwner,
+                extension: { name: ext.name, owner: ext.installedBy },
                 caller: {
                     gaii: agentGaii,
                     owner: parseGAII(agentGaii)?.owner ?? agentGaii,

@@ -40,6 +40,9 @@ function ctxFor(storage: SqliteStorage, gaii: string): ExtensionCtx {
         config: loadConfig({}),
         storage: storage as never,
         extMemoryOwner: EXT_OWNER,
+        // Who owns the shop comes from the extension's record, exactly as the invoke route resolves
+        // it. That is what makes an owner-only action possible without a first-caller-wins claim.
+        extension: { name: 'businesslauncher-shop', owner: OWNER.split('@')[0] },
         caller: { gaii, owner: gaii.split('@')[0], roles: ['owner'] } as never,
         extConfig: {},
         logPrefix: 'test',
@@ -61,13 +64,32 @@ describe('businesslauncher shop engine', () => {
 
     beforeEach(async () => {
         storage = new SqliteStorage(':memory:');
-        await run(storage, 'admin.js', OWNER, { op: 'claim', currency: 'EUR' });
+        await run(storage, 'admin.js', OWNER, { op: 'configure', currency: 'EUR', name: 'Test shop' });
     });
 
-    it('the first caller claims the shop and the second is refused', async () => {
-        const second = await run(storage, 'admin.js', BUYER, { op: 'claim' });
-        expect(second.ok).toBe(false);
-        expect(second.owner).toBe(OWNER);
+    // The shop belongs to whoever installed it, from the first second. A "whoever calls first
+    // claims it" step would leave a window between the install and the owner opening the back
+    // office in which anyone signed in could take the shop.
+    it('a stranger cannot configure a shop that is not theirs', async () => {
+        const res = await run(storage, 'admin.js', BUYER, { op: 'configure', name: 'Mine now' });
+        expect(res.ok).toBe(false);
+        expect(String(res.error)).toMatch(/only the shop owner/);
+        const shop = await storage.getMemory(EXT_OWNER, 'shop');
+        expect((shop?.value as { name: string }).name).toBe('Test shop');
+    });
+
+    it('an action that cannot tell who owns the shop refuses rather than assuming', async () => {
+        const blind = buildExtensionCtx({
+            config: loadConfig({}),
+            storage: storage as never,
+            extMemoryOwner: EXT_OWNER,
+            caller: { gaii: OWNER, owner: OWNER.split('@')[0], roles: ['owner'] } as never,
+            extConfig: {},
+            logPrefix: 'test',
+        });
+        const res = await executeExtensionAction(script('admin.js'), blind, { op: 'set_stock', units: { mug: 1 } } as never, LIMITS) as Record<string, unknown>;
+        expect(res.ok).toBe(false);
+        expect(String(res.error)).toMatch(/cannot tell who owns/);
     });
 
     it('only the owner may stock the shelf', async () => {
@@ -105,6 +127,31 @@ describe('businesslauncher shop engine', () => {
         expect((availability?.value as { units: Record<string, number> }).units.mug).toBe(2);
         // The public copy carries counts and nothing else.
         expect(JSON.stringify(availability?.value)).not.toContain(BUYER);
+    });
+
+    it('the policy pages are public, and each one says who wrote it', async () => {
+        const res = await run(storage, 'admin.js', OWNER, {
+            op: 'publish_pages',
+            pages: {
+                terms: { title: 'Terms', markdown: '# Terms\n\nWe ship in 3 days.' },
+                privacy: { title: 'Privacy', markdown: '# Privacy\n\nWe keep your address to post the parcel.' },
+            },
+        });
+        expect(res.ok).toBe(true);
+
+        const record = await storage.getMemory(EXT_OWNER, 'pages');
+        expect(record?.visibility).toBe('public');
+        const value = record?.value as Record<string, { writtenBy: string; markdown: string }>;
+        // A skeleton the operator filled in is a starting point they own, not advice from us, so
+        // the page carries an author rather than appearing out of nowhere.
+        expect(value.terms.writtenBy).toBe(OWNER.split('@')[0]);
+        expect(value.delivery).toBeUndefined();
+    });
+
+    it('a page with no text is refused rather than published empty', async () => {
+        const res = await run(storage, 'admin.js', OWNER, { op: 'publish_pages', pages: { terms: { title: 'Terms' } } });
+        expect(res.ok).toBe(false);
+        expect(String(res.error)).toMatch(/needs markdown/);
     });
 
     it('a hold takes the units off the shelf, and the same id twice is one hold', async () => {

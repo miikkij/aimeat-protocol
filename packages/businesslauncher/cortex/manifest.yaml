@@ -1,0 +1,35 @@
+metadata:
+  name: businesslauncher-shop
+  namespace: businesslauncher
+  description: The shop's browser surface. Reads the public catalogue, shelf numbers and policy pages with no session, and calls the shop extension for holds and owner operations.
+  author: operator
+  tags: [shop, commerce, businesslauncher]
+components:
+  - type: lib
+    name: businesslauncher-shop
+    filename: businesslauncher-shop.js
+    exports:
+      - shop
+      - catalog
+      - availability
+      - pages
+      - reserve
+      - release
+      - admin
+      - newId
+    api_surface: |
+      AIMEAT.shop.catalog()      -> { currency, updated, items:[...] } | null   (no session)
+      AIMEAT.shop.availability() -> { units: { sku: n }, updated } | null       (no session)
+      AIMEAT.shop.pages()        -> { privacy?, terms?, delivery? } | null      (no session)
+      AIMEAT.shop.shop()         -> { owner, currency, claimedAt } | null       (no session)
+
+      AIMEAT.shop.reserve(session, { sku, qty?, minutes?, reservationId? })
+        Holds units while the buyer pays. The id and expiry come from the caller, so a retry
+        after a dropped connection is the same hold rather than a second one.
+      AIMEAT.shop.release(session, reservationId)
+      AIMEAT.shop.admin(session, op, payload)
+        op: claim | publish_catalog | publish_pages | set_stock | commit | sweep
+
+      Requires: /v1/libs/aimeat-data.js for the reads, and a signed-in session for the writes.
+      availability() is a DISPLAY number: the record that decides a sale is private and is read
+      inside the same compare-and-swap that takes the units.

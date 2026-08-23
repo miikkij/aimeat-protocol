@@ -153,6 +153,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       const extMemoryOwner = `ext:${ext.name}.${instanceId}`;
       const ctx: ExtensionCtx = buildExtensionCtx({
         config, storage, extMemoryOwner,
+        extension: { name: ext.name, owner: ext.installedBy },
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
@@ -304,6 +305,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       const extMemoryOwner = `ext:${ext.name}`;
       const ctx: ExtensionCtx = buildExtensionCtx({
         config, storage, extMemoryOwner,
+        extension: { name: ext.name, owner: ext.installedBy },
         caller: {
           gaii: callerGaii, owner: req.auth!.owner as string, roles: req.auth!.roles,
           // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
