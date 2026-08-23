@@ -1,0 +1,38 @@
+# The brain's only clock, and it costs nothing to run. A `kind: extension` job executes a sandbox
+# action server-side with no model call at all, so the weekly caretaker spends no tokens and needs
+# no key of the owner's. Anything that WOULD spend tokens — reading the web, drafting text — is the
+# owner's switch to throw, never ours to assume on their behalf.
+#
+# WHY THE SOURCE REGISTER LIVES HERE AND NOT IN THE WORKSPACE. The caretaker has to read what it
+# maintains, and a sandboxed extension can read an owner's memory only where it is PUBLIC
+# (`ctx.memory.getPublic` returns null for anything else). Workspace records are private, so a
+# register kept there would be invisible to the one job whose whole purpose is to check it. It also
+# belongs here on its own merits: which feed runs, when it last succeeded and what it does not cover
+# is machinery, while the facts, entities and findings it produces are the company's knowledge and
+# stay in the owner's own workspace where they can be exported and shared.
+#
+# Every record this extension writes is `visibility: 'private'`. An `ext:` namespace is world-
+# readable by default, and a company's list of what it does not know is not a public document.
+schedules:
+  - id: caretaker
+    description: Once a week, say which feeds have gone quiet
+    action: admin
+    cron: "0 7 * * 1"
+    input:
+      op: sweep
+
+metadata:
+  name: company-brain
+  version: 1.0.0
+  description: The brain's caretaker — the register of what feeds this company's knowledge, and the weekly check that says which feed has gone quiet.
+  author: operator
+required_apis:
+  - memory
+actions:
+  - id: admin
+    method: POST
+    path: /admin
+    description: The brain's own machinery, refused for anyone but the person who installed it. op state (the register, the last report and which workspace this brain writes to, in one read), configure (name the company and the workspace), put_source (add or replace one feed), remove_source, touch_source (this feed just delivered, so the clock restarts), sweep (the weekly check — mark what has gone quiet, write the report, and speak only if something is broken).
+    input: { type: object, properties: { op: { type: string }, company: { type: string }, org: { type: string }, ws: { type: string }, source: { type: object }, id: { type: string }, error: { type: string } }, required: [op] }
+    output: { type: object, properties: { ok: { type: boolean }, error: { type: string } } }
+    script: admin.js

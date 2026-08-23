@@ -100,7 +100,40 @@ function sendErr(res: Response, config: AimeatConfig, e: unknown): boolean {
   return false;
 }
 
-function toInput(b: z.infer<typeof CreateSchema> | z.infer<typeof UpdateSchema>): Record<string, unknown> {
+/** Wire names → record names. Shared by create and update, and read by both mappers below. */
+const FIELD_MAP: Record<string, string> = {
+  description: 'description', organism_id: 'organismId',
+  business_id: 'businessId', vat_id: 'vatId', street_address: 'streetAddress',
+  postal_code: 'postalCode', city: 'city', country: 'country',
+  email: 'email', phone: 'phone', iban: 'iban', bic: 'bic',
+  einvoice_address: 'einvoiceAddress', einvoice_operator: 'einvoiceOperator',
+};
+
+/**
+ * The UPDATE mapper: only the keys the caller actually sent.
+ *
+ * updateCompany merges on `!== undefined` for every field, which is exactly right for a partial
+ * update — and toInput below defeated it, because `?? null` turns "absent" into "blank this". Every
+ * field of UpdateSchema is optional, so the route invited a partial update and then destroyed the
+ * rest of the record: PUT with just a new name wiped the organism link, the business id, the VAT
+ * id, the address, the IBAN and the e-invoicing details. The MCP tool never had this (mcp/
+ * companies.ts builds its own map for the same reason, with the same comment), so the two doors
+ * disagreed about what an update means.
+ *
+ * Found on 2026-08-23 by an app trying to write ONE field.
+ */
+function toUpdateInput(b: z.infer<typeof UpdateSchema>): Record<string, unknown> {
+  const any = b as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (any.name !== undefined) out.name = any.name;
+  for (const [wire, rec] of Object.entries(FIELD_MAP)) {
+    if (any[wire] !== undefined) out[rec] = any[wire] ?? null;
+  }
+  return out;
+}
+
+/** The CREATE mapper: absent means null, because a new record's unset fields ARE null. */
+function toInput(b: z.infer<typeof CreateSchema>): Record<string, unknown> {
   const any = b as Record<string, unknown>;
   return {
     name: any.name as string,
@@ -188,7 +221,7 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
         res.status(400).json(error(config.nodeId, 'INVALID_COMPANY', parsed.error.message));
         return;
       }
-      const company = await updateCompany(storage, resolve(req), req.params.id as string, toInput(parsed.data) as never);
+      const company = await updateCompany(storage, resolve(req), req.params.id as string, toUpdateInput(parsed.data) as never);
       emitChange('companies', resolve(req));
       res.json(success(config.nodeId, { company: withAddress(config, company) }));
     } catch (e) {

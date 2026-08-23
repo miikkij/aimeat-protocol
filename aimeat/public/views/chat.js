@@ -16,6 +16,9 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   v1.7.0 — 2026-08-23 — A fourth starter, "Set up my company" (TARGET-071). The other three name
+ *     something the PERSON does; this one names something their company gets, and it was the one
+ *     road into the whole company side that an empty chat did not offer.
  *   v1.6.0 — 2026-08-19 — The session cost cap (TARGET-066): when the node pays and the session
  *     passes ~50k estimated tokens, the composer stands down with a managed landing and two ways
  *     forward (own key, own place). Request-level; the server-side setting is a TODO by the cap
@@ -90,6 +93,11 @@ const STARTERS = [
       label: 'chat.starterWork', labelFallback: 'Take something off my plate' },
     { id: 'connect', key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it here so it can do this work?',
       label: 'chat.starterConnect', labelFallback: 'Connect my own AI' },
+    // The one that names a COMPANY rather than a task. Three of these are things a person does;
+    // this is a thing their company gets, and it is the only starter whose first move creates
+    // something with a public address, so the agent asks before it reserves one.
+    { id: 'company', key: 'chat.starterCompanyAsk', fallback: 'Set up my company here, and give it a memory of its own.',
+      label: 'chat.starterCompany', labelFallback: 'Set up my company' },
 ];
 
 /**
