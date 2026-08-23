@@ -66,7 +66,7 @@ import { dismissConversationNotifications } from '../services/notify.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
-import { resolveGroupTarget } from '../services/message-alias.js';
+import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { sendGroupMessage, isParticipant } from '../services/conversation-group.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { withMessageProvenance } from '../services/message-provenance.js';
@@ -160,6 +160,9 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
         conversation_id: group.conversation.id,
         participants: group.conversation.participants,
         delivered_to: sent.delivered,
+        // A named thread can legitimately reach nobody (you are the only operator). Say so, or the
+        // 0 reads as a failure and the caller retries something that worked.
+        note: soleParticipantNote(group.conversation, sent.delivered),
         // The id is the handle for everything after the first message. Saying so here is what stops
         // a second question opening a second thread nobody connects to the first.
         reply_with: 'POST /v1/messages with conversation_id set to the value above',

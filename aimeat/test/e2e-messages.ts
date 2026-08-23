@@ -67,6 +67,21 @@ async function registerOwner(name: string): Promise<{ token: string; ghii: strin
     return { token, ghii: `${name}@${NODE_ID}` };
 }
 
+/** An agent belonging to `ownerName`. An agent token signs its GAII, not owner + node id. */
+async function createAgent(ownerName: string, token: string, agentName: string, scopes: string[]): Promise<{ gaii: string; token: string }> {
+    const { status, body } = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: agentName, owner: ownerName, capabilities: ['memory'], scopes }),
+    });
+    assert(status === 201, `create agent ${agentName}: ${status} ${JSON.stringify(body)}`);
+    const gaii = body.data.agent.gaii;
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(body.data.private_key, gaii + timestamp);
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp, signature }) });
+    assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+    return { gaii, token: tok.body.data.token };
+}
+
 const stamp = Date.now();
 // The first owner on a fresh node becomes the OPERATOR, and the operator greets every new account
 // with a welcome message that (by design) opens the contact both ways. Alice used to be that first
@@ -496,6 +511,57 @@ await test('S8. A support thread names a person in the operator\'s list, not an 
         `the reporter wrote to the address and should still see it, got ${JSON.stringify(mine.peerGhii)}`);
     assert(mine.groupAlias === 'support@operators', 'the reporter\'s row is tagged as a thread, not a principal');
 });
+
+// ─── The node with ONE operator, which is every managed instance sold to one person ───
+// Both of these refused on a node where the only operator is the person asking. That node is not an
+// edge case: it is what a customer gets when they buy a platform of their own, and it is the exact
+// shape in which an agent is told to write to support@operators when something breaks.
+await test('S9. An operator\'s OWN agent writing to support reaches the human, with a bell', async () => {
+    const agent = await createAgent(opName, op.token, `sbot${stamp}`, ['messages:send', 'messages:read']);
+
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${agent.token}` },
+        body: JSON.stringify({ to: 'support@operators', subject: 'Storage will not mount', body: 'Every write returns EACCES.' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    // The agent and its owner share ONE mailbox, so the send used to be counted as "from the sender"
+    // and skipped entirely: delivered_to 0, no row worth reading, and the human heard nothing.
+    assert(body.data.delivered_to >= 1, `the human must be told their agent asked for help, got ${body.data.delivered_to}`);
+
+    // Not /inbox: the copy is `outbound`, because the message genuinely left this account. What the
+    // owner sees is the THREAD, and it must be there, unread, with the agent named as the author.
+    const list = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${op.token}` } });
+    const row = (list.body.data.conversations ?? []).find((c: any) => c.conversationId === body.data.conversation_id);
+    assert(!!row, 'the operator sees the thread their own agent opened in their name');
+    assert(row.unread >= 1, `a message you did not write is unread, got ${row.unread}`);
+
+    const thread = await json(`/v1/messages/conversations/${body.data.conversation_id}`, { headers: { Authorization: `Bearer ${op.token}` } });
+    const msg = (thread.body.data.messages ?? []).find((m: any) => m.id === body.data.message_id);
+    assert(!!msg, 'the operator can read what their agent asked for');
+    assert(msg.senderGhii === agent.gaii, `the agent is named as the author, got ${msg.senderGhii}`);
+
+    const notifs = await json('/v1/notifications', { headers: { Authorization: `Bearer ${op.token}` } });
+    const bell = (notifs.body.data.notifications ?? []).find((n: any) => (n.link ?? '').includes(body.data.conversation_id));
+    assert(!!bell, 'a message written in your name rings your bell');
+});
+
+await test('S10. The ONLY operator of a node can write to their own support address', async () => {
+    const { status, body } = await json('/v1/messages', {
+        method: 'POST', headers: { Authorization: `Bearer ${op.token}` },
+        body: JSON.stringify({ to: 'support@operators', subject: 'Note to self', body: 'Renew the certificate before October.' }),
+    });
+    // Membership collapsed to one person and the old floor of two refused it as NO_OPERATORS, so the
+    // one person who runs the node was the one person who could not use its support address.
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(typeof body.data.conversation_id === 'string' && body.data.conversation_id.length > 0, 'the thread exists and can be replied into');
+    assert(body.data.delivered_to === 0, `nobody else was told, got ${body.data.delivered_to}`);
+    assert(typeof body.data.note === 'string' && body.data.note.length > 0,
+        'delivered_to 0 must say WHY, or an agent reads it as a failure');
+});
+
+// The other half of the floor change — an UNNAMED group of one is still refused — has no HTTP door
+// to test through: the only caller of createGroupConversation is the support alias. It is asserted
+// at the service level instead, in test/unit/conversation-group-floor.test.ts.
 
 // ─── The node reports its OWN faults, without asking anyone to describe them ───
 // 108 places raise INTERNAL_ERROR, and every one of them used to be a dead end: one person saw

@@ -34705,6 +34705,10 @@ paths:
           carries `conversation_id`, `participants` and `delivered_to` instead of a single message
           record; pass that `conversation_id` back to continue the same thread. A support send is
           never held behind the first-contact gate. 503 `NO_OPERATORS` when the node has none.
+          `delivered_to` counts the people OTHER than the sender who were told, so it is 0 when the
+          only operator writes to their own support address; that is a stored thread rather than a
+          failure, and `note` says so in words. A message an operator's own AGENT sends counts 1,
+          because the human did not write it and is told.
         * A `conversation_id` naming an existing GROUP conversation posts into it, and `to` may then
           be omitted. A non-participant gets 403 `NOT_A_PARTICIPANT`.
 

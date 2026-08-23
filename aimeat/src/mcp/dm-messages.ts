@@ -43,7 +43,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
-import { resolveGroupTarget } from '../services/message-alias.js';
+import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
@@ -173,6 +173,9 @@ export function registerDmMessageTools(
                             addressed_to: group.conversation.alias ?? 'group',
                             participants: group.conversation.participants,
                             delivered_to: sent.delivered,
+                            // A named thread can legitimately reach nobody (you are the only
+                            // operator). Say so, or the 0 reads as a failure and you retry.
+                            note: soleParticipantNote(group.conversation, sent.delivered),
                             reply_with: 'aimeat_dm_send with conversation_id set to the value above',
                             ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                         }, null, 2),
