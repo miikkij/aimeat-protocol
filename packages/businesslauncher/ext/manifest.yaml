@@ -1,0 +1,29 @@
+metadata:
+  name: businesslauncher-shop
+  version: 1.0.0
+  description: The shop's engine — the public catalogue a visitor reads with no login, and the stock and holds behind it.
+  author: operator
+required_apis:
+  - memory
+actions:
+  - id: admin
+    method: POST
+    path: /admin
+    description: Owner operations. op claim (once, first caller becomes the owner), publish_catalog (write the public copy the storefront reads), set_stock (units on the shelf, absolute), commit (a sale completed, drop the hold without returning units), sweep (expired holds go back on the shelf).
+    input: { type: object, properties: { op: { type: string }, currency: { type: string }, catalog: { type: object }, units: { type: object }, reservationId: { type: string } }, required: [op] }
+    output: { type: object, properties: { ok: { type: boolean }, error: { type: string } } }
+    script: admin.js
+  - id: reserve
+    method: POST
+    path: /reserve
+    description: Hold units of one sku under an id the caller generates, until expiresAt. One compare-and-swap, so two buyers cannot both take the last unit. Calling twice with the same id is the same hold, not a second one.
+    input: { type: object, properties: { sku: { type: string }, qty: { type: number }, reservationId: { type: string }, expiresAt: { type: string } }, required: [sku, reservationId, expiresAt] }
+    output: { type: object, properties: { ok: { type: boolean }, reservationId: { type: string }, left: { type: number }, error: { type: string } } }
+    script: reserve.js
+  - id: release
+    method: POST
+    path: /release
+    description: Put a hold's units back on the shelf. The person who took the hold may release it, and so may the shop owner.
+    input: { type: object, properties: { reservationId: { type: string } }, required: [reservationId] }
+    output: { type: object, properties: { ok: { type: boolean }, released: { type: string }, left: { type: number }, error: { type: string } } }
+    script: release.js
