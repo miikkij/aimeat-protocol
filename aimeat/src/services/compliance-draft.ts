@@ -33,6 +33,9 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.0.1 — 2026-08-23 — Ids are unique within a draft. Two agents sharing a display name slugged
+ *     to the same id and the register refused the whole draft, so the button did nothing on any
+ *     node where a name repeated.
  *   v1.0.0 — 2026-08-23 — BR-02. Replaces the per-model proposal list.
  */
 import type { AimeatConfig } from '../config.js';
@@ -87,10 +90,22 @@ async function evidenceByPrincipal(storage: Storage, since: string): Promise<Map
   return out;
 }
 
-/** A stable, readable id from a name that may contain anything. */
-function slugOf(prefix: string, raw: string): string {
+/**
+ * A stable, readable id from a name that may contain anything, unique within one draft.
+ *
+ * The name is NOT unique and the id has to be: two agents may carry the same display name, and on a
+ * node where they did, every one of them slugged to `uc-ledgerbot` and the register refused the
+ * whole draft as duplicate ids. So the caller keeps a set and a collision takes a numeric suffix.
+ * Deterministic, because the callers are walked in a fixed order, and readable, which is the reason
+ * the id comes from the name rather than from the GAII in the first place.
+ */
+function slugOf(prefix: string, raw: string, used: Set<string>): string {
   const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60);
-  return `${prefix}-${slug || 'unnamed'}`;
+  const base = `${prefix}-${slug || 'unnamed'}`;
+  let id = base;
+  for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+  used.add(id);
+  return id;
 }
 
 /**
@@ -130,6 +145,7 @@ export async function draftRegisterFromActivity(
 
   let answeredFromEvidence = 0;
   const usecases: ComplianceUseCase[] = [];
+  const usedIds = new Set<string>();
 
   for (const [caller, group] of byCaller) {
     const agent = agentByGaii.get(caller);
@@ -153,7 +169,7 @@ export async function draftRegisterFromActivity(
 
     const title = agent?.displayName || agent?.name || (caller === '(unattributed)' ? 'AI use with no agent recorded' : caller);
     usecases.push({
-      id: slugOf('uc', title),
+      id: slugOf('uc', title, usedIds),
       title,
       // The agent's own description, written by whoever created it. Better than anything derivable,
       // and left empty rather than invented when there is none.
@@ -173,7 +189,7 @@ export async function draftRegisterFromActivity(
     if (!posture.generates?.length && !posture.usesAi) continue;
     const ref = `${app.ownerName}/${app.filename}`;
     usecases.push({
-      id: slugOf('uc-app', ref),
+      id: slugOf('uc-app', ref, usedIds),
       title: app.filename.replace(/\.html$/, ''),
       description: `Published app that declares it generates ${posture.generates?.join(', ') || 'content'}.`,
       ownerGhii: `${app.ownerName}@${config.nodeId}`,

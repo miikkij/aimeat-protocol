@@ -23,6 +23,9 @@
  *   - ComplianceTab (default) — the tab
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v1.2.0 — 2026-08-23 — The printout carries the register in full. It used to print forty-three
+ *     risk classes and none of the answers behind them, because the answers live in an editor that
+ *     is closed until you open one entry.
  *   v1.1.0 — 2026-08-23 — A copy-paste for the operator's own AI, above the gap list. The page had
  *     the chat path in its instructions and nowhere to start it from.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
@@ -39,6 +42,7 @@ import { apiGet, apiPut } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { RegisterSection, QuestionnaireSection } from './compliance-tab.register.js';
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
+import PrintableReport from './compliance-tab.print.js';
 
 const PERIODS = [
   { key: '30d', days: 30 },
@@ -299,16 +303,20 @@ export default function ComplianceTab() {
         `}
       </section>
 
-      <${RegisterSection}
-        usecases=${report.register.usecases}
-        questionnaire=${questionnaire}
-        saving=${saving}
-        drafting=${drafting}
-        onSave=${saveRegister}
-        onDraft=${loadDraft}
-      />
+      <div class="adm-cmp-screen-only">
+        <${RegisterSection}
+          usecases=${report.register.usecases}
+          questionnaire=${questionnaire}
+          saving=${saving}
+          drafting=${drafting}
+          onSave=${saveRegister}
+          onDraft=${loadDraft}
+        />
 
-      <${QuestionnaireSection} questionnaire=${questionnaire} />
+        <${QuestionnaireSection} questionnaire=${questionnaire} />
+      </div>
+
+      <${PrintableReport} report=${report} questionnaire=${questionnaire} />
     </div>
   `;
 }

@@ -91,6 +91,30 @@ describe('the draft groups by what called the model, not by the model', () => {
     expect(draft.usecases.map(u => u.title).sort()).toEqual(['First', 'Second']);
   });
 
+  it('gives two agents sharing a display name two different ids', async () => {
+    // Found by pressing the button on a node that had three agents called "ledgerbot": every one of
+    // them slugged to uc-ledgerbot, the register refused the whole draft as duplicate ids, and the
+    // button appeared to do nothing. The name is the person's, and it is not unique; the id must be.
+    const draft = await draftRegisterFromActivity(storageWith({
+      usage: [
+        { agentGaii: 'one#alice@test-node', model: 'm/one' },
+        { agentGaii: 'two#alice@test-node', model: 'm/two' },
+        { agentGaii: 'three#alice@test-node', model: 'm/three' },
+      ],
+      agents: [
+        { gaii: 'one#alice@test-node', name: 'one', displayName: 'Ledgerbot' },
+        { gaii: 'two#alice@test-node', name: 'two', displayName: 'Ledgerbot' },
+        { gaii: 'three#alice@test-node', name: 'three', displayName: 'Ledgerbot' },
+      ],
+    }), CONFIG);
+
+    const ids = draft.usecases.map(u => u.id);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(3);
+    // The readable name survives on all three; only the id is disambiguated.
+    expect(draft.usecases.every(u => u.title === 'Ledgerbot')).toBe(true);
+  });
+
   it('gives unattributed activity an entry rather than dropping it', async () => {
     // Silently omitting it would make the register look complete while a real call went unmentioned.
     const draft = await draftRegisterFromActivity(storageWith({

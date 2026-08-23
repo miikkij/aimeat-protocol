@@ -1068,6 +1068,29 @@
   color: var(--text-dim); white-space: pre-wrap; word-break: break-word;
 }
 
+/* The printed document. Hidden on screen; see views/admin/compliance-tab.print.js for why it is
+   rendered all the time rather than composed when printing starts. */
+.adm-cmp-print-only { display: none; }
+.adm-cmp-pr-head { margin-bottom: 1rem; }
+.adm-cmp-pr-head h2 { margin: 0 0 0.2rem; }
+.adm-cmp-pr-head p { margin: 0; color: var(--muted); font-size: 0.85rem; }
+.adm-cmp-pr-uc { margin: 0.9rem 0 1.2rem; padding-bottom: 0.6rem; border-bottom: 1px solid var(--border); }
+.adm-cmp-pr-uc h4 { margin: 0 0 0.25rem; font-size: 0.95rem; }
+.adm-cmp-pr-class { margin-left: 0.5rem; font-weight: 500; color: var(--muted); }
+.adm-cmp-pr-desc { margin: 0 0 0.35rem; }
+.adm-cmp-pr-field { font-size: 0.82rem; }
+.adm-cmp-pr-field > span { color: var(--muted); }
+.adm-cmp-pr-answers { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.8rem; }
+.adm-cmp-pr-answers td { vertical-align: top; padding: 0.15rem 0.4rem 0.15rem 0; }
+.adm-cmp-pr-q { width: 70%; }
+.adm-cmp-pr-a { white-space: nowrap; }
+.adm-cmp-pr-src { margin-left: 0.4rem; color: var(--muted); }
+.adm-cmp-pr-why { margin-top: 0.4rem; font-size: 0.82rem; }
+.adm-cmp-pr-why > span { color: var(--muted); }
+.adm-cmp-pr-why ul { margin: 0.1rem 0 0; padding-left: 1.1rem; }
+.adm-cmp-pr-qs { font-size: 0.82rem; padding-left: 1.2rem; }
+.adm-cmp-pr-qhelp { display: block; color: var(--muted); }
+
 /* Print / save as PDF.
    Scoped to body.adm-compliance-active because every view's CSS is preloaded globally — an unscoped
    @media print block here would hide the chrome on every other page in the SPA. */
@@ -1076,9 +1099,12 @@
   body.adm-compliance-active .adm-sidebar,
   body.adm-compliance-active .adm-header,
   body.adm-compliance-active .adm-cmp-no-print,
+  body.adm-compliance-active .adm-cmp-screen-only,
   body.adm-compliance-active .adm-toast { display: none !important; }
+  body.adm-compliance-active .adm-cmp-print-only { display: block; }
   body.adm-compliance-active .adm-cmp-print-area { width: 100%; margin: 0; padding: 0; }
   body.adm-compliance-active .adm-cmp-section { break-inside: avoid; }
-  body.adm-compliance-active h3 { break-after: avoid; }
+  body.adm-compliance-active .adm-cmp-pr-uc { break-inside: avoid; }
+  body.adm-compliance-active h3, body.adm-compliance-active h4 { break-after: avoid; }
   @page { margin: 1.8cm; }
 }
