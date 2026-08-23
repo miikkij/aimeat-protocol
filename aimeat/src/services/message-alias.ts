@@ -22,10 +22,14 @@
  *   - SUPPORT_ALIAS / OPERATORS_HOST — the address vocabulary
  *   - isAliasAddress() — does this `to:` name a group rather than a person
  *   - openSupportThread() — resolve the operators, open the group thread
+ *   - soleParticipantNote() — why a named thread reached nobody, when that is the honest answer
  * @usage
  *   if (isAliasAddress(to, config.nodeId)) { const t = await openSupportThread(ctx, sender, subject); }
  * @version-history
  *   v1.0.0 — 2026-08-11 — Initial: support@operators over group conversations.
+ *   v1.1.0 — 2026-08-23 — soleParticipantNote(): on a one-operator node the operator's own support
+ *     message reaches nobody, which is true rather than broken. Both send doors return the reason
+ *     beside the count, because an agent reading a bare `delivered_to: 0` concludes the node failed.
  */
 import type { AimeatConfig } from '../config.js';
 import type { ConversationRecord } from '../storage/interface.js';
@@ -93,6 +97,22 @@ export async function openSupportThread(
   if (!created.ok) return { ok: false, code: 'NO_OPERATORS', message: created.message };
 
   return { ok: true, conversation: created.conversation, operators };
+}
+
+/**
+ * Why a named thread delivered to nobody, when that is the honest answer rather than a failure.
+ *
+ * A node with one operator resolves `support@operators` to that one person, so when THEY write to it
+ * the membership is themselves and `delivered_to` is 0. An agent reading a bare 0 concludes the send
+ * failed and either retries or tells its owner the node is broken, neither of which is true. Both
+ * doors return this alongside the count so the number can be read.
+ *
+ * Undefined for an ordinary thread and whenever anyone was actually told: a note that appears when
+ * there is nothing to explain is noise.
+ */
+export function soleParticipantNote(convo: ConversationRecord, delivered: number): string | undefined {
+  if (delivered > 0 || !convo.alias) return undefined;
+  return `You are the only holder of ${convo.alias} on this node, so this is a note to yourself. It is stored and you can reply in it; nobody else was told.`;
 }
 
 export type GroupTarget =
