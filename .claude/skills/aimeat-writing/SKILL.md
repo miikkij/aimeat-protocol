@@ -50,6 +50,96 @@ translated, Jouni sees it immediately, and it costs a correction round every tim
 minutes on the first pass is cheaper than the iteration it saves. This is a standing instruction, not
 a preference.
 
+**Kaksikielinen sisältö kirjoitetaan kahdesti, ei käännetä kertaakaan** (opittu 23.8.2026, kun
+PITCH-esityksen suomi paljastui sanasta sanaan siirretyksi englanniksi). Fi- ja en-versio syntyvät
+samoista faktoista erillisinä sävellyksinä: englannin retoriikka ("two built-in flaws, and neither is
+a law of nature") EI käänny suomeksi rakenteensa kanssa — suomeksi sama ajatus on "kaksi vikaa, ja
+molemmat ovat valintoja". Jos suomenkielinen lause aukeaa vasta kun arvaa englanninkielisen
+alkuperäisen, se kirjoitetaan uusiksi.
+
+**Rekisteri: täysi virke, ei katkottu isku.** Jounin oma malliesimerkki (23.8.2026), joka voitti
+kirjoittajan lyhyemmän version: *"Alusta on saatavilla avoimena lähdekoodina ja omistat koko
+ympäristön itse: vaikka me katoaisimme huomenna, ympäristö jää sinulle."* Asia sanotaan loppuun
+yhdessä selkeässä virkkeessä; iskulauseeksi typistäminen ("Koodi on avoin ja ympäristö on sinun")
+hävisi, koska se pudottaa täsmällisyyden. Lyhyt isku kuuluu vain kansilauseisiin ja kickereihin.
+
+**Lauserakenteen säännöt (Jounin korjauskorpus, 23.8.2026).** Jokainen näistä syntyi todellisesta
+korjauksesta PITCH-esitykseen, ja jokainen on yleistys, ei kertatapaus:
+
+- **Mittari sanotaan substantiivilausekkeena, ei sivulauseena.** "montako maksavaa asiakasta", ei
+  "montako asiakasta maksaa". Suomessa määrite kulkee pääsanan edessä; englannin relatiivirakenne
+  ("how many customers pay") tuottaa sivulausemuodon, joka on käännössuomen tuntomerkki.
+- **Rahat ovat monikossa ja ehto sanotaan täydessä muodossa:** "vasta sitten, kun rahat ovat
+  tilillä", ei "vasta, kun raha on tilillä".
+- **Lead saa olla verbitön toteamus, kun se on ilmoitus:** "Luvut nähtävillä alustalla livenä!"
+  voitti muodon "Luvun voi käydä katsomassa itse alustalta". Voida + käydä + -massa -ketju on
+  kapulakieltä; nähtävillä-rakenne on suomalaisten ilmoitusten vakiokieltä.
+- **Idiomi tarkistetaan kokonaisuutena, ei sanoina.** "Ei tarvitse uskoa meidän sanamme varassa"
+  sekoitti kaksi rakennetta ("uskoa jotakin" + "olla jonkun sanan varassa") ja pysyi silti
+  kieliopillisesti koossa. Kollokaatio, jota ei löydy hakemalla luonnollisesta suomesta, jää
+  kirjoittamatta.
+- **Väite, jonka lukija kaataa yhdellä kysymyksellä, ei kelpaa.** "Kuka tahansa voi käydä
+  lukemassa ne" kaatui kysymykseen "mistä?". Joko paikka sanotaan tai väite jätetään pois.
+- **Sisältö, joka vanhenee viikossa, ei kuulu dialle.** Rakennusjärjestyslista poistettiin, koska
+  se olisi vanhentunut heti valmistuttuaan.
+
+**Lukijasimulaatio ennen julkaisua.** Julkiseen tai asiakkaalle näkyvään suomeen ajetaan kylmäluku:
+kontekstiton lukija (agentti kelpaa) lukee pelkän tekstin ja nimeää lauseet, jotka kuulostavat
+käännetyiltä, oudoilta tai joita ei ymmärrä ensimmäisellä lukemalla. Löydökset korjataan ennen
+julkaisua. Oma silmä ei riitä, koska kirjoittaja lukee omaa tekstiään englanninkielisen ajatuksen
+läpi.
+
+**Simulaatio ilman todisteita on kielletty** (opittu 23.8.2026, kun omasta päästään arvaava
+kylmälukija sekä ohitti käännössuomea että tuotti sitä itse: sen oma korjausehdotus oli rikkinäinen
+idiomi). Lukijasimulaation agentti todentaa verkkohauilla: epäilyttävä kollokaatio haetaan
+lainausmerkeissä ja katsotaan, käyttääkö luonnollinen suomenkielinen teksti sitä; sanaston oikea
+käyttö haetaan suomalaisyritysten ja median sivuilta lähteineen; kielioppikohta tarkistetaan
+Kielitoimiston ohjepankista. Sama vaatimus koskee agentin omia korjausehdotuksia: ehdotus, jonka
+idiomia ei ole todennettu, ei kelpaa löydöksen korjaukseksi. Jounin luku on aina viimeinen portti,
+ja hänen lukitsemaansa tekstiin ei mikään simulaatio koske.
+
+### Lukijasimulaation työohje
+
+Todennettu 23.8.2026: PITCH-esityksen suomesta löytyi tällä 35 korjattavaa, joista kirjoittaja
+itse ei nähnyt yhtään.
+
+1. **Poimi pelkät tekstit tiedostoon.** Ei tuotekuvausta, ei taustaa, ei sitä miksi teksti on
+   olemassa. Jos lukija tarvitsee kontekstin ymmärtääkseen lauseen, se on jo löydös.
+2. **Käynnistä erillinen agentti** (Agent-työkalu, ei sama sessio: kirjoittajalla on koko
+   keskustelun konteksti päässään eikä hän voi kylmälukea omaa tekstiään). Agentille annetaan
+   vain tiedostopolku ja alla oleva tehtävä.
+3. **Promptipohja**, neljä luokkaa:
+
+   > Olet suomenkielinen lukija, joka ei tiedä mitään tuotteesta, jonka tekstiä luet. Lue
+   > jokainen lause ensimmäisellä lukemalla ja raportoi:
+   > 1. KÄÄNNÖSSUOMI: lauseet jotka kuulostavat englannista käännetyiltä. Anna parannettu muotoilu.
+   > 2. EI AUKEA: lauseet tai sanat joita et ymmärrä tai joissa jouduit arvaamaan.
+   > 3. OUTO SÄVY: mahtipontinen, kömpelö tai suomalaiseen liikekieleen vieras kohta.
+   > 4. KIELIOPPI: pilkut (joka/että/kun/jos-sivulauseet), yhdyssanat, taivutus, idiomit.
+   > 5. ÄÄNEEN-TESTI: kirjoita jokainen avainlause uudestaan niin kuin sanoisit sen ääneen
+   >    asiakkaalle. Jos oma versiosi on parempi, alkuperäinen häviää ja versiosi tulee tilalle.
+   >    Kieliopillisesti oikea mutta kapula lause on löydös, ei läpimeno.
+   > 6. KYSYMYSTESTI: listaa jokaisesta lauseesta kysymykset, jotka se herättää (mikä? kenen?
+   >    kuka?). Abstrakti substantiivi ilman tarkoitetta (muisti, tekijä, identiteetti, oikeus)
+   >    on löydös, jos teksti ei vastaa kysymykseen samassa tai seuraavassa virkkeessä.
+   >    Etusivulla ja kansitekstissä sallittu määrä avoimia kysymyksiä on nolla.
+   > Älä arvioi sisällön totuutta, vain kieltä ja ymmärrettävyyttä. Palauta lista:
+   > [kohta] "lause" → ongelma → korjausehdotus. Ole ankara.
+
+   Opittu 23.8.2026 toisella kierroksella: neljä ensimmäistä luokkaa mittaavat virheitä, mutta
+   "ymmärrettävä mutta kapula" meni niistä läpi ("Alusta on avointa lähdekoodia, ja koko
+   ympäristö on omasi" on kieliopillisesti oikein ja silti paperia). Luokat 5 ja 6 mittaavat
+   laatua, ja vasta ne tekevät simulaatiosta lukijan simulaation.
+
+4. **Korjaa jokainen löydös tai kirjaa miksi ei** (esim. aito sitaatti pysyy sanatarkkana:
+   Kalle Määtän "kanvas" jäi, mutta sai selventävän jatkolauseen). Sitten vasta julkaisu.
+5. **Varmista koneellisesti se minkä voi**: em-dashit, kielletyt sanat (solmu, node
+   asiakaspinnassa) ja kieliversioiden pariteetti tarkistetaan skriptillä ennen ja jälkeen.
+
+Sama menetelmä toimii englannille (deckin kylmäluku löysi jargonin ja lähdeviiteriskin) ja
+espanjalle. Vaatimukset lyhyesti: erillinen agentti, pelkkä teksti ilman kontekstia, ankaruus
+pyydettynä, ja jokaiseen löydökseen joko korjaus tai kirjattu syy jättää korjaamatta.
+
 What gives a translation away, in the order it shows up here:
 
 - **Genitive chains.** "järjestelmän käyttäjän oikeuksien hallinta" is English noun-stacking in
@@ -71,6 +161,20 @@ What gives a translation away, in the order it shows up here:
 **Deliberate exception: machine and protocol tokens stay English in both languages.** Status names,
 stage labels and identifiers a person reads as a machine's vocabulary (`AUTH`, `DELIVR`, `SNIF`,
 `FRESH`, `done`, `failed`) are not translated. Everything a person reads as a sentence is.
+
+**Suomen asiakassanasto** (Jouni 23.8.2026, kun sekä "node" että "solmu" kaatuivat asiakasteksteissä
+— kumpikaan ei kanna merkitystä lukijalle, joka ei tunne järjestelmää):
+
+| Käsite | Asiakaspinnassa | Teknisessä/sisäisessä tekstissä |
+|---|---|---|
+| node | **oma AIMEAT** tai **oma ympäristö** (fyysinen kone: **oma palvelin**) | `node` säilyy koneistoterminä (dev-liitteet, SUUNTA, `€/node/kk`), ensimaininta selitetään |
+| solmu | **ei käytetä koskaan** — kukaan ei tajua mikä on solmu | ei käytetä |
+| instanssi | käy resurssikuoren osana ("2 GB instanssi") | käy |
+| toimittaja (vendor) | **ei käytetä** — hankintajargonia, ja arkilukija lukee sen journalistiksi. Tilalle: **työkalun tekijä**, **valmistaja**, tunteessa **jonkun muun koneilla**, vuokralainen-vertauksessa **isäntä** | käy hankinta- ja sopimusteksteissä |
+| SLA | avataan aina: **tukilupaus (SLA)** | käy |
+
+Sama testi kuin muullekin sanastolle: jos sana ei kanna merkitystään samassa lauseessa lukijalle,
+joka näkee tuotteen ensimmäistä kertaa, se ei kuulu asiakaspintaan.
 
 ## Spanish
 
