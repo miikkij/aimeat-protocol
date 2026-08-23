@@ -168,7 +168,11 @@ export function microMemoryRouter(config: AimeatConfig, storage: Storage): Route
             const otk = await storage.consumeOtk(otkKey, config.otkGraceMs);
             if (!otk) {
                 res.status(401).json(error(config.nodeId, 'OTK_EXPIRED', 'One-time key not found, expired, or already used', undefined, {
-                    initial_otk_hint: 'If this was an Initial OTK, its grace period may have expired. Request a new one via POST /v1/auth/initial-otk',
+                    // The public Tier 0.5 OTK mints (POST /v1/auth/otk, /v1/auth/initial-otk) were
+                    // removed on 2026-08-23 (deprecated in RFC v4.0). Micro-memory itself is a
+                    // deprecated Tier 0.5 surface; new integrations authenticate with a JWT via the
+                    // standard API rather than a keyed micro-memory URL.
+                    initial_otk_hint: 'Tier 0.5 one-time keys are deprecated (RFC v4.0) and the public mint has been removed. Authenticate with a JWT (POST /v1/auth/token) and use the standard memory API instead.',
                 }));
                 return;
             }

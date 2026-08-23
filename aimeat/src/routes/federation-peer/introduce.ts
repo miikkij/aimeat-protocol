@@ -152,15 +152,15 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        // Check if already a peer (allow re-introduction if depeering/offline)
+        // Check if already a peer (allow re-introduction if depeering/offline). This is a pure
+        // refusal — it deletes nothing, so it stays early. The DELETE of a re-introducible
+        // (depeering/offline) row is a write and is deferred until every refusal below has passed
+        // (invariant 14): a rejected re-introduction must not destroy the existing link (audit
+        // AI-triage 2026-08-23).
         const existingPeer = peers.get(node_id);
         if (existingPeer && existingPeer.status !== 'depeering' && existingPeer.status !== 'offline') {
             res.status(409).json(error(config.nodeId, 'CONFLICT', `Node "${node_id}" is already a peer`));
             return;
-        }
-        if (existingPeer) {
-            peers.delete(node_id);
-            await storage.deleteFederationPeer(node_id);
         }
 
         // Extension hook: pre_federation_peer
@@ -189,6 +189,13 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         if (!urlCheck.valid) {
             res.status(400).json(error(config.nodeId, 'INVALID_URL', urlCheck.reason ?? 'node_url failed validation'));
             return;
+        }
+
+        // Past every refusal now: retire a re-introducible (depeering/offline) row so the new
+        // admission/request replaces it cleanly. Deferred to here on purpose (invariant 14).
+        if (existingPeer) {
+            peers.delete(node_id);
+            await storage.deleteFederationPeer(node_id);
         }
 
         // An INVITE this node minted earlier. Its tier is this node's own decision quoted back, which

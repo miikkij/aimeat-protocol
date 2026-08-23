@@ -520,6 +520,34 @@ await test('I7. A refused URL does not burn the invite (refuse before you write)
     assert(good.body.data.tier === 'contact', `admitted at contact, got ${good.body.data.tier}`);
 });
 
+await test('I8. A refused re-introduction does not destroy the existing (depeering) link', async () => {
+    // Invariant 14 (audit AI-triage 2026-08-23): a re-introducible peer row was DELETED before the
+    // hook and URL checks, so a rejected re-introduction wiped the link it was refused for. The
+    // delete is now deferred past every refusal. Node I is a live contact peer here (from I7).
+    const iRow = async () => {
+        const r = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
+        return (r.body.data.peers as any[]).find(p => p.node_id === I_NODE);
+    };
+    assert(!!(await iRow()), 'precondition: node I is a peer');
+
+    // Normal de-peer (no emergency) → status 'depeering', which is re-introducible.
+    const del = await V.json(`/v1/federation/peers/${I_NODE}`, { method: 'DELETE', headers: auth(V.ownerToken) });
+    assert(del.status === 200, `normal de-peer: ${del.status} ${JSON.stringify(del.body)}`);
+    const depeering = await iRow();
+    assert(depeering?.status === 'depeering', `node I should be depeering, got ${JSON.stringify(depeering?.status)}`);
+
+    // Re-introduce with a bad URL: refused 400, and the depeering row must survive.
+    const badUrl = 'http://169.254.169.254:49994';
+    const timestamp = new Date().toISOString();
+    const signature = await sign(iKeys.privateKey, `${I_NODE}${badUrl}${timestamp}`);
+    const bad = await V.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({ node_id: I_NODE, node_url: badUrl, public_key: iKeys.publicKey, role: 'contributor', signature, timestamp }),
+    });
+    assert(bad.status === 400, `expected 400 INVALID_URL, got ${bad.status}: ${JSON.stringify(bad.body)}`);
+    assert(!!(await iRow()), 'the refused re-introduction must not have deleted the existing peer row');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 V!.server.close();
 process.exit(failed > 0 ? 1 : 0);
