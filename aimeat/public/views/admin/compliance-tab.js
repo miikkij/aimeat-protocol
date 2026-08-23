@@ -23,6 +23,8 @@
  *   - ComplianceTab (default) — the tab
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v1.3.0 — 2026-08-23 — The CSV carries the answers too, from the same formatter the printed
+ *     document uses, so the two files never disagree about one answer.
  *   v1.2.0 — 2026-08-23 — The printout carries the register in full. It used to print forty-three
  *     risk classes and none of the answers behind them, because the answers live in an editor that
  *     is closed until you open one entry.
@@ -42,7 +44,7 @@ import { apiGet, apiPut } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { RegisterSection, QuestionnaireSection } from './compliance-tab.register.js';
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
-import PrintableReport from './compliance-tab.print.js';
+import PrintableReport, { answerText } from './compliance-tab.print.js';
 
 const PERIODS = [
   { key: '30d', days: 30 },
@@ -238,15 +240,25 @@ export default function ComplianceTab() {
 
   const exportCsv = () => {
     if (!report) return;
+    const headers = ['row', 'id_or_kind', 'title_or_detail', 'risk', 'models', 'apps', 'purpose', 'answer', 'answered_by'];
+    const pad = (r) => [...r, ...Array(headers.length - r.length).fill('')];
     const rows = [];
+    const questions = questionnaire?.questions || [];
     for (const u of report.register.usecases) {
-      rows.push(['usecase', u.id, u.title || '', u.risk?.label || '', (u.models || []).join(' '), (u.apps || []).join(' '), u.purpose || '']);
+      rows.push(pad(['usecase', u.id, u.title || '', u.risk?.label || '', (u.models || []).join(' '), (u.apps || []).join(' '), u.purpose || '']));
+      // One row per question, under its entry. Without these the file carries a verdict per entry
+      // and nothing anyone could check it against, which is the same overstatement the printed
+      // document was fixed for. `answered_by` sits beside the answer because that is the column an
+      // auditor reads next.
+      for (const q of questions) {
+        rows.push(pad(['answer', u.id, q.text, '', '', '', '',
+          answerText(q, u.answers?.[q.id]) || '', u.answerSources?.[q.id] || '']));
+      }
     }
-    for (const g of report.gaps) rows.push(['gap', g.kind, g.detail, '', '', '', '']);
+    for (const g of report.gaps) rows.push(pad(['gap', g.kind, g.detail]));
     // The limits ride along in the same file. A CSV of findings with the scope left behind in the
     // browser is the export that overstates coverage, which is the one thing this must not produce.
-    for (const s of report.not_covered) rows.push(['not_covered', s.code || '', limitText(s), '', '', '', '']);
-    const headers = ['row', 'id_or_kind', 'title_or_detail', 'risk', 'models', 'apps', 'purpose'];
+    for (const s of report.not_covered) rows.push(pad(['not_covered', s.code || '', limitText(s)]));
     const stamp = (report.scope?.generated_at || '').slice(0, 10);
     downloadBlob(toCsvBlob(headers, rows), `compliance-${report.scope?.node_id || 'node'}-${stamp}.csv`);
   };

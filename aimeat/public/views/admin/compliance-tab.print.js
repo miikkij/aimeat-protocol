@@ -21,7 +21,8 @@
  *   filled in by a model, and the printed document is exactly where it matters: a page of answers
  *   that all read as considered would answer an auditor's first question wrongly.
  * @structure
- *   - answerText(question, value) — one answer in the question's own vocabulary
+ *   - answerText(question, value) — one answer in the question's own vocabulary; the CSV export
+ *     uses it too, so the two files say the same thing about the same answer
  *   - PrintableUseCase — one entry with its answers, its class and the reasons for it
  *   - PrintableReport (default export) — the print-only document
  * @usage rendered unconditionally by compliance-tab.js; CSS shows it only in print
@@ -46,7 +47,7 @@ const SOURCE_LABEL = {
  * A choice answer prints its option label rather than its stored value: `annex-iii-employment` is
  * the id, and "Employment, worker management" is what the question asked.
  */
-function answerText(question, value) {
+export function answerText(question, value) {
   if (value === undefined || value === null || value === '') return null;
   if (question.type === 'boolean') return value ? t('admin.compliance.yes') : t('admin.compliance.no');
   const opt = (question.options || []).find(o => o.value === value);
