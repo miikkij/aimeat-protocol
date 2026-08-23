@@ -8,25 +8,34 @@ export default async function (ctx, input) {
 
   const MAX_RETRIES = 5;
 
-  // ── claim ────────────────────────────────────────────────────────────────
-  // Whoever installs the shop calls this once. `ifVersion: 0` is what makes it a claim rather than a
-  // race: the second caller is refused by the store, not by a check that could interleave.
-  if (op === 'claim') {
-    const wrote = await ctx.memory.set('shop', {
-      owner: caller,
-      currency: String((input && input.currency) || 'EUR'),
-      claimedAt: now,
-    }, { ifVersion: 0 });
-    if (!wrote.ok) {
-      const held = await ctx.memory.get('shop');
-      return { ok: false, error: 'already claimed', owner: (held && held.owner) || null };
-    }
-    return { ok: true, owner: caller };
+  // WHO OWNS THIS SHOP IS NOT A RACE. `ctx.extension.owner` is resolved by the node from the
+  // extension's own record and cannot be reached by anything a caller sends, so the shop belongs to
+  // whoever installed it from the first second. A "whoever calls first claims it" step would mean a
+  // shop somebody else can take between the install and the owner opening the back office.
+  // Absent means the road did not know the record, and that reads as "not the owner", never as
+  // permission.
+  const shopOwner = (ctx.extension && ctx.extension.owner) || null;
+  if (!shopOwner) return { ok: false, error: 'this shop cannot tell who owns it' };
+  if ((ctx.caller && ctx.caller.owner) !== shopOwner) {
+    return { ok: false, error: 'only the shop owner may do that' };
   }
 
-  const shop = await ctx.memory.get('shop');
-  if (!shop) return { ok: false, error: 'this shop has not been claimed yet — call op "claim" first' };
-  if (shop.owner !== caller) return { ok: false, error: 'only the shop owner may do that' };
+  let shop = await ctx.memory.get('shop');
+
+  // ── configure ────────────────────────────────────────────────────────────
+  // The shop's own details. Not a claim: it changes nothing about who owns this.
+  if (op === 'configure') {
+    shop = {
+      owner: shopOwner,
+      name: String((input && input.name) || (shop && shop.name) || 'Shop'),
+      currency: String((input && input.currency) || (shop && shop.currency) || 'EUR'),
+      updated: now,
+    };
+    await ctx.memory.set('shop', shop);
+    return { ok: true, shop: shop };
+  }
+
+  if (!shop) shop = { owner: shopOwner, currency: 'EUR' };
 
   // ── publish_catalog ──────────────────────────────────────────────────────
   // The PUBLIC copy the storefront reads with no login. The editable truth lives in the owner's
@@ -41,6 +50,34 @@ export default async function (ctx, input) {
       items: items,
     });
     return { ok: true, items: items.length, updated: now };
+  }
+
+  // ── publish_pages ────────────────────────────────────────────────────────
+  // Privacy, terms and delivery, as the storefront shows them. Public for the same reason the
+  // catalogue is: a visitor must be able to read the terms before they buy, without an account.
+  // Who wrote the text travels with it, because a skeleton the operator filled in is a starting
+  // point they own and not advice from us.
+  if (op === 'publish_pages') {
+    const pages = (input && input.pages) || null;
+    if (!pages || typeof pages !== 'object') return { ok: false, error: 'pages must be an object' };
+    const clean = {};
+    const allowed = ['privacy', 'terms', 'delivery'];
+    for (const name of allowed) {
+      const page = pages[name];
+      if (!page) continue;
+      if (typeof page.markdown !== 'string' || !page.markdown.trim()) {
+        return { ok: false, error: 'page "' + name + '" needs markdown' };
+      }
+      clean[name] = {
+        title: String(page.title || name),
+        markdown: page.markdown,
+        writtenBy: String(page.writtenBy || shop.owner),
+        updated: now,
+      };
+    }
+    if (Object.keys(clean).length === 0) return { ok: false, error: 'nothing to publish' };
+    await ctx.memory.set('pages', clean);
+    return { ok: true, pages: Object.keys(clean) };
   }
 
   // ── set_stock ────────────────────────────────────────────────────────────

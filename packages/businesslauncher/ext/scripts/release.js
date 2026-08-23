@@ -7,8 +7,9 @@ export default async function (ctx, input) {
   const id = String((input && input.reservationId) || '');
   if (!id) return { ok: false, error: 'reservationId required' };
 
-  const shop = await ctx.memory.get('shop');
-  const isOwner = !!shop && shop.owner === caller;
+  // The owner comes from the extension's own record, not from a record a caller could have written.
+  const isOwner = !!(ctx.extension && ctx.extension.owner)
+    && (ctx.caller && ctx.caller.owner) === ctx.extension.owner;
 
   for (let attempt = 0; attempt < 5; attempt++) {
     const read = await ctx.memory.getVersioned('inventory');

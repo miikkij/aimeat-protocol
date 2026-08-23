@@ -27,6 +27,9 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.3.0 — 2026-08-23 — Carries `extension: { name, owner }` through to the sandbox so an
+ *     owner-only action can exist. Every road that knows the record passes it; a road that does not
+ *     leaves it absent, and a script must read that as "not the owner" rather than as permission.
  *   v1.2.0 — 2026-08-23 — `memory.getVersioned` + `memory.set(..., { ifVersion })`: compare-and-swap
  *     over the primitives the storage layer already had (`setMemoryIfVersion` for the update,
  *     `createMemoryIfAbsent` for the first write — the pair PATCH /v1/memory/:key uses). Without it
@@ -62,6 +65,8 @@ export interface ExtensionCtxDeps {
     caller: ExtensionCtx['caller'];
     /** The extension's manifest config, secrets already decrypted by the caller. */
     extConfig: Record<string, unknown>;
+    /** Which extension this is and who owns it, from the record — never from the request. */
+    extension?: ExtensionCtx['extension'];
     /** Instance id + its config, when the action runs against a named instance. */
     instance?: ExtensionCtx['instance'];
     /** Prefix for the sandbox's log lines, so a scheduled run is distinguishable from a request. */
@@ -450,6 +455,9 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
         },
 
         caller: deps.caller,
+        // Server-derived, so an owner-only action can exist at all. Absent on a road that does not
+        // know the record; a script must treat that as "not the owner" rather than as permission.
+        extension: deps.extension,
         config: deps.extConfig,
 
         // A wallet is per-road: a request can spend the caller's balance, a scheduled run has

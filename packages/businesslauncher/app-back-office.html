@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<!-- AIMEAT App Manifest
+name: Back office
+version: 1.0.0
+description: Where the shop is run: products, prices, what is on the shelf, the terms, the enquiries that came in, and the prompt that lets any AI chat do the same work.
+entry: index.html
+-->
+<!--
+  @file app-back-office.html
+  @description The OWNER's face of a BUSINESSLAUNCHER shop.
+
+    IT OPENS ON WHAT IS MISSING. The first run is a conversation that can be interrupted, and the
+    records are the state, so this page is the resume: it lists what is not done yet, in order, and
+    a person who closed the chat halfway finishes here instead of starting again.
+
+    THE WORKSPACE IS FOUND BY CONTRACT, NOT BY A STORED ID. It scans the owner's organisms for a
+    workspace whose manifest declares `contract: 'shop'` — one match opens, none shows the setup
+    prompt, several ask which. An app cannot create an organism (role 'app' may not), so the setup
+    step hands the owner a prompt their own AI runs once. Same shape as the signage admin.
+
+    Everything reaching the shop engine goes through AIMEAT.shop. This app never calls /v1/ext/.
+  @structure boot -> pickWorkspace | renderSetup -> renderHome (what is missing) -> tabs
+  @usage published app; launch with #aimeat-ws=<org>/<ws> or let it find the workspace.
+  @version-history
+    v1.0.0 — 2026-08-23 — Initial (TARGET-070).
+-->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="aimeat-scopes" content="memory:read memory:write organism:read organism:write" />
+  <title>Back office</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
+  <nav class="navbar bg-base-200 px-4 shadow-sm gap-2">
+    <div class="flex-1 min-w-0"><span class="text-lg font-bold">Back office</span>
+      <span id="ws-name" class="opacity-60 text-sm ml-2"></span></div>
+    <button id="agent-prompt" class="btn-outline px-3 text-sm" hidden>Copy agent prompt</button>
+    <span id="login"></span>
+  </nav>
+
+  <div id="tabs" class="tabs tabs-bordered px-4 pt-3" hidden>
+    <button class="tab tab-active" data-tab="home">To do</button>
+    <button class="tab" data-tab="products">Products</button>
+    <button class="tab" data-tab="stock">Shelf</button>
+    <button class="tab" data-tab="pages">Pages</button>
+    <button class="tab" data-tab="enquiries">Enquiries</button>
+  </div>
+
+  <main id="app" class="flex-1 w-full max-w-4xl mx-auto p-4"></main>
+
+  <!-- The crew-defs this app ships with. They travel with the package and wait for a runtime:
+       deploying one is a pointer task onto the owner's own fleet, which is not part of this node.
+       Read at install time by the component registrar (app-bundled-crews.ts). -->
+  <script type="application/json" id="aimeat-crews">
+  [
+    {
+      "agent_name": "shopkeeper",
+      "readme_md": "# Shopkeeper\n\nThe interview, run by an agent instead of by a form.\n\nIt asks what you sell and who buys it, one question at a time, in your language, and writes the answers straight into the shop as they land. It does not fill a blank with something that merely sounds right: what you did not say is left out, which matters most for delivery promises and anything a buyer would rely on.\n\n**It never touches money.** Attaching a card and publishing anything public stay with you.",
+      "tags": ["businesslauncher", "shop", "interview"],
+      "process": "sequential",
+      "agents": [
+        {
+          "role": "Interviewer",
+          "goal": "Find out what this person actually sells and who buys it, by asking rather than by guessing.",
+          "backstory": "You have spent years helping people describe the thing they do every day, which they are too close to explain. You ask short questions and you wait. You talk to the person in whatever language they write to you in. You never fill a blank with something that merely sounds right: a fact you were not told is a fact you leave out, and that discipline is the whole difference between a shop a buyer can trust and a brochure.",
+          "allow_delegation": false
+        },
+        {
+          "role": "Catalogue writer",
+          "goal": "Turn what the interview found into products a stranger can understand, stating only what was established.",
+          "backstory": "You write the few lines somebody reads before deciding to buy. You name what the thing is, who it is for, and what arrives. An unstated delivery time is an absent line, not a promise of next-day.",
+          "allow_delegation": false
+        }
+      ],
+      "tasks": [
+        {
+          "id": "interview",
+          "description": "Interview the owner about what they sell and who buys it. Their own words and context: {{ctx.prompt}}\n\nAsk about, roughly in this order and following whatever they raise: what they sell; who buys it and why; whether there is already a list of products somewhere; what a buyer needs to know before deciding; how it reaches the buyer; what it costs and why. Speak to them in their own language. Ask, do not lecture, and stop when you have enough rather than when you have asked everything.",
+          "expected_output": "A record of what the person actually said, organised by those areas, with anything they did not answer marked explicitly as not established.",
+          "agent": "Interviewer"
+        },
+        {
+          "id": "catalogue",
+          "description": "Turn the interview into a product list. Emit a single JSON object shaped {\"currency\":\"EUR\",\"items\":[{sku,name,description,priceMinor,unit}]}. Prices are in minor units (cents). Leave out anything the interview did not establish rather than inventing it.",
+          "expected_output": "One JSON object with a currency and an items array, and nothing else.",
+          "agent": "Catalogue writer",
+          "context": ["interview"]
+        }
+      ]
+    },
+    {
+      "agent_name": "pricer",
+      "readme_md": "# Pricer\n\nKeeps the price lists.\n\nA shop usually needs more than one: what a person pays, what a trade buyer pays, and what an agent pays per call. This one writes and maintains them, and keeps them in step with the catalogue.\n\n**It can set a price. It cannot attach a card, and it cannot list anything publicly.**",
+      "tags": ["businesslauncher", "shop", "pricing"],
+      "process": "sequential",
+      "agents": [
+        {
+          "role": "Pricer",
+          "goal": "Keep the shop's price lists correct, in step with the catalogue, and explainable.",
+          "backstory": "You have priced things for people who were about to undercharge. You work from what the thing costs to make and what comparable things go for, and you say which of the two a number came from. You never move a price without saying what moved it.",
+          "allow_delegation": false
+        }
+      ],
+      "tasks": [
+        {
+          "id": "price",
+          "description": "Write or update the shop's price lists from the owner's own words: {{ctx.prompt}}\n\nProduce a retail list, and a trade list only if the owner sells to trade. Emit JSON shaped {\"lists\":[{\"id\",\"label\",\"currency\",\"validFrom\",\"rows\":[{sku,amountMinor,unit}]}]}. Every row names a sku that exists in the catalogue. Say beside each list what the numbers are based on.",
+          "expected_output": "One JSON object with a lists array, plus a short plain sentence per list saying what its numbers rest on.",
+          "agent": "Pricer"
+        }
+      ]
+    },
+    {
+      "agent_name": "scout",
+      "readme_md": "# Scout\n\nFinds out what comparable things cost, and puts the source next to every number.\n\nA figure with no source is an opinion, and this one does not produce those. Where the node can contract a company-register capability it uses it; where it cannot, it says so instead of guessing.\n\nRuns on a clock only if you switch it on: it spends tokens, and that is your decision.",
+      "tags": ["businesslauncher", "shop", "research"],
+      "process": "sequential",
+      "agents": [
+        {
+          "role": "Scout",
+          "goal": "Find what comparable things really cost, and make every number checkable.",
+          "backstory": "You have watched people price against a competitor they imagined. You look for what is actually published, you quote it with its address and the date you read it, and where you found nothing you write that you found nothing. A number without a source does not go in.",
+          "allow_delegation": false
+        }
+      ],
+      "tasks": [
+        {
+          "id": "research",
+          "description": "Research what comparable offerings cost, for this shop: {{ctx.prompt}}\n\nUse the capabilities this node can actually reach. Where a company-register capability is contractable, use it; where it is not, say so rather than guessing. Emit JSON shaped {\"quarter\":\"YYYY-Qn\",\"findings\":[{claim,number,unit,source,readAt}]}.",
+          "expected_output": "One JSON object with a findings array in which every entry carries a source and the date it was read.",
+          "agent": "Scout"
+        }
+      ]
+    }
+  ]
+  </script>
+
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-data.js"></script>
+  <script src="/v1/libs/aimeat-intake.js"></script>
+  <script src="/v1/cortex/businesslauncher-shop/libs/businesslauncher-shop.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    var CONTRACT = 'shop';
+    var SPACES = { catalog: 'catalog', pricing: 'pricing', policy: 'policy', leads: 'leads' };
+
+    var session = null, CTX = null, shopMeta = null, tab = 'home';
+    var $ = function (id) { return document.getElementById(id); };
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    function app() { return $('app'); }
+    function say(html) { app().innerHTML = html; }
+
+    // ── boot ────────────────────────────────────────────────────────────────
+    async function boot() {
+      AIMEAT.auth.on('login', function () { start(); });
+      session = await AIMEAT.auth.login().catch(function () { return null; });
+      if (!session) { say('<p class="opacity-70">Sign in to run your shop.</p>'); return; }
+      start();
+    }
+
+    var started = false;
+    async function start() {
+      if (started) return; started = true;
+      session = await AIMEAT.auth.login().catch(function () { return null; });
+      if (!session) { started = false; return; }
+
+      var launch = /#aimeat-ws=([^/]+)\/([^&]+)/.exec(location.hash);
+      if (launch) return openWorkspace(launch[1], launch[2]);
+
+      var candidates = await findWorkspaces();
+      if (candidates.length === 1) return openWorkspace(candidates[0].org, candidates[0].ws);
+      if (candidates.length === 0) return renderSetup();
+      say('<h2 class="text-lg font-bold mb-3">Which shop?</h2>' + candidates.map(function (c, i) {
+        return '<button class="btn-outline w-full justify-start mb-2 px-4" data-pick="' + i + '">' + esc(c.label) + '</button>';
+      }).join(''));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-pick]'), function (b) {
+        b.onclick = function () { var c = candidates[Number(b.getAttribute('data-pick'))]; openWorkspace(c.org, c.ws); };
+      });
+    }
+
+    /** Every workspace of the owner's whose manifest declares this contract. */
+    async function findWorkspaces() {
+      var out = [];
+      var orgs = await AIMEAT.organism.list().catch(function () { return []; });
+      for (var i = 0; i < orgs.length; i++) {
+        var wss = await AIMEAT.organism.workspaces(orgs[i].id).catch(function () { return []; });
+        for (var j = 0; j < wss.length; j++) {
+          if (wss[j].access === 'none') continue;
+          var ws = await AIMEAT.organism.read(orgs[i].id, wss[j].id).catch(function () { return null; });
+          var types = (ws && ws.manifest && ws.manifest.objectTypes) || [];
+          var hit = types.some(function (o) { return o && o.contract === CONTRACT; });
+          if (hit) out.push({ org: orgs[i].id, ws: wss[j].id, label: orgs[i].name + ' / ' + (wss[j].name || wss[j].id) });
+        }
+      }
+      return out;
+    }
+
+    // ── setup: the app cannot create an organism, so it hands over a prompt ──
+    function setupPrompt() {
+      var manifest = {
+        manifestVersion: '1.0', id: 'shop', name: 'Shop', kind: 'project', status: 'active',
+        objectTypes: [
+          { name: SPACES.catalog, namespace: 'shop.catalog', schemaRef: 'shop.catalog', backing: 'memory', writeRole: 'member', mode: 'records', contract: CONTRACT, maxVersions: 5 },
+          { name: SPACES.pricing, namespace: 'shop.pricing', schemaRef: 'shop.pricing', backing: 'memory', writeRole: 'member', mode: 'records', maxVersions: 5 },
+          { name: SPACES.policy, namespace: 'shop.policy', schemaRef: 'schema:document@1', backing: 'memory', writeRole: 'member', mode: 'document' },
+          { name: SPACES.leads, namespace: 'shop.leads', schemaRef: 'shop.leads', backing: 'memory', writeRole: 'member', mode: 'records', maxVersions: 1 }
+        ]
+      };
+      return [
+        'Set up the space my shop keeps its things in, on AIMEAT. Use your AIMEAT MCP tools.',
+        '',
+        '1. Create an organism I own, name "My shop", visibility private (aimeat_organism_create).',
+        '2. In it, create a workspace (aimeat_workspace_create) with:',
+        '     name: "Shop"',
+        '     manifest: ' + JSON.stringify(manifest),
+        '3. Tell me the organism id and the ws id.',
+        '',
+        'The shop back office finds this workspace by itself afterwards — it looks for the contract',
+        '"' + CONTRACT + '" in the manifest, so there is nothing to paste back into it.',
+      ].join('\n');
+    }
+
+    function renderSetup() {
+      say('<h2 class="text-lg font-bold mb-2">One step before the shop can hold anything</h2>' +
+        '<p class="opacity-70 mb-3 text-sm">Your shop keeps its products, prices and pages in a space of your own, ' +
+        'so nobody else can read or edit them. This app cannot create that space for you. Paste the text below ' +
+        'into your own AI once, then reload this page.</p>' +
+        '<div class="mockup-code text-xs whitespace-pre-wrap p-3" id="setup-box"></div>' +
+        '<button class="btn-primary px-4 mt-3" id="copy-setup">Copy</button>');
+      $('setup-box').textContent = setupPrompt();
+      $('copy-setup').onclick = async function (e) {
+        await navigator.clipboard.writeText(setupPrompt());
+        e.target.textContent = 'Copied';
+      };
+    }
+
+    async function openWorkspace(org, ws) {
+      CTX = { org: org, ws: ws };
+      var meta = await AIMEAT.organism.read(org, ws).catch(function () { return null; });
+      $('ws-name').textContent = (meta && meta.manifest && meta.manifest.name) || ws;
+      $('tabs').hidden = false;
+      $('agent-prompt').hidden = false;
+      $('agent-prompt').onclick = async function (e) {
+        await navigator.clipboard.writeText(agentPrompt());
+        e.target.textContent = 'Copied';
+      };
+      Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) {
+        b.onclick = function () {
+          tab = b.getAttribute('data-tab');
+          Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (x) { x.classList.remove('tab-active'); });
+          b.classList.add('tab-active');
+          paint();
+        };
+      });
+      shopMeta = await AIMEAT.shop.shop();
+      paint();
+    }
+
+    /** The agent face is a prompt, not code: any MCP chat edits the same records this page does. */
+    function agentPrompt() {
+      return [
+        'You run a shop that keeps its things in an AIMEAT workspace. Use your AIMEAT MCP tools.',
+        '',
+        'Workspace: organism_id "' + CTX.org + '", ws "' + CTX.ws + '".',
+        'Spaces: "' + SPACES.catalog + '" (records), "' + SPACES.pricing + '" (records), "' + SPACES.policy + '" (documents), "' + SPACES.leads + '" (records, written by the contact form).',
+        '',
+        'A CATALOGUE is ONE record holding the whole list, not one record per product:',
+        '  { "currency": "EUR", "updated": "<ISO>", "items": [ { "sku", "name", "description", "priceMinor", "unit", "image" } ] }',
+        'A PRICE LIST is one record the same way: { "currency", "validFrom", "rows": [ { "sku", "amountMinor", "unit" } ] }.',
+        '',
+        'To change what is for sale:',
+        '1. Read it: aimeat_workspace_read { organism_id, ws, ids: ["<catalogue id>"] } (list all with aimeat_workspace_read { organism_id, ws }).',
+        '2. Change ONLY what was asked. Keep every field you were not asked to change.',
+        '3. Write it back: aimeat_workspace_write { organism_id, ws, space: "' + SPACES.catalog + '", id, value }.',
+        '4. Publish: aimeat_workspace_publish { organism_id, ws, namespace: "shop.' + SPACES.catalog + '", id }.',
+        '',
+        'The workspace is the editable truth. The SHOP FRONT reads a separate public copy, and that',
+        'copy only changes when the owner presses Publish in the back office. Do not try to write it:',
+        'it is the shop extension\'s own namespace and only the extension writes there.',
+        '',
+        'Rules: prices are in minor units (cents). Never invent a delivery time, a guarantee or a',
+        'quality claim the owner did not state — an unstated promise is an absent line.',
+      ].join('\n');
+    }
+
+    // ── views ───────────────────────────────────────────────────────────────
+    async function paint() {
+      if (tab === 'home') return paintHome();
+      if (tab === 'products') return paintList(SPACES.catalog, 'Products', 'The whole catalogue is one record. Publish sends a copy to the shop front.');
+      if (tab === 'pages') return paintList(SPACES.policy, 'Pages', 'Privacy, terms and delivery, as the shop front shows them.');
+      if (tab === 'stock') return paintStock();
+      if (tab === 'enquiries') return paintList(SPACES.leads, 'Enquiries', 'What came in through the contact form.');
+    }
+
+    /** The resume: what is not done yet, in the order it wants doing. */
+    async function paintHome() {
+      var steps = [];
+      if (!shopMeta) steps.push({ label: 'Name your shop', why: 'The shop front shows this above everything else.', act: 'configure' });
+      var cat = await AIMEAT.shop.catalog();
+      if (!cat || !(cat.items || []).length) steps.push({ label: 'Add what you sell', why: 'The shop front has nothing to show.', act: 'goto:products' });
+      var pages = await AIMEAT.shop.pages();
+      if (!pages || !pages.terms) steps.push({ label: 'Write your terms', why: 'A buyer should be able to read them before they buy.', act: 'goto:pages' });
+      var avail = await AIMEAT.shop.availability();
+      if (!avail) steps.push({ label: 'Say what is on the shelf', why: 'Without it the shop cannot hold anything for a buyer.', act: 'goto:stock' });
+
+      if (!steps.length) {
+        say('<div class="alert alert-success">Your shop is open and has everything it needs.</div>');
+        return;
+      }
+      say('<h2 class="text-lg font-bold mb-1">What is left</h2>' +
+        '<p class="opacity-70 text-sm mb-4">In order. You can stop after any of them and come back.</p>' +
+        steps.map(function (s, i) {
+          return '<div class="card bg-base-200 mb-3"><div class="card-body p-4 gap-1">' +
+            '<div class="font-semibold">' + (i + 1) + '. ' + esc(s.label) + '</div>' +
+            '<div class="text-sm opacity-70">' + esc(s.why) + '</div>' +
+            '<div class="pt-2"><button class="btn-primary px-4" data-act="' + esc(s.act) + '">Do this</button></div>' +
+            '</div></div>';
+        }).join(''));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-act]'), function (b) {
+        b.onclick = function () { doAct(b.getAttribute('data-act')); };
+      });
+    }
+
+    async function doAct(act) {
+      if (act === 'configure') {
+        // The shop already belongs to whoever installed it — the node resolves that from the
+        // extension's own record. This only gives it a name and a currency.
+        var name = prompt('What is your shop called?', 'My shop');
+        if (name === null) return;
+        var res = await AIMEAT.shop.admin(session, 'configure', { name: name, currency: 'EUR' });
+        shopMeta = await AIMEAT.shop.shop();
+        if (!res || !res.ok) alert((res && res.error) || 'Could not save that.');
+        return paintHome();
+      }
+      if (act.indexOf('goto:') === 0) {
+        tab = act.slice(5);
+        Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (x) {
+          x.classList.toggle('tab-active', x.getAttribute('data-tab') === tab);
+        });
+        return paint();
+      }
+    }
+
+    async function paintList(space, title, blurb) {
+      var index = await AIMEAT.organism.read(CTX.org, CTX.ws).catch(function () { return null; });
+      var rows = ((index && index.spaces) || []).filter(function (s) { return s.name === space; })[0];
+      var itemsIn = (rows && rows.items) || [];
+      say('<h2 class="text-lg font-bold mb-1">' + esc(title) + '</h2>' +
+        '<p class="opacity-70 text-sm mb-4">' + esc(blurb) + '</p>' +
+        (itemsIn.length
+          ? itemsIn.map(function (it) {
+            return '<div class="card bg-base-200 mb-2"><div class="card-body p-3 flex-row items-center gap-3">' +
+              '<span class="font-mono text-xs opacity-60">' + esc(it.id) + '</span>' +
+              '<span class="flex-1 truncate">' + esc((it.value && (it.value.title || it.value.name)) || '') + '</span>' +
+              '</div></div>';
+          }).join('')
+          : '<div class="opacity-60">Nothing here yet. Your AI can fill this in — copy the agent prompt at the top.</div>') +
+        (space === SPACES.catalog ? '<button id="publish" class="btn-primary px-4 mt-4">Publish to the shop front</button><div id="pub-msg" class="text-sm mt-2"></div>' : '') +
+        (space === SPACES.policy ? '<button id="publish-pages" class="btn-primary px-4 mt-4">Publish the pages</button><div id="pub-msg" class="text-sm mt-2"></div>' : ''));
+
+      if ($('publish')) $('publish').onclick = function () { publishCatalog(itemsIn); };
+      if ($('publish-pages')) $('publish-pages').onclick = function () { publishPages(itemsIn); };
+    }
+
+    async function publishCatalog(itemsIn) {
+      var doc = itemsIn.length ? itemsIn[0].value : null;
+      if (!doc) return void ($('pub-msg').textContent = 'There is nothing to publish yet.');
+      var res = await AIMEAT.shop.admin(session, 'publish_catalog', { catalog: doc });
+      $('pub-msg').className = 'text-sm ' + (res && res.ok ? 'text-success' : 'text-error');
+      $('pub-msg').textContent = res && res.ok ? ('Published ' + res.items + ' products.') : ((res && res.error) || 'Could not publish.');
+    }
+
+    async function publishPages(itemsIn) {
+      var pages = {};
+      itemsIn.forEach(function (it) {
+        var name = String(it.id).toLowerCase();
+        if (name === 'privacy' || name === 'terms' || name === 'delivery') {
+          pages[name] = { title: (it.value && it.value.title) || name, markdown: (it.value && it.value.markdown) || '' };
+        }
+      });
+      var res = await AIMEAT.shop.admin(session, 'publish_pages', { pages: pages });
+      $('pub-msg').className = 'text-sm ' + (res && res.ok ? 'text-success' : 'text-error');
+      $('pub-msg').textContent = res && res.ok ? ('Published: ' + res.pages.join(', ')) : ((res && res.error) || 'Could not publish.');
+    }
+
+    async function paintStock() {
+      var cat = await AIMEAT.shop.catalog();
+      var avail = await AIMEAT.shop.availability();
+      var units = (avail && avail.units) || {};
+      var itemsIn = (cat && cat.items) || [];
+      say('<h2 class="text-lg font-bold mb-1">Shelf</h2>' +
+        '<p class="opacity-70 text-sm mb-4">How many of each you have. A hold takes one off here the moment a buyer reaches for it.</p>' +
+        (itemsIn.length
+          ? itemsIn.map(function (it) {
+            return '<div class="flex items-center gap-3 mb-2">' +
+              '<span class="flex-1 truncate">' + esc(it.name) + ' <span class="opacity-50 text-xs font-mono">' + esc(it.sku) + '</span></span>' +
+              '<input type="number" min="0" class="input input-bordered input-sm w-24 stock-in" data-sku="' + esc(it.sku) + '" value="' + esc(String(units[it.sku] == null ? 0 : units[it.sku])) + '" />' +
+              '</div>';
+          }).join('') + '<button id="save-stock" class="btn-primary px-4 mt-3">Save</button><div id="stock-msg" class="text-sm mt-2"></div>'
+          : '<div class="opacity-60">Add what you sell first.</div>'));
+      if ($('save-stock')) $('save-stock').onclick = async function () {
+        var out = {};
+        Array.prototype.forEach.call(document.querySelectorAll('.stock-in'), function (el) {
+          out[el.getAttribute('data-sku')] = Number(el.value) || 0;
+        });
+        var res = await AIMEAT.shop.admin(session, 'set_stock', { units: out });
+        $('stock-msg').className = 'text-sm ' + (res && res.ok ? 'text-success' : 'text-error');
+        $('stock-msg').textContent = res && res.ok ? 'Saved.' : ((res && res.error) || 'Could not save.');
+      };
+    }
+
+    boot();
+  })();
+  </script>
+</body>
+</html>
