@@ -45,6 +45,10 @@
  *     surface role. The handshake had never passed one, so an agent connecting to /v1/mcp met a few
  *     hundred tool descriptions with nothing telling it that aimeat_handbook_get is the way in — the
  *     operating guide was reachable only by an agent that already guessed it existed.
+ *   v1.11.0 — 2026-08-23 — registerPackageTools: installing a component package. The package tools
+ *     were in the catalog and on the appdev surface list, but nothing here ever registered them, so
+ *     the node's own /v1/mcp served none of them — a chat could read about a package and not
+ *     install it. Only install is registered here; the four authoring ones stay connector-side.
  *   v1.x — 2026-08-08 — registerCompanyTools: the company registry on the MCP surface.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
@@ -119,6 +123,7 @@ import { registerAgentMessageTools } from './agent-messages.js';
 import { registerDmMessageTools } from './dm-messages.js';
 import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
+import { registerPackageTools } from './packages.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
@@ -301,6 +306,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);
         registerContactTools(mcp, storage, config, () => agentGaii);
         registerCompanyTools(mcp, storage, config, () => agentGaii);
+        registerPackageTools(mcp, storage, config, () => agentGaii);
         registerPortfolioTools(mcp, storage, config, () => agentGaii);
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
