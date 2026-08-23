@@ -19,12 +19,16 @@
  *     authenticate with the `aimeat_rt` cookie and return a credential. App origins are same-site
  *     with the apex, so the cookie is sent; reflecting their origin with credentials let a published
  *     app read a token minted for a visiting owner. An explicitly listed origin still passes.
+ *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 1): the memory-level origin lookup
+ *     reads by the resolved identity, not the raw `sub`, so an owner session finds its own
+ *     allowedOrigins instead of falling back to the node default.
  */
 
 import type { RequestHandler, Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 /**
  * Routes that authenticate with the host-only `aimeat_rt` cookie and return a usable credential.
@@ -125,11 +129,17 @@ async function resolveAllowedOrigins(
     try {
         const sub = req.auth.sub;     // GAII (agent) or owner name
         const owner = req.auth.owner;
+        // Memory lives under the RESOLVED identity: an owner session's `sub` is the bare name `alice`,
+        // but the record is keyed `alice@node`, so reading by `sub` misses the owner's own
+        // allowedOrigins and the CORS rule silently falls back to the node default (audit AI-triage
+        // 2026-08-23, invariant 1). resolveIdentity lifts an owner session to its GHII and leaves an
+        // agent's GAII as-is, matching how the memory routes store it.
+        const memoryIdentity = resolveIdentity(req.auth, config.nodeId);
 
         // Phase 4: Memory-level — check if this is a memory request with a key
         const memoryKey = extractMemoryKey(req);
         if (memoryKey) {
-            const record = await storage.getMemory(sub, memoryKey);
+            const record = await storage.getMemory(memoryIdentity, memoryKey);
             if (record?.allowedOrigins?.length) {
                 return record.allowedOrigins;
             }

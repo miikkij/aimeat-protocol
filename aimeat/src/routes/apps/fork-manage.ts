@@ -27,7 +27,7 @@ import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import type { CanonicalOwner } from './helpers.js';
 
@@ -82,9 +82,12 @@ export function registerForkManageRoutes(
             return;
         }
 
-        // Gate 2 — a paid source's bytes must not bypass the paywall.
+        // Gate 2 — a paid source's bytes must not bypass the paywall. The licence keys on the buyer's
+        // OWNER GHII, the same coordinate the purchase receipt stored (app-store.ts) and the wallet
+        // debited — not the raw `sub`, which on an owner session is a bare name that no receipt holds
+        // (audit AI-triage 2026-08-23, invariant 1).
         if (config.marketplaceEnabled && source.manifest.priceMorsels && source.manifest.priceMorsels > 0 && !sameOwner && !isOperator) {
-            const hasLicense = await storage.hasValidLicense(req.auth!.sub, source.ownerGaii, sourceFilename);
+            const hasLicense = await storage.hasValidLicense(ownerGhiiOf(callerGaii), source.ownerGaii, sourceFilename);
             if (!hasLicense) {
                 res.status(402).json(error(config.nodeId, 'PURCHASE_REQUIRED', `This app costs ${source.manifest.priceMorsels} morsels. Purchase it first via POST /v1/app-store/purchase before forking.`));
                 return;
