@@ -108,9 +108,12 @@ export const CHECKS = [
   ['check:mcp-schemas', 'AI-työkalujen parametrit samat', 'AI-työkalujen PARAMETRIT täsmäävät joka pinnalla, ettei parametri katoa hiljaa yhdellä ovella.'],
 ];
 
-// Invariants that cannot be a clean static rule, and what covers them instead.
+// Invariants that cannot be a clean static rule, and what covers them instead. Since 2026-08-23 the
+// AI diff review (ai-triage.mjs) reads every commit range against these four, so "katselmointi" is a
+// run, not a hope.
 export const NOT_STATIC = [
-  ['Tarkistuksen oikea järjestys', 'Sääntö ennen kirjoitusta, ei jälkeen. Tämä on kontrollivuon järjestys — staattinen haku ei näe sitä luotettavasti.', 'Kattavuus: E2E-testit.'],
-  ['Vanhentuneen ominaisuuden poisto', 'Deprekoinnin on nimettävä lippu, oletus ja poistoversio. Tämä on politiikka, ei koodikuvio.', 'Kattavuus: katselmointi.'],
-  ['Otsakkeen luotettavuus autorisoinnissa', 'Laillinen tunnus-otsake ja hyökkäyksen väite-otsake näyttävät koodissa samalta. Ei erotettavissa koneella.', 'Kattavuus: katselmointi + Host-johdettu alkuperä.'],
+  ['Tarkistuksen oikea järjestys', 'Sääntö ennen kirjoitusta, ei jälkeen. Tämä on kontrollivuon järjestys — staattinen haku ei näe sitä luotettavasti.', 'Kattavuus: E2E-testit + AI-diffikatselmointi joka triage-ajolla.'],
+  ['Vanhentuneen ominaisuuden poisto', 'Deprekoinnin on nimettävä lippu, oletus ja poistoversio. Tämä on politiikka, ei koodikuvio.', 'Kattavuus: AI-diffikatselmointi joka triage-ajolla.'],
+  ['Otsakkeen luotettavuus autorisoinnissa', 'Laillinen tunnus-otsake ja hyökkäyksen väite-otsake näyttävät koodissa samalta. Ei erotettavissa koneella.', 'Kattavuus: Host-johdettu alkuperä + AI-diffikatselmointi joka triage-ajolla.'],
+  ['Federaation allekirjoituksen ehdottomuus', 'Ehtolause allekirjoitustarkistuksen ympärillä voi olla laillinen tai vika — muoto on sama. Ei erotettavissa koneella.', 'Kattavuus: federaation E2E-testit + AI-diffikatselmointi joka triage-ajolla.'],
 ];

@@ -1,0 +1,45 @@
+# The shop's only clock, and it costs nothing to run. A `kind: extension` job executes a sandbox
+# action server-side with no model call at all, so this can tick often without spending a token.
+# Anything that WOULD spend tokens (market research, anything that drafts text on a schedule) is not
+# here: it is the owner's switch to throw, in the back office, never ours to assume.
+#
+# Without this, a hold taken by a buyer who then walked away would keep its units off the shelf for
+# good. The sweep runs as the installer, which is the same person the owner check inside the action
+# compares against.
+schedules:
+  - id: sweep-holds
+    description: Expired holds go back on the shelf
+    action: admin
+    cron: "*/15 * * * *"
+    input:
+      op: sweep
+
+metadata:
+  name: businesslauncher-shop
+  version: 1.0.0
+  description: The shop's engine — the public catalogue a visitor reads with no login, and the stock and holds behind it.
+  author: operator
+required_apis:
+  - memory
+actions:
+  - id: admin
+    method: POST
+    path: /admin
+    description: Owner operations, refused for anyone but the person who installed this shop. op configure (the shop's name, currency, and where an enquiry from the shop front is sent), publish_catalog (write the public copy the storefront reads), publish_pages (privacy, terms and delivery as the storefront shows them), set_stock (units on the shelf, absolute), commit (a sale completed, drop the hold without returning units), sweep (expired holds go back on the shelf).
+    input: { type: object, properties: { op: { type: string }, name: { type: string }, currency: { type: string }, contact: { type: object }, catalog: { type: object }, pages: { type: object }, units: { type: object }, reservationId: { type: string } }, required: [op] }
+    output: { type: object, properties: { ok: { type: boolean }, error: { type: string } } }
+    script: admin.js
+  - id: reserve
+    method: POST
+    path: /reserve
+    description: Hold units of one sku under an id the caller generates, until expiresAt. One compare-and-swap, so two buyers cannot both take the last unit. Calling twice with the same id is the same hold, not a second one.
+    input: { type: object, properties: { sku: { type: string }, qty: { type: number }, reservationId: { type: string }, expiresAt: { type: string } }, required: [sku, reservationId, expiresAt] }
+    output: { type: object, properties: { ok: { type: boolean }, reservationId: { type: string }, left: { type: number }, error: { type: string } } }
+    script: reserve.js
+  - id: release
+    method: POST
+    path: /release
+    description: Put a hold's units back on the shelf. The person who took the hold may release it, and so may the shop owner.
+    input: { type: object, properties: { reservationId: { type: string } }, required: [reservationId] }
+    output: { type: object, properties: { ok: { type: boolean }, released: { type: string }, left: { type: number }, error: { type: string } } }
+    script: release.js

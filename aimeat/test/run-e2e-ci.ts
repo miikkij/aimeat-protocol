@@ -358,6 +358,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-commerce.ts',
     'test/e2e-mcp-prompts.ts',
     'test/e2e-packages.ts',
+    'test/e2e-businesslauncher.ts',
     'test/e2e-micro-memory.ts',
     'test/e2e-personal-node.ts',
     'test/e2e-connect-tunnel.ts',

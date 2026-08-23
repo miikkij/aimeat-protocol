@@ -5,15 +5,29 @@ import type { ExtensionCtx, ExtensionLimits } from '../../src/services/extension
 // ── Helpers ──────────────────────────────────────────────────
 
 function makeCtx(overrides: Partial<ExtensionCtx> = {}): ExtensionCtx {
-    const memoryStore = new Map<string, unknown>();
+    // Versions are tracked here because the sandbox contract now carries them: `set` reports the
+    // version it wrote, and `ifVersion` refuses a write against a stale one. A double that ignored
+    // that would pass a compare-and-swap test that the real context would fail.
+    const memoryStore = new Map<string, { value: unknown; version: number }>();
 
     return {
         memory: {
             async get(key: string) {
-                return memoryStore.get(key) ?? null;
+                return memoryStore.get(key)?.value ?? null;
             },
-            async set(key: string, value: unknown) {
-                memoryStore.set(key, value);
+            async getVersioned(key: string) {
+                const row = memoryStore.get(key);
+                return row ? { value: row.value, version: row.version } : null;
+            },
+            async set(key: string, value: unknown, opts?: { ifVersion?: number }) {
+                const row = memoryStore.get(key);
+                if (opts?.ifVersion !== undefined) {
+                    const current = row?.version ?? 0;
+                    if (current !== opts.ifVersion) return { ok: false, version: row?.version ?? null };
+                }
+                const version = (row?.version ?? 0) + 1;
+                memoryStore.set(key, { value, version });
+                return { ok: true, version };
             },
             async search(_prefix: string, _opts?: Record<string, unknown>) {
                 return [];
@@ -192,6 +206,29 @@ describe('executeExtensionAction', () => {
         await expect(
             executeExtensionAction(script, makeCtx(), {}, defaultLimits()),
         ).rejects.toThrow('Something broke');
+    });
+
+    // A script's own compare-and-swap loop, across the sandbox boundary: the version has to reach
+    // the guest and the write's verdict has to come back. Before this, `set` resolved to null in the
+    // guest, so a script could not tell a landed write from a lost one.
+    it('a script can compare-and-swap through ctx.memory', async () => {
+        const script = `export default async function(ctx, input) {
+            const created = await ctx.memory.set('stock', { units: 1 }, { ifVersion: 0 });
+            const read = await ctx.memory.getVersioned('stock');
+            const won = await ctx.memory.set('stock', { units: 0 }, { ifVersion: read.version });
+            const stale = await ctx.memory.set('stock', { units: 99 }, { ifVersion: read.version });
+            const final = await ctx.memory.get('stock');
+            return { created, read, won, stale, final };
+        }`;
+
+        const result = await executeExtensionAction(script, makeCtx(), {}, defaultLimits());
+
+        expect(result.created).toEqual({ ok: true, version: 1 });
+        expect(result.read).toEqual({ value: { units: 1 }, version: 1 });
+        expect(result.won).toEqual({ ok: true, version: 2 });
+        expect(result.stale.ok).toBe(false);
+        // The refused write left the winner's value in place.
+        expect(result.final).toEqual({ units: 0 });
     });
 
     it('supports ctx.memory.delete', async () => {

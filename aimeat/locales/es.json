@@ -3181,6 +3181,16 @@
       "copied": "Copiado — pégalo en tu chat de IA",
       "proof": "Ya funcionando aquí:",
       "tour": "¿No sabes qué se puede hacer? Haz el recorrido →",
+      "businesslauncher": {
+        "title": "Una tienda abierta esta misma tarde",
+        "lead": "Un solo sí levanta una tienda que cualquiera puede mirar, una trastienda desde la que llevarla, y existencias que no venden dos veces lo mismo.",
+        "ask": "Quiero abrir una tienda. Guíame paso a paso.",
+        "step1": "Cuenta qué vendes y quién lo compra. Esa única respuesta decide lo demás.",
+        "step2": "Ves el plan entero antes de que exista nada, y dices que sí una vez.",
+        "step3": "Tus productos, tus precios y tus páginas tienen un espacio propio que nadie más puede leer.",
+        "step4": "Rellena lo que quieras. La trastienda te muestra lo que falta y en qué orden.",
+        "step5": "Acepta tarjetas cuando tú quieras: se pregunta aparte y nunca se da por hecho."
+      },
       "marketplace": {
         "title": "Una tienda que cobra con tarjetas, monedas y agentes",
         "lead": "Una caja que acepta una tarjeta, una stablecoin o el dinero de otro agente — y te paga a ti.",

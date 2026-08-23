@@ -1,0 +1,242 @@
+{
+  "version": 1,
+  "lastInvariantReviewCommit": "a1cfe3ea",
+  "entries": [
+    {
+      "fingerprint": "63fd23f9d95d1917",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/work.ts",
+      "line": 331,
+      "verdict": "legit",
+      "reason": "Haaraan tullaan vain kun kyseessä ei ole omistajan istunto (omistaja käsitellään erikseen riveillä 326-329), jolloin `sub` on agentin täysi tunnus, jolla työn providerGaii on tallennettukin.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "d889a37ef49d0604",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/work.ts",
+      "line": 358,
+      "verdict": "legit",
+      "reason": "Sama rakenne kuin inboxissa: else-haara on agentti-istunto, jossa `sub` on täysi tunnus ja vastaa työn requesterGaii-kenttää sellaisenaan.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "c7255c62dbaab43b",
+      "ruleId": "optional-auth-if-not-req-auth-gate",
+      "file": "aimeat/src/routes/apps/read.ts",
+      "line": 502,
+      "verdict": "legit",
+      "reason": "Vaikka ehto ei täsmäisi anonyymitilassa, heti perässä verrataan `req.auth.sub` myyjän tunnukseen ja vaaditaan voimassa oleva lisenssi (rivit 508-514), jota anonyymillä ei ole, joten vastaus on 402 eikä sovellus aukea.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "7da2aa31f4864f9e",
+      "ruleId": "optional-auth-if-not-req-auth-gate",
+      "file": "aimeat/src/routes/stats.ts",
+      "line": 49,
+      "verdict": "confirm",
+      "reason": "Sama ehto /v1/metrics-ovella: anonyymitilassa `req.auth` on aina asetettu, ja tarkistuksen jälkeen rekisteri palautetaan sellaisenaan ilman muuta suojaa.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "92fe1affaca254b9",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/auth-otk.ts",
+      "line": 79,
+      "verdict": "confirm",
+      "reason": "Tallennettu `ownerGaii` päätyy suoraan kirjoituksen kohteeksi (`targetGaii: otk.ownerGaii`, rivi 224), ja omistajan istunnossa `sub` on pelkkä tilinimi, jolloin muistiin kirjoitettu tietue menee väärään osoitteeseen.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "f5c37382fd27b411",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/auth-otk.ts",
+      "line": 111,
+      "verdict": "confirm",
+      "reason": "Sama kenttä luetaan hakutunnukseksi micro-memoryssa (`gaii = otk.ownerGaii`, micro-memory.ts:179), ja omistajan istunnossa `sub` on pelkkä tilinimi eikä täysi tunnus.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "9710bf233511ba32",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/auth-otk.ts",
+      "line": 159,
+      "verdict": "legit",
+      "reason": "Rekisteröinti lukee omistajan `otk.params.owner`-kentästä ja rakentaa tunnuksen `buildGAII`-funktiolla (agents/registration.ts:51-70), joten tämä `ownerGaii` jää pelkäksi merkinnäksi siitä kuka avaimen loi.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "955c1a519adc71ad",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/auth.ts",
+      "line": 496,
+      "verdict": "legit",
+      "reason": "Haaraan päästään vain kun `parseGAII(req.auth!.sub)` tuottaa tuloksen (rivi 493), eli `sub` on jo täysi agenttitunnus.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "839227c18d1f88e2",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/auth.ts",
+      "line": 515,
+      "verdict": "legit",
+      "reason": "Ekosysteemihaarassa `sub` on sovelluksen oma GEAI-tunnus, joka on juuri se avain jolla ekosysteemisovellukset on tallennettu.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "f8730fe3d67d478e",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/auth.ts",
+      "line": 547,
+      "verdict": "legit",
+      "reason": "Istuntorivi kirjataan samalla `sub`-arvolla joka juuri myönnettiin tokeniin (rivi 540), ja istunnot haetaan sessionId:llä tai refresh-tiivisteellä, ei tällä kentällä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "1bec12a464484117",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/schemas.ts",
+      "line": 68,
+      "verdict": "legit",
+      "reason": "`lockedBy` on lukitsijan merkintä, ja sitä verrataan rivillä 58 täsmälleen samalla lausekkeella jolla se kirjoitetaan, joten haku ei voi osua toisen tietueeseen.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "b5242df42c55d87d",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/disputes.ts",
+      "line": 149,
+      "verdict": "legit",
+      "reason": "`openedBy` kertoo kuka riidan avasi, ja samalla lausekkeella on rivillä 129 jo verrattu työn tilaajaan, eli kutsuja on agenttitunnuksellaan oikea osapuoli.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "642388bda04747e3",
+      "ruleId": "owner-name-cross-owner-widening",
+      "file": "aimeat/src/routes/instances/manage.ts",
+      "line": 245,
+      "verdict": "legit",
+      "reason": "Vertailu koskee instanssin omistajuutta eikä itse tiliä, ja operaattorirooli on erikseen sallittu, joten kyse ei ole tilin muutoksesta.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "ac2c6beb38da80f9",
+      "ruleId": "owner-name-cross-owner-widening",
+      "file": "aimeat/src/routes/owners.ts",
+      "line": 267,
+      "verdict": "legit",
+      "reason": "Poisto-ovi on `requireOwnerPrincipal()`-tarkistuksen takana (rivi 265), joka torjuu agentit, ekosysteemisovellukset ja sovellustokenit, joten nimivertailu on vasta toinen kerros sen päällä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "8f438dac8b42f4f5",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/memory/files.ts",
+      "line": 223,
+      "verdict": "legit",
+      "reason": "Haara ajetaan vain kun kyseessä ei ole omistajan istunto, jolloin `sub` on agentin tai ekosysteemisovelluksen täysi tunnus, jolla tiedostot on tallennettu.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "7d7ad9dc0bab3ae7",
+      "ruleId": "owner-name-cross-owner-widening",
+      "file": "aimeat/src/routes/owners/export.ts",
+      "line": 35,
+      "verdict": "legit",
+      "reason": "Vienti on `requireOwnerPrincipal()`-tarkistuksen takana (rivi 33), joten pelkällä tilinimellä toimivat agentti- ja sovellustokenit torjutaan jo ennen tätä vertailua.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "ede725ece809132e",
+      "ruleId": "raw-sub-into-storage-arg-no-resolve",
+      "file": "aimeat/src/routes/flags.ts",
+      "line": 150,
+      "verdict": "legit",
+      "reason": "`reviewedBy` merkitsee kuka moderoi, ja moderointioikeus on jo ratkaistu riveillä 131-147 operaattoriroolista ja organismin ylläpitäjyydestä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    },
+    {
+      "fingerprint": "0093d7b68f3be891",
+      "ruleId": "role-or-scope-agent-bypasses-scope",
+      "file": "aimeat/src/routes/organisms/workspace-access.ts",
+      "line": 439,
+      "verdict": "confirm",
+      "reason": "Kutsun peruutus menee läpi roolilla ennen kuin `organism:invite` katsotaan, ja sama sana suodattaa vastaavan MCP-työkalun (mcp/catalog/scopes.ts:198), joten pinnalla luvattu rajaus ei päde tällä ovella.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "a1cfe3ea"
+    }
+  ],
+  "invariantFindings": [
+    {
+      "id": "ea27ca44788f",
+      "invariant": 13,
+      "file": "aimeat/src/routes/federation-sync/messaging.ts",
+      "note": "Ensikontaktin portti päästää tuntemattoman lähettäjän läpi pelkästään sillä perusteella, että vastaanottajan postilaatikossa on jo viestejä kehyksen mukanaan tuomassa conversation_id:ssä, eikä se mitenkään sido tuota tunnusta lähettäjään; koska keskustelutunnus on julkinen ja determinististi laskettava kahdesta identiteetistä (conversationIdFor), naapurisolmulla oleva vieras voi laskea vastaanottajan olemassa olevan ketjun tunnuksen ja saada yhteydenottonsa automaattisesti hyväksytyksi.",
+      "commitRange": "HEAD~10..HEAD",
+      "date": "2026-08-23",
+      "status": "open"
+    },
+    {
+      "id": "ab8e33419f98",
+      "invariant": 14,
+      "file": "aimeat/src/routes/federation-peer/peers.ts",
+      "note": "PUT /v1/federation/peers/:nodeId kirjoittaa tier- ja lippumuutokset suoraan elävään peers-Mapin olioon ennen kuin support_upstream-tarkistukset ehtivät hylätä pyynnön 409:llä, joten hylätty pyyntö on silti ehtinyt muuttaa sitä mitä kaikki portit tästä eteenpäin valvovat, ja muistissa oleva tila eroaa tallennetusta.",
+      "commitRange": "HEAD~10..HEAD",
+      "date": "2026-08-23",
+      "status": "open"
+    },
+    {
+      "id": "5334aae4c04d",
+      "invariant": 14,
+      "file": "aimeat/src/routes/federation-peer/introduce.ts",
+      "note": "consumeLinkInvite kuluttaa kertakäyttöisen kutsun ennen validateOutboundUrl-tarkistusta, joten 400 INVALID_URL -hylkäys jättää kutsun käytetyksi vaikka liitosta ei syntynyt.",
+      "commitRange": "HEAD~10..HEAD",
+      "date": "2026-08-23",
+      "status": "open"
+    },
+    {
+      "id": "b6204d3970ce",
+      "invariant": 13,
+      "file": "aimeat/src/services/message-alias.ts",
+      "note": "resolveGroupTarget tulkitsee raa'an tyhjän to-kentän samaksi kuin support-osoite (addressedToSupport), joten solmulla jolla on support-upstream-naapuri pelkällä conversation_id:llä jatkettu tavallinen kahdenkeskinen viesti ohjautuu palveluntarjoajan tukiosoitteeseen ketjun oikean vastapuolen sijaan.",
+      "commitRange": "HEAD~10..HEAD",
+      "date": "2026-08-23",
+      "status": "open"
+    }
+  ]
+}

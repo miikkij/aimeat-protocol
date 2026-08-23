@@ -16,6 +16,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 6. [Identity, auth & scopes](#6-identity-auth--scopes)
 7. [Storage & multi-backend](#7-storage--multi-backend)
 8. [Extensions / Cortex / Memory namespaces](#8-extensions--cortex--memory-namespaces)
+8b. [Package components that are apps](#8b-package-components-that-are-apps)
 9. [AI / LLM calls](#9-ai--llm-calls)
 10. [Crypto & signatures](#10-crypto--signatures)
 11. [Organisms & workspaces (LOOM / MACHINE ROOM)](#11-organisms--workspaces-loom--machine-room)
@@ -114,6 +115,22 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **Cortex re-activate = deactivate first, then activate.**
 - **Extension manifests are strict:** identity fields live under `metadata:` (`name/version/description/author` all required) and EVERY action needs `id` + `method` + `path` + `script` — a missing `method`/`path` fails the whole install. Cortex manifests are k8s-style: `apiVersion: cortex.aimeat.org/v1`, `kind: Extension`, `metadata.name` + `metadata.namespace`, libs as `spec.components` `type: lib` entries (with `exports` + `api_surface`, or agents can't discover the lib). Copy the examples from `docs/guides/building-extension-cortex-app-stack.md` (fixed 2026-07-13) — older guide copies drift.
 - **Translations + settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`.
+
+## 8b. Package components that are apps
+*Symptoms: an installed app 404s on its own origin, never gets a subdomain, and its owner is asked to sign in inside the app.*
+
+- **A package's app component id MUST end in `.html`.** An installed app's filename is
+  `package-owner-shortId-componentId`, and the app-host path form treats a request as an app only
+  when the filename matches `/\.html?$/i` (`routes/subdomains.ts`, the `:owner/:filename` handler).
+  An extensionless component id therefore produces an app that never has a subdomain minted and can
+  never be opened on its own origin — which is the only place the silent SSO bridge works, so its
+  owner has to sign in inside the app instead of arriving already signed in. The app still serves
+  200 on the shared host, which is why this looks fine until somebody tries the per-app address.
+  *(Measured 2026-08-23 on a local node with `AIMEAT_APP_HOST` set: `businesslauncher`'s
+  `app-shop.html` 302s to `...apps.localhost`; `digital-signage`'s `app-admin` 404s on that door,
+  with and without a `.html` appended. `aimeat-iam` (`app-dashboard`) and `aimeat-marketplace`
+  (`app-marketplace`) have the same shape and were not probed.)* Renaming a component id changes
+  the filename of every EXISTING install, so this is not a silent fix.
 
 ## 9. AI / LLM calls
 *Symptoms: truncated completions, a non-English prompt in code, a long call timing out.*
