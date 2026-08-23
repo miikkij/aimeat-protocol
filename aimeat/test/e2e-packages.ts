@@ -13,6 +13,12 @@
  *   - Phase 7: Auth & Validation
  *   - Phase 8: Template Moderation Lifecycle
  * @version-history
+ *   v1.6.0 — 2026-08-23 — Bundled crew-defs across the package door (TARGET-070): a valid declaration
+ *     arrives on the installed app's manifest, and a malformed one fails the install out loud instead
+ *     of installing an app whose agents are quietly absent. Both cases were seen failing against the
+ *     registrar before the fix. Note for the next reader: a red run immediately after another run is
+ *     suspect — the previous server had not exited here, and the suite talked to stale code and stale
+ *     data, which reads exactly like a regression (pitfalls §18).
  *   v1.5.0 — 2026-08-16 — E2E quality, packages:678: the migration test read only the migration's own
  *     answer about itself, so a migration that announced every component and registered none would
  *     pass it. A new case reads the four components back through the status route, which recomputes
@@ -1440,6 +1446,95 @@ await test('Packages tab overview composite folds the 3 local reads (Phase 4 DbS
   // The instances section matches the standalone endpoint (both owner-scoped, installed).
   const { body: inst } = await json('/v1/instances?status=installed', { headers: authed(ownerToken) });
   assert(d.instances.total === inst.data.total, `overview instances (${d.instances.total}) == /v1/instances (${inst.data.total})`);
+});
+
+// ─── Bundled crew-defs survive a package install (TARGET-070) ───────
+//
+// The registrar builds an installed app's manifest by hand and had no `cortex` key, so a package
+// whose app shipped crew-defs installed an app with none, in silence. Bundling itself was never
+// broken — NOSTE ships two crews in production through the PUBLISH door. Only the PACKAGE door
+// dropped them. These two cases pin both halves: a valid declaration arrives, and a malformed one
+// is refused out loud rather than installed empty.
+
+const CREWS_APP_HTML = (crews: unknown) => '<!DOCTYPE html><html><head><title>Shop</title>'
+  + `<script type="application/json" id="aimeat-crews">${JSON.stringify(crews)}</script>`
+  + '</head><body><div>shop</div></body></html>';
+
+const VALID_CREW = {
+  agent_name: 'shopkeeper',
+  readme_md: '# Shopkeeper\n\nAsks what you sell and writes it down.',
+  process: 'sequential',
+  agents: [{
+    role: 'Interviewer',
+    goal: 'Find out what this person actually sells.',
+    backstory: 'You ask short questions and you wait.',
+    allow_delegation: false,
+  }],
+  tasks: [{
+    id: 'interview',
+    description: 'Interview the owner about what they sell. Their own words: {{ctx.prompt}}',
+    expected_output: 'What the person actually said, with anything unanswered marked as not established.',
+    agent: 'Interviewer',
+  }],
+};
+
+/** Create → publish → install one single-app package, and return the install response. */
+async function installAppOnlyPackage(name: string, appHtml: string) {
+  const { body: created } = await json('/v1/packages', {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({
+      name,
+      description: 'Crew-def carrier fixture',
+      components: [{ id: 'app-shop', type: 'app', label: 'Shop', content: appHtml, dependencies: [] }],
+    }),
+  });
+  const gid = encodeURIComponent(created.data.packageGroupId);
+  await json(`/v1/packages/${gid}/versions/${created.data.version}`, {
+    method: 'PATCH',
+    headers: authed(ownerToken),
+    body: JSON.stringify({ status: 'published' }),
+  });
+  return json(`/v1/packages/${gid}/install`, {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({ label: `${name} instance` }),
+  });
+}
+
+await test('Bundled crew-defs survive a package install', async () => {
+  const { status, body } = await installAppOnlyPackage(
+    `crews-ok-${Date.now()}`,
+    CREWS_APP_HTML([VALID_CREW]),
+  );
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+  const registeredAs = body.data?.installedComponents?.[0]?.registeredAs;
+  assert(typeof registeredAs === 'string', 'Missing registeredAs for the app component');
+
+  // `GET /v1/apps/:owner/:filename` serves the app's HTML; the manifest is on the catalogue row,
+  // and the owner's own row is the unredacted one.
+  const { status: listStatus, body: list } = await json('/v1/apps', { headers: authed(ownerToken) });
+  assert(listStatus === 200, `Expected 200 listing apps, got ${listStatus}`);
+  const row = (list.data?.apps ?? []).find((a: any) => a.filename === registeredAs);
+  assert(row, `Installed app ${registeredAs} not in the catalogue listing`);
+  const agents = row.manifest?.cortex?.agents;
+  assert(Array.isArray(agents), `Installed app carries no cortex.agents: ${JSON.stringify(row.manifest)}`);
+  assert(agents.length === 1, `Expected 1 bundled crew, got ${agents.length}`);
+  assert(agents[0].agent_name === 'shopkeeper', `Expected shopkeeper, got ${agents[0].agent_name}`);
+});
+
+await test('An app declaring a malformed crew-def is refused, not installed empty', async () => {
+  // Missing `tasks` entirely — the publish door refuses this shape, and so must the package door.
+  const broken = { agent_name: 'shopkeeper', agents: [{ role: 'Interviewer', goal: 'Ask.' }] };
+  const { status, body } = await installAppOnlyPackage(
+    `crews-bad-${Date.now()}`,
+    CREWS_APP_HTML([broken]),
+  );
+  assert(status === 500, `Expected the install to fail, got ${status}: ${JSON.stringify(body)}`);
+  assert(
+    String(body.error?.message ?? '').includes('crew-defs'),
+    `Expected the reason to name the crew-defs, got: ${JSON.stringify(body.error)}`,
+  );
 });
 
 // ─── Cleanup ────────────────────────────────────────────────────────

@@ -15,6 +15,14 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.4.0 — 2026-08-23 — An installed app keeps the crew-defs it bundles. The manifest built here
+ *     had no `cortex` key at all, so a package whose app shipped agents installed an app with none,
+ *     in silence — while the PUBLISH door carried them fine (NOSTE ships two in production). The
+ *     app's own HTML is the carrier (app-bundled-crews.ts), because `PackageComponent` is
+ *     `{ id, type, label, content, contentHash, dependencies }` and the ZIP round trip carries only
+ *     `content`, so a new field on the type would be dropped by export/import and the silence would
+ *     return by another road. A malformed declaration is REFUSED here rather than installed empty:
+ *     same gate as the publish route, and it hands the installer its existing reverse rollback.
  *   v1.3.0 — 2026-08-10 — An extension component goes through buildExtensionRecordFromManifest, the
  *     same builder POST /v1/extensions uses. This file had its own, lenient one, so a component
  *     registered here skipped every gate the front door applies — and the content is not always a
@@ -34,6 +42,8 @@ import { buildExtensionRecordFromManifest, EXT_NAME_PATTERN } from '../routes/ex
 import YAML from 'yaml';
 import type { Storage, PackageComponentType, CortexComponent } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { parseBundledCrews } from './app-bundled-crews.js';
+import { validateCortexAgents } from '../models/crew-def-schemas.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -386,6 +396,26 @@ export async function registerComponent(
           input.urlRewrites?.cortexNames,
           input.urlRewrites?.extensionNames,
         );
+        // BUNDLED CREWS TRAVEL WITH THE APP. Read AFTER the rewrite, so an `ext:<name>` a crew-def
+        // names in its own prompts points at this instance's extension rather than the author's.
+        // Validated with the same function the publish route uses, and refused the same way: a
+        // non-conforming crew-def must not reach a fleet through the package door either, and
+        // refusing here hands the installer its existing reverse rollback instead of installing an
+        // app whose agents are quietly absent. → app-bundled-crews.ts
+        const bundledCrews = parseBundledCrews(rewritten);
+        let cortex: { agents: Record<string, unknown>[] } | undefined;
+        if (bundledCrews) {
+          const checked = validateCortexAgents(bundledCrews);
+          if (!checked.ok) {
+            return {
+              success: false,
+              componentId,
+              registeredAs,
+              error: `app declares crew-defs that are not valid: ${checked.errors.join('; ')}`,
+            };
+          }
+          cortex = { agents: checked.agents as unknown as Record<string, unknown>[] };
+        }
         await storage.createApp({
           ownerGaii,
           ownerName: owner,
@@ -401,6 +431,7 @@ export async function registerComponent(
             tags: [...(input.packageTags || []), 'package-installed'],
             authorDisplay: owner,
             usesCortex: [],
+            ...(cortex ? { cortex } : {}),
           },
           mimeType: 'text/html',
           size: Buffer.byteLength(rewritten, 'utf-8'),
