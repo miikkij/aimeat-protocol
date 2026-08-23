@@ -489,17 +489,76 @@ await test('The scheduled monthly job runs on demand and stores a report', async
     for (let i = 0; i < 20; i++) {
         const list = await json('/v1/admin/compliance/reports', { headers: auth(op.token) });
         if ((list.body.data?.reports ?? []).length > 0) {
-            const month = list.body.data.reports[0].month;
-            assert(/^\d{4}-(0[1-9]|1[0-2])$/.test(month), `stored under a bad month key: ${month}`);
-            const stored = await json(`/v1/admin/compliance/reports?month=${month}`, { headers: auth(op.token) });
+            const entry = list.body.data.reports[0];
+            assert(/^\d{4}-(0[1-9]|1[0-2])$/.test(entry.id), `stored under a bad month key: ${entry.id}`);
+            assert(entry.kind === 'monthly', `the schedule's own report has to say so: ${entry.kind}`);
+            // The link in the notification the job sends spells it `month`, and those links outlive
+            // any rename, so both names have to reach the same record.
+            const stored = await json(`/v1/admin/compliance/reports?month=${entry.id}`, { headers: auth(op.token) });
             assert(stored.status === 200, `stored report: ${stored.status}`);
             assert(Array.isArray(stored.body.data.report.not_covered),
                 'a stored report has to carry its limits too, not only the live one');
+            const byId = await json(`/v1/admin/compliance/reports?id=${entry.id}`, { headers: auth(op.token) });
+            assert(byId.status === 200, `id= has to reach the same record as month=: ${byId.status}`);
             return;
         }
         await new Promise(r => setTimeout(r, 250));
     }
     throw new Error('the monthly job did not store a report within 5s');
+});
+
+// ─── Keeping this moment ───
+await test('An id that is neither a month nor a minute is refused before any read', async () => {
+    const r = await json('/v1/admin/compliance/reports?id=../../secrets', { headers: auth(op.token) });
+    assert(r.status === 400, `expected 400, got ${r.status}`);
+});
+
+await test('The operator keeps a snapshot, and it reads back unchanged', async () => {
+    // No content-type here: json() already sets one, and a second spelling of the same header makes
+    // fetch send "application/json, application/json", which express.json() does not recognise as
+    // JSON at all. The body then arrives empty and the window silently falls back to the default.
+    const saved = await json('/v1/admin/compliance/snapshot', {
+        method: 'POST', headers: auth(op.token),
+        body: JSON.stringify({ since_days: 7 }),
+    });
+    assert(saved.status === 201, `expected 201, got ${saved.status}: ${JSON.stringify(saved.body?.error)}`);
+    const id: string = saved.body.data.id;
+    assert(/^\d{4}-\d{2}-\d{2}-\d{4}$/.test(id), `a kept moment names its minute: ${id}`);
+    assert(saved.body.data.kind === 'manual', 'a kept moment is not the schedule\'s work');
+
+    const list = await json('/v1/admin/compliance/reports', { headers: auth(op.token) });
+    const entry = (list.body.data.reports ?? []).find((r: { id: string }) => r.id === id);
+    assert(entry, `the kept report is missing from the index: ${JSON.stringify(list.body.data.reports)}`);
+    assert(entry.kind === 'manual', `the index has to say which kind it is: ${entry.kind}`);
+
+    const read = await json(`/v1/admin/compliance/reports?id=${id}`, { headers: auth(op.token) });
+    assert(read.status === 200, `reading it back: ${read.status}`);
+    // The window is what the caller asked for, not a default. A snapshot that misdescribed its own
+    // period would be worse than none, because somebody reads it a year later and cannot tell.
+    const from = new Date(read.body.data.report.scope.period.from);
+    const to = new Date(read.body.data.report.scope.period.to);
+    const days = Math.round((to.getTime() - from.getTime()) / 86_400_000);
+    assert(days === 7, `the snapshot has to record the window it was asked for, got ${days} days`);
+    assert(Array.isArray(read.body.data.report.not_covered),
+        'a kept report carries its limits, exactly like the live one');
+});
+
+await test('An agent holding only compliance:read cannot keep one (403)', async () => {
+    // Keeping adds a node-wide document to what the node holds, so it is a write. The read word
+    // passing here would mean any credential that may look at the report may also add to the store.
+    const reader = await agentToken(op, 'snapreader', ['compliance:read']);
+    const r = await json('/v1/admin/compliance/snapshot', { method: 'POST', headers: auth(reader) });
+    assert(r.status === 403, `expected 403, got ${r.status}`);
+});
+
+await test('An owner who does not run the node cannot keep one (403)', async () => {
+    const r = await json('/v1/admin/compliance/snapshot', { method: 'POST', headers: auth(plain.token) });
+    assert(r.status === 403, `expected 403, got ${r.status}`);
+});
+
+await test('Unauthenticated cannot keep one (401)', async () => {
+    const r = await json('/v1/admin/compliance/snapshot', { method: 'POST' });
+    assert(r.status === 401, `expected 401, got ${r.status}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

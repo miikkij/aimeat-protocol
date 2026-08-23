@@ -10819,23 +10819,34 @@ paths:
   /v1/admin/compliance/reports:
     get:
       operationId: listComplianceReports
-      summary: The stored monthly compliance reports
+      summary: The compliance reports this node has kept
       tags: [Compliance, Admin]
       description: >
-        Node operator only (`compliance:read`). Without `month`, the index: which months have a
-        stored report and when each was generated, newest first - titles only, never the bodies.
-        With `month`, that month's stored report.
+        Node operator only (`compliance:read`). Without `id`, the index: which reports are stored,
+        when each was generated, and whether it came from the schedule (`kind: monthly`) or from
+        somebody keeping a moment (`kind: manual`), newest first - titles only, never the bodies.
+        With `id`, that stored report exactly as it was written, which is the point of keeping one:
+        its numbers will never change again.
 
         The scheduled job `core:compliance-report-monthly` writes one on the first of each month
-        for the month that ended. Trigger it by hand from the scheduler rather than waiting.
+        for the month that ended, named `2026-08`. POST /v1/admin/compliance/snapshot keeps the
+        report as it stands right now, named `2026-08-23-1930` down to the minute.
+
+        `month` is accepted as an alias for `id`, because the notification the monthly job sends
+        links with it and those links outlive any rename.
       security:
         - BearerAuth: []
       parameters:
+        - name: id
+          in: query
+          required: false
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])(-(0[1-9]|[12]\d|3[01])-([01]\d|2[0-3])[0-5]\d)?$' }
+          description: Return this stored report instead of the index.
         - name: month
           in: query
           required: false
           schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
-          description: Return this month's stored report instead of the index.
+          description: Deprecated alias for `id`, kept for links already sent out.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -10846,11 +10857,50 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
-          description: No report was stored for that month
+          description: Nothing is stored under that id
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+
+  /v1/admin/compliance/snapshot:
+    post:
+      operationId: saveComplianceSnapshot
+      summary: Keep the compliance report as it stands now
+      tags: [Compliance, Admin]
+      description: >
+        Node operator only, and `compliance:write` specifically - an agent holding `compliance:read`
+        is refused here, because this adds a node-wide document to what the installation keeps
+        rather than only reading one.
+
+        Builds the report for the window given and stores it under an id naming this minute, so it
+        can be read back unchanged from GET /v1/admin/compliance/reports. The window is recorded in
+        the report's own scope: a snapshot taken from a page showing ninety days and stored as
+        thirty would misdescribe itself to whoever opens it a year later.
+
+        The read is audited the same way the report read is: it copies every account's activity into
+        a record that outlives the page it was taken from.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since_days:
+                  type: integer
+                  minimum: 1
+                  maximum: 3650
+                  description: The window the snapshot covers. Defaults to 30.
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /v1/admin/compliance/draft:
     get:

@@ -26,7 +26,8 @@
  * @structure
  *   - adminComplianceRouter(config, storage)
  *   - GET  /v1/admin/compliance/report          — the roll-up  (compliance:read)
- *   - GET  /v1/admin/compliance/reports         — scheduled monthly snapshots (compliance:read)
+ *   - GET  /v1/admin/compliance/reports         — what is kept, or one in full (compliance:read)
+ *   - POST /v1/admin/compliance/snapshot        — keep this moment (compliance:write)
  *   - GET  /v1/admin/compliance/draft           — the node's own first draft (compliance:read)
  *   - GET  /v1/admin/compliance/usecases        — the register (compliance:read)
  *   - PUT  /v1/admin/compliance/usecases        — replace it   (compliance:write)
@@ -36,6 +37,8 @@
  *   import { adminComplianceRouter } from './routes/admin-compliance.js';
  *   app.use(adminComplianceRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-08-23 — A report can be kept on demand, and the index says which of the kept ones
+ *     came from the schedule. The schedule used to be the only thing that could keep one.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { Router } from 'express';
@@ -55,9 +58,10 @@ import {
 import { draftRegisterFromActivity } from '../services/compliance-draft.js';
 import {
   QuestionnaireSchema, UseCasesSchema, effectiveQuestionnaire, readUseCases,
-  writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport,
+  writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport, storedReportKind,
   type ComplianceQuestionnaire,
 } from '../services/compliance-register.js';
+import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
 
 export function adminComplianceRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -100,28 +104,56 @@ export function adminComplianceRouter(config: AimeatConfig, storage: Storage): R
     ]));
   });
 
-  // ── GET /v1/admin/compliance/reports — the scheduled monthly snapshots ────────────────────
+  // ── GET /v1/admin/compliance/reports — what is kept, and one of them in full ──────────────
+  // `month` is still accepted alongside `id`: the notification the monthly job sends links with it,
+  // and those links live in people's inboxes for as long as the notification does.
   router.get('/v1/admin/compliance/reports', ...canRead, async (req: Request, res: Response) => {
-    const month = typeof req.query.month === 'string' ? req.query.month : undefined;
-    if (month) {
-      if (!MONTH_RE.test(month)) {
+    const raw = typeof req.query.id === 'string' ? req.query.id
+      : typeof req.query.month === 'string' ? req.query.month : undefined;
+    if (raw) {
+      if (!storedReportKind(raw)) {
         res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR',
-          'The month has to look like 2026-08.'));
+          'A stored report is named either 2026-08 for a month or 2026-08-23-1930 for a saved moment.'));
         return;
       }
-      const stored = await readStoredReport(storage, config.nodeId, month);
+      const stored = await readStoredReport(storage, config.nodeId, raw);
       if (!stored) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-          `No monthly report was stored for ${month}. The job runs on the first of the following month; `
-          + 'you can also run it now from the scheduler.'));
+          `Nothing is stored under ${raw}. The monthly job runs on the first of the following month, `
+          + 'and you can keep the report as it stands now with POST /v1/admin/compliance/snapshot.'));
         return;
       }
-      res.json(success(config.nodeId, { report: stored }));
+      res.json(success(config.nodeId, { id: raw, kind: storedReportKind(raw), report: stored }));
       return;
     }
     const reports = await listStoredReports(storage, config.nodeId);
     res.json(success(config.nodeId, { reports, total: reports.length }, [
+      { description: 'Keep the report as it stands now', method: 'POST', url: '/v1/admin/compliance/snapshot' },
       { description: 'Run the monthly job now', method: 'POST', url: '/v1/admin/scheduler/jobs/core:compliance-report-monthly/trigger' },
+    ]));
+  });
+
+  // ── POST /v1/admin/compliance/snapshot — keep this moment ─────────────────────────────────
+  // Behind the WRITE word: it puts a node-wide document into the store, and a credential that may
+  // only read the report has no business adding to what the node keeps.
+  router.post('/v1/admin/compliance/snapshot', ...canWrite, async (req: Request, res: Response) => {
+    const sinceDays = Number.parseInt(String(req.body?.since_days ?? req.query.since_days ?? ''), 10);
+    const saved = await saveComplianceSnapshot(config, storage, {
+      sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined,
+    });
+
+    // Same reason the report read is audited: a snapshot copies every account's activity into a
+    // record that outlives the page it was taken from.
+    const operator = operatorOf(req);
+    recordUsageCall({
+      ownerGhii: operator, actorGaii: operator, actorKind: 'operator', surface: 'operator',
+      coordinate: 'compliance.snapshot', counterpartyGhii: '', outcome: 'ok',
+      meta: { id: saved.id, gaps: saved.gaps, usecases: saved.usecases },
+    });
+    logger.info('admin-compliance: operator kept a snapshot', { operator, id: saved.id });
+
+    res.status(201).json(success(config.nodeId, saved, [
+      { description: 'Read it back', method: 'GET', url: `/v1/admin/compliance/reports?id=${saved.id}` },
     ]));
   });
 

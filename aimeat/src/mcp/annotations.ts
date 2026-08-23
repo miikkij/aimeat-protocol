@@ -336,6 +336,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write
     // silently drops every entry the caller did not resend.
     aimeat_compliance_register_write: { title: 'Compliance: Replace Register', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // Not readOnly, because action="save" adds a record; not destructive, because it only ever adds
+    // one, and a second save in the same minute writes a new version of that minute rather than
+    // replacing anything a person would miss.
+    aimeat_compliance_snapshot: { title: 'Compliance: Kept Reports', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     // destructiveHint: mints morsels (irreversible ledger change, financial action)
     aimeat_admin_mint: { title: 'Admin: Mint Morsels', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
 

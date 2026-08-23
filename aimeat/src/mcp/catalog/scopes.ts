@@ -239,6 +239,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     // reading discloses every account's AI activity, writing changes what the report says.
     aimeat_compliance_register_read:          'compliance:read',
     aimeat_compliance_register_write:         'compliance:write',
+    // The write word, because its save action adds a node-wide document to what the installation
+    // keeps. The handler asks for the read word instead when the action only looks at the shelf.
+    aimeat_compliance_snapshot:               'compliance:write',
 
     // Writes something other people see under the owner's name.
     aimeat_flag_report:                       'social:write',

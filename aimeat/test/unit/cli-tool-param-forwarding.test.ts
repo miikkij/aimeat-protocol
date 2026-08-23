@@ -46,6 +46,12 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
         organism_id: 'Conditional, not dropped: only sent with view="workspace", which is the only listing that scopes to one workspace.',
         workspace_id: 'Same condition.',
     },
+    aimeat_compliance_snapshot: {
+        id: 'Conditional, not dropped: the probe holds `action` at its sentinel "save", which POSTs a new '
+            + 'snapshot and has no id to send. The handler forwards id on every other action — verified '
+            + 'directly in test/unit/compliance-snapshot-dispatch.test.ts, because the two parameters here '
+            + 'are mutually exclusive and one probe run cannot exercise both.',
+    },
     aimeat_memory_write: {
         expected_version: 'POST /v1/memory has no optimistic lock; the node MCP calls the write service directly and PUT /v1/memory/:key spells it `version`.',
     },

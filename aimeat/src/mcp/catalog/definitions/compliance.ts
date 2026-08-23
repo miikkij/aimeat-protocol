@@ -5,7 +5,7 @@
  * @description Catalog metadata for the operator's compliance tools: the node-wide report, and the
  *   use-case register and question set behind it.
  *
- *   THREE TOOL NAMES, NOT FIVE. `part` carries which document is meant, because every name here has
+ *   FOUR TOOL NAMES, NOT EIGHT. `part` and `action` carry which document is meant, because every name here has
  *   to stay in step across three surfaces — the node MCP, the connector MCP and the CLI dispatch a
  *   fleet daemon actually calls. The smaller the surface, the fewer places parity can quietly break,
  *   and it has broken three times in one week before.
@@ -15,9 +15,11 @@
  *   standing job, and the kind of job an agent should be doing. Locking it to one surface would make
  *   the register a thing you maintain by clicking, which is the failure this whole feature is meant
  *   to avoid on the reporting side.
- * @structure complianceTools — the three definitions
+ * @structure complianceTools — the four definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.1.0 — 2026-08-23 — aimeat_compliance_snapshot: what the installation has kept, and keeping
+ *     one now. The schedule was writing reports nothing could read back.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
@@ -53,6 +55,17 @@ export const complianceTools: AimeatToolDefinition[] = [
             part: { type: 'string', required: true, enum: ['usecases', 'questionnaire'], description: 'Which document to replace.' },
             value: { type: 'object', required: true, description: 'The whole document. For "usecases", { usecases: [...] }. For "questionnaire", { version, note, classes, defaultClass, questions }.' },
             dry_run: { type: 'boolean', description: 'Validate and return what would be stored, storing nothing. Use this to show somebody the result before it goes in.' },
+        },
+    },
+    {
+        name: 'aimeat_compliance_snapshot',
+        description: 'Operator-only. The reports this installation has KEPT, as opposed to the live one aimeat_compliance_report builds each time it is asked. action="list" is the index, newest first: each entry has an id, a generated_at, and a kind — "monthly" for the one the schedule writes on the first of each month, "manual" for a moment somebody chose to keep. action="read" with that id returns that report exactly as it was stored, which is the point of it: the numbers in it will never change again. action="save" keeps the report as it stands right now and returns its new id; use since_days to say what window it should cover, because a snapshot describes its own period and will be read a year later by somebody who was not there. Reading needs "compliance:read"; saving needs "compliance:write", since it adds a node-wide document to what the installation keeps.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            action: { type: 'string', required: true, enum: ['list', 'read', 'save'], description: 'What to do. Start with "list".' },
+            id: { type: 'string', description: 'For "read": which stored report, e.g. 2026-08 for a month or 2026-08-23-1930 for a saved moment.' },
+            since_days: { type: 'number', description: 'For "save": the window the snapshot covers (default 30).' },
         },
     },
 ];
