@@ -5,7 +5,9 @@
  *
  * These checks already gate CI in ci.yml (they fail the build on a NEW violation). This adapter does
  * not replace that; it makes their state VISIBLE and tracked alongside the semantic rules. A failing
- * check becomes an error-level result; a passing one is recorded as a note so the tool's coverage is
+ * check becomes an error-level result; a passing one is NOT uploaded (a note still counts as an open
+ * alert on the Security tab, so twelve green gates read as "12 open" and bury the real signal —
+ * coverage-when-green lives in the local `pnpm audit:report` instead). Historic note: passing gates
  * legible even when everything is green.
  *
  * Usage (from aimeat/):  node ../security/semantic-audit/checks-to-sarif.mjs > audit-gates.sarif
@@ -41,13 +43,16 @@ for (const [script, concern] of CHECKS) {
     detail = String(err.stdout || err.message || '').split('\n').slice(-6).join(' ').slice(0, 400);
   }
   rules.push({ id: script, shortDescription: { text: concern } });
+  // Only a REGRESSED gate becomes a Security-tab alert. A passing gate is not uploaded: a note-level
+  // result still counts as an open alert in GitHub's tally, so twelve always-green gates read as
+  // "12 open" on the tab and drown the real signal. Coverage-when-green is legible in the local
+  // `pnpm audit:report` (the "12/12 checks green" row) instead; the tab shows only what regressed.
+  if (ok) continue;
   results.push({
     ruleId: script,
-    level: ok ? 'note' : 'error',
+    level: 'error',
     message: {
-      text: ok
-        ? `${script} passes — ${concern}`
-        : `${script} REGRESSED — ${concern}. Run \`pnpm ${script}\` locally. ${detail}`,
+      text: `${script} REGRESSED — ${concern}. Run \`pnpm ${script}\` locally. ${detail}`,
     },
     // No source location: these are project-wide gate states, anchored to the config that defines them.
     locations: [{
