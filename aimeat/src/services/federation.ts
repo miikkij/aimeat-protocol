@@ -72,11 +72,21 @@ export interface PeerInfo {
     shareCatalogue: boolean;
     replicateMemory: boolean;
     allowRouting: boolean;
+    /** May this peer deliver direct messages, read receipts and attachment grants here? */
+    allowMessaging: boolean;
+    /** May this peer's operator announce to EVERY human on this node at once? */
+    allowBroadcast: boolean;
+    /** May this peer move morsels onto this node's ledger? */
+    allowSettlement: boolean;
     peerMode: 'federation' | 'private';
     allowFederatedAuth: boolean;
     federationAuthScopes: string[];
-    /** Trust tier: 'genesis' | 'member' | 'visiting' (see services/federation-tiers.ts). Absent → 'member'. */
-    tier?: 'genesis' | 'member' | 'visiting';
+    /** Trust tier (see services/federation-tiers.ts). Absent → 'member'. `contact` is the floor:
+     *  messages and nothing else. */
+    tier?: 'genesis' | 'member' | 'visiting' | 'contact';
+    /** Does this node's `support@operators` resolve to THIS peer? Deliberately NOT a TierFlag: it is
+     *  a per-link routing decision rather than a capability, so a tier change never flips it. */
+    supportUpstream?: boolean;
     /** Availability label derived from heartbeat uptime (Phase B): 'temporary' | 'permanent' | 'unknown'. */
     availability?: 'temporary' | 'permanent' | 'unknown';
     /** Optional expiry for time-limited visiting peers (populated/enforced in Phase B). */
