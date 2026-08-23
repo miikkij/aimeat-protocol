@@ -8,6 +8,11 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v2.3.0 — 2026-08-23 — Compare-and-swap reaches the sandbox: `ctx.memory.getVersioned` and
+ *     `set(..., { ifVersion })`, and `set` RETURNS its verdict instead of resolving to null. Every
+ *     extension that counted anything was last-write-wins, so two concurrent calls both read a stock
+ *     of 1 and both wrote 0 — while the node already owned the atomic primitives the guard needed.
+ *     `ifVersion: 0` means "only if absent". Omitting it keeps the historical behaviour exactly.
  *   v1.1.0 — 2026-07-28 — `ctx.buy`: an extension buys another owner's app-tool on its OWN owner's
  *     account — the supply-chain leg. Counted against maxApiCalls; answers with a decision, not a throw.
  *   v1.0.0 -- 2026-03-01 -- Initial V8 sandbox implementation (isolated-vm)
@@ -29,13 +34,45 @@ import { safeFetch } from '../utils/url-validator.js';
 
 // ── Public interfaces (UNCHANGED) ──────────────────────────
 
+/**
+ * What a sandbox write reports back. `set` used to return nothing, which is why an extension could
+ * not tell a landed write from a lost one — the whole reason every counter here was racy.
+ */
+export interface MemoryWriteResult {
+    /** Did this write land? False only when an `ifVersion` guard refused it; nothing was written. */
+    ok: boolean;
+    /**
+     * The version now on the record: the one just written when `ok`, the one that was really there
+     * when a guard refused, and null when the key does not exist (a refused `ifVersion: 0` means it
+     * does exist, so this is a number there).
+     */
+    version: number | null;
+}
+
 export interface ExtensionCtx {
     memory: {
         get(key: string): Promise<unknown | null>;
+        /**
+         * The value AND the version to swap against, or null when the key does not exist.
+         *
+         * The read half of compare-and-swap: `set(..., { ifVersion })` is unusable without it,
+         * because a script has no other way to learn the version it is racing.
+         */
+        getVersioned(key: string): Promise<{ value: unknown; version: number } | null>;
         /** `visibility` defaults to 'public' — the historical behaviour every extension was written
          *  against. Pass 'private' for a key that holds anyone's personal data: an ext namespace is
-         *  world-readable, so a membership list written the default way is served to strangers. */
-        set(key: string, value: unknown, opts?: { visibility?: 'public' | 'private' }): Promise<void>;
+         *  world-readable, so a membership list written the default way is served to strangers.
+         *
+         *  `ifVersion` makes the write a COMPARE-AND-SWAP: it lands only if the stored record is
+         *  still at that version, and `0` means "only if this key does not exist yet". Omit it and
+         *  the write is last-write-wins, exactly as before. Anything an extension COUNTS — stock, a
+         *  reservation, a balance — needs the guard: without it two concurrent calls both read 1 and
+         *  both write 0. */
+        set(
+            key: string,
+            value: unknown,
+            opts?: { visibility?: 'public' | 'private'; ifVersion?: number },
+        ): Promise<MemoryWriteResult>;
         search(prefix: string, opts?: Record<string, unknown>): Promise<Array<{ key: string; value: unknown }>>;
         delete(key: string): Promise<boolean>;
         getPublic(namespace: string, key: string): Promise<unknown | null>;
@@ -280,7 +317,8 @@ ${userFnDecl}
         now: () => __runStartedAt,
         hash: (s) => __hash(s),
         memory: {
-            get:       async (key)            => __call(__memory_get, [key]),
+            get:          async (key)         => __call(__memory_get, [key]),
+            getVersioned: async (key)         => __call(__memory_get_versioned, [key]),
             set:       async (key, value, opts) => __call(__memory_set, [key, JSON.stringify(value), JSON.stringify(opts || {})]),
             search:    async (prefix, opts)   => __call(__memory_search, [prefix, opts ? JSON.stringify(opts) : '{}']),
             delete:    async (key)            => __call(__memory_delete, [key]),
@@ -354,6 +392,12 @@ export function trackMemoryAccess(ctx: ExtensionCtx): { ctx: ExtensionCtx; acces
         get: async (key) => {
             accessLog.reads.push(key);
             return origMemory.get(key);
+        },
+        // A compare-and-swap reads the version before it writes, and that read is a read: leaving it
+        // out would make a CAS loop look like a write with no input.
+        getVersioned: async (key) => {
+            accessLog.reads.push(key);
+            return origMemory.getVersioned(key);
         },
         set: async (key, value, opts) => {
             accessLog.writes.push(key);
@@ -451,11 +495,19 @@ export async function executeExtensionAction(
             async (key) => ctx.memory.get(key),
             counter, limits.maxApiCalls, inflight);
 
+        registerAsyncHostFn(vm, '__memory_get_versioned',
+            async (key) => ctx.memory.getVersioned(key),
+            counter, limits.maxApiCalls, inflight);
+
         registerAsyncHostFn(vm, '__memory_set',
             async (key, valueJson, optsJson) => {
                 const value = JSON.parse(valueJson);
-                const opts = JSON.parse(optsJson || '{}') as { visibility?: 'public' | 'private' };
-                await ctx.memory.set(key, value, opts);
+                const opts = JSON.parse(optsJson || '{}') as {
+                    visibility?: 'public' | 'private'; ifVersion?: number;
+                };
+                // The result is RETURNED now. It used to be discarded, so a script could not tell a
+                // landed write from a lost one — which is what made every counter here racy.
+                return ctx.memory.set(key, value, opts);
             },
             counter, limits.maxApiCalls, inflight);
 

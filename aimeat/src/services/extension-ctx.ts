@@ -27,6 +27,12 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.2.0 — 2026-08-23 — `memory.getVersioned` + `memory.set(..., { ifVersion })`: compare-and-swap
+ *     over the primitives the storage layer already had (`setMemoryIfVersion` for the update,
+ *     `createMemoryIfAbsent` for the first write — the pair PATCH /v1/memory/:key uses). Without it
+ *     every counter an extension keeps is last-write-wins. A refusal writes nothing and reports the
+ *     version really there; the key is still resolved under extMemoryOwner, so the guard adds no
+ *     reach. A backend with no atomic update refuses rather than falling back to a silent clobber.
  *   v1.1.0 — 2026-08-11 — sandboxLimits(): the memory/timeout/API-call arithmetic, which both doors
  *     had written out themselves. The MCP copy used max(declared, cap), turning the node ceiling
  *     into a floor.
@@ -325,26 +331,78 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 return record ? record.value : null;
             },
 
+            // The read half of compare-and-swap. `get` returns only the value, so a script had no
+            // way to learn the version it needed to swap against.
+            getVersioned: async (key) => {
+                const record = await storage.getMemory(extMemoryOwner, key);
+                return record ? { value: record.value, version: record.version } : null;
+            },
+
             // GUARD (June H-5): the per-value size and per-key count limits. Enforcing this only in
             // the REST wrapper left the scheduler able to fill the database on a clock, repeatably,
             // which is why it belongs to the context and not to the caller.
+            //
+            // COMPARE-AND-SWAP (TARGET-070). Without `ifVersion` this is the historical
+            // read-increment-write, which is last-write-wins: two concurrent invocations of one
+            // action both read a stock of 1 and both write 0. The node already owned the atomic
+            // primitives — `setMemoryIfVersion` for the update and `createMemoryIfAbsent` for the
+            // first write, the same pair PATCH /v1/memory/:key uses — and the sandbox simply could
+            // not reach them. `ifVersion: 0` means "only if absent"; a refusal writes NOTHING and
+            // reports the version that is really there, so the script can re-read and retry.
+            //
+            // The key is always resolved under `extMemoryOwner`, here as everywhere else in this
+            // block, so the guard adds no reach: an extension still cannot aim a write at another
+            // namespace.
             set: async (key, value, opts) => {
                 await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
                 const existing = await storage.getMemory(extMemoryOwner, key);
                 const now = new Date().toISOString();
-                await storage.setMemory({
+                const record = {
                     key,
                     ownerGaii: extMemoryOwner,
                     value,
                     // Default 'public' is the historical contract every extension was written
                     // against; 'private' is opt-in for a key holding somebody's personal data.
-                    visibility: opts?.visibility === 'private' ? 'private' : 'public',
-                    tags: [],
+                    visibility: (opts?.visibility === 'private' ? 'private' : 'public') as 'private' | 'public',
+                    tags: [] as string[],
                     ttlHours: null,
                     version: existing ? existing.version + 1 : 1,
                     createdAt: existing ? existing.createdAt : now,
                     updatedAt: now,
-                });
+                };
+
+                if (opts?.ifVersion === undefined) {
+                    const written = await storage.setMemory(record);
+                    return { ok: true, version: written?.version ?? record.version };
+                }
+
+                // Create-only. `createMemoryIfAbsent` answers null when another writer got there
+                // first; a backend without it falls back to the existence check we already read.
+                if (opts.ifVersion === 0) {
+                    if (!storage.createMemoryIfAbsent) {
+                        if (existing) return { ok: false, version: existing.version };
+                        const written = await storage.setMemory({ ...record, version: 1 });
+                        return { ok: true, version: written?.version ?? 1 };
+                    }
+                    const created = await storage.createMemoryIfAbsent({ ...record, version: 1 });
+                    if (created) return { ok: true, version: created.version };
+                    const now2 = await storage.getMemory(extMemoryOwner, key);
+                    return { ok: false, version: now2?.version ?? null };
+                }
+
+                // Update-only, at exactly that version.
+                if (!existing) return { ok: false, version: null };
+                if (!storage.setMemoryIfVersion) {
+                    // No atomic update on this backend: refuse rather than pretend. A silent
+                    // last-write-wins here would be the very defect the guard was asked for.
+                    if (existing.version !== opts.ifVersion) return { ok: false, version: existing.version };
+                    const written = await storage.setMemory(record);
+                    return { ok: true, version: written?.version ?? record.version };
+                }
+                const swapped = await storage.setMemoryIfVersion(record, opts.ifVersion);
+                if (swapped) return { ok: true, version: swapped.version };
+                const current = await storage.getMemory(extMemoryOwner, key);
+                return { ok: false, version: current?.version ?? null };
             },
 
             search: async (prefix) => {
