@@ -80,6 +80,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
+import { resolveSupportRoute } from '../services/message-alias.js';
 import { registerCoreTools } from './core.js';
 import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
@@ -211,6 +212,16 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // the handshake is the one moment every client passes through, and never allowed to fail a
         // connection: proactiveGuidance() answers null on any trouble.
         const guidance = await proactiveGuidance(storage, config, owner);
+        // Who answers support here. Read from the stored peer rows because this layer has no peer
+        // map, and through the SAME resolver the send path uses, so the sentence an agent is told
+        // and the address its message actually takes cannot disagree. Never fails a connection: an
+        // unreadable peer list means the instructions say what they always said.
+        const supportAnsweredBy = await storage.listFederationPeers()
+            .then(rows => {
+                const route = resolveSupportRoute(rows);
+                return route.kind === 'upstream' ? route.nodeId : null;
+            })
+            .catch(err => { logger.warn('mcp: support routing unread, instructions unchanged', { error: String(err) }); return null; });
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             {
@@ -218,7 +229,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 // The orientation an agent reads before it has called anything. Without it a client
                 // meets a few hundred tool descriptions and no indication of where to start, so the
                 // handbook this text points at was reachable only by guessing it existed.
-                instructions: instructionsFor(role, { proactiveGuidance: guidance }),
+                instructions: instructionsFor(role, { proactiveGuidance: guidance, supportAnsweredBy }),
             },
         );
 

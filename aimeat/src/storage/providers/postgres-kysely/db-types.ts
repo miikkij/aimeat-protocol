@@ -942,6 +942,8 @@ export interface Conversation {
   id: string;
   kind: Generated<string>;
   participants: Json;
+  /** The one party to this thread on ANOTHER node. Not a participant: membership stays node-local. */
+  remote: Json | null;
   subject: string | null;
   updatedAt: Generated<Timestamp>;
 }
@@ -1136,8 +1138,11 @@ export interface ExtensionInstance {
 
 export interface FederationPeer {
   addedAt: Generated<Timestamp>;
+  allowBroadcast: Generated<boolean>;
   allowFederatedAuth: Generated<boolean>;
+  allowMessaging: Generated<boolean>;
   allowRouting: Generated<boolean>;
+  allowSettlement: Generated<boolean>;
   availability: string | null;
   availabilityPct: number | null;
   availabilityWindow: string | null;
@@ -1154,6 +1159,7 @@ export interface FederationPeer {
   shareCatalogue: Generated<boolean>;
   softwareVersion: string | null;
   status: Generated<string>;
+  supportUpstream: Generated<boolean>;
   tier: Generated<string>;
   url: string;
 }
@@ -1573,6 +1579,7 @@ export interface PeeringRequest {
   requestId: string;
   status: Generated<string>;
   targetUrl: string | null;
+  tier: string | null;
   toNodeId: string | null;
   updatedAt: Timestamp;
 }

@@ -43,7 +43,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from '../services/federation.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
-import { resolveGroupTarget } from '../services/message-alias.js';
+import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
 import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
@@ -120,7 +120,8 @@ export function registerDmMessageTools(
         annotationsFor('aimeat_dm_send'),
         async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
-            const recipientGhii = (to ?? '').trim();
+            // Reassigned when support here is answered on another node (see the redirect below).
+            let recipientGhii = (to ?? '').trim();
 
             if (recipientGhii && recipientGhii === senderGhii) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
@@ -156,6 +157,15 @@ export function registerDmMessageTools(
             if (group.kind === 'refused') {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: group.message, code: group.code }) }] };
             }
+            // Support here is answered on another node: an ordinary signed 1:1 to that node's support
+            // address, which it resolves into its own support thread. You wrote `support@operators`.
+            let redirectedTo: string | undefined;
+            if (group.kind === 'redirect') {
+                recipientGhii = group.to;
+                conversation_id = group.conversationId;
+                subject = group.subject ?? subject;
+                redirectedTo = group.to;
+            }
             if (group.kind === 'group') {
                 const sent = await sendGroupMessage(ctx, {
                     conversationId: group.conversation.id,
@@ -173,6 +183,9 @@ export function registerDmMessageTools(
                             addressed_to: group.conversation.alias ?? 'group',
                             participants: group.conversation.participants,
                             delivered_to: sent.delivered,
+                            // A named thread can legitimately reach nobody (you are the only
+                            // operator). Say so, or the 0 reads as a failure and you retry.
+                            note: soleParticipantNote(group.conversation, sent.delivered),
                             reply_with: 'aimeat_dm_send with conversation_id set to the value above',
                             ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                         }, null, 2),
@@ -202,6 +215,11 @@ export function registerDmMessageTools(
                         status: result.message.status,
                         attachments: result.message.attachments?.length ?? 0,
                         created_at: result.message.createdAt,
+                        ...(redirectedTo ? {
+                            addressed_to: redirectedTo,
+                            note: 'Support on this node is answered by the people who run it, on another node. Pass conversation_id back to continue the same thread.',
+                            reply_with: 'aimeat_dm_send with conversation_id set to the value above',
+                        } : {}),
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],

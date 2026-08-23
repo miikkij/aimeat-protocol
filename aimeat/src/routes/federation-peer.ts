@@ -13,6 +13,7 @@
  *       · ./federation-peer/peers.ts       — admin peering decisions, activate, heartbeat, presence, peer CRUD, promote
  *       · ./federation-peer/policy-book.ts — network policy + federation book
  *       · ./federation-peer/lifecycle.ts   — de-peer, ping, key-exchange
+ *       · ./federation-peer/link-invites.ts — one-time invitations that admit a node at a named tier
  *       · ./federation-peer/promotion.ts   — promotionMetrics helper
  *
  * @version-history
@@ -28,6 +29,7 @@ import { registerIntroduceRoutes } from './federation-peer/introduce.js';
 import { registerPeersRoutes } from './federation-peer/peers.js';
 import { registerPolicyBookRoutes } from './federation-peer/policy-book.js';
 import { registerLifecycleRoutes } from './federation-peer/lifecycle.js';
+import { registerLinkInviteRoutes } from './federation-peer/link-invites.js';
 
 export function federationPeerRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -37,6 +39,7 @@ export function federationPeerRouter(config: AimeatConfig, storage: Storage, pee
     registerPeersRoutes(router, config, storage, peers);
     registerPolicyBookRoutes(router, config, storage, peers);
     registerLifecycleRoutes(router, config, storage, peers);
+    registerLinkInviteRoutes(router, config, storage);
 
     return router;
 }

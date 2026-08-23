@@ -28,6 +28,7 @@ import { generateKeyPair, sign } from '../auth/keypair.js';
 import { emitChange } from '../services/event-bus.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import type { PeerInfo } from '../services/federation.js';
+import { deriveTierFlags } from '../services/federation-tiers.js';
 import { performKeyExchange } from '../services/federation-helpers.js';
 import { logger } from '../utils/logger.js';
 import { ROOMS } from '../services/home-rooms.js';
@@ -591,12 +592,10 @@ async function completeJoin(
         status: 'active',
         addedAt: now,
         lastSeen: now,
-        shareCatalogue: true,
-        replicateMemory: true,
-        allowRouting: true,
-        peerMode: 'federation',
-        allowFederatedAuth: false,
-        federationAuthScopes: [],
+        // The flags were spelled out here, which made this the fifth copy of the member literals and
+        // the one that silently missed every flag added since. Derive them.
+        ...deriveTierFlags('member'),
+        tier: 'member',
     };
 
     if (peers) peers.set(targetNodeId, newPeer);

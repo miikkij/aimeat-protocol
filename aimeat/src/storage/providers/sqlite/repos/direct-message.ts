@@ -473,13 +473,14 @@ function deserializeConversation(row: Record<string, unknown>): ConversationReco
   };
   if (row.subject) record.subject = row.subject as string;
   if (row.alias) record.alias = row.alias as string;
+  if (row.remote) record.remote = JSON.parse(row.remote as string) as ConversationRecord['remote'];
   return record;
 }
 
 export function createConversation(db: Database.Database, record: ConversationRecord): ConversationRecord {
   db.prepare(
-    `INSERT INTO conversations (id, kind, subject, participants, createdBy, alias, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO conversations (id, kind, subject, participants, createdBy, alias, remote, createdAt, updatedAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.id,
     record.kind,
@@ -487,6 +488,7 @@ export function createConversation(db: Database.Database, record: ConversationRe
     JSON.stringify(record.participants),
     record.createdBy,
     record.alias ?? null,
+    record.remote ? JSON.stringify(record.remote) : null,
     record.createdAt,
     record.updatedAt,
   );

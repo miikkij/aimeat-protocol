@@ -1404,9 +1404,17 @@ components:
           enum: [active, degraded, offline]
         tier:
           type: string
-          enum: [genesis, member, visiting]
+          enum: [genesis, member, visiting, contact]
           default: member
-          description: "Trust tier. 'visiting' = low-trust self-join (browse + request work only); 'member' = full peer; promoted by a local operator."
+          description: >-
+            Trust tier, low to high: contact < visiting < member < genesis. 'contact' is the floor
+            of the ladder — direct messages cross and nothing else does: no catalogue, no memory
+            replication, no routing, no broadcast, no settlement, no federated auth, and the peer is
+            absent from both nodes' public directory (peer_mode is forced to 'private'). This is
+            where an infrastructure operator sits on a managed instance. 'visiting' = low-trust
+            self-join (browse + request work only); 'member' = full peer, promoted by a local
+            operator. A contact link is not promotable in one step: widening it is a re-peering
+            decision (409 TIER_NOT_PROMOTABLE).
         software_version:
           type: string
           nullable: true
@@ -1439,11 +1447,39 @@ components:
           type: boolean
           default: true
           description: Whether to accept routed requests from this peer
+        allow_messaging:
+          type: boolean
+          default: true
+          description: >-
+            Whether this peer may deliver direct messages, read receipts and attachment download
+            grants here. The one capability a 'contact' peer carries. Absent on a row written before
+            this field existed means true.
+        allow_broadcast:
+          type: boolean
+          default: true
+          description: >-
+            Whether this peer's operator may announce to EVERY human on this node at once. Off for
+            'contact': a broadcast auto-accepts the contact for each recipient, on a link only the
+            operator agreed to.
+        allow_settlement:
+          type: boolean
+          default: true
+          description: >-
+            Whether this peer may move morsels onto this node's ledger. Off for 'contact'. This is
+            the only unauthenticated door on the node that credits a balance.
+        support_upstream:
+          type: boolean
+          default: false
+          description: >-
+            Whether this node's `support@operators` is answered by THIS peer. At most one active peer
+            may carry it. Not a tier flag: raising the link's tier keeps the support routing.
         peer_mode:
           type: string
           enum: [federation, private]
           default: federation
-          description: Peering mode controlling which federation features are enabled
+          description: >-
+            Peering mode controlling which federation features are enabled. Forced to 'private' at
+            tier 'contact', which is what keeps the link out of GET /v1/federation/directory.
     # === Catalogue ===
     Catalogue:
       type: object
@@ -16705,14 +16741,32 @@ paths:
                 allow_routing:
                   type: boolean
                   description: Whether to accept routed requests from this peer
+                allow_messaging:
+                  type: boolean
+                  description: Whether this peer may deliver messages, receipts and attachment grants here
+                allow_broadcast:
+                  type: boolean
+                  description: Whether this peer may announce to every human on this node at once
+                allow_settlement:
+                  type: boolean
+                  description: Whether this peer may move morsels onto this node's ledger
+                support_upstream:
+                  type: boolean
+                  description: >-
+                    Point this node's `support@operators` at this peer. 409 ONE_UPSTREAM_ONLY when
+                    another active peer already carries it.
                 peer_mode:
                   type: string
                   enum: [federation, private]
                   description: Peering mode controlling which federation features are enabled
                 tier:
                   type: string
-                  enum: [genesis, member, visiting]
-                  description: Change the peer's trust tier; re-derives the canonical permission flags
+                  enum: [genesis, member, visiting, contact]
+                  description: >-
+                    Change the peer's trust tier; re-derives the canonical permission flags. Every
+                    flag in this body is then held to what the tier permits, so an edit may always
+                    turn a capability OFF and may only turn one ON where the tier already allows it.
+                    At 'contact' nothing is editable upward, peer_mode included.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -30346,6 +30400,14 @@ paths:
         low-trust `visiting` peer immediately (200, `{ status: active, tier: visiting }`) — visiting
         peers may browse/discover and request paid work, but get no provider/relay/replication/auth
         rights until a local operator promotes them to `member`.
+
+        INVITE. An optional `invite_token` presents a one-time invitation the receiving node minted
+        earlier (POST /v1/federation/link-invites), and admits the caller at the tier THAT INVITE
+        names — typically `contact`, for a node the operator is provisioning. The tier is read from
+        the stored invite and never from this body: a door that believes a caller's claim about its
+        own trust level is not a door. An unknown, expired or already-used token is not an error; it
+        falls through to the ordinary pending path, so a leaked token is worth one link, at one tier,
+        once.
       tags: [Federation]
       requestBody:
         required: true
@@ -30353,11 +30415,85 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                invite_token:
+                  type: string
+                  description: A one-time invitation minted by the receiving node. Optional.
       responses:
         '200':
-          description: Auto-admitted as a visiting peer (open join enabled)
+          description: Auto-admitted (open join, or a valid invite) — carries the tier admitted at
         '202':
-          description: Pending operator approval (default)
+          description: Pending operator approval (default; also an unknown/expired/used invite)
+
+  /v1/federation/link-invites:
+    post:
+      operationId: mintLinkInvite
+      summary: Mint a one-time link invitation
+      description: |
+        Create an invitation that admits ONE node at a named tier when it introduces itself. This is
+        how a node you PROVISION becomes a peer without its future operator having to approve a
+        request from you on a screen they have not been shown yet.
+
+        The token is returned here and nowhere else: only its hash is stored, so a lost token is
+        re-minted rather than looked up, and the listing never contains one. A tier fuller than
+        `visiting` is refused — full federation is agreed with a node you can already see, not
+        granted in advance by a token.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: string
+                  enum: [contact, visiting]
+                  default: contact
+                  description: What the invited node is admitted as. `contact` is messages and nothing else.
+                ttl_hours:
+                  type: number
+                  default: 72
+                  description: How long the unused invite stands.
+                label:
+                  type: string
+                  description: Free-text note for the operator, e.g. which customer this was minted for.
+      responses:
+        '201':
+          description: Created — the response carries the token, which is never readable again
+        '400':
+          description: INVALID_INPUT — a tier an invite may not name, or a non-positive ttl_hours
+    get:
+      operationId: listLinkInvites
+      summary: List link invitations
+      description: Every invite this node has minted, newest first, with its state (open, consumed, expired). Never includes a token.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/federation/link-invites/{id}:
+    delete:
+      operationId: revokeLinkInvite
+      summary: Revoke a link invitation
+      description: Delete an unused invitation so it can no longer admit anybody. A consumed invite is kept as the record of who was admitted at what tier.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          description: NOT_FOUND — no invite by that id
 
   /v1/federation/peer/introduce/{id}/status:
     get:
@@ -34705,10 +34841,25 @@ paths:
           carries `conversation_id`, `participants` and `delivered_to` instead of a single message
           record; pass that `conversation_id` back to continue the same thread. A support send is
           never held behind the first-contact gate. 503 `NO_OPERATORS` when the node has none.
+          `delivered_to` counts the people OTHER than the sender who were told, so it is 0 when the
+          only operator writes to their own support address; that is a stored thread rather than a
+          failure, and `note` says so in words. A message an operator's own AGENT sends counts 1,
+          because the human did not write it and is told.
         * A `conversation_id` naming an existing GROUP conversation posts into it, and `to` may then
           be omitted. A non-participant gets 403 `NOT_A_PARTICIPANT`.
 
-        A group conversation is currently node-local: every participant must live on this node.
+        SUPPORT ANSWERED ELSEWHERE. On a node where a peer carries `support_upstream` (a managed
+        instance, whose buyer is its own local operator), `support@operators` resolves to that peer
+        instead of to this node's operators. The sender writes the same address and needs to know
+        nothing: the message becomes an ordinary signed 1:1 to `support@{peerNodeId}`, which the
+        receiving node resolves into its own support thread, and the response carries `addressed_to`
+        plus a `note` saying where it went. Pass `conversation_id` back to continue the same ticket.
+        `support@{thisNodeId}` — the long form — always means THIS node's own operators and is the
+        escape hatch for an owner who wants their own people rather than their provider's.
+
+        A group conversation is currently node-local: every participant must live on this node. A
+        thread that arrived from a peer keeps that peer's party as a return address rather than as a
+        participant, which is how an answer travels back without a foreign member.
       tags: [Direct Messages]
       security:
         - BearerAuth: []

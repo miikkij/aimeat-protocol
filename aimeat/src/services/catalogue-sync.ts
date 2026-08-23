@@ -76,6 +76,18 @@ export async function syncCatalogueToPeer(
   const syncState = getPeerSyncState(peer.nodeId);
   const catalogueHash = await computeCatalogueHash(storage);
 
+  // `shareCatalogue` described half a relationship. The inbound route has always refused a peer
+  // without it, while this pushed our whole catalogue outward to any active peer — and the half it
+  // did not describe was the one where our data LEAVES. The guard sits here rather than in the
+  // callers because this is the funnel every live path goes through (sync-scheduler, both of its
+  // sites), which is exactly where replicateMemoryToPeer puts the same check.
+  if (peer.shareCatalogue === false) {
+    return {
+      peer_node_id: peer.nodeId, entries_sent: 0, incremental: false,
+      catalogue_hash: catalogueHash, success: true, resync_required: false,
+    };
+  }
+
   try {
     // 1. Read local CSMs where federate: true
     const csms = await storage.listCsms();

@@ -21,12 +21,15 @@ import type { Storage, DirectMessageAttachment } from '../../storage/interface.j
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
+import { gatePeer } from '../../services/federation-peer-gate.js';
 import { verify } from '../../auth/keypair.js';
 import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
 import { parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
-import { messagePreview, conversationIdFor } from '../../utils/messaging.js';
+import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
+import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
+import { listOperatorGhiis } from '../../services/operators.js';
 import { generateDownloadToken } from '../../services/download-token.js';
 import { duplicateMessageAttachments } from '../../services/attachment-duplication.js';
 
@@ -59,25 +62,17 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        // Verify the source node is a known peer
-        const peer = [...peers.values()].find(p => p.nodeId === source_node);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        // Active peer, entitled to this door, key on file. Refused before anything is read or written.
+        const gate = gatePeer(peers, source_node, 'replicateMemory');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
-
-        if (!peer.replicateMemory) {
-            res.status(403).json(error(config.nodeId, 'POLICY_DENIED', 'This peer has memory replication disabled'));
-            return;
-        }
+        const peer = gate.peer;
 
         // P1-11: Require signed replication — verify peer signature
         if (!signature) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on replication request'));
-            return;
-        }
-        if (!peer.publicKey) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Peer has no public key on file for signature verification'));
             return;
         }
         const replicatePayload = JSON.stringify({ source_node, gaii, key, value, visibility, version, timestamp });
@@ -168,17 +163,14 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        const peer = [...peers.values()].find(p => p.nodeId === source_node);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        const gate = gatePeer(peers, source_node, 'allowMessaging');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
+        const peer = gate.peer;
         if (!signature) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on message'));
-            return;
-        }
-        if (!peer.publicKey) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Peer has no public key on file for signature verification'));
             return;
         }
         const messagePayload = JSON.stringify({ source_node, message, timestamp });
@@ -193,6 +185,49 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // `deliveryGhii`, so fall back to the recipient itself (prior behaviour).
         const recipientGhii: string = message.recipientGhii;
         const deliveryGhii: string = message.deliveryGhii ?? recipientGhii;
+
+        // Addressed to this node's SUPPORT, not to a person on it. Resolved here, before the owner
+        // lookup below, which would find no owner called `support` and answer 404 RECIPIENT_NOT_FOUND
+        // — the sender would be told their provider does not exist.
+        //
+        // No first-contact gate on this path, matching the local support thread: someone asking for
+        // help must not land in a request queue nobody opens. The control over an abusive peer is
+        // revoking the link, which is the same control that created it.
+        if (isAliasAddress(deliveryGhii, config.nodeId)) {
+            const received = await receiveRemoteSupportMessage({ config, storage, peers }, config, {
+                sourceNode: source_node,
+                senderGhii: message.senderGhii,
+                conversationId: message.conversationId,
+                subject: message.subject ?? undefined,
+                body: message.body ?? '',
+                messageId: message.id,
+                attachments: normalizeInboundAttachments(message.attachments, message.senderGhii, source_node),
+                createdAt: message.createdAt,
+            });
+            if (!received.ok) {
+                res.status(received.status).json(error(config.nodeId, received.code, received.message));
+                return;
+            }
+            emitChange('messages');
+            // Wake any agent among the operators, the same signal a 1:1 DM sends.
+            for (const participant of received.participants) {
+                if (participant === deliveryTargetFor(participant)) continue;
+                emitDelivery({
+                    target: participant, kind: 'dm.inbound', id: message.id,
+                    payload: {
+                        id: message.id, conversationId: received.conversationId,
+                        subject: message.subject ?? null, senderGhii: message.senderGhii,
+                        preview: messagePreview(message.body ?? ''),
+                        attachments: message.attachments?.length ?? 0,
+                        createdAt: message.createdAt ?? new Date().toISOString(), interactive: null,
+                    },
+                });
+                try { emitResourceUpdated(participant, 'aimeat://dm/inbox'); } catch (err) { logger.warn('POST /v1/federation/message: no live MCP session', { error: String(err) }); }
+            }
+            res.json(success(config.nodeId, { delivered: true, state: 'accepted', conversation_id: received.conversationId }));
+            return;
+        }
+
         const parsedDelivery = parseGaiiLoose(deliveryGhii);
         if (parsedDelivery.node !== config.nodeId) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Recipient is not hosted on this node'));
@@ -212,7 +247,27 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         }
         let state = contact?.state;
         if (!state) {
-            const autoAccept = isSameOwner(message.senderGhii, deliveryGhii);
+            // A first contact from a stranger is held. Three things are not that.
+            //
+            // (2) is the general one and it fixes a class rather than a case: an answer arrives from a
+            // DIFFERENT identity than the one that was written to, and the gate reads it as a cold
+            // approach. Support is where it bites hardest — you write to `support@{node}` and a named
+            // person answers — but any thread whose other side has more than one identity has it.
+            // If this mailbox, or the agent the message is addressed to, already holds a message in
+            // this conversation, then somebody here started it and the question has been answered.
+            //
+            // (3) covers the genuinely cold case: the people who answer support for this node writing
+            // to the operator who pointed support at them. Deliberately narrow — an operator only, not
+            // every human on the node, because on a fifty-person managed instance the link was agreed
+            // by the operator alone and is not a licence to approach their colleagues.
+            const knownThread = message.conversationId
+                ? (await Promise.all([...new Set([deliveryGhii, recipientGhii])].map(async mailbox =>
+                    (await storage.listConversation(mailbox, message.conversationId)).messages.length > 0))).some(Boolean)
+                : false;
+            const fromOurSupport = peer.supportUpstream === true
+                && (await listOperatorGhiis(storage, config)).includes(deliveryGhii);
+
+            const autoAccept = isSameOwner(message.senderGhii, deliveryGhii) || knownThread || fromOurSupport;
             state = autoAccept ? 'accepted' : 'pending';
             await storage.setContactState(deliveryGhii, message.senderGhii, state, message.id);
         }
@@ -298,12 +353,15 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node and broadcast{senderGhii} are required'));
             return;
         }
-        const peer = [...peers.values()].find(p => p.nodeId === source_node);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        // A broadcast reaches EVERY human on this node and auto-accepts the contact for each of them,
+        // on a link only the operator agreed to. Its own word, refused at the floor.
+        const gate = gatePeer(peers, source_node, 'allowBroadcast');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
-        if (!signature || !peer.publicKey) {
+        const peer = gate.peer;
+        if (!signature) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer key'));
             return;
         }
@@ -356,12 +414,14 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, message_id, and kind are required'));
             return;
         }
-        const peer = [...peers.values()].find(p => p.nodeId === source_node);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        // A receipt is part of the message conversation, so it rides the same word.
+        const gate = gatePeer(peers, source_node, 'allowMessaging');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
-        if (!signature || !peer.publicKey) {
+        const peer = gate.peer;
+        if (!signature) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer public key'));
             return;
         }
@@ -388,12 +448,15 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'source_node, message_id, storage_key, owner_ghii, recipient_ghii are required'));
             return;
         }
-        const peer = [...peers.values()].find(p => p.nodeId === source_node);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        // Refused BEFORE the relationship check below, which reads a stored message and tells the
+        // caller whether it exists. A peer with no message rights must not learn that either.
+        const gate = gatePeer(peers, source_node, 'allowMessaging');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
-        if (!signature || !peer.publicKey) {
+        const peer = gate.peer;
+        if (!signature) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature or peer public key'));
             return;
         }

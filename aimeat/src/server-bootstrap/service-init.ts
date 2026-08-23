@@ -201,6 +201,12 @@ export async function initializeServices(
         shareCatalogue: sp.shareCatalogue ?? true,
         replicateMemory: sp.replicateMemory ?? true,
         allowRouting: sp.allowRouting ?? true,
+        // A row written before these columns existed keeps what it could already do. supportUpstream
+        // is the opposite default: support routing is never inherited from an absent value.
+        allowMessaging: sp.allowMessaging ?? true,
+        allowBroadcast: sp.allowBroadcast ?? true,
+        allowSettlement: sp.allowSettlement ?? true,
+        supportUpstream: sp.supportUpstream ?? false,
         peerMode: sp.peerMode || 'federation',
         allowFederatedAuth: sp.allowFederatedAuth ?? false,
         federationAuthScopes: sp.federationAuthScopes ?? [],

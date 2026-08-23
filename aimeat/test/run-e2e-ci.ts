@@ -218,6 +218,8 @@ const ALL_SUITES = [
     'test/e2e-federation.ts',
     'test/e2e-presence.ts',
     'test/e2e-federation-visiting.ts',
+    'test/e2e-federation-contact-link.ts',
+    'test/federation-support.ts',
     'test/e2e-federation-policy.ts',
     'test/e2e-federation-nodeinfo.ts',
     'test/e2e-federation-book.ts',
@@ -501,6 +503,7 @@ const GUARD_SUITES = [
     'test/e2e-storage-visibility.ts',       // private, shared and public files, and who may fetch which
     'test/e2e-money-audit.ts',              // no path mints, double-spends or bills the wrong account
     'test/e2e-zip-security.ts',             // an uploaded archive cannot write outside where it was unpacked
+    'test/e2e-federation-contact-link.ts',  // a contact link carries messages and refuses every other door
     'test/e2e-static-hardening.ts',         // a dotfile (.env, .env~, .git/) is refused before any static handler
 ];
 

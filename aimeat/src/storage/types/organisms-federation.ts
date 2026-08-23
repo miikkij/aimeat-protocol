@@ -22,6 +22,11 @@ export interface PeeringRequestRecord {
   publicKey?: string;
   message?: string;
   status: 'pending' | 'approved' | 'rejected' | 'auto_approved';
+  /** The tier this request was APPROVED at. Absent → 'member', which is what every request meant
+   *  before the ladder had a floor. Load-bearing: de-peering does not delete the request, and the
+   *  key-exchange auto-add reads it, so without this a de-peered contact link comes back as a
+   *  member on the next key exchange. */
+  tier?: 'genesis' | 'member' | 'visiting' | 'contact';
   createdAt: string;
   updatedAt: string;
 }
@@ -206,11 +211,21 @@ export interface FederationPeerRecord {
   shareCatalogue: boolean;
   replicateMemory: boolean;
   allowRouting: boolean;
+  /** May this peer deliver direct messages, read receipts and attachment grants here?
+   *  Legacy rows default TRUE: every peer that exists today keeps messaging exactly as it does. */
+  allowMessaging: boolean;
+  /** May this peer's operator announce to EVERY human on this node at once? Legacy rows TRUE. */
+  allowBroadcast: boolean;
+  /** May this peer move morsels onto this node's ledger? Legacy rows TRUE. */
+  allowSettlement: boolean;
   peerMode: 'federation' | 'private';
   allowFederatedAuth: boolean;
   federationAuthScopes: string[];
-  /** Trust tier: 'genesis' | 'member' | 'visiting'. Absent (legacy rows) → 'member'. */
-  tier?: 'genesis' | 'member' | 'visiting';
+  /** Trust tier. Absent (legacy rows) → 'member'. `contact` is the floor: messages only. */
+  tier?: 'genesis' | 'member' | 'visiting' | 'contact';
+  /** Does this node's `support@operators` resolve to THIS peer? At most one active peer may carry
+   *  it. Not a TierFlag, so promoting the link does not lose the routing. Legacy rows FALSE. */
+  supportUpstream?: boolean;
   /** Availability label from heartbeat uptime (Phase B): 'temporary' | 'permanent' | 'unknown'. */
   availability?: 'temporary' | 'permanent' | 'unknown' | null;
   /** Optional expiry for time-limited visiting peers (Phase B). */
