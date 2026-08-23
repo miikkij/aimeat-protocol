@@ -21,8 +21,23 @@
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredArray } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, requiredValue, optionalNumber, optionalBoolean, optionalArray, optionalRecord, requiredRecord, requiredArray } from './tool-call-helpers.js';
 import type { ApiResponse } from './api-client.js';
+
+/**
+ * The compliance register's `part`, checked against the two documents that exist.
+ *
+ * It becomes a path segment, so an unchecked value would build a URL the route never declared and
+ * the caller would read the resulting 404 as "the report is empty" rather than "you asked for
+ * something that is not a thing".
+ */
+function compliancePart(input: JsonObject): 'usecases' | 'questionnaire' {
+    const part = requiredString(input, 'part');
+    if (part !== 'usecases' && part !== 'questionnaire') {
+        throw new Error(`part has to be "usecases" or "questionnaire", not "${part}"`);
+    }
+    return part;
+}
 
 /**
  * Appended to the catalog description on both connector doors. An agent that learns this from the
@@ -273,6 +288,32 @@ export const coreTools: ConnectCliToolDefinition[] = [
     {
         name: 'aimeat_admin_config',
         handler: ({ client }) => client.get('/v1/admin/config'),
+    },
+    {
+        // `part` is validated against the two literals rather than interpolated, because it lands in
+        // a path segment. An unchecked value here would be a path the route never declared.
+        name: 'aimeat_compliance_report',
+        handler: ({ client }, input) => {
+            // Two doors for two reports: the owner slice needs no permission, the whole installation
+            // needs an operator account plus the exact word. Defaulting to the slice is least
+            // privilege, and it is what almost every caller means.
+            const scope = optionalString(input, 'scope');
+            const path = scope === 'node' ? '/v1/admin/compliance/report' : '/v1/compliance/report/mine';
+            return client.get(`${path}${query({
+                month: optionalString(input, 'month'),
+                since_days: optionalNumber(input, 'since_days'),
+            })}`);
+        },
+    },
+    {
+        name: 'aimeat_compliance_register_read',
+        handler: ({ client }, input) => client.get(`/v1/admin/compliance/${compliancePart(input)}`),
+    },
+    {
+        name: 'aimeat_compliance_register_write',
+        handler: ({ client }, input) => client.put(
+            `/v1/admin/compliance/${compliancePart(input)}`, requiredRecord(input, 'value'),
+        ),
     },
     {
         name: 'aimeat_board_list',

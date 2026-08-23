@@ -24,6 +24,11 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   v1.14.0 — 2026-08-23 — handleExtensionUpload derives the owner BEFORE parsing the manifest and
+ *     passes it to parseExtensionZip. The builder was being handed the literal string `upload` as
+ *     the installer, and config.app compares the named app's owner against exactly that, so a
+ *     presigned ZIP could not install any extension that gates an app. It was invisible because
+ *     this handler overwrote installedBy on the record afterwards.
  *   v1.13.0 — 2026-08-11 — handleStorageUpload calls services/storage-file-write.ts and
  *     handleCortexUpload's install branch calls services/cortex-lifecycle.ts, so this door stops
  *     being a third copy of two capabilities that got one implementation each in the August 2026
@@ -370,22 +375,22 @@ async function handleExtensionUpload(
     res: Response, config: AimeatConfig, storage: Storage,
     sub: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
-    const result = await parseExtensionZip(data, config);
+    // Derived BEFORE the manifest is parsed, because the manifest check for config.app compares
+    // the named app's owner against the installer. The token subject is a full GAII
+    // (agent#owner@node) for agent uploads and the owner's GHII (owner@node) for owner / app-grant
+    // uploads; parseGAII returns null for the GHII form.
+    const parsedSub = parseGAII(sub);
+    const ownerName = parsedSub ? parsedSub.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
+
+    const result = await parseExtensionZip(data, config, ownerName);
     if (!result.ok) {
         res.status(400).json({ success: false, error: result.code ?? 'VALIDATION_FAILED', message: result.error });
         return;
     }
 
-    // The token subject is a full GAII (agent#owner@node) for agent uploads and the owner's GHII
-    // (owner@node) for owner / app-grant uploads. parseGAII returns null for the GHII form, so
-    // `parseGAII(sub)?.owner` alone recorded the extension as installedBy 'upload' AND made the
-    // ownership check below vanish by short-circuiting — any owner could then overwrite anyone's
-    // extension through a presigned ZIP. Derive the bare owner the way handleAppUpload does.
-    const parsedSub = parseGAII(sub);
-    const ownerName = parsedSub ? parsedSub.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
-
+    // The builder has already stamped installedBy from the same derived owner; the ownership check
+    // below and the record therefore read one value, not two.
     const record = result.record!;
-    record.installedBy = ownerName;
     record.installedAt = new Date().toISOString();
 
     // `update`/`activate` ride in the token meta (PRESIGNED_META_KEYS). This handler used to ignore

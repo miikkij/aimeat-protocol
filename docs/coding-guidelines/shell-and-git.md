@@ -27,7 +27,24 @@ can only be corrected by rewriting history, so the damage is permanent.
 | Commit with a message longer than one line | Write the message to a file, then `bash scripts/git-commit.sh <file>` |
 | Commit with a one-line message | `git commit -m "…"` is fine — one line, one pair of quotes, no here-string |
 | Write a file with any content | Use the editor / file-writing tool, never `echo`, `cat <<EOF` or `python -c` |
+| Change part of an existing file | Use the editing tool, never `sed -i`, `perl -pi` or a rewrite-in-place script |
+| Read or search a file | The shell is the right tool: `cat`, `head`, `sed -n`, `grep`, `find` |
 | Send a request body | `curl --data-binary @file` (also the only way UTF-8 survives on Windows) |
+
+The reading half and the writing half are not the same question. Reading through the shell is
+cheap and reversible; `sed -n '40,80p'` that lands on the wrong lines shows you the wrong lines and
+you notice. Writing through it is neither. `sed -i` with a pattern that matches twice edits both,
+matches zero times and edits nothing, or matches inside a string literal — and all three exit 0.
+The editing tool refuses when its anchor is not unique or not found, which converts the same
+mistake into a message on the spot.
+
+An assistant working here may be told by its own harness to prefer the shell for edits, because in
+bypass-permissions mode Bash prompts less. That instruction also says to fall back to a dedicated
+tool when the shell cannot do the job. On a source file in this repo it cannot, for the reasons
+above, and the fallback is the default rather than the exception.
+
+A bulk edit across many files is the one case that earns a script, and the rules for writing one are
+in *Rewriting a file instead of editing it* below.
 
 `scripts/git-commit.sh` exists so the message never touches a shell's quoting rules:
 

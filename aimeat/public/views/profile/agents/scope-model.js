@@ -81,6 +81,13 @@ export const NOT_IN_WILDCARD = [
   // own. It answers an incident an unscoped agent caused, so carrying it inside "Full access" would
   // rebuild the same hole one level up. Only an operator's own agent can be given it at all.
   'operator:organism-repair',
+  // ── Added 2026-08-23 ─────────────────────────────────────────────────────────────────────────
+  // The node-wide compliance report, and the register it reads. The report puts every account's AI
+  // activity on this node into one document, so the read word gives away as much as the write word
+  // changes, and neither rides along with "Full access". Only an operator's own agent can be given
+  // them at all.
+  'compliance:read',
+  'compliance:write',
 ];
 
 /**
@@ -201,6 +208,15 @@ export const SCOPE_DOMAINS = [
   //   organism whose creator became unreachable had no repair path on any surface, and a capability
   //   an operator cannot grant from this page is a capability with no door.
   { key: 'operator',   permissions: ['organism-repair'] },
+
+  // ── Added 2026-08-23 (BR-02) ─────────────────────────────────────────────────────────────────
+  // compliance:read / compliance:write — the node-wide compliance report, and the use-case register
+  //   and question set behind it. Same gate as operator:organism-repair
+  //   (requireOperatorPrincipal, src/auth/middleware.ts), so the same caveat applies: it reads the
+  //   OWNER's roles first, and on a normal account these boxes grant nothing. Two words rather than
+  //   one because they fail differently — reading is a disclosure of every account's AI activity,
+  //   writing changes what the report says about the node.
+  { key: 'compliance', permissions: ['read', 'write'] },
 ];
 
 export const SCOPE_TEMPLATES = {

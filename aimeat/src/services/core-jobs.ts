@@ -59,6 +59,14 @@ export function registerCoreHandlers(
     await runUsageArchiveJob(storage);
   });
 
+  // The operator's monthly compliance report, built from the month that ended and stored under
+  // compliance.report.<YYYY-MM>. Dynamic import for the same reason as the two above: a node whose
+  // operator never looks at this never loads it.
+  scheduler.registerCoreHandler('compliance-report-monthly', async () => {
+    const { runComplianceMonthlyReport } = await import('./compliance-monthly-job.js');
+    await runComplianceMonthlyReport(config, storage);
+  });
+
   scheduler.registerCoreHandler('capability-aggregation', async () => {
     const { runCapabilityAggregation } = await import('./capability-aggregator.js');
     await runCapabilityAggregation(config, storage);

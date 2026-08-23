@@ -49,6 +49,7 @@ import { registerContactTools } from './contacts.js';
 import { registerCompanyTools } from './companies.js';
 import { registerPortfolioTools } from './portfolio.js';
 import { registerOperatorTools } from './operator.js';
+import { registerComplianceTools } from './compliance.js';
 
 export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void {
   registerCoreTools(mcp, registry);
@@ -85,4 +86,5 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerCompanyTools(mcp, registry);
   registerPortfolioTools(mcp, registry);
   registerOperatorTools(mcp, registry);
+  registerComplianceTools(mcp, registry);
 }
