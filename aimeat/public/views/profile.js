@@ -71,6 +71,7 @@ import OffersTab from './profile/offers-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
 import { OpenRouterSettings } from './profile/openrouter-settings.js';
 import { AiTransparencyCard } from './profile/ai-transparency-card.js';
+import { ComplianceCard } from './profile/compliance-card.js';
 import CalibratorTab from './profile/calibrator-tab.js';
 import PackagesTab from './profile/packages-tab.js';
 import CapabilitiesTab from './profile/capabilities-tab.js';
@@ -94,7 +95,8 @@ import LibrariesTab from './profile/libraries-tab.js';
 function OpenRouterTab(props) {
   return html`
     <${OpenRouterSettings} ...${props} startOpen=${true} />
-    <${AiTransparencyCard} />`;
+    <${AiTransparencyCard} />
+    <${ComplianceCard} />`;
 }
 
 const TABS = [

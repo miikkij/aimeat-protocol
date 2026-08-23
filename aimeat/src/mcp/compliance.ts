@@ -31,6 +31,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE } from '../utils/scope-coverage.js';
@@ -72,20 +73,27 @@ export function registerComplianceTools(
     'aimeat_compliance_report',
     descriptionFor('aimeat_compliance_report'),
     {
+      scope: z.enum(['mine', 'node']).optional()
+        .describe('Whose report. "mine" (the default) is your owner\'s own slice; "node" is the whole installation and is operator-only.'),
       since_days: z.number().int().min(1).max(3650).optional()
         .describe('Rolling window in days (default 30). Ignored when month is given.'),
       month: z.string().optional()
         .describe('A whole calendar month, YYYY-MM. Wins over since_days.'),
     },
     annotationsFor('aimeat_compliance_report'),
-    async ({ since_days, month }) => {
-      const denied = await gate(COMPLIANCE_READ_SCOPE);
-      if (denied) return refuse(denied);
+    async ({ scope, since_days, month }) => {
       if (month && !MONTH_RE.test(month)) {
         return refuse('The month has to look like 2026-08. Leave it out to get a rolling window instead.');
       }
-      const report = await buildComplianceReport(storage, config, { sinceDays: since_days, month });
-      return text(report);
+      // "mine" is the default on purpose: least privilege, and it is the answer almost every caller
+      // wants. The whole installation is the deliberate ask, and it is the one that is gated.
+      if (scope === 'node') {
+        const denied = await gate(COMPLIANCE_READ_SCOPE);
+        if (denied) return refuse(denied);
+        return text(await buildComplianceReport(storage, config, { sinceDays: since_days, month }));
+      }
+      const ownerGhii = ownerGhiiOf(agentGaii);
+      return text(await buildComplianceReport(storage, config, { ownerGhii, sinceDays: since_days, month }));
     },
   );
 

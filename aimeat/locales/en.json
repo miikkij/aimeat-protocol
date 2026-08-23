@@ -304,7 +304,11 @@
         "consent-retention": "Records of who accessed what are deleted after {days} days here, so anything older cannot appear. The permissions themselves are not deleted.",
         "usage-window": "AI use is counted from a window of about {days} days. Anything older has been archived, and a zero would mean archived rather than idle.",
         "provenance-on": "Recording is on, so content produced here during this period has a record. Content produced before it was turned on does not.",
-        "provenance-off": "Recording is OFF here. Nothing was recorded, so every count above is zero for that reason and not because nothing happened."
+        "provenance-off": "Recording is OFF here. Nothing was recorded, so every count above is zero for that reason and not because nothing happened.",
+        "owner-this-node-only": "Only what you did here. Anything you published elsewhere, on another installation or on your own personal one, is outside these numbers.",
+        "owner-your-slice": "Only yours. Nothing on this page describes anybody else's activity, and nobody else sees yours here.",
+        "owner-register-is-the-operators": "The record of what AI is used for is kept by whoever runs this installation, not by you. Below are the entries that name your account. If something of yours is missing, that is a conversation with them rather than something you can fix here.",
+        "owner-provenance-off": "Recording is switched off on this installation, which is not your setting. Nothing was recorded, so every number above is zero for that reason and not because you did nothing."
       },
       "howIntro": "This page compares two things: what has actually been done with AI here, and what has been written down about it. The difference appears at the top under \"Needs a look\", and it is what an audit asks about."
     }
@@ -9742,5 +9746,20 @@
   "chat.nudgeDismiss": "Not now",
   "chat.starterWork": "Take something off my plate",
   "chat.starterWorkAsk": "Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.",
-  "appGrant.updatedNotice": "This app has been updated and now asks for something new. Approve it again to keep using it."
+  "appGrant.updatedNotice": "This app has been updated and now asks for something new. Approve it again to keep using it.",
+  "complianceMine": {
+    "title": "Your own AI use, and what has been written down about it",
+    "desc": "What you have done with AI here, and whether any of it has been written down. Yours only.",
+    "loading": "Reading your own figures…",
+    "loadFailed": "Your figures could not be read just now.",
+    "calls": "Model calls",
+    "models": "Models used",
+    "undocumented": "Not written down",
+    "entries": "Entries about you",
+    "undocumentedNote": "You have used these models and no entry mentions them. The entries are kept by whoever runs this installation, so this is worth raising with them.",
+    "entriesTitle": "Entries that name you",
+    "entriesNote": "These were written by whoever runs this installation. You cannot change them from here, but you can see what has been written about you.",
+    "entriesEmpty": "No entry names you. If you have used AI here, none of it appears in what has been written down.",
+    "limitsTitle": "What this does not cover"
+  }
 }

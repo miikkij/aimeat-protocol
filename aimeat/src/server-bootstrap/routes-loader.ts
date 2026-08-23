@@ -147,6 +147,7 @@ import { instancesRouter } from '../routes/instances.js';
 import { templatesRouter } from '../routes/templates.js';
 import { adminSchedulerRouter } from '../routes/admin-scheduler.js';
 import { adminComplianceRouter } from '../routes/admin-compliance.js';
+import { complianceRouter } from '../routes/compliance.js';
 import { capabilitiesRouter } from '../routes/capabilities.js';
 import { adminCapabilitiesRouter } from '../routes/admin-capabilities.js';
 import { adminExtensionsRouter } from '../routes/admin-extensions.js';
@@ -715,6 +716,9 @@ export async function mountRoutes(
   // question set. Gated on the ACCOUNT being an operator plus an exact scope word, so the HTTP door
   // and the MCP tools answer the same question rather than two different ones.
   app.use(adminComplianceRouter(config, storage));
+
+  // An account's own slice of the same picture, scoped by resolveIdentity() and by nothing else.
+  app.use(complianceRouter(config, storage));
 
   // Bundled extensions admin routes
   app.use(adminExtensionsRouter(config, storage, scheduler));

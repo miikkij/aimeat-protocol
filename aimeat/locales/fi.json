@@ -304,7 +304,11 @@
         "consent-retention": "Merkinnät siitä kuka luki mitäkin poistetaan {days} päivän jälkeen, joten sitä vanhempi ei voi näkyä. Itse lupia ei poisteta.",
         "usage-window": "Tekoälyn käyttö lasketaan noin {days} päivän ikkunasta. Sitä vanhempi on arkistoitu, ja nolla tarkoittaisi arkistoitua eikä käyttämätöntä.",
         "provenance-on": "Kirjaus on päällä, joten tällä jaksolla täällä tuotetusta sisällöstä on tietue. Ennen kirjauksen käyttöönottoa tuotetusta ei ole.",
-        "provenance-off": "Kirjaus on POIS päältä täällä. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettei mitään olisi tapahtunut."
+        "provenance-off": "Kirjaus on POIS päältä täällä. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettei mitään olisi tapahtunut.",
+        "owner-this-node-only": "Vain se mitä olet tehnyt täällä. Kaikki mitä olet julkaissut muualla, toisessa asennuksessa tai omassa henkilökohtaisessa, on näiden lukujen ulkopuolella.",
+        "owner-your-slice": "Vain sinun omasi. Mikään tällä sivulla ei kerro kenenkään muun toiminnasta, eikä kukaan muu näe sinun tietojasi täältä.",
+        "owner-register-is-the-operators": "Kirjaukset siitä mihin tekoälyä käytetään pitää se, joka pyörittää tätä asennusta, et sinä. Alla näkyvät ne merkinnät, jotka koskevat sinun tiliäsi. Jos jotain sinun toimintaasi puuttuu, se on keskustelu hänen kanssaan eikä asia jonka voit korjata täältä.",
+        "owner-provenance-off": "Kirjaus on kytketty pois tästä asennuksesta, mikä ei ole sinun asetuksesi. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettet olisi tehnyt mitään."
       },
       "howIntro": "Tämä sivu vertaa kahta asiaa: mitä täällä on oikeasti tehty tekoälyllä, ja mitä siitä on kirjoitettu ylös. Erotus näkyy ylimpänä kohdassa \"Vaatii katsomista\", ja juuri sitä auditoinnissa kysytään."
     }
@@ -9742,5 +9746,20 @@
   "chat.nudgeDismiss": "Ei nyt",
   "chat.starterWork": "Ota jotain harteiltani",
   "chat.starterWorkAsk": "Yksi asia listallani lipsuu jatkuvasti. Kysy siitä minulta, ja ehdota sitten yhtä asiaa jonka voisit ottaa hoitaaksesi.",
-  "appGrant.updatedNotice": "Tämä sovellus on päivittynyt ja pyytää nyt jotain uutta. Hyväksy uudelleen, niin se toimii kuten ennenkin."
+  "appGrant.updatedNotice": "Tämä sovellus on päivittynyt ja pyytää nyt jotain uutta. Hyväksy uudelleen, niin se toimii kuten ennenkin.",
+  "complianceMine": {
+    "title": "Oma tekoälykäyttösi ja sen kirjaukset",
+    "desc": "Mitä sinä olet tehnyt täällä tekoälyllä, ja onko siitä kirjattu ylös mitään. Vain sinun omasi.",
+    "loading": "Luetaan omia tietojasi…",
+    "loadFailed": "Tietojasi ei juuri nyt saatu luettua.",
+    "calls": "Mallikutsua",
+    "models": "Mallia käytössä",
+    "undocumented": "Kirjaamatta",
+    "entries": "Merkintää sinusta",
+    "undocumentedNote": "Näitä malleja olet käyttänyt, mutta yksikään kirjaus ei mainitse niitä. Kirjaukset pitää se, joka pyörittää tätä asennusta, joten tästä kannattaa mainita hänelle.",
+    "entriesTitle": "Merkinnät jotka koskevat sinua",
+    "entriesNote": "Nämä on kirjannut se, joka pyörittää tätä asennusta. Et voi muuttaa niitä täältä, mutta näet mitä sinusta on kirjoitettu.",
+    "entriesEmpty": "Sinusta ei ole tehty yhtään merkintää. Jos olet käyttänyt tekoälyä täällä, se ei siis näy missään kirjauksessa.",
+    "limitsTitle": "Mitä tämä ei kata"
+  }
 }

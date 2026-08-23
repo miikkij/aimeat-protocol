@@ -25,10 +25,11 @@ import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 export const complianceTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_compliance_report',
-        description: 'Operator-only. The node-wide compliance report: the trail this node kept (AI provenance and Article 50 labelling, AI usage across every account, consent grants) joined to the use-case register the operator wrote, plus the difference between them. Read `gaps` first — each entry is a model used here that no use case mentions, a use case with unanswered questions and so no risk class, public content published without a label, or an app that says it generates content while the publish check found a disclosure gap. Read `not_covered` second: it names what the report does NOT cover, and a total without its population reads as coverage. Needs the exact permission "compliance:read", which no wildcard carries. Use aimeat_compliance_register_read to see the register raw, and aimeat_compliance_register_write to change it.',
-        caller: 'operator',
+        description: 'The compliance report: AI activity joined to the written record of what AI is used for, and the difference between them. Defaults to scope="mine" — your owner\'s own slice, which any session may read and which needs no special permission. scope="node" is the whole installation across every account, and needs the exact permission "compliance:read" plus an account that runs the installation; no wildcard carries that word. Read `gaps` first — each entry is a model used and mentioned in no entry, an entry with unanswered questions and so no risk class, public content published without a label, or an app that says it generates content while the publish check found a disclosure gap. Read `not_covered` second, and note the two scopes state DIFFERENT limits: a total without its population reads as coverage. Use aimeat_compliance_register_read to see the written record raw, and aimeat_compliance_register_write to change it.',
+        caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            scope: { type: 'string', enum: ['mine', 'node'], description: 'Whose report. "mine" (the default) is your owner\'s own slice; "node" is the whole installation and is operator-only.' },
             since_days: { type: 'number', description: 'Rolling window in days (default 30). Ignored when month is given.' },
             month: { type: 'string', description: 'A whole calendar month, YYYY-MM. Wins over since_days — a rolling window filed under a month\'s name is wrong in an archive somebody reads later.' },
         },

@@ -304,7 +304,11 @@
         "consent-retention": "Los registros de quién accedió a qué se borran después de {days} días, así que nada más antiguo puede aparecer. Los permisos en sí no se borran.",
         "usage-window": "El uso de IA se cuenta desde una ventana de unos {days} días. Lo más antiguo está archivado, y un cero significaría archivado y no inactivo.",
         "provenance-on": "El registro está activo, así que el contenido producido aquí en este periodo tiene su registro. El producido antes de activarlo, no.",
-        "provenance-off": "El registro está DESACTIVADO aquí. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no haya pasado nada."
+        "provenance-off": "El registro está DESACTIVADO aquí. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no haya pasado nada.",
+        "owner-this-node-only": "Solo lo que hiciste aquí. Todo lo que publicaste en otro lugar, en otra instalación o en la tuya propia, queda fuera de estas cifras.",
+        "owner-your-slice": "Solo lo tuyo. Nada en esta página describe la actividad de otra persona, y nadie más ve la tuya aquí.",
+        "owner-register-is-the-operators": "El registro de para qué se usa la IA lo mantiene quien administra esta instalación, no tú. Abajo están las entradas que nombran tu cuenta. Si falta algo tuyo, eso es una conversación con esa persona y no algo que puedas arreglar aquí.",
+        "owner-provenance-off": "El registro está desactivado en esta instalación, y eso no lo configuraste tú. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no hayas hecho nada."
       },
       "howIntro": "Esta página compara dos cosas: lo que realmente se ha hecho aquí con IA, y lo que se ha anotado al respecto. La diferencia aparece arriba, en \"Requiere revisión\", y es justo lo que se pregunta en una auditoría."
     }
@@ -9732,5 +9736,20 @@
   "chat.nudgeDismiss": "Ahora no",
   "chat.starterWork": "Quítame algo de encima",
   "chat.starterWorkAsk": "Algo de mi lista se me escapa una y otra vez. Pregúntame por ello y luego propón una cosa de la que puedas encargarte.",
-  "appGrant.updatedNotice": "Esta aplicación se ha actualizado y ahora pide algo nuevo. Apruébala de nuevo para seguir usándola."
+  "appGrant.updatedNotice": "Esta aplicación se ha actualizado y ahora pide algo nuevo. Apruébala de nuevo para seguir usándola.",
+  "complianceMine": {
+    "title": "Tu propio uso de IA, y lo que se ha anotado sobre él",
+    "desc": "Lo que tú has hecho con IA aquí, y si algo de eso quedó anotado. Solo lo tuyo.",
+    "loading": "Leyendo tus cifras…",
+    "loadFailed": "No se pudieron leer tus cifras en este momento.",
+    "calls": "Llamadas a modelos",
+    "models": "Modelos usados",
+    "undocumented": "Sin anotar",
+    "entries": "Entradas sobre ti",
+    "undocumentedNote": "Has usado estos modelos y ninguna entrada los menciona. Las entradas las mantiene quien administra esta instalación, así que vale la pena comentárselo.",
+    "entriesTitle": "Entradas que te nombran",
+    "entriesNote": "Las escribió quien administra esta instalación. No puedes cambiarlas desde aquí, pero sí ver qué se ha escrito sobre ti.",
+    "entriesEmpty": "Ninguna entrada te nombra. Si has usado IA aquí, nada de eso aparece en lo que se ha anotado.",
+    "limitsTitle": "Qué no cubre esto"
+  }
 }
