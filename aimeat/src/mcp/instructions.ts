@@ -90,6 +90,15 @@ export interface InstructionsOptions {
      * about a capability it does not have would go looking for it.
      */
     proactiveGuidance?: string | null;
+    /**
+     * The node that answers support here, when it is not this one.
+     *
+     * A managed instance makes its buyer the local operator, so `support@operators` reaches the
+     * customer rather than the people who run the platform. The routing is server-side and the
+     * ADDRESS does not change, so this exists only to stop an agent second-guessing where its report
+     * went. Absent leaves the instructions byte for byte as they were.
+     */
+    supportAnsweredBy?: string | null;
 }
 
 /**
@@ -98,7 +107,15 @@ export interface InstructionsOptions {
  * up front, since on those the agent is looking at an allowlist rather than everything.
  */
 export function instructionsFor(role: SurfaceRole | 'all', opts: InstructionsOptions = {}): string {
-    const base = role === 'all' ? BASE : `${SURFACE_INTROS[role]}\n\n${BASE}`;
+    let base = role === 'all' ? BASE : `${SURFACE_INTROS[role]}\n\n${BASE}`;
+
+    // Appended, never substituted: the address is unchanged and the agent does the same thing with
+    // it. What this adds is only the answer to "did that actually go anywhere".
+    const answeredBy = opts.supportAnsweredBy?.trim();
+    if (answeredBy) {
+        base += `\n\nSupport here is answered by ${answeredBy}, who run this node. Write to \`support@operators\` exactly as you would anywhere; it reaches them.`;
+    }
+
     const guidance = opts.proactiveGuidance?.trim();
     return guidance ? `${base}\n\n${guidance}` : base;
 }

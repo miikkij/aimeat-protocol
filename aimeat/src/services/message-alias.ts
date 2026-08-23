@@ -35,7 +35,6 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { ConversationRecord, DirectMessageAttachment } from '../storage/interface.js';
 import type { DeliveryCtx } from './message-delivery.js';
-import type { PeerInfo } from './federation.js';
 import { listOperatorGhiis } from './operators.js';
 import { createGroupConversation, setParticipants, fanOutToParticipants } from './conversation-group.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -96,11 +95,25 @@ export type SupportRoute =
  * The PUT route refuses that combination up front; this is the second half of the same rule, for a
  * flag turned off after the routing was set.
  */
-export function resolveSupportRoute(peers: Map<string, PeerInfo>): SupportRoute {
-  const upstream = [...peers.values()].find(p =>
+export function resolveSupportRoute(peers: Iterable<SupportRoutablePeer>): SupportRoute {
+  const upstream = [...peers].find(p =>
     p.supportUpstream === true && p.status === 'active' && p.allowMessaging !== false);
   if (!upstream) return { kind: 'local' };
   return { kind: 'upstream', nodeId: upstream.nodeId, address: `${SUPPORT_LOCAL_PART}@${upstream.nodeId}` };
+}
+
+/**
+ * The four fields the question actually turns on, so both sources answer it with the same function.
+ *
+ * The send path holds the live peer MAP; the MCP handshake has storage and no map, and reads the
+ * ROWS. Those are the same peers, and "who answers support here" must not have two implementations
+ * that can disagree — one of them would eventually be the one a customer's agent believed.
+ */
+export interface SupportRoutablePeer {
+  nodeId: string;
+  status: string;
+  supportUpstream?: boolean;
+  allowMessaging?: boolean;
 }
 
 export type OpenSupportResult =
@@ -184,7 +197,7 @@ export async function resolveGroupTarget(
   senderGhii: string,
   input: { to: string; conversationId?: string; subject?: string },
 ): Promise<GroupTarget> {
-  const route = resolveSupportRoute(ctx.peers);
+  const route = resolveSupportRoute(ctx.peers.values());
   const addressedToSupport = !input.to?.trim() || isAliasAddress(input.to, config.nodeId);
 
   if (input.conversationId) {
