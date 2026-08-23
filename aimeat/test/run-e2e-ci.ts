@@ -299,6 +299,7 @@ const ALL_SUITES = [
     'test/e2e-agent-offers.ts',
     'test/e2e-commerce.ts',
     'test/e2e-commerce-holds.ts',
+    'test/e2e-compliance-report.ts',
     'test/e2e-attestations.ts',
     'test/e2e-finance.ts',
     'test/e2e-outbound.ts',
