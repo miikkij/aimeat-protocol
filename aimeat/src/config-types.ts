@@ -315,7 +315,6 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   dailyAllowance: number;
   dailyAllowanceCap: number;
   burnRate: number;
-  keyedBrowseEnabled: boolean;
   extendedFeaturesEnabled: boolean;
   maxRelayHops: number;
   depeeringGracePeriodHours: number;
@@ -341,10 +340,6 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   /** Hard cap on a browser voice-message recording, in seconds. Served to the UI so the recorder
    *  stops at the node's own number instead of a hardcoded one. */
   voiceMsgMaxSeconds: number;
-  microMemoryQuotaKb: number;
-  microMemoryMaxSetsPerAgent: number;
-  microMemoryMaxKeysPerSet: number;
-  microMemoryMaxValueSizeBytes: number;
   maxActionsPerAgent: number;
   minTrustForPaidActions: number;
   appMaxSizeMb: number;

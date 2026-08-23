@@ -44,7 +44,6 @@ import type { WalletRepository } from './repositories/wallet.repository.js';
 import type { BoardRepository } from './repositories/board.repository.js';
 import type { OtkRepository } from './repositories/otk.repository.js';
 import type { DisputeRepository } from './repositories/dispute.repository.js';
-import type { MicroMemoryRepository } from './repositories/micro-memory.repository.js';
 import type { FileRepository } from './repositories/file.repository.js';
 import type { IdentityRepository } from './repositories/identity.repository.js';
 import type { SchemaRepository } from './repositories/schema.repository.js';
@@ -101,7 +100,7 @@ export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
   ActionRepository, WorkRepository, WalletRepository,
   BoardRepository, OtkRepository, DisputeRepository,
-  MicroMemoryRepository, FileRepository, IdentityRepository,
+  FileRepository, IdentityRepository,
   SchemaRepository, ConsentRepository, CatalogueRepository,
   ModerationRepository, OrganismRepository, MarketplaceRepository,
   FederationRepository, NodeRepository, NotificationRepository,

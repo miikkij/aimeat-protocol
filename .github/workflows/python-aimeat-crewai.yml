@@ -16,6 +16,10 @@ on:
       - 'aimeat/src/cli/connect/**'
       - '.github/workflows/python-aimeat-crewai.yml'
 
+# Least privilege: this workflow only reads the repo.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest

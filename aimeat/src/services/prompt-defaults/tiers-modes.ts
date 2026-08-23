@@ -57,7 +57,7 @@ Then include the token in all write requests:
   Authorization: Bearer <token>
 
 The token lasts 24 hours. You only need to do this once per session.
-Reading (/v1/memory GET) and Micro-Memory (/v1/mm) work without a token.
+Reading (/v1/memory GET) works without a token.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ANONYMOUS KEY NAMESPACE — All keys must start with anonymous.
@@ -147,32 +147,6 @@ IMPORTANT: Always READ a key before updating it!
   2. Then POST (simple overwrite) or PUT (safe update with version)
   This ensures you preserve existing data from other agents.
 
-Micro-Memory (simple GET-based key-value — NO token needed, works without auth):
-  GET {{node_url}}/v1/mm?op=add&set={set}&key={key}&value={value}
-  GET {{node_url}}/v1/mm?op=list&set={set}
-  GET {{node_url}}/v1/mm?op=mod&set={set}&key={key}&value={new_value}
-  GET {{node_url}}/v1/mm?op=del&set={set}&key={key}
-  GET {{node_url}}/v1/mm?op=batch&set={set}&key0=a&value0=x&key1=b&value1=y
-
-Micro-Memory is fully open in anonymous mode — no token, no namespace restrictions.
-Use it for quick notes, platform-limited operations, and when simplicity matters.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-GET-ONLY PLATFORMS (Copilot, Gemini in browse mode, etc.)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-If you can only make GET requests (no POST/PUT/DELETE), use Micro-Memory (/v1/mm)
-for ALL read and write operations. Everything works via GET query parameters:
-
-  WRITE:  GET {{node_url}}/v1/mm?op=add&set=notes&key=hello&value=world
-  READ:   GET {{node_url}}/v1/mm?op=list&set=notes
-  UPDATE: GET {{node_url}}/v1/mm?op=mod&set=notes&key=hello&value=updated
-  DELETE: GET {{node_url}}/v1/mm?op=del&set=notes&key=hello
-  BATCH:  GET {{node_url}}/v1/mm?op=batch&set=notes&key0=a&value0=1&key1=b&value1=2
-
-Use "set" as your namespace (like a folder). Example sets: "context", "handoff", "notes", "agents"
-Use these GET URLs directly -- they handle everything without curl or shell commands.
-Micro-Memory works without any authentication in anonymous mode.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 KEY NAMING CONVENTIONS — Follow these

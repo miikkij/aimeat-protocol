@@ -33,7 +33,6 @@ import { sessionMethods } from './methods/sessions.js';
 import { schemaMethods } from './methods/schema.js';
 import { agentOnboardingMethods } from './methods/agent-onboarding.js';
 import { fileMethods } from './methods/files.js';
-import { microMemoryMethods } from './methods/micro-memory.js';
 import { organismMethods } from './methods/organisms.js';
 import { boardMethods } from './methods/boards.js';
 import { consentMethods } from './methods/consent.js';
@@ -139,7 +138,6 @@ Object.assign(
   schemaMethods,
   agentOnboardingMethods,
   fileMethods,
-  microMemoryMethods,
   organismMethods,
   boardMethods,
   consentMethods,

@@ -32,7 +32,6 @@ function mockConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
     dailyAllowance: 50,
     dailyAllowanceCap: 500,
     burnRate: 0.1,
-    keyedBrowseEnabled: true,
     extendedFeaturesEnabled: true,
     consulEnabled: false,
     consulUrl: 'http://localhost:8500',
@@ -124,12 +123,12 @@ test('applyConsulValues skips invalid values', () => {
 });
 
 test('applyConsulValues handles boolean fields', () => {
-  const config = mockConfig({ keyedBrowseEnabled: true });
+  const config = mockConfig({ extendedFeaturesEnabled: true });
   const { applied } = applyConsulValues(config, {
-    'features.keyed_browse_enabled': 'false',
+    'features.extended_features_enabled': 'false',
   });
-  assert.deepEqual(applied, ['features.keyed_browse_enabled']);
-  assert.equal(config.keyedBrowseEnabled, false);
+  assert.deepEqual(applied, ['features.extended_features_enabled']);
+  assert.equal(config.extendedFeaturesEnabled, false);
 });
 
 test('applyConsulValues type-parses float correctly', () => {

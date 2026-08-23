@@ -43,6 +43,7 @@ import { renderInvoicePdf } from '../finance/invoice-pdf.js';
 import { buildFinvoiceXml } from '../finance/finvoice.js';
 import { requireOwnInvoice } from '../finance/invoice-service.js';
 import { resolveCompanySender, sendAsCompany } from '../company/company-smtp.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 
 export class OutboundError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {
@@ -51,7 +52,6 @@ export class OutboundError extends Error {
   }
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const SUPPRESS_AFTER_BOUNCES = 3;
 
 export interface ContactInput {
@@ -100,7 +100,7 @@ function normalizeRelation(raw: string | null | undefined): string | null {
 /** Creates or returns the owner's contact for an email (one entry per owner per address). */
 export async function ensureContact(storage: Storage, ownerGhii: string, input: ContactInput): Promise<OutboundContactRecord> {
   const email = (input.email || '').trim().toLowerCase();
-  if (!EMAIL_RE.test(email)) throw new OutboundError('INVALID_EMAIL', 400, 'A valid email is required');
+  if (!isValidEmail(email)) throw new OutboundError('INVALID_EMAIL', 400, 'A valid email is required');
   if (!input.name || typeof input.name !== 'string' || input.name.trim().length < 1) {
     throw new OutboundError('INVALID_CONTACT', 400, 'name is required');
   }

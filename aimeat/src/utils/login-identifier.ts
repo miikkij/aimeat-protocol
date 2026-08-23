@@ -11,10 +11,9 @@
  * @usage const id = parseLoginIdentifier(req.body.username, config.nodeId);
  * @version-history
  *   v1.0.0 — 2026-08-07 — Extracted when POST /v1/ghii/login learned to accept a verified email.
+ *   v1.1.0 — 2026-08-23 — Email shape via the shared, length-capped isValidEmail (CodeQL ReDoS).
  */
-
-/** A dot-bearing domain marks an email. GHII node ids (`aimeat-fi-001-genesis`) never carry one. */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { isValidEmail } from './email-validator.js';
 
 export type LoginIdentifier =
     /** An email address — it SELECTS an account by its verified address; resolve it before lookup. */
@@ -27,7 +26,7 @@ export type LoginIdentifier =
 /** Classify a typed sign-in identifier. Trims and lowercases; never touches storage. */
 export function parseLoginIdentifier(raw: string, nodeId: string): LoginIdentifier {
     const value = (raw || '').trim().toLowerCase();
-    if (EMAIL_RE.test(value)) return { kind: 'email', localName: value };
+    if (isValidEmail(value)) return { kind: 'email', localName: value };
     const at = value.indexOf('@');
     if (at === -1) return { kind: 'local', localName: value };
     const nodePart = value.substring(at + 1);

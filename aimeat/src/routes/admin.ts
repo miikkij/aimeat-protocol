@@ -24,7 +24,6 @@ import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import { validateOwnerName } from '../utils/gaii.js';
 import { issueJWT } from '../auth/jwt.js';
-import { generateOtk } from '../utils/otk.js';
 // i18n imports removed — admin UI is now a client-side SPA
 // admin-dashboard.ts SSR removed — admin UI is now a SPA at /v1/admin
 import { hashPassword } from '../services/password.js';
@@ -277,54 +276,6 @@ export function adminRouter(
         });
     });
 
-    // POST /v1/admin/setup/initial-otk — generate an Initial OTK (password-protected)
-    router.post('/v1/admin/setup/initial-otk', adminAuthLimit, async (req, res) => {
-        // Check admin session or password via header (NOT query param)
-        const sessionId = getCookie(req, 'admin_session') ?? (req.headers['x-admin-session'] as string);
-        const pw = (req.headers['x-admin-password'] as string) ?? '';
-        if (!(sessionId && validateAdminSession(sessionId)) && (!config.adminPassword || !verifyAdminPassword(pw, config.adminPassword))) {
-            res.status(401).json({ ok: false, error: 'Invalid admin password' });
-            return;
-        }
-
-        const { owner } = req.body ?? {};
-        if (!owner || typeof owner !== 'string') {
-            res.status(400).json({ ok: false, error: 'owner name is required' });
-            return;
-        }
-
-        // Find agent or use owner as identity
-        const agents = await storage.getAgentsByOwner(owner);
-        const ownerGaii = agents.length > 0 ? agents[0].gaii : owner;
-
-        const key = generateOtk();
-        const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60_000).toISOString();
-
-        await storage.createOtk({
-            key,
-            ownerGaii,
-            action: 'initial',
-            params: {},
-            expiresAt: farFuture,
-            initial: true,
-            used: false,
-            usedAt: null,
-            sessionId: null,
-            createdAt: new Date().toISOString(),
-        });
-
-        res.json({
-            ok: true,
-            otk: key,
-            initial: true,
-            owner: ownerGaii,
-            grace_ms: config.otkGraceMs,
-            dev_mode: config.devMode,
-            node_url: config.baseUrl,
-            note: `Initial OTK — no expiry until first use. After first use, valid for ${config.otkGraceMs / 1000}s.`,
-        });
-    });
-
     // GET /v1/admin/dashboard — node overview (operator only)
     router.get('/v1/admin/dashboard', requireAuth(), requireRole('operator'), async (_req, res) => {
         const owners = await storage.listOwners();
@@ -542,7 +493,6 @@ export function adminRouter(
             config: {
                 port: config.port,
                 jwt_ttl_seconds: config.jwtTtlSeconds,
-                keyed_browse_enabled: config.keyedBrowseEnabled,
             },
             ...(config.personalNodesEnabled ? await (async () => {
                 const personalNodes = await storage.listPersonalNodes();

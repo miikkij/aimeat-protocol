@@ -83,9 +83,6 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     logger.info(`   Storage:   ${config.storageProvider}${config.storageProvider === 'sqlite' ? ` (${config.sqlitePath})` : ''}`);
     logger.info(`   URL:       ${config.baseUrl}/`);
     logger.info(`   Protocol:  AIMEAT v1.3 | License: MIT`);
-    if (config.devMode) {
-      logger.info(`   ⚠ DEV MODE: OTK validation bypassed on micro-memory`);
-    }
     if (config.anonymousMode) {
       logger.info(`   ⚠ ANONYMOUS MODE: No auth required — all agents share one memory space`);
       logger.info(`   Anonymous prompt: ${config.baseUrl}/v1/prompts/anonymous`);

@@ -388,7 +388,7 @@ How to build:
 
 Key SDK libraries (loaded via script tags):
 - /v1/libs/aimeat-auth.js -- login, session management (REQUIRED)
-- /v1/libs/aimeat-data.js -- memory CRUD, micro-memory
+- /v1/libs/aimeat-data.js -- memory CRUD
 - /v1/libs/aimeat-storage.js -- file uploads
 - /v1/libs/aimeat-social.js -- boards, posts, reactions
 - /v1/libs/aimeat-markdown.js -- markdown rendering: AIMEAT.md.render(text, target) renders INTO an element (returns an Element -- use the target param or renderToString, never innerHTML = render(...)); await AIMEAT.md.renderRich(text, target) adds task lists, footnotes, code highlighting, Mermaid

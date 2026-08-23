@@ -59,7 +59,6 @@ export interface OwnerUsageSummary {
   owner: string;
   memory: QuotaUsage & { used_keys: number; max_keys: number };
   storage: QuotaUsage & { used_files: number };
-  micro_memory: QuotaUsage & { used_sets: number; max_sets: number };
   counts: {
     agents: number;
     organisms: number;
@@ -115,20 +114,17 @@ async function computeOwnerUsageSummary(
   const memBytes = await storage.sumMemoryBytesForOwners(identities);
   const memMax = config.memoryQuotaMb * 1024 * 1024;
 
-  // ── Storage files / micro-memory / actions — each a SINGLE cross-identity aggregate ──
-  // Previously one listStorageFiles + listMicroMemorySets(+bytes) per identity + listActionsByProvider
-  // per agent — for an owner with ~100 agents that was ~250-400 queries per cache-miss (the profiler
-  // showed 268, dominated by ~130 micro-memory calls). Now: one sum for storage, one for micro, one
-  // count for actions. Everything runs concurrently.
+  // ── Storage files / actions — each a SINGLE cross-identity aggregate ──
+  // Previously one listStorageFiles per identity + listActionsByProvider per agent — for an owner
+  // with ~100 agents that was ~250-400 queries per cache-miss. Now: one sum for storage, one count
+  // for actions. Everything runs concurrently.
   const storageMax = config.storageQuotaMb * 1024 * 1024;
-  const microMax = config.microMemoryQuotaKb * 1024;
 
   const [
-    storageAgg, microAgg, services,
+    storageAgg, services,
     organismsList, appsResult, extensionsList, cortexesList, ghiiRecord,
   ] = await Promise.all([
     storage.sumStorageBytesForOwners(identities),
-    storage.getMicroMemoryTotalForOwners(identities),
     storage.countActionsForProviders(agents.map(a => a.gaii)),
     storage.listOrganisms({ member: ownerName, perPage: 10000 }),
     storage.listApps({ ownerGaii: ghii, limit: 1 }),
@@ -146,7 +142,6 @@ async function computeOwnerUsageSummary(
   const allowanceRemaining = remainingOf(allowance);
 
   const storageBytes = storageAgg.bytes, storageFiles = storageAgg.count;
-  const microBytes = microAgg.bytes, microSets = microAgg.sets;
 
   // ── Counts ──
   const organisms = organismsList.length;
@@ -158,7 +153,6 @@ async function computeOwnerUsageSummary(
     owner: ownerName,
     memory: { used_keys: usedKeys, max_keys: config.memoryMaxKeysPerAgent, used_bytes: memBytes, max_bytes: memMax, percent: pct(memBytes, memMax) },
     storage: { used_files: storageFiles, used_bytes: storageBytes, max_bytes: storageMax, percent: pct(storageBytes, storageMax) },
-    micro_memory: { used_sets: microSets, max_sets: config.microMemoryMaxSetsPerAgent, used_bytes: microBytes, max_bytes: microMax, percent: pct(microBytes, microMax) },
     counts: {
       agents: agents.length,
       organisms,

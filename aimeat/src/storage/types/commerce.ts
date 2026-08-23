@@ -184,15 +184,6 @@ export interface DisputeAuditEntry {
   previousHash: string;
 }
 
-export interface MicroMemoryRecord {
-  gaii: string;
-  set: string;
-  entries: Record<string, string>;
-  visibility: 'private' | 'public_read' | 'shared_read' | 'shared_write' | 'public_write';
-  accessCode?: string;    // required for shared_read / shared_write
-  updatedAt: string;
-}
-
 export interface StorageFileRecord {
   key: string;
   ownerGaii: string;

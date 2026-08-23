@@ -54,12 +54,12 @@ import { getActiveEmailService } from './email.js';
 import { registrationInviteEmail } from './email-templates.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { isValidEmail } from '../utils/email-validator.js';
 
 export const INVITE_DEFAULT_EXPIRY_DAYS = 7;
 export const INVITE_MAX_EXPIRY_DAYS = 30;
 export const INVITE_MAX_PENDING_PER_ORG = 50; // abuse cap on outstanding email invites per organism
 export const INVITE_CODE_QUOTA_PER_MEMBER = 3; // per-inviter cap on provisioned-code keys; org creators/admins are exempt (unlimited)
-const INVITE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DAY_MS = 86_400_000;
 
 /** SHA-256 of the raw invite token — only the hash is stored; the raw token lives only in the link. */
@@ -215,7 +215,7 @@ export async function createEmailInvitation(
   input: CreateEmailInvitationInput,
 ): Promise<CreateEmailInvitationResult> {
   const cleanEmail = (input.email || '').trim().toLowerCase();
-  if (!cleanEmail || !INVITE_EMAIL_RE.test(cleanEmail)) {
+  if (!cleanEmail || !isValidEmail(cleanEmail)) {
     throw new InvitationError(400, 'INVALID_INPUT', 'A valid "email" is required');
   }
   const id = input.organism.id;
@@ -357,7 +357,7 @@ export async function createRegistrationInvitation(
     input: RegistrationInviteInput,
 ): Promise<RegistrationInviteResult> {
     const cleanEmail = (input.email || '').trim().toLowerCase();
-    if (!cleanEmail || !INVITE_EMAIL_RE.test(cleanEmail)) {
+    if (!cleanEmail || !isValidEmail(cleanEmail)) {
         throw new InvitationError(400, 'INVALID_INPUT', 'A valid "email" is required');
     }
     const emailHash = inviteEmailHash(cleanEmail);

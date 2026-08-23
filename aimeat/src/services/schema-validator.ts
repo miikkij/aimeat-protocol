@@ -119,6 +119,19 @@ export async function validateMemoryWrite(
     (schemaToValidate as Record<string, unknown>).additionalProperties = false;
   }
 
+  // A schema lock is registered by the principal, and a self-referential `$ref` compiled against a
+  // deeply-nested value can recurse the validator to a stack overflow (CodeQL
+  // resource-exhaustion-from-deep-object-traversal, AI-triage 2026-08-23). The value is size-capped
+  // upstream but not depth-capped, so bound the nesting BEFORE validation, measured iteratively so
+  // the check itself cannot overflow. 64 is far past any legitimate memory record.
+  if (exceedsMaxDepth(value, 64)) {
+    return {
+      valid: false,
+      errors: [{ path: '/', message: 'value is nested too deeply (max 64 levels)', schema_rule: 'maxDepth' }],
+      schemaKey: schemaRecord.keyPattern,
+    };
+  }
+
   const validate = getValidator(schemaToValidate);
   const isValid = validate(value);
 
@@ -145,6 +158,23 @@ export async function validateMemoryWrite(
  * Validate a schema itself — is the given object a valid JSON Schema?
  * Returns null if ok, error message if not.
  */
+/**
+ * True if `value` nests deeper than `max` levels of objects/arrays. Iterative (explicit stack) so
+ * measuring the depth of a pathological value cannot itself overflow the call stack.
+ */
+export function exceedsMaxDepth(value: unknown, max: number): boolean {
+  const stack: Array<{ v: unknown; d: number }> = [{ v: value, d: 0 }];
+  while (stack.length) {
+    const { v, d } = stack.pop() as { v: unknown; d: number };
+    if (v === null || typeof v !== 'object') continue;
+    if (d > max) return true;
+    for (const child of Array.isArray(v) ? v : Object.values(v as Record<string, unknown>)) {
+      stack.push({ v: child, d: d + 1 });
+    }
+  }
+  return false;
+}
+
 export function validateSchemaItself(schema: Record<string, unknown>): string | null {
   try {
     ajv.compile(schema);

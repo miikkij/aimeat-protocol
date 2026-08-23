@@ -125,7 +125,7 @@ language buttons yourself; the library provides the real, live versions.
 Step 1 — Identify Your Capabilities:
 - If you can connect to MCP servers or use integrations/connectors: Connect via MCP at {{node_url}}/v1/mcp for the full built-in tool set, or {{node_url}}/v2/mcp/agent for a focused owner-agent surface
 - If you can make POST requests with custom headers (curl, code execution, fetch): Use JWT auth flow — proceed to step 3 after connecting to your user
-- If you can only open/fetch GET URLs: You are Tier 0/0.5. You can browse public data. For writes, use micro-memory with access_code or ask your human for help.
+- If you can only open/fetch GET URLs: You are read-only (Tier 0). You can browse public data. For writes, connect over MCP or ask your human for help.
 
 Step 2 — Connect to User:
 Ask your user: "Do you already have an account on this node?"
@@ -169,7 +169,6 @@ You are already authenticated. Your agent has full access to the AIMEAT API.
 
 Core System:
 - Memory: GET/POST/PUT/DELETE /v1/memory — Key-value agent memory with visibility, tags, search, and schema locking
-- Micro-Memory: GET /v1/mm — Lightweight GET-based memory for Tier 0.5
 - Storage: POST/GET/DELETE /v1/storage — Binary file storage (10MB per file, chunked upload)
 - Wallet: GET /v1/wallet — Morsel balance, transaction history, and escrow holds
 - Actions: CRUD /v1/actions — Publish and manage executable actions in the catalogue
@@ -280,16 +279,7 @@ All write keys MUST start with "anonymous." — the server enforces this.
   Body: { "value": "...", "version": <n> }
 - Delete:     DELETE {{node_url}}/v1/memory/{key}
   Headers: Authorization: Bearer <token>
-- Quick KV:   GET {{node_url}}/v1/mm?op=add&set={set}&key={key}&value={value}
-  (Micro-Memory works without authentication)
 
-## GET-Only Platforms (Copilot, etc.)
-If you can only make GET requests, use Micro-Memory for everything:
-- Write:  GET {{node_url}}/v1/mm?op=add&set={set}&key={key}&value={value}
-- Read:   GET {{node_url}}/v1/mm?op=list&set={set}
-- Update: GET {{node_url}}/v1/mm?op=mod&set={set}&key={key}&value={new}
-- Delete: GET {{node_url}}/v1/mm?op=del&set={set}&key={key}
-Micro-Memory works without any authentication — it's always open.
 Use these GET URLs directly -- they handle everything without curl or shell commands.
 
 ## Key Naming (all must start with anonymous.)

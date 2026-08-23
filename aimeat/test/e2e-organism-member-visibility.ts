@@ -146,6 +146,14 @@ await test('7. failure: an invalid member_visibility value is rejected (400)', a
     assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body)}`);
 });
 
+await test('8. A crafted array query param does not 500 the list (CodeQL type-confusion)', async () => {
+    // A duplicated key (?member=x&member=y) makes Express parse member as an array, and
+    // member.split() threw a 500 on this unauthenticated route (AI-triage 2026-08-23). The param is
+    // now coerced to a single string or dropped; the list answers 200 either way.
+    const arr = await json('/v1/organisms?member=x&member=y');
+    assert(arr.status === 200, `a duplicated member param must not 500, got ${arr.status}`);
+});
+
 await test('Cleanup', async () => {
     await json(`/v1/organisms/${orgId}`, { method: 'DELETE', headers: auth(creatorTok) });
     await json(`/v1/owners/${memberName}`, { method: 'DELETE', headers: auth(memberTok) });
