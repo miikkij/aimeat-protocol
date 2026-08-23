@@ -34,5 +34,9 @@ actions:
     path: /admin
     description: The brain's own machinery, refused for anyone but the person who installed it. op state (the register, the last report and which workspace this brain writes to, in one read), configure (name the company and the workspace), put_source (add or replace one feed), remove_source, touch_source (this feed just delivered, so the clock restarts), sweep (the weekly check — mark what has gone quiet, write the report, and speak only if something is broken).
     input: { type: object, properties: { op: { type: string }, company: { type: string }, org: { type: string }, ws: { type: string }, source: { type: object }, id: { type: string }, error: { type: string } }, required: [op] }
+    # A source is { id, kind, ref, feeds, cadence_days, coverage_note, schedule_id }. schedule_id is
+    # a POINTER the page resolves against the owner's own schedule list when it renders; this
+    # extension never reads it, because a sandboxed action cannot see the owner's schedules and
+    # should not pretend to.
     output: { type: object, properties: { ok: { type: boolean }, error: { type: string } } }
     script: admin.js
