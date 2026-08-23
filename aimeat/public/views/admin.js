@@ -32,6 +32,7 @@ import OverviewTab     from './admin/overview-tab.js';
 import EconomyTab      from './admin/economy-tab.js';
 import ConfigTab       from './admin/config-tab.js';
 import SecurityTab     from './admin/security-tab.js';
+import ComplianceTab   from './admin/compliance-tab.js';
 import CorsTab         from './admin/cors-tab.js';
 import MaintenanceTab  from './admin/maintenance-tab.js';
 import HooksTab        from './admin/hooks-tab.js';
@@ -82,6 +83,7 @@ const NAV_GROUPS = [
     { id: 'economy',      key: 'dashboard.economy',    component: EconomyTab },
     { id: 'config',       key: 'dashboard.config',     component: ConfigTab },
     { id: 'security',     key: 'admin.security.title',  component: SecurityTab },
+    { id: 'compliance',   key: 'admin.compliance.title', component: ComplianceTab },
     { id: 'cors',         key: 'dashboard.cors',       component: CorsTab },
     { id: 'maintenance',  key: 'dashboard.maintenance',component: MaintenanceTab },
     { id: 'hooks',        key: 'dashboard.hooks',      component: HooksTab },

@@ -254,6 +254,16 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   'aimeat_capabilities_create',
   'aimeat_capabilities_update',
   'aimeat_commerce_beneficiary_split_set',
+  // DECIDED, 2026-08-23 (BR-02). The compliance register and the risk question set are the
+  // operator's own internal documentation: they live under the node's `system@` identity, are
+  // readable only behind the operator gate, and are never served to a reader on any public surface.
+  // Provenance describes how content a PERSON READS was made, and there is no such content here.
+  //
+  // Attribution is not lost by this. Every use case carries `updatedBy`, which the write path fills
+  // with the calling principal, so a register an agent maintained says so in the register itself —
+  // and an auditor reading it sees who wrote each line without needing a provenance record for a
+  // document nobody outside the operator's own account can open.
+  'aimeat_compliance_register_write',
   'aimeat_exchange_need_post',
   'aimeat_feedback_send',
   'aimeat_flag_report',

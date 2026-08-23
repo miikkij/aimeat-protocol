@@ -13,11 +13,15 @@ import { swallowed } from '/js/swallowed.js';
  *   - LOCALES/detectLocale/persistLocale: language preference via URL → localStorage → cookie → navigator
  *   - sanitizeHtml: strip to a safe tag/attribute whitelist
  *   - copyToClipboard/generateStars/handleImgError: clipboard, background stars, image error placeholder
+ *   - downloadBlob/toCsvBlob: hand the viewer a file the page built, and build a CSV Excel can read
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-12 — Spanish added. detectLocale reads the LOCALES list instead of naming two
  *     languages in four places.
+ *   v1.2.0 — 2026-08-23 — downloadBlob() and toCsvBlob(). The download idiom was inlined in nine
+ *     views and had no home; the CSV writer had none at all on the browser side, so the compliance
+ *     export would have been the tenth copy of one and the first copy of the other.
  */
 
 /** Micros per whole currency unit — money amounts are 6-decimal micro-units (matches USDC/x402). */
@@ -196,6 +200,46 @@ export function generateStars(container, count = 80) {
  *
  * Usage in Preact/HTM:  onError=${handleImgError}
  */
+/**
+ * Hand the browser a file the page built, and clean up after it.
+ *
+ * This exact seven-line idiom was inlined in nine views before it lived anywhere — admin backup,
+ * admin security, admin portal, the skills service, the data wallet, memory, packages, aimeat-os and
+ * the portfolio builder. Nine copies of a `URL.revokeObjectURL` that one of them will eventually
+ * forget, which is a leak nobody would ever look for. New callers use this; the nine are a separate
+ * tidy-up and not this change's business.
+ *
+ * `revokeObjectURL` runs synchronously after `click()` on purpose: the browser has already taken the
+ * URL by then, and holding it open is what leaks.
+ */
+export function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Rows to CSV text, quoted the one way that survives Excel.
+ *
+ * Every field is quoted rather than only the ones that need it: the alternative is deciding per
+ * field, and the decision is wrong the first time a value contains a delimiter, a quote or a
+ * newline. CRLF line endings and a UTF-8 BOM because that is what Excel reads correctly — without
+ * the BOM it renders every non-ASCII name as mojibake, which in a compliance export is a document
+ * somebody cannot use.
+ */
+export function toCsvBlob(headers, rows) {
+  const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const body = [headers, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+  // The BOM is written as an escape, never as a literal character: a bare one in source is
+  // invisible, and the next person to touch this line would delete it without seeing it.
+  return new Blob([`\uFEFF${body}`], { type: 'text/csv;charset=utf-8' });
+}
+
 export function handleImgError(e) {
   const img = e.target;
   if (img.dataset.fallback) return; // already handled

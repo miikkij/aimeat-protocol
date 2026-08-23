@@ -48,6 +48,7 @@ import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces
 import { packagesTools } from './definitions/packages.js';
 import { commerceTools } from './definitions/commerce.js';
 import { exchangeTools } from './definitions/exchange.js';
+import { complianceTools } from './definitions/compliance.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...agentMessagingTools,
@@ -59,6 +60,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...commerceTools,
     ...companyTools,
     ...exchangeTools,
+    ...complianceTools,
 ];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));
