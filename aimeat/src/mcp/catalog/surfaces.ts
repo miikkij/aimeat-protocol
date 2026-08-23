@@ -175,6 +175,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // The operator's break-glass over an organism whose creator account is unreachable, plus the
         // read that shows the roster before it is re-pointed.
         'aimeat_admin_organism_ownership', 'aimeat_admin_organism_owner_add',
+        // The node-wide compliance report and the two documents behind it. On this surface rather
+        // than 'service' because it is the node's own governance rather than anything the node
+        // sells, and because the only caller it will ever have is the operator's own agent.
+        'aimeat_compliance_report', 'aimeat_compliance_register_read', 'aimeat_compliance_register_write',
         'aimeat_flag_report',
         'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
         'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',

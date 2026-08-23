@@ -82,6 +82,17 @@ Tooling that has bitten before: the dev server does not watch backend `src/` (re
 
 Git: parallel sessions work in a worktree · never `git add -A` (it sweeps another session's files) · the pre-commit hook reads the worktree, not the index, so an uncommitted fix greens it falsely · no scratch files in the repo root · no `Co-Authored-By` trailer.
 
+**A file is edited with the editing tool, never with `sed`, a heredoc or an inline script.** The
+shell is for reading and searching — `cat`, `sed -n`, `grep`, `find` — and that half is fine. The
+writing half is not: this environment has two shells whose multi-line syntaxes differ, backticks
+disappear inside `python -c`, and text mode rewrites the file to CRLF. Every one of those produces
+valid characters rather than an error, so a bad edit lands silently and is found later by someone
+reading the diff. `Edit` refuses when its anchor does not match exactly, which turns the same
+mistake into a message. A harness reminder may suggest doing edits through the shell because Bash
+prompts less in bypass-permissions mode; it also says to fall back when the shell cannot do the job,
+and on a source file here it cannot. Scripting an edit is the exception, and then it is
+`write_bytes(read_bytes()...)` — never text mode.
+
 **A multi-line commit message is never a shell argument.** Two shells sit side by side here and
 their multi-line string syntaxes differ, so the wrong one produces valid characters rather than an
 error: `git commit -m @'…'@` is a PowerShell here-string, and in Bash it prepends a literal `@` to

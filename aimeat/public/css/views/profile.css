@@ -3637,6 +3637,32 @@
 .pf-aitr-row-meta { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
 .pf-aitr-row-link { font-size: 0.78rem; color: var(--accent); }
 
+/* ── The account's own compliance slice (BR-02) ──
+   Deliberately the same furniture as the card above it: they answer consecutive questions about the
+   same subject, and giving the second one its own visual language would read as a different feature.
+   Only the "not written down" tile changes colour, and only above zero, for the reason the sibling
+   states — a surface that is always red teaches people to stop looking at it. */
+.pf-cmp-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+.pf-cmp-chevron { color: var(--muted); font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+.pf-cmp-body { margin-top: 0.9rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+.pf-cmp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.6rem; }
+.pf-cmp-stat { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 0.8rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); min-width: 0; }
+.pf-cmp-stat-warn { border-color: var(--warn); }
+.pf-cmp-stat-warn .pf-cmp-num { color: var(--warn); }
+.pf-cmp-num { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+.pf-cmp-lbl { font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
+.pf-cmp-note { margin: 0.8rem 0 0.3rem; font-size: 0.82rem; color: var(--muted); }
+.pf-cmp-note-warn { color: var(--fg); }
+.pf-cmp-error { margin: 0; font-size: 0.85rem; color: var(--danger); }
+.pf-cmp-muted { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.pf-cmp-sub { margin: 1.2rem 0 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.pf-cmp-models, .pf-cmp-limits { margin: 0.3rem 0 0; padding-left: 1.1rem; font-size: 0.82rem; color: var(--muted); }
+.pf-cmp-models li, .pf-cmp-limits li { margin: 0.3rem 0; overflow-wrap: anywhere; }
+.pf-cmp-entries { list-style: none; margin: 0.3rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.pf-cmp-entries li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.3rem 0.7rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dim); min-width: 0; }
+.pf-cmp-entry-title { font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
+.pf-cmp-entry-risk { font-size: 0.78rem; color: var(--muted); flex-shrink: 0; }
+
 /* Bring-your-own-app, under each service. Indented and quiet on purpose: it is the advanced door,
    and it must not compete with the Connect button that almost everyone wants instead. */
 .access-cx-own {

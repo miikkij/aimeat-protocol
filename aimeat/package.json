@@ -45,6 +45,7 @@
     "test:e2e:auth-lib": "tsx test/e2e-auth-lib.ts",
     "test:e2e:board-ttl": "tsx test/e2e-board-ttl.ts",
     "test:e2e:calibrator": "tsx test/e2e-calibrator.ts",
+    "test:e2e:compliance-report": "tsx test/e2e-compliance-report.ts",
     "test:e2e:concurrency": "tsx test/e2e-concurrency.ts",
     "test:e2e:disputes": "tsx test/e2e-disputes.ts",
     "test:e2e:extensions": "tsx test/e2e-extensions.ts",

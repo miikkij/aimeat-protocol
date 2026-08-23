@@ -40,6 +40,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     { id: 'core:invitation-expiry', name: 'Invitation Expiry', coreHandler: 'invitation-expiry', cron: '*/10 * * * *' },
     // Operator storage-growth telemetry: capture a per-table row-count snapshot every hour.
     { id: 'core:storage-stats-snapshot', name: 'Storage Stats Snapshot', coreHandler: 'storage-stats-snapshot', cron: '0 * * * *' },
+    // The compliance report for the month that just ended. 04:00 on the first, after the nightly
+    // usage rollup and archive at 03:xx, so the month it reports on is fully folded before it reads.
+    { id: 'core:compliance-report-monthly', name: 'Monthly Compliance Report', coreHandler: 'compliance-report-monthly', cron: '0 4 1 * *' },
   ];
 
   if (config.consentEnabled) {

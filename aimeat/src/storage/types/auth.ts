@@ -168,6 +168,31 @@ export interface ConsentRecord {
   metadata?: Record<string, unknown>;  // Free-form metadata
 }
 
+/**
+ * Filters for the consent roll-up. Every field narrows; omit all for the whole node.
+ *
+ * Deliberately the same shape as AiProvenanceFacetQuery: the compliance report asks both the same
+ * question about the same window, and two filter vocabularies would make the two halves of one
+ * report describe two different periods without saying so.
+ */
+export interface ConsentFacetQuery {
+  /** Restrict to one account. Omit for every account on the node — see the repository doc comment. */
+  ownerGhii?: string;
+  /** ISO timestamp; grants made at or after it. */
+  since?: string;
+}
+
+/** One distinct combination of what a grant says, and how many grants fall in it. */
+export interface ConsentFacet {
+  /** `active` | `revoked` | `expired`. */
+  status: string;
+  /** `private` | `dmz` | `federation` | `auth`. */
+  scope: string;
+  /** `YYYY-MM-DD` of `grantedAt`. */
+  day: string;
+  count: number;
+}
+
 export interface ConsentAuditEntry {
   id: string;                 // UUID
   consentId: string;          // References ConsentRecord.id
