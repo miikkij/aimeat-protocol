@@ -17,6 +17,7 @@
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   v1.2.1 — 2026-08-23 — Em-dash swept from the identity hint (banned in every surface).
  *   v1.2.0 — 2026-08-19 — The GHII address under the name, with its meaning in the tooltip.
  *     Nothing anywhere told a person they HAVE a permanent address; the nameplate is where an
  *     address belongs, and the term arrives paired with what it means.
@@ -50,7 +51,7 @@ export function HomeHeader({ name, owner, identity, onOpenSettings }) {
         <span class="koti-name">${name}</span>
         ${identity && html`
           <span class="koti-identity"
-            title=${tr('home.identityHint', 'GHII — your permanent address. People, homes and agents everywhere find you by it.')}>
+            title=${tr('home.identityHint', 'GHII: your permanent address. People, homes and agents everywhere find you by it.')}>
             ${identity}
           </span>`}
       </span>

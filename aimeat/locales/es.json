@@ -3152,8 +3152,8 @@
     "readyTitle": "Tu hogar está en marcha.",
     "readySub": "Tu felpudo de bienvenida está puesto y tu primer agente ya está en casa.",
     "matCompact": "Tu felpudo de bienvenida:",
-    "webpage": "Tu página web — hecha por tu IA:",
-    "identityHint": "GHII — tu dirección permanente. Personas, casas y agentes de todas partes te encuentran con ella.",
+    "webpage": "Tu página web, hecha por tu IA:",
+    "identityHint": "GHII: tu dirección permanente. Personas, casas y agentes de todas partes te encuentran con ella.",
     "chatDoor": {
       "lede": "Tu agente está en el chat. Di qué necesitas y se pone a trabajar.",
       "cta": "Continuar en el chat"
@@ -3164,8 +3164,9 @@
       "organisms": "Espacios compartidos",
       "memory": "Notas y registros",
       "files": "Archivos",
+      "assets": "Recursos",
       "knowledge": "Tu conocimiento estructurado",
-      "knowledgeExplain": "Conocimiento estructurado: lo que has organizado de tus chats de IA, para tus IAs, tus aplicaciones y — cuando tú quieras — otras personas.",
+      "knowledgeExplain": "Conocimiento estructurado: lo que has organizado de tus chats de IA, para tus IAs, tus aplicaciones y, cuando tú quieras, otras personas.",
       "star": "Mantener este siempre visible",
       "showAll": "Mostrar todo ({n})",
       "showLess": "Mostrar menos"
@@ -3177,8 +3178,8 @@
       "houseModel": "El chat de la casa responde con {model}."
     },
     "mail": {
-      "unread": "{n} sin leer — ve a mirar",
-      "empty": "Buzón — nada nuevo"
+      "unread": "{n} sin leer, ve a mirar",
+      "empty": "Buzón: nada nuevo"
     },
     "fleet": {
       "oneOk": "Tu agente está en casa y bien.",
@@ -3197,9 +3198,10 @@
     "playbooks": {
       "title": "¿Qué te gustaría montar?",
       "lead": "Cada uno es algo que este sitio hace de verdad, con los pasos y el prompt que lo consigue.",
+      "row": "Para montar",
       "ask": "Pídeselo a mi agente",
       "copy": "Copiar para mi propia IA",
-      "copied": "Copiado — pégalo en tu chat de IA",
+      "copied": "Copiado. Pégalo en tu chat de IA",
       "proof": "Ya funcionando aquí:",
       "tour": "¿No sabes qué se puede hacer? Haz el recorrido →",
       "businesslauncher": {
@@ -3214,12 +3216,12 @@
       },
       "marketplace": {
         "title": "Una tienda que cobra con tarjetas, monedas y agentes",
-        "lead": "Una caja que acepta una tarjeta, una stablecoin o el dinero de otro agente — y te paga a ti.",
+        "lead": "Una caja que acepta una tarjeta, una stablecoin o el dinero de otro agente, y te paga a ti.",
         "ask": "Quiero montar una tienda que acepte tarjetas, stablecoin y compras de agentes. Guíame.",
         "step1": "Di qué vendes: una cosa, un servicio o el trabajo que tus agentes hacen para otros.",
         "step2": "Conecta el dinero. Las tarjetas van por tu proveedor de pagos; USDC y EURC llegan directas a tu dirección.",
         "step3": "Tu agente publica la tienda como una aplicación con su propia dirección web.",
-        "step4": "Las ventas se retienen, se cobran y se te pagan — y puedes repartir lo ganado con quien te ayudó."
+        "step4": "Las ventas se retienen, se cobran y se te pagan, y puedes repartir lo ganado con quien te ayudó."
       },
       "accounts": {
         "title": "Tus cuentas, conectadas",
@@ -3236,7 +3238,7 @@
         "ask": "Publica mi propia página y dame la dirección.",
         "step1": "Dile a tu agente quién eres y qué debe decir la página.",
         "step2": "La publica y te da la dirección.",
-        "step3": "Cámbiala pidiéndolo — no hay editor que aprender.",
+        "step3": "Cámbiala pidiéndolo. No hay editor que aprender.",
         "step4": "Añade las partes que solo verán algunas personas, cuando quieras."
       },
       "instance": {
@@ -3244,7 +3246,7 @@
         "lead": "Todo esto en tu máquina o tu nube: tus reglas, tus datos, tus costes.",
         "ask": "Estoy pensando en ejecutar AIMEAT en mi propia máquina. Ayúdame a decidir y luego instálalo.",
         "step1": "Piensa qué quieres que este sitio no te da.",
-        "step2": "Instálalo — un comando, y responde en tu propia dirección.",
+        "step2": "Instálalo: un comando, y responde en tu propia dirección.",
         "step3": "Llévate tus cosas: memoria, archivos, espacios y agentes se exportan e importan.",
         "step4": "Decide tus propias reglas, y federa con otros solo si quieres."
       }

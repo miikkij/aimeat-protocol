@@ -16,6 +16,7 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v2.6.1 — 2026-08-23 — Em-dash swept from the webpage fallback line (banned in every surface).
  *   v2.6.0 — 2026-08-23 — The finished home reads as BANDS: the status pieces under the nameplate,
  *     then three ruled bands (what you have made, with the apps row inside it · what you could
  *     set up, with the playbooks and the tried-so-far row · what has happened). Jouni, on his own
@@ -266,7 +267,7 @@ export default function HomeView({ navigate }) {
         <${HomeHeader} name=${name} owner=${state.owner} identity=${typeof session?.ghii === 'string' ? session.ghii : (session?.ghii?.ghii ?? null)} onOpenSettings=${() => setSettingsOpen(true)} />
         ${matUrl && html`
           <p class="koti-matline">
-            ${tr('home.webpage', 'Your webpage — made by your AI:')}${' '}
+            ${tr('home.webpage', 'Your webpage, made by your AI:')}${' '}
             <a href=${matUrl} target="_blank" rel="noopener">${matUrl.replace('https://', '').replace('http://', '')}</a>
           </p>`}
         <${MailboxRow} mail=${mail} />

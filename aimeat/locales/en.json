@@ -3164,8 +3164,8 @@
     "readyTitle": "Your home is up and running.",
     "readySub": "Your welcome mat is out and your first agent is home.",
     "matCompact": "Your welcome mat:",
-    "webpage": "Your webpage — made by your AI:",
-    "identityHint": "GHII — your permanent address. People, homes and agents everywhere find you by it.",
+    "webpage": "Your webpage, made by your AI:",
+    "identityHint": "GHII: your permanent address. People, homes and agents everywhere find you by it.",
     "chatDoor": {
       "lede": "Your agent is in the chat. Say what you need, and it gets to work.",
       "cta": "Continue in the chat"
@@ -3176,8 +3176,9 @@
       "organisms": "Shared spaces",
       "memory": "Notes and records",
       "files": "Files",
+      "assets": "Assets",
       "knowledge": "Structured knowledge",
-      "knowledgeExplain": "Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and — when you choose — other people to use.",
+      "knowledgeExplain": "Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and, when you choose, other people to use.",
       "star": "Keep this one always visible",
       "showAll": "Show all ({n})",
       "showLess": "Show less"
@@ -3189,8 +3190,8 @@
       "houseModel": "The house chat answers with {model}."
     },
     "mail": {
-      "unread": "{n} unread — go have a look",
-      "empty": "Mailbox — nothing new"
+      "unread": "{n} unread, go have a look",
+      "empty": "Mailbox: nothing new"
     },
     "fleet": {
       "oneOk": "Your agent is home and well.",
@@ -3209,9 +3210,10 @@
     "playbooks": {
       "title": "What would you like to set up?",
       "lead": "Each one is a real thing you can do here, with the steps and the prompt that gets it done.",
+      "row": "To set up",
       "ask": "Ask my agent",
       "copy": "Copy for my own AI",
-      "copied": "Copied — paste it in your AI chat",
+      "copied": "Copied. Paste it in your AI chat",
       "proof": "Already running here:",
       "tour": "Not sure what this can do? Take the tour →",
       "businesslauncher": {
@@ -3226,12 +3228,12 @@
       },
       "marketplace": {
         "title": "A shop that takes cards, coins and agents",
-        "lead": "One checkout that accepts a card, a stablecoin or another agent's money — and pays out to you.",
+        "lead": "One checkout that accepts a card, a stablecoin or another agent's money, and pays out to you.",
         "ask": "I want to set up a shop that takes cards, stablecoin and agent purchases. Walk me through it.",
         "step1": "Say what you sell: a thing, a service, or work your agents do for people.",
         "step2": "Connect the money. Cards go through your payment provider; USDC and EURC settle straight to your address.",
         "step3": "Your agent publishes the shop as an app with its own web address.",
-        "step4": "Sales are held, captured and paid out to you — and you can split the takings with whoever helped."
+        "step4": "Sales are held, captured and paid out to you, and you can split the takings with whoever helped."
       },
       "accounts": {
         "title": "Your accounts, connected",
@@ -3248,7 +3250,7 @@
         "ask": "Put up my own page and give me the address.",
         "step1": "Tell your agent who you are and what the page should say.",
         "step2": "It publishes the page and hands you the address.",
-        "step3": "Change it by asking — there is no editor to learn.",
+        "step3": "Change it by asking. There is no editor to learn.",
         "step4": "Add the parts only certain people may see, whenever you want them."
       },
       "instance": {
@@ -3256,7 +3258,7 @@
         "lead": "The whole thing on your own machine or cloud: your rules, your data, your costs.",
         "ask": "I am thinking about running AIMEAT on my own machine. Help me decide, then install it.",
         "step1": "Work out what you want that this place does not give you.",
-        "step2": "Install it — one command, and it answers on your own address.",
+        "step2": "Install it: one command, and it answers on your own address.",
         "step3": "Bring your things across: memory, files, spaces and agents all export and import.",
         "step4": "Decide your own rules, and federate with others only if you want to."
       }
@@ -3293,10 +3295,10 @@
       "promptLabel": "The prompt",
       "promptShort": "The shorter prompt",
       "copy": "Copy the prompt",
-      "copied": "Copied — paste it in your AI chat",
+      "copied": "Copied. Paste it in your AI chat",
       "loading": "Loading…",
       "pasteLabel": "Paste what your AI gave you here",
-      "pastePlaceholder": "Everything it wrote is fine — explanation and all.",
+      "pastePlaceholder": "Everything it wrote is fine, explanation and all.",
       "submit": "Here is my welcome mat",
       "sending": "Reading it…",
       "view": "Look at it",
@@ -3326,7 +3328,7 @@
       "modeSteps": "Do it step by step",
       "promptLabel": "The prompt",
       "copy": "Copy the prompt",
-      "copied": "Copied — paste it in your AI chat",
+      "copied": "Copied. Paste it in your AI chat",
       "doneManual": "I have started it",
       "waitTitle": "Waiting for your agent to knock.",
       "waitBody": "The next move is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.",
@@ -3339,7 +3341,7 @@
       "stateProduction": "Connected and at home.",
       "stateIdle": "Here, but quiet just now.",
       "stateOnboarding": "Settling in.",
-      "stateNew": "Just arrived — it has not started yet.",
+      "stateNew": "Just arrived, it has not started yet.",
       "stateProblem": "It has hit a snag. Shall we take a look?",
       "stateSystem": "Part of the house.",
       "othersProblem": "Shall we see how the other {count} are doing?",
@@ -3357,8 +3359,8 @@
       "againTitle": "Then make the mat again with it",
       "againBody": "Same prompt, new app. Paste what it gives you here and we carry on from there. Your first mat stays until this one replaces it.",
       "submit": "Here is the new one",
-      "stillB": "That one cannot open a connection either. The list above is the checked one — the app has to be from it.",
-      "ledePlan": "{app} made it, and {app} can open a connection to your home — but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.",
+      "stillB": "That one cannot open a connection either. The list above is the checked one; the app has to be from it.",
+      "ledePlan": "{app} made it, and {app} can open a connection to your home, but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.",
       "yours": "The one you already use"
     },
     "feed": {
@@ -3457,7 +3459,7 @@
         "entered": "You went to read your messages."
       },
       "copyPrompt": "Copy the prompt",
-      "copied": "Copied — paste it in your AI chat"
+      "copied": "Copied. Paste it in your AI chat"
     },
     "settings": {
       "open": "Settings",
@@ -4337,9 +4339,9 @@
     "agentDoorTitle": "Let your AI do this",
     "agentDoorSub": "Copy the prompt into your own AI chat. If it can, a link arrives in your email and your account is done.",
     "agentDoorCopy": "Copy the prompt",
-    "agentDoorCopied": "Copied — paste it in your AI chat",
+    "agentDoorCopied": "Copied. Paste it in your AI chat",
     "agentDoorAfter": "It will ask you for your email address and nothing else. You choose your own username afterwards, from the link.",
-    "agentDoorMcp": "Be ready to set up a connector for it later — that is the step that lets it reach your home directly.",
+    "agentDoorMcp": "Be ready to set up a connector for it later; that is the step that lets it reach your home directly.",
     "agentDoorCannot": "If it says it cannot, that is a fine answer. Register below instead.",
     "registerHome": "Register your home",
     "registerHomeSub": "If you do not have a way in yet.",

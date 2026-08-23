@@ -15,6 +15,7 @@
  *   summary once the mat exists.
  * @usage import { StepMat } from './step-mat.js';
  * @version-history
+ *   (2026-08-23) Em-dashes swept from the copied and paste fallbacks (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  */
 import { h } from 'preact';
@@ -108,7 +109,7 @@ export function StepMat({ onDone }) {
         prompt=${shown}
         className=${hasPaste ? 'btn-outline' : 'btn-primary'}
         copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
-        copiedLabel=${tr('home.mat.copied', 'Copied — paste it in your AI chat')} />
+        copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
       <label class="koti-paste-label" for="koti-paste">
         ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
@@ -119,7 +120,7 @@ export function StepMat({ onDone }) {
         class="koti-paste"
         rows="8"
         spellcheck="false"
-        placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine — explanation and all.')}
+        placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine, explanation and all.')}
         value=${paste}
         onInput=${(e) => setPaste(e.target.value)}></textarea>
 
