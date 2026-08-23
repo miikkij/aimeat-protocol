@@ -17,6 +17,11 @@ on:
       - "aimeat-crewai-v*.*.*"
   workflow_dispatch: {}  # allow manual runs from the Actions tab for testing
 
+# Least-privilege default; the publish job below grants itself the id-token: write it needs for the
+# PyPI OIDC Trusted Publisher flow.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build sdist + wheel

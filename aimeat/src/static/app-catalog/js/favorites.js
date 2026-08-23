@@ -12,6 +12,7 @@
 import { loadConfig } from './config.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { t } from './i18n.js';
+import { jsArg } from './util.js';
 
 const KEY = 'app-catalog.favorites';
 let favSet = new Set();
@@ -66,6 +67,6 @@ export function favStarHtml(ref) {
   var on = favSet.has(ref);
   var title = on ? (t('fav.remove') || 'Remove from favourites') : (t('fav.add') || 'Add to favourites');
   return '<button class="fav-toggle' + (on ? ' on' : '') + '"'
-    + ' onclick="event.stopPropagation(); window._launcher.toggleFavorite(\'' + String(ref).replace(/'/g, "\\'") + '\')"'
+    + ' onclick="event.stopPropagation(); window._launcher.toggleFavorite(\'' + jsArg(ref) + '\')"'
     + ' title="' + title + '">' + (on ? '⭐' : '☆') + '</button>';
 }
