@@ -293,10 +293,17 @@ export const coreTools: ConnectCliToolDefinition[] = [
         // `part` is validated against the two literals rather than interpolated, because it lands in
         // a path segment. An unchecked value here would be a path the route never declared.
         name: 'aimeat_compliance_report',
-        handler: ({ client }, input) => client.get(`/v1/admin/compliance/report${query({
-            month: optionalString(input, 'month'),
-            since_days: optionalNumber(input, 'since_days'),
-        })}`),
+        handler: ({ client }, input) => {
+            // Two doors for two reports: the owner slice needs no permission, the whole installation
+            // needs an operator account plus the exact word. Defaulting to the slice is least
+            // privilege, and it is what almost every caller means.
+            const scope = optionalString(input, 'scope');
+            const path = scope === 'node' ? '/v1/admin/compliance/report' : '/v1/compliance/report/mine';
+            return client.get(`${path}${query({
+                month: optionalString(input, 'month'),
+                since_days: optionalNumber(input, 'since_days'),
+            })}`);
+        },
     },
     {
         name: 'aimeat_compliance_register_read',

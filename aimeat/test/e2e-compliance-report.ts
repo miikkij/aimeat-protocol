@@ -103,6 +103,7 @@ async function agentToken(owner: Owner, label: string, scopes: string[]): Promis
 const REPORT = '/v1/admin/compliance/report';
 const USECASES = '/v1/admin/compliance/usecases';
 const QUESTIONS = '/v1/admin/compliance/questionnaire';
+const MINE = '/v1/compliance/report/mine';
 
 // ─── State ───
 let op: Owner;
@@ -320,6 +321,84 @@ await test('A consent grant reaches the report — the node-wide facet query wor
         `expected the new grant to be counted: ${was} → ${after.body.data.derived.consent.active}`);
     assert(typeof after.body.data.derived.consent.by_scope.federation === 'number',
         'the facet should group by scope, not only by status');
+});
+
+// ─── The account's own slice ───
+await test('Any account reads its own slice, with no permission and no operator role', async () => {
+    const r = await json(MINE, { headers: auth(plain.token) });
+    assert(r.status === 200, `a plain owner must be able to read their own: got ${r.status}`);
+    assert(r.body.data.scope.ring === 'owner', `ring should be owner, got ${r.body.data.scope.ring}`);
+    assert(String(r.body.data.scope.owner_ghii).startsWith(plain.name),
+        `the slice should name the caller, got ${r.body.data.scope.owner_ghii}`);
+});
+
+await test('The slice is scoped by the token, not by anything the request can say', async () => {
+    // The whole point of the route. If a query parameter could move the scope, an account could read
+    // the operator's picture through a door that asks for nothing.
+    const r = await json(`${MINE}?owner=${encodeURIComponent(op.name)}&ownerGhii=${encodeURIComponent(op.name)}`, {
+        headers: auth(plain.token),
+    });
+    assert(r.status === 200, `expected 200, got ${r.status}`);
+    assert(String(r.body.data.scope.owner_ghii).startsWith(plain.name),
+        `a request parameter moved the scope to ${r.body.data.scope.owner_ghii}`);
+});
+
+await test('One account cannot see another account\'s use cases in its own slice', async () => {
+    // The operator writes two entries, one naming each account. Each account must see its own and
+    // not the other's — the isolation that makes this surface safe to give to everybody.
+    const put = await json(USECASES, {
+        method: 'PUT',
+        headers: auth(op.token),
+        body: JSON.stringify({
+            usecases: [
+                { id: 'uc-op-only', title: 'Belongs to the operator', ownerGhii: `${op.name}@${NODE_ID}` },
+                { id: 'uc-plain-only', title: 'Belongs to the other account', ownerGhii: `${plain.name}@${NODE_ID}` },
+                { id: 'uc-house', title: 'Belongs to nobody in particular' },
+            ],
+        }),
+    });
+    assert(put.status === 200, `PUT usecases: ${put.status} ${JSON.stringify(put.body?.error)}`);
+
+    const mine = await json(MINE, { headers: auth(plain.token) });
+    const ids = mine.body.data.register.usecases.map((u: any) => u.id).sort();
+    // Its own, plus the one that names nobody — a use belonging to the installation is still one
+    // this account runs under. Never the entry naming the other account.
+    assert(JSON.stringify(ids) === JSON.stringify(['uc-house', 'uc-plain-only']),
+        `expected its own and the unowned entry, got ${JSON.stringify(ids)}`);
+});
+
+await test('The slice states its OWN limits, not the operator\'s', async () => {
+    const mine = await json(MINE, { headers: auth(plain.token) });
+    const codes: string[] = mine.body.data.not_covered.map((l: any) => l.code);
+    assert(codes.includes('owner-your-slice'), `the slice must say it shows nobody else: ${JSON.stringify(codes)}`);
+    assert(codes.includes('owner-register-is-the-operators'),
+        'the slice must say who keeps the register, because the reader cannot change it');
+    // The operator's wording would be false here: an account operates nothing.
+    assert(!codes.includes('register-unverified'), 'the operator\'s register sentence leaked into the owner slice');
+    assert(!codes.includes('this-node-only'), 'the operator\'s scope sentence leaked into the owner slice');
+});
+
+await test('An agent reading its owner\'s slice needs the activity-read word', async () => {
+    // The owner passes without it (requireScope lets an owner session through); an agent does not.
+    // Same word as GET /v1/usage/summary, because it is the same material one level up.
+    const bare = await agentToken(plain, 'slicebare', ['memory:read']);
+    const r = await json(MINE, { headers: auth(bare) });
+    assert(r.status === 403, `an agent without wallet:read should be refused, got ${r.status}`);
+});
+
+await test('An agent WITH the word sees its OWNER, not itself', async () => {
+    const agent = await agentToken(plain, 'slice', ['memory:read', 'wallet:read']);
+    const r = await json(MINE, { headers: auth(agent) });
+    assert(r.status === 200, `an agent should read its owner's slice: got ${r.status}`);
+    assert(String(r.body.data.scope.owner_ghii).startsWith(plain.name),
+        `an agent must resolve to its owner, got ${r.body.data.scope.owner_ghii}`);
+    assert(!String(r.body.data.scope.owner_ghii).includes('#'),
+        `the slice resolved to the agent rather than the person: ${r.body.data.scope.owner_ghii}`);
+});
+
+await test('The owner slice is refused without authentication', async () => {
+    const r = await json(MINE);
+    assert(r.status === 401, `expected 401, got ${r.status}`);
 });
 
 // ─── The stored monthly reports ───

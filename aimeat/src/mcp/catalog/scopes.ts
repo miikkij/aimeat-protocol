@@ -229,7 +229,6 @@ export const TOOL_SCOPES: Record<string, string> = {
     // a tool is REGISTERED according to this table, and neither word is carried by any wildcard
     // (SCOPES_OUTSIDE_WILDCARD). Read and write are separate words because they fail differently:
     // reading discloses every account's AI activity, writing changes what the report says.
-    aimeat_compliance_report:                 'compliance:read',
     aimeat_compliance_register_read:          'compliance:read',
     aimeat_compliance_register_write:         'compliance:write',
 

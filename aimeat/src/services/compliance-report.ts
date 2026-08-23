@@ -90,8 +90,16 @@ export interface ComplianceGap {
 export interface ComplianceReport {
   scope: {
     node_id: string;
-    /** `node-wide` here. Ring 2 serves `owner` and a different `not_covered`. */
-    ring: 'node-wide';
+    /**
+     * Who this report is about. `node-wide` is the operator's, `owner` is one account's own slice.
+     *
+     * They are not the same document narrowed. An owner reading their slice operates nothing and
+     * can see nothing about anybody else, so `not_covered` says different things — and saying the
+     * operator's sentences to them would be the report claiming a reach it does not have.
+     */
+    ring: 'node-wide' | 'owner';
+    /** The account this is about, when it is about one. */
+    owner_ghii?: string;
     period: { from: string; to: string };
     generated_at: string;
     questionnaire_version: string;
@@ -131,6 +139,13 @@ export interface ComplianceReportOptions {
   sinceDays?: number;
   /** `YYYY-MM` — the whole calendar month, which is what the scheduled report asks for. */
   month?: string;
+  /**
+   * Narrow every half to one account — the owner's own slice.
+   *
+   * The caller passes the identity it RESOLVED, never one a request supplied. The route reads it
+   * from resolveIdentity() for exactly the reason every other identity-keyed read on this node does.
+   */
+  ownerGhii?: string;
 }
 
 /** Inclusive `from` / exclusive-feeling `to` for a calendar month, both ISO. */
@@ -148,6 +163,65 @@ export function monthWindow(month: string): { from: string; to: string; days: nu
  * `transparencyNote` is lifted from the roll-up's own scope note instead of restated, so the two can
  * never come to say different things about the same absence.
  */
+/**
+ * The limits an OWNER reads about their own slice.
+ *
+ * A different list, not the operator's filtered. The three sentences that change are the ones that
+ * would be false if said to an account: they operate nothing, so they cannot switch provenance on or
+ * change a retention window, and the register they are compared against is the operator's rather
+ * than their own. Handing them the operator's wording would be the report claiming a reach the
+ * reader does not have, which is the same defect as a total that reads as coverage — one level up.
+ */
+function notCoveredForOwner(config: AimeatConfig, transparencyNote: string): ComplianceLimit[] {
+  return [
+    { code: 'no-record', text: transparencyNote },
+    {
+      code: 'owner-this-node-only',
+      text: 'Only what you did here. Anything you published elsewhere — on another installation, on '
+        + 'your own personal one, or off this system entirely — is outside every number here.',
+    },
+    {
+      code: 'owner-your-slice',
+      text: 'Only yours. Nothing on this page describes anybody else\'s activity, and nobody else '
+        + 'sees yours here.',
+    },
+    {
+      code: 'owner-register-is-the-operators',
+      text: 'The list of what AI is used for is kept by whoever runs this installation, not by you. '
+        + 'What you see below are the entries that name your account; if something of yours is '
+        + 'missing from it, that is a conversation with them rather than something you can fix here.',
+    },
+    {
+      code: 'not-a-legal-determination',
+      text: 'A risk class is somebody\'s answers run through a question set. It is an aid for finding '
+        + 'what needs a closer look, not a legal determination.',
+    },
+    {
+      code: 'no-watermark',
+      text: 'Text is not watermarked here. The tokens are not sampled, and that layer belongs to '
+        + 'whoever runs the model.',
+    },
+    {
+      code: 'consent-retention',
+      days: config.consentAuditRetentionDays,
+      text: `Records of who read what are deleted after ${config.consentAuditRetentionDays} days `
+        + 'here, so anything older cannot appear. The permissions themselves are not deleted.',
+    },
+    {
+      code: 'usage-window',
+      days: USAGE_HOT_WINDOW_DAYS,
+      text: `Your AI use is counted from a window of about ${USAGE_HOT_WINDOW_DAYS} days. Anything `
+        + 'older has been archived, and a zero would mean archived rather than idle.',
+    },
+    ...(config.aiProvenance ? [] : [{
+      code: 'owner-provenance-off',
+      text: 'Recording is switched off on this installation, which is not something you set. Nothing '
+        + 'was recorded, so every count above is zero for that reason and not because you did '
+        + 'nothing.',
+    }]),
+  ];
+}
+
 function notCovered(config: AimeatConfig, transparencyNote: string): ComplianceLimit[] {
   return [
     // The absent-record rule is lifted from the roll-up's own scope note rather than restated, so
@@ -203,11 +277,22 @@ function notCovered(config: AimeatConfig, transparencyNote: string): ComplianceL
   ];
 }
 
-/** Node-wide AI usage, folded out of the daily aggregate rows. */
+/**
+ * AI usage, folded out of the daily aggregate rows.
+ *
+ * TWO DIFFERENT STORAGE METHODS, not one with a filter. `queryUsageDaily` is owner-scoped in its own
+ * signature — the owner is required, not optional — while `queryUsageDailyAllOwners` documents
+ * itself as applying no caller restriction. Choosing between them here rather than passing an
+ * optional owner into one call means an owner slice cannot become node-wide by an argument going
+ * missing, which is the shape of the mistake this whole feature is built to notice in other people.
+ */
 async function aiUsage(
-  storage: Storage, from: string, to: string,
+  storage: Storage, from: string, to: string, ownerGhii?: string,
 ): Promise<ComplianceReport['derived']['ai_usage']> {
-  const rows = await storage.queryUsageDailyAllOwners({ from: from.slice(0, 10), to: to.slice(0, 10) });
+  const window = { from: from.slice(0, 10), to: to.slice(0, 10) };
+  const rows = ownerGhii
+    ? await storage.queryUsageDaily({ ownerGhii, ...window })
+    : await storage.queryUsageDailyAllOwners(window);
   const models = new Set<string>();
   const owners = new Set<string>();
   const out = {
@@ -231,11 +316,11 @@ async function aiUsage(
   return out;
 }
 
-/** Node-wide consent, folded out of the facets. */
+/** Consent, folded out of the facets. Node-wide unless an owner is given. */
 async function consentTotals(
-  storage: Storage, config: AimeatConfig, since: string,
+  storage: Storage, config: AimeatConfig, since: string, ownerGhii?: string,
 ): Promise<ComplianceReport['derived']['consent']> {
-  const facets = await storage.consentFacets({ since });
+  const facets = await storage.consentFacets({ since, ownerGhii });
   const out = {
     active: 0, revoked: 0, expired: 0,
     by_scope: {} as Record<string, number>,
@@ -326,25 +411,33 @@ export async function buildComplianceReport(
       return { from: new Date(to.getTime() - days * 86_400_000).toISOString(), to: to.toISOString(), days };
     })();
 
+  const owner = opts.ownerGhii;
   const questionnaire = await effectiveQuestionnaire(storage, config.nodeId);
   const [transparency, usage, consent, rawUseCases] = await Promise.all([
-    buildAiTransparencyReport(storage, { sinceDays: window.days }),
-    aiUsage(storage, window.from, window.to),
-    consentTotals(storage, config, window.from),
+    buildAiTransparencyReport(storage, { sinceDays: window.days, ownerGhii: owner }),
+    aiUsage(storage, window.from, window.to, owner),
+    consentTotals(storage, config, window.from, owner),
     readUseCases(storage, config.nodeId),
   ]);
 
-  const usecases = rawUseCases.map(uc => ({ ...uc, risk: classifyUseCase(uc, questionnaire) }));
+  // The register is one document the operator keeps, so an owner slice SELECTS from it rather than
+  // reading a different one: the entries that name this account, plus the ones that name nobody,
+  // because a use that belongs to the installation itself is still one this account runs under.
+  const visible = owner ? rawUseCases.filter(uc => !uc.ownerGhii || uc.ownerGhii === owner) : rawUseCases;
+  const usecases = visible.map(uc => ({ ...uc, risk: classifyUseCase(uc, questionnaire) }));
 
   return {
     scope: {
       node_id: config.nodeId,
-      ring: 'node-wide',
+      ring: owner ? 'owner' : 'node-wide',
+      ...(owner ? { owner_ghii: owner } : {}),
       period: { from: window.from, to: window.to },
       generated_at: new Date().toISOString(),
       questionnaire_version: questionnaire.version,
     },
-    not_covered: notCovered(config, transparency.scope.note),
+    not_covered: owner
+      ? notCoveredForOwner(config, transparency.scope.note)
+      : notCovered(config, transparency.scope.note),
     derived: { ai_transparency: transparency, ai_usage: usage, consent },
     register: { usecases, questionnaire },
     gaps: findGaps(usecases, usage, transparency),

@@ -11234,6 +11234,52 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /v1/compliance/report/mine:
+    get:
+      operationId: getMyComplianceReport
+      summary: Your own AI activity, and which use-case entries name your account
+      tags: [Compliance]
+      description: >
+        Any authenticated principal, and what comes back is its own owner's slice: an agent asking on
+        behalf of somebody sees exactly what that person sees. The scope is taken from the token via
+        resolveIdentity() and from nothing else - there is no `owner` parameter, and adding one would
+        undo the point of the route.
+
+        Same shape as the operator report, with `scope.ring` set to `owner` and `scope.owner_ghii`
+        naming the account. `register.usecases` holds only the entries that name this account, plus
+        the ones that name nobody, because a use belonging to the installation itself is still one
+        this account runs under. The entries are read-only here: the register belongs to whoever runs
+        the installation.
+
+        `not_covered` is a DIFFERENT list from the operator's, not that list filtered. Three of the
+        operator's sentences would be false said to an account - they operate nothing, they set no
+        retention window, and the register they are measured against is somebody else's - so this
+        ring states its own limits.
+
+        Most publishing here is done by accounts and the duty follows whoever publishes, which is why
+        this exists: an account that cannot see its own exposure cannot act on it, and the operator's
+        report is not theirs to read.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since_days
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 3650, default: 30 }
+          description: Rolling window. Ignored when `month` is given.
+        - name: month
+          in: query
+          required: false
+          schema: { type: string, pattern: '^\d{4}-(0[1-9]|1[0-2])$' }
+          description: A whole calendar month, `YYYY-MM`.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/ai-transparency/mine:
     get:
       operationId: aiTransparencyMine
