@@ -26,11 +26,13 @@ export const CORTEX_PACKS: LibraryPack[] = [
     kind: 'cortex',
     category: 'ui',
     title: 'UI viewers (DataTable & co)',
+    // 1.1.0: the bundled aimeat-ui-viewers.yaml pack was bumped (3521e37e) but this registry entry
+    // was left at 1.0.0, so no node re-fetched the changed pack. Kept in lockstep with the YAML.
     description: 'Data viewers: sortable/filterable/paginated DataTable, Carousel, Grid, List, Gallery, Timeline.',
     url: '/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>'],
     requires: [],
-    version: '1.0.0',
+    version: '1.1.0',
     license: 'MIT',
     apiSurface: 'AIMEAT.ui.viewers',
     aiDoc: [
