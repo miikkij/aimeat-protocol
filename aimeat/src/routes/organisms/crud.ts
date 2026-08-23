@@ -133,12 +133,17 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   }
 
   router.get('/v1/organisms', optionalAuth(), async (req, res) => {
-    const { type, city, interest, visibility, member, page, per_page } = req.query;
+    // Express parses `?member[]=x` and `?member[k]=v` into an array/object, so the old `as string`
+    // cast lied and buildOrganismList's `member.split()` threw a 500 on a crafted query from any
+    // unauthenticated caller (CodeQL js/type-confusion, AI-triage 2026-08-23). Take the single
+    // string form of each filter and drop anything that is not a plain string.
+    const qstr = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
     const result = await buildOrganismList(req.auth, {
-      type: type as string, city: city as string, interest: interest as string,
-      visibility: visibility as string, member: member as string,
-      page: page ? Number(page) : undefined, perPage: per_page ? Number(per_page) : undefined,
-      include: req.query.include as string,
+      type: qstr(req.query.type), city: qstr(req.query.city), interest: qstr(req.query.interest),
+      visibility: qstr(req.query.visibility), member: qstr(req.query.member),
+      page: qstr(req.query.page) ? Number(qstr(req.query.page)) : undefined,
+      perPage: qstr(req.query.per_page) ? Number(qstr(req.query.per_page)) : undefined,
+      include: qstr(req.query.include),
     });
     res.json(success(config.nodeId, result));
   });

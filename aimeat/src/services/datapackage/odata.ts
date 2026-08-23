@@ -212,6 +212,13 @@ export function parseQuery(params: URLSearchParams, schema: TableSchema): ParseR
 
     const filter = params.get('$filter');
     if (filter) {
+        // $filter is untrusted URL input, and the clause regexes below (COMPARISON/FUNCTION, with
+        // `\s+…\s+` and `.+?…\s*$`) plus the `\s+and\s+` split can backtrack polynomially on a value
+        // padded with whitespace (CodeQL js/polynomial-redos, AI-triage 2026-08-23). A real OData
+        // filter is short; cap the length so the backtracking is bounded to a trivial constant.
+        if (filter.length > 2048) {
+            return { ok: false, code: 'BAD_REQUEST', message: '$filter is too long (max 2048 characters).' };
+        }
         // `or` and `not` get their OWN refusal, ahead of everything else, because the split below is
         // on `and`: an `or` left in would be silently torn into two ANDed clauses and match FEWER
         // rows than asked for, with no symptom at all. Tested with string literals blanked first, so

@@ -22,6 +22,7 @@ import { verifyPassword } from '../../services/password.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { loginTarpit } from '../../middleware/login-tarpit.js';
 import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 
 export function registerAttachEmailRoute(
     router: Router,
@@ -40,7 +41,7 @@ export function registerAttachEmailRoute(
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required'));
             return;
         }
-        if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        if (!isValidEmail(email)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid email is required'));
             return;
         }

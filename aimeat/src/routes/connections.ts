@@ -428,7 +428,10 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       await storage.deleteVerificationNonce(state).catch((err: unknown) => {
         logger.warn('connections: could not clear the state after a provider-side refusal', { error: String(err) });
       });
-      res.status(400).send(`The provider did not complete the connection: ${providerError}`);
+      // text/plain, not the default text/html of res.send(string): providerError is unauthenticated
+      // query input, and an HTML response would execute `?error=<img onerror=…>` on this node's own
+      // origin (CodeQL js/reflected-xss, AI-triage 2026-08-23).
+      res.status(400).type('txt').send(`The provider did not complete the connection: ${providerError}`);
       return;
     }
     if (!state || !code) {

@@ -21,7 +21,7 @@
  */
 import { Router } from 'express';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { join, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parse as parseYaml } from 'yaml';
 import type { AimeatConfig } from '../config.js';
@@ -41,6 +41,17 @@ const __dirname = dirname(__filename);
  * In dev:  src/routes/../../docs/extensions  (repo root)
  * In dist: dist/src/routes/../../../docs/extensions
  */
+/**
+ * A route-supplied path segment (an extension name or an action id) that is safe to join into a
+ * filesystem path. Even on operator-only routes, an unvalidated `:name`/`:actionId` joined into a
+ * path is directory traversal — a crafted `../../…` reads or WRITES outside docs/extensions/ (CodeQL
+ * js/path-injection, AI-triage 2026-08-23). Extension names and action ids are lowercase identifiers,
+ * so a plain-segment allowlist (no separators, no `..`) is both sufficient and the natural shape.
+ */
+function isSafeSegment(s: unknown): s is string {
+  return typeof s === 'string' && /^[a-z0-9][a-z0-9._-]*$/.test(s) && !s.includes('..');
+}
+
 function getBundledExtensionsDir(): string {
   const candidates = [
     join(__dirname, '..', '..', '..', 'docs', 'extensions'),   // dist
@@ -113,6 +124,7 @@ function readBundledExtensions(): BundledExtensionInfo[] {
 }
 
 function readBundledExtensionFull(name: string): { manifest: string; scripts: Record<string, string> } | null {
+  if (!isSafeSegment(name)) return null; // defense in depth: never join an unvalidated name into a path
   const dir = getBundledExtensionsDir();
   const extDir = join(dir, name);
   const yamlPath = join(extDir, 'extension.yaml');
@@ -127,10 +139,14 @@ function readBundledExtensionFull(name: string): { manifest: string; scripts: Re
 
   const scripts: Record<string, string> = {};
   if (Array.isArray(actions)) {
+    const extDirAbs = resolve(extDir);
     for (const action of actions) {
       const scriptPath = action.script as string | undefined;
       if (!scriptPath) continue;
-      const fullPath = join(extDir, scriptPath);
+      // The script path comes from the on-disk manifest; contain it to extDir so a `../` in a
+      // hand-edited manifest cannot read outside the extension's own directory.
+      const fullPath = resolve(extDir, scriptPath);
+      if (fullPath !== extDirAbs && !fullPath.startsWith(extDirAbs + sep)) continue;
       if (existsSync(fullPath)) {
         scripts[scriptPath] = readFileSync(fullPath, 'utf-8');
       }
@@ -171,6 +187,7 @@ export function adminExtensionsRouter(config: AimeatConfig, storage: Storage, sc
   router.post('/v1/admin/extensions/available/:name/install', requireAuth(), requireRole('operator'), async (req, res) => {
     try {
       const name = req.params.name as string;
+      if (!isSafeSegment(name)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name')); return; }
 
       // Check if already installed
       const existingExt = await storage.getExtension(name);
@@ -471,6 +488,7 @@ actions:
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
+      if (!isSafeSegment(name) || !isSafeSegment(actionId)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name or action id')); return; }
       const dir = getBundledExtensionsDir();
       const scriptPath = join(dir, name, 'actions', `${actionId}.js`);
 
@@ -492,6 +510,7 @@ actions:
     try {
       const name = req.params.name as string;
       const actionId = req.params.actionId as string;
+      if (!isSafeSegment(name) || !isSafeSegment(actionId)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name or action id')); return; }
       const body = req.body as Record<string, unknown>;
       const scriptContent = body.scriptContent as string;
 
@@ -529,6 +548,7 @@ actions:
   router.post('/v1/admin/extensions/available/:name/actions', requireAuth(), requireRole('operator'), async (req, res) => {
     try {
       const name = req.params.name as string;
+      if (!isSafeSegment(name)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name')); return; }
       const { id, method, description } = req.body as { id?: string; method?: string; description?: string };
 
       if (!id || typeof id !== 'string' || !/^[a-z0-9-]+$/.test(id)) {
@@ -612,6 +632,7 @@ return { ok: true };
   router.post('/v1/admin/extensions/available/:name/reinstall', requireAuth(), requireRole('operator'), async (req, res) => {
     try {
       const name = req.params.name as string;
+      if (!isSafeSegment(name)) { res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'Invalid extension name')); return; }
 
       // Read updated files from disk
       const bundled = readBundledExtensionFull(name);

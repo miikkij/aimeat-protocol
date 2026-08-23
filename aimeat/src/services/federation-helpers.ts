@@ -18,6 +18,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { safeFetch } from '../utils/url-validator.js';
 
 // ── E.4: Keyword matching helpers for cross-catalogue filtering ──
 
@@ -93,7 +94,10 @@ export async function performKeyExchange(
             timestamp: new Date().toISOString(),
         };
 
-        const resp = await fetch(`${peerUrl}/v1/federation/key-exchange`, {
+        // safeFetch, not fetch: peerUrl is a remote-supplied address (it arrives on the introduce
+        // flow), and a plain fetch follows a 3xx into an internal host without re-validating. safeFetch
+        // re-checks every redirect hop (CodeQL js/request-forgery, AI-triage 2026-08-23).
+        const resp = await safeFetch(`${peerUrl}/v1/federation/key-exchange`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
