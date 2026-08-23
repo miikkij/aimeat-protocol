@@ -344,12 +344,17 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             timestamp,
         });
 
-        // Return our own keys
+        // Return our own keys.
+        //
+        // The AGENT keys are a roster: every agent's GAII and public key on this node, which names
+        // every person here and how many AIs each of them runs. Cross-node delivery signs with the
+        // NODE key alone (services/message-delivery.ts), so a link that only carries messages needs
+        // none of it. Sent only where routing or replication makes it useful.
         const nodeKey = await storage.getNodeKey();
-        const agents = await storage.listAgents();
-        const ourAgentKeys = agents
-            .filter(a => a.publicKey)
-            .map(a => ({ gaii: a.gaii, public_key: a.publicKey }));
+        const sharesAgentKeys = peer.allowRouting || peer.replicateMemory;
+        const ourAgentKeys = sharesAgentKeys
+            ? (await storage.listAgents()).filter(a => a.publicKey).map(a => ({ gaii: a.gaii, public_key: a.publicKey }))
+            : [];
 
         res.json(success(config.nodeId, {
             node_id: config.nodeId,

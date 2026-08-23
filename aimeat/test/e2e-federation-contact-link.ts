@@ -269,6 +269,37 @@ await test('R9. An attachment download is MESSAGING, so the door opens — and t
     assert(!r.body.data?.download_url, 'no download capability may be issued');
 });
 
+await test('R11. A key exchange hands over no roster of who lives here', async () => {
+    // agent_keys is every agent's GAII and public key on this node: every person here, and how many
+    // AIs each of them runs. Cross-node delivery signs with the NODE key alone, so a messages-only
+    // link needs none of it.
+    const agent = await V.json('/v1/agents', {
+        method: 'POST', headers: auth(V.ownerToken),
+        body: JSON.stringify({ name: `roster${ts}`, owner: V.ownerName, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(agent.status === 201, `create agent: ${agent.status} ${JSON.stringify(agent.body)}`);
+
+    const timestamp = new Date().toISOString();
+    const r = await V.json('/v1/federation/key-exchange', {
+        method: 'POST', headers: { 'x-source-node': C_NODE },
+        body: JSON.stringify({ node_id: C_NODE, node_url: C_URL, node_public_key: cKeys.publicKey, agent_keys: [], timestamp }),
+    });
+    assert(r.status === 200, `key-exchange: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(Array.isArray(r.body.data.agent_keys) && r.body.data.agent_keys.length === 0,
+        `no roster may cross, got ${JSON.stringify(r.body.data.agent_keys)}`);
+    assert(typeof r.body.data.node_public_key === 'string' && r.body.data.node_public_key.length > 0,
+        'the NODE key is still exchanged — that is what signs a message');
+});
+
+await test('R12. This node does not PUSH its catalogue to a peer it refuses to share one with', async () => {
+    // The promise is symmetric or it is not a promise. Peer C's URL is not served by anything, so a
+    // sync that tried would surface as a failed result; a filtered peer produces no result at all.
+    const r = await V.json('/v1/federation/templates/sync', { method: 'POST', headers: auth(V.ownerToken) });
+    assert(r.status === 200, `sync: ${r.status} ${JSON.stringify(r.body)}`);
+    const touched = (r.body.data.syncResults ?? []).map((s: any) => s.node);
+    assert(!touched.includes(C_NODE), `a contact peer must not be contacted at all, got ${JSON.stringify(touched)}`);
+});
+
 await test('R10. A contact link is absent from the public directory, so it is nobody\'s customer list', async () => {
     const r = await V.json('/v1/federation/directory');
     assert(r.status === 200, `directory: ${r.status}`);
