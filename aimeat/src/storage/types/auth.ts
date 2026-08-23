@@ -238,7 +238,7 @@ export interface TrustedIssuerRecord {
 export interface VerificationNonceRecord {
   id: string;
   owner: string;
-  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'connect';
+  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'saml_login' | 'connect';
   state: string;
   /** OIDC nonce for the login types; the PKCE code_verifier for `connect`. */
   nonce: string;

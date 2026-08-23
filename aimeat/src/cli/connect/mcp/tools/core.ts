@@ -8,6 +8,8 @@
  * @structure
  *   - registerCoreTools() -- Registers core REST-backed connector MCP tools
  * @version-history
+ *   v1.11.0 -- 2026-08-24 -- BR-04: the nine SSO-administration and account-lifecycle tools, thin
+ *     over the same /v1/admin/sso and /v1/admin/owners routes the node MCP's service calls serve.
  *   v1.10.0 -- 2026-08-16 -- owner_scope on memory_read and memory_write, limit on memory_search.
  *     All three existed on the server MCP tool and on the REST route and were undeclared here, so
  *     zod dropped them. Measured cost: a crew's public mirror read only its own namespace for weeks
@@ -440,5 +442,92 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get('/v1/admin/config');
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  // ── BR-04: SSO administration + manual account lifecycle (operator's agent) ──
+  const asText = (resp: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify((resp as { data?: unknown }).data ?? resp, null, 2) }] });
+
+  mcp.tool('aimeat_admin_sso_list', descriptionFor('aimeat_admin_sso_list'), {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_admin_sso_list'), async ({ agent_name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.get('/v1/admin/sso/connections'));
+  });
+
+  mcp.tool('aimeat_admin_sso_get', descriptionFor('aimeat_admin_sso_get'), {
+    agent_name: agentNameSchema,
+    id: z.string().describe('The connection id (slug).'),
+  }, annotationsFor('aimeat_admin_sso_get'), async ({ agent_name, id }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.get(`/v1/admin/sso/connections/${encodeURIComponent(id)}`));
+  });
+
+  mcp.tool('aimeat_admin_sso_create', descriptionFor('aimeat_admin_sso_create'), {
+    agent_name: agentNameSchema,
+    id: z.string().describe('Permanent slug id (lowercase letters, digits, dashes; 2-31 chars).'),
+    name: z.string().describe('The organisation\'s name — the sign-in button label when listed.'),
+    domains: z.array(z.string()).optional().describe('Email domains this organisation vouches for, e.g. ["contoso.com"].'),
+    organism_id: z.string().optional().describe('Organism its people are added to on first sign-in or provisioning.'),
+    login_visibility: z.enum(['listed', 'hidden']).optional().describe('"listed" shows a sign-in button; "hidden" keeps the organisation off the public modal (default listed).'),
+    allow_idp_initiated: z.boolean().optional().describe('Accept sign-ins started from the IdP\'s own portal tile (default false).'),
+  }, annotationsFor('aimeat_admin_sso_create'), async ({ agent_name, ...body }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.post('/v1/admin/sso/connections', body));
+  });
+
+  mcp.tool('aimeat_admin_sso_update', descriptionFor('aimeat_admin_sso_update'), {
+    agent_name: agentNameSchema,
+    id: z.string().describe('The connection id.'),
+    name: z.string().optional().describe('New organisation name.'),
+    domains: z.array(z.string()).optional().describe('New email-domain list (replaces the old one).'),
+    organism_id: z.string().optional().describe('New organism binding; an empty string clears it.'),
+    login_visibility: z.enum(['listed', 'hidden']).optional().describe('"listed" or "hidden".'),
+    allow_idp_initiated: z.boolean().optional().describe('Accept IdP-initiated sign-ins.'),
+  }, annotationsFor('aimeat_admin_sso_update'), async ({ agent_name, id, ...body }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.put(`/v1/admin/sso/connections/${encodeURIComponent(id)}`, body));
+  });
+
+  mcp.tool('aimeat_admin_sso_delete', descriptionFor('aimeat_admin_sso_delete'), {
+    agent_name: agentNameSchema,
+    id: z.string().describe('The connection id.'),
+  }, annotationsFor('aimeat_admin_sso_delete'), async ({ agent_name, id }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.delete(`/v1/admin/sso/connections/${encodeURIComponent(id)}`));
+  });
+
+  mcp.tool('aimeat_admin_sso_idp_metadata', descriptionFor('aimeat_admin_sso_idp_metadata'), {
+    agent_name: agentNameSchema,
+    id: z.string().describe('The connection id.'),
+    url: z.string().optional().describe('The IdP metadata URL (e.g. Entra\'s federation metadata address).'),
+    xml: z.string().optional().describe('The IdP metadata document itself, when a URL is not reachable.'),
+    name_id_format: z.string().optional().describe('Requested NameID format, when the IdP\'s default is not wanted.'),
+  }, annotationsFor('aimeat_admin_sso_idp_metadata'), async ({ agent_name, id, ...body }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.post(`/v1/admin/sso/connections/${encodeURIComponent(id)}/idp-metadata`, body));
+  });
+
+  mcp.tool('aimeat_admin_sso_scim_token', descriptionFor('aimeat_admin_sso_scim_token'), {
+    agent_name: agentNameSchema,
+    id: z.string().describe('The connection id.'),
+  }, annotationsFor('aimeat_admin_sso_scim_token'), async ({ agent_name, id }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.post(`/v1/admin/sso/connections/${encodeURIComponent(id)}/scim-token`));
+  });
+
+  mcp.tool('aimeat_admin_owner_disable', descriptionFor('aimeat_admin_owner_disable'), {
+    agent_name: agentNameSchema,
+    name: z.string().describe('The owner name to deactivate.'),
+  }, annotationsFor('aimeat_admin_owner_disable'), async ({ agent_name, name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.post(`/v1/admin/owners/${encodeURIComponent(name)}/disable`));
+  });
+
+  mcp.tool('aimeat_admin_owner_enable', descriptionFor('aimeat_admin_owner_enable'), {
+    agent_name: agentNameSchema,
+    name: z.string().describe('The owner name to reactivate.'),
+  }, annotationsFor('aimeat_admin_owner_enable'), async ({ agent_name, name }) => {
+    const { client } = pickAgent(registry, agent_name);
+    return asText(await client.post(`/v1/admin/owners/${encodeURIComponent(name)}/enable`));
   });
 }

@@ -45,6 +45,10 @@ pnpm audit --fix
 |---------|---------|---------|---------|
 | `@clack/prompts` | ^1.0.1 | CLI wizard UI | MIT |
 | `@modelcontextprotocol/sdk` | ^1.27.1 | MCP protocol support | MIT |
+| `@node-saml/node-saml` | ^5.1.0 | SAML 2.0 SP: AuthnRequest, Response + XML-DSig validation (BR-04; >=5.1.0 pins the CVE-2025-54419 fix) | MIT |
+| `@xmldom/xmldom` | ^0.9.12 | Namespace-aware parsing of IdP metadata documents (BR-04) | MIT |
+| `scimmy` | ^1.3.5 | SCIM 2.0 protocol: schemas, filter grammar, PATCH semantics (BR-04) | MIT |
+| `scimmy-routers` | ^1.3.2 | Express routers over scimmy (BR-04) | MIT |
 | `@noble/ed25519` | ^3.0.0 | Ed25519 key generation/signing | MIT |
 | `@noble/hashes` | ^2.0.1 | Cryptographic hash functions | MIT |
 | `ajv` | ^8.18.0 | JSON Schema validation | MIT |
@@ -77,6 +81,7 @@ pnpm audit --fix
 | `@eslint/js` | ^10.0.1 | ESLint built-in rules | MIT |
 | `@playwright/test` | ^1.58.2 | Browser E2E testing | Apache-2.0 |
 | `eslint` | ^10.0.2 | Code linting | MIT |
+| `xml-crypto` | ^6.1.2 | The fake IdP signs real SAML Responses in tests (BR-04); already transitive under node-saml | MIT |
 | `openapi-typescript` | ^7.8.0 | Generate types from OpenAPI spec | MIT |
 | `tsx` | ^4.21.0 | TypeScript execution (tests, scripts) | MIT |
 | `typescript` | ^5.9.3 | TypeScript compiler | Apache-2.0 |

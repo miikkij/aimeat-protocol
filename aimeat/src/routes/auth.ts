@@ -10,6 +10,8 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   v1.6.0 -- 2026-08-23 -- Both /v1/auth/token branches answer 403 ACCOUNT_DISABLED for a
+ *     deactivated owner (BR-04), after the signature check and before any row is written.
  *   v1.5.0 -- 2026-08-15 -- The Tier 0.5 OTK write path stops being a fourth implementation and a
  *     way around the reserved-key rule. GET /v1/otk/:key executes UNAUTHENTICATED by design, so
  *     every question about who may do this belongs at the mint — and the mint carried requireAuth()
@@ -191,6 +193,15 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       // registration and again at password login.
       const roles = ['agent'];
 
+      // Deactivated owner (BR-04): the agent acts in a person's name, and that person is gone from
+      // this node's point of view. After the signature check (no state disclosure to strangers),
+      // before any row is written.
+      const agentOwnerRecord = await storage.getOwner(parsed.owner);
+      if (agentOwnerRecord?.disabledAt) {
+        res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
+        return;
+      }
+
       // P3-7: Create session record for JWT tracking
       const sessionId = generateSessionId();
       const now = new Date();
@@ -255,6 +266,13 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       const ts = new Date(timestamp).getTime();
       if (Math.abs(Date.now() - ts) > 5 * 60 * 1000) {
         res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Timestamp too old or too far in the future'));
+        return;
+      }
+
+      // Deactivated account (BR-04): refused after the signature proves the caller holds the key,
+      // before the session row and the mint.
+      if (ownerRecord.disabledAt) {
+        res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
         return;
       }
 

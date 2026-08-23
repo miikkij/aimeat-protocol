@@ -290,6 +290,77 @@ export const coreTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_admin_config',
         handler: ({ client }) => client.get('/v1/admin/config'),
     },
+    // ── BR-04: SSO administration + manual account lifecycle. Every handler forwards the whole
+    // declared input; ids and names land in path segments through encodeURIComponent only.
+    {
+        name: 'aimeat_admin_sso_list',
+        handler: ({ client }) => client.get('/v1/admin/sso/connections'),
+    },
+    {
+        name: 'aimeat_admin_sso_get',
+        handler: ({ client }, input) => client.get(`/v1/admin/sso/connections/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_admin_sso_create',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { id: requiredString(input, 'id'), name: requiredString(input, 'name') };
+            const domains = optionalArray(input, 'domains');
+            if (domains !== undefined) body.domains = domains;
+            const organismId = optionalString(input, 'organism_id');
+            if (organismId !== undefined) body.organism_id = organismId;
+            const visibility = optionalString(input, 'login_visibility');
+            if (visibility !== undefined) body.login_visibility = visibility;
+            const idpInitiated = optionalBoolean(input, 'allow_idp_initiated');
+            if (idpInitiated !== undefined) body.allow_idp_initiated = idpInitiated;
+            return client.post('/v1/admin/sso/connections', body);
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_update',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const name = optionalString(input, 'name');
+            if (name !== undefined) body.name = name;
+            const domains = optionalArray(input, 'domains');
+            if (domains !== undefined) body.domains = domains;
+            const organismId = optionalString(input, 'organism_id');
+            if (organismId !== undefined) body.organism_id = organismId;
+            const visibility = optionalString(input, 'login_visibility');
+            if (visibility !== undefined) body.login_visibility = visibility;
+            const idpInitiated = optionalBoolean(input, 'allow_idp_initiated');
+            if (idpInitiated !== undefined) body.allow_idp_initiated = idpInitiated;
+            return client.put(`/v1/admin/sso/connections/${encodeURIComponent(requiredString(input, 'id'))}`, body);
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_delete',
+        handler: ({ client }, input) => client.delete(`/v1/admin/sso/connections/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_admin_sso_idp_metadata',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const url = optionalString(input, 'url');
+            if (url !== undefined) body.url = url;
+            const xml = optionalString(input, 'xml');
+            if (xml !== undefined) body.xml = xml;
+            const nameIdFormat = optionalString(input, 'name_id_format');
+            if (nameIdFormat !== undefined) body.name_id_format = nameIdFormat;
+            return client.post(`/v1/admin/sso/connections/${encodeURIComponent(requiredString(input, 'id'))}/idp-metadata`, body);
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_scim_token',
+        handler: ({ client }, input) => client.post(`/v1/admin/sso/connections/${encodeURIComponent(requiredString(input, 'id'))}/scim-token`),
+    },
+    {
+        name: 'aimeat_admin_owner_disable',
+        handler: ({ client }, input) => client.post(`/v1/admin/owners/${encodeURIComponent(requiredString(input, 'name'))}/disable`),
+    },
+    {
+        name: 'aimeat_admin_owner_enable',
+        handler: ({ client }, input) => client.post(`/v1/admin/owners/${encodeURIComponent(requiredString(input, 'name'))}/enable`),
+    },
     {
         // `part` is validated against the two literals rather than interpolated, because it lands in
         // a path segment. An unchecked value here would be a path the route never declared.

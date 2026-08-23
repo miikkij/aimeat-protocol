@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Identity + principal record types (owners, agents, ecosystem apps, GHII, sessions, personal nodes, agent activity). Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-23 — OwnerRecord.disabledAt/disabledBy/managedBy: the first "account exists
+ *     but cannot act" state (BR-04 deactivation), and the SSO-connection fence for SCIM-managed
+ *     accounts. Until now the only off switch an account had was erasure.
  *   v1.2.0 — 2026-08-13 — AgentRecord.registeredBy: who asked for this agent. The node recorded it
  *     on the device-authorization record and swept that record on expiry, so the answer survived
  *     about half an hour. Creation ledger, and the fence on agent-initiated deletion.
@@ -19,6 +22,21 @@ export interface OwnerRecord {
   publicKey: string;   // base64 Ed25519 public key
   roles: string[];     // ['owner'] or ['owner', 'operator']
   createdAt: string;
+  /**
+   * Set when the account is deactivated (ISO timestamp). A deactivated account exists — its data,
+   * memberships and history remain — but no credential acting in its name authenticates and no new
+   * one is minted. This is the state a SCIM `active: false` lands in, and it is reversible:
+   * reactivation clears the flag while previously revoked tokens stay dead. Null/absent = active.
+   */
+  disabledAt?: string | null;
+  /** Who deactivated: an operator name or an SSO connection id (`sso:<id>`). Cleared on reactivation. */
+  disabledBy?: string | null;
+  /**
+   * SSO connection id when this account's lifecycle is managed by an organisation's identity
+   * provider (created or adopted through SCIM). A connection may only read, update or deactivate
+   * accounts carrying ITS id here — this field is what refuses connection B access to A's people.
+   */
+  managedBy?: string | null;
 }
 
 export interface AgentRecord {

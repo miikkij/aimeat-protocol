@@ -25,6 +25,9 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v1.11.0 -- 2026-08-23 -- closeForOwner(): account deactivation (owner-lifecycle.ts, BR-04)
+ *     closes every live socket acting for that owner, because upgrade-time verification is the
+ *     only one a tunnel gets.
  *   v1.10.0 -- 2026-08-19 -- Pure extraction: the wire contract (ConnectFrame, WorkspaceSpaceRef,
  *     ConnectTunnelStats) and its three pure helpers moved to ./connect-tunnel-wire.ts when this
  *     file passed the 800-line cap, and are re-exported here. Bodies verbatim.
@@ -623,6 +626,21 @@ export class ConnectTunnelManager {
       this.send(conn.ws, { type: 'auth_revoked', message: 'Token revoked', timestamp: new Date().toISOString() });
       try { conn.ws.close(1000, 'auth_revoked'); } catch (err) { logger.warn('onTokenRevoked: ignore', { error: String(err) }); }
       break;  // single-socket-per-principal — at most one match
+    }
+  }
+
+  /**
+   * Close every live socket whose principal acts for this OWNER. Deactivating an account
+   * (owner-lifecycle.ts) revokes session rows, but a tunnel verified its bearer only at upgrade,
+   * so without this the deactivated owner's agents keep receiving pushes until their own exp.
+   * Matched on the verified token's `owner` claim, which is the bare owner name on every
+   * principal family this tunnel accepts (agents and ecosystem apps).
+   */
+  closeForOwner(owner: string): void {
+    for (const conn of this.connections.values()) {
+      if (conn.identity.owner !== owner) continue;
+      this.send(conn.ws, { type: 'auth_revoked', message: 'Account deactivated', timestamp: new Date().toISOString() });
+      try { conn.ws.close(1000, 'auth_revoked'); } catch (err) { logger.warn('closeForOwner: ignore', { error: String(err) }); }
     }
   }
 

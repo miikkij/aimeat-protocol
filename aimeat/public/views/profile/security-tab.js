@@ -41,7 +41,7 @@ export default function SecurityTab({ session, showToast }) {
       // fall back to listAgents + the per-agent CORS fan-out + listSessions.
       const ov = await securityService.getSecurityOverview();
       if (ov) {
-        setSecurityData({ ghii: ov.ghii, agents: ov.agents });
+        setSecurityData({ ghii: ov.ghii, agents: ov.agents, managedBy: ov.managed_by || null });
         setSessions(ov.sessions);
       } else {
         const [agents, sessionsList] = await Promise.all([
@@ -112,6 +112,13 @@ export default function SecurityTab({ session, showToast }) {
   return html`
     <div class="section-title">\u{1F512} ${t('profile.security.title')}</div>
     <div class="section-desc">${t('profile.security.desc')}</div>
+
+    ${securityData.managedBy && html`
+      <div class="card mb-1">
+        <span class="pf-bold">${t('profile.security.managedTitle')}</span>
+        <p class="text-caption mb-0">${t('profile.security.managedDesc').replace('{name}', securityData.managedBy.name)}</p>
+      </div>
+    `}
 
     <h3 class="card-h3 mt-section">${t('profile.security.ghiiTitle')}</h3>
     <p class="text-caption mb-1">${t('profile.security.ghiiDesc')}</p>

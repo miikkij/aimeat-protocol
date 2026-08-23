@@ -9,6 +9,8 @@
  * @structure PAT_PREFIX; ResolvedPat; resolvePat(storage, rawToken).
  * @usage import { resolvePat, PAT_PREFIX } from '../services/access-token.js'
  * @version-history
+ * v1.1.0 - 2026-08-23 - A deactivated owner's PATs resolve to null (BR-04); the owner record was
+ *   already read here, so the check costs nothing extra per request.
  * v1.0.0 - 2026-06-03 - Initial (plan 2026-06-03-agent-access-tokens).
  */
 import type { Storage } from '../storage/interface.js';
@@ -36,6 +38,9 @@ export async function resolvePat(storage: Storage, rawToken: string): Promise<Re
   if (pat.expiresAt && Date.now() >= Date.parse(pat.expiresAt)) return null;
   const ownerRecord = await storage.getOwner(pat.owner);
   if (!ownerRecord) return null;
+  // A deactivated owner's PATs answer exactly like revoked ones (BR-04): the owner record is
+  // already in hand here, so this is the whole per-request cost on the PAT path.
+  if (ownerRecord.disabledAt) return null;
 
   let sub: string;
   let roles: string[];

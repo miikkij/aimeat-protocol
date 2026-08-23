@@ -24,6 +24,9 @@
  *   cd aimeat && pnpm check:route-scopes --strict   # the hook/CI gate
  *   cd aimeat && pnpm check:route-scopes --seed     # rewrite the exemption file from today's state
  * @version-history
+ *   v1.3.0 — 2026-08-24 — requireScimConnection counts as a gate (BR-04): it is an explicit
+ *     authorization decision (SCIM bearer hash → connection record → the record's id must equal
+ *     the path's), a credential family of its own beside JWT/PAT.
  *   v1.2.0 — 2026-08-14 — The stale line names the routes it is counting. It reported "exemptions
  *     now fixed 4" and nothing else, so acting on it meant re-deriving by hand what the script had
  *     already worked out, and the four entries sat in the file for three days. Two dead constants
@@ -45,7 +48,7 @@ const EXEMPTIONS = join(ROOT, 'security', 'route-scope-exemptions.json');
  *  it answers "is this the account holder, or something acting for them", which is the decision the
  *  account-security doors need and the one no scope word can express. */
 const GATES = ['requireScope', 'requireAnyScope', 'requireRole', 'requireRoleOrScope', 'requireOperator',
-    'requireOwnerPrincipal'];
+    'requireOwnerPrincipal', 'requireScimConnection'];
 
 export interface Finding {
     file: string;

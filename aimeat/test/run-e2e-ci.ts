@@ -245,6 +245,12 @@ const ALL_SUITES = [
     'test/e2e-login-by-email.ts',
     'test/e2e-owner-usage.ts',
     'test/e2e-owner-home.ts',
+    // BR-04: deactivation ends every credential family, now; each assertion is a refusal.
+    'test/e2e-owner-deactivation.ts',
+    // BR-04: SAML organisation sign-in over live HTTP — doors, discovery, invite/disable refusals.
+    'test/e2e-saml-login.ts',
+    // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
+    'test/e2e-scim-users.ts',
     'test/e2e-ai-usage-history.ts',
     'test/e2e-ai-provenance.ts',
     'test/e2e-ai-provenance-surfaces.ts',
@@ -509,6 +515,9 @@ const GUARD_SUITES = [
     'test/e2e-zip-security.ts',             // an uploaded archive cannot write outside where it was unpacked
     'test/e2e-federation-contact-link.ts',  // a contact link carries messages and refuses every other door
     'test/e2e-static-hardening.ts',         // a dotfile (.env, .env~, .git/) is refused before any static handler
+    'test/e2e-owner-deactivation.ts',       // deactivating an account ends every credential family, now (BR-04)
+    'test/e2e-saml-login.ts',               // the organisation sign-in doors: who signs in, and every refusal (BR-04)
+    'test/e2e-scim-users.ts',               // a directory drives accounts; connection isolation and the operator fence (BR-04)
 ];
 
 // Every other .ts file in test/, with the reason it is not a suite. The reason is the point: someone

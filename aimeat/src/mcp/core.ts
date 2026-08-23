@@ -104,6 +104,7 @@ import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOu
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho, readProvenance, readProvenanceMany } from './ai-provenance-result.js';
 import { registerCoreAdminTools } from './core-admin.js';
+import { registerAdminSsoTools } from './admin-sso.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { registerCoreDataPackageTools } from './core-datapackage.js';
 import { logger } from '../utils/logger.js';
@@ -770,4 +771,6 @@ export function registerCoreTools(
 
     // ── Admin Tools (operator-only) — extracted to ./core-admin.ts ──
     registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
+    // BR-04: the operator's SSO administration and manual account lifecycle.
+    registerAdminSsoTools(mcp, storage, config, getAgentGaii);
 }

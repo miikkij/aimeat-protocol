@@ -8,6 +8,8 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.0.0 - 2026-08-24 - The auth lib's provider prelude also carries the LISTED SSO connections
+ *   (BR-04 R12), read from storage at serve time — hidden connections never reach the modal.
  * v2.2.0 - 2026-07-28 - New library aimeat-game.js: the general-purpose gamification UI kit
  *   (menus, screens, overlays, rails, meters, the clickable score breakdown, badges, coming-soon
  *   cards, counters, streaks, leaderboards, stat grids, tables, showcase cards). It makes no
@@ -160,6 +162,7 @@ import type { Storage } from '../storage/interface.js';
 import { sdkLibSource, configPrelude, readSdkBundle } from './libs/sdk-serve.js';
 import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 import { buildLibsCatalogue } from '../data/library-packs.js';
+import { logger } from '../utils/logger.js';
 
 // The migrated SDK libraries, served from committed esbuild-IIFE bundles (src/static/sdk-libs/dist/)
 // + a per-node config prelude. Route path is /v1/libs/aimeat-<name>.js; sdkLibSource(config, name)
@@ -203,9 +206,21 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // GET /v1/libs/aimeat-auth.js — Auth library. Prepends the standard config prelude PLUS an
   // auth-specific one carrying the node's enabled OIDC providers (server-computed — the generic
   // prelude only has nodeId/baseUrl), which auth/config.js reads as window.__AIMEAT_AUTH_CFG__.providers.
-  router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
+  router.get('/v1/libs/aimeat-auth.js', async (_req, res) => {
+    // OIDC providers from config, plus the LISTED SSO connections (BR-04 R12) — hidden ones share
+    // a direct login link instead, so a shared node's sign-in modal never publishes its customers.
+    const providers: Array<{ id: string; label: string; i18nKey?: string }> = [...listEnabledProviderMeta(config)];
+    if (config.ssoEnabled) {
+      try {
+        for (const c of await _storage.listSsoConnections()) {
+          if (c.loginVisibility === 'listed' && c.saml) providers.push({ id: `saml:${c.id}`, label: c.name });
+        }
+      } catch (err) {
+        logger.warn('listing SSO connections for the auth lib failed; the modal shows OIDC only', { error: String(err) });
+      }
+    }
     const authCfg = `window.__AIMEAT_AUTH_CFG__=${JSON.stringify({
-      providers: listEnabledProviderMeta(config),
+      providers,
       // Whether this node's registration gate demands an email. The modal's Register tab shows the
       // email field up front when it does, instead of asking for it only AFTER the create attempt
       // fails with EMAIL_REQUIRED (which read as the form losing the person's work).
