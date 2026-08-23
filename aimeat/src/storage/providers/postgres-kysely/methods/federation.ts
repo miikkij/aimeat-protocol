@@ -51,7 +51,9 @@ function toPeeringRequest(r: Selectable<PeeringRequest>): PeeringRequestRecord {
   return {
     id: r.requestId, fromNodeUrl: r.fromNodeUrl, fromNodeId: r.fromNodeId ?? undefined, toNodeId: r.toNodeId ?? undefined,
     targetUrl: r.targetUrl ?? undefined, publicKey: r.publicKey ?? undefined, message: r.message ?? undefined,
-    status: r.status as PeeringRequestRecord['status'], createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
+    status: r.status as PeeringRequestRecord['status'],
+    tier: (r.tier ?? undefined) as PeeringRequestRecord['tier'],
+    createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
   };
 }
 function toPersonalNode(r: Selectable<PersonalNode>): PersonalNodeRecord {
@@ -110,6 +112,7 @@ export const federationMethods = {
     await this.db.insertInto('PeeringRequest').values({
       requestId: req.id, fromNodeUrl: req.fromNodeUrl, fromNodeId: req.fromNodeId ?? null, toNodeId: req.toNodeId ?? null,
       targetUrl: req.targetUrl ?? null, publicKey: req.publicKey ?? null, message: req.message ?? null, status: req.status,
+      tier: req.tier ?? null,
       createdAt: new Date(req.createdAt), updatedAt: new Date(req.updatedAt),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();

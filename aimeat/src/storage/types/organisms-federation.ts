@@ -22,6 +22,11 @@ export interface PeeringRequestRecord {
   publicKey?: string;
   message?: string;
   status: 'pending' | 'approved' | 'rejected' | 'auto_approved';
+  /** The tier this request was APPROVED at. Absent → 'member', which is what every request meant
+   *  before the ladder had a floor. Load-bearing: de-peering does not delete the request, and the
+   *  key-exchange auto-add reads it, so without this a de-peered contact link comes back as a
+   *  member on the next key exchange. */
+  tier?: 'genesis' | 'member' | 'visiting' | 'contact';
   createdAt: string;
   updatedAt: string;
 }

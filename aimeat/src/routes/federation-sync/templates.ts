@@ -21,7 +21,8 @@ import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
-import { verify } from '../../auth/keypair.js';
+import { sign, verify } from '../../auth/keypair.js';
+import { gatePeer } from '../../services/federation-peer-gate.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
 const FRESHNESS_MS = 5 * 60 * 1000;
@@ -42,9 +43,36 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        const peer = [...peers.values()].find(p => p.nodeId === sourceNode);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        // A template listing is catalogue, so it rides the catalogue word.
+        const gate = gatePeer(peers, sourceNode, 'shareCatalogue');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
+            return;
+        }
+
+        // SECURITY: the only gate here used to be that `x-source-node` NAMED an active peer, and a
+        // node id is public — GET /v1/federation/directory publishes it. Anyone who could read the
+        // directory could set the header and read this. That is decoration, not a gate, and it is the
+        // same finding as audit H-15 on /v1/federation/memory/list, closed the same way: the caller
+        // signs `{ source_node, timestamp }` and proves it is the node it names.
+        //
+        // BREAKING for a peer running older code, which sends no signature and gets a clean 401. Same
+        // trade the developer took for /memory/list on 2026-08-10: a gate that does not gate is worth
+        // less than version skew. The client half below signs, so a node on this version speaks to a
+        // node on this version.
+        const signature = req.headers['x-signature'] as string | undefined;
+        const timestamp = req.headers['x-timestamp'] as string | undefined;
+        if (!signature || !timestamp) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing x-signature / x-timestamp on template listing request'));
+            return;
+        }
+        const listTs = new Date(timestamp).getTime();
+        if (isNaN(listTs) || Math.abs(Date.now() - listTs) > 300_000) {
+            res.status(400).json(error(config.nodeId, 'STALE_TIMESTAMP', 'Timestamp is missing, invalid, or outside the 5-minute window'));
+            return;
+        }
+        if (!await verify(gate.peer.publicKey, JSON.stringify({ source_node: sourceNode, timestamp }), signature)) {
+            res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Invalid signature on template listing request'));
             return;
         }
 
@@ -102,8 +130,11 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        const activePeers = [...peers.values()].filter(p => p.status === 'active');
+        // Only peers this node shares its catalogue with. A template listing is catalogue, and asking
+        // a peer we would refuse in the other direction is the asymmetry that makes a promise a lie.
+        const activePeers = [...peers.values()].filter(p => p.status === 'active' && p.shareCatalogue);
         const results: { node: string; templates: number; error?: string }[] = [];
+        const nodeKey = await storage.getNodeKey();
 
         for (const peer of activePeers) {
             try {
@@ -113,11 +144,21 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
                     results.push({ node: peer.nodeId, templates: 0, error: urlCheck.reason ?? 'URL validation failed' });
                     continue;
                 }
+                if (!nodeKey) {
+                    results.push({ node: peer.nodeId, templates: 0, error: 'This node has no signing key' });
+                    continue;
+                }
+
+                // Prove we are the node the header names — the receiving half requires it now.
+                const timestamp = new Date().toISOString();
+                const listSignature = await sign(nodeKey.privateKey, JSON.stringify({ source_node: config.nodeId, timestamp }));
 
                 const response = await fetch(peerUrl, {
                     headers: {
                         'Content-Type': 'application/json',
                         'x-source-node': config.nodeId,
+                        'x-timestamp': timestamp,
+                        'x-signature': listSignature,
                     },
                     signal: AbortSignal.timeout(30_000),
                 });
@@ -151,11 +192,15 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
-        const peer = [...peers.values()].find(p => p.nodeId === requesting_node);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Requesting node is not an active peer'));
+        // A memory key inventory is memory, so it rides the replication word. Until now the only
+        // gate was "an active peer with a signature", which let a VISITING peer read any local
+        // person's whole key list — a tier that exists to browse a catalogue, reading the inventory.
+        const gate = gatePeer(peers, requesting_node, 'replicateMemory');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
+        const peer = gate.peer;
 
         // SECURITY (audit H-15, the July audit's deferred F2): this route returns a person's whole
         // memory key inventory — every key name, its visibility, tags and version. Its only gate was

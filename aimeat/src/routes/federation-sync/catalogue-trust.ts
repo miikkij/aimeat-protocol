@@ -17,7 +17,8 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { deriveTierFlags } from '../../services/federation-tiers.js';
+import { deriveTierFlags, tierRank, coerceTier } from '../../services/federation-tiers.js';
+import { gatePeer } from '../../services/federation-peer-gate.js';
 import { emitChange } from '../../services/event-bus.js';
 
 export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
@@ -33,24 +34,16 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
             return;
         }
 
-        const peer = [...peers.values()].find(p => p.nodeId === source_node);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        const gate = gatePeer(peers, source_node, 'shareCatalogue');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
-
-        if (!peer.shareCatalogue) {
-            res.status(403).json(error(config.nodeId, 'POLICY_DENIED', 'This peer has catalogue sharing disabled'));
-            return;
-        }
+        const peer = gate.peer;
 
         // P1-11: Require signed catalogue sync — verify peer signature
         if (!signature) {
             res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Missing signature on catalogue-sync request'));
-            return;
-        }
-        if (!peer.publicKey) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Peer has no public key on file for signature verification'));
             return;
         }
         const catalogueSyncPayload = JSON.stringify({ source_node, actions: actionList, since_timestamp, catalogue_hash });
@@ -158,11 +151,15 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
         // If suspend advisory, demote a full member back to the low-trust visiting tier and strip
         // its elevated permission flags (provider/relay/replication/auth). This is the trust-revocation
         // lever for the visiting/member model — a suspended node can never be a provider until re-vouched.
+        //
+        // A demotion has to check it IS one. The test used to be "not already visiting", which for a
+        // `contact` peer is true, so suspending the least-trusted kind of peer we have would have
+        // handed it catalogue read and taken it out of privacy — a punishment that promotes.
         if (advisory_type === 'suspend') {
             const entry = [...peers.entries()].find(([, p]) => p.nodeId === target_node);
             if (entry) {
                 const peer = entry[1];
-                if ((peer.tier ?? 'member') !== 'visiting') {
+                if (tierRank(coerceTier(peer.tier)) > tierRank('visiting')) {
                     peer.tier = 'visiting';
                     Object.assign(peer, deriveTierFlags('visiting'));
                     storage.saveFederationPeer(peer).catch(err => { logger.warn('POST /v1/federation/trust-advisory: continuing after a suppressed failure', { error: String(err) }); });

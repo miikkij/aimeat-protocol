@@ -24,7 +24,7 @@ import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
-import { deriveTierFlags, type PeerTier } from '../../services/federation-tiers.js';
+import { deriveTierFlags, coerceTier, type PeerTier } from '../../services/federation-tiers.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -273,7 +273,11 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
 
             if (hasApprovedRequest && senderUrl) {
                 const now = new Date().toISOString();
-                const tier: PeerTier = 'member';
+                // The tier the operator APPROVED, not a hardcoded 'member'. Same reasoning as the key
+                // just above: de-peering leaves the approved request standing, so this branch is a
+                // re-admission ticket, and a ticket that upgrades the holder is worse than one that
+                // does not expire. A contact link comes back as a contact link, or not at all.
+                const tier: PeerTier = coerceTier(approvedRequest?.tier);
                 const newPeer: PeerInfo = {
                     nodeId: node_id,
                     url: senderUrl,

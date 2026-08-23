@@ -24,13 +24,13 @@ export const identityNodesMethods = {
 
   async createPeeringRequest(this: SqliteStorage, req: PeeringRequestRecord): Promise<PeeringRequestRecord> {
     this.db.prepare(
-      `INSERT INTO peering_requests (id, fromNodeUrl, fromNodeId, toNodeId, targetUrl, publicKey, message, status, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO peering_requests (id, fromNodeUrl, fromNodeId, toNodeId, targetUrl, publicKey, message, status, tier, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       req.id, req.fromNodeUrl, req.fromNodeId ?? null,
       req.toNodeId ?? null, req.targetUrl ?? null,
       req.publicKey ?? null, req.message ?? null,
-      req.status, req.createdAt, req.updatedAt,
+      req.status, req.tier ?? null, req.createdAt, req.updatedAt,
     );
     return req;
   },
@@ -54,12 +54,12 @@ export const identityNodesMethods = {
     const updated = { ...existing, ...updates };
     this.db.prepare(
       `UPDATE peering_requests SET fromNodeUrl = ?, fromNodeId = ?, toNodeId = ?, targetUrl = ?,
-       publicKey = ?, message = ?, status = ?, createdAt = ?, updatedAt = ? WHERE id = ?`
+       publicKey = ?, message = ?, status = ?, tier = ?, createdAt = ?, updatedAt = ? WHERE id = ?`
     ).run(
       updated.fromNodeUrl, updated.fromNodeId ?? null,
       updated.toNodeId ?? null, updated.targetUrl ?? null,
       updated.publicKey ?? null, updated.message ?? null,
-      updated.status, updated.createdAt, updated.updatedAt, id,
+      updated.status, updated.tier ?? null, updated.createdAt, updated.updatedAt, id,
     );
     return updated;
   },
@@ -82,6 +82,7 @@ export const identityNodesMethods = {
     if (row.targetUrl) record.targetUrl = row.targetUrl as string;
     if (row.publicKey) record.publicKey = row.publicKey as string;
     if (row.message) record.message = row.message as string;
+    if (row.tier) record.tier = row.tier as PeeringRequestRecord['tier'];
     return record;
   },
 
