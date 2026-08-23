@@ -3214,6 +3214,17 @@
         "step4": "Rellena lo que quieras. La trastienda te muestra lo que falta y en qué orden.",
         "step5": "Acepta tarjetas cuando tú quieras: se pregunta aparte y nunca se da por hecho."
       },
+      "brain": {
+        "title": "Una empresa que recuerda",
+        "lead": "Lo que sabe tu empresa, de dónde salió cada dato y qué conviene volver a comprobar. Tus propios datos son lo primero que sabe.",
+        "ask": "Quiero que mi empresa tenga memoria. Guíame paso a paso.",
+        "step1": "Registra la empresa. Basta con un nombre, y la dirección es tuya desde ese momento.",
+        "step2": "Rellena tus datos. Esos doce campos son sus primeros hechos, y no caducan nunca.",
+        "step3": "Ves el plan entero antes de que exista nada, y dices que sí una sola vez.",
+        "step4": "Lo que aprende se guarda en un espacio tuyo que nadie más puede leer.",
+        "step5": "Se abre en la dirección propia de tu empresa, para ti y para quien tú dejes entrar.",
+        "step6": "Di qué lo alimenta, y qué deja fuera cada fuente. Te avisa cuando alguna se queda callada."
+      },
       "marketplace": {
         "title": "Una tienda que cobra con tarjetas, monedas y agentes",
         "lead": "Una caja que acepta una tarjeta, una stablecoin o el dinero de otro agente, y te paga a ti.",
@@ -9745,6 +9756,8 @@
   "chat.jumpLatest": "Ir a lo último",
   "chat.starterPage": "Crea mi página de bienvenida",
   "chat.starterPageAsk": "Publica mi página de bienvenida — sencilla, y dime la dirección cuando esté en línea.",
+  "chat.starterCompany": "Poner en marcha mi empresa",
+  "chat.starterCompanyAsk": "Pon en marcha mi empresa aquí y dale una memoria propia.",
   "chat.starterConnect": "Conecta mi propia IA",
   "chat.starterConnectAsk": "Ya pago una suscripción de IA. ¿Cómo la conecto aquí para que haga este trabajo?",
   "chat.card.open": "Abrir",

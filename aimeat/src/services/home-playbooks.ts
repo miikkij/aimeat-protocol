@@ -31,6 +31,10 @@
  *   import { openPlaybooks } from '../services/home-playbooks.js';
  *   const playbooks = await openPlaybooks(storage, config);
  * @version-history
+ *   v1.2.0 — 2026-08-23 — The company-brain playbook (TARGET-071), second in the list and
+ *     `presence: 'always'`: keeping what a company knows needs no money layer, so a node with
+ *     commerce switched off still serves it. No proof candidates yet, on purpose — the first real
+ *     brain on a node earns that link.
  *   v1.1.0 — 2026-08-23 — The BUSINESSLAUNCHER playbook, first in the list: a shop that INSTALLS
  *     rather than one built by hand. A NEW prompt id rather than a deeper marketplace one, because
  *     prompt-seeder re-syncs content only for the generator, builders and tiers groups — editing an
@@ -78,6 +82,9 @@ export const PLAYBOOKS: readonly PlaybookDef[] = [
     // A shop that installs rather than one that gets built. It carries no proof candidates yet on
     // purpose: nothing here fakes a live example, and the first real shop on a node earns the link.
     { id: 'businesslauncher', prompt: 'playbook-businesslauncher', steps: 5, presence: 'commerce' },
+    // A company that remembers. `always`, unlike the two shops above: keeping what a company knows
+    // needs no money layer switched on, so a node with commerce off still serves this one.
+    { id: 'brain', prompt: 'playbook-brain', steps: 6, presence: 'always' },
     { id: 'marketplace', prompt: 'playbook-marketplace', steps: 4, presence: 'commerce', proof: ['exchange', 'noste'] },
     { id: 'accounts', prompt: 'playbook-accounts', steps: 4, presence: 'providers' },
     { id: 'page', prompt: 'playbook-page', steps: 4, presence: 'always' },
