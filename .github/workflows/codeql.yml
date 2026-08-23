@@ -40,6 +40,13 @@ jobs:
               - 'aimeat/public/lib/**'
               - '**/*.min.js'
               - 'docs/**'
+            # 1057 of the first scoped run's 1188 alerts were this one heuristic firing on every
+            # Express handler: it only recognises express-rate-limit and friends, not the node's own
+            # rate-limit middleware (src/middleware/rate-limit.ts + the global tarpit), so on this
+            # codebase it is pure noise that buries the other ~130 findings.
+            query-filters:
+              - exclude:
+                  id: js/missing-rate-limiting
 
       - uses: github/codeql-action/analyze@v3
         with:

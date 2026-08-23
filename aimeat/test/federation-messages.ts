@@ -242,6 +242,46 @@ await test('5. Bob replies; Alice receives it freely (initiator not re-gated)', 
     assert(inbox.body.data.messages.some((m: any) => m.senderGhii === B!.ownerGhii), 'Bob reply in Alice inbox');
 });
 
+// SECURITY (audit AI-triage 2026-08-23, invariant 13). The conversation id is derived
+// deterministically from two public identities, so a stranger on a THIRD node can compute the id of
+// Alice and Bob's thread and send into it to skip Alice's first-contact queue. Auto-accept must
+// require that Alice already wrote to the REPLYING node in this thread — which she never did to
+// node C. Against the pre-fix source (bare "a message with this id exists") this test fails: Carol's
+// injection lands straight in Alice's inbox as accepted.
+await test('5b. A stranger on a third node who computes the thread id is still held at the gate', async () => {
+    const C = await bootNode(40272, 'aimeat-node-001-msgc');
+    try {
+        await setupOwner(C, `carol${ts}`);
+        // Peer A<->C so A accepts C's signed federation frame at all (the gate is about first
+        // CONTACT, not about whether the wire is trusted).
+        await addAndActivatePeer(A!, C.nodeId, C.baseUrl);
+        await addAndActivatePeer(C, A!.nodeId, A!.baseUrl);
+        await A!.json('/v1/federation/peer/activate', {
+            method: 'POST', headers: { Authorization: `Bearer ${A!.ownerToken}` }, body: JSON.stringify({ peer_node_id: C.nodeId }),
+        });
+        await C.json('/v1/federation/peer/activate', {
+            method: 'POST', headers: { Authorization: `Bearer ${C.ownerToken}` }, body: JSON.stringify({ peer_node_id: A!.nodeId }),
+        });
+
+        // Carol sends to Alice, pasting the Alice↔Bob conversation id she is not a party to.
+        const inject = await C.json('/v1/messages', {
+            method: 'POST', headers: { Authorization: `Bearer ${C.ownerToken}` },
+            body: JSON.stringify({ to: A!.ownerGhii, conversation_id: convId, body: 'Computed my way into your thread.' }),
+        });
+        assert(inject.status === 201, `Carol's send status ${inject.status}: ${JSON.stringify(inject.body)}`);
+
+        // On Alice's node it must be a HELD first contact, not an accepted message in the inbox.
+        const reqs = await A!.json('/v1/messages/requests', { headers: { Authorization: `Bearer ${A!.ownerToken}` } });
+        assert((reqs.body.data.requests ?? []).some((x: any) => x.contactId === C.ownerGhii),
+            'Carol must appear as a pending first-contact request, not slip in on the computed id');
+        const inbox = await A!.json('/v1/messages/inbox', { headers: { Authorization: `Bearer ${A!.ownerToken}` } });
+        assert(!(inbox.body.data.messages ?? []).some((m: any) => m.senderGhii === C.ownerGhii),
+            'Carol\'s message must NOT be in Alice\'s inbox before she accepts');
+    } finally {
+        try { C.server.close(); } catch { /* ignore */ }
+    }
+});
+
 console.log('\nPhase 3 -- Cross-node attachment (grant + duplicate)');
 await test('6. Alice attaches an image; Bob pulls + duplicates it across nodes', async () => {
     const attKey = `dm-fed-img-${ts}.png`;

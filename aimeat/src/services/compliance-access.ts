@@ -15,10 +15,14 @@
  *   principal carry this exact word. Account first, because the word means nothing on an account
  *   that does not run the node, and answering in the other order would leak whether a scope exists.
  *
- *   AN OPERATOR IN PERSON CARRIES NO SCOPE LIST. Owner and PAT sessions arrive with an empty one, so
- *   the word is demanded only from principals that HAVE a list — which is exactly the set that is
- *   acting on somebody's behalf. Same rule as requireOperatorPrincipal() in auth/middleware.ts,
- *   which is the HTTP half of this pair.
+ *   THE WORD IS DEMANDED BY WHO THE CALLER IS, NOT BY WHAT IT CARRIES. The first version demanded
+ *   the scope only from callers whose scope list was non-empty, meaning it to exempt the operator
+ *   in person (owner and PAT sessions arrive with an empty list) — but an agent with ZERO granted
+ *   words arrives with an empty list too, so the emptiest principal passed the gate the fullest one
+ *   was held at, and requireOperatorPrincipal() (the HTTP half of this pair) refused the same
+ *   caller. The test is now the principal's SHAPE: a delegated identity (GAII or GEAI) must carry
+ *   the exact word however short its list; a bare owner GHII is the person and is asked nothing.
+ *   Audit AI-triage 2026-08-23, invariant 13.
  * @structure
  *   - ComplianceCaller — the caller as both doors can describe it
  *   - complianceRefusal(storage, caller, scope) — null when allowed, the sentence when not
@@ -26,6 +30,9 @@
  *   const refusal = await complianceRefusal(storage, { gaii, scopes }, COMPLIANCE_READ_SCOPE);
  *   if (refusal) return refuse(refusal);
  * @version-history
+ *   v1.1.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 13): the scope demand keys on the
+ *     principal's shape (delegated GAII/GEAI vs the person's bare GHII), not on whether the scope
+ *     list happens to be empty — a zero-scope agent of an operator passed the old gate.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import type { Storage } from '../storage/interface.js';
@@ -57,11 +64,14 @@ export async function complianceRefusal(
   if (!owner?.roles.includes('operator')) {
     return 'This is the compliance report for the whole installation. The account behind this session does not run it.';
   }
-  const scopes = caller.scopes ?? [];
+  // A delegated principal — an agent (GAII) or an ecosystem app (GEAI) — must carry the exact
+  // word, and an empty grant list is the strongest possible reason to refuse, not an exemption.
+  // Only the bare owner GHII is the operator in person.
+  const delegated = caller.gaii.startsWith('eco:') || parsed !== null;
   // scopeIsCovered() rather than includes(): it is the one place that knows these words are outside
   // every wildcard, and restating that rule is how three copies of it came to disagree in
   // auth/middleware.ts.
-  if (scopes.length && !scopeIsCovered(scopes, scope)) {
+  if (delegated && !scopeIsCovered(caller.scopes ?? [], scope)) {
     return `This needs the "${scope}" permission. Whoever runs this installation grants it per agent, `
       + 'and "Full access" does not carry it.';
   }
