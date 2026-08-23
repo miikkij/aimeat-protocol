@@ -509,6 +509,42 @@ await test('26. deleting the company frees the address and stops serving it', as
   assert(free.body.data.available === true, 'the address must be claimable again');
 });
 
+await test('26b. an update carries only what it was sent, and leaves the rest of the record alone', async () => {
+  // Every field of the update schema is optional, so the route invites a partial update. Until
+  // 2026-08-23 its mapper turned every ABSENT field into null before the service saw it, and the
+  // service's own careful `!== undefined` merge could not tell the difference: a PUT with just a
+  // new name wiped the organism link, the business id, the VAT id, the address and the IBAN.
+  const made = await json('/v1/companies', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      name: `Osittainen Oy ${Date.now().toString(36).slice(-5)}`,
+      business_id: '1234567-8', iban: 'FI2112345600000785', city: 'Espoo',
+      organism_id: 'org-partial-test',
+    }),
+  });
+  assert(made.status === 201, `register failed: ${made.status} ${JSON.stringify(made.body)}`);
+  const id = made.body.data.company.id;
+
+  const renamed = await json(`/v1/companies/${id}`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ name: 'Uusi nimi Oy' }),
+  });
+  assert(renamed.status === 200, `rename failed: ${renamed.status} ${JSON.stringify(renamed.body)}`);
+  const c = renamed.body.data.company;
+  assert(c.name === 'Uusi nimi Oy', `the rename did not take: ${c.name}`);
+  assert(c.businessId === '1234567-8', `the business id was wiped by a rename: ${JSON.stringify(c.businessId)}`);
+  assert(c.iban === 'FI2112345600000785', `the IBAN was wiped by a rename: ${JSON.stringify(c.iban)}`);
+  assert(c.city === 'Espoo', `the city was wiped by a rename: ${JSON.stringify(c.city)}`);
+  assert(c.organismId === 'org-partial-test', `the organism link was wiped by a rename: ${JSON.stringify(c.organismId)}`);
+
+  // …and an explicit null still clears one, because "blank this" has to stay sayable.
+  const cleared = await json(`/v1/companies/${id}`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ iban: null }),
+  });
+  assert(cleared.body.data.company.iban === null, 'an explicit null must still clear the field');
+  assert(cleared.body.data.company.businessId === '1234567-8', 'clearing one field must not clear its neighbours');
+  await json(`/v1/companies/${id}`, { method: 'DELETE', headers: authed(A.token) });
+});
+
 console.log('\nPhase 7 — signing in at the company address');
 
 /**

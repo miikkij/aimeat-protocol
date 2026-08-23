@@ -11,6 +11,11 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.6.0 -- 2026-08-23 -- The silent SSO bridge is framable from a company address too. The
+ *     frame-ancestors list enumerated the app and portfolio families, and the co family is a
+ *     SIBLING of the app one rather than a child, so an app served as a company's front page
+ *     rendered and could not sign anybody in: the bridge iframe was blocked and the only sign of it
+ *     was a console line. Third place to learn this after the two grant doors.
  *   v1.0.0 -- pre-2026-05 -- Initial static file bootstrap with /wizard.html redirect
  *   v1.1.0 -- 2026-05-29 -- Add 301 redirects for /privacy.html, /privacy.fi.html,
  *     /connect.html, /connect.fi.html to their /v1/ canonical routes so the
@@ -387,16 +392,25 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     // H-2 seamless SSO: the silent bridge page must be FRAMABLE by app origins (a hidden iframe
     // inside an app), so override the global X-Frame-Options: SAMEORIGIN and pin frame-ancestors
     // to the app host family (*.appHost) — plus the portfolio host family when the portfolio
-    // origin is enabled (standalone portfolios use the same silent bridge for members data).
-    // Never framable by anything else.
+    // origin is enabled (standalone portfolios use the same silent bridge for members data), plus
+    // the company host family when the company origin is enabled. Never framable by anything else.
+    //
+    // THE CO FAMILY IS A SIBLING, NOT A CHILD. `deriveCoHost` rewrites the leading label, so
+    // `acme.co.<apex>` never matched `*.apps.<apex>` and this list is the THIRD place that had to
+    // learn it: the grant doors were fixed on 2026-08-23 and an app at a company address still met
+    // "Framing violates frame-ancestors" in the console, with the page rendering and the sign-in
+    // button doing nothing. Found by driving a browser, which is the only place a blocked frame
+    // shows up — the HTTP tests it was hiding behind all passed.
     const appSilentPath = join(pwaStaticDir, 'app-silent.html');
-    if ((config.appHost || (config.portfolioOriginEnabled && config.portfolioHost)) && existsSync(appSilentPath)) {
+    const coFamily = config.coOriginEnabled && config.coHost ? config.coHost : '';
+    if ((config.appHost || (config.portfolioOriginEnabled && config.portfolioHost) || coFamily) && existsSync(appSilentPath)) {
       let scheme = 'https';
       // eslint-disable-next-line aimeat/no-silent-catch -- keep https
       try { scheme = new URL(config.baseUrl).protocol.replace(':', ''); } catch { /* keep https */ }
       const families = [
         ...(config.appHost ? [config.appHost] : []),
         ...(config.portfolioOriginEnabled && config.portfolioHost ? [config.portfolioHost] : []),
+        ...(coFamily ? [coFamily] : []),
       ];
       const ancestors = families.map(h => `${scheme}://*.${h} ${scheme}://*.${h}:*`).join(' ');
       app.get('/app-silent.html', (_req, res) => {
