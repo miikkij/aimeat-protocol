@@ -10,6 +10,10 @@
  *
  * Run from aimeat/:  pnpm audit:triage    (then pnpm audit:report to render)
  * @version-history
+ *  - 1.2.0 (2026-08-23): CodeQL alerts join the triage too, via the same code-scanning fetch
+ *    (generalized to fetchCodeScanningFindings). CodeQL is the generic JS/TS suite, not the identity
+ *    model, so the prompt carries a CodeQL branch and each finding's security-severity; a
+ *    belt-and-braces path filter drops any stray test/vendored/doc hit.
  *  - 1.1.0 (2026-08-23): Semgrep taint findings join the same triage — read from the GitHub
  *    code-scanning alerts the CI job uploads (Semgrep does not run on Windows), fingerprinted from
  *    rule + file + the flagged line's current text. Claude calls are batched (15 findings each).
@@ -52,29 +56,38 @@ const store = loadStore();
 const known = new Set(store.entries.map(e => e.fingerprint));
 
 /**
- * Semgrep does not run on the Windows dev machine, so its findings are read from where they DO
- * land: the GitHub code-scanning alerts the CI semgrep-taint job uploads. The fingerprint is built
- * from the alert's rule + file + the current text of the flagged line, read locally — same
- * invalidation rule as ast-grep: edit the line and the acknowledgment dies.
+ * Semgrep and CodeQL do not run on the Windows dev machine, so their findings are read from where
+ * they DO land: the GitHub code-scanning alerts the CI jobs upload. The fingerprint is built from
+ * the alert's rule + file + the current text of the flagged line, read locally — same invalidation
+ * rule as ast-grep: edit the line and the acknowledgment dies. `source` labels which tool; CodeQL
+ * alerts also carry a security-severity, kept for the report and the prompt's priority sense.
  */
-function fetchSemgrepFindings() {
+function fetchCodeScanningFindings(toolName, source) {
   try {
     const repo = execSync('gh repo view --json nameWithOwner -q .nameWithOwner',
       { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
     const raw = execSync(
-      `gh api "repos/${repo}/code-scanning/alerts?per_page=100&state=open&tool_name=Semgrep%20OSS" --paginate`,
-      { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+      `gh api "repos/${repo}/code-scanning/alerts?per_page=100&state=open&tool_name=${encodeURIComponent(toolName)}" --paginate`,
+      { cwd: ROOT, encoding: 'utf8', maxBuffer: 128 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
     const alerts = JSON.parse(raw.replace(/\]\s*\[/g, ','));
     return alerts.map(a => {
       const file = a.most_recent_instance?.location?.path;
       const line = a.most_recent_instance?.location?.start_line ?? 1;
       if (!file) return null;
+      // Only findings in code we ship; CodeQL default queries reach vendored/test paths the
+      // workflow's paths-ignore already drops, but a belt-and-braces filter here keeps a stray one out.
+      if (/(^|\/)(test|tests)\//.test(file) || /\/dist\//.test(file) || /\.min\.js$/.test(file) || file.startsWith('docs/')) return null;
       let text = '';
       try { text = readFileSync(resolve(ROOT, file), 'utf8').split('\n')[line - 1] ?? ''; } catch { return null; }
-      return { ruleId: a.rule?.id ?? 'semgrep', file, text, range: { start: { line: line - 1 } }, source: 'semgrep', alertNumber: a.number };
+      return {
+        ruleId: a.rule?.id ?? source, file, text, range: { start: { line: line - 1 } },
+        source, alertNumber: a.number,
+        severity: a.rule?.security_severity_level ?? a.rule?.severity ?? null,
+        ruleDesc: a.rule?.description ?? '',
+      };
     }).filter(Boolean);
   } catch {
-    process.stderr.write('   (Semgrep-hälytyksiä ei saatu GitHubista — gh puuttuu tai ei oikeuksia. Jatketaan ilman.)\n');
+    process.stderr.write(`   (${toolName}-hälytyksiä ei saatu GitHubista — gh puuttuu tai ei oikeuksia. Jatketaan ilman.)\n`);
     return [];
   }
 }
@@ -82,7 +95,11 @@ function fetchSemgrepFindings() {
 // ── 1. Triage the guard findings that have no acknowledgment yet ──
 process.stderr.write('1/2 Ajetaan vahdit ja triagetaan uudet osumat…\n');
 const astFindings = astScan('aimeat/src').map(f => ({ ...f, source: 'ast-grep' }));
-const findings = [...astFindings, ...fetchSemgrepFindings()];
+const findings = [
+  ...astFindings,
+  ...fetchCodeScanningFindings('Semgrep OSS', 'semgrep'),
+  ...fetchCodeScanningFindings('CodeQL', 'codeql'),
+];
 const fresh = findings
   .map(f => ({ ...f, fingerprint: fingerprintOf(f) }))
   .filter(f => !known.has(f.fingerprint));
@@ -95,26 +112,36 @@ if (fresh.length === 0) {
   const ruleDocs = GUARDS.map(g => `- rule \`${g.id}\`: ${g.why}\n  Triage guidance so far: ${g.triage}`).join('\n');
   const header = [
     'You are the triage reviewer of a security audit for the AIMEAT node (TypeScript, Express 5).',
-    'The rules over-report by design; your job is to decide, per finding, whether the flagged site',
-    'is a legitimate, known-safe pattern or something a human must confirm. Findings come from two',
-    'tools: ast-grep (structural) and Semgrep taint (interprocedural — it follows req.auth.sub',
-    'through variables and function calls into a storage argument; its rule file with the known',
-    'sanitizers is security/semantic-audit/semgrep/resolve-identity.yml).',
+    'The tools over-report by design; your job is to decide, per finding, whether the flagged site',
+    'is a legitimate, known-safe pattern or something a human must confirm. Findings come from THREE',
+    'tools, and each block below is tagged with which:',
+    '  - ast-grep (structural) and Semgrep taint (interprocedural) — the identity invariants. Semgrep',
+    '    follows req.auth.sub through variables and calls into a storage argument; its rule file with',
+    '    the known sanitizers is security/semantic-audit/semgrep/resolve-identity.yml.',
+    '  - CodeQL — the generic JS/TS security suite (injection, path traversal, ReDoS, clear-text',
+    '    logging, XSS, SSRF, …). A CodeQL finding is NOT about the identity model; judge whether the',
+    '    flagged data flow is actually reachable and exploitable in THIS code, or a known-safe usage',
+    '    (a constant/allowlisted input, a value already validated upstream, a log line with no secret,',
+    '    a regex over bounded input). Default to "confirm" for anything touching untrusted input that',
+    '    you cannot prove safe by reading the surrounding code.',
     '',
     'ast-grep rule background (Finnish, from the audit report content):',
     ruleDocs,
     '',
-    'Known-safe patterns: an agent/ecosystem-session branch where `sub` already IS the full identity;',
-    'attribution fields (reviewedBy, performedBy, …) that record who acted and are never a retrieval',
-    'key; inline GHII construction `${sub}@${nodeId}`; a door that also carries requireAuth()/',
-    'requireScope() so the flagged check is not the only gate; ownership of a non-account resource.',
+    'Known-safe patterns for the identity findings: an agent/ecosystem-session branch where `sub`',
+    'already IS the full identity; attribution fields (reviewedBy, performedBy, …) that record who',
+    'acted and are never a retrieval key; inline GHII construction `${sub}@${nodeId}`; a door that',
+    'also carries requireAuth()/requireScope() so the flagged check is not the only gate; ownership',
+    'of a non-account resource.',
     'You may Read any file in the repo (rules live in security/semantic-audit/, auth middleware in',
     'aimeat/src/auth/middleware.ts) to verify how a flagged site actually behaves — prefer reading',
     'over guessing when the context below is not conclusive.',
     '',
-    'Verdicts: "legit" = provably one of the safe patterns; "confirm" = a human must look (default',
-    'when uncertain). The reason must be ONE sentence, written in natural Finnish, naming the',
-    'concrete evidence (what the surrounding code does), because it is printed in a Finnish report.',
+    'Verdicts: "legit" = provably safe (a known-safe identity pattern, or a CodeQL flow you can show',
+    'is not exploitable); "confirm" = a human must look (default when uncertain, and the default for',
+    'a real-looking CodeQL vulnerability). The reason must be ONE sentence, written in natural',
+    'Finnish, naming the concrete evidence (what the surrounding code does), because it is printed in',
+    'a Finnish report.',
     '',
   ];
   const contextOf = (f) => {
@@ -134,7 +161,9 @@ if (fresh.length === 0) {
     if (!batch.length) continue;
     const blocks = batch.map((f, j) => {
       const line = (f.range?.start?.line ?? 0) + 1;
-      return `### Finding ${j + 1}\nfingerprint: ${f.fingerprint}\ntool: ${f.source}\nrule: ${f.ruleId}\nfile: ${norm(f.file)}:${line}\nmatched: ${String(f.text || '').slice(0, 300)}\ncontext:\n\`\`\`ts\n${contextOf(f)}\n\`\`\``;
+      const sev = f.severity ? `\nseverity: ${f.severity}` : '';
+      const desc = f.ruleDesc ? `\nwhat the rule flags: ${f.ruleDesc}` : '';
+      return `### Finding ${j + 1}\nfingerprint: ${f.fingerprint}\ntool: ${f.source}\nrule: ${f.ruleId}${sev}${desc}\nfile: ${norm(f.file)}:${line}\nmatched: ${String(f.text || '').slice(0, 300)}\ncontext:\n\`\`\`ts\n${contextOf(f)}\n\`\`\``;
     });
     const prompt = [...header, blocks.join('\n\n'), '',
       'Respond with ONLY this JSON object, no prose around it:',
@@ -158,6 +187,7 @@ if (fresh.length === 0) {
         line: (f.range?.start?.line ?? 0) + 1,
         source: f.source,
         ...(f.alertNumber !== undefined ? { alertNumber: f.alertNumber } : {}),
+        ...(f.severity ? { severity: f.severity } : {}),
         verdict,
         reason: v?.reason || 'AI ei antanut verdiktiä — ihmisen katsottava.',
         decidedBy: 'ai',

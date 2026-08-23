@@ -43,9 +43,9 @@
       "ruleId": "optional-auth-if-not-req-auth-gate",
       "file": "aimeat/src/routes/stats.ts",
       "line": 49,
-      "verdict": "confirm",
-      "reason": "Sama ehto /v1/metrics-ovella: anonyymitilassa `req.auth` on aina asetettu, ja tarkistuksen jälkeen rekisteri palautetaan sellaisenaan ilman muuta suojaa.",
-      "decidedBy": "ai",
+      "verdict": "legit",
+      "reason": "Hyväksytty: /v1/metrics on tarkoituksella kevyt seurantapiste (kuten /health), ei tunnuksin avaimitettua dataa. Pääsy rajataan nginx:ssä omaan seurantaverkkoon, ei koodimuutosta. — Jouni 2026-08-23",
+      "decidedBy": "human",
       "date": "2026-08-23",
       "commit": "a1cfe3ea",
       "source": "ast-grep"

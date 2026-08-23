@@ -24,6 +24,10 @@
  *   v1.1.0 — 2026-03-15 — GHII resolution via identity system
  *   v1.2.0 — 2026-03-15 — enforce templateReviewsEnabled/templateDiscussionsEnabled config; remove (config as any) cast
  *   v1.3.0 — 2026-03-20 — add moderation endpoints: pending, review, approve, reject, suspend
+ *   v1.4.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 1): the review and discussion authors
+ *     resolve the owner's GHII (resolveGhii) instead of storing the raw `sub`, closing the two TODOs.
+ *     A raw `sub` is a bare name on an owner session and an agent GAII on an agent, so one person
+ *     posted under two identities and their unique review doubled.
  */
 
 import { Router } from 'express';
@@ -399,8 +403,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
     const listingId = req.params.id as string;
     const owner = req.auth!.owner;
-    // TODO: resolve owner's GHII via identity system when integration is confirmed
-    const authorGhii = req.auth!.sub;
+    // The author key must be the owner's GHII, the same resolver the earlier handlers use — not the
+    // raw `sub`, which is a bare name on an owner session and an agent GAII on an agent, so the same
+    // person would post under two identities and their UNIQUE(listingId, authorGhii) review would
+    // double (audit AI-triage 2026-08-23, invariant 1).
+    const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
 
     const { rating, comment } = req.body ?? {};
 
@@ -480,8 +487,11 @@ export function templatesRouter(config: AimeatConfig, storage: Storage): Router 
 
     const listingId = req.params.id as string;
     const owner = req.auth!.owner;
-    // TODO: resolve owner's GHII via identity system when integration is confirmed
-    const authorGhii = req.auth!.sub;
+    // The author key must be the owner's GHII, the same resolver the earlier handlers use — not the
+    // raw `sub`, which is a bare name on an owner session and an agent GAII on an agent, so the same
+    // person would post under two identities and their UNIQUE(listingId, authorGhii) review would
+    // double (audit AI-triage 2026-08-23, invariant 1).
+    const authorGhii = await resolveGhii(storage, owner, req.auth!.sub);
 
     const { message, parentId } = req.body ?? {};
 
