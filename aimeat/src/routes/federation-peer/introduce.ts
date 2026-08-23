@@ -22,7 +22,8 @@ import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
-import { deriveTierFlags } from '../../services/federation-tiers.js';
+import { deriveTierFlags, type PeerTier } from '../../services/federation-tiers.js';
+import { consumeLinkInvite } from '../../services/link-invites.js';
 import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-policy.js';
 import { logger } from '../../utils/logger.js';
 
@@ -107,7 +108,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
     // POST /v1/federation/peer/introduce — unauthenticated "knock on the door" for joining nodes
     // SECURITY: Requires cryptographic signature + operator approval (never auto-approve)
     router.post('/v1/federation/peer/introduce', async (req, res) => {
-        const { node_id, node_url, public_key, role, message, signature, timestamp } = req.body ?? {};
+        const { node_id, node_url, public_key, role, message, signature, timestamp, invite_token } = req.body ?? {};
 
         if (!node_id || !node_url || !public_key || !role) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id, node_url, public_key, and role are required'));
@@ -177,9 +178,17 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         // memory-replication/federated-auth rights (deriveTierFlags('visiting')).
         // Reaching 'member' still requires a deliberate local-operator promotion.
         // Network policy may further gate (or disable) auto-admit by domain/protocol.
+        // An INVITE this node minted earlier. Its tier is this node's own decision quoted back, which
+        // is why the tier is read from the stored invite and never from the request body — a door that
+        // believes a caller's claim about its own trust level is not a door (the F1 finding in
+        // lifecycle.ts). An unknown, expired or already-used token is not an error: it falls through
+        // to the ordinary pending path below, so a leaked token is worth one link, at one tier, once.
+        const invited = await consumeLinkInvite(storage, invite_token, node_id);
+
         const policy = await getActivePolicy(storage);
         const policyAdmit = evaluateAutoAdmit({ node_url }, policy);
-        if (config.federationOpenJoin && policyAdmit.allowed) {
+        if (invited.ok || (config.federationOpenJoin && policyAdmit.allowed)) {
+            const admitTier: PeerTier = invited.ok ? invited.tier : 'visiting';
             // SSRF: node_url drives the outbound key-exchange below.
             const urlCheck = await validateOutboundUrl(node_url);
             if (!urlCheck.valid) {
@@ -187,19 +196,18 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
                 return;
             }
 
-            const flags = deriveTierFlags('visiting');
-            const visitingPeer: PeerInfo = {
+            const admittedPeer: PeerInfo = {
                 nodeId: node_id,
                 url: node_url,
                 publicKey: public_key,
                 status: 'active',
                 addedAt: now,
                 lastSeen: now,
-                ...flags,
-                tier: 'visiting',
+                ...deriveTierFlags(admitTier),
+                tier: admitTier,
             };
-            peers.set(node_id, visitingPeer);
-            await storage.saveFederationPeer(visitingPeer);
+            peers.set(node_id, admittedPeer);
+            await storage.saveFederationPeer(admittedPeer);
 
             // Record the (auto-approved) request for audit + reciprocal auto-add on key exchange.
             await storage.createPeeringRequest({
@@ -211,6 +219,9 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
                 publicKey: public_key,
                 message: message ?? '',
                 status: 'auto_approved',
+                // The tier this admission was for. The key-exchange auto-add reads it, so a de-peered
+                // link cannot come back one rung higher than it was let in at.
+                tier: admitTier,
                 createdAt: now,
                 updatedAt: now,
             });
@@ -221,9 +232,11 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             res.status(200).json(success(config.nodeId, {
                 request_id: id,
                 status: 'active',
-                tier: 'visiting',
+                tier: admitTier,
                 key_exchange: keyExchange.success ? 'completed' : 'failed',
-                message: 'Joined as a visiting node. Browse the catalogue and request work; ask the operator to promote you to a full member.',
+                message: admitTier === 'contact'
+                    ? 'Linked for messages. Direct messages cross this link and nothing else does: no catalogue, no memory, no routing, and neither node is listed in the public directory of the other.'
+                    : 'Joined as a visiting node. Browse the catalogue and request work; ask the operator to promote you to a full member.',
             }, [
                 { description: 'Browse the federation directory', method: 'GET', url: '/v1/federation/directory' },
             ]));

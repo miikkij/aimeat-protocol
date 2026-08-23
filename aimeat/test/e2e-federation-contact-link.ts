@@ -383,6 +383,115 @@ await test('T4. Messaging can still be turned OFF — a clamp holds a ceiling, n
     });
 });
 
+// ── The invite: how a node you provision becomes a link before its operator ever logs in. ──
+console.log('\nPhase 4 — one-time invitations');
+
+let inviteToken = '';
+const I_NODE = 'aimeat-peer-001-invited';
+const I_URL = 'http://localhost:49994';
+let iKeys: { publicKey: string; privateKey: string };
+
+/** Introduce as node I, signed the way the door requires. */
+async function introduce(token?: string) {
+    const timestamp = new Date().toISOString();
+    const signature = await sign(iKeys.privateKey, `${I_NODE}${I_URL}${timestamp}`);
+    return V.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: I_NODE, node_url: I_URL, public_key: iKeys.publicKey,
+            role: 'contributor', signature, timestamp,
+            ...(token ? { invite_token: token } : {}),
+        }),
+    });
+}
+
+async function dropPeer(nodeId: string) {
+    await V.json(`/v1/federation/peers/${nodeId}?emergency=true`, { method: 'DELETE', headers: auth(V.ownerToken) });
+}
+
+await test('I1. An operator mints an invite, and the token is shown exactly once', async () => {
+    iKeys = await generateKeyPair();
+    const r = await V.json('/v1/federation/link-invites', {
+        method: 'POST', headers: auth(V.ownerToken),
+        body: JSON.stringify({ tier: 'contact', label: 'Provisioning for a customer' }),
+    });
+    assert(r.status === 201, `mint: ${r.status} ${JSON.stringify(r.body)}`);
+    inviteToken = r.body.data.token;
+    assert(typeof inviteToken === 'string' && inviteToken.length > 20, 'a token comes back');
+    assert(r.body.data.tier === 'contact', `at the tier asked for, got ${r.body.data.tier}`);
+
+    // Only its hash is stored, so listing must never hand it out again.
+    const list = await V.json('/v1/federation/link-invites', { headers: auth(V.ownerToken) });
+    const mine = (list.body.data.invites ?? []).find((i: any) => i.id === r.body.data.id);
+    assert(!!mine && mine.state === 'open', `it is listed as open, got ${JSON.stringify(mine)}`);
+    assert(!JSON.stringify(list.body).includes(inviteToken), 'and the token is not in the listing');
+});
+
+await test('I2. REFUSED — an invite cannot name a tier fuller than the ladder allows', async () => {
+    const r = await V.json('/v1/federation/link-invites', {
+        method: 'POST', headers: auth(V.ownerToken), body: JSON.stringify({ tier: 'member' }),
+    });
+    assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body)}`);
+});
+
+await test('I3. Presenting the invite admits the node at the tier the INVITE names', async () => {
+    const r = await introduce(inviteToken);
+    assert(r.status === 200, `introduce: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(r.body.data.tier === 'contact', `admitted at contact, got ${r.body.data.tier}`);
+
+    const list = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
+    const row = (list.body.data.peers as any[]).find(p => p.node_id === I_NODE);
+    assert(!!row && row.tier === 'contact', `the stored peer is contact, got ${JSON.stringify(row?.tier)}`);
+    assert(row.share_catalogue === false && row.allow_broadcast === false, 'with the floor\'s flags');
+});
+
+await test('I4. The token is spent: a second use is not a second link', async () => {
+    await dropPeer(I_NODE);
+    const r = await introduce(inviteToken);
+    // Falls through to the ordinary path, which never auto-approves.
+    assert(r.status === 202, `expected a pending request, got ${r.status}: ${JSON.stringify(r.body)}`);
+
+    const list = await V.json('/v1/federation/peers', { headers: auth(V.ownerToken) });
+    assert(!(list.body.data.peers as any[]).some(p => p.node_id === I_NODE), 'and no peer was created');
+});
+
+await test('I5. A body that ASKS for a tier gets the invite\'s tier, not the one it asked for', async () => {
+    // Taking a trust level from what the caller sent is the whole class of mistake this avoids.
+    await dropPeer(I_NODE);
+    const mint = await V.json('/v1/federation/link-invites', {
+        method: 'POST', headers: auth(V.ownerToken), body: JSON.stringify({ tier: 'contact' }),
+    });
+    const token = mint.body.data.token;
+
+    const timestamp = new Date().toISOString();
+    const signature = await sign(iKeys.privateKey, `${I_NODE}${I_URL}${timestamp}`);
+    const r = await V.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: I_NODE, node_url: I_URL, public_key: iKeys.publicKey, role: 'operator',
+            signature, timestamp, invite_token: token,
+            tier: 'member', tier_request: 'genesis',   // ignored: not where the tier comes from
+        }),
+    });
+    assert(r.status === 200, `introduce: ${r.status} ${JSON.stringify(r.body)}`);
+    assert(r.body.data.tier === 'contact', `the invite decides, got ${r.body.data.tier}`);
+});
+
+await test('I6. An unknown or revoked token is a pending request, never a link', async () => {
+    await dropPeer(I_NODE);
+    const bogus = await introduce('not-a-real-token-at-all');
+    assert(bogus.status === 202, `expected 202, got ${bogus.status}: ${JSON.stringify(bogus.body)}`);
+
+    const mint = await V.json('/v1/federation/link-invites', {
+        method: 'POST', headers: auth(V.ownerToken), body: JSON.stringify({ tier: 'contact' }),
+    });
+    const del = await V.json(`/v1/federation/link-invites/${mint.body.data.id}`, { method: 'DELETE', headers: auth(V.ownerToken) });
+    assert(del.status === 200, `revoke: ${del.status}`);
+
+    const revoked = await introduce(mint.body.data.token);
+    assert(revoked.status === 202, `a revoked token admits nobody, got ${revoked.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 V!.server.close();
 process.exit(failed > 0 ? 1 : 0);
