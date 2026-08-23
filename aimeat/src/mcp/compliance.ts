@@ -40,8 +40,9 @@ import { buildComplianceReport, MONTH_RE } from '../services/compliance-report.j
 import { draftRegisterFromActivity } from '../services/compliance-draft.js';
 import {
   QuestionnaireSchema, UseCasesSchema, effectiveQuestionnaire, readUseCases,
-  writeQuestionnaire, writeUseCases,
+  writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport, storedReportKind,
 } from '../services/compliance-register.js';
+import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 const refuse = (message: string) => ({ content: [{ type: 'text' as const, text: message }], isError: true });
@@ -176,6 +177,40 @@ export function registerComplianceTools(
       }
       const saved = await writeUseCases(storage, config.nodeId, parsed.data.usecases, agentGaii);
       return text({ usecases: saved, total: saved.length });
+    },
+  );
+
+  mcp.tool(
+    'aimeat_compliance_snapshot',
+    descriptionFor('aimeat_compliance_snapshot'),
+    {
+      action: z.enum(['list', 'read', 'save']).describe('What to do. Start with "list".'),
+      id: z.string().optional()
+        .describe('For "read": which stored report, e.g. 2026-08 or 2026-08-23-1930.'),
+      since_days: z.number().int().min(1).max(3650).optional()
+        .describe('For "save": the window the snapshot covers (default 30).'),
+    },
+    annotationsFor('aimeat_compliance_snapshot'),
+    async ({ action, id, since_days }) => {
+      // Saving adds a node-wide document to what the installation keeps, so it asks for the write
+      // word. Reading the shelf asks for the read one. Same split as the register.
+      const denied = await gate(action === 'save' ? COMPLIANCE_WRITE_SCOPE : COMPLIANCE_READ_SCOPE);
+      if (denied) return refuse(denied);
+
+      if (action === 'save') {
+        return text(await saveComplianceSnapshot(config, storage, { sinceDays: since_days }));
+      }
+      if (action === 'read') {
+        if (!id || !storedReportKind(id)) {
+          return refuse('Say which stored report to read: 2026-08 for a month, or 2026-08-23-1930 for a saved moment. '
+            + 'action="list" shows what exists.');
+        }
+        const stored = await readStoredReport(storage, config.nodeId, id);
+        if (!stored) return refuse(`Nothing is stored under ${id}. action="list" shows what exists.`);
+        return text({ id, kind: storedReportKind(id), report: stored });
+      }
+      const reports = await listStoredReports(storage, config.nodeId);
+      return text({ reports, total: reports.length });
     },
   );
 }

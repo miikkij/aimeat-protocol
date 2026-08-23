@@ -186,6 +186,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // than 'service' because it is the node's own governance rather than anything the node
         // sells, and because the only caller it will ever have is the operator's own agent.
         'aimeat_compliance_report', 'aimeat_compliance_register_read', 'aimeat_compliance_register_write',
+        'aimeat_compliance_snapshot',
         'aimeat_flag_report',
         'aimeat_group_list', 'aimeat_group_get', 'aimeat_group_create', 'aimeat_group_add_member', 'aimeat_group_remove_member',
         'aimeat_share_create', 'aimeat_share_list', 'aimeat_share_revoke',

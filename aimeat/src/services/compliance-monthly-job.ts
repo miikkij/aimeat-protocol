@@ -17,17 +17,24 @@
  *   IT NOTIFIES THE OPERATORS, NOT EVERYONE. The report is node-wide, and the accounts entitled to
  *   read it are the ones the gate admits. A node with no operator writes the report and tells
  *   nobody, which is the right shape: the record exists for whoever is appointed later.
+ *   A SNAPSHOT SAVED BY HAND IS THE SAME THING WITH A DIFFERENT PERIOD. It covers a rolling window
+ *   ending now rather than a closed month, and its id says so, so the two never get confused in the
+ *   list a year later. It notifies nobody: the person who pressed the button is already looking at
+ *   the page.
  * @structure
  *   - previousMonth(now) — `YYYY-MM` of the month before the given date, UTC
  *   - runComplianceMonthlyReport(config, storage) — the handler
+ *   - saveComplianceSnapshot(config, storage, opts) — keep the report as it stands right now
  * @usage registered as the core handler `compliance-report-monthly` in services/core-jobs.ts
  * @version-history
+ *   v1.1.0 — 2026-08-23 — saveComplianceSnapshot: the schedule was the only thing that could keep a
+ *     report, so a person who wanted this moment had to wait for the first of next month.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { buildComplianceReport } from './compliance-report.js';
-import { writeStoredReport } from './compliance-register.js';
+import { writeStoredReport, snapshotIdFor } from './compliance-register.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
 
@@ -78,5 +85,43 @@ export async function runComplianceMonthlyReport(
   return {
     month, gaps: report.gaps.length,
     usecases: report.register.usecases.length, notified: operators.length,
+  };
+}
+
+export interface SnapshotResult {
+  id: string;
+  kind: 'manual';
+  generated_at: string;
+  period: { from: string; to: string };
+  gaps: number;
+  usecases: number;
+}
+
+/**
+ * Keep the report as it stands right now.
+ *
+ * The window is the one the caller was looking at, because a snapshot taken from a page showing
+ * ninety days and stored as thirty would misdescribe itself the moment somebody opens it again.
+ * Everything else is the monthly job's path: the same builder, the same key prefix, the same
+ * overwrite-writes-a-new-version behaviour if a second one lands in the same minute.
+ */
+export async function saveComplianceSnapshot(
+  config: AimeatConfig, storage: Storage, opts: { sinceDays?: number; now?: Date } = {},
+): Promise<SnapshotResult> {
+  const now = opts.now ?? new Date();
+  const id = snapshotIdFor(now);
+  const report = await buildComplianceReport(storage, config, { sinceDays: opts.sinceDays });
+  await writeStoredReport(storage, config.nodeId, id, report);
+
+  logger.info('compliance: snapshot stored', {
+    id, gaps: report.gaps.length, usecases: report.register.usecases.length,
+  });
+  return {
+    id,
+    kind: 'manual',
+    generated_at: report.scope.generated_at,
+    period: { from: report.scope.period.from, to: report.scope.period.to },
+    gaps: report.gaps.length,
+    usecases: report.register.usecases.length,
   };
 }

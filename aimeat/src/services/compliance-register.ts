@@ -28,11 +28,14 @@
  *   - classifyUseCase(useCase, questionnaire) — the pure function; no ids, no class names
  *   - readQuestionnaire / writeQuestionnaire / readUseCases / writeUseCases
  *   - effectiveQuestionnaire(storage, nodeId) — the stored set, or the seed; never null
- *   - reportKeyFor / writeStoredReport / readStoredReport / listStoredReports — the monthly snapshots
+ *   - reportKeyFor / storedReportKind / snapshotIdFor — the id shapes of a stored report
+ *   - writeStoredReport / readStoredReport / listStoredReports — the stored reports themselves
  * @usage
  *   const q = await readQuestionnaire(storage, config.nodeId);
  *   const verdict = classifyUseCase(useCase, q);
  * @version-history
+ *   v1.1.0 — 2026-08-23 — A stored report can also be a moment somebody kept, not only a month the
+ *     schedule wrote. The index says which kind each one is.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { z } from 'zod';
@@ -333,41 +336,77 @@ export async function writeUseCases(
 
 // ── The scheduled monthly snapshots ──────────────────────────────────────────────────────────
 
-/** One key per month: twelve a year, which the key budget swallows for decades. */
-export const reportKeyFor = (month: string): string => `compliance.report.${month}`;
+/** One key per stored report: twelve a year from the schedule, plus whatever a person saves. */
+export const reportKeyFor = (id: string): string => `compliance.report.${id}`;
 const REPORT_PREFIX = 'compliance.report.';
 
-/** Store one month's report. Overwrites, because re-running a month must not leave two answers. */
-export async function writeStoredReport(
-  storage: Storage, nodeId: string, month: string, report: unknown,
-): Promise<void> {
-  await writeSystemRecord(storage, nodeId, reportKeyFor(month), report, 'report');
-}
+/** A month the schedule wrote. */
+const MONTHLY_ID = /^\d{4}-(0[1-9]|1[0-2])$/;
+/** A moment a person saved, to the minute. */
+const MANUAL_ID = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])-([01]\d|2[0-3])[0-5]\d$/;
 
-export async function readStoredReport(
-  storage: Storage, nodeId: string, month: string,
-): Promise<unknown | null> {
-  const rec = await storage.getMemory(systemGhiiFor(nodeId), reportKeyFor(month));
-  return rec?.value ?? null;
+/** Whether an id is one the store recognises at all, and which kind of thing wrote it. */
+export function storedReportKind(id: string): 'monthly' | 'manual' | null {
+  if (MONTHLY_ID.test(id)) return 'monthly';
+  if (MANUAL_ID.test(id)) return 'manual';
+  return null;
 }
 
 /**
- * Which months have a stored report, newest first — the index, never the bodies.
+ * The id for a snapshot taken now, to the minute.
+ *
+ * Minute precision on purpose: a double-click writes one record rather than two identical ones a
+ * second apart, and a person who deliberately saves twice in a minute meant the second one.
+ */
+export function snapshotIdFor(now: Date): string {
+  const p = (n: number, w = 2) => String(n).padStart(w, '0');
+  return `${now.getUTCFullYear()}-${p(now.getUTCMonth() + 1)}-${p(now.getUTCDate())}`
+    + `-${p(now.getUTCHours())}${p(now.getUTCMinutes())}`;
+}
+
+/** Store one report. Overwrites, because re-running the same id must not leave two answers. */
+export async function writeStoredReport(
+  storage: Storage, nodeId: string, id: string, report: unknown,
+): Promise<void> {
+  await writeSystemRecord(storage, nodeId, reportKeyFor(id), report, 'report');
+}
+
+export async function readStoredReport(
+  storage: Storage, nodeId: string, id: string,
+): Promise<unknown | null> {
+  const rec = await storage.getMemory(systemGhiiFor(nodeId), reportKeyFor(id));
+  return rec?.value ?? null;
+}
+
+export interface StoredReportEntry {
+  id: string;
+  /** `monthly` came from the schedule; `manual` is a moment somebody chose to keep. */
+  kind: 'monthly' | 'manual';
+  generated_at: string;
+}
+
+/**
+ * Which reports are stored, newest first — the index, never the bodies.
  *
  * Listing metadata rather than values on purpose: a year of reports is a large read, and the caller
- * wants to know what exists before choosing one.
+ * wants to know what exists before choosing one. Sorting on the id rather than on `generated_at`
+ * keeps a re-run month in its own place in the year instead of jumping to the top of the list.
  */
 export async function listStoredReports(
   storage: Storage, nodeId: string,
-): Promise<Array<{ month: string; generated_at: string }>> {
+): Promise<StoredReportEntry[]> {
   const { items } = await storage.listAllMemoryMeta({
     ownerPrefix: systemGhiiFor(nodeId), prefix: REPORT_PREFIX, limit: 500, excludeVersionRows: true,
   });
   return items
-    .map(r => ({ month: r.key.slice(REPORT_PREFIX.length), generated_at: r.updatedAt }))
-    // A `.version.N` row would otherwise appear as a month named "2026-08.version.3".
-    .filter(r => /^\d{4}-(0[1-9]|1[0-2])$/.test(r.month))
-    .sort((a, b) => b.month.localeCompare(a.month));
+    .map(r => {
+      const id = r.key.slice(REPORT_PREFIX.length);
+      // A `.version.N` row would otherwise appear as a report called "2026-08.version.3".
+      const kind = storedReportKind(id);
+      return kind ? { id, kind, generated_at: r.updatedAt } : null;
+    })
+    .filter((r): r is StoredReportEntry => r !== null)
+    .sort((a, b) => b.id.localeCompare(a.id));
 }
 
 /**

@@ -1068,6 +1068,16 @@
   color: var(--text-dim); white-space: pre-wrap; word-break: break-word;
 }
 
+/* The reports this node has kept. */
+.adm-cmp-saved-list { list-style: none; margin: 0.6rem 0 0; padding: 0; }
+.adm-cmp-saved-list > li { border-top: 1px solid var(--border); padding: 0.45rem 0; }
+.adm-cmp-saved-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.7rem; }
+.adm-cmp-saved-id { font-family: var(--font-mono); font-size: 0.85rem; }
+.adm-cmp-saved-kind { color: var(--muted); font-size: 0.8rem; }
+.adm-cmp-saved-row > button { margin-left: auto; }
+.adm-cmp-saved-open { padding: 0.3rem 0 0.6rem; }
+.adm-cmp-saved-facts { list-style: none; display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; margin: 0 0 0.5rem; padding: 0; font-size: 0.85rem; }
+
 /* The printed document. Hidden on screen; see views/admin/compliance-tab.print.js for why it is
    rendered all the time rather than composed when printing starts. */
 .adm-cmp-print-only { display: none; }

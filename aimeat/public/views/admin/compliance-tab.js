@@ -23,6 +23,8 @@
  *   - ComplianceTab (default) — the tab
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v1.4.0 — 2026-08-23 — The kept reports have a reader, and a button that keeps one now. The
+ *     monthly job had been writing them into a store no screen could open.
  *   v1.3.0 — 2026-08-23 — The CSV carries the answers too, from the same formatter the printed
  *     document uses, so the two files never disagree about one answer.
  *   v1.2.0 — 2026-08-23 — The printout carries the register in full. It used to print forty-three
@@ -45,6 +47,7 @@ import { swallowed } from '/js/swallowed.js';
 import { RegisterSection, QuestionnaireSection } from './compliance-tab.register.js';
 import { CompliancePromptSection } from './compliance-tab.prompt.js';
 import PrintableReport, { answerText } from './compliance-tab.print.js';
+import SavedReports from './compliance-tab.saved.js';
 
 const PERIODS = [
   { key: '30d', days: 30 },
@@ -326,6 +329,12 @@ export default function ComplianceTab() {
         />
 
         <${QuestionnaireSection} questionnaire=${questionnaire} />
+
+        <${SavedReports}
+          days=${PERIODS.find(p => p.key === period)?.days ?? 30}
+          onSaved=${showSuccess}
+          onError=${showError}
+        />
       </div>
 
       <${PrintableReport} report=${report} questionnaire=${questionnaire} />

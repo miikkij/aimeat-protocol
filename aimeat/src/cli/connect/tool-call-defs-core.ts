@@ -320,6 +320,25 @@ export const coreTools: ConnectCliToolDefinition[] = [
         ),
     },
     {
+        name: 'aimeat_compliance_snapshot',
+        handler: ({ client }, input) => {
+            const action = requiredString(input, 'action');
+            if (action === 'save') {
+                const sinceDays = optionalNumber(input, 'since_days');
+                return client.post('/v1/admin/compliance/snapshot',
+                    sinceDays === undefined ? {} : { since_days: sinceDays });
+            }
+            // The id is forwarded whenever it is given, rather than only when action says "read".
+            // The route already branches on its presence, so gating it here would add a second
+            // opinion that can only ever drop a value the caller meant — which is the exact defect
+            // this dispatch table has produced three times. It goes through query(), which encodes
+            // it: it is caller text landing next to a stored key.
+            return client.get(`/v1/admin/compliance/reports${query({
+                id: optionalString(input, 'id'),
+            })}`);
+        },
+    },
+    {
         name: 'aimeat_board_list',
         handler: ({ client }) => client.get('/v1/boards'),
     },
