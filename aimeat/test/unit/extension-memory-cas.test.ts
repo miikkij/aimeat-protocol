@@ -29,7 +29,7 @@ const EXT_OWNER = 'ext:shop';
 
 function makeCtx(storage: SqliteStorage): ExtensionCtx {
     return buildExtensionCtx({
-        config: loadConfig({}),
+        config: loadConfig().config,
         storage: storage as never,
         extMemoryOwner: EXT_OWNER,
         caller: { gaii: 'alice@aimeat-local-001-dev', owner: 'alice', roles: ['owner'] } as never,

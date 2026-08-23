@@ -1,4 +1,15 @@
-<!DOCTYPE html>
+/**
+ * @file businesslauncher-app-back-office.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The back office of the BUSINESSLAUNCHER package, inlined for install.
+ *
+ *   GENERATED FILE — do not edit by hand. Edit packages/businesslauncher/app-back-office.html and re-run
+ *   `node packages/build-businesslauncher-pkg.mjs`.
+ * @version-history
+ *   v1.0.0 — 2026-08-23 — Initial (TARGET-070).
+ */
+export const APP_BACK_OFFICE = `<!DOCTYPE html>
 <!-- AIMEAT App Manifest
 name: Back office
 version: 1.0.0
@@ -14,7 +25,7 @@ entry: index.html
     a person who closed the chat halfway finishes here instead of starting again.
 
     THE WORKSPACE IS FOUND BY CONTRACT, NOT BY A STORED ID. It scans the owner's organisms for a
-    workspace whose manifest declares `contract: 'shop'` — one match opens, none shows the setup
+    workspace whose manifest declares \`contract: 'shop'\` — one match opens, none shows the setup
     prompt, several ask which. An app cannot create an organism (role 'app' may not), so the setup
     step hands the owner a prompt their own AI runs once. Same shape as the signage admin.
 
@@ -73,7 +84,7 @@ entry: index.html
   [
     {
       "agent_name": "shopkeeper",
-      "readme_md": "# Shopkeeper\n\nThe interview, run by an agent instead of by a form.\n\nIt asks what you sell and who buys it, one question at a time, in your language, and writes the answers straight into the shop as they land. It does not fill a blank with something that merely sounds right: what you did not say is left out, which matters most for delivery promises and anything a buyer would rely on.\n\n**It never touches money.** Attaching a card and publishing anything public stay with you.",
+      "readme_md": "# Shopkeeper\\n\\nThe interview, run by an agent instead of by a form.\\n\\nIt asks what you sell and who buys it, one question at a time, in your language, and writes the answers straight into the shop as they land. It does not fill a blank with something that merely sounds right: what you did not say is left out, which matters most for delivery promises and anything a buyer would rely on.\\n\\n**It never touches money.** Attaching a card and publishing anything public stay with you.",
       "tags": ["businesslauncher", "shop", "interview"],
       "process": "sequential",
       "agents": [
@@ -93,13 +104,13 @@ entry: index.html
       "tasks": [
         {
           "id": "interview",
-          "description": "Interview the owner about what they sell and who buys it. Their own words and context: {{ctx.prompt}}\n\nAsk about, roughly in this order and following whatever they raise: what they sell; who buys it and why; whether there is already a list of products somewhere; what a buyer needs to know before deciding; how it reaches the buyer; what it costs and why. Speak to them in their own language. Ask, do not lecture, and stop when you have enough rather than when you have asked everything.",
+          "description": "Interview the owner about what they sell and who buys it. Their own words and context: {{ctx.prompt}}\\n\\nAsk about, roughly in this order and following whatever they raise: what they sell; who buys it and why; whether there is already a list of products somewhere; what a buyer needs to know before deciding; how it reaches the buyer; what it costs and why. Speak to them in their own language. Ask, do not lecture, and stop when you have enough rather than when you have asked everything.",
           "expected_output": "A record of what the person actually said, organised by those areas, with anything they did not answer marked explicitly as not established.",
           "agent": "Interviewer"
         },
         {
           "id": "catalogue",
-          "description": "Turn the interview into a product list. Emit a single JSON object shaped {\"currency\":\"EUR\",\"items\":[{sku,name,description,priceMinor,unit}]}. Prices are in minor units (cents). Leave out anything the interview did not establish rather than inventing it.",
+          "description": "Turn the interview into a product list. Emit a single JSON object shaped {\\"currency\\":\\"EUR\\",\\"items\\":[{sku,name,description,priceMinor,unit}]}. Prices are in minor units (cents). Leave out anything the interview did not establish rather than inventing it.",
           "expected_output": "One JSON object with a currency and an items array, and nothing else.",
           "agent": "Catalogue writer",
           "context": ["interview"]
@@ -108,7 +119,7 @@ entry: index.html
     },
     {
       "agent_name": "pricer",
-      "readme_md": "# Pricer\n\nKeeps the price lists.\n\nA shop usually needs more than one: what a person pays, what a trade buyer pays, and what an agent pays per call. This one writes and maintains them, and keeps them in step with the catalogue.\n\n**It can set a price. It cannot attach a card, and it cannot list anything publicly.**",
+      "readme_md": "# Pricer\\n\\nKeeps the price lists.\\n\\nA shop usually needs more than one: what a person pays, what a trade buyer pays, and what an agent pays per call. This one writes and maintains them, and keeps them in step with the catalogue.\\n\\n**It can set a price. It cannot attach a card, and it cannot list anything publicly.**",
       "tags": ["businesslauncher", "shop", "pricing"],
       "process": "sequential",
       "agents": [
@@ -122,7 +133,7 @@ entry: index.html
       "tasks": [
         {
           "id": "price",
-          "description": "Write or update the shop's price lists from the owner's own words: {{ctx.prompt}}\n\nProduce a retail list, and a trade list only if the owner sells to trade. Emit JSON shaped {\"lists\":[{\"id\",\"label\",\"currency\",\"validFrom\",\"rows\":[{sku,amountMinor,unit}]}]}. Every row names a sku that exists in the catalogue. Say beside each list what the numbers are based on.",
+          "description": "Write or update the shop's price lists from the owner's own words: {{ctx.prompt}}\\n\\nProduce a retail list, and a trade list only if the owner sells to trade. Emit JSON shaped {\\"lists\\":[{\\"id\\",\\"label\\",\\"currency\\",\\"validFrom\\",\\"rows\\":[{sku,amountMinor,unit}]}]}. Every row names a sku that exists in the catalogue. Say beside each list what the numbers are based on.",
           "expected_output": "One JSON object with a lists array, plus a short plain sentence per list saying what its numbers rest on.",
           "agent": "Pricer"
         }
@@ -130,7 +141,7 @@ entry: index.html
     },
     {
       "agent_name": "scout",
-      "readme_md": "# Scout\n\nFinds out what comparable things cost, and puts the source next to every number.\n\nA figure with no source is an opinion, and this one does not produce those. Where the node can contract a company-register capability it uses it; where it cannot, it says so instead of guessing.\n\nRuns on a clock only if you switch it on: it spends tokens, and that is your decision.",
+      "readme_md": "# Scout\\n\\nFinds out what comparable things cost, and puts the source next to every number.\\n\\nA figure with no source is an opinion, and this one does not produce those. Where the node can contract a company-register capability it uses it; where it cannot, it says so instead of guessing.\\n\\nRuns on a clock only if you switch it on: it spends tokens, and that is your decision.",
       "tags": ["businesslauncher", "shop", "research"],
       "process": "sequential",
       "agents": [
@@ -144,7 +155,7 @@ entry: index.html
       "tasks": [
         {
           "id": "research",
-          "description": "Research what comparable offerings cost, for this shop: {{ctx.prompt}}\n\nUse the capabilities this node can actually reach. Where a company-register capability is contractable, use it; where it is not, say so rather than guessing. Emit JSON shaped {\"quarter\":\"YYYY-Qn\",\"findings\":[{claim,number,unit,source,readAt}]}.",
+          "description": "Research what comparable offerings cost, for this shop: {{ctx.prompt}}\\n\\nUse the capabilities this node can actually reach. Where a company-register capability is contractable, use it; where it is not, say so rather than guessing. Emit JSON shaped {\\"quarter\\":\\"YYYY-Qn\\",\\"findings\\":[{claim,number,unit,source,readAt}]}.",
           "expected_output": "One JSON object with a findings array in which every entry carries a source and the date it was read.",
           "agent": "Scout"
         }
@@ -190,7 +201,7 @@ entry: index.html
       session = await AIMEAT.auth.login().catch(function () { return null; });
       if (!session) { started = false; return; }
 
-      var launch = /#aimeat-ws=([^/]+)\/([^&]+)/.exec(location.hash);
+      var launch = /#aimeat-ws=([^/]+)\\/([^&]+)/.exec(location.hash);
       if (launch) return openWorkspace(launch[1], launch[2]);
 
       var candidates = await findWorkspaces();
@@ -243,7 +254,7 @@ entry: index.html
         '',
         'The shop back office finds this workspace by itself afterwards — it looks for the contract',
         '"' + CONTRACT + '" in the manifest, so there is nothing to paste back into it.',
-      ].join('\n');
+      ].join('\\n');
     }
 
     function renderSetup() {
@@ -302,11 +313,11 @@ entry: index.html
         '',
         'The workspace is the editable truth. The SHOP FRONT reads a separate public copy, and that',
         'copy only changes when the owner presses Publish in the back office. Do not try to write it:',
-        'it is the shop extension\'s own namespace and only the extension writes there.',
+        'it is the shop extension\\'s own namespace and only the extension writes there.',
         '',
         'Rules: prices are in minor units (cents). Never invent a delivery time, a guarantee or a',
         'quality claim the owner did not state — an unstated promise is an absent line.',
-      ].join('\n');
+      ].join('\\n');
     }
 
     // ── views ───────────────────────────────────────────────────────────────
@@ -509,3 +520,4 @@ entry: index.html
   </script>
 </body>
 </html>
+`;

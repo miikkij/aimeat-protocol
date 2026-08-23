@@ -25,10 +25,22 @@ export default async function (ctx, input) {
   // ── configure ────────────────────────────────────────────────────────────
   // The shop's own details. Not a claim: it changes nothing about who owns this.
   if (op === 'configure') {
+    // Where the shop front sends an enquiry. Public Intake is the node's own anonymous-write path, so
+    // this is a POINTER at a form the owner already defined, never a form definition and never a
+    // destination a caller could aim somewhere else: the intake route resolves the owner from its own
+    // stored config rather than from the submission.
+    var contact = (input && input.contact) || (shop && shop.contact) || null;
+    if (input && input.contact === null) contact = null; // an explicit null takes the form off the page
+    if (contact && !(contact.org && contact.ws && contact.formId)) {
+      return { ok: false, error: 'contact must carry org, ws and formId' };
+    }
     shop = {
       owner: shopOwner,
       name: String((input && input.name) || (shop && shop.name) || 'Shop'),
       currency: String((input && input.currency) || (shop && shop.currency) || 'EUR'),
+      contact: contact
+        ? { org: String(contact.org), ws: String(contact.ws), formId: String(contact.formId) }
+        : null,
       updated: now,
     };
     await ctx.memory.set('shop', shop);

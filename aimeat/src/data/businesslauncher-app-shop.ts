@@ -1,4 +1,15 @@
-<!DOCTYPE html>
+/**
+ * @file businesslauncher-app-shop.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The shop front of the BUSINESSLAUNCHER package, inlined for install.
+ *
+ *   GENERATED FILE — do not edit by hand. Edit packages/businesslauncher/app-shop.html and re-run
+ *   `node packages/build-businesslauncher-pkg.mjs`.
+ * @version-history
+ *   v1.0.0 — 2026-08-23 — Initial (TARGET-070).
+ */
+export const APP_SHOP = `<!DOCTYPE html>
 <!-- AIMEAT App Manifest
 name: Shop
 version: 1.0.0
@@ -138,7 +149,7 @@ entry: index.html
     function monogram(name) {
       // Words that start with a digit are sizes and counts, not names: "Paahtopavut 500 g" gave "P5",
       // which reads as a product code rather than as initials.
-      var parts = String(name || '').trim().split(/\s+/).filter(function (w) { return /^[^\W\d_]/.test(w); });
+      var parts = String(name || '').trim().split(/\\s+/).filter(function (w) { return /^[^\\W\\d_]/.test(w); });
       if (!parts.length) return '';
       return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
     }
@@ -340,3 +351,4 @@ entry: index.html
   </script>
 </body>
 </html>
+`;

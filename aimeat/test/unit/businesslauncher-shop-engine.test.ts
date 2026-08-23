@@ -37,7 +37,7 @@ const LIMITS: ExtensionLimits = { memoryMb: 64, timeoutMs: 5000, maxApiCalls: 20
 
 function ctxFor(storage: SqliteStorage, gaii: string): ExtensionCtx {
     return buildExtensionCtx({
-        config: loadConfig({}),
+        config: loadConfig().config,
         storage: storage as never,
         extMemoryOwner: EXT_OWNER,
         // Who owns the shop comes from the extension's record, exactly as the invoke route resolves
@@ -80,7 +80,7 @@ describe('businesslauncher shop engine', () => {
 
     it('an action that cannot tell who owns the shop refuses rather than assuming', async () => {
         const blind = buildExtensionCtx({
-            config: loadConfig({}),
+            config: loadConfig().config,
             storage: storage as never,
             extMemoryOwner: EXT_OWNER,
             caller: { gaii: OWNER, owner: OWNER.split('@')[0], roles: ['owner'] } as never,
@@ -90,6 +90,43 @@ describe('businesslauncher shop engine', () => {
         const res = await executeExtensionAction(script('admin.js'), blind, { op: 'set_stock', units: { mug: 1 } } as never, LIMITS) as Record<string, unknown>;
         expect(res.ok).toBe(false);
         expect(String(res.error)).toMatch(/cannot tell who owns/);
+    });
+
+    // Where an enquiry is sent is a POINTER at a Public Intake form the owner already defined, and
+    // the intake route resolves the destination from its own stored config. A half-filled pointer
+    // would still put a button on the shop front and send people into nothing, so it is refused
+    // here rather than discovered by the first person who writes in.
+    it('a contact pointer missing any of its three parts is refused', async () => {
+        const res = await run(storage, 'admin.js', OWNER, {
+            op: 'configure', contact: { org: 'org-1', ws: 'ws-1' },
+        });
+        expect(res.ok).toBe(false);
+        expect(String(res.error)).toMatch(/org, ws and formId/);
+        const shop = await storage.getMemory(EXT_OWNER, 'shop');
+        expect((shop?.value as { contact: unknown }).contact).toBeNull();
+    });
+
+    it('a whole contact pointer is kept, and configuring something else does not drop it', async () => {
+        const set = await run(storage, 'admin.js', OWNER, {
+            op: 'configure', contact: { org: 'org-1', ws: 'ws-1', formId: 'frm_x' },
+        });
+        expect(set.ok).toBe(true);
+
+        // Renaming the shop must not silently take the contact form off the page.
+        const renamed = await run(storage, 'admin.js', OWNER, { op: 'configure', name: 'New name' });
+        expect(renamed.ok).toBe(true);
+        const shop = await storage.getMemory(EXT_OWNER, 'shop');
+        const v = shop?.value as { name: string; contact: { formId: string } };
+        expect(v.name).toBe('New name');
+        expect(v.contact.formId).toBe('frm_x');
+    });
+
+    it('an explicit null takes the contact form off the shop front', async () => {
+        await run(storage, 'admin.js', OWNER, { op: 'configure', contact: { org: 'o', ws: 'w', formId: 'f' } });
+        const off = await run(storage, 'admin.js', OWNER, { op: 'configure', contact: null });
+        expect(off.ok).toBe(true);
+        const shop = await storage.getMemory(EXT_OWNER, 'shop');
+        expect((shop?.value as { contact: unknown }).contact).toBeNull();
     });
 
     it('only the owner may stock the shelf', async () => {

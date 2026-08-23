@@ -57,19 +57,20 @@
     if (!session || typeof session.fetch !== 'function') {
       return Promise.reject(new Error('sign in first'));
     }
+    // session.fetch RESOLVES TO THE PARSED ENVELOPE, not to a Response. Calling .json() on it is the
+    // mistake that looks right: it throws "res.json is not a function" from inside a lib, one frame
+    // away from the button the person pressed.
     return session.fetch(ACTION + action, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {}),
-    }).then(function (res) {
-      return res.json().then(function (envelope) {
-        // The action's own answer is inside the node's envelope. A refusal from the shop (sold out,
-        // not yours) arrives as ok:false in there, not as an HTTP error, so it is handed back as it
-        // is rather than thrown: "sold out" is an answer the caller renders, not an exception.
-        var out = (envelope && envelope.data) ? envelope.data : envelope;
-        if (out && typeof out === 'object' && 'result' in out) return out.result;
-        return out;
-      });
+    }).then(function (envelope) {
+      // The action's own answer is inside the node's envelope. A refusal from the shop (sold out,
+      // not yours) arrives as ok:false in there, not as an HTTP error, so it is handed back as it
+      // is rather than thrown: "sold out" is an answer the caller renders, not an exception.
+      var out = (envelope && envelope.data) ? envelope.data : envelope;
+      if (out && typeof out === 'object' && 'result' in out) return out.result;
+      return out;
     });
   }
 
@@ -93,7 +94,7 @@
     return call(session, 'release', { reservationId: reservationId });
   }
 
-  /** Owner operations: claim, publish_catalog, publish_pages, set_stock, commit, sweep. */
+  /** Owner operations: configure, publish_catalog, publish_pages, set_stock, commit, sweep. */
   function admin(session, op, payload) {
     var body = { op: op };
     for (var k in (payload || {})) { if (Object.prototype.hasOwnProperty.call(payload, k)) body[k] = payload[k]; }

@@ -48,6 +48,30 @@ const cortex = JSON.stringify({
     libs: { 'businesslauncher-shop.js': read('cortex/businesslauncher-shop.js') },
 });
 
+/**
+ * The two apps are emitted as their own modules. Inlined together with the extension and the cortex
+ * they put the package file over the repo's 800-line ceiling, and the rule for that is a pure
+ * extraction rather than a shorter file: the HTML is one coherent group per app.
+ */
+const appModule = (name, constName, html, source) => `/**
+ * @file ${name}
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The ${constName === 'APP_SHOP' ? 'shop front' : 'back office'} of the BUSINESSLAUNCHER package, inlined for install.
+ *
+ *   GENERATED FILE — do not edit by hand. Edit packages/businesslauncher/${source} and re-run
+ *   \`node packages/build-businesslauncher-pkg.mjs\`.
+ * @version-history
+ *   v1.0.0 — 2026-08-23 — Initial (TARGET-070).
+ */
+export const ${constName} = \`${esc(html)}\`;
+`;
+
+writeFileSync(resolve(root, 'aimeat/src/data/businesslauncher-app-shop.ts'),
+    appModule('businesslauncher-app-shop.ts', 'APP_SHOP', appShop, 'app-shop.html'));
+writeFileSync(resolve(root, 'aimeat/src/data/businesslauncher-app-back-office.ts'),
+    appModule('businesslauncher-app-back-office.ts', 'APP_BACK_OFFICE', appBackOffice, 'app-back-office.html'));
+
 const out = `/**
  * @file businesslauncher-package.ts
  * @author Jouni Miikki
@@ -73,10 +97,10 @@ const out = `/**
  *   v1.0.0 — 2026-08-23 — Initial (TARGET-070).
  */
 import type { ExamplePackageDef } from './example-packages.js';
-
-const APP_SHOP = \`${esc(appShop)}\`;
-
-const APP_BACK_OFFICE = \`${esc(appBackOffice)}\`;
+// The two apps live in their own generated modules: inlined here as well they put this file over
+// the 800-line ceiling, and the split is a pure extraction (one coherent group per app).
+import { APP_SHOP } from './businesslauncher-app-shop.js';
+import { APP_BACK_OFFICE } from './businesslauncher-app-back-office.js';
 
 const EXT_SHOP = \`${esc(extension)}\`;
 
@@ -94,8 +118,13 @@ export function businesslauncherPackage(): ExamplePackageDef {
       // references are rewritten to these components' per-instance names as each app registers.
       { id: 'ext-shop', type: 'extension', label: 'Shop engine', content: EXT_SHOP, dependencies: [] },
       { id: 'cortex-shop', type: 'cortex', label: 'Shop lib', content: CORTEX_SHOP, dependencies: ['ext-shop'] },
-      { id: 'app-shop', type: 'app', label: 'Shop', content: APP_SHOP, dependencies: ['ext-shop', 'cortex-shop'] },
-      { id: 'app-back-office', type: 'app', label: 'Back office', content: APP_BACK_OFFICE, dependencies: ['ext-shop', 'cortex-shop'] },
+      // THE .html SUFFIX IS LOAD-BEARING, not decoration. An installed app's filename is
+      // package-owner-shortId-componentId, and the app-origin path form treats a request as an app
+      // only when the filename ends in .html (routes/subdomains.ts). An extensionless component id
+      // therefore produces an app that can never be opened on its own origin — the only place the
+      // SSO bridge works — and never gets a subdomain minted for it.
+      { id: 'app-shop.html', type: 'app', label: 'Shop', content: APP_SHOP, dependencies: ['ext-shop', 'cortex-shop'] },
+      { id: 'app-back-office.html', type: 'app', label: 'Back office', content: APP_BACK_OFFICE, dependencies: ['ext-shop', 'cortex-shop'] },
     ],
     templateListing: {
       title: 'Shop (BUSINESSLAUNCHER)',
