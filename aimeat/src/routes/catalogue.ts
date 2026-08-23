@@ -12,6 +12,9 @@
  *   v1.1.0 — 2026-06-23 — Exclude `unlisted` agents from GET /v1/catalogue/agents (Secretary Phase 0).
  *   v1.2.0 — 2026-07-14 — Perf: GET /v1/catalogue/knowledge finds manifests via ONE listAllMemory key
  *     scan + cache, instead of a listMemory per owner AND per agent on every (uncached) request.
+ *   v1.3.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 1): publish + delete resolve the
+ *     provider identity instead of storing the raw `sub`, so an owner session (admitted through the
+ *     agent role) publishes under its GHII rather than a bare name the delete would miss.
  */
 import { Router } from 'express';
 import { createHash, randomUUID } from 'node:crypto';
@@ -20,6 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { cached, TTL } from '../services/cache.js';
 import type { DirectoryService } from '../services/directory.js';
 import type { RealtimeStats } from '../services/realtime-manager.js';
@@ -393,7 +397,13 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
   // POST /v1/catalogue — publish a service/action (owner/agent auth)
   router.post('/v1/catalogue', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    // The provider coordinate is stored, shown as provider_gaii and matched by the delete below, so
+    // it must be the resolved identity, not the raw `sub`. requireRole('agent') admits an owner
+    // session through the role hierarchy, and there `sub` is the bare name `alice`, which would
+    // publish under a half-identity the delete could then miss (audit AI-triage 2026-08-23,
+    // invariant 1). resolveIdentity keeps an agent AS the agent (attribution) and only lifts an
+    // owner session to its GHII.
+    const gaii = resolveIdentity(req.auth!, config.nodeId);
     const { display_name, description, category, price_morsels, unit, webhook_url } = req.body ?? {};
 
     if (!display_name || !description) {
@@ -431,7 +441,9 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
 
   // DELETE /v1/catalogue/:actionId — unpublish a service (owner/agent auth)
   router.delete('/v1/catalogue/:actionId', requireAuth(), requireRole('agent'), async (req, res) => {
-    const gaii = req.auth!.sub;
+    // Same resolution as the publish above, so an owner deletes the action they published under
+    // their GHII rather than missing it behind a bare name.
+    const gaii = resolveIdentity(req.auth!, config.nodeId);
     const actionId = req.params.actionId as string;
 
     const deleted = await storage.deleteAction(actionId, gaii);
