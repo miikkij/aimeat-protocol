@@ -21,6 +21,13 @@
  * @structure OutboundError · ensureContact · recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   v1.3.0 — 2026-08-23 — Every send log says WHICH COMPANY sent it, and the daily cap counts per
+ *     company when one is named (TARGET-072). `company_id` reached the SMTP identity and stopped
+ *     there, so an owner with two companies had one sending reputation, one allowance and no way
+ *     to answer "what did this company send" — while their invoices carried an organism id all
+ *     along. The company is resolved before the FIRST gate, so a refused send is recorded with the
+ *     company on it too: the rows saying why something did not go out are the ones an owner reads
+ *     when a company's sending looks wrong.
  *   v1.2.0 — 2026-08-17 — TARGET-063. ensureContact stamps `emailHash` (so a person who verifies
  *     this address later can be found) and accepts the address-book fields links/relation. The
  *     identity lookup now calls storage.getGHIIByEmailHash directly instead of going through
@@ -236,21 +243,36 @@ async function loadTemplate(storage: Storage, ownerGhii: string, templateId: str
 export async function sendOutbound(config: AimeatConfig, storage: Storage, ownerGhii: string, input: SendInput): Promise<SendResult> {
   const contact = await requireOwnContact(storage, ownerGhii, input.contactId);
 
+  // WHICH COMPANY IS SPEAKING, resolved before the first log line rather than at the SMTP step.
+  // `company_id` reached the sender identity and stopped there, so a refused send — a suppression,
+  // an opt-out, a full allowance — was recorded with no company on it at all. The rows that say
+  // why something did NOT go out are the ones an owner reads when a company's sending looks wrong.
+  // A company that is not this owner's contributes no scope rather than an error: the SMTP
+  // resolution below refuses it by name, and this line is not the place that decides.
+  const sendingCompany = input.companyId ? await storage.getCompany(input.companyId) : undefined;
+  const organismId = sendingCompany && sendingCompany.ownerGhii === ownerGhii
+    ? sendingCompany.organismId : null;
+
   // Gate 2: suppression beats everything.
   if (contact.suppressedAt) {
-    const log = await writeLog(storage, ownerGhii, contact.id, 'email', input.kind, input.subject ?? '(suppressed)', input.templateId ?? null, 'suppressed', `Address suppressed after ${contact.bounceCount} bounces`, input.invoiceId ?? null);
+    const log = await writeLog(storage, ownerGhii, contact.id, 'email', input.kind, input.subject ?? '(suppressed)', input.templateId ?? null, 'suppressed', `Address suppressed after ${contact.bounceCount} bounces`, input.invoiceId ?? null, organismId);
     throw Object.assign(new OutboundError('SUPPRESSED', 422, 'Recipient address is suppressed (bounces); clear it on the contact first'), { log });
   }
 
   // Gate 3: opt-out blocks marketing only.
   if (contact.optedOut && input.kind === 'marketing') {
-    const log = await writeLog(storage, ownerGhii, contact.id, 'email', input.kind, input.subject ?? '(opted out)', input.templateId ?? null, 'skipped', 'Recipient has opted out of marketing', input.invoiceId ?? null);
+    const log = await writeLog(storage, ownerGhii, contact.id, 'email', input.kind, input.subject ?? '(opted out)', input.templateId ?? null, 'skipped', 'Recipient has opted out of marketing', input.invoiceId ?? null, organismId);
     throw Object.assign(new OutboundError('OPTED_OUT', 422, 'Recipient has opted out of marketing messages'), { log });
   }
 
-  // Gate 4: rolling 24 h daily limit.
+  // Gate 4: rolling 24 h daily limit, PER COMPANY when the send names one.
+  //
+  // One allowance shared by two companies means one busy company silences the other, and the
+  // person who is silenced has no way to see why: the number they are counted against is somebody
+  // else's sending. A send that names no company keeps counting against the owner-wide total,
+  // which is what every account had before and still has.
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const sentToday = await storage.countOutboundMessagesSince(ownerGhii, since);
+  const sentToday = await storage.countOutboundMessagesSince(ownerGhii, since, organismId ?? undefined);
   if (sentToday >= config.outboundDailyLimit) {
     throw new OutboundError('DAILY_LIMIT', 429, `Outbound daily limit reached (${config.outboundDailyLimit}/24h)`);
   }
@@ -353,7 +375,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     await storage.setInvoiceStatus(invoiceId, (await storage.getInvoice(invoiceId))!.status, { deliveryStatus: 'delivered' });
   }
 
-  const log = await writeLog(storage, ownerGhii, contact.id, channel, input.kind, subject, input.templateId ?? null, status, error, invoiceId);
+  const log = await writeLog(storage, ownerGhii, contact.id, channel, input.kind, subject, input.templateId ?? null, status, error, invoiceId, organismId);
   emitChange('outbound', ownerGhii);
   return { log, channel, status };
 }
@@ -366,9 +388,10 @@ async function writeLog(
   storage: Storage, ownerGhii: string, contactId: string, channel: OutboundChannel,
   kind: OutboundKind, subject: string, templateId: string | null,
   status: OutboundStatus, error: string | null, invoiceId: string | null,
+  organismId: string | null = null,
 ): Promise<OutboundMessageRecord> {
   const log: OutboundMessageRecord = {
-    id: randomUUID(), ownerGhii, contactId, channel, kind,
+    id: randomUUID(), ownerGhii, organismId, contactId, channel, kind,
     subject: subject.slice(0, 300), templateId, status, error, invoiceId,
     createdAt: new Date().toISOString(),
   };
