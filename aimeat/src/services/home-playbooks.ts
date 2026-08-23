@@ -31,6 +31,11 @@
  *   import { openPlaybooks } from '../services/home-playbooks.js';
  *   const playbooks = await openPlaybooks(storage, config);
  * @version-history
+ *   v1.1.0 — 2026-08-23 — The BUSINESSLAUNCHER playbook, first in the list: a shop that INSTALLS
+ *     rather than one built by hand. A NEW prompt id rather than a deeper marketplace one, because
+ *     prompt-seeder re-syncs content only for the generator, builders and tiers groups — editing an
+ *     existing playbook never reaches a node that has already seeded it, and a new id does. No proof
+ *     candidates yet, on purpose: the first real shop on a node earns that link.
  *   v1.0.0 — 2026-08-19 — Initial: the four first playbooks (marketplace, connected accounts, own
  *     page, own instance), their capability checks, and proof resolved from this node's own
  *     subdomain mappings.
@@ -70,6 +75,9 @@ export interface PlaybookDef {
  * this on my own machine" rather than a first move.
  */
 export const PLAYBOOKS: readonly PlaybookDef[] = [
+    // A shop that installs rather than one that gets built. It carries no proof candidates yet on
+    // purpose: nothing here fakes a live example, and the first real shop on a node earns the link.
+    { id: 'businesslauncher', prompt: 'playbook-businesslauncher', steps: 5, presence: 'commerce' },
     { id: 'marketplace', prompt: 'playbook-marketplace', steps: 4, presence: 'commerce', proof: ['exchange', 'noste'] },
     { id: 'accounts', prompt: 'playbook-accounts', steps: 4, presence: 'providers' },
     { id: 'page', prompt: 'playbook-page', steps: 4, presence: 'always' },

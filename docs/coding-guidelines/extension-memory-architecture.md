@@ -27,13 +27,40 @@ An extension's `ctx.memory.set(key, value)` writes to `ext:{extensionName}` with
 **Critical:** The ONLY allowed top-level statement in action scripts is `export default async function(ctx, input) { ... }`. All constants, helpers, and variables must be INSIDE the default function. Top-level `const`/`let`/`var`/`function`/`class` declarations crash the sandbox.
 
 ```
-ctx.memory.get(key)           → reads from ext:{name} namespace (own data)
-ctx.memory.set(key, value)    → writes to ext:{name} namespace (own data, visibility: public)
-ctx.memory.search(prefix)     → searches ext:{name} namespace
-ctx.memory.delete(key)        → deletes from ext:{name} namespace
-ctx.memory.getPublic(ns, key) → reads from ANY namespace (cross-read, public only)
-ctx.fetch(url, opts)          → HTTP to external APIs
+ctx.memory.get(key)             → reads from ext:{name} namespace (own data)
+ctx.memory.getVersioned(key)    → { value, version } — the version to swap against, or null
+ctx.memory.set(key, value)      → writes to ext:{name} namespace (own data, visibility: public)
+ctx.memory.set(key, v, { ifVersion })  → compare-and-swap; returns { ok, version }
+ctx.memory.search(prefix)       → searches ext:{name} namespace
+ctx.memory.delete(key)          → deletes from ext:{name} namespace
+ctx.memory.getPublic(ns, key)   → reads from ANY namespace (cross-read, public only)
+ctx.fetch(url, opts)            → HTTP to external APIs
 ```
+
+### Anything you COUNT needs `ifVersion`
+
+A plain `set` is read-increment-write, which is last-write-wins: two calls of the same action can
+both read a stock of 1 and both write 0, and nothing anywhere says so. Stock, reservations, a
+balance, a claim on a limited thing — all of them need the guard.
+
+```javascript
+export default async function (ctx, input) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const read = await ctx.memory.getVersioned('stock');
+    if (!read) return { ok: false, reason: 'no stock record' };
+    const units = read.value.units;
+    if (units < 1) return { ok: false, reason: 'sold out' };
+    const wrote = await ctx.memory.set('stock', { units: units - 1 }, { ifVersion: read.version });
+    if (wrote.ok) return { ok: true, left: units - 1 };
+    // Somebody else got there first. Read again and retry.
+  }
+  return { ok: false, reason: 'too much contention' };
+}
+```
+
+`ifVersion: 0` means "only if this key does not exist yet", which is how you create a counter without
+two callers each creating their own. A refused write changes nothing and reports the version really
+there. Omit `ifVersion` and the behaviour is exactly what it always was.
 
 Extensions read owner seed data (translations, settings) via:
 ```javascript
