@@ -1,3 +1,19 @@
+# The shop's only clock, and it costs nothing to run. A `kind: extension` job executes a sandbox
+# action server-side with no model call at all, so this can tick often without spending a token.
+# Anything that WOULD spend tokens (market research, anything that drafts text on a schedule) is not
+# here: it is the owner's switch to throw, in the back office, never ours to assume.
+#
+# Without this, a hold taken by a buyer who then walked away would keep its units off the shelf for
+# good. The sweep runs as the installer, which is the same person the owner check inside the action
+# compares against.
+schedules:
+  - id: sweep-holds
+    description: Expired holds go back on the shelf
+    action: admin
+    cron: "*/15 * * * *"
+    input:
+      op: sweep
+
 metadata:
   name: businesslauncher-shop
   version: 1.0.0
