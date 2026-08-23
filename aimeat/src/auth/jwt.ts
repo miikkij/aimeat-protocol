@@ -6,9 +6,11 @@
  *   token revocation. Issues credentials for every authenticated principal — owner (GHII), agent
  *   (GAII), and ecosystem app (GEAI). Optional claims (mcp_client, federated, eco_app, …) are threaded
  *   conditionally so tokens stay minimal.
- * @structure initNodeKeys / issueJWT / verifyJWT / generateSessionId / revokeToken / isRevoked
+ * @structure initNodeKeys / AccountDisabledError / issueJWT / verifyJWT / generateSessionId / revokeToken / isRevoked
  * @usage import { issueJWT, verifyJWT } from '../auth/jwt.js';
  * @version-history
+ *   v1.3.0 — 2026-08-23 — Mint backstop (BR-04): issueJWT throws AccountDisabledError for a
+ *     deactivated local owner, so a door that forgot to ask still cannot mint in their name.
  *   v1.2.0 — 2026-08-10 — Fails closed at both ends: issueJWT writes [] rather than ['*'] when the
  *     caller omits scopes, and verifyJWT reads a missing claim the same way. issueJWT has always
  *     written the claim, so no token in circulation lacks it.
@@ -72,8 +74,29 @@ export function generateSessionId(): string {
   return `sid-${randomBytes(16).toString('hex')}`;
 }
 
+/** Thrown by issueJWT when the owner an aspiring credential would act for is deactivated (BR-04).
+ *  Doors catch it and answer 403 ACCOUNT_DISABLED; a door that forgot to ask still cannot mint. */
+export class AccountDisabledError extends Error {
+  readonly code = 'ACCOUNT_DISABLED';
+  /** Read by the global error handler so an uncaught throw still answers 403, not 500. */
+  readonly status = 403;
+  constructor(owner: string) {
+    super(`Account "${owner}" is deactivated`);
+    this.name = 'AccountDisabledError';
+  }
+}
+
 export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionId?: string): Promise<string> {
   if (!nodePrivateKey) throw new Error('Node keys not initialized');
+
+  // Mint backstop (BR-04): no credential is minted in a deactivated owner's name, whichever of the
+  // twenty call sites asked. Same shape as provisionOwner's registration-mode backstop — the human
+  // doors refuse with a clean 403 before reaching here, and this makes a forgotten door impossible.
+  // Federated mints are excluded: their `owner` is a remote node's name, judged by its home node.
+  if (payload.owner && !payload.federated && _storage) {
+    const ownerRecord = await _storage.getOwner(payload.owner);
+    if (ownerRecord?.disabledAt) throw new AccountDisabledError(payload.owner);
+  }
 
   const builder = new SignJWT({
     owner: payload.owner,

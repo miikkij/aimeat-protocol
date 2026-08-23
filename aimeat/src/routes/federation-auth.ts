@@ -8,6 +8,8 @@
  *   for an auth consent granting the requesting node access, and returns a signed
  *   attestation that the remote node can use to issue a federated JWT.
  * @version-history
+ *   v1.1.0 -- 2026-08-23 -- A deactivated owner gets no attestation (BR-04): the home node is the
+ *     only place that knows, so this is where cross-node deactivation holds.
  *   v1.0.0 -- 2026-05-20 -- Initial implementation (Federation Mesh Phase 3)
  */
 
@@ -83,6 +85,16 @@ export function federationAuthRouter(config: AimeatConfig, storage: Storage): Ro
             if (!valid) {
                 logger.warn(`Federation auth: password mismatch for ${ghii} (requested by ${requesting_node})`);
                 res.status(401).json(error(config.nodeId, 'FEDERATION_AUTH_FAILED', 'Authentication failed'));
+                return;
+            }
+
+            // Deactivated account (BR-04): this attestation is how the person signs in ELSEWHERE in
+            // the federation, and the home node is the only place that knows they were switched off.
+            // The remote-side middleware deliberately skips federated principals, so refusing here is
+            // what makes deactivation hold across nodes. After the password check (no disclosure).
+            const ownerRecord = await storage.getOwner(ghiiRecord.ownerName);
+            if (ownerRecord?.disabledAt) {
+                res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
                 return;
             }
 

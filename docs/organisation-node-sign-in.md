@@ -3,8 +3,8 @@
 *How to run one AIMEAT node for your company and the partner companies you approve, with Microsoft
 Entra ID as the way in.*
 
-**Version:** 1.0
-**Date:** 2026-08-21
+**Version:** 1.1 — SAML sign-in, SCIM provisioning and account deactivation (BR-04)
+**Date:** 2026-08-24
 **License:** MIT
 
 ---
@@ -139,7 +139,49 @@ Ungated Entra sign-in (`common` or `organizations` with no allowlist) does not v
   and workspace access all remain. Removing an organisation is therefore reversible, and it is not
   the same thing as deleting anyone.
 
-## 7. Where this lives in the code
+## 7. SAML and SCIM: the organisation's own identity provider (BR-04)
+
+Entra OIDC above answers "our staff sign in with Microsoft". SAML and SCIM answer the two questions
+an enterprise buyer asks next: *can our people sign in through whatever identity provider we run*,
+and *when someone leaves, does their access end without anyone remembering to click*. Both arrive
+as an **SSO connection** — a record an operator manages at runtime, in the admin dashboard's
+Organisation sign-in tab, over `/v1/admin/sso/connections`, or through the `aimeat_admin_sso_*`
+tools from a chat.
+
+One connection carries one organisation: its email domains, an optional organism its people join
+on arrival, the SAML half (read from the IdP's metadata, by URL or pasted XML) and the SCIM half
+(a provisioning token shown once, hash stored). A node for one company creates one connection;
+a shared node creates one per customer, and marks them `hidden` so the public sign-in modal does
+not publish the customer list.
+
+The setup itself is a five-step playbook in the admin tab, and every step shows what the node has
+actually SEEN — metadata read, a real sign-in through, the directory calling the SCIM endpoint —
+rather than what was configured. The tab also carries Entra and Okta walkthroughs and a copyable
+brief for the operator's own AI. Two runtime switches govern the doors:
+
+- `sso.enabled` (`AIMEAT_SSO_ENABLED`, default false) — the public doors (SAML login, ACS, SCIM,
+  SP metadata) answer 503 until it is on. Management works either way: configure first, enable second.
+- `sso.connections_locked` (`AIMEAT_SSO_CONNECTIONS_LOCKED`, default false) — freezes every
+  connection write with 403. A host who wants "who may sign in" to take a deploy SEALS this key
+  (`AIMEAT_SEALED_CONFIG_KEYS=sso.enabled,sso.connections_locked`) — the same mechanism as every
+  other sealed setting, deliberately not a new immutable flag.
+
+What deprovisioning actually does: `active: false` (or DELETE) **deactivates** the account. The
+person's knowledge, memberships and history remain; every credential acting in their name —
+sessions, their agents' 90-day tokens, personal access tokens, app grants, live connect tunnels —
+ends within the request, and nothing new can be minted. Reactivation lets the person back in
+without resurrecting the old credentials. The same state is behind the operator's manual
+Deactivate button on the Owners tab. A connection may only touch accounts it manages
+(`managedBy`), it can never deactivate an operator-role account, and it may ADOPT an existing
+account only when that account's locally verified email is in the connection's own domains.
+
+Entra specifics worth knowing before the console: the SAML app is an *Enterprise application*
+(Identifier and Reply URL come from the connection's SP details), and the provisioning Tenant URL
+must end with `?aadOptscim062020` — without it Entra's SCIM client departs from RFC 7644 (the node
+tolerates its capitalised op verbs and string booleans either way). Okta: a SAML 2.0 app
+integration, same two values, metadata address from the Sign On tab.
+
+## 8. Where this lives in the code
 
 | What | Where |
 |---|---|
@@ -148,6 +190,13 @@ Ungated Entra sign-in (`common` or `organizations` with no allowlist) does not v
 | Registration-mode rule table | `aimeat/src/services/owner-provisioning.ts` |
 | Config keys and defaults | `aimeat/src/config.ts`, `aimeat/src/config-types-social-login.ts` |
 | Tests | `aimeat/test/unit/registration-gate.test.ts`, `aimeat/test/e2e-registration-mode.ts` |
+| Shared account-mapping tree (OIDC + SAML) | `aimeat/src/services/external-login.ts` |
+| SAML SP wrapper + IdP metadata parsing | `aimeat/src/services/saml-sp.ts` |
+| SAML login routes (authorize/ACS/finalize) | `aimeat/src/routes/saml-login.ts` |
+| SSO connection management (one implementation) | `aimeat/src/services/sso-connections.ts`, routes `aimeat/src/routes/admin-sso.ts`, MCP `aimeat/src/mcp/admin-sso.ts` |
+| SCIM door + resource handlers | `aimeat/src/routes/scim.ts`, `aimeat/src/services/scim-users.ts` |
+| Account deactivation (one implementation) | `aimeat/src/services/owner-lifecycle.ts` |
+| BR-04 tests | `aimeat/test/unit/saml-assertion.test.ts`, `aimeat/test/unit/scim-entra-compat.test.ts`, `aimeat/test/e2e-owner-deactivation.ts`, `aimeat/test/e2e-saml-login.ts`, `aimeat/test/e2e-scim-users.ts` |
 
 One implementation detail worth recording, because it looks like it should be a problem. A
 multi-tenant Entra app discovers its metadata at the `organizations` authority, whose discovery

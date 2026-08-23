@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Owner, Agent, and Memory storage methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.1.0 — 2026-08-23 — Owner lifecycle columns (disabledAt/disabledBy/managedBy, BR-04) carried
+ *     through deserializeOwner and updateOwner. This file is the copy the prototype actually uses;
+ *     repos/owner.ts got the same change.
  *   v1.5.0 — 2026-08-13 — …and `registeredBy`. It is carried through updateAgent rather than
  *     omitted from the SET list: the write-once rule lives where the value is set (createAgent
  *     alone), so both providers behave the same way.
@@ -67,12 +70,16 @@ export const ownerMethods = {
     if (!existing) return null;
     const updated = { ...existing, ...updates };
     this.db.prepare(
-      `UPDATE owners SET displayName = ?, publicKey = ?, roles = ?, createdAt = ? WHERE name = ?`
+      `UPDATE owners SET displayName = ?, publicKey = ?, roles = ?, createdAt = ?,
+         disabledAt = ?, disabledBy = ?, managedBy = ? WHERE name = ?`
     ).run(
       updated.displayName ?? null,
       updated.publicKey,
       JSON.stringify(updated.roles),
       updated.createdAt,
+      updated.disabledAt ?? null,
+      updated.disabledBy ?? null,
+      updated.managedBy ?? null,
       name,
     );
     return updated;
@@ -145,6 +152,9 @@ export const ownerMethods = {
       publicKey: row.publicKey as string,
       roles: JSON.parse(row.roles as string) as string[],
       createdAt: row.createdAt as string,
+      disabledAt: (row.disabledAt as string) ?? null,
+      disabledBy: (row.disabledBy as string) ?? null,
+      managedBy: (row.managedBy as string) ?? null,
     };
   },
 

@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   v1.3.0 — 2026-08-24 — BR-04: SSO connection management + owner disable/enable helpers.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-08-17 — getMetricsText: raw Prometheus text for the Metrics tab
  *   v1.2.0 — 2026-08-17 — getAuthRefusals: the refusal log's tail for the Security tab
@@ -47,6 +48,18 @@ export const getAgentDetail  = (gaii)   => apiGet(`/v1/agents/${encodeURICompone
 export const getOwnerDetail  = (name)   => apiGet(`/v1/owners/${encodeURIComponent(name)}`);
 export const grantRole       = (owner, role) => apiPost('/v1/admin/roles/grant', { owner, role });
 export const revokeRole      = (owner, role) => apiPost('/v1/admin/roles/revoke', { owner, role });
+// Account lifecycle (BR-04): deactivate ends every credential now; reactivate lets the person back in.
+export const disableOwner    = (name) => apiPost(`/v1/admin/owners/${encodeURIComponent(name)}/disable`);
+export const enableOwner     = (name) => apiPost(`/v1/admin/owners/${encodeURIComponent(name)}/enable`);
+
+// ── Organisation sign-in (BR-04: SSO connections) ──
+export const getSsoConnections   = ()   => apiGet('/v1/admin/sso/connections');
+export const getSsoConnection    = (id) => apiGet(`/v1/admin/sso/connections/${encodeURIComponent(id)}`);
+export const createSsoConnection = (body) => apiPost('/v1/admin/sso/connections', body);
+export const updateSsoConnection = (id, body) => apiPut(`/v1/admin/sso/connections/${encodeURIComponent(id)}`, body);
+export const deleteSsoConnection = (id) => apiDelete(`/v1/admin/sso/connections/${encodeURIComponent(id)}`);
+export const mintSsoScimToken    = (id) => apiPost(`/v1/admin/sso/connections/${encodeURIComponent(id)}/scim-token`);
+export const setSsoIdpMetadata   = (id, body) => apiPost(`/v1/admin/sso/connections/${encodeURIComponent(id)}/idp-metadata`, body);
 
 // ── Actions & Boards ──
 export const getActions      = ()       => apiGet('/v1/actions');

@@ -7,6 +7,8 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-08-23 — Owner lifecycle: disabledAt/disabledBy/managedBy on read and update (migration
+ *     0047). Null is a meaningful update value here — reactivation clears the flag.
  *   2026-08-13 — registeredBy on create and on read (migration 0035).
  *   2026-08-13 — consoleUrl on create and on read (migration 0034); updateAgent needs nothing, it
  *     passes unknown keys through.
@@ -31,7 +33,10 @@ const isoOpt = (t: Date | string | null | undefined): string | undefined => (t =
 const arr = (a: string[] | null | undefined): string[] | undefined => (a && a.length ? a : undefined);
 
 function toOwnerRecord(r: Selectable<Owner>): OwnerRecord {
-  return { name: r.name, displayName: r.displayName ?? undefined, publicKey: r.publicKey, roles: r.roles ?? [], createdAt: iso(r.createdAt) };
+  return {
+    name: r.name, displayName: r.displayName ?? undefined, publicKey: r.publicKey, roles: r.roles ?? [], createdAt: iso(r.createdAt),
+    disabledAt: isoOpt(r.disabledAt) ?? null, disabledBy: r.disabledBy ?? null, managedBy: r.managedBy ?? null,
+  };
 }
 
 function toAgentRecord(r: Selectable<Agent>): AgentRecord {
@@ -99,6 +104,11 @@ export const identityMethods = {
     if (updates.displayName !== undefined) data.displayName = updates.displayName;
     if (updates.publicKey !== undefined) data.publicKey = updates.publicKey;
     if (updates.roles !== undefined) data.roles = updates.roles;
+    // Lifecycle fields: null is a meaningful write (reactivation clears the flag), so the
+    // undefined-check pattern above carries it through rather than dropping it.
+    if (updates.disabledAt !== undefined) data.disabledAt = updates.disabledAt === null ? null : new Date(updates.disabledAt);
+    if (updates.disabledBy !== undefined) data.disabledBy = updates.disabledBy;
+    if (updates.managedBy !== undefined) data.managedBy = updates.managedBy;
     if (Object.keys(data).length === 0) return this.getOwner(name);
     const rows = await this.db.updateTable('Owner').set(data).where('name', '=', name).returningAll().execute();
     return rows[0] ? toOwnerRecord(rows[0]) : null;

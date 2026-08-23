@@ -90,6 +90,8 @@ import { accountEventsRouter } from '../routes/account-events.js';
 import { boardsRouter } from '../routes/boards.js';
 import { promptsRouter } from '../routes/prompts.js';
 import { adminRouter } from '../routes/admin.js';
+import { adminSsoRouter } from '../routes/admin-sso.js';
+import { scimRouter } from '../routes/scim.js';
 import { federationRouter } from '../routes/federation.js';
 import { organismsRouter } from '../routes/organisms.js';
 import { notificationsRouter } from '../routes/notifications.js';
@@ -131,6 +133,7 @@ import { personalRouter } from '../routes/personal.js';
 import { pushRouter } from '../routes/push.js';
 import { verificationRouter } from '../routes/verification.js';
 import { oauthLoginRouter } from '../routes/oauth-login.js';
+import { samlLoginRouter } from '../routes/saml-login.js';
 import { buildOidcProviders } from '../services/oidc-providers.js';
 import { knowledgeRouter } from '../routes/knowledge.js';
 import { siteRouter } from '../routes/site.js';
@@ -548,6 +551,10 @@ export async function mountRoutes(
   app.use(boardsRouter(config, storage));
   app.use(promptsRouter(config, storage));
   app.use(adminRouter(config, storage, maintenanceState, provenance, consulService, peers));
+  // BR-04: SSO connection management (operator) + the public SP metadata document.
+  app.use(adminSsoRouter(config, storage));
+  // BR-04: the SCIM provisioning door — its own credential family (requireScimConnection).
+  app.use(scimRouter(config, storage));
   app.use(organismsRouter(config, storage));
   app.use(notificationsRouter(config, storage));
   app.use(adminSecurityRouter(config, storage));
@@ -633,6 +640,8 @@ export async function mountRoutes(
   // Social login OIDC providers (Google + Casdoor + Entra ID) — generic, per-provider config-gated.
   // buildOidcProviders creates + lazily discovers each configured client (503 until ready).
   app.use(oauthLoginRouter(config, storage, buildOidcProviders(config)));
+  // BR-04: SAML organisation sign-in — same three-door shape, per SSO connection.
+  app.use(samlLoginRouter(config, storage));
 
   // DID Document + VC signing key — Phase 3.3
   // Node key is loaded async; once available, enable VC signing and serve DID Document

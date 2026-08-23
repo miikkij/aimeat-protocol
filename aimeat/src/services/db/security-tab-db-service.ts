@@ -13,6 +13,8 @@
  * @structure SecurityTabService.overview(owner, currentSessionId) → { ghii, agents, sessions }
  * @usage const ov = await createSecurityTabService(storage, config).overview(owner, req.auth.sessionId);
  * @version-history
+ *   v1.1.0 — 2026-08-24 — managed_by (BR-04): the Security tab tells an organisation-managed
+ *     account that its lifecycle lives in the organisation's directory, by the connection's name.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Security tab's CORS-per-agent N+1 into two shared reads.
  */
 import type { AimeatConfig } from '../../config.js';
@@ -23,6 +25,8 @@ export interface SecurityOverview {
   ghii: { ghii: string; allowed_origins: string[] | null; effective: string[]; inherited: boolean } | null;
   agents: Array<{ gaii: string; allowed_origins: string[] | null; effective: string[]; inherited_from: string }>;
   sessions: Array<Record<string, unknown>>;
+  /** Set when an organisation's identity provider manages this account's lifecycle (BR-04). */
+  managed_by: { connection: string; name: string } | null;
 }
 
 export class SecurityTabService {
@@ -36,11 +40,20 @@ export class SecurityTabService {
    */
   overview(owner: string, currentSessionId: string | undefined): Promise<SecurityOverview> {
     return runInReadScope(async () => {
-      const [agents, ghiiRecord, sessions] = await Promise.all([
+      const [agents, ghiiRecord, sessions, ownerRecord] = await Promise.all([
         this.storage.getAgentsByOwner(owner),
         this.storage.getGHIIByOwner(owner),
         this.storage.listActiveSessions(owner),
+        this.storage.getOwner(owner),
       ]);
+
+      // BR-04: when an organisation connection manages the account, the person should SEE that —
+      // it is why they have no password here and why leaving the organisation ends their access.
+      let managedBy: SecurityOverview['managed_by'] = null;
+      if (ownerRecord?.managedBy) {
+        const conn = await this.storage.getSsoConnection(ownerRecord.managedBy);
+        managedBy = { connection: ownerRecord.managedBy, name: conn?.name ?? ownerRecord.managedBy };
+      }
 
       const nodeDefault = this.config.corsAllowedOrigins;
       const ghiiOrigins = ghiiRecord?.allowedOrigins;
@@ -65,6 +78,7 @@ export class SecurityTabService {
       return {
         ghii,
         agents: agentsCors,
+        managed_by: managedBy,
         sessions: sessions.map(s => ({
           session_id: s.sessionId, gaii: s.gaii, issued_at: s.issuedAt, expires_at: s.expiresAt,
           last_used_at: s.lastUsedAt ?? null, device_label: s.deviceLabel ?? null,

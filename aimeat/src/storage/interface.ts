@@ -32,6 +32,7 @@ export * from './types/agents-messaging.js';
 export * from './types/ai-provenance.js';
 export * from './types/usage.js';
 export * from './types/account-events.js';
+export * from './types/sso.js';
 
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
@@ -95,6 +96,7 @@ import type { ConnectionRepository } from './repositories/connection.repository.
 import type { FinanceRepository } from './repositories/finance.repository.js';
 import type { OutboundRepository } from './repositories/outbound.repository.js';
 import type { CompanyRepository } from './repositories/company.repository.js';
+import type { SsoConnectionRepository } from './repositories/sso-connection.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -128,6 +130,7 @@ export interface Storage extends
   FinanceRepository,
   OutboundRepository,
   CompanyRepository,
+  SsoConnectionRepository,
   StatsRepository {
   /**
    * Run `fn` inside ONE database transaction: every storage call made underneath it commits together

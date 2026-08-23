@@ -13,6 +13,10 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   v1.8.0 — 2026-08-23 — credentialRevoked() asks a FOURTH question (BR-04): is the owner this
+ *     credential acts for deactivated. Uncached keyed read per authenticated request, same
+ *     reasoning as the session check; federated principals excluded (their owner is remote and
+ *     their home node refuses the attestation instead).
  *   v1.7.0 — 2026-08-23 — requireOperatorPrincipal() takes the scope word as a parameter, defaulting
  *     to the organism-repair one so its two existing call sites read as before. The compliance
  *     surface (BR-02) is the second door of this shape and needs two different words; a near-copy
@@ -206,11 +210,29 @@ async function appGrantRevoked(verified: VerifiedToken): Promise<boolean> {
 }
 
 /**
- * Is this credential dead? Three ways a JWT stops being one, and a door that asks fewer than three
+ * Is the OWNER this credential acts for deactivated? (BR-04.) Every principal family — owner
+ * session, agent, ecosystem app, app grant, MCP OAuth token — carries the bare local owner name in
+ * `owner`, and deactivation is a statement about the person, so one read answers for all of them.
+ * Uncached for the same reason the session check is: an IdP saying "this person left" means now.
+ *
+ * Federated principals are excluded: their `owner` is the bare local-part of a name owned by a
+ * DIFFERENT node (register-login.ts sets it from the remote identity), so reading the local owners
+ * table would answer about the wrong person in both directions. Their home node refuses the
+ * attestation instead (federation-auth.ts).
+ */
+async function ownerDisabled(verified: VerifiedToken): Promise<boolean> {
+  if (verified.federated === true || !verified.owner || !_sessionStorage) return false;
+  const owner = await _sessionStorage.getOwner(verified.owner);
+  return !!owner?.disabledAt;
+}
+
+/**
+ * Is this credential dead? Four ways a JWT stops being one, and a door that asks fewer than four
  * questions is a door the revoked keep opening:
  *   - the exact token was revoked          (POST /v1/auth/revoke)
  *   - its session row was revoked          (sign out, sign out everywhere, deleting the agent)
  *   - its app grant was revoked            (the owner pressed Revoke on the app)
+ *   - the owner it acts for is deactivated (BR-04 — SCIM active:false, the admin disable door)
  *
  * Exported because verifying a JWT is not only Express's job. The WebSocket upgrade for the connect
  * tunnel (src/index-start.ts) cannot run middleware on a raw socket, so it verified the token by
@@ -221,7 +243,11 @@ async function appGrantRevoked(verified: VerifiedToken): Promise<boolean> {
 export async function credentialRevoked(token: string, verified: VerifiedToken): Promise<boolean> {
   if (await isRevoked(token)) return true;
   if (await sessionRevoked(verified)) return true;
-  return appGrantRevoked(verified);
+  if (await appGrantRevoked(verified)) return true;
+  // Fourth question (BR-04): a deactivated owner's credentials are dead even when the token
+  // itself was never individually revoked — MCP OAuth tokens carry no session row at all, and
+  // this is the only door that catches them.
+  return ownerDisabled(verified);
 }
 
 /**

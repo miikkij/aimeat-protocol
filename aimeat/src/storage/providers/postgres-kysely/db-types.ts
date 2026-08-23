@@ -331,6 +331,24 @@ export interface UsageRollupState {
 }
 
 /** Per-owner "what has happened" window. Its own system, not a memory record. */
+/** One organisation's identity provider on this node (BR-04): SAML sign-in + SCIM provisioning. */
+export interface SsoConnection {
+  id: string;
+  name: string;
+  organismId: string | null;
+  domains: Generated<unknown>;
+  saml: unknown | null;
+  allowIdpInitiated: Generated<boolean>;
+  loginVisibility: Generated<string>;
+  scimTokenHash: string | null;
+  scimTokenCreatedAt: Timestamp | null;
+  lastScimRequestAt: Timestamp | null;
+  lastLoginAt: Timestamp | null;
+  createdBy: string;
+  createdAt: Generated<Timestamp>;
+  updatedAt: Generated<Timestamp>;
+}
+
 export interface AccountEvent {
   id: string;
   ownerGhii: string;
@@ -1510,8 +1528,11 @@ export interface Otk {
 
 export interface Owner {
   createdAt: Generated<Timestamp>;
+  disabledAt: Timestamp | null;
+  disabledBy: string | null;
   displayName: string | null;
   id: Generated<string>;
+  managedBy: string | null;
   name: string;
   publicKey: string;
   roles: string[] | null;
@@ -2005,6 +2026,7 @@ export interface DB {
   UsageRollupState: UsageRollupState;
   AccountEvent: AccountEvent;
   AccountEventArchive: AccountEventArchive;
+  SsoConnection: SsoConnection;
   AiProvenance: AiProvenance;
   App: App;
   AppDownload: AppDownload;

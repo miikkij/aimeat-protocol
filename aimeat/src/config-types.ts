@@ -184,8 +184,9 @@ export interface SiteLinksConfig {
 import type { AiCapabilityConfig } from './config-types-ai.js';
 import type { SitePresenceConfig } from './config-site-presence.js';
 import type { SocialLoginConfig } from './config-types-social-login.js';
+import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, EnterpriseSsoConfig {
   port: number;
   baseUrl: string;
   /**

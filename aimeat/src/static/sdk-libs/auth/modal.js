@@ -13,6 +13,8 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.4.0 — 2026-08-24 — SSO connection buttons (BR-04): a colon provider id (saml:contoso)
+ *     navigates to its slash login path; no icon is fine, the organisation name is the label.
  *   v1.3.0 — 2026-08-12 — The language switch is generated from MODAL_LANGS instead of two written-out
  *     buttons. Spanish arrived and the modal kept offering EN and FI while serving Spanish text.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2/3.ts (SDK-libs migration Phase 3).
@@ -321,7 +323,8 @@ export function showLoginModal(opts, renderBtn) {
       btn.addEventListener('click', function () {
         var id = btn.getAttribute('data-provider');
         var back = encodeURIComponent(location.pathname + location.search + location.hash);
-        location.href = NODE_URL + '/v1/ghii/login/' + id + '?redirect=' + back;
+        // SSO connections carry a colon id ('saml:contoso'); their login path is /saml/contoso.
+        location.href = NODE_URL + '/v1/ghii/login/' + id.split(':').join('/') + '?redirect=' + back;
       });
     });
 

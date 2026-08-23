@@ -213,6 +213,98 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
         input: {},
     },
     {
+        name: 'aimeat_admin_sso_list',
+        description: 'Operator-only. List this node\'s SSO connections — the identity providers organisations have connected for SAML sign-in and SCIM provisioning — with each connection\'s domains, visibility, whether SAML and SCIM are configured, and the SP details (entity id, ACS URL, SCIM base URL) an IdP console asks for. Secrets are never returned.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {},
+    },
+    {
+        name: 'aimeat_admin_sso_get',
+        description: 'Operator-only. Read one SSO connection: its domains, organism binding, sign-in visibility, whether SAML metadata and a SCIM token are configured, when the identity provider last signed someone in and last called the SCIM endpoint, and the SP details to paste into the IdP console. Secrets are never returned.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'The connection id (slug).' },
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_create',
+        description: 'Operator-only. Connect an organisation\'s identity provider: create an SSO connection with a permanent slug id, the organisation\'s name, its email domains (which decide whose existing accounts it may adopt), an optional organism its people join on arrival, and whether the connection shows as a sign-in button. Configure the SAML half next with aimeat_admin_sso_idp_metadata and mint the provisioning token with aimeat_admin_sso_scim_token. Refused while connection management is locked on this node.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'Permanent slug id (lowercase letters, digits, dashes; 2-31 chars).' },
+            name: { type: 'string', required: true, description: 'The organisation\'s name — the sign-in button label when listed.' },
+            domains: { type: 'array', description: 'Email domains this organisation vouches for, e.g. ["contoso.com"].' },
+            organism_id: { type: 'string', description: 'Organism its people are added to on first sign-in or provisioning.' },
+            login_visibility: { type: 'string', description: '"listed" shows a sign-in button; "hidden" keeps the organisation off the public modal (default listed).' },
+            allow_idp_initiated: { type: 'boolean', description: 'Accept sign-ins started from the IdP\'s own portal tile (default false).' },
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_update',
+        description: 'Operator-only. Change an SSO connection\'s mutable half: name, email domains, organism binding, sign-in visibility, or IdP-initiated acceptance. The id never changes, and the SAML metadata goes through aimeat_admin_sso_idp_metadata instead. Refused while connection management is locked on this node.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'The connection id.' },
+            name: { type: 'string', description: 'New organisation name.' },
+            domains: { type: 'array', description: 'New email-domain list (replaces the old one).' },
+            organism_id: { type: 'string', description: 'New organism binding; an empty string clears it.' },
+            login_visibility: { type: 'string', description: '"listed" or "hidden".' },
+            allow_idp_initiated: { type: 'boolean', description: 'Accept IdP-initiated sign-ins.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_delete',
+        description: 'Operator-only. Remove an SSO connection — the door, not the people: every account it created or adopted remains, with its knowledge and memberships, and recreating the connection under the same id restores provisioning authority over them. Refused while connection management is locked on this node.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'The connection id.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_idp_metadata',
+        description: 'Operator-only. Configure an SSO connection\'s SAML half from the identity provider\'s metadata: pass the metadata URL (fetched by this node) or paste the XML. Nothing is saved unless the document yields an entity id, an HTTP-Redirect sign-in endpoint and at least one signing certificate. Refused while connection management is locked on this node.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'The connection id.' },
+            url: { type: 'string', description: 'The IdP metadata URL (e.g. Entra\'s federation metadata address).' },
+            xml: { type: 'string', description: 'The IdP metadata document itself, when a URL is not reachable.' },
+            name_id_format: { type: 'string', description: 'Requested NameID format, when the IdP\'s default is not wanted.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_sso_scim_token',
+        description: 'Operator-only. Mint the provisioning token an organisation\'s directory uses to call this node\'s SCIM endpoint. The token is returned ONCE and only its hash is stored; minting again replaces the previous token, which stops working immediately. Paste it into the IdP\'s provisioning configuration together with the connection\'s SCIM base URL. Refused while connection management is locked on this node.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            id: { type: 'string', required: true, description: 'The connection id.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_owner_disable',
+        description: 'Operator-only. Deactivate an account on this node: the person\'s knowledge, memberships and history remain, but every credential acting in their name — sessions, agents\' tokens, access tokens, app grants — stops immediately and nothing new can be minted. Reversible with aimeat_admin_owner_enable. You cannot deactivate your own account. This is the manual offboarding door; an organisation\'s directory does the same automatically over SCIM.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'The owner name to deactivate.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_owner_enable',
+        description: 'Operator-only. Reactivate a deactivated account. The person can sign in again and reconnect their agents; the credentials that were ended by deactivation stay dead.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        input: {
+            name: { type: 'string', required: true, description: 'The owner name to reactivate.' },
+        },
+    },
+    {
         name: 'aimeat_admin_organism_ownership',
         description: 'Operator-only. Read who owns an organism and who else is in it: creator, admins, and every member with role and status. Read this before aimeat_admin_organism_owner_set — installing an owner is a cross-account act and the roster it re-points should be seen first. For an organism you belong to yourself, use aimeat_organism_get.',
         caller: 'operator',

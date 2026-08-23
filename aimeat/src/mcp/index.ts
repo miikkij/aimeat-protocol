@@ -11,6 +11,10 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.18.0 -- 2026-08-23 -- The MCP door asks all FOUR credential-death questions
+ *     (credentialRevoked), not just exact-token revocation: a revoked session, a revoked app grant
+ *     and a deactivated owner (BR-04) were alive here while dead on every REST route, and the
+ *     session-resume branch asked nothing at all.
  *   v1.17.0 -- 2026-08-22 -- The handshake carries the proactive guidance when the owner keeps
  *     that setting on (services/proactive-mode.ts). createMcpServer takes the owner name and
  *     reads it here, because a connection is the one moment every client passes through; a
@@ -356,20 +360,24 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         const authHeader = req.headers.authorization;
         const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
 
-        // A REVOKED token is refused here, before anything else looks at it. POST /v1/mcp/token/revoke
-        // writes the JWT into the revocation list and answers `{revoked:true}`, and this door was the
-        // one place that never read the list: auth/middleware.ts checks isRevoked on all three of its
-        // paths, so the same credential was dead on the REST surface and alive on the MCP one. The
-        // check sits ABOVE the session-resume branch on purpose — a live session must not outlive the
-        // credential it was opened with, and that branch even refreshes the session's stored bearer
-        // from the request. E2E test-quality audit, e2e-mcp:448: the suite asserted the endpoint's
-        // `revoked: true` echo, which RFC 7009 answers unconditionally for any string.
+        // A DEAD credential is refused here, before anything else looks at it, and dead means all
+        // FOUR ways a credential dies (auth/middleware.ts credentialRevoked): exact-token revocation,
+        // a revoked session row, a revoked app grant, and a deactivated owner. Until 2026-08-23 this
+        // door asked only the first question, so signing out, deleting an agent or revoking an app
+        // kept working on the REST surface while the same credential stayed alive on the MCP one —
+        // and the session-resume branch below never asked anything at all. The check sits ABOVE the
+        // session-resume branch on purpose — a live session must not outlive the credential it was
+        // opened with, and that branch even refreshes the session's stored bearer from the request.
+        // E2E test-quality audit, e2e-mcp:448: the suite asserted the endpoint's `revoked: true`
+        // echo, which RFC 7009 answers unconditionally for any string.
         if (token) {
-            const { isRevoked } = await import('../auth/jwt.js');
-            if (await isRevoked(token)) {
+            const { verifyJWT } = await import('../auth/jwt.js');
+            const { credentialRevoked } = await import('../auth/middleware.js');
+            const verified = await verifyJWT(token);
+            if (!verified || await credentialRevoked(token, verified)) {
                 res.status(401).json({
                     jsonrpc: '2.0',
-                    error: { code: -32001, message: 'Token has been revoked. Obtain a new access token via /v1/mcp/token.' },
+                    error: { code: -32001, message: 'Token is invalid or has been revoked. Obtain a new access token via /v1/mcp/token.' },
                     id: (Array.isArray(req.body) ? req.body[0]?.id : req.body?.id) ?? null,
                 });
                 return;

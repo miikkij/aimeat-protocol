@@ -502,6 +502,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     entraOAuthClientId: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
     entraOAuthClientSecret: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
     entraOAuthRedirectUri: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',
+    // Enterprise SSO (BR-04). Opt-IN: the SAML/SCIM doors answer 503 until an operator (or the
+    // env) turns the feature on; the admin connection-management routes work either way.
+    ssoEnabled: process.env.AIMEAT_SSO_ENABLED === 'true',
+    ssoConnectionsLocked: process.env.AIMEAT_SSO_CONNECTIONS_LOCKED === 'true',
     // Outbound connections (TARGET-057). Opt-IN: `=== 'true'`, so a node that has never heard of
     // this feature does not start offering to hold people's accounts.
     connectionsEnabled: process.env.AIMEAT_CONNECTIONS_ENABLED === 'true',

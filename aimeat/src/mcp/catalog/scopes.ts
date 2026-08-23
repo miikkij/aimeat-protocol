@@ -86,6 +86,16 @@ import { logger } from '../../utils/logger.js';
  */
 export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_admin_mint',                             // gated in the handler on the operator role, not by a scope
+    // BR-04 SSO administration: all seven mutate node-level connection records or account
+    // lifecycle, and every one is gated in the handler on the operator role — the same decision
+    // aimeat_admin_mint records. No scope word narrows an operator.
+    'aimeat_admin_sso_create',
+    'aimeat_admin_sso_update',
+    'aimeat_admin_sso_delete',
+    'aimeat_admin_sso_idp_metadata',
+    'aimeat_admin_sso_scim_token',
+    'aimeat_admin_owner_disable',
+    'aimeat_admin_owner_enable',
     'aimeat_agent_capabilities_report',              // Identity is resolved once from the session at agent-capabilities
     'aimeat_agent_telemetry_report',                 // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
     'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope

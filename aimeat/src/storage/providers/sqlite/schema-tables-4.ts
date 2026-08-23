@@ -414,5 +414,28 @@ export function applySchemaTables4(db: Database.Database): void {
       updatedAt TEXT NOT NULL
     );
 
+    -- ── SSO connections (mirrors Postgres 0048, BR-04) ──
+    -- One organisation's identity provider: the SAML sign-in half and the SCIM provisioning half.
+    -- A table because it holds server-trusted secrets (SCIM token hash, IdP certificates) and two
+    -- unauthenticated hot paths read it (the ACS and the SCIM bearer resolution).
+    CREATE TABLE IF NOT EXISTS sso_connections (
+      id                 TEXT PRIMARY KEY,
+      name               TEXT NOT NULL,
+      organismId         TEXT,
+      domains            TEXT NOT NULL DEFAULT '[]',
+      saml               TEXT,
+      allowIdpInitiated  INTEGER NOT NULL DEFAULT 0,
+      loginVisibility    TEXT NOT NULL DEFAULT 'listed',
+      scimTokenHash      TEXT,
+      scimTokenCreatedAt TEXT,
+      lastScimRequestAt  TEXT,
+      lastLoginAt        TEXT,
+      createdBy          TEXT NOT NULL,
+      createdAt          TEXT NOT NULL,
+      updatedAt          TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_sso_connections_scim_hash
+      ON sso_connections(scimTokenHash) WHERE scimTokenHash IS NOT NULL;
+
   `);
 }

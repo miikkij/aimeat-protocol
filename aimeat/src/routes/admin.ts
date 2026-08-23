@@ -11,6 +11,8 @@
  *   - imports adminConfig/Monitoring/Agents/Maintenance/Economy/Memory sub-routers
  *
  * @version-history
+ *   v1.3.0 — 2026-08-23 — Owner deactivation doors (BR-04): POST /v1/admin/owners/:name/disable
+ *     and /enable, operator-only, never on yourself; the owners list carries the lifecycle state.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Extract ADMIN_LOGIN_HTML / ADMIN_SETUP_HTML to ./admin/setup-html.ts (max-file-lines)
  *   v1.2.0 — 2026-07-16 — GET /v1/admin/owners rosters via getAgentsByOwners (one IN, was per-owner)
@@ -30,6 +32,7 @@ import { hashPassword } from '../services/password.js';
 import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
+import { deactivateOwnerByOperator, reactivateOwnerByOperator } from '../services/owner-lifecycle.js';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -528,8 +531,47 @@ export function adminRouter(
             roles: o.roles,
             agents: (agentsByOwner[o.name] ?? []).map(a => ({ gaii: a.gaii, display_name: a.displayName, trust_score: a.trustScore })),
             created_at: o.createdAt,
+            disabled_at: o.disabledAt ?? null,
+            disabled_by: o.disabledBy ?? null,
+            managed_by: o.managedBy ?? null,
         }));
         res.json(success(config.nodeId, { owners: result }));
+    });
+
+    // POST /v1/admin/owners/:name/disable — deactivate an account (BR-04): the account and its
+    // knowledge remain, every credential acting in its name stops now, nothing new is minted.
+    // An operator may deactivate another operator (offboarding is real), never themselves — a node
+    // must not be able to lock out the person holding its keys with one mistyped call.
+    router.post('/v1/admin/owners/:name/disable', requireAuth(), requireRole('operator'), async (req, res) => {
+        const name = req.params.name as string;
+        const r = await deactivateOwnerByOperator(storage, name, req.auth!.owner);
+        if (!r.ok) {
+            res.status(r.status).json(error(config.nodeId, r.code, r.message));
+            return;
+        }
+        emitChange('ghii');
+        const result = r.result!;
+        res.json(success(config.nodeId, {
+            name,
+            disabled: true,
+            sessions_revoked: result.sessionsRevoked,
+            pats_revoked: result.patsRevoked,
+            grants_revoked: result.grantsRevoked,
+            ...(result.incomplete.length ? { incomplete: result.incomplete } : {}),
+        }));
+    });
+
+    // POST /v1/admin/owners/:name/enable — reactivate. Clears the flag only: credentials revoked
+    // by deactivation stay dead, the person signs in fresh.
+    router.post('/v1/admin/owners/:name/enable', requireAuth(), requireRole('operator'), async (req, res) => {
+        const name = req.params.name as string;
+        const r = await reactivateOwnerByOperator(storage, name);
+        if (!r.ok) {
+            res.status(r.status).json(error(config.nodeId, r.code, r.message));
+            return;
+        }
+        emitChange('ghii');
+        res.json(success(config.nodeId, { name, disabled: false }));
     });
 
     // GET /v1/admin/ui — legacy URL, redirect to SPA

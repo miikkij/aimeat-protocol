@@ -6,6 +6,8 @@
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v1.12.0 — 2026-08-24 — Organisation sign-in tab (BR-04): .adm-sso-* — the playbook steps,
+ *     copy rows and the small layout utilities the tab needs instead of inline styles.
  *   v1.11.0 — 2026-08-15 — Organism ownership tab: .adm-oo-row / .adm-oo-card. The panel first
  *     shipped with the profile's .detail-card/.form-row classes, which admin.css does not define, so
  *     label and value rendered with no gap ("Ownershappyadmin") and the button dropped under the
@@ -1108,3 +1110,24 @@
   body.adm-compliance-active h3, body.adm-compliance-active h4 { break-after: avoid; }
   @page { margin: 1.8cm; }
 }
+
+/* ── Organisation sign-in tab (BR-04): the playbook steps and copy rows ── */
+.adm-sso-step { margin-bottom: 12px; }
+.adm-sso-step-head { display: flex; align-items: baseline; gap: 10px; }
+.adm-sso-step-body { margin-top: 8px; }
+.adm-sso-tag-dim { opacity: .6; }
+.adm-sso-copyrow { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.adm-sso-copylabel { min-width: 140px; color: var(--text-dim); }
+.adm-sso-code { font-size: .78rem; word-break: break-all; }
+.adm-sso-dim { color: var(--text-dim); }
+.adm-sso-note { margin-top: 6px; color: var(--text-dim); }
+.adm-sso-gap-top { margin-top: 10px; }
+.adm-sso-section { margin-top: 16px; }
+.adm-sso-title-code { font-size: .8rem; }
+.adm-sso-check-row { display: block; margin: 6px 0; }
+.adm-sso-actions { display: flex; gap: 8px; }
+.adm-sso-brief { font-size: .78rem; }
+.adm-sso-intro { color: var(--text-dim); }
+.adm-sso-h3 { margin: 12px 0 4px; }
+.adm-sso-lead { color: var(--text-dim); margin: 0 0 16px; }
+.adm-sso-mb0 { margin: 0; }

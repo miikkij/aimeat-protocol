@@ -12,6 +12,8 @@
  *   - loadAll(agents): aggregates GHII CORS + all agents' CORS in one call
  *
  * @version-history
+ *   v1.1.0 — 2026-08-24 — The overview carries managed_by through (BR-04): the field was served
+ *     and this shaping dropped it, so the "signed in through your organisation" row never rendered.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
@@ -89,6 +91,6 @@ export async function getSecurityOverview() {
     const data = await apiGet('/v1/security/overview');
     const d = data?.data;
     if (!d) return null;
-    return { ghii: d.ghii ?? null, agents: d.agents || [], sessions: d.sessions || [] };
+    return { ghii: d.ghii ?? null, agents: d.agents || [], sessions: d.sessions || [], managed_by: d.managed_by ?? null };
   } catch (err) { swallowed('security: getSecurityOverview', err); return null; }
 }

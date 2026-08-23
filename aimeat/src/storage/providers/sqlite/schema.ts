@@ -515,6 +515,15 @@ export function initializeSchema(db: Database.Database): void {
   // live budget counter, and its composite PRIMARY KEY cannot take a new column by ALTER anyway.
   safeAddColumn('agent_usage_event', 'appId', "TEXT NOT NULL DEFAULT ''");
   safeAddColumn('agent_usage_event', 'surface', "TEXT NOT NULL DEFAULT ''");
+
+  // ── Owner lifecycle (mirrors Postgres 0047, BR-04) ──
+  // The first "account exists but cannot act" state: deactivation flag, who set it, and the SSO
+  // connection that manages the account's lifecycle over SCIM. Index AFTER the ALTERs, and partial,
+  // because unmanaged accounts are the common case.
+  safeAddColumn('owners', 'disabledAt', 'TEXT');
+  safeAddColumn('owners', 'disabledBy', 'TEXT');
+  safeAddColumn('owners', 'managedBy', 'TEXT');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_owners_managed_by ON owners(managedBy) WHERE managedBy IS NOT NULL;');
   // The fold's cursor. Both columns predate this change, so it could live in block 1 — it sits here
   // next to the ALTERs it belongs with, which costs nothing and keeps the change readable in one place.
   db.exec('CREATE INDEX IF NOT EXISTS idx_agent_usage_event_cursor ON agent_usage_event(ts, id);');
