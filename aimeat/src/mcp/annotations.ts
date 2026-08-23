@@ -23,6 +23,9 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   v1.x — 2026-08-23 — Annotation for aimeat_package_install: a write, not destructive, and NOT
+ *     idempotent — each install mints a fresh instance with its own component names, so a host that
+ *     retries on a timeout leaves two copies.
  *   v1.x — 2026-08-16 — Annotations for the four incremental app-draft tools (write/replace/read/seed). draft_read is the only read-only one,
  *     which is what a host's smart-approve mode reads to decide what runs without asking; the two
  *     writing tools are NOT idempotent, because appending twice is the point.
@@ -243,6 +246,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_package_versions: { title: 'List Package Versions', readOnlyHint: true },
     aimeat_package_publish: { title: 'Publish Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_package_delete: { title: 'Delete Package Version', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // Not idempotent: each install mints a fresh instance with its own component names, so calling
+    // it twice leaves two copies rather than one.
+    aimeat_package_install: { title: 'Install Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_app_list: { title: 'List Apps', readOnlyHint: true },
     aimeat_app_get: { title: 'Get App', readOnlyHint: true },
     aimeat_app_versions: { title: 'List App Versions', readOnlyHint: true },

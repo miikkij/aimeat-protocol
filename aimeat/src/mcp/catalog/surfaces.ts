@@ -21,6 +21,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-08-23 — aimeat_package_install on `appdev` beside the other package tools, and on `agent`
+ *     beside the company ones: installing is the person's agent taking a shipped package into use,
+ *     which is a different act from authoring one.
  *   2026-08-16 — Place the four incremental app-draft tools (write/replace/read/seed) on `appdev`,
  *     beside aimeat_app_draft_save. They are how an agent authors an app larger than one model
  *     response, so they belong wherever publishing does.
@@ -69,7 +72,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_discover',
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
         // Component packages — a different backend from the apps above, named so since 2026-08-16.
-        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_versions', 'aimeat_package_publish', 'aimeat_package_delete',
+        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_versions', 'aimeat_package_publish', 'aimeat_package_delete', 'aimeat_package_install',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
         'aimeat_image_generate',
@@ -100,6 +103,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread',
         'aimeat_company_list', 'aimeat_company_create', 'aimeat_company_update',
         'aimeat_company_front_page', 'aimeat_company_portfolio_publish',
+        // Taking a shipped package into use, beside the company tools rather than with the four
+        // authoring ones on appdev. Installing is not building: it is the person's own agent
+        // turning something this node ships into a copy they own, which is this surface's business.
+        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_install',
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email',
