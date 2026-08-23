@@ -20,7 +20,7 @@ import { executeHooks } from '../../services/hooks.js';
 import { PeeringRequestSchema, validateBody } from '../../models/schemas.js';
 import type { PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
-import { validateOutboundUrl } from '../../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
@@ -374,7 +374,10 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         const checks: Record<string, { passed: boolean; detail: string }> = {};
 
         try {
-            const response = await fetch(`${target_url}/.well-known/aimeat`, {
+            // safeFetch, not fetch: validateOutboundUrl above checks the initial URL, but a plain
+            // fetch would still follow a 3xx into an internal host without re-validating. safeFetch
+            // re-checks every redirect hop (CodeQL js/request-forgery, AI-triage 2026-08-23).
+            const response = await safeFetch(`${target_url}/.well-known/aimeat`, {
                 signal: AbortSignal.timeout(5000),
             });
             checks['well_known'] = {
