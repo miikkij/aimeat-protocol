@@ -62,6 +62,11 @@ export const V2_EXCLUDED: readonly string[] = [
     'aimeat_task_request_changes',
     // Connector-CLI-only convenience (no v2 MCP surface) — see definitions.ts.
     'aimeat_agent_statistics',
+    // The read/write package tools are registered on the connector doors, not on this node's
+    // /v1/mcp (mcp/packages.ts registers only aimeat_package_install). They are defined in the
+    // catalog for the connector, so they are placed here as deliberately off the v2 node surfaces.
+    'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_versions',
+    'aimeat_package_publish', 'aimeat_package_delete',
 ];
 
 /** role -> allowlist of tool names. Derived from docs/mcp_audit/11-v2-mcp-design.md §2/§3. */
@@ -72,7 +77,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_discover',
         'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_app_draft_publish', 'aimeat_app_draft_discard', 'aimeat_app_list', 'aimeat_app_get', 'aimeat_app_versions', 'aimeat_app_delete',
         // Component packages — a different backend from the apps above, named so since 2026-08-16.
-        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_versions', 'aimeat_package_publish', 'aimeat_package_delete', 'aimeat_package_install',
+        // Only INSTALL is registered on this node's /v1/mcp (mcp/packages.ts: "installing is the one
+        // a conversation actually needs"); the read/write package tools live on the connector doors.
+        // The v2 surface must list exactly what is registered, so it carries install alone here.
+        'aimeat_package_install',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
         'aimeat_image_generate',
@@ -106,7 +114,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         // Taking a shipped package into use, beside the company tools rather than with the four
         // authoring ones on appdev. Installing is not building: it is the person's own agent
         // turning something this node ships into a copy they own, which is this surface's business.
-        'aimeat_package_list', 'aimeat_package_get', 'aimeat_package_install',
+        // Only install is registered on this node's /v1/mcp (see appdev note); list/get are
+        // connector-only, so the v2 surface lists what is actually served.
+        'aimeat_package_install',
         // The person's own welcome page, beside the company one: same act, different owner.
         'aimeat_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email',

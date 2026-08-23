@@ -491,8 +491,11 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         res.redirect(301, config.baseUrl + '/v1/profile?tab=companies'); // bare co.<apex>
         return;
       }
+      // An explicit empty hint list, because the envelope's default next-step for a NOT_* code is
+      // "This one is not available…" — and a 404 that says "available" turns this uniform failure
+      // into the company-enumeration oracle the comment above says it must not be.
       const companyNotFound = () =>
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown company address'));
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown company address', undefined, undefined, []));
       if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return companyNotFound();
       const company = await storage.getCompanyBySlug(sub);
       if (!company || company.status !== 'active') return companyNotFound();
