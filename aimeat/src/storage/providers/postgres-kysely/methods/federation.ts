@@ -27,6 +27,13 @@ function toFederationPeer(r: Selectable<FederationPeer>): FederationPeerRecord {
     nodeId: r.nodeId, url: r.url, publicKey: r.publicKey, status: r.status,
     addedAt: iso(r.addedAt), lastSeen: iso(r.lastSeen),
     shareCatalogue: r.shareCatalogue ?? true, replicateMemory: r.replicateMemory ?? true, allowRouting: r.allowRouting ?? true,
+    // A row written before these columns existed keeps what it could already do: messaging,
+    // broadcasting and settling were ungated, so absent means true. supportUpstream is the opposite:
+    // nobody's support routing may be invented by a migration, so absent means false.
+    allowMessaging: r.allowMessaging ?? true,
+    allowBroadcast: r.allowBroadcast ?? true,
+    allowSettlement: r.allowSettlement ?? true,
+    supportUpstream: r.supportUpstream ?? false,
     peerMode: (r.peerMode || 'federation') as FederationPeerRecord['peerMode'],
     allowFederatedAuth: r.allowFederatedAuth ?? false,
     federationAuthScopes: r.federationAuthScopes ?? [],
@@ -44,7 +51,9 @@ function toPeeringRequest(r: Selectable<PeeringRequest>): PeeringRequestRecord {
   return {
     id: r.requestId, fromNodeUrl: r.fromNodeUrl, fromNodeId: r.fromNodeId ?? undefined, toNodeId: r.toNodeId ?? undefined,
     targetUrl: r.targetUrl ?? undefined, publicKey: r.publicKey ?? undefined, message: r.message ?? undefined,
-    status: r.status as PeeringRequestRecord['status'], createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
+    status: r.status as PeeringRequestRecord['status'],
+    tier: (r.tier ?? undefined) as PeeringRequestRecord['tier'],
+    createdAt: iso(r.createdAt), updatedAt: iso(r.updatedAt),
   };
 }
 function toPersonalNode(r: Selectable<PersonalNode>): PersonalNodeRecord {
@@ -76,6 +85,8 @@ export const federationMethods = {
     const shared = {
       url: peer.url, publicKey: peer.publicKey, status: peer.status, lastSeen: new Date(peer.lastSeen),
       shareCatalogue: peer.shareCatalogue, replicateMemory: peer.replicateMemory, allowRouting: peer.allowRouting,
+      allowMessaging: peer.allowMessaging, allowBroadcast: peer.allowBroadcast, allowSettlement: peer.allowSettlement,
+      supportUpstream: peer.supportUpstream ?? false,
       peerMode: peer.peerMode || 'federation', allowFederatedAuth: peer.allowFederatedAuth ?? false,
       federationAuthScopes: peer.federationAuthScopes ?? [], tier: peer.tier ?? 'member',
       availability: peer.availability ?? null, expiresAt: peer.expiresAt ? new Date(peer.expiresAt) : null,
@@ -101,6 +112,7 @@ export const federationMethods = {
     await this.db.insertInto('PeeringRequest').values({
       requestId: req.id, fromNodeUrl: req.fromNodeUrl, fromNodeId: req.fromNodeId ?? null, toNodeId: req.toNodeId ?? null,
       targetUrl: req.targetUrl ?? null, publicKey: req.publicKey ?? null, message: req.message ?? null, status: req.status,
+      tier: req.tier ?? null,
       createdAt: new Date(req.createdAt), updatedAt: new Date(req.updatedAt),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();

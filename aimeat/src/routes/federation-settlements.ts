@@ -25,6 +25,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { logger } from '../utils/logger.js';
 import type { PeerInfo } from '../services/federation.js';
+import { gatePeer } from '../services/federation-peer-gate.js';
 import { sign, verify } from '../auth/keypair.js';
 import { validateOutboundUrl } from '../utils/url-validator.js';
 import type { RouteManifest } from '../types/route-manifest.js';
@@ -73,20 +74,16 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             return;
         }
 
-        // Verify the sending node is a known active peer
-        const peer = [...peers.values()].find(p => p.nodeId === from_node);
-        if (!peer || (peer.status !== 'active' && peer.status !== 'depeering')) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-                `Node ${from_node} is not a known active peer`));
+        // The sending node is an active peer entitled to move balances here. This is the only
+        // unauthenticated door on the node that credits money, so the word is checked BEFORE the
+        // replay lookup and long before the credit. `depeering` still passes: money already owed
+        // must land while a link is being taken down.
+        const gate = gatePeer(peers, from_node, 'allowSettlement', { acceptStatuses: ['active', 'depeering'] });
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
-
-        // Verify peer has a public key for signature verification
-        if (!peer.publicKey) {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-                'Peer has no public key on file for signature verification'));
-            return;
-        }
+        const peer = gate.peer;
 
         // Verify the cryptographic signature
         const settlementPayload = JSON.stringify({

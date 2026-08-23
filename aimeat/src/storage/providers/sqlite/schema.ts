@@ -212,6 +212,22 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('federation_peers', 'softwareVersion', 'TEXT');
   safeAddColumn('federation_peers', 'nodeCardHash', 'TEXT');
 
+  // The `contact` tier (federation's floor: messages and nothing else) needs words for three doors
+  // that had none, so they could be refused. DEFAULT 1 is deliberate: every peer that exists today
+  // could message, broadcast and settle, and an upgrade must not quietly take that away.
+  safeAddColumn('federation_peers', 'allowMessaging', 'INTEGER NOT NULL DEFAULT 1');
+  safeAddColumn('federation_peers', 'allowBroadcast', 'INTEGER NOT NULL DEFAULT 1');
+  safeAddColumn('federation_peers', 'allowSettlement', 'INTEGER NOT NULL DEFAULT 1');
+  // Which peer answers this node's support@operators. DEFAULT 0: a migration must never invent
+  // somebody's support routing.
+  safeAddColumn('federation_peers', 'supportUpstream', 'INTEGER NOT NULL DEFAULT 0');
+  // A support thread that arrived from a peer keeps the one party who lives on the other node, so
+  // the answer has somewhere to go. NOT a participant: membership stays node-local.
+  safeAddColumn('conversations', 'remote', 'TEXT');
+  // The tier a peering request was APPROVED at. Without it the key-exchange auto-add re-admits a
+  // de-peered contact link at 'member', because the approved request outlives the peer row.
+  safeAddColumn('peering_requests', 'tier', 'TEXT');
+
   // Federation Mesh Phase 1 — per-record federation opt-in
   safeAddColumn('actions', 'federate', 'INTEGER NOT NULL DEFAULT 0');
   safeAddColumn('agents', 'federate', 'INTEGER NOT NULL DEFAULT 0');

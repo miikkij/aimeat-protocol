@@ -115,7 +115,7 @@ belongs to the service surface).
 not complete, or when you need a decision only a human can make, send it:
 \`aimeat_dm_send(to: "support@operators", subject: "<the problem>", body: "<what you were doing, what
 happened instead>")\`. You need no identity lookup and no idea who runs this node; the address
-reaches every operator in ONE thread they answer in, and the send returns a \`conversation_id\` —
+reaches the people who run this node in ONE thread they answer in, and the send returns a \`conversation_id\` —
 pass it back as \`conversation_id\` to continue rather than opening a second thread.
 
 Write there rather than working around it silently. An unreported wall stays a wall for the next

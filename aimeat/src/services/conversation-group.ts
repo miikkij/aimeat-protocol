@@ -24,6 +24,7 @@
  * @structure
  *   - createGroupConversation() — open a thread with a membership
  *   - sendGroupMessage() — one message, one copy per participant mailbox
+ *   - fanOutToParticipants() — the shared write: one copy per mailbox, notify, wake the agents
  *   - setParticipants() — replace the membership (a support thread re-resolves its operators)
  *   - threadAddressFor() — the address a group's copies carry
  * @usage
@@ -32,10 +33,16 @@
  * @version-history
  *   v1.0.0 — 2026-08-11 — Initial: group threads, built for support@operators and for any thread
  *     with several people and AIs in it.
+ *   v1.1.0 — 2026-08-23 — Two refusals that hit the one-owner node hardest. A mailbox shared by
+ *     several participants now tells the ones who did not write it: an owner whose OWN agent posted
+ *     to support@operators was skipped as "the sender" and got no row worth reading, no bell and
+ *     delivered:0. And a NAMED thread may have a single participant, because a role with one holder
+ *     is still the role. Fan-out extracted so the next caller (an inbound support frame from a peer)
+ *     writes copies the same way rather than a second time.
  */
 import { randomUUID } from 'node:crypto';
 import type { ConversationRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
-import type { DeliveryCtx } from './message-delivery.js';
+import { deliverDirectMessage, type DeliveryCtx } from './message-delivery.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor, messagePreviewWithAttachments } from '../utils/messaging.js';
 import { notify } from './notify.js';
@@ -79,6 +86,10 @@ export interface CreateGroupInput {
   subject?: string;
   /** The named address this thread was opened through (`support@operators`), when there was one. */
   alias?: string;
+  /** Use this id instead of a fresh one, so both nodes know a cross-node ticket by the same name. */
+  id?: string;
+  /** The one party on another node. NOT a participant — see ConversationRecord.remote. */
+  remote?: ConversationRecord['remote'];
 }
 
 export type CreateGroupResult =
@@ -95,13 +106,25 @@ export type CreateGroupResult =
  * mailbox copies written in one pass, and a copy on a peer node is a federation frame with its own
  * delivery, retry and membership-agreement problem. That is a separate piece of work; refusing it
  * here is better than half-delivering a thread and calling it sent.
+ *
+ * A NAMED thread may have one participant. `support@operators` on a node with a single operator
+ * resolves to that one person, and the creator IS that person, so the membership collapses to one
+ * and the old floor of two refused it with 503 NO_OPERATORS: the only operator of a node could not
+ * write to their own support address. A name is addressed to a ROLE, and a role with one holder is
+ * still the role. An UNNAMED ad-hoc group of one is a mistake and still refuses.
  */
 export async function createGroupConversation(ctx: DeliveryCtx, input: CreateGroupInput): Promise<CreateGroupResult> {
   const { config, storage } = ctx;
   const participants = [...new Set([input.createdBy, ...input.participants].map(p => p.trim()).filter(Boolean))];
 
-  if (participants.length < 2) {
-    return { ok: false, code: 'TOO_FEW_PARTICIPANTS', message: 'A conversation needs at least two participants' };
+  const floor = input.alias ? 1 : 2;
+  if (participants.length < floor) {
+    return {
+      ok: false, code: 'TOO_FEW_PARTICIPANTS',
+      message: floor === 1
+        ? 'A conversation needs at least one participant'
+        : 'A conversation needs at least two participants',
+    };
   }
   if (participants.length > MAX_GROUP_PARTICIPANTS) {
     return { ok: false, code: 'TOO_MANY_PARTICIPANTS', message: `A conversation holds at most ${MAX_GROUP_PARTICIPANTS} participants` };
@@ -116,12 +139,15 @@ export async function createGroupConversation(ctx: DeliveryCtx, input: CreateGro
 
   const now = new Date().toISOString();
   const conversation = await storage.createConversation({
-    id: randomUUID(),
+    // A caller may name the thread when both sides have to know it by the same id. Nobody else does,
+    // and a collision is the caller's to detect: receiveRemoteSupportMessage checks before it asks.
+    id: input.id ?? randomUUID(),
     kind: 'group',
     subject: input.subject,
     participants,
     createdBy: input.createdBy,
     alias: input.alias,
+    remote: input.remote,
     createdAt: now,
     updatedAt: now,
   });
@@ -159,68 +185,159 @@ export async function sendGroupMessage(ctx: DeliveryCtx, input: GroupSendInput):
 
   const id = randomUUID();
   const now = new Date().toISOString();
-  const recipientGhii = threadAddressFor(convo);
-  const senderMailbox = deliveryTargetFor(input.senderGhii);
 
-  // Mailbox → the participant identity it stands for, so an agent in the thread is still woken by
-  // name even though its copy lives in its owner's mailbox.
-  const mailboxes = new Map<string, string>();
-  for (const participant of convo.participants) {
-    const mailbox = deliveryTargetFor(participant);
-    if (!mailboxes.has(mailbox)) mailboxes.set(mailbox, participant);
-  }
+  const { delivered } = await fanOutToParticipants(ctx, convo, {
+    id,
+    senderGhii: input.senderGhii,
+    recipientGhii: threadAddressFor(convo),
+    body: input.body,
+    attachments: input.attachments,
+    interactive: input.interactive,
+    replyToId: input.replyToId,
+    aiProvenanceId: input.aiProvenanceId,
+    origin: 'local',
+    originNodeId: config.nodeId,
+    createdAt: now,
+    deliveredAt: now,
+    // A thread with a party on another node: the sender's own row is the one that has to travel, so
+    // it names that party and starts queued. The other participants' copies are local and delivered.
+    senderCopy: convo.remote ? { recipientGhii: convo.remote.ghii, status: 'queued' } : undefined,
+  });
 
-  let delivered = 0;
-  for (const [mailbox, participant] of mailboxes) {
-    const isSender = mailbox === senderMailbox;
-    await storage.createDirectMessage({
-      id,
-      ownerGhii: mailbox,
-      conversationId: convo.id,
-      subject: convo.subject,
-      senderGhii: input.senderGhii,
-      recipientGhii,
-      body: input.body,
-      attachments: input.attachments,
-      interactive: input.interactive,
-      respondable: true,
-      status: 'delivered',
-      direction: isSender ? 'outbound' : 'inbound',
-      replyToId: input.replyToId,
-      origin: 'local',
-      originNodeId: config.nodeId,
-      aiProvenanceId: input.aiProvenanceId,
-      createdAt: now,
-      deliveredAt: now,
-    });
-    if (isSender) continue;
-    delivered++;
-
-    await notify(storage, mailbox, {
-      type: 'direct_message',
-      title: convo.subject ? `${convo.subject} — ${input.senderGhii}` : `New message from ${input.senderGhii}`,
-      body: messagePreviewWithAttachments(input.body, input.attachments),
-      link: `/v1/profile#inbox/${convo.id}`,
-      actions: [{ id: 'reply', label: 'Reply', kind: 'reply', to: recipientGhii, conversationId: convo.id, subject: convo.subject, replyTo: id }],
-    });
-
-    // An agent participant is woken over its connect tunnel, the same signal a 1:1 DM sends, so a
-    // thread with an AI in it does not wait for that AI to poll.
-    if (participant !== mailbox) {
-      emitDelivery({
-        target: participant, kind: 'dm.inbound', id,
-        payload: {
-          id, conversationId: convo.id, subject: convo.subject ?? null, senderGhii: input.senderGhii,
-          preview: messagePreview(input.body), attachments: input.attachments?.length ?? 0, createdAt: now,
-          interactive: input.interactive?.role ?? null,
-        },
-      });
-    }
+  // The answer leaves. deliverDirectMessage routes on the address it is GIVEN, so this works whatever
+  // the row says; the row matters for the retry sweep, which re-reads it and routes on recipientGhii.
+  if (convo.remote) {
+    const senderCopy = await storage.getDirectMessage(id, deliveryTargetFor(input.senderGhii));
+    if (senderCopy) await deliverDirectMessage(ctx, senderCopy, deliveryTargetFor(convo.remote.ghii));
   }
 
   await storage.updateConversation(convo.id, {});
   emitChange('messages');
   return { ok: true, messageId: id, delivered };
+}
+
+export interface FanOutMessage {
+  id: string;
+  senderGhii: string;
+  /** What every copy names as its recipient: the thread's address, the same value in each copy. */
+  recipientGhii: string;
+  body: string;
+  attachments?: DirectMessageAttachment[];
+  interactive?: InteractivePayload;
+  replyToId?: string;
+  aiProvenanceId?: string;
+  /** 'local' when this node produced the message, 'federation' when it arrived signed from a peer. */
+  origin: 'local' | 'federation';
+  originNodeId: string;
+  createdAt: string;
+  deliveredAt: string;
+  /**
+   * What the SENDER's own copy names as its recipient, and its status, when the thread has a party
+   * on another node.
+   *
+   * The sender's row is the one the retry job re-reads, and it computes the target node from
+   * `recipientGhii`. A group copy normally carries the thread's address, which parses to the node
+   * `operators` — no peer, so a queued reply would be retried forever against nothing. Naming the
+   * remote party makes the row routable, which is the whole reason the field exists.
+   */
+  senderCopy?: { recipientGhii: string; status: 'queued' };
+}
+
+/**
+ * Write one message into every participant's mailbox, tell the people who did not write it, and wake
+ * the AIs among them. The single write path for a group thread, whoever produced the message.
+ *
+ * MAILBOXES ARE SHARED, and that is where this went wrong. A thread can name both `alice@node` and
+ * `bot#alice@node`, and both resolve to Alice's mailbox; two rows would collide on the (id, ownerGhii)
+ * primary key, so there is exactly one copy per MAILBOX. The old code therefore kept the first
+ * participant it saw per mailbox and skipped the mailbox entirely when it was the sender's own. On a
+ * one-owner node that is the common case rather than an edge: the owner's agent writes to
+ * `support@operators`, agent and owner collapse into one mailbox, the mailbox reads as "the sender",
+ * and the human was told nothing while the agent was told `delivered: 0`.
+ *
+ * So a mailbox now maps to EVERY identity behind it, and the three decisions are made per identity:
+ *   - the copy is written once per mailbox, `outbound` when the sender lives there (the message did
+ *     leave this account) and `inbound` otherwise;
+ *   - the mailbox OWNER is notified unless the owner is literally the sender, so an agent writing in
+ *     your name rings your bell and your own message does not;
+ *   - every agent identity in the mailbox other than the sender is woken over its connect tunnel.
+ *
+ * A mailbox holding nobody but the sender is skipped and uncounted: there is no one there to tell.
+ */
+export async function fanOutToParticipants(
+  ctx: DeliveryCtx,
+  convo: ConversationRecord,
+  msg: FanOutMessage,
+): Promise<{ delivered: number }> {
+  const { storage } = ctx;
+  const senderMailbox = deliveryTargetFor(msg.senderGhii);
+
+  // Mailbox → every participant identity that resolves to it. An agent in the thread is woken by
+  // name even though its copy lives in its owner's mailbox.
+  const mailboxes = new Map<string, string[]>();
+  for (const participant of convo.participants) {
+    const mailbox = deliveryTargetFor(participant);
+    const members = mailboxes.get(mailbox);
+    if (members) { if (!members.includes(participant)) members.push(participant); } else mailboxes.set(mailbox, [participant]);
+  }
+
+  let delivered = 0;
+  for (const [mailbox, members] of mailboxes) {
+    const isSenderMailbox = mailbox === senderMailbox;
+    await storage.createDirectMessage({
+      id: msg.id,
+      ownerGhii: mailbox,
+      conversationId: convo.id,
+      subject: convo.subject,
+      senderGhii: msg.senderGhii,
+      recipientGhii: isSenderMailbox && msg.senderCopy ? msg.senderCopy.recipientGhii : msg.recipientGhii,
+      body: msg.body,
+      attachments: msg.attachments,
+      interactive: msg.interactive,
+      respondable: true,
+      status: isSenderMailbox && msg.senderCopy ? msg.senderCopy.status : 'delivered',
+      direction: isSenderMailbox ? 'outbound' : 'inbound',
+      replyToId: msg.replyToId,
+      origin: msg.origin,
+      originNodeId: msg.originNodeId,
+      aiProvenanceId: msg.aiProvenanceId,
+      createdAt: msg.createdAt,
+      deliveredAt: msg.deliveredAt,
+    });
+
+    // Everyone in this mailbox who is not the author. Empty means the sender lives here alone.
+    const others = members.filter(m => m !== msg.senderGhii);
+    if (!others.length) continue;
+    delivered++;
+
+    // The human is told unless the human IS the author. `senderMailbox === mailbox` is not that test:
+    // an agent's copy lands in its owner's mailbox, and the owner did not write it.
+    if (msg.senderGhii !== mailbox) {
+      await notify(storage, mailbox, {
+        type: 'direct_message',
+        title: convo.subject ? `${convo.subject} — ${msg.senderGhii}` : `New message from ${msg.senderGhii}`,
+        body: messagePreviewWithAttachments(msg.body, msg.attachments),
+        link: `/v1/profile#inbox/${convo.id}`,
+        actions: [{ id: 'reply', label: 'Reply', kind: 'reply', to: msg.recipientGhii, conversationId: convo.id, subject: convo.subject, replyTo: msg.id }],
+      });
+    }
+
+    // An agent participant is woken over its connect tunnel, the same signal a 1:1 DM sends, so a
+    // thread with an AI in it does not wait for that AI to poll.
+    for (const member of others) {
+      if (member === mailbox) continue;
+      emitDelivery({
+        target: member, kind: 'dm.inbound', id: msg.id,
+        payload: {
+          id: msg.id, conversationId: convo.id, subject: convo.subject ?? null, senderGhii: msg.senderGhii,
+          preview: messagePreview(msg.body), attachments: msg.attachments?.length ?? 0, createdAt: msg.createdAt,
+          interactive: msg.interactive?.role ?? null,
+        },
+      });
+    }
+  }
+
+  return { delivered };
 }
 
 /**

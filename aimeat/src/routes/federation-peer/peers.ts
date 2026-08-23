@@ -22,7 +22,8 @@ import { verify } from '../../auth/keypair.js';
 import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../../services/presence.js';
-import { deriveTierFlags, coerceTier } from '../../services/federation-tiers.js';
+import { deriveTierFlags, coerceTier, clampFlagsToTier } from '../../services/federation-tiers.js';
+import { gatePeer } from '../../services/federation-peer-gate.js';
 import { getActivePolicy, evaluatePromotion } from '../../services/network-policy.js';
 import { promotionMetrics } from './promotion.js';
 
@@ -65,6 +66,11 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         // If approved, add to peers list and persist
         if (decision === 'approve') {
             const now = new Date().toISOString();
+            // The tier the REQUEST carries, not a hardcoded 'member'. A request minted by a contact
+            // invite says so, and an ordinary request has no tier and coerces to 'member' exactly as
+            // before. The request is also what the key-exchange auto-add reads later, so the two
+            // paths agree instead of one of them re-admitting the peer a rung higher.
+            const approvedTier = coerceTier(request.tier);
             const peerInfo: PeerInfo = {
                 nodeId: request.fromNodeId ?? request.id,
                 url: request.targetUrl ?? request.fromNodeUrl,
@@ -72,8 +78,8 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 status: 'approved',
                 addedAt: now,
                 lastSeen: now,
-                ...deriveTierFlags('member'),
-                tier: 'member',
+                ...deriveTierFlags(approvedTier),
+                tier: approvedTier,
             };
             peers.set(peerInfo.nodeId, peerInfo);
             await storage.saveFederationPeer(peerInfo);
@@ -190,11 +196,15 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
-        const peer = peers.get(from_node_id) ?? [...peers.values()].find(p => p.nodeId === from_node_id);
-        if (!peer || peer.status !== 'active') {
-            res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Source node is not an active peer'));
+        // Presence is discovery, so it rides the catalogue word: a contact peer neither sees nor
+        // publishes who is online here. gatePeer also refuses a peer with NO public key, which used
+        // to skip the signature check below entirely rather than fail it.
+        const gate = gatePeer(peers, from_node_id, 'shareCatalogue');
+        if (!gate.ok) {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
+        const peer = gate.peer;
 
         // Timestamp freshness (5-minute window)
         const ts = new Date(timestamp).getTime();
@@ -245,6 +255,10 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 share_catalogue: p.shareCatalogue ?? true,
                 replicate_memory: p.replicateMemory ?? true,
                 allow_routing: p.allowRouting ?? true,
+                allow_messaging: p.allowMessaging ?? true,
+                allow_broadcast: p.allowBroadcast ?? true,
+                allow_settlement: p.allowSettlement ?? true,
+                support_upstream: p.supportUpstream ?? false,
                 peer_mode: p.peerMode ?? 'federation',
                 allow_federated_auth: p.allowFederatedAuth ?? false,
                 federation_auth_scopes: p.federationAuthScopes ?? [],
@@ -317,7 +331,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
-        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, peer_mode, allow_federated_auth, federation_auth_scopes, tier } = req.body ?? {};
+        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, support_upstream, peer_mode, allow_federated_auth, federation_auth_scopes, tier } = req.body ?? {};
         if (url) peer.url = url;
         if (public_key) peer.publicKey = public_key;
         if (status) peer.status = status;
@@ -326,22 +340,47 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         // so a promotion grants the full member capability set in one step. Explicit flag
         // fields below may still override afterwards.
         const currentTier = coerceTier(peer.tier);
-        if (tier === 'genesis' || tier === 'member' || tier === 'visiting') {
+        if (tier === 'genesis' || tier === 'member' || tier === 'visiting' || tier === 'contact') {
             peer.tier = tier;
             Object.assign(peer, deriveTierFlags(tier));
         }
         const effectiveTier = coerceTier(peer.tier);
 
-        // Guard: a 'visiting' peer must not be silently granted provider/relay/replication/auth
-        // via flag fields — those caps require an actual tier change (promotion). Catalogue read
-        // and peerMode remain freely editable.
-        const blockElevation = effectiveTier === 'visiting';
+        // Apply what was asked, then hold the whole set to what the tier permits. The rules used to
+        // be five inline conditions here, which is why three of them were missing the moment a flag
+        // was added; clampFlagsToTier owns them now and is tested on its own.
         if (typeof share_catalogue === 'boolean') peer.shareCatalogue = share_catalogue;
-        if (typeof replicate_memory === 'boolean' && !(blockElevation && replicate_memory)) peer.replicateMemory = replicate_memory;
-        if (typeof allow_routing === 'boolean' && !(blockElevation && allow_routing)) peer.allowRouting = allow_routing;
+        if (typeof replicate_memory === 'boolean') peer.replicateMemory = replicate_memory;
+        if (typeof allow_routing === 'boolean') peer.allowRouting = allow_routing;
+        if (typeof allow_messaging === 'boolean') peer.allowMessaging = allow_messaging;
+        if (typeof allow_broadcast === 'boolean') peer.allowBroadcast = allow_broadcast;
+        if (typeof allow_settlement === 'boolean') peer.allowSettlement = allow_settlement;
         if (peer_mode === 'federation' || peer_mode === 'private') peer.peerMode = peer_mode;
-        if (typeof allow_federated_auth === 'boolean' && !(blockElevation && allow_federated_auth)) peer.allowFederatedAuth = allow_federated_auth;
-        if (Array.isArray(federation_auth_scopes) && !blockElevation) peer.federationAuthScopes = federation_auth_scopes;
+        if (typeof allow_federated_auth === 'boolean') peer.allowFederatedAuth = allow_federated_auth;
+        if (Array.isArray(federation_auth_scopes)) peer.federationAuthScopes = federation_auth_scopes;
+        Object.assign(peer, clampFlagsToTier(effectiveTier, peer));
+
+        // Where this node's `support@operators` is answered. Refused when another active peer already
+        // holds it, so "who answers support here" cannot become two answers: a support request going
+        // to two vendors at once serves neither of them, and the invalid state is better made
+        // unrepresentable than resolved later by whichever peer the iterator reached first.
+        if (typeof support_upstream === 'boolean') {
+            if (support_upstream) {
+                const held = [...peers.values()].find(p => p.nodeId !== nodeId && p.status === 'active' && p.supportUpstream);
+                if (held) {
+                    res.status(409).json(error(config.nodeId, 'ONE_UPSTREAM_ONLY',
+                        `Support on this node is already answered by ${held.nodeId}. Turn that off before pointing it here.`));
+                    return;
+                }
+                // Routing to a peer that cannot carry a message is a black hole with a green light.
+                if (peer.allowMessaging === false) {
+                    res.status(409).json(error(config.nodeId, 'MESSAGING_DISABLED',
+                        'This peer may not deliver messages here, so it cannot answer support. Enable allow_messaging first.'));
+                    return;
+                }
+            }
+            peer.supportUpstream = support_upstream;
+        }
         await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {
@@ -352,6 +391,10 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             share_catalogue: peer.shareCatalogue,
             replicate_memory: peer.replicateMemory,
             allow_routing: peer.allowRouting,
+            allow_messaging: peer.allowMessaging,
+            allow_broadcast: peer.allowBroadcast,
+            allow_settlement: peer.allowSettlement,
+            support_upstream: peer.supportUpstream ?? false,
             peer_mode: peer.peerMode,
             allow_federated_auth: peer.allowFederatedAuth,
             federation_auth_scopes: peer.federationAuthScopes,
@@ -371,6 +414,17 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peer not found: ${nodeId}`));
             return;
         }
+        // A contact link is not a visiting peer that has yet to earn a vouch: it is a deliberate
+        // "messages and nothing else", usually with a customer on the other end who agreed to
+        // exactly that. Promoting it in one click, on availability metrics it was never measured
+        // against, would widen what crosses the link without anyone on that side being asked.
+        // Raising it is a de-peer and a re-link, which is a decision rather than a button.
+        if (coerceTier(peer.tier) === 'contact') {
+            res.status(409).json(error(config.nodeId, 'TIER_NOT_PROMOTABLE',
+                'This is a contact link (messages only). Widening it is a re-peering decision, not a promotion.'));
+            return;
+        }
+
         const force = req.body?.force === true;
         const policy = await getActivePolicy(storage);
         const verdict = evaluatePromotion(await promotionMetrics(storage, peer), policy);

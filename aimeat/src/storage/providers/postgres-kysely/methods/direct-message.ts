@@ -74,6 +74,7 @@ function toConversationRecord(r: Selectable<ConversationRow>): ConversationRecor
   };
   if (r.subject) record.subject = r.subject;
   if (r.alias) record.alias = r.alias;
+  if (r.remote) record.remote = r.remote as unknown as ConversationRecord['remote'];
   return record;
 }
 
@@ -390,6 +391,7 @@ export const directMessageMethods = {
       participants: jsonb(record.participants) as unknown as JsonValue,
       createdBy: record.createdBy,
       alias: record.alias ?? null,
+      remote: record.remote ? jsonb(record.remote) as unknown as JsonValue : null,
       createdAt: new Date(record.createdAt),
       updatedAt: new Date(record.updatedAt),
     }).execute();
