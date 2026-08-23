@@ -28,6 +28,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { hashPassword, verifyPassword } from '../../services/password.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
+import { isValidEmail } from '../../utils/email-validator.js';
 import { logger } from '../../utils/logger.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { promoteContactsForVerifiedEmail } from '../../services/contacts.js';
@@ -56,8 +57,8 @@ export function registerRecoveryRoutes(
             return;
         }
 
-        // Basic email format validation
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        // Basic email format validation (shared, length-capped — CodeQL ReDoS)
+        if (!isValidEmail(email)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invalid email format'));
             return;
         }

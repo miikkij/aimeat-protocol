@@ -47,7 +47,6 @@ type Db = Kysely<DB>;
 export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<void> {
   // Memory and micro-memory
   await db.deleteFrom('Memory').where('ownerGaii', '=', gaii).execute();
-  await db.deleteFrom('MicroMemory').where('gaii', '=', gaii).execute();
 
   // Actions offered by this identity
   await db.deleteFrom('Action').where('providerGaii', '=', gaii).execute();

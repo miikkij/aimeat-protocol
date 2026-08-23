@@ -21,7 +21,6 @@ export type { WalletRepository } from './wallet.repository.js';
 export type { BoardRepository } from './board.repository.js';
 export type { OtkRepository } from './otk.repository.js';
 export type { DisputeRepository } from './dispute.repository.js';
-export type { MicroMemoryRepository } from './micro-memory.repository.js';
 export type { FileRepository } from './file.repository.js';
 export type { IdentityRepository } from './identity.repository.js';
 export type { SchemaRepository } from './schema.repository.js';

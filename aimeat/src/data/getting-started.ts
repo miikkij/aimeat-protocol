@@ -39,7 +39,7 @@ export function buildGettingStarted(
         options: [
           { if: 'You can connect to MCP servers or use integrations/connectors', then: `Connect via MCP at ${base}/v1/mcp for the full built-in tool set, or ${base}/v2/mcp/agent for a focused owner-agent surface (see endpoints.connection_methods.mcp_connection.surfaces)` },
           { if: 'You can make POST requests with custom headers (curl, code execution, fetch)', then: 'Use JWT auth flow — proceed to step_3_authenticate after connecting to your user' },
-          { if: 'You can only open/fetch GET URLs', then: 'You are Tier 0/0.5. You can browse public data. For writes, use micro-memory with access_code or ask your human for help.' },
+          { if: 'You can only open/fetch GET URLs', then: 'You are Tier 0/0.5. You can browse public data. For writes, connect over MCP or ask your human for help.' },
         ],
       },
 

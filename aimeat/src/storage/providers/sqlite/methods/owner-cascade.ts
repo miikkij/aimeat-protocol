@@ -25,7 +25,6 @@ export const cascadeMethods = {
     // Memory
     this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(gaii);
     // Micro-memory
-    this.db.prepare('DELETE FROM micro_memory WHERE gaii = ?').run(gaii);
     // Actions
     this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(gaii);
     // Work (as provider or requester) — also clean up related disputes

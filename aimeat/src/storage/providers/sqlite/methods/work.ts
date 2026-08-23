@@ -20,11 +20,10 @@
  */
 import type {
   ActionRecord, WorkRecord, WalletTransaction, BoardRecord, BoardPostRecord, OtkRecord,
-  DisputeRecord, DisputeAuditEntry, MicroMemoryRecord, BoardSubscriptionRecord
+  DisputeRecord, DisputeAuditEntry, BoardSubscriptionRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { countActionsForProviders as countActionsForProvidersRepo } from '../repos/action.js';
-import { getMicroMemoryTotalForOwners as getMicroMemoryTotalForOwnersRepo } from '../repos/storage-file.js';
 
 export const workMethods = {
   // ── Actions ──
@@ -92,10 +91,6 @@ export const workMethods = {
 
   async countActionsForProviders(this: SqliteStorage, providerGaiis: string[]): Promise<number> {
     return countActionsForProvidersRepo(this.db, providerGaiis);
-  },
-
-  async getMicroMemoryTotalForOwners(this: SqliteStorage, gaiis: string[]): Promise<{ bytes: number; sets: number }> {
-    return getMicroMemoryTotalForOwnersRepo(this.db, gaiis);
   },
 
   async updateAction(this: SqliteStorage, id: string, providerGaii: string, updates: Partial<ActionRecord>): Promise<ActionRecord | null> {
@@ -578,16 +573,6 @@ export const workMethods = {
     return otk;
   },
 
-  async listOtksBySession(this: SqliteStorage, sessionId: string): Promise<OtkRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM otks WHERE sessionId = ?').all(sessionId) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeOtk(r));
-  },
-
-  async expireSessionOtks(this: SqliteStorage, sessionId: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM otks WHERE sessionId = ?').run(sessionId);
-    return result.changes;
-  },
-
   deserializeOtk(this: SqliteStorage, row: Record<string, unknown>): OtkRecord {
     return {
       key: row.key as string,
@@ -712,66 +697,6 @@ export const workMethods = {
       updatedAt: row.updatedAt as string,
     };
     if (row.ruling) record.ruling = JSON.parse(row.ruling as string);
-    return record;
-  },
-
-  // ══════════════════════════════════════════════════════════
-  // ── Micro-Memory ──
-  // ══════════════════════════════════════════════════════════
-
-  async setMicroMemory(this: SqliteStorage, record: MicroMemoryRecord): Promise<MicroMemoryRecord> {
-    this.db.prepare(
-      `INSERT OR REPLACE INTO micro_memory (gaii, setName, entries, visibility, accessCode, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?)`
-    ).run(
-      record.gaii, record.set,
-      JSON.stringify(record.entries), record.visibility,
-      record.accessCode ?? null, record.updatedAt,
-    );
-    return record;
-  },
-
-  async getMicroMemory(this: SqliteStorage, gaii: string, set: string): Promise<MicroMemoryRecord | null> {
-    const row = this.db.prepare('SELECT * FROM micro_memory WHERE gaii = ? AND setName = ?').get(gaii, set) as Record<string, unknown> | undefined;
-    return row ? this.deserializeMicroMemory(row) : null;
-  },
-
-  async listMicroMemorySets(this: SqliteStorage, gaii: string): Promise<MicroMemoryRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM micro_memory WHERE gaii = ?').all(gaii) as Record<string, unknown>[];
-    return rows.map(r => this.deserializeMicroMemory(r));
-  },
-
-  async deleteMicroMemory(this: SqliteStorage, gaii: string, set: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM micro_memory WHERE gaii = ? AND setName = ?').run(gaii, set);
-    return result.changes > 0;
-  },
-
-  async deleteMicroMemoryEntry(this: SqliteStorage, gaii: string, set: string, key: string): Promise<boolean> {
-    const record = await this.getMicroMemory(gaii, set);
-    if (!record || !(key in record.entries)) return false;
-    delete record.entries[key];
-    this.db.prepare('UPDATE micro_memory SET entries = ? WHERE gaii = ? AND setName = ?').run(
-      JSON.stringify(record.entries), gaii, set,
-    );
-    return true;
-  },
-
-  async findMicroMemoryByAccessCode(this: SqliteStorage, set: string, accessCode: string): Promise<MicroMemoryRecord | null> {
-    const row = this.db.prepare(
-      `SELECT * FROM micro_memory WHERE setName = ? AND accessCode = ? AND (visibility = 'shared_read' OR visibility = 'shared_write')`
-    ).get(set, accessCode) as Record<string, unknown> | undefined;
-    return row ? this.deserializeMicroMemory(row) : null;
-  },
-
-  deserializeMicroMemory(this: SqliteStorage, row: Record<string, unknown>): MicroMemoryRecord {
-    const record: MicroMemoryRecord = {
-      gaii: row.gaii as string,
-      set: row.setName as string,
-      entries: JSON.parse(row.entries as string),
-      visibility: row.visibility as MicroMemoryRecord['visibility'],
-      updatedAt: row.updatedAt as string,
-    };
-    if (row.accessCode) record.accessCode = row.accessCode as string;
     return record;
   },
 

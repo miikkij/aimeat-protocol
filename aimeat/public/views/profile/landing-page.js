@@ -34,7 +34,7 @@
  *   v3.9.0 — 2026-07-05 — Home AiSpendCard: 24h/7d/30d AI token + cost tiles, a per-app stacked bar
  *     of the last 30 days, and a "where it went" top-apps breakdown, backed by GET
  *     /v1/ai/usage/history. Hidden until there is any AI-apps spend.
- *   v3.8.0 — 2026-06-22 — Home UsageCard: quota usage bars (memory / files / micro-memory) + resource
+ *   v3.8.0 — 2026-06-22 — Home UsageCard: quota usage bars (memory / files) + resource
  *     counts (agents, organisms, apps, connected apps, extensions, cortexes, services), backed by the
  *     cached GET /v1/owner/usage endpoint (60s server-side TTL).
  *   v3.7.0 — 2026-06-22 — WaitingForYou uses one getWaiting() call (server-aggregated) instead of the

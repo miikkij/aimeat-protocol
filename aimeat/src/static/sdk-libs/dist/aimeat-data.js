@@ -223,67 +223,6 @@
     async getPublicEntry(gaii, key) {
       const res = await publicEntryResponse(gaii, key);
       return res === null ? null : withProvenance(res);
-    },
-    // ── Micro-Memory (Tier 0.5, GET-based) ──
-    micro(setName, accessCode) {
-      const base = NODE_URL + "/v1/mm";
-      function mmUrl(params) {
-        const p = new URLSearchParams(params);
-        if (accessCode) p.set("access_code", accessCode);
-        return base + "?" + p.toString();
-      }
-      async function mmFetch(params) {
-        const r = await fetch(mmUrl(params));
-        const res = await r.json();
-        if (!res.ok) throw new Error(res.error?.message || "Micro-memory operation failed");
-        return res.data;
-      }
-      return {
-        // Add or overwrite a key
-        async add(key, value) {
-          return mmFetch({ op: "add", set: setName, key, value: typeof value === "object" ? JSON.stringify(value) : String(value) });
-        },
-        // Modify existing key
-        async mod(key, value) {
-          return mmFetch({ op: "mod", set: setName, key, value: typeof value === "object" ? JSON.stringify(value) : String(value) });
-        },
-        // Delete a key
-        async del(key) {
-          return mmFetch({ op: "del", set: setName, key });
-        },
-        // List all entries in this set
-        async list() {
-          return mmFetch({ op: "list", set: setName });
-        },
-        // Batch add multiple key-value pairs
-        async batch(entries) {
-          const params = { op: "batch", set: setName };
-          Object.keys(entries).forEach((k, i) => {
-            params["key" + i] = k;
-            const v = entries[k];
-            params["value" + i] = typeof v === "object" ? JSON.stringify(v) : String(v);
-          });
-          return mmFetch(params);
-        },
-        // Configure visibility
-        async config(visibility) {
-          const params = { op: "config", set: setName, access: visibility };
-          return mmFetch(params);
-        },
-        // Get a single key value
-        async get(key) {
-          const d = await mmFetch({ op: "list", set: setName });
-          return d.entries?.[key] ?? null;
-        }
-      };
-    },
-    // List all micro-memory sets
-    async microSets() {
-      const url = NODE_URL + "/v1/mm?op=list";
-      const r = await fetch(url);
-      const res = await r.json();
-      if (!res.ok) throw new Error(res.error?.message || "Failed to list micro-memory sets");
-      return res.data;
     }
   };
   attach("data", data);

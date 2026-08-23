@@ -45,8 +45,7 @@ import { ensureContact, updateContactCard, sendOutbound, OutboundError } from '.
 import { revokeContactHandles } from './contact-handles.js';
 import { parseGaiiLoose, isValidGAII, isValidGEAI, isValidGHII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { isValidEmail } from '../utils/email-validator.js';
 
 /**
  * How many contact RECORDS the projection folds in. The consent sources are naturally bounded by
@@ -376,7 +375,7 @@ async function addIdentityContact(
   // Shape first, existence second. The most common wrong input here is an email address, and the
   // useful answer to it is not "no such owner" but "that is a person, save them as one".
   if (!existing && !isIdentityShaped(contactId)) {
-    throw new ContactsError(400, 'INVALID_INPUT', EMAIL_RE.test(contactId)
+    throw new ContactsError(400, 'INVALID_INPUT', isValidEmail(contactId)
       ? `"${contactId}" is an email address — save them as a person with a name and an email instead`
       : `"${contactId}" is not an AIMEAT identity (expected owner@node, agent#owner@node, or eco:app#owner@node)`);
   }
@@ -406,7 +405,7 @@ async function addPersonContact(
   // three defects this project has already paid for. The resolution costs one indexed lookup that
   // ensureContact will repeat; that is the price of the check happening in the right order.
   const clean = (input.email || '').trim().toLowerCase();
-  if (EMAIL_RE.test(clean)) {
+  if (isValidEmail(clean)) {
     const identity = await storage.getGHIIByEmailHash(inviteEmailHash(clean));
     const resolved = identity?.emailVerifiedAt ? identity.ghii : null;
     if (resolved === ownerGhii) {
@@ -553,7 +552,7 @@ export type ResolveEmailResult =
  *  → can_invite signals whether an email invitation could be sent. Throws ContactsError on a bad email. */
 export async function resolveContactEmail(storage: Storage, email: string): Promise<ResolveEmailResult> {
   const clean = (email || '').trim().toLowerCase();
-  if (!clean || !EMAIL_RE.test(clean)) throw new ContactsError(400, 'INVALID_INPUT', 'A valid "email" is required');
+  if (!clean || !isValidEmail(clean)) throw new ContactsError(400, 'INVALID_INPUT', 'A valid "email" is required');
   const rec = await storage.getGHIIByEmailHash(inviteEmailHash(clean));
   if (rec) return { found: true, ghii: rec.ghii, owner: rec.ghii.split('@')[0], display_name: rec.displayName ?? null };
   return { found: false, can_invite: !!getActiveEmailService()?.enabled };
@@ -609,7 +608,7 @@ export type ResolveOwnerByEmailResult =
  */
 export async function resolveOwnerByVerifiedEmail(storage: Storage, email: string): Promise<ResolveOwnerByEmailResult> {
   const clean = (email || '').trim().toLowerCase();
-  if (!clean || !EMAIL_RE.test(clean)) {
+  if (!clean || !isValidEmail(clean)) {
     return { ok: false, code: 'INVALID_EMAIL', message: `"${email}" is not a valid email address.` };
   }
   const verified = (await storage.getGHIIsByEmailHash(inviteEmailHash(clean))).filter(m => !!m.emailVerifiedAt);

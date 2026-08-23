@@ -1,7 +1,7 @@
 /**
  * @file e2e-owner-usage.ts
  * @description E2E for GET /v1/owner/usage — the cached owner usage/quota summary that backs the
- *   profile Home usage card. Covers: response shape (memory/storage/micro-memory quota + counts +
+ *   profile Home usage card. Covers: response shape (memory/storage quota + counts +
  *   morsels), auth requirement, the in-memory cache (two reads return the same cached_at), and that a
  *   memory write INVALIDATES the cache (next read recomputes — new cached_at + higher used_keys —
  *   before the TTL would have expired), exercising the generic cache layer's event-bus invalidation.
@@ -108,7 +108,6 @@ await test('GET /v1/owner/usage returns the full summary shape', async () => {
     assert(typeof d.memory.max_bytes === 'number' && d.memory.max_bytes > 0, 'memory.max_bytes set');
     assert(typeof d.memory.percent === 'number', 'memory.percent present');
     assert(typeof d.storage.used_files === 'number', 'storage.used_files present');
-    assert(typeof d.micro_memory.used_sets === 'number', 'micro_memory.used_sets present');
     assert(d.counts.agents >= 1, `counts.agents >= 1, got ${d.counts.agents}`);
     assert(typeof d.counts.apps.max === 'number', 'counts.apps.max present');
     assert(typeof d.counts.extensions.max === 'number', 'counts.extensions.max present');
@@ -120,7 +119,7 @@ await test('GET /v1/owner/usage returns the full summary shape', async () => {
 });
 
 await test('The summary carries the AI allowance — the one limit a person could not see', async () => {
-    // The bars on Home are memory, files and micro-memory; what a person may SPEND was on none of
+    // The bars on Home are memory and files; what a person may SPEND was on none of
     // them and on no other page they visit. own_key decides the shape rather than the number: an
     // owner running on their own key has no house limit at all, and a bar would invent one.
     const { body } = await json('/v1/owner/usage', { headers: { Authorization: `Bearer ${ownerToken}` } });

@@ -9,7 +9,7 @@
  */
 import type {
   OwnerRecord, AgentRecord, MemoryRecord, ActionRecord, WorkRecord, WalletTransaction,
-  BoardRecord, BoardPostRecord, OtkRecord, DisputeRecord, MicroMemoryRecord, PeeringRequestRecord,
+  BoardRecord, BoardPostRecord, OtkRecord, DisputeRecord, PeeringRequestRecord,
   GHIIRecord, PersonalNodeRecord, MailboxItemRecord, SchemaRecord, ConsentRecord, CsmRecord,
   MsmRecord, EmailVerificationRecord, FlagRecord, MatchRecord, OrganismRecord, OrganismMembershipRecord,
   JoinRequestRecord, PendingApprovalRecord, AppealRecord, ListingRecord, PurchaseRecord, TrustedIssuerRecord,
@@ -36,7 +36,6 @@ export interface SqliteInternals {
   deserializeBoardSubscription(row: Record<string, unknown>): BoardSubscriptionRecord ;
   deserializeOtk(row: Record<string, unknown>): OtkRecord ;
   deserializeDispute(row: Record<string, unknown>): DisputeRecord ;
-  deserializeMicroMemory(row: Record<string, unknown>): MicroMemoryRecord ;
   deserializePeeringRequest(row: Record<string, unknown>): PeeringRequestRecord ;
   deserializeGHII(row: Record<string, unknown>): GHIIRecord ;
   deserializeChatInstance(row: Record<string, unknown>): ChatInstanceRecord ;

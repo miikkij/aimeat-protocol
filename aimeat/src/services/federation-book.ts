@@ -25,7 +25,7 @@ import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { computeServiceSummary } from '../utils/service-summary.js';
-import { validateOutboundUrl } from '../utils/url-validator.js';
+import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { sign, verify } from '../auth/keypair.js';
 import { peerKeyCache } from './federation-helpers.js';
 import { logger } from '../utils/logger.js';
@@ -158,7 +158,8 @@ export async function assembleBook(config: AimeatConfig, storage: Storage, peers
     try {
       const check = await validateOutboundUrl(peer.url);
       if (!check.valid) continue;
-      const resp = await fetch(`${peer.url}/v1/federation/node-card`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
+      // safeFetch re-validates each redirect hop; peer.url is remote-supplied (CodeQL request-forgery).
+      const resp = await safeFetch(`${peer.url}/v1/federation/node-card`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
       if (!resp.ok) continue;
       const body = await resp.json() as { data?: NodeCard };
       const card = body?.data;
@@ -212,7 +213,8 @@ export async function pullBook(config: AimeatConfig, storage: Storage, peers: Ma
 
   let book: FederationBook;
   try {
-    const resp = await fetch(`${source.replace(/\/+$/, '')}/v1/federation/book`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
+    // safeFetch re-validates each redirect hop; source is remote-supplied (CodeQL request-forgery).
+    const resp = await safeFetch(`${source.replace(/\/+$/, '')}/v1/federation/book`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
     if (!resp.ok) return { ok: false, status: 502, code: 'FETCH_FAILED', message: `Source returned ${resp.status}` };
     const body = await resp.json() as { data?: { book?: FederationBook } };
     book = body?.data?.book as FederationBook;

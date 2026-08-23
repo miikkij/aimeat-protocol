@@ -1358,8 +1358,8 @@ function detailLoadVersions(owner, filename) {
         }
       }
       if (versions.length === 0) { detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>'; listEl.innerHTML = detailVersionsHtml; return; }
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var ownerArg = "'" + jsArg(owner) + "'";
+      var fileArg = "'" + jsArg(filename) + "'";
       var html = '';
       for (var i = 0; i < versions.length; i++) {
         var v = versions[i];
@@ -2058,8 +2058,8 @@ function showVersionsModal(owner, filename) {
       statusEl.textContent = versions.length + ' ' + t('versions.stored');
       statusEl.style.color = 'var(--text-muted)';
 
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var ownerArg = "'" + jsArg(owner) + "'";
+      var fileArg = "'" + jsArg(filename) + "'";
       var html = '';
       for (var i = 0; i < versions.length; i++) {
         var v = versions[i];

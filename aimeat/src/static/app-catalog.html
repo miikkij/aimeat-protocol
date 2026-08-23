@@ -7388,8 +7388,8 @@
         listEl.innerHTML = detailVersionsHtml;
         return;
       }
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var ownerArg = "'" + jsArg(owner) + "'";
+      var fileArg = "'" + jsArg(filename) + "'";
       var html = "";
       for (var i = 0; i < versions.length; i++) {
         var v = versions[i];
@@ -8077,8 +8077,8 @@
       }
       statusEl.textContent = versions.length + " " + t("versions.stored");
       statusEl.style.color = "var(--text-muted)";
-      var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
-      var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";
+      var ownerArg = "'" + jsArg(owner) + "'";
+      var fileArg = "'" + jsArg(filename) + "'";
       var html = "";
       for (var i = 0; i < versions.length; i++) {
         var v = versions[i];
@@ -8652,7 +8652,7 @@
   function favStarHtml(ref) {
     var on = favSet.has(ref);
     var title = on ? t("fav.remove") || "Remove from favourites" : t("fav.add") || "Add to favourites";
-    return '<button class="fav-toggle' + (on ? " on" : "") + `" onclick="event.stopPropagation(); window._launcher.toggleFavorite('` + String(ref).replace(/'/g, "\\'") + `')" title="` + title + '">' + (on ? "⭐" : "☆") + "</button>";
+    return '<button class="fav-toggle' + (on ? " on" : "") + `" onclick="event.stopPropagation(); window._launcher.toggleFavorite('` + jsArg(ref) + `')" title="` + title + '">' + (on ? "⭐" : "☆") + "</button>";
   }
 
   // src/static/app-catalog/js/server-io.js
