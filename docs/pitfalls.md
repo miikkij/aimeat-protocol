@@ -117,20 +117,32 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **Translations + settings are USER data** — cortex reads them via `AIMEAT.data.get('service.i18n.fi')`, NEVER via `getPublic('ext:...')`.
 
 ## 8b. Package components that are apps
-*Symptoms: an installed app 404s on its own origin, never gets a subdomain, and its owner is asked to sign in inside the app.*
+*Symptoms: the link a listing gives for a freshly installed app 404s, and the app has no subdomain until somebody opens it some other way.*
 
-- **A package's app component id MUST end in `.html`.** An installed app's filename is
-  `package-owner-shortId-componentId`, and the app-host path form treats a request as an app only
-  when the filename matches `/\.html?$/i` (`routes/subdomains.ts`, the `:owner/:filename` handler).
-  An extensionless component id therefore produces an app that never has a subdomain minted and can
-  never be opened on its own origin — which is the only place the silent SSO bridge works, so its
-  owner has to sign in inside the app instead of arriving already signed in. The app still serves
-  200 on the shared host, which is why this looks fine until somebody tries the per-app address.
-  *(Measured 2026-08-23 on a local node with `AIMEAT_APP_HOST` set: `businesslauncher`'s
-  `app-shop.html` 302s to `...apps.localhost`; `digital-signage`'s `app-admin` 404s on that door,
-  with and without a `.html` appended. `aimeat-iam` (`app-dashboard`) and `aimeat-marketplace`
-  (`app-marketplace`) have the same shape and were not probed.)* Renaming a component id changes
-  the filename of every EXISTING install, so this is not a silent fix.
+- **An app component's id IS its filename, and the filename has to end in `.html`.** The installer
+  registers every component as `package-owner-shortId-componentId` and the registrar writes
+  `filename: registeredAs` verbatim — nothing in between adds a suffix. But two other places decide
+  "is this an app" by looking for `.html` on that filename: the publish-time subdomain provisioning
+  (`services/app-publish.ts`) and the app-host path form (`routes/subdomains.ts`). The path form is
+  what `resolveAppUrls` hands out for any app that has no subdomain yet, and its own comment states
+  the invariant a bare filename breaks: *"The path form serves every app regardless, so a
+  subdomain-table failure costs a prettier URL and never the link itself."* For a bare filename it
+  costs the link itself.
+  **Closed 2026-08-23 in the installer** (`registeredNameFor`, `routes/instances/install.ts`): a
+  `type: 'app'` component whose id lacks the suffix gets one appended. Idempotent, so a package that
+  already writes `app-shop.html` passes through untouched; the COMPONENT ID does not move, because
+  dependencies and migration prompts address components by id; and `ensureAppSubdomain` strips the
+  suffix before building a label, so no subdomain changes.
+  *(Measured before and after on a local node with `AIMEAT_APP_HOST` set. Before: `digital-signage`'s
+  `app-admin` 404s on the path form, with and without a `.html` appended, while still serving 200 on
+  the shared host — which is why it looks fine. After: `app-admin.html`, path form 302s and mints,
+  own origin 200.)*
+- **It only fixes NEW installs.** An app already installed under a bare filename keeps it and stays
+  reachable only through the apex; it heals when the package is installed again.
+- **A package install never provisions a subdomain the way a publish does.** The registrar calls
+  `storage.createApp` directly rather than `services/app-publish.ts`, so the "provision it NOW so the
+  vanity URL does not 404" step that ordinary published apps get is skipped. With the suffix in place
+  the first open through either door mints one, so this costs a redirect rather than a dead link.
 
 ## 9. AI / LLM calls
 *Symptoms: truncated completions, a non-English prompt in code, a long call timing out.*

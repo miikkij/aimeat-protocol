@@ -528,6 +528,63 @@ await test('Install package (POST /v1/packages/:groupId/install)', async () => {
   instanceId = body.data.id;
 });
 
+await test('An app component gets a filename that an app origin recognises', async () => {
+  // An installed app's filename IS the component id with the install prefix on it, and TWO other
+  // gates decide "is this an app" by looking for .html on that filename: the publish-time subdomain
+  // provisioning (app-publish.ts) and the app-host path form (subdomains.ts). A package that names
+  // its component `app-admin` therefore installs an app that skips both, and its owner meets a 404
+  // on the address a listing handed them. Appending is idempotent, so a package that already writes
+  // `app-shop.html` is untouched.
+  const { body: created } = await json('/v1/packages', {
+    method: 'POST',
+    headers: authed(ownerToken),
+    body: JSON.stringify({
+      name: 'app-suffix-probe',
+      description: 'Two app components, one named with the suffix and one without',
+      visibility: 'public',
+      components: [
+        { id: 'app-bare', type: 'app', label: 'Bare', content: '<!DOCTYPE html><title>bare</title>', dependencies: [] },
+        { id: 'app-suffixed.html', type: 'app', label: 'Suffixed', content: '<!DOCTYPE html><title>suffixed</title>', dependencies: [] },
+      ],
+    }),
+  });
+  const probeGroup = encodeURIComponent(created.data.packageGroupId as string);
+  await json(`/v1/packages/${probeGroup}/versions/${created.data.version}`, {
+    method: 'PATCH', headers: authed(ownerToken), body: JSON.stringify({ status: 'published' }),
+  });
+
+  const { status, body } = await json(`/v1/packages/${probeGroup}/install`, {
+    method: 'POST', headers: authed(ownerToken), body: JSON.stringify({ label: 'Suffix probe' }),
+  });
+  assert(status === 201, `Expected 201, got ${status}: ${JSON.stringify(body)}`);
+
+  const comps = body.data.installedComponents as Array<{ componentId: string; registeredAs: string }>;
+  const bareApp = comps.find(c => c.componentId === 'app-bare')!;
+  const suffixed = comps.find(c => c.componentId === 'app-suffixed.html')!;
+  assert(bareApp.registeredAs.endsWith('.html'),
+    `a bare app component id must still install as an .html filename: ${bareApp.registeredAs}`);
+  assert(!suffixed.registeredAs.endsWith('.html.html'),
+    `appending must be idempotent, got ${suffixed.registeredAs}`);
+  assert(suffixed.registeredAs.endsWith('-app-suffixed.html'),
+    `an id that already carries the suffix must pass through unchanged: ${suffixed.registeredAs}`);
+
+  // The component id itself does not move: dependencies and migration prompts address components
+  // by id, and renaming them here would break both.
+  assert(bareApp.componentId === 'app-bare', 'the component id must stay as the package wrote it');
+
+  // The suffix is a filename detail and must not leak into what a person reads: the catalogue shows
+  // the component's own label.
+  const { body: appsBody } = await json('/v1/apps', { headers: authed(ownerToken) });
+  const row = (appsBody.data as { apps: Array<{ filename: string; manifest: { name: string } }> }).apps
+    .find(a => a.filename === bareApp.registeredAs);
+  assert(!!row, `the installed app is not in the catalogue: ${bareApp.registeredAs}`);
+  assert(row!.manifest.name === 'Bare', `expected the label as the display name, got ${row!.manifest.name}`);
+
+  // And it is really served under the new filename, which is the whole point of appending it.
+  const served = await fetch(`${BASE}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(bareApp.registeredAs)}`);
+  assert(served.status === 200, `Expected 200 serving the installed app, got ${served.status}`);
+});
+
 await test('Cannot install draft package', async () => {
   // Create a draft-only package to test against
   const { body: draftPkg } = await json('/v1/packages', {
