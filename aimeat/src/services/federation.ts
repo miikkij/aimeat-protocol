@@ -247,12 +247,18 @@ export function startHeartbeatJob(
             if (Math.abs(cyclePhase - stagger) > BASE_INTERVAL_MS * 0.3) continue;
 
             try {
+                // A heartbeat says "I am up". `stats` says how many agents and actions this node
+                // has and hashes its catalogue, which is discovery data: a peer we share no
+                // catalogue with should not be counting our people. Liveness is still sent, because
+                // deliverDirectMessage refuses an offline peer and a contact link needs to work.
                 const payload = {
                     node_id: config.nodeId,
                     timestamp: new Date().toISOString(),
                     version: 'v1',
                     software_version: getSoftwareVersion(),
-                    stats: {
+                    stats: peer.shareCatalogue === false ? {
+                        uptime_hours: (Date.now() - startedAt) / 3_600_000,
+                    } : {
                         agents_active: agents.length,
                         actions_published: actions.length,
                         uptime_hours: (Date.now() - startedAt) / 3_600_000,
