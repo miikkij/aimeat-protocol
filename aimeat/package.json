@@ -268,7 +268,7 @@
       "brace-expansion@<1.1.18": ">=1.1.18",
       "brace-expansion@>=2.0.0 <2.1.4": ">=2.1.4",
       "brace-expansion@>=4.0.0 <5.0.9": ">=5.0.9",
-      "js-yaml@>=4.0.0 <4.3.1": ">=4.3.1",
+      "js-yaml@>=4.0.0 <4.3.1": "^4.3.1",
       "minimatch@>=5.0.0 <5.1.8": "5.1.8",
       "readdir-glob@3>minimatch": "10.2.5",
       "path-to-regexp@>=8.0.0 <8.4.0": "8.4.0",
