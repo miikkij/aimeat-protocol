@@ -63,6 +63,7 @@ const GAP_LABEL = {
 function HowToStart({ empty }) {
   return html`
     <${ExpandableHelp} title=${t('admin.compliance.howTitle')} open=${empty}>
+      <p class="adm-cmp-note">${t('admin.compliance.howIntro')}</p>
       <ol class="adm-cmp-steps">
         <li>${t('admin.compliance.howStep1')}</li>
         <li>${t('admin.compliance.howStep2')}</li>
