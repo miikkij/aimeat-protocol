@@ -649,8 +649,8 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'Get a new token', method: 'POST', url: '/v1/auth/token' },
     ]));
   });
-  // Tier 0.5 one-time keys — moved to auth-otk.ts by pure extraction (max-file-lines).
-  registerOtkRoutes(router, config, storage, sessions, SESSION_INACTIVITY_MS);
+  // Connectivity-key mint — the Tier 0.5 OTK routes beside it were removed 2026-08-23 (RFC v4.0).
+  registerOtkRoutes(router, config, storage);
 
 
   // Cleanup expired challenges and inactive sessions periodically

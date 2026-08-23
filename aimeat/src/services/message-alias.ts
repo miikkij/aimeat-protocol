@@ -30,6 +30,11 @@
  *   v1.1.0 — 2026-08-23 — soleParticipantNote(): on a one-operator node the operator's own support
  *     message reaches nobody, which is true rather than broken. Both send doors return the reason
  *     beside the count, because an agent reading a bare `delivered_to: 0` concludes the node failed.
+ *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 13): an omitted `to` no longer counts
+ *     as "addressed to support" by itself. An id-only continuation on an upstream-support node
+ *     redirects only when the sender has already written to the upstream support address in that
+ *     thread; any other pair thread continued by id alone falls through to the ordinary path
+ *     instead of being rerouted to the vendor's support.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -198,7 +203,6 @@ export async function resolveGroupTarget(
   input: { to: string; conversationId?: string; subject?: string },
 ): Promise<GroupTarget> {
   const route = resolveSupportRoute(ctx.peers.values());
-  const addressedToSupport = !input.to?.trim() || isAliasAddress(input.to, config.nodeId);
 
   if (input.conversationId) {
     const existing = await ctx.storage.getConversation(input.conversationId);
@@ -209,8 +213,24 @@ export async function resolveGroupTarget(
     // No record means a PAIR thread, which is what an upstream ticket is on this side. Continuing it
     // has to reach the same thread id, or "pass the conversation id back" stops being true the
     // moment support is answered somewhere else.
-    if (route.kind === 'upstream' && addressedToSupport) {
-      return { kind: 'redirect', to: route.address, conversationId: input.conversationId, subject: input.subject };
+    //
+    // The gate reads what the SENDER actually did, not the raw request (invariant 13; audit
+    // AI-triage 2026-08-23): an omitted `to` used to count as "addressed to support" on its own, so
+    // any pair thread continued by id alone on a node with a support upstream was silently rerouted
+    // to the vendor's support address instead of the thread's real counterparty. Now an id-only
+    // continuation redirects only when this sender has already written to the upstream support
+    // address in this very thread — which is what "continuing my ticket" means. An explicit
+    // support address still redirects as before.
+    if (route.kind === 'upstream') {
+      const explicit = isAliasAddress(input.to, config.nodeId);
+      const continuesOwnTicket = async () => {
+        if (input.to?.trim()) return false;
+        const { messages } = await ctx.storage.listConversation(senderGhii, input.conversationId!);
+        return messages.some(m => m.senderGhii === senderGhii && m.recipientGhii === route.address);
+      };
+      if (explicit || await continuesOwnTicket()) {
+        return { kind: 'redirect', to: route.address, conversationId: input.conversationId, subject: input.subject };
+      }
     }
     return { kind: 'none' };
   }

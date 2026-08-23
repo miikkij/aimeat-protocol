@@ -6,6 +6,12 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 15): the four email-invitation doors
+ *     move from requireRoleOrScope('agent', 'organism:invite') to requireScope('organism:invite').
+ *     The role path ran first, so ANY agent passed and the scope word was decorative on the HTTP
+ *     door while the MCP surface filtered tools on the same word — enforced where the owner reads,
+ *     ignored where the write happens. Owner sessions still bypass scopes; an app session with the
+ *     owner-granted scope still passes (the v1.4.0 intent); an agent without the word now gets 403.
  *   v1.1.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): the code-key mint provisions via:'invitation' and maps RegistrationClosedError to 403 on a fully closed node.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  *   v1.1.0 — 2026-07-15 — Discovery list marks a workspace 'granted' for org managers (creator/admin),
@@ -42,7 +48,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, requireRoleOrScope } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner, validateOwnerName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -436,7 +442,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   /* POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin only).
    * Throttle a single inviter to bound outbound email; the per-organism pending cap in
    * createEmailInvitation() is the harder backstop against accumulating spam invites. */
-  router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+  router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireScope('organism:invite'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const organism = await requireOrgAdmin(req, res, id);
@@ -472,7 +478,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   });
 
   /* GET /v1/organisms/:id/invitations/email — list pending email invitations (creator/admin) */
-  router.get('/v1/organisms/:id/invitations/email', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), async (req, res) => {
+  router.get('/v1/organisms/:id/invitations/email', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await requireOrgAdmin(req, res, id);
     if (!organism) return;
@@ -482,7 +488,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
   /* PATCH /v1/organisms/:id/invitations/email/:invId — edit a PENDING email invite's role/workspace
    * grants (rights stay editable until accepted, mirroring the name-invite PATCH). Body: { orgRole?, workspaces? } */
-  router.patch('/v1/organisms/:id/invitations/email/:invId', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), async (req, res) => {
+  router.patch('/v1/organisms/:id/invitations/email/:invId', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const invId = req.params.invId as string;
     const organism = await requireOrgAdmin(req, res, id);
@@ -507,7 +513,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   });
 
   /* POST /v1/organisms/:id/invitations/email/:invId/cancel — cancel a pending email invite (creator/admin) */
-  router.post('/v1/organisms/:id/invitations/email/:invId/cancel', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), async (req, res) => {
+  router.post('/v1/organisms/:id/invitations/email/:invId/cancel', requireAuth(), requireScope('organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const invId = req.params.invId as string;
     const organism = await requireOrgAdmin(req, res, id);

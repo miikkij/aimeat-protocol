@@ -17946,76 +17946,6 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  /v1/auth/otk:
-    post:
-      operationId: generateOtk
-      summary: Generate one-time key
-      description: Create a one-time key for Tier 0.5 operations (GET-based writes).
-      tags: [Auth]
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [action, params]
-              properties:
-                action:
-                  type: string
-                  description: Operation type (write_memory, post_board, etc.)
-                params:
-                  type: object
-                  description: Parameters for the OTK operation
-                ttl_minutes:
-                  type: integer
-                  default: 60
-      responses:
-        '201':
-          $ref: '#/components/responses/AimeatSuccess'
-
-  /v1/otk/{key}:
-    get:
-      operationId: executeOtk
-      summary: Execute one-time key
-      description: |
-        Execute a previously generated one-time key (Tier 0.5). No auth
-        required — the key itself is the credential. Currently supports
-        the `write_memory` action. The key is consumed on first use.
-      tags: [Auth]
-      parameters:
-        - name: key
-          in: path
-          required: true
-          schema:
-            type: string
-          description: The one-time key token
-      responses:
-        '200':
-          description: OTK action executed
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          action:
-                            type: string
-                            example: write_memory
-                          key:
-                            type: string
-                          written:
-                            type: boolean
-        '401':
-          description: Session expired due to inactivity
-        '404':
-          description: One-time key not found, expired, or already used
-
   # ── Chunked Upload ─────────────────────────────────────────
 
   /v1/storage/upload/init:
@@ -42549,37 +42479,6 @@ paths:
                           expires_in: { type: integer }
         '403':
           $ref: '#/components/responses/Forbidden'
-  /v1/auth/initial-otk:
-    post:
-      operationId: postAuthInitialOtk
-      tags: [Auth]
-      summary: Generate an Initial OTK (timer starts on first use)
-      description: |
-        Requires authentication. Mints a one-time key that stays dormant (no expiry) until its
-        first use; once used it remains valid for the node's OTK grace period. Intended to be
-        embedded in prompts for AI agents.
-      security:
-        - BearerAuth: []
-      responses:
-        '201':
-          description: Initial OTK created
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          otk: { type: string }
-                          initial: { type: boolean }
-                          grace_ms: { type: integer }
-                          note: { type: string }
-                          owner: { type: string }
-        '401':
-          $ref: '#/components/responses/Unauthorized'
   /v1/auth/sessions:
     get:
       operationId: getAuthSessions

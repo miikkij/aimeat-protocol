@@ -5,6 +5,9 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 14): PUT /peers/:nodeId stages every
+ *     change on a copy and touches the live peers-Map object only after the last refusal has passed.
+ *     A support_upstream 409 used to leave a half-applied peer in memory, diverging from storage.
  *   v1.1.0 — 2026-08-10 — Security audit H-14: heartbeat refuses a missing signature instead of skipping
  *     verification, and recovers status only from a liveness state.
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
@@ -332,33 +335,40 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         }
 
         const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, support_upstream, peer_mode, allow_federated_auth, federation_auth_scopes, tier } = req.body ?? {};
-        if (url) peer.url = url;
-        if (public_key) peer.publicKey = public_key;
-        if (status) peer.status = status;
+
+        // Every change is staged on a COPY and the live peers-Map object is only touched after the
+        // last refusal has passed (invariant 14 — refuse before you write; audit AI-triage
+        // 2026-08-23). The old shape mutated `peer` field by field and 409'd in the middle, so a
+        // rejected request had already changed what every gate reads from the live Map, and the
+        // in-memory state diverged from the stored one until restart.
+        const next: PeerInfo = { ...peer };
+        if (url) next.url = url;
+        if (public_key) next.publicKey = public_key;
+        if (status) next.status = status;
 
         // Tier change (e.g. promote visiting → member) re-derives the canonical flags first,
         // so a promotion grants the full member capability set in one step. Explicit flag
         // fields below may still override afterwards.
         const currentTier = coerceTier(peer.tier);
         if (tier === 'genesis' || tier === 'member' || tier === 'visiting' || tier === 'contact') {
-            peer.tier = tier;
-            Object.assign(peer, deriveTierFlags(tier));
+            next.tier = tier;
+            Object.assign(next, deriveTierFlags(tier));
         }
-        const effectiveTier = coerceTier(peer.tier);
+        const effectiveTier = coerceTier(next.tier);
 
         // Apply what was asked, then hold the whole set to what the tier permits. The rules used to
         // be five inline conditions here, which is why three of them were missing the moment a flag
         // was added; clampFlagsToTier owns them now and is tested on its own.
-        if (typeof share_catalogue === 'boolean') peer.shareCatalogue = share_catalogue;
-        if (typeof replicate_memory === 'boolean') peer.replicateMemory = replicate_memory;
-        if (typeof allow_routing === 'boolean') peer.allowRouting = allow_routing;
-        if (typeof allow_messaging === 'boolean') peer.allowMessaging = allow_messaging;
-        if (typeof allow_broadcast === 'boolean') peer.allowBroadcast = allow_broadcast;
-        if (typeof allow_settlement === 'boolean') peer.allowSettlement = allow_settlement;
-        if (peer_mode === 'federation' || peer_mode === 'private') peer.peerMode = peer_mode;
-        if (typeof allow_federated_auth === 'boolean') peer.allowFederatedAuth = allow_federated_auth;
-        if (Array.isArray(federation_auth_scopes)) peer.federationAuthScopes = federation_auth_scopes;
-        Object.assign(peer, clampFlagsToTier(effectiveTier, peer));
+        if (typeof share_catalogue === 'boolean') next.shareCatalogue = share_catalogue;
+        if (typeof replicate_memory === 'boolean') next.replicateMemory = replicate_memory;
+        if (typeof allow_routing === 'boolean') next.allowRouting = allow_routing;
+        if (typeof allow_messaging === 'boolean') next.allowMessaging = allow_messaging;
+        if (typeof allow_broadcast === 'boolean') next.allowBroadcast = allow_broadcast;
+        if (typeof allow_settlement === 'boolean') next.allowSettlement = allow_settlement;
+        if (peer_mode === 'federation' || peer_mode === 'private') next.peerMode = peer_mode;
+        if (typeof allow_federated_auth === 'boolean') next.allowFederatedAuth = allow_federated_auth;
+        if (Array.isArray(federation_auth_scopes)) next.federationAuthScopes = federation_auth_scopes;
+        Object.assign(next, clampFlagsToTier(effectiveTier, next));
 
         // Where this node's `support@operators` is answered. Refused when another active peer already
         // holds it, so "who answers support here" cannot become two answers: a support request going
@@ -373,14 +383,17 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                     return;
                 }
                 // Routing to a peer that cannot carry a message is a black hole with a green light.
-                if (peer.allowMessaging === false) {
+                if (next.allowMessaging === false) {
                     res.status(409).json(error(config.nodeId, 'MESSAGING_DISABLED',
                         'This peer may not deliver messages here, so it cannot answer support. Enable allow_messaging first.'));
                     return;
                 }
             }
-            peer.supportUpstream = support_upstream;
+            next.supportUpstream = support_upstream;
         }
+
+        // All refusals are behind us: commit to the live object and persist the same state.
+        Object.assign(peer, next);
         await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {

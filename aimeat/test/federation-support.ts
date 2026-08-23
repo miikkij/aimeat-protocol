@@ -348,6 +348,47 @@ await test('S10. REFUSED — a second peer cannot also answer support', async ()
     assert(r.body.error?.code === 'ONE_UPSTREAM_ONLY', `got ${r.body.error?.code}`);
 });
 
+await test('S10b. The refused PUT changed nothing: a 409 leaves the peer as it was', async () => {
+    // Invariant 14 (audit AI-triage 2026-08-23): the handler used to mutate the live peers-Map
+    // object field by field and 409 in the middle, so the refused request had already promoted the
+    // peer in memory while storage kept the old row. Against the pre-fix source the tier below
+    // reads 'member'.
+    const other = 'aimeat-peer-001-second';
+    const r = await C.json(`/v1/federation/peers/${other}`, {
+        method: 'PUT', headers: auth(C.ownerToken),
+        body: JSON.stringify({ tier: 'member', support_upstream: true }),
+    });
+    assert(r.status === 409, `expected 409, got ${r.status}: ${JSON.stringify(r.body)}`);
+
+    const list = await C.json('/v1/federation/peers', { headers: auth(C.ownerToken) });
+    const row = (list.body.data.peers as any[]).find(p => p.node_id === other);
+    assert(!!row && row.tier === 'contact', `the refused PUT promoted the peer anyway: ${JSON.stringify(row?.tier)}`);
+    assert(row.support_upstream !== true, 'and it did not take support either');
+});
+
+await test('S10c. A pair thread continued by id alone is NOT rerouted to the vendor\'s support', async () => {
+    // Invariant 13 (audit AI-triage 2026-08-23): an omitted `to` used to count as "addressed to
+    // support" by itself, so on a node with a support upstream ANY pair thread continued with just
+    // its conversation id was silently delivered to the vendor's support queue instead of the
+    // thread's real counterparty. Against the pre-fix source the continuation below answers 201
+    // with addressed_to support@{vendor}.
+    const opened = await C.json('/v1/messages', {
+        method: 'POST', headers: auth(C.ownerToken),
+        body: JSON.stringify({ to: V.ownerGhii, subject: 'Private thread', body: 'Between the two of us.' }),
+    });
+    assert(opened.status === 201, `open pair thread: ${opened.status} ${JSON.stringify(opened.body)}`);
+    const pairId = opened.body.data.conversation_id ?? opened.body.data.message?.conversationId;
+    assert(typeof pairId === 'string' && pairId.length > 0, 'the pair thread has an id');
+
+    const cont = await C.json('/v1/messages', {
+        method: 'POST', headers: auth(C.ownerToken),
+        body: JSON.stringify({ conversation_id: pairId, body: 'Still between the two of us.' }),
+    });
+    assert(cont.body.data?.addressed_to !== `support@${V.nodeId}`,
+        `the private continuation was rerouted to the vendor's support: ${JSON.stringify(cont.body.data)}`);
+    assert(cont.status === 400, `an id-only pair continuation asks for its recipient (400), got ${cont.status}: ${JSON.stringify(cont.body)}`);
+});
+
 await test('S11. Taking support back makes support@operators local again, immediately', async () => {
     const off = await C.json(`/v1/federation/peers/${V.nodeId}`, {
         method: 'PUT', headers: auth(C.ownerToken), body: JSON.stringify({ support_upstream: false }),

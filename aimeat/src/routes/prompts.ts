@@ -655,12 +655,12 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
           },
           auth_instructions: config.anonymousMode
             ? 'Anonymous mode is enabled. No authentication needed \u2014 connect directly to the MCP URL.'
-            : 'Authentication required. Use an Initial OTK (POST /v1/auth/initial-otk) or JWT (POST /v1/auth/token) as a Bearer token in the MCP connection headers.',
+            : 'Authentication required. Use a JWT (POST /v1/auth/token) as a Bearer token in the MCP connection headers.',
           docs: `${baseUrl}/v1/docs`,
           integration_guide: 'See docs/integrations/openclaw-setup.md for full setup instructions.',
         }, [
           { description: 'Connect via MCP', method: 'POST', url: '/v1/mcp' },
-          { description: 'Generate Initial OTK for auth', method: 'POST', url: '/v1/auth/initial-otk' },
+          { description: 'Get a JWT for auth', method: 'POST', url: '/v1/auth/token' },
           { description: 'Browse catalogue', method: 'GET', url: '/v1/catalogue' },
         ]));
         break;

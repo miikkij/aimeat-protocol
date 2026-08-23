@@ -492,6 +492,34 @@ await test('I6. An unknown or revoked token is a pending request, never a link',
     assert(revoked.status === 202, `a revoked token admits nobody, got ${revoked.status}`);
 });
 
+await test('I7. A refused URL does not burn the invite (refuse before you write)', async () => {
+    // Invariant 14 (audit AI-triage 2026-08-23): consumeLinkInvite used to run before the URL
+    // check, so a 400 INVALID_URL left the one-time token spent with no link to show for it.
+    // Against the pre-fix source the second half fails: the retry falls through to 202 pending.
+    await dropPeer(I_NODE);
+    const mint = await V.json('/v1/federation/link-invites', {
+        method: 'POST', headers: auth(V.ownerToken), body: JSON.stringify({ tier: 'contact' }),
+    });
+    const token = mint.body.data.token;
+
+    const badUrl = 'http://169.254.169.254:49994'; // link-local: refused whatever the egress profile
+    const timestamp = new Date().toISOString();
+    const signature = await sign(iKeys.privateKey, `${I_NODE}${badUrl}${timestamp}`);
+    const bad = await V.json('/v1/federation/peer/introduce', {
+        method: 'POST',
+        body: JSON.stringify({
+            node_id: I_NODE, node_url: badUrl, public_key: iKeys.publicKey,
+            role: 'contributor', signature, timestamp, invite_token: token,
+        }),
+    });
+    assert(bad.status === 400, `expected 400 INVALID_URL, got ${bad.status}: ${JSON.stringify(bad.body)}`);
+
+    // The same token, now with a valid URL: it must still admit — the refusal did not consume it.
+    const good = await introduce(token);
+    assert(good.status === 200, `the invite was burned by the refused attempt: ${good.status} ${JSON.stringify(good.body)}`);
+    assert(good.body.data.tier === 'contact', `admitted at contact, got ${good.body.data.tier}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 V!.server.close();
 process.exit(failed > 0 ? 1 : 0);
