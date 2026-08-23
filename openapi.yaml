@@ -10974,6 +10974,12 @@ paths:
         node, the register being unverified, the consent-audit retention window, and the usage
         archive window. A total without its population reads as coverage.
 
+        Each entry is `{ code, text, days? }`. `text` is the English statement, which is what a
+        machine or an exported document reads; `code` is a stable identifier a user interface
+        translates, and `days` carries the number a retention or archive sentence turns on. New
+        codes are added, never renamed in place, so a reader that does not know one falls back to
+        `text` rather than showing nothing.
+
         The gate is the ACCOUNT, not the token's role list: the operator in person passes, and the
         operator's agent passes carrying the exact scope `compliance:read`, which no wildcard
         conveys. Reading writes its own usage row before responding.

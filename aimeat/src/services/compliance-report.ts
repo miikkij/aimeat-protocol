@@ -54,6 +54,27 @@ const USAGE_HOT_WINDOW_DAYS = 90;
 /** `YYYY-MM`, the scheduled report's period. */
 export const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
+/**
+ * One thing the report does not cover.
+ *
+ * BOTH A CODE AND A SENTENCE, because two different readers need different things. A person opens
+ * this in their own language, so the surface renders `code` through the locale files. A machine —
+ * the API, the CSV an auditor is handed, another node — gets `text`, which is the English statement
+ * and is also the fallback when a surface has no string for a code it has not seen.
+ *
+ * The first version was English prose only, built here. It was derived and honest and it could not
+ * be translated, which on a page whose whole argument is "read the limits before the numbers" made
+ * the limits the one part a Finnish reader skipped.
+ */
+export interface ComplianceLimit {
+  /** Stable identifier the surfaces translate. New codes are additive; never renamed in place. */
+  code: string;
+  /** The English statement. Served as-is to machines, and used when a surface lacks the code. */
+  text: string;
+  /** The number the sentence turns on, when it has one — a retention or archive window in days. */
+  days?: number;
+}
+
 export interface ComplianceGap {
   kind:
     | 'undocumented-ai-activity'
@@ -76,7 +97,7 @@ export interface ComplianceReport {
     questionnaire_version: string;
   };
   /** What this report does NOT cover. Read before the numbers. See the file header. */
-  not_covered: string[];
+  not_covered: ComplianceLimit[];
   derived: {
     ai_transparency: AiTransparencyReport;
     ai_usage: {
@@ -127,27 +148,58 @@ export function monthWindow(month: string): { from: string; to: string; days: nu
  * `transparencyNote` is lifted from the roll-up's own scope note instead of restated, so the two can
  * never come to say different things about the same absence.
  */
-function notCovered(config: AimeatConfig, transparencyNote: string): string[] {
+function notCovered(config: AimeatConfig, transparencyNote: string): ComplianceLimit[] {
   return [
-    transparencyNote,
-    'Only this node. Content published on a federation peer, on someone\'s personal node, or '
-      + 'anywhere off this node is outside every number here.',
-    'The use-case register is what the operator wrote down. Nothing in this report checks it against '
-      + 'what is actually running — that comparison is the gap list, and it can only see what the '
-      + 'node itself records.',
-    'A risk class is the operator\'s own answers run through the operator\'s own question set. It is '
-      + 'an engineering aid for finding what needs a closer look, not a legal determination.',
-    'This node does not watermark text. It does not sample the tokens, and that layer belongs to '
-      + 'whoever runs the model.',
-    `Consent audit entries are deleted after ${config.consentAuditRetentionDays} days on this node, `
-      + 'so access older than that cannot appear here. The grant counts themselves are not pruned.',
-    `AI usage is counted from the rolled-up window of about ${USAGE_HOT_WINDOW_DAYS} days. A period `
-      + 'older than that has been archived, and a zero here would mean archived rather than idle.',
+    // The absent-record rule is lifted from the roll-up's own scope note rather than restated, so
+    // the two can never come to say different things about the same absence.
+    { code: 'no-record', text: transparencyNote },
+    {
+      code: 'this-node-only',
+      text: 'Only this node. Content published on a federation peer, on someone\'s personal node, or '
+        + 'anywhere off this node is outside every number here.',
+    },
+    {
+      code: 'register-unverified',
+      text: 'The use-case register is what the operator wrote down. Nothing in this report checks it '
+        + 'against what is actually running — that comparison is the gap list, and it can only see '
+        + 'what the node itself records.',
+    },
+    {
+      code: 'not-a-legal-determination',
+      text: 'A risk class is the operator\'s own answers run through the operator\'s own question '
+        + 'set. It is an engineering aid for finding what needs a closer look, not a legal '
+        + 'determination.',
+    },
+    {
+      code: 'no-watermark',
+      text: 'This node does not watermark text. It does not sample the tokens, and that layer '
+        + 'belongs to whoever runs the model.',
+    },
+    {
+      code: 'consent-retention',
+      days: config.consentAuditRetentionDays,
+      text: `Consent audit entries are deleted after ${config.consentAuditRetentionDays} days on `
+        + 'this node, so access older than that cannot appear here. The grant counts themselves are '
+        + 'not pruned.',
+    },
+    {
+      code: 'usage-window',
+      days: USAGE_HOT_WINDOW_DAYS,
+      text: `AI usage is counted from the rolled-up window of about ${USAGE_HOT_WINDOW_DAYS} days. A `
+        + 'period older than that has been archived, and a zero here would mean archived rather than '
+        + 'idle.',
+    },
     config.aiProvenance
-      ? 'Provenance recording is on, so content produced through this node during the period has a '
-        + 'record. Content produced before it was switched on does not.'
-      : 'Provenance recording is OFF on this node (AIMEAT_AI_PROVENANCE). Nothing was recorded, so '
-        + 'every count above is zero for that reason and not because nothing happened.',
+      ? {
+        code: 'provenance-on',
+        text: 'Provenance recording is on, so content produced through this node during the period '
+          + 'has a record. Content produced before it was switched on does not.',
+      }
+      : {
+        code: 'provenance-off',
+        text: 'Provenance recording is OFF on this node (AIMEAT_AI_PROVENANCE). Nothing was '
+          + 'recorded, so every count above is zero for that reason and not because nothing happened.',
+      },
   ];
 }
 

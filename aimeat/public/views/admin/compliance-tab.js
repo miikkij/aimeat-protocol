@@ -30,7 +30,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { downloadBlob, toCsvBlob } from '/js/utils.js';
 import { num, StatsGrid, DataTable, Empty, Spinner, ErrorBox, useToast, Toast, ExpandableHelp } from './shared.js';
 import { apiGet, apiPut } from '/js/api.js';
@@ -112,10 +112,22 @@ function NotCovered({ items }) {
       <h3>${t('admin.compliance.limitsTitle')}</h3>
       <p class="adm-cmp-note">${t('admin.compliance.limitsNote')}</p>
       <ul class="adm-cmp-limits">
-        ${(items || []).map((s, i) => html`<li key=${i}>${s}</li>`)}
+        ${(items || []).map((s, i) => html`<li key=${s.code || i}>${limitText(s)}</li>`)}
       </ul>
     </section>
   `;
+}
+
+/**
+ * One limit in the reader's language, falling back to the node's English.
+ *
+ * tOr() rather than t(): a node running a newer build can serve a code this surface has no string
+ * for, and the English sentence is a better answer than the raw key. A limit that renders as
+ * `admin.compliance.limit.something` is a limit nobody reads, on the one list that must be read.
+ */
+function limitText(item) {
+  if (typeof item === 'string') return item;      // a node on the previous shape
+  return tOr(`admin.compliance.limit.${item.code}`, item.text, { days: item.days });
 }
 
 function DerivedStats({ derived }) {
@@ -197,7 +209,7 @@ export default function ComplianceTab() {
     for (const g of report.gaps) rows.push(['gap', g.kind, g.detail, '', '', '', '']);
     // The limits ride along in the same file. A CSV of findings with the scope left behind in the
     // browser is the export that overstates coverage, which is the one thing this must not produce.
-    for (const s of report.not_covered) rows.push(['not_covered', '', s, '', '', '', '']);
+    for (const s of report.not_covered) rows.push(['not_covered', s.code || '', limitText(s), '', '', '', '']);
     const headers = ['row', 'id_or_kind', 'title_or_detail', 'risk', 'models', 'apps', 'purpose'];
     const stamp = (report.scope?.generated_at || '').slice(0, 10);
     downloadBlob(toCsvBlob(headers, rows), `compliance-${report.scope?.node_id || 'node'}-${stamp}.csv`);
