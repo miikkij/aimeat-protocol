@@ -296,6 +296,11 @@
       "promptTitle": "Let your own AI do this",
       "promptNote": "Copy this into a chat with an AI you have connected here. It reads the report, works out what each agent and app is for, answers the questions it can back up, and shows you the result before anything is stored. Answers it produces are marked as answered by an AI, so you can always see which ones are yours.",
       "promptShow": "Read the prompt first",
+      "printTitle": "Compliance report",
+      "printGenerated": "generated {at}",
+      "printQsVersion": "questions version {v}",
+      "printAccount": "Account",
+      "printWhy": "What decided the class:",
       "limit": {
         "no-record": "These counts describe content a provenance record exists for. Content with NO record is unstated and does not appear here: an absent record is not evidence that a person wrote something.",
         "this-node-only": "Only what runs here. Anything published on a partner installation, on somebody's own personal one, or anywhere else, is outside every number on this page.",

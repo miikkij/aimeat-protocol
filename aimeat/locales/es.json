@@ -296,6 +296,11 @@
       "promptTitle": "Deja que tu propia IA lo haga",
       "promptNote": "Copia esto en un chat con una IA que hayas conectado aquí. Lee el informe, averigua para qué sirve cada agente y cada aplicación, responde las preguntas que puede sustentar y te muestra el resultado antes de guardar nada. Las respuestas que produce quedan marcadas como respondidas por una IA, así siempre ves cuáles son tuyas.",
       "promptShow": "Lee primero el prompt",
+      "printTitle": "Informe de cumplimiento",
+      "printGenerated": "generado el {at}",
+      "printQsVersion": "versión de las preguntas {v}",
+      "printAccount": "Cuenta",
+      "printWhy": "Qué decidió la clase:",
       "limit": {
         "no-record": "Estas cifras describen contenido del que existe un registro de procedencia. El contenido SIN registro queda sin declarar y no aparece aquí: la ausencia de un registro no prueba que lo haya escrito una persona.",
         "this-node-only": "Solo lo que funciona aquí. Todo lo publicado en la instalación de un socio, en la propia de alguien, o en cualquier otro lugar, queda fuera de las cifras de esta página.",

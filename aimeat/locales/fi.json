@@ -296,6 +296,11 @@
       "promptTitle": "Anna oman tekoälysi tehdä tämä",
       "promptNote": "Kopioi tämä sen tekoälyn chattiin, jonka olet yhdistänyt tänne. Se lukee raportin, selvittää mihin kutakin agenttia ja sovellusta käytetään, vastaa niihin kysymyksiin jotka se pystyy perustelemaan, ja näyttää tuloksen sinulle ennen kuin mitään tallennetaan. Sen tuottamat vastaukset merkitään tekoälyn antamiksi, joten näet aina mitkä vastaukset ovat sinun.",
       "promptShow": "Lue kehote ensin",
+      "printTitle": "Vaatimustenmukaisuusraportti",
+      "printGenerated": "muodostettu {at}",
+      "printQsVersion": "kysymyssarjan versio {v}",
+      "printAccount": "Tili",
+      "printWhy": "Mikä ratkaisi luokan:",
       "limit": {
         "no-record": "Nämä luvut kuvaavat sisältöä, josta on alkuperätietue. Sisältö jolla EI ole tietuetta on kirjaamatta eikä näy tässä: puuttuva tietue ei ole todiste siitä, että jonkin kirjoitti ihminen.",
         "this-node-only": "Vain se mikä pyörii täällä. Kaikki mitä on julkaistu kumppanin asennuksessa, jonkun omassa henkilökohtaisessa, tai muualla, on tämän sivun lukujen ulkopuolella.",
