@@ -19,6 +19,11 @@
  *     POST /token, GET /v1/app-grants, DELETE /v1/app-grants/:grantId
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.12.0 — 2026-08-23 — A company address (`<slug>.co.<apex>`) is a valid redirect origin, and it
+ *     binds to its company's front-page app the way a per-app subdomain binds to its app. The co
+ *     host is a SIBLING of the app host rather than a child, so the one endsWith test admitted
+ *     neither the origin nor the binding: an app published as a company's front page could not
+ *     complete this flow, and the person it served had no way to sign in.
  *   v1.11.0 — 2026-08-17 — Consent rows carry `description_keys`: the ordered locale-key chain the
  *     consent UI already resolves client-side (consent-vocab.js), served so API consumers can
  *     localize the sentence instead of hardcoding the English `description`. Display metadata only,
@@ -258,20 +263,31 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     for (const [k, v] of authCodes) if (v.expiresAt <= now) authCodes.delete(k);
   }
 
-  /** redirect_uri must be an absolute http(s) URL on the app origin — never the apex. */
+  /**
+   * redirect_uri must be an absolute http(s) URL on an origin this node serves apps from — never
+   * the apex.
+   *
+   * Two families qualify. `<sub>.apps.<apex>` is an app's own address. `<slug>.co.<apex>` is a
+   * company's, and it is a SIBLING of the app host rather than a child (deriveCoHost rewrites the
+   * leading label), so the endsWith test below had to be written for it separately — until
+   * 2026-08-23 an app served as a company's front page could not complete this flow at all. Bare
+   * `co.<apex>` is excluded: it names no company and redirects to the profile.
+   */
   function validRedirect(uri: string): { ok: true; origin: string } | { ok: false } {
     let u: URL;
     try { u = new URL(uri); } catch { return { ok: false }; }
     if (u.protocol !== 'https:' && u.protocol !== 'http:') return { ok: false };
     const host = u.hostname.toLowerCase();
     const appHost = (config.appHost || '').toLowerCase();
-    if (appHost) {
-      // Must be the app host or a per-app subdomain of it — never the apex SPA origin.
-      if (host !== appHost && !host.endsWith('.' + appHost)) return { ok: false };
-    } else {
-      // No app origin provisioned (dev): only allow localhost so the flow is testable.
-      if (host !== 'localhost' && host !== '127.0.0.1') return { ok: false };
-    }
+    const coHost = (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase();
+    // The app host or a per-app subdomain of it — never the apex SPA origin.
+    const onApps = !!appHost && (host === appHost || host.endsWith('.' + appHost));
+    // A company address. Bare `co.<apex>` names no company, so it is not one.
+    const onCo = !!coHost && host !== coHost && host.endsWith('.' + coHost);
+    // No app origin provisioned (dev): allow localhost so the flow stays testable. Gated on the
+    // app host being absent, exactly as before — a node that HAS one must not accept loopback.
+    const onDevLoopback = !appHost && (host === 'localhost' || host === '127.0.0.1');
+    if (!onApps && !onCo && !onDevLoopback) return { ok: false };
     return { ok: true, origin: u.origin };
   }
 
@@ -343,12 +359,23 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // bare app host → cannot be bound → they keep the manual consent screen.
     let originBound = false;
     const appHostL = (config.appHost || '').toLowerCase();
+    const coHostL = (config.coOriginEnabled ? (config.coHost || '') : '').toLowerCase();
     const rdHost = new URL(redirectUri).hostname.toLowerCase();
     if (appHostL && rdHost !== appHostL && rdHost.endsWith('.' + appHostL)) {
       const sub = rdHost.slice(0, -(appHostL.length + 1));
       const site = sub && !sub.includes('.') ? await storage.getSubdomainSite(sub) : null;
       if (!site || !site.enabled || site.kind !== 'app' || site.target !== app) {
         return res.status(400).json(error(config.nodeId, 'INVALID_REDIRECT_URI', 'redirect_uri subdomain is not bound to this app'));
+      }
+      originBound = true;
+    } else if (coHostL && rdHost !== coHostL && rdHost.endsWith('.' + coHostL)) {
+      // A company address binds the same way, and it has to: without this an app could name a
+      // company's origin as its redirect and harvest a code there in that company's name. The
+      // company's front page IS the app or the request is refused — resolveAppOriginTarget answers
+      // which app runs at this address, so the binding rule is written once and both doors ask it.
+      const resolved = await resolveAppOriginTarget(config, storage, new URL(redirectUri).origin);
+      if (!resolved.ok || resolved.family !== 'app' || resolved.target !== app) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_REDIRECT_URI', 'redirect_uri company address is not bound to this app'));
       }
       originBound = true;
     }

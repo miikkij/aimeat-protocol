@@ -20,6 +20,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.13.0 -- 2026-08-23 -- aimeat_package_install -> packages:write, the scope
+ *     POST /v1/packages/:groupId/install already requires. Installing registers an app, a cortex, an
+ *     extension and any @activate cron the manifest declares, all under the owner's identity.
  *   v1.12.0 -- 2026-08-22 -- scopesForProfile warns when it is handed a profile name that is not in
  *     the table. The name it silently swallowed was `agent`, from the built-in chat agent, and the
  *     fallback left the person's own chat holding memory read and write on their own node.
@@ -147,6 +150,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_fork:                          'app:write',
     aimeat_app_publish:                       'app:write',
     aimeat_package_publish:                   'app:write',
+
+    // Installing registers an app, a cortex, an extension and any @activate cron the manifest
+    // declares, all under the owner's identity — a write with a long tail, and its own word on the
+    // consent screen. Same scope POST /v1/packages/:groupId/install requires.
+    aimeat_package_install:                   'packages:write',
 
     // A capability is how this account offers work to others, so writing one speaks in the
     // owner's name.

@@ -5,6 +5,9 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.5.0 -- 2026-08-23 -- aimeat_package_install, and aimeat_package_publish given the route's own
+ *     parameters. Publish declared {name, description, content} while POST /v1/packages requires a
+ *     `components` array and reads no `content`, so every call it described was answered 400.
  *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 11b: aimeat_app_get folds meta.provenance.
  *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_app_publish / aimeat_app_draft_publish
  *     carry `ai_provenance` / `ai_provenance_id` and echo what was recorded.
@@ -51,12 +54,46 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
       { tool: 'aimeat_app_publish', declared: a.ai_provenance, declaredId: a.ai_provenance_id }, resp);
   });
 
+  // POST /v1/packages takes a `components` ARRAY and reads no `content` field at all. This tool
+  // declared {name, description, content} from the day it was split out, so every call it described
+  // was answered 400 INVALID_INPUT ("components must be an array with at least 1 item") — the tool
+  // was published, callable, and could not succeed. The parameters below are the route's own.
   mcp.tool('aimeat_package_publish', descriptionFor('aimeat_package_publish'), {
-    name: z.string().describe('Package name'),
-    description: z.string().describe('Package description'),
-    content: z.string().describe('Package content'),
-  }, annotationsFor('aimeat_package_publish'), async ({ name, description, content }) =>
-    out(await client.post('/v1/packages', { name, description, content })));
+    name: z.string().describe('Package name. With your owner name it forms the group id, e.g. "company-brain::alice".'),
+    description: z.string().optional().describe('What the package is for'),
+    category: z.string().optional().describe('Category for the package gallery'),
+    tags: z.array(z.string()).optional().describe('Tags for search'),
+    visibility: z.enum(['private', 'public']).optional().describe('Who may install it (default private)'),
+    components: z.array(z.object({
+      id: z.string().describe('Component id, unique within the package'),
+      type: z.string().describe('app | extension | cortex | translation'),
+      label: z.string().optional().describe('Human-readable name'),
+      content: z.string().optional().describe('The component source'),
+      dependencies: z.array(z.string()).optional().describe('Ids of components this one needs installed first'),
+    })).min(1).describe('The components that install together. At least one.'),
+    manifest: z.record(z.string(), z.unknown()).optional().describe('Package manifest: object types, schedules, the workspace it provisions'),
+  }, annotationsFor('aimeat_package_publish'), async ({ name, description, category, tags, visibility, components, manifest }) => {
+    const body: Record<string, unknown> = { name, components };
+    if (description !== undefined) body.description = description;
+    if (category !== undefined) body.category = category;
+    if (tags !== undefined) body.tags = tags;
+    if (visibility !== undefined) body.visibility = visibility;
+    if (manifest !== undefined) body.manifest = manifest;
+    return out(await client.post('/v1/packages', body));
+  });
+
+  mcp.tool('aimeat_package_install', descriptionFor('aimeat_package_install'), {
+    group_id: z.string().describe('Package group identifier, from aimeat_package_list'),
+    label: z.string().optional().describe('What to call this copy, e.g. the company it is for'),
+    version: z.string().optional().describe('A specific version (default: the latest published one)'),
+    dry_run: z.boolean().optional().describe('Report what would be registered and register nothing'),
+  }, annotationsFor('aimeat_package_install'), async ({ group_id, label, version, dry_run }) => {
+    const body: Record<string, unknown> = {};
+    if (label !== undefined) body.label = label;
+    if (version !== undefined) body.version = version;
+    if (dry_run !== undefined) body.dry_run = dry_run;
+    return out(await client.post(`/v1/packages/${encodeURIComponent(group_id)}/install`, body));
+  });
 
   // ───────────────────────────────────────────────────────────────────────────────────────────────
   // THE APP TOOLS TALK ABOUT APPS. Until 2026-08-16 the four below pointed at /v1/packages, a
