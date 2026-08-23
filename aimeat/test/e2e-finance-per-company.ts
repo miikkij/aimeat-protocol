@@ -201,6 +201,27 @@ await test('4. …and their payment references still DIFFER', async () => {
     `the owner-level sequence restarted (${acmeInvoice.numberSeq}) — the unique index would collide next`);
 });
 
+await test('4b. within ONE company’s series a number is never repeated', async () => {
+  // Uniqueness is required within a series, not across an owner's companies: two accounting
+  // entities both having an invoice number 1 is ordinary, and the invoice carries the seller's
+  // business id to say which is which. What must never happen is one company issuing "2026-3"
+  // twice, so this bills the same company repeatedly and reads its own series back.
+  const late = await makeOwner('series');
+  const one = await makeCompany(late.token, 'Sarja Oy');
+  const numbers: string[] = [];
+  for (let i = 0; i < 4; i++) numbers.push((await invoice(late.token, one.id)).invoiceNumber);
+  assert(new Set(numbers).size === 4, `one company repeated a number: ${numbers.join(', ')}`);
+  const seqs = numbers.map((n) => Number(n.split('-').pop()));
+  assert(JSON.stringify(seqs) === JSON.stringify([1, 2, 3, 4]),
+    `a company's series must run 1,2,3,4 without gaps: ${seqs.join(', ')}`);
+
+  // And a second company under the same owner runs its own 1,2 beside it.
+  const two = await makeCompany(late.token, 'Rinnakkain Oy');
+  const other = [(await invoice(late.token, two.id)).invoiceNumber, (await invoice(late.token, two.id)).invoiceNumber];
+  assert(other.map((n) => Number(n.split('-').pop())).join() === '1,2',
+    `the second company gets its own series from 1: ${other.join(', ')}`);
+});
+
 await test('5. an owner with no company keeps the plain owner-level series', async () => {
   const solo = await makeOwner('solo');
   const draft = await json('/v1/finance/invoices', {

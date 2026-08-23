@@ -256,6 +256,12 @@ export async function send(storage: Storage, ownerGhii: string, id: string, deli
   // table is keyed (ownerGhii, kind) and kind is free text, so this needs no column and no
   // migration, and it is atomic by the same INSERT ... ON CONFLICT statement as every other
   // counter. An owner with no company keeps the owner-level series exactly as before.
+  // EACH COMPANY'S SERIES STARTS AT 1, and two companies both having an invoice number 1 is
+  // correct rather than a collision: they are different accounting entities, and the invoice
+  // carries the seller's business id. Uniqueness is required WITHIN a series, which is what a
+  // per-company counter gives. An owner who invoiced as themselves before registering companies
+  // keeps those invoices in the owner-level series they were issued in; the company series beside
+  // it is a new book, not a continuation of that one.
   const numberSeq = await storage.nextFinanceCounter(ownerGhii, 'invoice');
   const displaySeq = inv.organismId
     ? await storage.nextFinanceCounter(ownerGhii, `invoice:${inv.organismId}`)
