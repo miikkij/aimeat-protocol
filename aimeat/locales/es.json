@@ -293,8 +293,6 @@
       "howStep3": "Después responde las preguntas de cada entrada. Deciden la clase de riesgo, y ninguna máquina puede responderlas: si algo decide un asunto sobre una persona, o publica sobre un tema de interés público, es un juicio. Una pregunta sin responder deja la entrada sin clase, y la entrada se queda en la lista de arriba hasta que respondas.",
       "howMonthly": "El informe se guarda solo una vez al mes, el primer día del mes siguiente, y los meses anteriores se conservan. Si quieres uno ahora, ejecútalo desde la pestaña Programador, en la tarea Monthly Compliance Report.",
       "howAgent": "No hay que instalar ni activar nada. Las preguntas ya están listas, y no se guarda nada hasta que presiones Guardar.",
-      "proposalsNote": "Estos se han usado aquí y no están anotados en ninguna parte. Los modelos y las aplicaciones vienen de lo que realmente se ejecutó; tú respondes las preguntas.",
-      "proposalAdd": "Agregar",
       "limit": {
         "no-record": "Estas cifras describen contenido del que existe un registro de procedencia. El contenido SIN registro queda sin declarar y no aparece aquí: la ausencia de un registro no prueba que lo haya escrito una persona.",
         "this-node-only": "Solo lo que funciona aquí. Todo lo publicado en la instalación de un socio, en la propia de alguien, o en cualquier otro lugar, queda fuera de las cifras de esta página.",
@@ -310,7 +308,15 @@
         "owner-register-is-the-operators": "El registro de para qué se usa la IA lo mantiene quien administra esta instalación, no tú. Abajo están las entradas que nombran tu cuenta. Si falta algo tuyo, eso es una conversación con esa persona y no algo que puedas arreglar aquí.",
         "owner-provenance-off": "El registro está desactivado en esta instalación, y eso no lo configuraste tú. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no hayas hecho nada."
       },
-      "howIntro": "Esta página compara dos cosas: lo que realmente se ha hecho aquí con IA, y lo que se ha anotado al respecto. La diferencia aparece arriba, en \"Requiere revisión\", y es justo lo que se pregunta en una auditoría."
+      "howIntro": "Esta página compara dos cosas: lo que realmente se ha hecho aquí con IA, y lo que se ha anotado al respecto. La diferencia aparece arriba, en \"Requiere revisión\", y es justo lo que se pregunta en una auditoría.",
+      "draftAction": "Complétalas por mí",
+      "drafting": "Trabajando…",
+      "draftNote": "Aquí se ha ejecutado IA y eso ya se sabe. Presiona abajo y se arman las entradas según qué agente o aplicación llamó a cada modelo, tomando los títulos y las descripciones de lo que tú mismo escribiste sobre esos agentes, y respondiendo las preguntas que se pueden responder con lo registrado. No se guarda nada hasta que presiones Guardar.",
+      "draftLoaded": "Se armaron {entries} entradas y {answered} respuestas desde lo registrado. Revísalas y guarda.",
+      "draftFailed": "No se pudo armar el borrador.",
+      "answerFromEvidence": "de lo registrado",
+      "answerFromAi": "borrador de la IA",
+      "answerFromHuman": "tu respuesta"
     }
   },
   "admin.messages.desc": "Telemetría de entrega de los mensajes entre personas. No se enseña el contenido de ningún mensaje ni quién participa.",

@@ -50,18 +50,24 @@ export function registerComplianceTools(mcp: McpServer, registry: AgentRegistry)
 
   mcp.tool('aimeat_compliance_register_read', descriptionFor('aimeat_compliance_register_read'), {
     agent_name: agentNameSchema,
-    part: z.enum(['usecases', 'questionnaire']).describe('Which document to read.'),
-  }, annotationsFor('aimeat_compliance_register_read'), async ({ agent_name, part }) => {
+    part: z.enum(['draft', 'usecases', 'questionnaire']).describe('Which document to read. Start with "draft".'),
+    since_days: z.number().int().min(1).max(3650).optional()
+      .describe('For "draft": how far back to look for activity (default 30).'),
+  }, annotationsFor('aimeat_compliance_register_read'), async ({ agent_name, part, since_days }) => {
     const { client } = pickAgent(registry, agent_name);
-    return text(await client.get(`/v1/admin/compliance/${part}`));
+    const qs = part === 'draft' && since_days !== undefined ? `?since_days=${since_days}` : '';
+    return text(await client.get(`/v1/admin/compliance/${part}${qs}`));
   });
 
   mcp.tool('aimeat_compliance_register_write', descriptionFor('aimeat_compliance_register_write'), {
     agent_name: agentNameSchema,
     part: z.enum(['usecases', 'questionnaire']).describe('Which document to replace.'),
     value: z.record(z.string(), z.unknown()).describe('The whole document — this replaces, it does not merge.'),
-  }, annotationsFor('aimeat_compliance_register_write'), async ({ agent_name, part, value }) => {
+    dry_run: z.boolean().optional().describe('Validate and return what would be stored, storing nothing.'),
+  }, annotationsFor('aimeat_compliance_register_write'), async ({ agent_name, part, value, dry_run }) => {
     const { client } = pickAgent(registry, agent_name);
-    return text(await client.put(`/v1/admin/compliance/${part}`, value));
+    // The preview is a query flag on the same route, so one handler validates both paths and a dry
+    // run cannot come to disagree with the write it is previewing.
+    return text(await client.put(`/v1/admin/compliance/${part}${dry_run ? '?dry_run=true' : ''}`, value));
   });
 }

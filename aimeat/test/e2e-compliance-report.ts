@@ -104,6 +104,7 @@ const REPORT = '/v1/admin/compliance/report';
 const USECASES = '/v1/admin/compliance/usecases';
 const QUESTIONS = '/v1/admin/compliance/questionnaire';
 const MINE = '/v1/compliance/report/mine';
+const DRAFT = '/v1/admin/compliance/draft';
 
 // ─── State ───
 let op: Owner;
@@ -321,6 +322,78 @@ await test('A consent grant reaches the report — the node-wide facet query wor
         `expected the new grant to be counted: ${was} → ${after.body.data.derived.consent.active}`);
     assert(typeof after.body.data.derived.consent.by_scope.federation === 'number',
         'the facet should group by scope, not only by status');
+});
+
+// ─── The node drafts the register itself ───
+await test('The draft is served, says what it derived, and stores nothing', async () => {
+    const r = await json(DRAFT, { headers: auth(op.token) });
+    assert(r.status === 200, `expected 200, got ${r.status}`);
+    const d = r.body.data;
+    assert(Array.isArray(d.usecases), 'a draft has to carry entries, even when there are none');
+    assert(typeof d.counts.entries === 'number' && typeof d.counts.answeredFromEvidence === 'number',
+        'the draft has to say how much it worked out');
+    assert(d.notes.join(' ').toLowerCase().includes('nothing is stored'),
+        'the draft must say it stored nothing');
+    // And it really stored nothing: the register is whatever the earlier tests left.
+    const stored = await json(USECASES, { headers: auth(op.token) });
+    assert(stored.status === 200, `usecases: ${stored.status}`);
+});
+
+await test('A dry-run write returns what would be stored and stores nothing', async () => {
+    const before = await json(USECASES, { headers: auth(op.token) });
+    const beforeIds = before.body.data.usecases.map((u: any) => u.id).sort();
+
+    const preview = await json(`${USECASES}?dry_run=true`, {
+        method: 'PUT',
+        headers: auth(op.token),
+        body: JSON.stringify({
+            usecases: [{
+                id: 'uc-preview-only', title: 'Never actually stored',
+                answers: { 'q-publishes-publicly': true },
+                answerSources: { 'q-publishes-publicly': 'ai' },
+            }],
+        }),
+    });
+    assert(preview.status === 200, `dry run: ${preview.status} ${JSON.stringify(preview.body?.error)}`);
+    assert(preview.body.data.stored === false, 'a dry run must say it stored nothing');
+    assert(preview.body.data.would_store[0].id === 'uc-preview-only', 'the preview should echo what would land');
+
+    const after = await json(USECASES, { headers: auth(op.token) });
+    assert(JSON.stringify(after.body.data.usecases.map((u: any) => u.id).sort()) === JSON.stringify(beforeIds),
+        'the dry run changed the register, which is the one thing it must never do');
+});
+
+await test('A dry run still validates, and names an answer with no recorded source', async () => {
+    const bad = await json(`${USECASES}?dry_run=true`, {
+        method: 'PUT', headers: auth(op.token),
+        body: JSON.stringify({ usecases: [{ id: 'dup', title: 'a' }, { id: 'dup', title: 'b' }] }),
+    });
+    assert(bad.status === 400, `a preview that skipped validation would show a document the real write refuses; got ${bad.status}`);
+
+    const unmarked = await json(`${USECASES}?dry_run=true`, {
+        method: 'PUT', headers: auth(op.token),
+        body: JSON.stringify({ usecases: [{ id: 'uc-x', title: 'x', answers: { 'q-publishes-publicly': true } }] }),
+    });
+    assert(unmarked.body.data.answers_with_no_recorded_source?.length === 1,
+        'an answer with no source should be named in the preview, not discovered at the audit');
+});
+
+await test('An answer keeps the record of who produced it', async () => {
+    const put = await json(USECASES, {
+        method: 'PUT', headers: auth(op.token),
+        body: JSON.stringify({
+            usecases: [{
+                id: 'uc-sourced', title: 'Sourced answers',
+                answers: { 'q-publishes-publicly': true, 'q-manipulative-technique': false },
+                answerSources: { 'q-publishes-publicly': 'evidence', 'q-manipulative-technique': 'human' },
+            }],
+        }),
+    });
+    assert(put.status === 200, `PUT: ${put.status} ${JSON.stringify(put.body?.error)}`);
+    const back = await json(USECASES, { headers: auth(op.token) });
+    const uc = back.body.data.usecases.find((u: any) => u.id === 'uc-sourced');
+    assert(uc?.answerSources?.['q-publishes-publicly'] === 'evidence', 'the evidence marker was lost on the round trip');
+    assert(uc?.answerSources?.['q-manipulative-technique'] === 'human', 'the human marker was lost on the round trip');
 });
 
 // ─── The account's own slice ───
