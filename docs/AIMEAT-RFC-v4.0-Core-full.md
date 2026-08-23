@@ -98,7 +98,7 @@ v4.0 states, for every capability, whether it is **specified**, **implemented**,
 
 **Part VIII — Federation**
 - 31 Federation Overview & Real-World Topology
-- 32 Peering Lifecycle
+- 32 Peering Lifecycle (incl. 32.1 Trust Tiers, 32.2 Link Invitations)
 - 33 Cross-Node Identity & Login
 - 34 Heartbeat, Sync & Replication
 - 35 Personal Nodes & the Connector Tunnel
@@ -702,6 +702,37 @@ The five-phase sequence is implemented and wired (peer request → readiness tes
 `POST /v1/federation/peer/request` → `POST /v1/federation/test` (`core`/`full`/`extended`) → `PUT /v1/admin/peering/requests/{id}` (approve, with a bilateral `share_config`) → `POST /v1/federation/peer/activate`. Each side independently defines what it shares. `GET /v1/federation/peers`, `DELETE /v1/federation/peers/{id}` (with `?emergency=true` and a grace-period purge).
 
 **Default config ships with zero peers** (`genesisUrl` null, no seed list); a federated deployment is established by an operator peering explicitly, as the home ↔ aimeat.io ↔ peer topology above demonstrates.
+
+### 32.1 Trust Tiers — federation is a ladder, not a switch
+
+Peering is not one decision. An operator who says they do not want to federate is almost never refusing to be *reachable*; they are refusing to share a catalogue, replicate memory, relay traffic, or let another node issue logins. Presented as a single switch, the only available answer is no. The tiers are therefore rungs, and a peer sits on exactly one:
+
+```
+contact  <  visiting  <  member  <  genesis
+```
+
+| Tier | What it may do | How it is reached |
+|---|---|---|
+| `contact` | Direct messages, their read receipts, and their attachment grants. Nothing else: no catalogue, no memory replication, no routing, no broadcast, no settlement, no federated auth, and `peer_mode` is forced to `private` so neither node lists the other in its public directory. | An operator's deliberate tier choice, or a one-time invite (§32.2). Never by self-join. |
+| `visiting` | The above plus catalogue read, directory presence, and originating paid work as a **requester**. Never a provider-of-record, relay, replication target or auth issuer. | Signed self-join when `federationOpenJoin` is on and network policy allows, or an invite. |
+| `member` | Full peer capability. Federated auth remains opt-in even here. | A local operator's deliberate promotion ("vouch") of a visiting peer. |
+| `genesis` | As `member`, tagged distinctly for the anchor relationship. | Operator configuration. |
+
+`contact` is the floor, and it exists for a relationship that is common and was previously unrepresentable: **the operator of the infrastructure a node runs on.** On a managed instance the buyer holds the operator role, so the provider who actually runs the platform has no standing on it at all — including no way to receive the support requests the node's own agent instructions tell every agent to send. A contact link gives the provider exactly one thing, and the customer can see and revoke it.
+
+Implementations MUST enforce a tier at every inbound door rather than at the point of admission alone. Each capability is named by a permission word carried on the peer record (`shareCatalogue`, `replicateMemory`, `allowRouting`, `allowMessaging`, `allowBroadcast`, `allowSettlement`, `allowFederatedAuth`), a door refuses before it reads, writes or credits anything, and an absent word on a record written by an earlier implementation means the capability it describes was ungated then and is granted now.
+
+Three further rules keep a tier from drifting upward:
+
+- **A flag edit is clamped to the tier's ceiling.** An operator may always turn a capability OFF; turning one ON above the tier requires a real tier change. A tier's *defaults* and its *ceiling* are distinct questions and MUST be distinct in the implementation: `member` defaults federated auth off and may raise it.
+- **A demotion MUST verify it is one.** A trust advisory that lowers a peer to `visiting` would ELEVATE a `contact` peer into catalogue read. Compare rank.
+- **The outbound side MUST honour the same word.** A node that refuses a peer's catalogue while pushing its own to that peer has described half a relationship, and the undescribed half is the one where its data leaves.
+
+### 32.2 Link invitations
+
+A node an operator is **provisioning** is not a stranger who knocked. An invitation lets that operator admit it in advance: `POST /v1/federation/link-invites` mints a single-use token naming a tier (`contact` or `visiting` only — fuller federation is agreed with a node one can already see, not granted ahead of time by a token), which the new node presents as `invite_token` on `POST /v1/federation/peer/introduce`.
+
+The tier MUST be read from the stored invitation and MUST NOT be read from the introduce body: an unauthenticated door that believes a caller's claim about its own trust level is not a door. The token SHOULD be stored hashed, as it is a bearer secret. An unknown, expired, revoked or already-used token MUST fall through to the ordinary pending-approval path rather than answering distinctly, so the endpoint cannot be used to test whether a token exists, and a leaked token is worth one link, at one tier, once.
 
 ## 33. Cross-Node Identity & Login (Promoted)
 
