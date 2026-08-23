@@ -30400,6 +30400,14 @@ paths:
         low-trust `visiting` peer immediately (200, `{ status: active, tier: visiting }`) — visiting
         peers may browse/discover and request paid work, but get no provider/relay/replication/auth
         rights until a local operator promotes them to `member`.
+
+        INVITE. An optional `invite_token` presents a one-time invitation the receiving node minted
+        earlier (POST /v1/federation/link-invites), and admits the caller at the tier THAT INVITE
+        names — typically `contact`, for a node the operator is provisioning. The tier is read from
+        the stored invite and never from this body: a door that believes a caller's claim about its
+        own trust level is not a door. An unknown, expired or already-used token is not an error; it
+        falls through to the ordinary pending path, so a leaked token is worth one link, at one tier,
+        once.
       tags: [Federation]
       requestBody:
         required: true
@@ -30407,11 +30415,85 @@ paths:
           application/json:
             schema:
               type: object
+              properties:
+                invite_token:
+                  type: string
+                  description: A one-time invitation minted by the receiving node. Optional.
       responses:
         '200':
-          description: Auto-admitted as a visiting peer (open join enabled)
+          description: Auto-admitted (open join, or a valid invite) — carries the tier admitted at
         '202':
-          description: Pending operator approval (default)
+          description: Pending operator approval (default; also an unknown/expired/used invite)
+
+  /v1/federation/link-invites:
+    post:
+      operationId: mintLinkInvite
+      summary: Mint a one-time link invitation
+      description: |
+        Create an invitation that admits ONE node at a named tier when it introduces itself. This is
+        how a node you PROVISION becomes a peer without its future operator having to approve a
+        request from you on a screen they have not been shown yet.
+
+        The token is returned here and nowhere else: only its hash is stored, so a lost token is
+        re-minted rather than looked up, and the listing never contains one. A tier fuller than
+        `visiting` is refused — full federation is agreed with a node you can already see, not
+        granted in advance by a token.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tier:
+                  type: string
+                  enum: [contact, visiting]
+                  default: contact
+                  description: What the invited node is admitted as. `contact` is messages and nothing else.
+                ttl_hours:
+                  type: number
+                  default: 72
+                  description: How long the unused invite stands.
+                label:
+                  type: string
+                  description: Free-text note for the operator, e.g. which customer this was minted for.
+      responses:
+        '201':
+          description: Created — the response carries the token, which is never readable again
+        '400':
+          description: INVALID_INPUT — a tier an invite may not name, or a non-positive ttl_hours
+    get:
+      operationId: listLinkInvites
+      summary: List link invitations
+      description: Every invite this node has minted, newest first, with its state (open, consumed, expired). Never includes a token.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/federation/link-invites/{id}:
+    delete:
+      operationId: revokeLinkInvite
+      summary: Revoke a link invitation
+      description: Delete an unused invitation so it can no longer admit anybody. A consumed invite is kept as the record of who was admitted at what tier.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          description: NOT_FOUND — no invite by that id
 
   /v1/federation/peer/introduce/{id}/status:
     get:
