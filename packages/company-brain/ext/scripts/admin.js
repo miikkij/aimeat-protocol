@@ -35,6 +35,11 @@ export default async function (ctx, input) {
       // WHAT IT DOES NOT COVER. The register keeps this whether or not it is filled in, because a
       // source whose limits are unwritten is the one that quietly becomes "everything we know".
       coverage_note: String((raw && raw.coverage_note) != null ? raw.coverage_note : (prev.coverage_note || '')),
+      // WHICH CLOCK DRIVES IT, when one does. The register does not read the schedule and cannot:
+      // this is a pointer the PAGE resolves at the moment it renders, against the owner's own
+      // schedule list. That is why a broken clock shows up the second somebody opens the page
+      // rather than a week later when the caretaker next runs.
+      schedule_id: String((raw && raw.schedule_id) != null ? raw.schedule_id : (prev.schedule_id || '')),
       last_ok_at: (raw && raw.last_ok_at) || prev.last_ok_at || null,
       last_error: (raw && raw.last_error) != null ? raw.last_error : (prev.last_error || null),
       status: String((raw && raw.status) || prev.status || 'ok'),
