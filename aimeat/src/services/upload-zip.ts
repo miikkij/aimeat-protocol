@@ -15,6 +15,10 @@
  *   v1.0.0 — 2026-05-02 — Initial implementation
  *   v1.1.0 — 2026-07-05 — Adopt the shared isUnsafeName guard from safe-zip (adds backslash /
  *     drive-letter / null-byte rejection on top of ../ and absolute paths).
+ *   v1.3.0 — 2026-08-23 — parseExtensionZip takes the installer instead of passing the literal
+ *     'upload' to the shared builder. config.app compares the app's owner against the installer,
+ *     so every extension that gates an app was refused on the presigned path, which is the path
+ *     an author is told to use. parseCortexZip below has taken an ownerName from the start.
  *   v1.2.0 — 2026-07-26 — parseExtensionZip delegates validation + record building to the shared
  *     buildExtensionRecordFromManifest (routes/extensions/manifest.ts) instead of keeping a thinner
  *     third copy. The copy had drifted: per-action pricing (tollMorsels / commercial / ODPS), the
@@ -46,7 +50,15 @@ interface ExtensionZipResult {
     warnings?: string[];
 }
 
-export async function parseExtensionZip(buffer: Buffer, config: AimeatConfig): Promise<ExtensionZipResult> {
+/**
+ * @param installedBy The principal the presigned token was minted for: a bare owner name or a full
+ *   GAII. REQUIRED and never defaulted. This used to be the literal string `upload`, which the
+ *   route then overwrote on the record it got back, so the placeholder was invisible everywhere
+ *   except the one gate that reads the installer while the record is still being built.
+ */
+export async function parseExtensionZip(
+    buffer: Buffer, config: AimeatConfig, installedBy: string,
+): Promise<ExtensionZipResult> {
     if (buffer.length < 4 || !buffer.subarray(0, 4).equals(ZIP_MAGIC)) {
         return { ok: false, error: 'Not a valid ZIP file (missing magic bytes)' };
     }
@@ -84,7 +96,7 @@ export async function parseExtensionZip(buffer: Buffer, config: AimeatConfig): P
     // provider became a free one purely by being installed as a ZIP. Only ZIP-shaped concerns
     // (magic bytes, entry extraction, the scripts/ layout) belong here.
     const built = buildExtensionRecordFromManifest(
-        manifestBuf.toString('utf-8'), scripts, config, 'upload', new Date().toISOString(),
+        manifestBuf.toString('utf-8'), scripts, config, installedBy, new Date().toISOString(),
     );
     if (!built.ok) {
         return { ok: false, error: built.message, code: built.code };
