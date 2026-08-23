@@ -5,6 +5,12 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 13): the first-contact auto-accept no
+ *     longer trusts a bare conversation-id match. The id is derived deterministically from two public
+ *     identities, so a stranger on any node could compute an existing thread's id and paste it in to
+ *     skip the request queue. Auto-accept now requires that THIS side already sent a message in the
+ *     thread addressed to the node the reply comes from. The support-answer case is preserved; a
+ *     computed-id cold approach falls to pending.
  *   v1.1.0 — 2026-08-15 — An inbound message's attachment descriptors are normalized instead of
  *     stored as the peer sent them. `ownerGhii` and `originNodeId` decide WHOSE storage the
  *     duplicator reads, so a peer that named this node and a local owner had this node open that
@@ -253,17 +259,26 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             // DIFFERENT identity than the one that was written to, and the gate reads it as a cold
             // approach. Support is where it bites hardest — you write to `support@{node}` and a named
             // person answers — but any thread whose other side has more than one identity has it.
-            // If this mailbox, or the agent the message is addressed to, already holds a message in
-            // this conversation, then somebody here started it and the question has been answered.
+            //
+            // The test is NOT "does a message with this conversation id exist" — that id is derived
+            // deterministically from two public identities (conversationIdFor), so a stranger on any
+            // node can compute the id of an existing thread and paste it in to skip the queue (audit
+            // AI-triage 2026-08-23, invariant 13). The test is: did THIS side already write to the
+            // node this reply is coming from, in this very thread? An answer is a reply to something
+            // we sent, so a message we sent, addressed to the replying node, must be on record.
+            const senderNode = parseGaiiLoose(message.senderGhii).node;
+            const knownThread = message.conversationId
+                ? (await Promise.all([...new Set([deliveryGhii, recipientGhii])].map(mailbox =>
+                    storage.listConversation(mailbox, message.conversationId!))))
+                    .flatMap(r => r.messages)
+                    .some(m => isSameOwner(m.senderGhii, deliveryGhii)
+                        && parseGaiiLoose(m.recipientGhii).node === senderNode)
+                : false;
             //
             // (3) covers the genuinely cold case: the people who answer support for this node writing
             // to the operator who pointed support at them. Deliberately narrow — an operator only, not
             // every human on the node, because on a fifty-person managed instance the link was agreed
             // by the operator alone and is not a licence to approach their colleagues.
-            const knownThread = message.conversationId
-                ? (await Promise.all([...new Set([deliveryGhii, recipientGhii])].map(async mailbox =>
-                    (await storage.listConversation(mailbox, message.conversationId)).messages.length > 0))).some(Boolean)
-                : false;
             const fromOurSupport = peer.supportUpstream === true
                 && (await listOperatorGhiis(storage, config)).includes(deliveryGhii);
 
