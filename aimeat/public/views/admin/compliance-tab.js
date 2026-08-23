@@ -23,6 +23,8 @@
  *   - ComplianceTab (default) — the tab
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v1.1.0 — 2026-08-23 — A copy-paste for the operator's own AI, above the gap list. The page had
+ *     the chat path in its instructions and nowhere to start it from.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { h } from 'preact';
@@ -36,6 +38,7 @@ import { num, StatsGrid, DataTable, Empty, Spinner, ErrorBox, useToast, Toast, E
 import { apiGet, apiPut } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { RegisterSection, QuestionnaireSection } from './compliance-tab.register.js';
+import { CompliancePromptSection } from './compliance-tab.prompt.js';
 
 const PERIODS = [
   { key: '30d', days: 30 },
@@ -275,6 +278,11 @@ export default function ComplianceTab() {
       </p>
 
       <${HowToStart} empty=${report.register.usecases.length === 0} />
+
+      <${CompliancePromptSection}
+        nodeId=${report.scope?.node_id}
+        days=${PERIODS.find(p => p.key === period)?.days ?? 30}
+      />
 
       <${GapList} gaps=${report.gaps} />
       <${NotCovered} items=${report.not_covered} />
