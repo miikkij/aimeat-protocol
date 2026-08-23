@@ -974,6 +974,17 @@
 .adm-cmp-small { font-size: 0.8rem; color: var(--muted); }
 .adm-cmp-hint { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 0.15rem; }
 
+/* What the node already saw, offered as one-click entries. Set apart from the register list so it
+   reads as the node's suggestion rather than as something already written down. */
+.adm-cmp-proposals {
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  padding: 0.7rem 0.9rem; margin: 0.6rem 0 1rem;
+}
+.adm-cmp-proposal-list { list-style: none; margin: 0.3rem 0 0; padding: 0; }
+.adm-cmp-proposal-list li {
+  display: flex; align-items: center; gap: 0.7rem;
+  flex-wrap: wrap; margin: 0.4rem 0;
+}
 .adm-cmp-steps { margin: 0.3rem 0 0.8rem; padding-left: 1.3rem; }
 .adm-cmp-steps li { margin: 0.5rem 0; max-width: 62rem; }
 .adm-cmp-gaps, .adm-cmp-limits, .adm-cmp-qs { margin: 0.4rem 0; padding-left: 1.1rem; }

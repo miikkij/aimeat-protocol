@@ -288,11 +288,13 @@
       "print": "Print or save as PDF",
       "csv": "Download CSV",
       "howTitle": "How to start",
-      "howStep1": "Write down each thing AI is used for here. One entry per use: what it is, which models it runs on, which published apps.",
-      "howStep2": "Answer the questions for each entry. Leave one unanswered and that entry has no class and shows up at the top — that is on purpose, so nothing sits here looking approved when nobody has looked at it.",
-      "howStep3": "Read \"Needs a look\". A model that ran here but appears in no entry is listed there. That difference is the whole point of this page: an empty register means everything counts as undocumented.",
-      "howMonthly": "A report for each month is written automatically on the first of the following month, and kept. You can run it early from Scheduler, under the job named Monthly Compliance Report.",
-      "howAgent": "Your own AI can keep this current instead of you: give it the \"compliance:read\" permission to read the report and \"compliance:write\" to change what is written down. Both are granted per agent in Profile, and neither comes with Full access."
+      "howStep1": "Ask your own AI to do it. Connected over MCP it can read this report and keep the register current: \"Read the compliance report here and write up what we use AI for.\" Give it the \"compliance:read\" and \"compliance:write\" permissions first, per agent, in Profile.",
+      "howStep2": "Or work from what has already been spotted. Anything used here that is written down nowhere is proposed below with its models and apps filled in — add it with one click.",
+      "howStep3": "Then answer the questions on each entry. This part is not derivable and nobody should guess it: whether a use decides something about a person, or publishes on a matter of public interest, is a judgement. Leave one unanswered and the entry has no class and stays at the top.",
+      "howMonthly": "A report for each month is written on the first of the following month and kept. You can run it early from Scheduler, under the job named Monthly Compliance Report.",
+      "howAgent": "Nothing needs switching on. The question set is served ready-made and nothing is stored until the first save.",
+      "proposalsNote": "Used here, written down nowhere. The models and apps are filled in from what actually ran; you supply the answers.",
+      "proposalAdd": "Add"
     }
   },
   "admin.messages.desc": "Delivery telemetry for user-to-user messages. No message content or participant identities are shown.",

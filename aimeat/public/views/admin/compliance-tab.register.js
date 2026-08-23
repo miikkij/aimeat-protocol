@@ -140,7 +140,39 @@ export function UseCaseEditor({ useCase, questionnaire, onPatch, onAnswer, onRem
   `;
 }
 
-export function RegisterSection({ usecases, questionnaire, saving, onSave }) {
+/**
+ * Turn what the node SAW into a draft entry, so nobody types in a fact the node already holds.
+ *
+ * The gap list is already the difference between the recorded trail and the register, which means
+ * every undocumented-activity gap is a register entry waiting to exist: the model id and the app
+ * reference are both in its evidence. Asking a person to read that off the screen and retype it
+ * below would be the node making a human do its own bookkeeping.
+ *
+ * What is NOT proposed is the answers. Whether a use decides something about a person, or publishes
+ * on a matter of public interest, is a judgement no ledger contains — that is the half a person or
+ * their AI actually has to supply, and inventing a default for it would be the single most damaging
+ * shortcut in this whole feature.
+ */
+function proposalsFromGaps(gaps, usecases) {
+  const known = {
+    models: new Set(usecases.flatMap(u => u.models ?? [])),
+    apps: new Set(usecases.flatMap(u => u.apps ?? [])),
+  };
+  const out = [];
+  for (const g of gaps ?? []) {
+    const model = g.evidence?.model;
+    if (g.kind === 'undocumented-ai-activity' && model && !known.models.has(model)) {
+      out.push({ key: `m:${model}`, label: model, draft: { title: model, models: [model] } });
+    }
+    const app = g.evidence?.app;
+    if (g.kind === 'app-declares-generation-with-gap' && app && !known.apps.has(app)) {
+      out.push({ key: `a:${app}`, label: app, draft: { title: app, apps: [app] } });
+    }
+  }
+  return out;
+}
+
+export function RegisterSection({ usecases, questionnaire, gaps, saving, onSave }) {
   const [draft, setDraft] = useState(null);
   const [openId, setOpenId] = useState(null);
 
@@ -162,13 +194,36 @@ export function RegisterSection({ usecases, questionnaire, saving, onSave }) {
     setDraft((prev) => [...(prev ?? usecases), { id: `uc-${Date.now().toString(36)}`, title: '', answers: {} }]);
     setOpenId(null);
   };
+  /** Accept one of the node's proposals: the inventory arrives filled in, the answers do not. */
+  const acceptProposal = (p) => {
+    const id = `uc-${Date.now().toString(36)}`;
+    setDraft((prev) => [...(prev ?? usecases), { id, answers: {}, ...p.draft }]);
+    setOpenId(id);
+  };
+  const proposals = proposalsFromGaps(gaps, list);
 
   return html`
     <section class="adm-cmp-section">
       <h3>${t('admin.compliance.registerTitle')}</h3>
       <p class="adm-cmp-note">${t('admin.compliance.registerNote')}</p>
 
-      ${list.length === 0 && html`<${Empty} text=${t('admin.compliance.registerEmpty')} />`}
+      ${proposals.length > 0 && html`
+        <div class="adm-cmp-proposals adm-cmp-no-print">
+          <p class="adm-cmp-note">${t('admin.compliance.proposalsNote')}</p>
+          <ul class="adm-cmp-proposal-list">
+            ${proposals.map(p => html`
+              <li key=${p.key}>
+                <span class="mono adm-cmp-small">${p.label}</span>
+                <button type="button" class="btn-outline" onClick=${() => acceptProposal(p)}>
+                  ${t('admin.compliance.proposalAdd')}
+                </button>
+              </li>
+            `)}
+          </ul>
+        </div>
+      `}
+
+      ${list.length === 0 && proposals.length === 0 && html`<${Empty} text=${t('admin.compliance.registerEmpty')} />`}
 
       ${list.length > 0 && html`
         <${DataTable}
