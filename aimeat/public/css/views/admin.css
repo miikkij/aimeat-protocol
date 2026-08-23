@@ -1058,6 +1058,16 @@
 }
 .adm-cmp-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
 
+/* The chat paste, shown only when the reader opens it. word-break stays at break-word rather than
+   break-all: the text is prose with tool names in it, and breaking mid-identifier makes a name that
+   has to be copied exactly look like two. */
+.adm-cmp-prompt-box {
+  background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.9rem; margin-top: 0.5rem; max-height: 22rem; overflow-y: auto;
+  font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.55;
+  color: var(--text-dim); white-space: pre-wrap; word-break: break-word;
+}
+
 /* Print / save as PDF.
    Scoped to body.adm-compliance-active because every view's CSS is preloaded globally — an unscoped
    @media print block here would hide the chrome on every other page in the SPA. */
