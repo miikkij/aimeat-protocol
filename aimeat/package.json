@@ -153,7 +153,9 @@
     "check:liaison-surface": "tsx scripts/check-liaison-surface.ts --strict",
     "check:storage-parity": "tsx scripts/check-storage-parity.ts --strict",
     "check:audit-gates": "pnpm check:route-scopes && pnpm check:denial-coverage && pnpm check:outbound-fetch && pnpm check:trusted-keys && pnpm check:storage-parity && pnpm check:ext-entrypoints && pnpm check:shared-impl && pnpm check:sse-parity && pnpm check:copied-logic && pnpm check:liaison-surface",
-    "audit:report": "node ../security/semantic-audit/generate-report.mjs"
+    "audit:report": "node ../security/semantic-audit/generate-report.mjs",
+    "audit:triage": "node ../security/semantic-audit/ai-triage.mjs",
+    "audit:full": "pnpm audit:triage && pnpm audit:report"
   },
   "keywords": [
     "aimeat",
