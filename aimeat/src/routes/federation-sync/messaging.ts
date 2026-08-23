@@ -266,7 +266,14 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             // AI-triage 2026-08-23, invariant 13). The test is: did THIS side already write to the
             // node this reply is coming from, in this very thread? An answer is a reply to something
             // we sent, so a message we sent, addressed to the replying node, must be on record.
-            const senderNode = parseGaiiLoose(message.senderGhii).node;
+            //
+            // The replying node is `source_node` — the value the signature was verified over
+            // (messagePayload above), NOT parseGaiiLoose(message.senderGhii).node, which is an
+            // unverified body field. A linked peer could otherwise set senderGhii to claim it sits on
+            // the node we wrote to and auto-accept itself (a second finding on this same fix, AI-triage
+            // 2026-08-23, invariant 13). source_node cannot be forged: the peer signed it with the key
+            // gatePeer pinned.
+            const senderNode = source_node;
             const knownThread = message.conversationId
                 ? (await Promise.all([...new Set([deliveryGhii, recipientGhii])].map(mailbox =>
                     storage.listConversation(mailbox, message.conversationId!))))
