@@ -7,6 +7,11 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   v1.4.0 — 2026-08-23 — Phase 7: signing in at the company address. An app served as a company's
+ *     front page can start the app-grant flow with a redirect on its own `{slug}.co.<apex>`, and the
+ *     address binds to that one app — another owner's app naming it is refused by the binding, an
+ *     unclaimed label and the bare co host by the origin check. All five failed before the two host
+ *     checks learned the co family; the co host is a sibling of `apps.<apex>`, not a child.
  *   v1.3.0 — 2026-08-12 — `coFetch` opens its own socket so the company Host really arrives.
  *     It passed `Host` in a `fetch` headers bag, and undici drops that as a forbidden header, so
  *     every serving assertion reached the server as plain `localhost`. subdomain.ts v1.5.0 honours
@@ -502,6 +507,90 @@ await test('26. deleting the company frees the address and stops serving it', as
   assert(served.status === 404, `the address must stop serving, got ${served.status}`);
   const free = await json(`/v1/companies/available?slug=${slug}`, { headers: authed(A.token) });
   assert(free.body.data.available === true, 'the address must be claimable again');
+});
+
+console.log('\nPhase 7 — signing in at the company address');
+
+/**
+ * The app-grant flow as an app running at a company address starts it. Until 2026-08-23 the two
+ * host checks knew only `*.apps.<apex>`, and `deriveCoHost` makes the co host a SIBLING of that
+ * rather than a child, so an app published as a company's front page could not run this flow at
+ * all: it was served to the visitor and had no way to sign them in.
+ */
+async function authorize(app: string, redirectUri: string): Promise<{ status: number; location: string | null; code: string; message: string }> {
+  const qs = new URLSearchParams({
+    app, response_type: 'code', redirect_uri: redirectUri,
+    code_challenge: 'e2e-company-origin-verifier', code_challenge_method: 'plain',
+    scope: 'memory:read', state: 'xyz',
+  });
+  const res = await fetch(`${BASE}/v1/app-grants/authorize?${qs}`, { redirect: 'manual' });
+  const text = await res.text();
+  let body: any = {};
+  try { body = JSON.parse(text); } catch { /* a 302 carries no body */ }
+  return {
+    status: res.status, location: res.headers.get('location'),
+    code: body?.error?.code ?? '', message: body?.error?.message ?? '',
+  };
+}
+
+let signinCompanyId = '';
+let signinSlug = '';
+const coRedirect = (s: string): string => `http://${s}.${CO_HOST}:${PORT}/callback`;
+
+await test('27. a second company points its address at the same owner-published app', async () => {
+  const r = await json('/v1/companies', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ name: `Kirjautuva Oy ${Date.now().toString(36).slice(-5)}` }),
+  });
+  assert(r.status === 201, `register failed: ${r.status} ${JSON.stringify(r.body)}`);
+  signinCompanyId = r.body.data.company.id;
+  signinSlug = r.body.data.company.slug;
+  const set = await json(`/v1/companies/${signinCompanyId}/front-page`, {
+    method: 'PUT', headers: authed(A.token),
+    body: JSON.stringify({ kind: 'app', target: `${A.owner}/${APP_FILE}` }),
+  });
+  assert(set.status === 200, `front page failed: ${set.status} ${JSON.stringify(set.body)}`);
+  const served = await coFetch(signinSlug);
+  assert(served.body.includes(APP_MARKER), 'the address must serve the app before we ask it to sign anyone in');
+});
+
+await test('28. the company address is a valid redirect origin for its own front-page app', async () => {
+  const r = await authorize(`${A.owner}/${APP_FILE}`, coRedirect(signinSlug));
+  assert(r.status === 302, `expected 302 to the consent page, got ${r.status} ${r.code} ${r.message}`);
+  assert((r.location ?? '').includes('/v1/app-grant?req='),
+    `expected the consent page, got ${r.location}`);
+});
+
+await test("29. a company address will not stand in for an app that is not its front page", async () => {
+  // B's app asking to be signed in at A's company address. Without the binding this is how one app
+  // harvests a code on another party's origin, so the refusal has to name that reason.
+  const r = await authorize(`${B.owner}/other-${APP_FILE}`, coRedirect(signinSlug));
+  assert(r.status === 400, `expected 400, got ${r.status} ${r.location}`);
+  assert(r.code === 'INVALID_REDIRECT_URI', `expected INVALID_REDIRECT_URI, got ${r.code}`);
+  assert(r.message.includes('not bound to this app'),
+    `the refusal must be the BINDING one, not the origin-family one: ${r.message}`);
+});
+
+await test('30. an unclaimed company address is refused, and the bare co host is not a company', async () => {
+  const unclaimed = await authorize(`${A.owner}/${APP_FILE}`, coRedirect(`vapaa${Date.now().toString(36).slice(-5)}`));
+  assert(unclaimed.status === 400 && unclaimed.code === 'INVALID_REDIRECT_URI',
+    `unclaimed address: expected 400 INVALID_REDIRECT_URI, got ${unclaimed.status} ${unclaimed.code}`);
+  const bare = await authorize(`${A.owner}/${APP_FILE}`, `http://${CO_HOST}:${PORT}/callback`);
+  assert(bare.status === 400 && bare.code === 'INVALID_REDIRECT_URI',
+    `bare co host: expected 400 INVALID_REDIRECT_URI, got ${bare.status} ${bare.code}`);
+  assert(bare.message.includes('on the app origin'),
+    `the bare host must be refused by the ORIGIN check, not the binding one: ${bare.message}`);
+});
+
+await test('31. removing the front page takes the sign-in door with it', async () => {
+  const set = await json(`/v1/companies/${signinCompanyId}/front-page`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ kind: 'none' }),
+  });
+  assert(set.status === 200, `front page reset failed: ${set.status}`);
+  const r = await authorize(`${A.owner}/${APP_FILE}`, coRedirect(signinSlug));
+  assert(r.status === 400 && r.message.includes('not bound to this app'),
+    `an address with no app must refuse the binding, got ${r.status} ${r.message}`);
+  await json(`/v1/companies/${signinCompanyId}`, { method: 'DELETE', headers: authed(A.token) });
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
