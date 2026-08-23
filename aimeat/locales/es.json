@@ -294,7 +294,18 @@
       "howMonthly": "El informe de cada mes se escribe el primer día del mes siguiente y queda guardado. Puedes ejecutarlo antes desde la pestaña Programador, en la tarea Monthly Compliance Report.",
       "howAgent": "No hace falta activar nada. El cuestionario se sirve listo y no se guarda nada hasta el primer guardado.",
       "proposalsNote": "Se usó aquí y no está anotado. Los modelos y las aplicaciones vienen de lo que realmente se ejecutó; tú aportas las respuestas.",
-      "proposalAdd": "Agregar"
+      "proposalAdd": "Agregar",
+      "limit": {
+        "no-record": "Estas cifras describen contenido del que existe un registro de procedencia. El contenido SIN registro queda sin declarar y no aparece aquí: la ausencia de un registro no prueba que lo haya escrito una persona.",
+        "this-node-only": "Solo lo que funciona aquí. Todo lo publicado en la instalación de un socio, en la propia de alguien, o en cualquier otro lugar, queda fuera de las cifras de esta página.",
+        "register-unverified": "Para qué se usa la IA es lo que anotaste tú. Nada aquí lo contrasta con lo que realmente está funcionando; la comparación es la lista de arriba, y solo alcanza lo que quedó registrado.",
+        "not-a-legal-determination": "Una clase son tus propias respuestas pasadas por tus propias preguntas. Es una herramienta para encontrar lo que merece una revisión más atenta, no una determinación legal ni asesoría.",
+        "no-watermark": "Aquí el texto no lleva marca de agua. No se muestrean los tokens, y esa capa le corresponde a quien ejecuta el modelo.",
+        "consent-retention": "Los registros de quién accedió a qué se borran después de {days} días, así que nada más antiguo puede aparecer. Los permisos en sí no se borran.",
+        "usage-window": "El uso de IA se cuenta desde una ventana de unos {days} días. Lo más antiguo está archivado, y un cero significaría archivado y no inactivo.",
+        "provenance-on": "El registro está activo, así que el contenido producido aquí en este periodo tiene su registro. El producido antes de activarlo, no.",
+        "provenance-off": "El registro está DESACTIVADO aquí. No se registró nada, así que cada cifra de arriba es cero por eso y no porque no haya pasado nada."
+      }
     }
   },
   "admin.messages.desc": "Telemetría de entrega de los mensajes entre personas. No se enseña el contenido de ningún mensaje ni quién participa.",

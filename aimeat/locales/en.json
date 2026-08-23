@@ -294,7 +294,18 @@
       "howMonthly": "A report for each month is written on the first of the following month and kept. You can run it early from Scheduler, under the job named Monthly Compliance Report.",
       "howAgent": "Nothing needs switching on. The question set is served ready-made and nothing is stored until the first save.",
       "proposalsNote": "Used here, written down nowhere. The models and apps are filled in from what actually ran; you supply the answers.",
-      "proposalAdd": "Add"
+      "proposalAdd": "Add",
+      "limit": {
+        "no-record": "These counts describe content a provenance record exists for. Content with NO record is unstated and does not appear here: an absent record is not evidence that a person wrote something.",
+        "this-node-only": "Only what runs here. Anything published on a partner installation, on somebody's own personal one, or anywhere else, is outside every number on this page.",
+        "register-unverified": "What AI is used for is what you wrote down. Nothing here checks that against what is actually running; the comparison is the list at the top, and it only sees what was recorded.",
+        "not-a-legal-determination": "A class is your own answers run through your own questions. It is a tool for finding what needs a closer look, not a legal determination and not advice.",
+        "no-watermark": "Text is not watermarked here. The tokens are not sampled, and that layer belongs to whoever runs the model.",
+        "consent-retention": "Records of who accessed what are deleted after {days} days here, so anything older cannot appear. The permissions themselves are not deleted.",
+        "usage-window": "AI use is counted from a window of about {days} days. Anything older has been archived, and a zero would mean archived rather than idle.",
+        "provenance-on": "Recording is on, so content produced here during this period has a record. Content produced before it was turned on does not.",
+        "provenance-off": "Recording is OFF here. Nothing was recorded, so every count above is zero for that reason and not because nothing happened."
+      }
     }
   },
   "admin.messages.desc": "Delivery telemetry for user-to-user messages. No message content or participant identities are shown.",

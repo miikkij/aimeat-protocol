@@ -277,10 +277,10 @@ await test('A month outside the calendar is refused', async () => {
 // ─── The report says what it does not cover ───
 await test('not_covered is populated and names the absent-record rule', async () => {
     const r = await json(REPORT, { headers: auth(op.token) });
-    const limits: string[] = r.body.data.not_covered;
+    const limits: Array<{ code: string; text: string; days?: number }> = r.body.data.not_covered;
     assert(Array.isArray(limits) && limits.length >= 5,
         `a compliance report has to state its own limits; got ${limits?.length}`);
-    const joined = limits.join(' ').toLowerCase();
+    const joined = limits.map(l => l.text).join(' ').toLowerCase();
     // The one sentence that must survive every future edit: absence of a record is not evidence a
     // person wrote something. Without it a total reads as "everything published here".
     assert(joined.includes('unstated') || joined.includes('no provenance record') || joined.includes('no record'),

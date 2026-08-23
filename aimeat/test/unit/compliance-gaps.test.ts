@@ -119,7 +119,7 @@ describe('what the report says it does not cover', () => {
   it('is never empty, and names the absent-record rule and the retention window', async () => {
     const report = await buildComplianceReport(storageWith({}), CONFIG);
     expect(report.not_covered.length).toBeGreaterThanOrEqual(5);
-    const joined = report.not_covered.join(' ').toLowerCase();
+    const joined = report.not_covered.map(l => l.text).join(' ').toLowerCase();
     expect(joined).toMatch(/unstated|no record/);
     expect(joined).toContain('90 days');
   });
@@ -127,6 +127,23 @@ describe('what the report says it does not cover', () => {
   it('says so plainly when provenance recording is off, rather than showing a clean zero', async () => {
     const off = { ...CONFIG, aiProvenance: false } as AimeatConfig;
     const report = await buildComplianceReport(storageWith({}), off);
-    expect(report.not_covered.join(' ')).toContain('OFF');
+    expect(report.not_covered.map(l => l.text).join(' ')).toContain('OFF');
+    expect(report.not_covered.map(l => l.code)).toContain('provenance-off');
+  });
+
+  it('carries a code on every limit, so a surface can say it in the reader\'s language', async () => {
+    // The first version was English prose only. It was derived and honest and it could not be
+    // translated, which on the one list a reader must read made it the part they skipped.
+    const report = await buildComplianceReport(storageWith({}), CONFIG);
+    for (const limit of report.not_covered) {
+      expect(limit.code, `a limit with no code: ${limit.text}`).toBeTruthy();
+      expect(limit.text, `a limit with no fallback text: ${limit.code}`).toBeTruthy();
+    }
+    const codes = report.not_covered.map(l => l.code);
+    expect(new Set(codes).size, 'two limits share a code, so one would render as the other').toBe(codes.length);
+    // The two that interpolate a number have to supply it, or the sentence renders with {days} in it.
+    for (const limit of report.not_covered.filter(l => ['consent-retention', 'usage-window'].includes(l.code))) {
+      expect(typeof limit.days, `${limit.code} carries no days`).toBe('number');
+    }
   });
 });
