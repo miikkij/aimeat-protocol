@@ -286,7 +286,13 @@
       "period90d": "90 days",
       "period365d": "A year",
       "print": "Print or save as PDF",
-      "csv": "Download CSV"
+      "csv": "Download CSV",
+      "howTitle": "How to start",
+      "howStep1": "Write down each thing AI is used for here. One entry per use: what it is, which models it runs on, which published apps.",
+      "howStep2": "Answer the questions for each entry. Leave one unanswered and that entry has no class and shows up at the top — that is on purpose, so nothing sits here looking approved when nobody has looked at it.",
+      "howStep3": "Read \"Needs a look\". A model that ran here but appears in no entry is listed there. That difference is the whole point of this page: an empty register means everything counts as undocumented.",
+      "howMonthly": "A report for each month is written automatically on the first of the following month, and kept. You can run it early from Scheduler, under the job named Monthly Compliance Report.",
+      "howAgent": "Your own AI can keep this current instead of you: give it the \"compliance:read\" permission to read the report and \"compliance:write\" to change what is written down. Both are granted per agent in Profile, and neither comes with Full access."
     }
   },
   "admin.messages.desc": "Delivery telemetry for user-to-user messages. No message content or participant identities are shown.",

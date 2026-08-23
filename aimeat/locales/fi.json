@@ -286,7 +286,13 @@
       "period90d": "90 päivää",
       "period365d": "Vuosi",
       "print": "Tulosta tai tallenna PDF:ksi",
-      "csv": "Lataa CSV"
+      "csv": "Lataa CSV",
+      "howTitle": "Näin pääset alkuun",
+      "howStep1": "Kirjaa jokainen asia, johon tekoälyä täällä käytetään. Yksi merkintä per käyttötapa: mistä on kyse, millä malleilla se pyörii, mitkä julkaistut apit siihen liittyvät.",
+      "howStep2": "Vastaa jokaisen merkinnän kysymyksiin. Jos jätät yhden vastaamatta, merkinnällä ei ole luokkaa ja se nousee ylimmäksi. Se on tarkoitus: mikään ei saa näyttää hyväksytyltä silloin, kun kukaan ei ole katsonut sitä.",
+      "howStep3": "Lue \"Vaatii katsomista\". Siellä näkyy malli, joka on ollut käytössä mutta jota yksikään merkintä ei mainitse. Juuri tämä ero on sivun idea: jos mitään ei ole kirjattu, kaikki lasketaan dokumentoimattomaksi.",
+      "howMonthly": "Kunkin kuukauden raportti kirjoittuu itsestään seuraavan kuun ensimmäisenä päivänä ja jää talteen. Voit ajaa sen etuajassa Ajastin-välilehdeltä, työ nimeltä Monthly Compliance Report.",
+      "howAgent": "Oma tekoälysi voi pitää tätä ajan tasalla puolestasi: anna sille oikeus \"compliance:read\" raportin lukemiseen ja \"compliance:write\" kirjausten muuttamiseen. Molemmat annetaan agenttikohtaisesti Profiilissa, eikä kumpikaan tule Täysien oikeuksien mukana."
     }
   },
   "admin.messages.desc": "Toimitustelemetria käyttäjien välisille viesteille. Viestien sisältöä tai osapuolten henkilöllisyyttä ei näytetä.",

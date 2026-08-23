@@ -974,6 +974,8 @@
 .adm-cmp-small { font-size: 0.8rem; color: var(--muted); }
 .adm-cmp-hint { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 0.15rem; }
 
+.adm-cmp-steps { margin: 0.3rem 0 0.8rem; padding-left: 1.3rem; }
+.adm-cmp-steps li { margin: 0.5rem 0; max-width: 62rem; }
 .adm-cmp-gaps, .adm-cmp-limits, .adm-cmp-qs { margin: 0.4rem 0; padding-left: 1.1rem; }
 .adm-cmp-gaps li, .adm-cmp-limits li { margin: 0.45rem 0; max-width: 62rem; }
 .adm-cmp-gap-kind { display: block; font-weight: 600; }
