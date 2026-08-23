@@ -44,6 +44,10 @@
  *     the default fallthrough (calls next() -> JSON 404), so refusal is enforced in the guard where
  *     it is visible and testable. /.well-known/* (agent discovery, ACME) is the one allowed exception.
  *     Defense-in-depth for a node run without the apex nginx dotfile deny, or a mis-scoped static root.
+ *   v1.11.0 -- 2026-08-23 -- Exempt the exact path `/.md` too: it is the ROOT page's markdown mirror
+ *     (a scanner appends `.md` to a page URL, so the root's is `/.md`), a legitimate discovery URL
+ *     the dotfile guard was 403ing. The mirror router 404s anything it does not recognise, and it is
+ *     the only dotfile-shaped mirror, so the exact-path carve-out is safe. e2e-agent-readiness.
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -157,7 +161,11 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
   // of a path component, so /js/app.js.map and a filename that merely contains a dot are unaffected.
   app.use((req, res, next) => {
     const p = req.path;
-    if (p.startsWith('/v1/') || p.startsWith('/local/') || p.startsWith('/.well-known/')) {
+    // `/.md` is the ROOT page's markdown mirror (a scanner forms a page's mirror by appending `.md`,
+    // so the root's is `/.md`) — a legitimate agent-discovery URL like /.well-known, not a dotfile.
+    // The markdownMirrorsRouter 404s anything it does not recognise, so exempting the exact path is
+    // safe; it is the only dotfile-shaped mirror (every other page's is `<page>.md`).
+    if (p.startsWith('/v1/') || p.startsWith('/local/') || p.startsWith('/.well-known/') || p === '/.md') {
       next();
       return;
     }
