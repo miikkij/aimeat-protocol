@@ -293,8 +293,6 @@
       "howStep3": "Vastaa lopuksi jokaisen merkinnän kysymyksiin. Ne ratkaisevat riskiluokan, eikä niihin voi vastata koneellisesti: onko kyse päätöksestä joka koskee ihmistä, vai julkaisusta yleisesti merkittävästä aiheesta, on harkintaa. Vastaamatta jäänyt kysymys jättää merkinnän ilman luokkaa, ja merkintä pysyy ylimmässä listassa kunnes vastaat.",
       "howMonthly": "Raportti tallentuu itsestään kerran kuussa, seuraavan kuun ensimmäisenä päivänä, ja vanhat kuukaudet säilyvät. Jos haluat raportin heti, aja se Ajastin-välilehdeltä työstä nimeltä Monthly Compliance Report.",
       "howAgent": "Mitään ei tarvitse asentaa eikä kytkeä päälle. Kysymykset ovat valmiina, eikä mitään tallennu ennen kuin painat Tallenna.",
-      "proposalsNote": "Näitä on käytetty täällä, mutta niitä ei ole kirjattu mihinkään. Mallit ja apit on täytetty valmiiksi sen mukaan mitä oikeasti ajettiin; sinä vastaat kysymyksiin.",
-      "proposalAdd": "Lisää",
       "limit": {
         "no-record": "Nämä luvut kuvaavat sisältöä, josta on alkuperätietue. Sisältö jolla EI ole tietuetta on kirjaamatta eikä näy tässä: puuttuva tietue ei ole todiste siitä, että jonkin kirjoitti ihminen.",
         "this-node-only": "Vain se mikä pyörii täällä. Kaikki mitä on julkaistu kumppanin asennuksessa, jonkun omassa henkilökohtaisessa, tai muualla, on tämän sivun lukujen ulkopuolella.",
@@ -310,7 +308,15 @@
         "owner-register-is-the-operators": "Kirjaukset siitä mihin tekoälyä käytetään pitää se, joka pyörittää tätä asennusta, et sinä. Alla näkyvät ne merkinnät, jotka koskevat sinun tiliäsi. Jos jotain sinun toimintaasi puuttuu, se on keskustelu hänen kanssaan eikä asia jonka voit korjata täältä.",
         "owner-provenance-off": "Kirjaus on kytketty pois tästä asennuksesta, mikä ei ole sinun asetuksesi. Mitään ei kirjattu, joten jokainen yllä oleva luku on nolla siitä syystä eikä siksi ettet olisi tehnyt mitään."
       },
-      "howIntro": "Tämä sivu vertaa kahta asiaa: mitä täällä on oikeasti tehty tekoälyllä, ja mitä siitä on kirjoitettu ylös. Erotus näkyy ylimpänä kohdassa \"Vaatii katsomista\", ja juuri sitä auditoinnissa kysytään."
+      "howIntro": "Tämä sivu vertaa kahta asiaa: mitä täällä on oikeasti tehty tekoälyllä, ja mitä siitä on kirjoitettu ylös. Erotus näkyy ylimpänä kohdassa \"Vaatii katsomista\", ja juuri sitä auditoinnissa kysytään.",
+      "draftAction": "Täytä nämä puolestani",
+      "drafting": "Kootaan…",
+      "draftNote": "Täällä on ajettu tekoälyä, ja se tiedetään jo. Painamalla alla merkinnät kootaan sen mukaan mikä agentti tai appi mitäkin mallia kutsui, otsikot ja kuvaukset otetaan siitä mitä itse kirjoitit agenteista, ja ne kysymykset joihin löytyy vastaus kirjatusta vastataan valmiiksi. Mitään ei tallennu ennen kuin painat Tallenna.",
+      "draftLoaded": "Koottu {entries} merkintää, {answered} vastausta kirjatusta. Katso läpi ja tallenna.",
+      "draftFailed": "Luonnosta ei saatu koottua.",
+      "answerFromEvidence": "kirjatusta",
+      "answerFromAi": "tekoälyn luonnos",
+      "answerFromHuman": "sinun vastauksesi"
     }
   },
   "admin.messages.desc": "Toimitustelemetria käyttäjien välisille viesteille. Viestien sisältöä tai osapuolten henkilöllisyyttä ei näytetä.",

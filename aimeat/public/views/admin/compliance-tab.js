@@ -154,6 +154,7 @@ export default function ComplianceTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const [toastMsg, showError, showSuccess, clearToast] = useToast();
 
   const load = useCallback(async (p, { showSpinner = true } = {}) => {
@@ -199,6 +200,33 @@ export default function ComplianceTab() {
       swallowed('compliance-tab: save', e);
     }
     setSaving(false);
+  };
+
+  /**
+   * Ask the node for its own draft. Returns the entries, or null when it could not be read.
+   *
+   * Nothing is stored by this: the editor holds the draft unsaved so the operator reviews it and
+   * presses Save, which is the approval step. The count in the toast is what the node worked out
+   * without asking anybody, and it is the number worth seeing.
+   */
+  const loadDraft = async () => {
+    setDrafting(true);
+    try {
+      const days = PERIODS.find(x => x.key === period)?.days ?? 30;
+      const r = await apiGet(`/v1/admin/compliance/draft?since_days=${days}`);
+      const d = r?.data;
+      if (!d?.usecases) { showError(t('admin.compliance.draftFailed')); return null; }
+      showSuccess(t('admin.compliance.draftLoaded')
+        .replace('{entries}', d.counts.entries)
+        .replace('{answered}', d.counts.answeredFromEvidence));
+      return d.usecases;
+    } catch (e) {
+      showError(e?.message || t('admin.compliance.draftFailed'));
+      swallowed('compliance-tab: draft', e);
+      return null;
+    } finally {
+      setDrafting(false);
+    }
   };
 
   const exportCsv = () => {
@@ -266,9 +294,10 @@ export default function ComplianceTab() {
       <${RegisterSection}
         usecases=${report.register.usecases}
         questionnaire=${questionnaire}
-        gaps=${report.gaps}
         saving=${saving}
+        drafting=${drafting}
         onSave=${saveRegister}
+        onDraft=${loadDraft}
       />
 
       <${QuestionnaireSection} questionnaire=${questionnaire} />

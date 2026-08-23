@@ -27,6 +27,7 @@
  *   - adminComplianceRouter(config, storage)
  *   - GET  /v1/admin/compliance/report          — the roll-up  (compliance:read)
  *   - GET  /v1/admin/compliance/reports         — scheduled monthly snapshots (compliance:read)
+ *   - GET  /v1/admin/compliance/draft           — the node's own first draft (compliance:read)
  *   - GET  /v1/admin/compliance/usecases        — the register (compliance:read)
  *   - PUT  /v1/admin/compliance/usecases        — replace it   (compliance:write)
  *   - GET  /v1/admin/compliance/questionnaire   — the question set (compliance:read)
@@ -51,6 +52,7 @@ import { logger } from '../utils/logger.js';
 import {
   buildComplianceReport, complianceUnlabelledDetail, MONTH_RE,
 } from '../services/compliance-report.js';
+import { draftRegisterFromActivity } from '../services/compliance-draft.js';
 import {
   QuestionnaireSchema, UseCasesSchema, effectiveQuestionnaire, readUseCases,
   writeQuestionnaire, writeUseCases, listStoredReports, readStoredReport,
@@ -123,6 +125,20 @@ export function adminComplianceRouter(config: AimeatConfig, storage: Storage): R
     ]));
   });
 
+  // ── GET /v1/admin/compliance/draft — the node's own first draft of the register ───────────
+  // Composed from what actually ran and stored nowhere. The point is that an operator opening this
+  // for the first time is handed a filled-in register to review rather than an empty form and a
+  // list of models to retype.
+  router.get('/v1/admin/compliance/draft', ...canRead, async (req: Request, res: Response) => {
+    const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
+    const draft = await draftRegisterFromActivity(storage, config, {
+      sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined,
+    });
+    res.json(success(config.nodeId, draft, [
+      { description: 'Save it, once you have looked at it', method: 'PUT', url: '/v1/admin/compliance/usecases' },
+    ]));
+  });
+
   // ── The use-case register ─────────────────────────────────────────────────────────────────
   router.get('/v1/admin/compliance/usecases', ...canRead, async (_req: Request, res: Response) => {
     const usecases = await readUseCases(storage, config.nodeId);
@@ -133,6 +149,17 @@ export function adminComplianceRouter(config: AimeatConfig, storage: Storage): R
     validateBody(UseCasesSchema, config.nodeId),
     async (req: Request, res: Response) => {
       const operator = operatorOf(req);
+      // The preview answers AFTER validateBody, so what it shows is what would actually land. A
+      // preview that skipped the checks would show a document the real write then refuses.
+      if (req.query.dry_run === 'true') {
+        const unmarked = (req.body.usecases as Array<{ id: string; answers?: Record<string, unknown>; answerSources?: Record<string, string> }>)
+          .flatMap(uc => Object.keys(uc.answers ?? {}).filter(q => !(uc.answerSources ?? {})[q]).map(q => `${uc.id}:${q}`));
+        res.json(success(config.nodeId, {
+          would_store: req.body.usecases, total: req.body.usecases.length, stored: false,
+          ...(unmarked.length ? { answers_with_no_recorded_source: unmarked } : {}),
+        }));
+        return;
+      }
       const saved = await writeUseCases(storage, config.nodeId, req.body.usecases, operator);
       logger.info('admin-compliance: register replaced', { operator, count: saved.length });
       res.json(success(config.nodeId, { usecases: saved, total: saved.length }, [

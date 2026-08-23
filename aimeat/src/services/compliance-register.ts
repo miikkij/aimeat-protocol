@@ -99,6 +99,17 @@ export interface ComplianceUseCase {
   dataSubjects?: string;
   /** questionId → the answer. `boolean` questions store a boolean; `choice` questions a string. */
   answers?: Record<string, unknown>;
+  /**
+   * questionId → who produced that answer.
+   *
+   * `evidence` means the node read it out of what it recorded and nobody decided anything. `ai`
+   * means a model drafted it. `human` means a person answered. An auditor's whole question is which
+   * of the three, and a register that could not tell them apart would answer it wrongly by omission:
+   * the confident-sounding ones would all read as considered.
+   *
+   * Absent for an answer that predates this field, which reads as unknown rather than as human.
+   */
+  answerSources?: Record<string, 'human' | 'ai' | 'evidence'>;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -185,6 +196,7 @@ export const UseCaseSchema = z.object({
   purpose: z.string().max(2000).optional(),
   dataSubjects: z.string().max(2000).optional(),
   answers: z.record(z.string(), z.unknown()).optional(),
+  answerSources: z.record(z.string(), z.enum(['human', 'ai', 'evidence'])).optional(),
   updatedAt: z.string().optional(),
   updatedBy: z.string().max(300).optional(),
 });
