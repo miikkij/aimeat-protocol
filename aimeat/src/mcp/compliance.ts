@@ -37,6 +37,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE } from '../utils/scope-coverage.js';
 import { complianceRefusal } from '../services/compliance-access.js';
 import { buildComplianceReport, MONTH_RE } from '../services/compliance-report.js';
+import { draftRegisterFromActivity } from '../services/compliance-draft.js';
 import {
   QuestionnaireSchema, UseCasesSchema, effectiveQuestionnaire, readUseCases,
   writeQuestionnaire, writeUseCases,
@@ -100,11 +101,18 @@ export function registerComplianceTools(
   mcp.tool(
     'aimeat_compliance_register_read',
     descriptionFor('aimeat_compliance_register_read'),
-    { part: z.enum(['usecases', 'questionnaire']).describe('Which document to read.') },
+    {
+      part: z.enum(['draft', 'usecases', 'questionnaire']).describe('Which document to read. Start with "draft".'),
+      since_days: z.number().int().min(1).max(3650).optional()
+        .describe('For "draft": how far back to look for activity (default 30).'),
+    },
     annotationsFor('aimeat_compliance_register_read'),
-    async ({ part }) => {
+    async ({ part, since_days }) => {
       const denied = await gate(COMPLIANCE_READ_SCOPE);
       if (denied) return refuse(denied);
+      if (part === 'draft') {
+        return text(await draftRegisterFromActivity(storage, config, { sinceDays: since_days }));
+      }
       if (part === 'questionnaire') {
         return text({ questionnaire: await effectiveQuestionnaire(storage, config.nodeId) });
       }
@@ -119,9 +127,11 @@ export function registerComplianceTools(
     {
       part: z.enum(['usecases', 'questionnaire']).describe('Which document to replace.'),
       value: z.record(z.string(), z.unknown()).describe('The whole document — this replaces, it does not merge.'),
+      dry_run: z.boolean().optional()
+        .describe('Validate and return what would be stored, storing nothing.'),
     },
     annotationsFor('aimeat_compliance_register_write'),
-    async ({ part, value }) => {
+    async ({ part, value, dry_run }) => {
       const denied = await gate(COMPLIANCE_WRITE_SCOPE);
       if (denied) return refuse(denied);
 
@@ -130,6 +140,15 @@ export function registerComplianceTools(
         if (!parsed.success) {
           return refuse('That question set was not stored: '
             + parsed.error.issues.map(i => `${i.path.join('.')} — ${i.message}`).join('; '));
+        }
+        // The dry run answers AFTER validation, so what it shows is what would actually land rather
+        // than what was asked for. A preview that skipped the checks would show a document the real
+        // write would then refuse, which is worse than no preview.
+        if (dry_run) {
+          return text({
+            would_store: parsed.data, stored: false,
+            note: 'Nothing was written. Show this to the person, and call again without dry_run to store it.',
+          });
         }
         const saved = await writeQuestionnaire(storage, config.nodeId, parsed.data);
         return text({
@@ -143,6 +162,17 @@ export function registerComplianceTools(
       if (!parsed.success) {
         return refuse('That register was not stored: '
           + parsed.error.issues.map(i => `${i.path.join('.')} — ${i.message}`).join('; '));
+      }
+      if (dry_run) {
+        const unmarked = parsed.data.usecases.flatMap(uc =>
+          Object.keys(uc.answers ?? {}).filter(q => !(uc.answerSources ?? {})[q]).map(q => `${uc.id}:${q}`));
+        return text({
+          would_store: parsed.data.usecases, total: parsed.data.usecases.length, stored: false,
+          // Naming them here rather than refusing: an unmarked answer is readable as unknown, and a
+          // preview is the right moment to notice it instead of the audit.
+          ...(unmarked.length ? { answers_with_no_recorded_source: unmarked } : {}),
+          note: 'Nothing was written. Show this to the person, and call again without dry_run to store it.',
+        });
       }
       const saved = await writeUseCases(storage, config.nodeId, parsed.data.usecases, agentGaii);
       return text({ usecases: saved, total: saved.length });

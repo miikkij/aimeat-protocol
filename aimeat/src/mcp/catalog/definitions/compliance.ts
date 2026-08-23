@@ -36,21 +36,23 @@ export const complianceTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_compliance_register_read',
-        description: 'Operator-only. Read one of the two documents the compliance report is built from. part="usecases" returns what AI is used for on this node — each entry with the models, apps and systems it runs on, and its answers to the risk questions. part="questionnaire" returns the risk-classification question set: the classes, and each question with the answers that imply each class. The question set is DATA, so it can be edited without a release; read it before writing it, because a write replaces the whole document. Needs the exact permission "compliance:read".',
+        description: 'Operator-only. Read what the compliance report is built from. part="draft" is the one to start with: the node composes a first draft of the register out of what actually ran, grouped by which agent or app called the model rather than by the model, with each agent\'s own name and description as the entry, and the two questions it can answer from the record already answered and marked as evidence. Nothing in a draft is stored. part="usecases" is the register as stored; part="questionnaire" is the risk-classification question set — the classes, and each question with the answers that imply each class. The question set is DATA and can be edited without a release. Read before writing, because a write replaces the whole document. Needs the exact permission "compliance:read".',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
-            part: { type: 'string', required: true, enum: ['usecases', 'questionnaire'], description: 'Which document to read.' },
+            part: { type: 'string', required: true, enum: ['draft', 'usecases', 'questionnaire'], description: 'Which document to read. Start with "draft".' },
+            since_days: { type: 'number', description: 'For "draft": how far back to look for activity (default 30).' },
         },
     },
     {
         name: 'aimeat_compliance_register_write',
-        description: 'Operator-only. Replace one of the two documents the compliance report is built from. REPLACES, does not merge: send every use case or every question you want to keep, so read the document first. part="usecases" expects { usecases: [...] }; part="questionnaire" expects the whole set with version, classes, defaultClass and questions. A question set that names a class it does not define, a choice question with no options, or a duplicate id is refused rather than stored — each would surface later as a silent default inside a compliance document. Adding a question takes effect on the next report with no release and no restart, which is the reason this is data. Saving re-classifies every use case: one whose answers no longer cover every question becomes unclassified and appears in the report gap list. Needs the exact permission "compliance:write" — "compliance:read" is refused here, and no wildcard carries either.',
+        description: 'Operator-only. Replace one of the two stored documents. REPLACES, does not merge: send every use case or every question you want to keep, so read first. Pass dry_run=true to get back exactly what WOULD be stored, validated, without storing it — show that to the person and let them approve it before the real write. part="usecases" expects { usecases: [...] }; part="questionnaire" expects the whole set with version, classes, defaultClass and questions. Mark each answer in answerSources as "human", "ai" or "evidence": an auditor\'s question is which of the three, and answers that all read as considered would answer it wrongly. A question set naming a class it does not define, a choice question with no options, or a duplicate id is refused rather than stored. Adding a question takes effect on the next report with no release. Saving re-classifies everything: an entry whose answers no longer cover every question becomes unclassified and appears in the gap list. Needs the exact permission "compliance:write" — "compliance:read" is refused here, and no wildcard carries either.',
         caller: 'operator',
         visibility: agentEverywhere,
         input: {
             part: { type: 'string', required: true, enum: ['usecases', 'questionnaire'], description: 'Which document to replace.' },
             value: { type: 'object', required: true, description: 'The whole document. For "usecases", { usecases: [...] }. For "questionnaire", { version, note, classes, defaultClass, questions }.' },
+            dry_run: { type: 'boolean', description: 'Validate and return what would be stored, storing nothing. Use this to show somebody the result before it goes in.' },
         },
     },
 ];
