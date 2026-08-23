@@ -11,6 +11,13 @@
  *   - WorkspaceProvisionError: thrown for a malformed manifest (surfaces as 400/validation)
  * @usage const { ws } = await provisionWorkspace(storage, config, { orgId, ownerName, ownerGhii, name, manifest, schemas });
  * @version-history
+ *   v1.2.0 -- 2026-08-23 -- Rollback. The four writes had none, so a failure at write three left
+ *     locked schemas and a manifest that no registry knows about: a workspace that half exists,
+ *     which nothing lists and nothing cleans. Undone in reverse now, with the registry RESTORED
+ *     rather than deleted (it is the one key that may have existed before), and whatever could not
+ *     be undone NAMED in the error instead of hidden — the same shape the package installer uses.
+ *     A workspace cannot be a package component (the seven legal types are csm/extension/cortex/app/
+ *     msm/memory/translation), so it can never ride that installer's rollback and needs its own.
  *   v1.0.0 -- 2026-07-14 -- Extracted from mcp/workspaces.ts _create; adds a REST provisioning path so
  *     published apps can create their own structured data space (multi-tenant apps) under the owner.
  *   v1.1.0 -- 2026-07-25 -- Backfill the full manifest envelope (manifestVersion/id/name/kind/status)
@@ -73,29 +80,85 @@ export async function provisionWorkspace(
   const root = `organism.${input.orgId}.w.${wsId}`;
   const now = new Date().toISOString();
 
-  // 1. Lock the records schemas under the owner GHII (direct storage — no route owner/operator gate).
-  for (const [namespace, schema] of Object.entries(schemaMap)) {
-    if (!schema || typeof schema !== 'object') continue;
-    await storage.setSchema({ keyPattern: `${root}.${namespace}`, applyTo: 'prefix', schemaJson: schema, schemaMode: 'strict', lockedBy: input.ownerGhii, setAt: now, updatedAt: now });
-  }
-  // 2. Manifest (validated against the manifest meta-schema). Backfill the envelope
-  //    (manifestVersion/id/name/kind/status) the model routinely omits so a manifest with just
-  //    objectTypes validates on the first call instead of being rejected for a missing required field.
-  const manifestValue = backfillManifestEnvelope(man as Record<string, unknown>, { orgId: input.orgId, fallbackName: input.name });
-  const mkey = `${root}.meta.manifest`;
-  const valid = await validateMemoryWrite(mkey, manifestValue, storage);
-  if (!valid.valid) throw new WorkspaceProvisionError('Manifest rejected by schema: ' + JSON.stringify(valid.errors));
-  await setMeta(storage, mkey, manifestValue, input.ownerGhii, now);
-  // 3. Readme.
-  const summary = man.summary;
-  await setMeta(storage, `${root}.meta.readme`, input.readme || `# ${String(man.name || input.name)}\n\n${typeof summary === 'string' ? summary : ''}`, input.ownerGhii, now);
-  // 4. Register in the organism's workspace registry.
-  const regKey = `organism.${input.orgId}.meta.workspaces`;
-  const regRec = await storage.getMemory(input.ownerGhii, regKey);
-  const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
-  await setMeta(storage, regKey, { workspaces: [...workspaces, { id: wsId, name: String(input.name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: input.ownerName }] }, input.ownerGhii, now);
+  // WHAT WAS WRITTEN SO FAR, so a failure part-way can be undone in reverse. A workspace cannot be
+  // a package component (the seven legal types are csm/extension/cortex/app/msm/memory/translation),
+  // so it can never ride the installer's rollback and needs its own. → rollback() below.
+  const done: Array<{ kind: 'schema'; keyPattern: string } | { kind: 'memory'; key: string }> = [];
+  /** The registry as it was before we touched it, so the append can be put back exactly. */
+  let registryBefore: { existed: boolean; value: unknown } | undefined;
 
-  return { ws: wsId, types: (man.objectTypes as Array<{ name?: string }>).map(o => o.name || '').filter(Boolean), schemas_locked: Object.keys(schemaMap) };
+  /** Undo in reverse. Returns what could NOT be undone, named, rather than claiming a clean undo. */
+  async function rollback(): Promise<string[]> {
+    const orphans: string[] = [];
+    for (const item of [...done].reverse()) {
+      try {
+        if (item.kind === 'schema') {
+          if (!await storage.deleteSchema(item.keyPattern)) orphans.push(`schema ${item.keyPattern}`);
+        } else if (!await storage.deleteMemory(input.ownerGhii, item.key)) {
+          orphans.push(item.key);
+        }
+      } catch (err) {
+        orphans.push(`${item.kind === 'schema' ? 'schema ' : ''}${item.kind === 'schema' ? item.keyPattern : item.key} (${String(err)})`);
+      }
+    }
+    // The registry is the one key that may have existed before, so it is RESTORED rather than
+    // deleted. Only reached if the append itself landed and something after it failed.
+    if (registryBefore) {
+      const regKey = `organism.${input.orgId}.meta.workspaces`;
+      try {
+        if (registryBefore.existed) await setMeta(storage, regKey, registryBefore.value, input.ownerGhii, now);
+        else await storage.deleteMemory(input.ownerGhii, regKey);
+      } catch (err) {
+        orphans.push(`${regKey} (${String(err)})`);
+      }
+    }
+    return orphans;
+  }
+
+  try {
+    // 1. Lock the records schemas under the owner GHII (direct storage — no route owner/operator gate).
+    for (const [namespace, schema] of Object.entries(schemaMap)) {
+      if (!schema || typeof schema !== 'object') continue;
+      const keyPattern = `${root}.${namespace}`;
+      await storage.setSchema({ keyPattern, applyTo: 'prefix', schemaJson: schema, schemaMode: 'strict', lockedBy: input.ownerGhii, setAt: now, updatedAt: now });
+      done.push({ kind: 'schema', keyPattern });
+    }
+    // 2. Manifest (validated against the manifest meta-schema). Backfill the envelope
+    //    (manifestVersion/id/name/kind/status) the model routinely omits so a manifest with just
+    //    objectTypes validates on the first call instead of being rejected for a missing required field.
+    const manifestValue = backfillManifestEnvelope(man as Record<string, unknown>, { orgId: input.orgId, fallbackName: input.name });
+    const mkey = `${root}.meta.manifest`;
+    const valid = await validateMemoryWrite(mkey, manifestValue, storage);
+    if (!valid.valid) throw new WorkspaceProvisionError('Manifest rejected by schema: ' + JSON.stringify(valid.errors));
+    await setMeta(storage, mkey, manifestValue, input.ownerGhii, now);
+    done.push({ kind: 'memory', key: mkey });
+    // 3. Readme.
+    const summary = man.summary;
+    const rkey = `${root}.meta.readme`;
+    await setMeta(storage, rkey, input.readme || `# ${String(man.name || input.name)}\n\n${typeof summary === 'string' ? summary : ''}`, input.ownerGhii, now);
+    done.push({ kind: 'memory', key: rkey });
+    // 4. Register in the organism's workspace registry.
+    const regKey = `organism.${input.orgId}.meta.workspaces`;
+    const regRec = await storage.getMemory(input.ownerGhii, regKey);
+    const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
+    registryBefore = { existed: !!regRec, value: regRec?.value };
+    await setMeta(storage, regKey, { workspaces: [...workspaces, { id: wsId, name: String(input.name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: input.ownerName }] }, input.ownerGhii, now);
+    // The append landed, so there is nothing left to put back.
+    registryBefore = undefined;
+
+    return { ws: wsId, types: (man.objectTypes as Array<{ name?: string }>).map(o => o.name || '').filter(Boolean), schemas_locked: Object.keys(schemaMap) };
+  } catch (err) {
+    const orphans = await rollback();
+    const reason = err instanceof Error ? err.message : String(err);
+    if (orphans.length) {
+      // Say what survived. A rollback that reports success it did not achieve is worse than none,
+      // because nobody goes looking for the leftovers.
+      throw new WorkspaceProvisionError(
+        `${reason}. Partial rollback — these were left behind: ${orphans.join(', ')}`,
+      );
+    }
+    throw err;
+  }
 }
 
 /** Re-export so callers can narrow the manifest-normalization error too. */
