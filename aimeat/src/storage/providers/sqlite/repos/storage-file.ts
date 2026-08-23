@@ -15,7 +15,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
-import type { StorageFileRecord, ChunkedUploadRecord, MicroMemoryRecord } from '../../../interface.js';
+import type { StorageFileRecord, ChunkedUploadRecord } from '../../../interface.js';
 
 // ── Storage Files ──
 
@@ -125,40 +125,6 @@ export function deleteChunkedUpload(chunkedUploads: Map<string, ChunkedUploadRec
 
 // ── Micro-Memory ──
 
-function deserializeMicroMemory(row: Record<string, unknown>): MicroMemoryRecord {
-  const record: MicroMemoryRecord = {
-    gaii: row.gaii as string,
-    set: row.setName as string,
-    entries: JSON.parse(row.entries as string),
-    visibility: row.visibility as MicroMemoryRecord['visibility'],
-    updatedAt: row.updatedAt as string,
-  };
-  if (row.accessCode) record.accessCode = row.accessCode as string;
-  return record;
-}
-
-export function setMicroMemory(db: Database.Database, record: MicroMemoryRecord): MicroMemoryRecord {
-  db.prepare(
-    `INSERT OR REPLACE INTO micro_memory (gaii, setName, entries, visibility, accessCode, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    record.gaii, record.set,
-    JSON.stringify(record.entries), record.visibility,
-    record.accessCode ?? null, record.updatedAt,
-  );
-  return record;
-}
-
-export function getMicroMemory(db: Database.Database, gaii: string, set: string): MicroMemoryRecord | null {
-  const row = db.prepare('SELECT * FROM micro_memory WHERE gaii = ? AND setName = ?').get(gaii, set) as Record<string, unknown> | undefined;
-  return row ? deserializeMicroMemory(row) : null;
-}
-
-export function listMicroMemorySets(db: Database.Database, gaii: string): MicroMemoryRecord[] {
-  const rows = db.prepare('SELECT * FROM micro_memory WHERE gaii = ?').all(gaii) as Record<string, unknown>[];
-  return rows.map(r => deserializeMicroMemory(r));
-}
-
 /** Total storage bytes + file count across MANY owner identities in ONE SQL query — the owner-scope
  *  footprint for the usage summary (replaces one listStorageFiles-then-sum per identity). */
 export function sumStorageBytesForOwners(db: Database.Database, ownerGaiis: string[]): { bytes: number; count: number } {
@@ -170,36 +136,3 @@ export function sumStorageBytesForOwners(db: Database.Database, ownerGaiis: stri
 
 /** Total micro-memory bytes + set count across MANY identities in ONE query (deprecated subsystem;
  *  this keeps the usage summary off a per-identity fan-out over it). */
-export function getMicroMemoryTotalForOwners(db: Database.Database, gaiis: string[]): { bytes: number; sets: number } {
-  if (gaiis.length === 0) return { bytes: 0, sets: 0 };
-  const ph = gaiis.map(() => '?').join(',');
-  const rows = db.prepare(`SELECT entries FROM micro_memory WHERE gaii IN (${ph})`).all(...gaiis) as Array<{ entries: string | null }>;
-  let bytes = 0;
-  for (const r of rows) {
-    const entries = JSON.parse(r.entries ?? '{}') as Record<string, unknown>;
-    for (const [k, v] of Object.entries(entries)) bytes += Buffer.byteLength(k, 'utf8') + Buffer.byteLength(String(v), 'utf8');
-  }
-  return { bytes, sets: rows.length };
-}
-
-export function deleteMicroMemory(db: Database.Database, gaii: string, set: string): boolean {
-  const result = db.prepare('DELETE FROM micro_memory WHERE gaii = ? AND setName = ?').run(gaii, set);
-  return result.changes > 0;
-}
-
-export function deleteMicroMemoryEntry(db: Database.Database, gaii: string, set: string, key: string): boolean {
-  const record = getMicroMemory(db, gaii, set);
-  if (!record || !(key in record.entries)) return false;
-  delete record.entries[key];
-  db.prepare('UPDATE micro_memory SET entries = ? WHERE gaii = ? AND setName = ?').run(
-    JSON.stringify(record.entries), gaii, set,
-  );
-  return true;
-}
-
-export function findMicroMemoryByAccessCode(db: Database.Database, set: string, accessCode: string): MicroMemoryRecord | null {
-  const row = db.prepare(
-    `SELECT * FROM micro_memory WHERE setName = ? AND accessCode = ? AND (visibility = 'shared_read' OR visibility = 'shared_write')`
-  ).get(set, accessCode) as Record<string, unknown> | undefined;
-  return row ? deserializeMicroMemory(row) : null;
-}

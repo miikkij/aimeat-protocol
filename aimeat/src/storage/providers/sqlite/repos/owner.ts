@@ -127,7 +127,6 @@ export function cascadeDeleteAgentData(db: Database.Database, gaii: string): voi
   // Memory
   db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(gaii);
   // Micro-memory
-  db.prepare('DELETE FROM micro_memory WHERE gaii = ?').run(gaii);
   // Actions
   db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(gaii);
   // Work (as provider or requester) — also clean up related disputes

@@ -563,7 +563,7 @@ await test('Prompts — tier0, tier1, tier2 + unified', async () => {
         assert(typeof body.data?.system_prompt === 'string', `${tier} has prompt`);
     }
     // Unified prompts
-    for (const tier of ['0', '0.5', '1', '2']) {
+    for (const tier of ['0', '1', '2']) {
         const { body } = await json(`/v1/prompts/${tier}`);
         assert(body.ok === true, `prompts/${tier} ok`);
         assert(typeof body.data?.system_prompt === 'string', `prompts/${tier} has prompt`);
@@ -1310,11 +1310,11 @@ await test('Rate limiting 429', async () => {
     // With high test limits, just verify the headers exist (rate limiting is enabled)
 });
 
-// ─── Phase 7: Initial OTK removal + admin setup mint ───
+// ─── Phase 7: Initial OTK removal ───
 // POST /v1/auth/initial-otk was removed 2026-08-23 with the rest of the Tier 0.5 OTK routes
 // (deprecated in RFC v4.0). Micro-memory's `?otk=` consumption still exists and is covered through
-// the admin setup mint below and by e2e-micro-memory.ts.
-console.log('Phase 7 — Initial OTK removal + admin setup mint');
+// the micro-memory subsystem it fed was removed on the same day.
+console.log('Phase 7 — Initial OTK removal');
 
 await test('Initial OTK mint is removed (404)', async () => {
     const { status } = await json('/v1/auth/initial-otk', {
@@ -1324,24 +1324,14 @@ await test('Initial OTK mint is removed (404)', async () => {
     assert(status === 404, `removed initial mint answered ${status}`);
 });
 
-await test('Initial OTK — admin setup endpoint', async () => {
-    const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? '';
-    // Skip if no admin password available
-    if (!ADMIN_PW) {
-        console.log('    ⏩ Skipped (no AIMEAT_ADMIN_PASSWORD in env)');
-        passed++; // count as passed (skipped)
-        return;
-    }
-
-    const { body } = await json('/v1/admin/setup/initial-otk', {
+await test('Admin initial-OTK mint is removed (404)', async () => {
+    // Removed 2026-08-23 with the micro-memory subsystem it fed. Anything but 404 means it came back.
+    const { status } = await json('/v1/admin/setup/initial-otk', {
         method: 'POST',
-        headers: { 'X-Admin-Password': ADMIN_PW },
+        headers: { 'X-Admin-Password': process.env.AIMEAT_ADMIN_PASSWORD ?? '' },
         body: JSON.stringify({ owner: ownerName }),
     });
-    assert(body.ok === true, `admin initial-otk: ${JSON.stringify(body)}`);
-    assert(body.initial === true, 'initial flag');
-    assert(typeof body.otk === 'string', 'has otk');
-    assert(typeof body.grace_ms === 'number', 'has grace_ms');
+    assert(status === 404, `removed admin mint answered ${status}`);
 });
 
 // ─── Phase 8: Chat Instance CRUD ───

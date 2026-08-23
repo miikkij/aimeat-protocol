@@ -397,7 +397,7 @@ async function setupAnonymousIdentity(config: AimeatConfig, storage: Storage): P
         gaii: ANON_GAII,
         displayName: 'Shared Anonymous Agent',
         description: 'Shared agent for anonymous mode — all AI agents share this identity and memory space',
-        capabilities: ['memory', 'micro-memory', 'actions', 'catalogue'],
+        capabilities: ['memory', 'actions', 'catalogue'],
         publicKey: kp.publicKey,
         trustScore: 50,
         morselBalance: config.welcomeBonus,

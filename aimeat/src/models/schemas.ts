@@ -266,7 +266,6 @@ export const ConfigUpdateSchema = z.object({
     dailyAllowanceCap: z.number().int().nonnegative().optional(),
     burnRate: z.number().min(0).max(1).optional(),
     jwtTtlSeconds: z.number().int().positive().optional(),
-    keyedBrowseEnabled: z.boolean().optional(),
     rateLimits: z.record(z.string(), z.unknown()).optional(),
 });
 

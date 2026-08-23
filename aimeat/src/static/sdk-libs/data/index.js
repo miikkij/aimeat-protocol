@@ -2,14 +2,14 @@
  * @file data/index.js
  * @description The aimeat-data library (SDK-libs migration — config-path proof lib). Exposes
  *   AIMEAT.data: the Memory API (Tier 1, JWT auth via AIMEAT.auth) with an app-creator public-read
- *   fallback, and Micro-Memory (Tier 0.5, GET-based). This is the componentized ESM source esbuild
+ *   fallback. This is the componentized ESM source esbuild
  *   bundles to the IIFE served, unchanged, at /v1/libs/aimeat-data.js. It is the first migrated lib
- *   that actually CONSUMES the shared config: `NODE_URL` (direct public/micro fetches) and `NODE_ID`
+ *   that actually CONSUMES the shared config: `NODE_URL` (direct public reads) and `NODE_ID`
  *   (the `creator@node` construction in get()'s fallback) come from _core/config — the exact values
  *   the legacy string form baked in via `${config.baseUrl}` / `${config.nodeId}`.
  * @structure imports NODE_URL/NODE_ID (config), authFetch (session), attach (namespace);
  *   withProvenance()/publicEntryResponse(); data.set/get/getEntry/update/delete/list/search/
- *   getPublic/getPublicEntry; data.micro()/microSets(); attach('data', …).
+ *   getPublic/getPublicEntry; attach('data', …).
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
@@ -241,72 +241,6 @@ const data = {
   async getPublicEntry(gaii, key) {
     const res = await publicEntryResponse(gaii, key);
     return res === null ? null : withProvenance(res);
-  },
-
-  // ── Micro-Memory (Tier 0.5, GET-based) ──
-  micro(setName, accessCode) {
-    const base = NODE_URL + '/v1/mm';
-
-    function mmUrl(params) {
-      const p = new URLSearchParams(params);
-      if (accessCode) p.set('access_code', accessCode);
-      return base + '?' + p.toString();
-    }
-
-    async function mmFetch(params) {
-      const r = await fetch(mmUrl(params));
-      const res = await r.json();
-      if (!res.ok) throw new Error(res.error?.message || 'Micro-memory operation failed');
-      return res.data;
-    }
-
-    return {
-      // Add or overwrite a key
-      async add(key, value) {
-        return mmFetch({ op: 'add', set: setName, key, value: typeof value === 'object' ? JSON.stringify(value) : String(value) });
-      },
-      // Modify existing key
-      async mod(key, value) {
-        return mmFetch({ op: 'mod', set: setName, key, value: typeof value === 'object' ? JSON.stringify(value) : String(value) });
-      },
-      // Delete a key
-      async del(key) {
-        return mmFetch({ op: 'del', set: setName, key });
-      },
-      // List all entries in this set
-      async list() {
-        return mmFetch({ op: 'list', set: setName });
-      },
-      // Batch add multiple key-value pairs
-      async batch(entries) {
-        const params = { op: 'batch', set: setName };
-        Object.keys(entries).forEach((k, i) => {
-          params['key' + i] = k;
-          const v = entries[k];
-          params['value' + i] = typeof v === 'object' ? JSON.stringify(v) : String(v);
-        });
-        return mmFetch(params);
-      },
-      // Configure visibility
-      async config(visibility) {
-        const params = { op: 'config', set: setName, access: visibility };
-        return mmFetch(params);
-      },
-      // Get a single key value
-      async get(key) {
-        const d = await mmFetch({ op: 'list', set: setName });
-        return d.entries?.[key] ?? null;
-      },
-    };
-  },
-
-  // List all micro-memory sets
-  async microSets() {
-    const url = NODE_URL + '/v1/mm?op=list';
-    const r = await fetch(url);
-    const res = await r.json();
-    if (!res.ok) throw new Error(res.error?.message || 'Failed to list micro-memory sets');
-    return res.data;
   },
 };
 

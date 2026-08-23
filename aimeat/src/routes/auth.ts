@@ -6,7 +6,6 @@
  *   refresh, revocation, and session OTK flows.
  * @structure
  *   - authRouter() -- Express router for authentication endpoints
- *   - checkOtkSession() -- inactivity guard for session-bound OTKs
  *   - Challenge/session stores for interactive auth flows
  * @usage
  *   app.use(authRouter(config, storage));
@@ -59,34 +58,10 @@ import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, isExternalPrincipal } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
 import { randomBytes } from 'node:crypto';
-import { generateOtk } from '../utils/otk.js';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
-import { logger } from '../utils/logger.js';
 
 // In-memory challenge store
 const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
-
-// Session inactivity tracking: sessionId → lastActivity timestamp
-const sessions = new Map<string, { ownerGaii: string; lastActivity: number }>();
-const SESSION_INACTIVITY_MS = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Check if an OTK's session is still active (not timed out by inactivity).
- * Updates lastActivity on success. Returns false if session has expired.
- * Non-session OTKs always return true.
- */
-export async function checkOtkSession(otk: { sessionId: string | null }, storage: Storage): Promise<boolean> {
-  if (!otk.sessionId) return true;
-  const session = sessions.get(otk.sessionId);
-  if (!session) return true; // session not tracked (e.g. standalone OTK)
-  if (Date.now() - session.lastActivity > SESSION_INACTIVITY_MS) {
-    await storage.expireSessionOtks(otk.sessionId);
-    sessions.delete(otk.sessionId);
-    return false;
-  }
-  session.lastActivity = Date.now();
-  return true;
-}
 
 export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -152,108 +127,6 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
           signature: 'base64(Ed25519_sign(private_key, gaii + timestamp))',
         },
       },
-    ]));
-  });
-
-  // GET /v1/auth/session — Submit signed challenge, get OTK (Tier 0.5)
-  router.get('/v1/auth/session', async (req, res) => {
-    const owner = req.query.owner as string | undefined;
-    const challengeStr = req.query.challenge as string | undefined;
-    const sig = req.query.sig as string | undefined;
-
-    if (!owner || !challengeStr || !sig) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Query parameters "owner", "challenge", and "sig" are required'));
-      return;
-    }
-
-    // Look up challenge
-    const stored = challenges.get(challengeStr);
-    if (!stored) {
-      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Challenge not found or expired'));
-      return;
-    }
-    if (Date.now() > stored.expiresAt) {
-      challenges.delete(challengeStr);
-      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Challenge expired'));
-      return;
-    }
-    if (stored.owner !== owner) {
-      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Challenge does not match owner'));
-      return;
-    }
-
-    // Verify signature: owner signed the challenge string with their private key
-    const ownerRecord = await storage.getOwner(owner);
-    if (!ownerRecord) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner not found: ${owner}`));
-      return;
-    }
-
-    const valid = await verify(ownerRecord.publicKey, challengeStr, sig);
-    if (!valid) {
-      res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid signature'));
-      return;
-    }
-
-    // Consume challenge
-    challenges.delete(challengeStr);
-
-    // Find first agent for this owner (or create session OTK for owner)
-    const agents = await storage.getAgentsByOwner(owner);
-    const sessionGaii = agents.length > 0 ? agents[0].gaii : owner;
-
-    // Create a session for inactivity tracking
-    const sessionId = `sess-${randomBytes(8).toString('hex')}`;
-    sessions.set(sessionId, { ownerGaii: sessionGaii, lastActivity: Date.now() });
-
-    // Generate OTK for Tier 0.5 operations
-    const otk = generateOtk();
-    const expiresAt = new Date(Date.now() + config.otkTtlMs).toISOString();
-
-    await storage.createOtk({
-      key: otk,
-      ownerGaii: sessionGaii,
-      action: 'session',
-      params: { owner, sessionType: 'tier_0_5', sessionId },
-      expiresAt,
-      initial: false,
-      used: false,
-      usedAt: null,
-      sessionId,
-      createdAt: new Date().toISOString(),
-    });
-
-    // Pre-rotate: generate next_otk so the AI always has a buffered key
-    const nextOtk = generateOtk();
-    const nextExpiresAt = new Date(Date.now() + config.otkTtlMs).toISOString();
-    await storage.createOtk({
-      key: nextOtk,
-      ownerGaii: sessionGaii,
-      action: 'session',
-      params: { owner, sessionType: 'tier_0_5', sessionId },
-      expiresAt: nextExpiresAt,
-      initial: false,
-      used: false,
-      usedAt: null,
-      sessionId,
-      createdAt: new Date().toISOString(),
-    });
-
-    res.json(success(config.nodeId, {
-      otk,
-      otk_expires: expiresAt,
-      next_otk: nextOtk,
-      next_otk_expires: nextExpiresAt,
-      session_id: sessionId,
-      session_agent: sessionGaii,
-      session_inactivity_timeout_seconds: SESSION_INACTIVITY_MS / 1000,
-      otk_ttl_ms: config.otkTtlMs,
-      otk_grace_ms: config.otkGraceMs,
-      max_url_length: config.maxUrlLength,
-      note: `OTKs remain valid for ${config.otkGraceMs / 1000} seconds after first use to handle retries. Session expires after 5 minutes of inactivity.`,
-    }, [
-      { description: 'Use OTK for micro-memory operations', method: 'GET', url: `/v1/mm?otk=${otk}&op=list` },
-      { description: 'Accept work via GET', method: 'GET', url: `/v1/work/{tc}/accept?otk=${otk}` },
     ]));
   });
 
@@ -653,18 +526,11 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
   registerOtkRoutes(router, config, storage);
 
 
-  // Cleanup expired challenges and inactive sessions periodically
+  // Cleanup expired challenges periodically
   setInterval(() => {
     const now = Date.now();
     for (const [key, val] of challenges) {
       if (now > val.expiresAt) challenges.delete(key);
-    }
-    // Expire inactive sessions (5 min inactivity)
-    for (const [sessionId, session] of sessions) {
-      if (now - session.lastActivity > SESSION_INACTIVITY_MS) {
-        storage.expireSessionOtks(sessionId).catch(err => { logger.warn('GET /v1/otk/:key: continuing after a suppressed failure', { error: String(err) }); });
-        sessions.delete(sessionId);
-      }
     }
   }, 30_000);
 

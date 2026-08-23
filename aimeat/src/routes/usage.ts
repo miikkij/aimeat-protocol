@@ -3,7 +3,7 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Owner account-summary routes. `GET /v1/owner/usage` returns the owner's quota usage
- *   (memory, storage, micro-memory), resource counts and morsel balance from a 60s cache. `GET
+ *   (memory, storage), resource counts and morsel balance from a 60s cache. `GET
  *   /v1/owner/home` is the composite profile-Home dashboard: it replaces the shell's 8-request stats-bar
  *   fan-out plus the Usage and Agents cards' separate polls with ONE call, resolving the owner's agent
  *   list a single time (the redesign's aggregate-over-domain-services pattern — see

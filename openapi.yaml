@@ -40,8 +40,6 @@ tags:
     description: Owner and agent registration
   - name: Memory
     description: Key-value memory storage with visibility controls
-  - name: Micro-Memory
-    description: Tier 0.5 GET-based write operations via OTK
   - name: Storage
     description: Binary file storage
   - name: Actions
@@ -1578,22 +1576,6 @@ components:
               type: integer
             status:
               type: string
-
-    # === Micro-Memory ===
-    MicroMemorySet:
-      type: object
-      properties:
-        gaii:
-          $ref: '#/components/schemas/GAII'
-        set:
-          type: string
-        entries:
-          type: object
-          additionalProperties:
-            type: string
-        visibility:
-          type: string
-          enum: [private, public_read, shared_read, shared_write, public_write]
 
     # === Trust ===
     TrustProfile:
@@ -5706,51 +5688,6 @@ paths:
                             type: string
                             format: date-time
 
-  /v1/auth/session:
-    get:
-      operationId: submitChallenge
-      summary: Submit signed challenge, get OTK
-      description: For Tier 0.5 — submit signature as query parameter, receive one-time key for GET-based operations.
-      tags: [Auth]
-      parameters:
-        - name: owner
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: challenge
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: sig
-          in: query
-          required: true
-          schema:
-            type: string
-          description: Ed25519 signature (base64url)
-      responses:
-        '200':
-          description: OTK session activated
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          otk:
-                            type: string
-                          otk_expires:
-                            type: string
-                            format: date-time
-                          next_otk_activates:
-                            type: string
-                            format: date-time
-
   /v1/auth/token:
     post:
       operationId: getToken
@@ -6199,135 +6136,6 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
-  # ── Micro-Memory (Tier 0.5) ────────────────────────────────
-  /v1/mm:
-    get:
-      operationId: microMemoryOp
-      summary: Micro-memory operations
-      description: >
-        GET-based write/read operations using one-time keys. Supports op=add, del, mod, list, config, batch.
-        In anonymous mode (AIMEAT_ANONYMOUS=true), requests without OTK are accepted but visibility
-        rules are enforced: private sets are hidden, shared_read/shared_write require access_code.
-      tags: [Micro-Memory]
-      security:
-        - OTK: []
-        - {} # Anonymous mode allows unauthenticated access
-      parameters:
-        - name: otk
-          in: query
-          required: false
-          description: One-time key. Required unless anonymous mode or dev mode is enabled.
-          schema:
-            type: string
-        - name: op
-          in: query
-          required: true
-          schema:
-            type: string
-            enum: [add, del, mod, list, config, batch]
-        - name: set
-          in: query
-          schema:
-            type: string
-          description: Memory set name
-        - name: key
-          in: query
-          schema:
-            type: string
-        - name: value
-          in: query
-          schema:
-            type: string
-        - name: value64
-          in: query
-          schema:
-            type: string
-          description: Base64-encoded value (alternative to value — avoids URL encoding issues)
-        - name: access_code
-          in: query
-          schema:
-            type: string
-          description: Access code for shared_read/shared_write sets. Required for anonymous access to shared sets.
-        - name: access
-          in: query
-          schema:
-            type: string
-            enum: [private, public_read, shared_read, shared_write, public_write]
-          description: Visibility mode to set (op=config only). Alias for visibility.
-        - name: key0
-          in: query
-          schema:
-            type: string
-          description: First key in a batch operation (op=batch). Use key0/value0, key1/value1, ... up to 100 pairs.
-        - name: value0
-          in: query
-          schema:
-            type: string
-          description: First value in a batch operation. Alternatively use value64_0 for base64 encoding.
-      responses:
-        '200':
-          $ref: '#/components/responses/AimeatSuccess'
-
-  /v1/mm/{gaii}/{set}:
-    get:
-      operationId: readMicroMemory
-      summary: Read or write public/shared micro-memory set
-      description: |
-        No auth required for public sets. For shared_write and public_write sets,
-        write operations are supported via ?op=add|mod|del query parameters.
-      tags: [Micro-Memory]
-      parameters:
-        - name: gaii
-          in: path
-          required: true
-          schema:
-            type: string
-          description: URL-encoded GAII
-        - name: set
-          in: path
-          required: true
-          schema:
-            type: string
-        - name: op
-          in: query
-          schema:
-            type: string
-            enum: [add, mod, del]
-          description: Write operation (only for shared_write/public_write sets)
-        - name: key
-          in: query
-          schema:
-            type: string
-          description: Entry key (required for write ops)
-        - name: value
-          in: query
-          schema:
-            type: string
-          description: Entry value (required for add/mod)
-        - name: value64
-          in: query
-          schema:
-            type: string
-          description: Base64-encoded value (alternative to value)
-        - name: access_code
-          in: query
-          schema:
-            type: string
-          description: Access code for shared_read/shared_write sets
-      responses:
-        '200':
-          description: Micro-memory set contents or write confirmation
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        $ref: '#/components/schemas/MicroMemorySet'
-
-  # ── Identity & Registration ────────────────────────────────
   /v1/owners:
     post:
       operationId: registerOwner
@@ -15091,14 +14899,6 @@ paths:
                             type: object
                             properties:
                               used_files: { type: integer }
-                              used_bytes: { type: integer }
-                              max_bytes: { type: integer }
-                              percent: { type: integer }
-                          micro_memory:
-                            type: object
-                            properties:
-                              used_sets: { type: integer }
-                              max_sets: { type: integer }
                               used_bytes: { type: integer }
                               max_bytes: { type: integer }
                               percent: { type: integer }
@@ -30683,28 +30483,6 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
-  # ── Micro-Memory Helper Routes ──────────────────────────────
-  /v1/mm/test-url-length:
-    get:
-      operationId: testMmUrlLength
-      summary: Test max URL length
-      description: Probe endpoint to determine the maximum URL length supported.
-      tags: [Micro-Memory]
-      responses:
-        '200':
-          $ref: '#/components/responses/AimeatSuccess'
-
-  /v1/mm/help:
-    get:
-      operationId: getMmHelp
-      summary: Micro-memory usage guide
-      description: Returns a guide for agents on how to use the micro-memory API.
-      tags: [Micro-Memory]
-      responses:
-        '200':
-          $ref: '#/components/responses/AimeatSuccess'
-
-  # ── Federation Genesis & Settlements ────────────────────────
   /v1/federation/peer/introduce:
     post:
       operationId: introducePeer
@@ -46278,59 +46056,6 @@ paths:
                 properties:
                   ok: { type: boolean }
                   session_id: { type: string }
-        '401':
-          description: Invalid admin password
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-                  error: { type: string }
-        '429': { $ref: '#/components/responses/RateLimited' }
-  /v1/admin/setup/initial-otk:
-    post:
-      operationId: adminSetupInitialOtk
-      tags: [Auth, Admin]
-      summary: Generate an initial OTK
-      description: |
-        Admin-password-protected (session cookie/header or `X-Admin-Password`). Generates an
-        initial one-time key for an owner (or its first agent) with no expiry until first use.
-        Rate limited.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [owner]
-              properties:
-                owner: { type: string }
-      responses:
-        '200':
-          description: Initial OTK generated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-                  otk: { type: string }
-                  initial: { type: boolean }
-                  owner: { type: string }
-                  grace_ms: { type: integer }
-                  dev_mode: { type: boolean }
-                  node_url: { type: string }
-                  note: { type: string }
-        '400':
-          description: Missing owner
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  ok: { type: boolean }
-                  error: { type: string }
         '401':
           description: Invalid admin password
           content:

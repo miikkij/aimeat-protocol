@@ -98,7 +98,6 @@ import { sharingGroupsRouter } from '../routes/sharing-groups.js';
 import { connectionsRouter } from '../routes/connections.js';
 import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
-import { microMemoryRouter } from '../routes/micro-memory.js';
 import { storageFilesRouter } from '../routes/storage-files.js';
 import { dataPackagesRouter } from '../routes/datapackages.js';
 import { odataRouter } from '../routes/odata.js';
@@ -366,7 +365,6 @@ export async function mountRoutes(
   app.use('/v1/wallet', rejectForRelay);
   app.use('/v1/boards', rejectForRelay);
   app.use('/v1/disputes', rejectForRelay);
-  app.use('/v1/micro-memory', rejectForRelay);
   app.use('/v1/storage', rejectForRelay);
 
   // Mirror nodes block writes (except federation replication)
@@ -560,7 +558,6 @@ export async function mountRoutes(
   app.use(flagsRouter(config, storage));
   app.use(appealsRouter(config, storage));
   app.use(matchesRouter(config, storage));
-  app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
   // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
   // address of a package is the /v1/pub storage URL these routes hand back; this is where a

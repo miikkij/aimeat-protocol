@@ -40,18 +40,6 @@ export async function getStorageTotalBytes(storage: Storage, gaii: string): Prom
     return total;
 }
 
-/** Calculate total micro-memory size for an agent (all sets, all entries). */
-export async function getMicroMemoryTotalBytes(storage: Storage, gaii: string): Promise<number> {
-    const sets = await storage.listMicroMemorySets(gaii);
-    let total = 0;
-    for (const s of sets) {
-        for (const [k, v] of Object.entries(s.entries)) {
-            total += Buffer.byteLength(k, 'utf8') + Buffer.byteLength(v, 'utf8');
-        }
-    }
-    return total;
-}
-
 /**
  * Enforce the per-value-size and per-key-count hard limits for an extension's
  * `ctx.memory.set`. The REST `/v1/memory` handler enforces these, but extensions
@@ -178,30 +166,6 @@ export async function checkStorageQuota(
     }
 
     return { allowed: true, currentBytes, quotaBytes, overageBytes, overageMorsels };
-}
-
-/**
- * Check micro-memory total quota (hard limit, no overage).
- */
-export async function checkMicroMemoryQuota(
-    config: AimeatConfig,
-    storage: Storage,
-    gaii: string,
-    additionalBytes: number,
-): Promise<QuotaCheckResult> {
-    const currentBytes = await getMicroMemoryTotalBytes(storage, gaii);
-    const projectedBytes = currentBytes + additionalBytes;
-    const quotaBytes = config.microMemoryQuotaKb * 1024;
-
-    if (projectedBytes <= quotaBytes) {
-        return { allowed: true, currentBytes, quotaBytes, overageBytes: 0, overageMorsels: 0 };
-    }
-
-    return {
-        allowed: false, currentBytes, quotaBytes,
-        overageBytes: projectedBytes - quotaBytes, overageMorsels: 0,
-        reason: `Micro-memory quota exceeded (${(projectedBytes / 1024).toFixed(1)}KB / ${config.microMemoryQuotaKb}KB).`,
-    };
 }
 
 /**

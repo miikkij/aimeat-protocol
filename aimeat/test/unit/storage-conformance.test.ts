@@ -113,8 +113,6 @@ async function seedOwner(s: Storage, name: string): Promise<{ ghii: string; gaii
         ownerName: name, endpoint: `https://push.example.test/${name}/laptop`,
         keys: { p256dh: 'conf-p256dh', auth: 'conf-auth' }, createdAt: now, lastUsedAt: now,
     });
-    // Under the AGENT identity, so the per-agent branch of the cascade is exercised too.
-    await s.setMicroMemory({ gaii, set: 'conf', entries: { a: '1' }, visibility: 'private', updatedAt: now });
     return { ghii, gaii };
 }
 
@@ -127,7 +125,6 @@ async function leftovers(s: Storage, owner: string, ghii: string, gaii: string) 
         files: (await s.listStorageFiles(ghii)).length,
         sharingGroups: (await s.listSharingGroups(ghii)).length,
         pushSubscriptions: (await s.listPushSubscriptionsByOwner(owner)).length,
-        microMemory: (await s.listMicroMemorySets(gaii)).length,
         agents: (await s.getAgentsByOwner(owner)).length,
         ghii: !!(await s.getGHII(ghii)),
     };

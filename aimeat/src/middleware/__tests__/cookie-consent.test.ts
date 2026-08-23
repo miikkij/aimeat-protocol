@@ -39,7 +39,6 @@ function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
     dailyAllowance: 50,
     dailyAllowanceCap: 500,
     burnRate: 0.1,
-    keyedBrowseEnabled: true,
     extendedFeaturesEnabled: true,
     maxRelayHops: 3,
     depeeringGracePeriodHours: 72,

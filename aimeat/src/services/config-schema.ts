@@ -100,7 +100,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'entraAllowedTenants', dotPath: 'auth.entra_allowed_tenants', envVar: 'AIMEAT_ENTRA_ALLOWED_TENANTS', type: 'string', validate: () => true, immutable: true, description: 'Microsoft Entra tenant GUIDs allowed to sign in (comma-separated). Empty = the gate comes from AIMEAT_ENTRA_OAUTH_TENANT alone: a GUID there admits that one tenant, common/organizations admit any Microsoft account.' },
 
   // ── Features (mutable) ──
-  { key: 'keyedBrowseEnabled', dotPath: 'features.keyed_browse_enabled', envVar: 'AIMEAT_KEYED_BROWSE', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Allow browsing with API keys' },
   { key: 'extendedFeaturesEnabled', dotPath: 'features.extended_features_enabled', envVar: 'AIMEAT_EXTENDED_FEATURES', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable extended feature set' },
 
   // ── Work (mutable) ──
@@ -110,7 +109,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Quotas (mutable) ──
   { key: 'memoryQuotaMb', dotPath: 'quota.memory_mb', envVar: 'AIMEAT_MEMORY_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Memory quota per agent in MB', range: '1-10000' },
   { key: 'storageQuotaMb', dotPath: 'quota.storage_mb', envVar: 'AIMEAT_STORAGE_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Storage quota per agent in MB', range: '1-100000' },
-  { key: 'microMemoryQuotaKb', dotPath: 'quota.micro_memory_kb', envVar: 'AIMEAT_MICRO_MEMORY_QUOTA_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Micro-memory quota per agent in KB', range: '1-10000' },
 
   // ── Federation (mutable) ──
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
@@ -274,9 +272,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory keys per agent', range: '1-100000' },
   { key: 'storageMaxFileSizeMb', dotPath: 'quota.storage_max_file_size_mb', envVar: 'AIMEAT_STORAGE_MAX_FILE_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max file size for storage in MB', range: '1-1024' },
   { key: 'storageMaxChunkedFileSizeGb', dotPath: 'quota.storage_max_chunked_file_size_gb', envVar: 'AIMEAT_STORAGE_MAX_CHUNKED_FILE_SIZE_GB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max chunked file size in GB', range: '1-100' },
-  { key: 'microMemoryMaxSetsPerAgent', dotPath: 'quota.micro_memory_max_sets', envVar: 'AIMEAT_MICRO_MEMORY_MAX_SETS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max micro-memory sets per agent', range: '1-1000' },
-  { key: 'microMemoryMaxKeysPerSet', dotPath: 'quota.micro_memory_max_keys_per_set', envVar: 'AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max keys per micro-memory set', range: '1-10000' },
-  { key: 'microMemoryMaxValueSizeBytes', dotPath: 'quota.micro_memory_max_value_size_bytes', envVar: 'AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max micro-memory value size in bytes', range: '1-65536' },
   { key: 'maxActionsPerAgent', dotPath: 'quota.max_actions_per_agent', envVar: 'AIMEAT_MAX_ACTIONS_PER_AGENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max actions per agent', range: '1-1000' },
   { key: 'minTrustForPaidActions', dotPath: 'quota.min_trust_paid_actions', envVar: 'AIMEAT_MIN_TRUST_PAID_ACTIONS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Min trust score for paid actions', range: '0-100' },
   { key: 'appMaxSizeMb', dotPath: 'quota.app_max_size_mb', envVar: 'AIMEAT_APP_MAX_SIZE_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max app package size in MB', range: '1-100' },

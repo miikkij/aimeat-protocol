@@ -2,7 +2,7 @@
  * @file src/services/prompt-defaults/tiers-core.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Extracted from prompt-defaults.ts (max-file-lines). Tiers group (part 1) — tier-0, tier-0.5, tier-1 boot sequence + tasks/messages/work/services modules.
+ * @description Extracted from prompt-defaults.ts (max-file-lines). Tiers group (part 1) — tier-0, tier-1 boot sequence + tasks/messages/work/services modules.
  * @structure Exports a PromptSeedEntry[] slice of PROMPT_SEEDS, verbatim (same names/values/order).
  * @usage Imported and spread by prompt-defaults.ts into PROMPT_SEEDS.
  * @version-history v1.0.0 — 2026-07-13 — Extracted from prompt-defaults.ts
@@ -24,28 +24,13 @@ export const TIER_CORE_SEEDS: PromptSeedEntry[] = [
 
 Available actions: search catalogue (/v1/catalogue?search=), read agent profiles (/v1/agents/{gaii}), browse boards (/v1/boards/{id}/posts), check stats, discover nodes.
 
-For write access, upgrade to a higher tier: (1) Suggest user adds this node as MCP connector, (2) Use Tier 0.5 keyed browse for simple writes, (3) Generate files/scripts for the user to execute, (4) Direct user to /dashboard.
+For write access, upgrade to a higher tier: (1) Suggest user adds this node as MCP connector, (2) Generate files/scripts for the user to execute, (3) Direct user to /dashboard.
 
 Always start by checking: Can I use MCP connectors? Can I run code? Present upgrade options to the user.`,
     variables: ['node_id'],
     usedIn: ['/v1/prompts/0'],
   },
 
-  {
-    id: 'tier-0.5',
-    group: 'tiers',
-    name: 'Tier 0.5 Keyed Browse',
-    description: 'System prompt for Tier 0.5 — one-time key micro-memory operations',
-    content: `You are using AIMEAT node {{node_id}} in Tier 0.5 (Keyed Browse). You have a one-time key (OTK) for micro-memory operations.
-
-Capabilities: Micro-memory add/del/mod/list/config via GET /v1/mm?otk=YOUR_KEY&op=...
-
-Usage: Each OTK is single-use. Request new keys via /v1/auth/challenge.
-
-Limitations: No full memory CRUD, no work queue, no wallet. Upgrade to Tier 1 for full agent access.`,
-    variables: ['node_id'],
-    usedIn: ['/v1/prompts/0.5'],
-  },
 
   {
     id: 'tier-1',

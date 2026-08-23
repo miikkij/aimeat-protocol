@@ -511,28 +511,9 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
           upgrade_paths: {
             mcp: '/v1/mcp',
             jwt: 'POST /v1/auth/token',
-            keyed_browse: '/v1/auth/challenge',
             dashboard: '/dashboard',
           },
           stats: { agents: agents.length, actions: actions.length },
-        }));
-        break;
-      }
-      case '0.5': {
-        const record = await storage.getSystemPrompt('tier-0.5');
-        if (!record || !record.active) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Prompt not available')); return; }
-        const promptContent = resolvePromptContent(record, req.headers['accept-language'] as string);
-        const system_prompt = substituteVariables(promptContent, {
-          node_url: config.baseUrl,
-          node_id: config.nodeId,
-          agent_count: agents.length,
-          action_count: actions.length,
-        });
-        res.json(success(config.nodeId, {
-          tier: '0.5',
-          system_prompt,
-          available_endpoints: ['/v1/mm', '/v1/mm/{gaii}/{set}', '/v1/catalogue', '/v1/auth/challenge'],
-          keyed_browse_enabled: config.keyedBrowseEnabled,
         }));
         break;
       }
@@ -593,7 +574,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
           enabled: config.anonymousMode,
           system_prompt: systemPrompt,
           available_endpoints: config.anonymousMode
-            ? ['/v1/memory', '/v1/memory/{key}', '/v1/memory/search', '/v1/mm', '/v1/prompts/anonymous/share',
+            ? ['/v1/memory', '/v1/memory/{key}', '/v1/memory/search', '/v1/prompts/anonymous/share',
               '/v1/catalogue', '/v1/catalogue/agents', '/v1/catalogue/actions', '/v1/stats', '/v1/health']
             : [],
           key_conventions: config.anonymousMode ? {
@@ -682,7 +663,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         break;
       }
       default:
-        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 0.5, 1, 2, anonymous, openclaw, package-builder`));
+        res.status(400).json(error(config.nodeId, 'INVALID_TIER', `Unknown tier: ${tier}. Valid: 0, 1, 2, anonymous, openclaw, package-builder`));
     }
   });
 
@@ -718,7 +699,6 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'View anonymous mode guidance', method: 'GET', url: '/v1/prompts/anonymous' },
       { description: 'List memory keys', method: 'GET', url: '/v1/memory' },
-      { description: 'Micro-memory operations', method: 'GET', url: '/v1/mm?op=list' },
     ]));
   });
 
