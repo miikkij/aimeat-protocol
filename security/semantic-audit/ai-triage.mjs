@@ -10,6 +10,9 @@
  *
  * Run from aimeat/:  pnpm audit:triage    (then pnpm audit:report to render)
  * @version-history
+ *  - 1.1.0 (2026-08-23): Semgrep taint findings join the same triage — read from the GitHub
+ *    code-scanning alerts the CI job uploads (Semgrep does not run on Windows), fingerprinted from
+ *    rule + file + the flagged line's current text. Claude calls are batched (15 findings each).
  *  - 1.0.0 (2026-08-23): first version — finding triage + non-static invariant review.
  */
 import { execFileSync, execSync } from 'node:child_process';
@@ -48,9 +51,38 @@ function askClaude(prompt) {
 const store = loadStore();
 const known = new Set(store.entries.map(e => e.fingerprint));
 
+/**
+ * Semgrep does not run on the Windows dev machine, so its findings are read from where they DO
+ * land: the GitHub code-scanning alerts the CI semgrep-taint job uploads. The fingerprint is built
+ * from the alert's rule + file + the current text of the flagged line, read locally — same
+ * invalidation rule as ast-grep: edit the line and the acknowledgment dies.
+ */
+function fetchSemgrepFindings() {
+  try {
+    const repo = execSync('gh repo view --json nameWithOwner -q .nameWithOwner',
+      { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    const raw = execSync(
+      `gh api "repos/${repo}/code-scanning/alerts?per_page=100&state=open&tool_name=Semgrep%20OSS" --paginate`,
+      { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+    const alerts = JSON.parse(raw.replace(/\]\s*\[/g, ','));
+    return alerts.map(a => {
+      const file = a.most_recent_instance?.location?.path;
+      const line = a.most_recent_instance?.location?.start_line ?? 1;
+      if (!file) return null;
+      let text = '';
+      try { text = readFileSync(resolve(ROOT, file), 'utf8').split('\n')[line - 1] ?? ''; } catch { return null; }
+      return { ruleId: a.rule?.id ?? 'semgrep', file, text, range: { start: { line: line - 1 } }, source: 'semgrep', alertNumber: a.number };
+    }).filter(Boolean);
+  } catch {
+    process.stderr.write('   (Semgrep-hälytyksiä ei saatu GitHubista — gh puuttuu tai ei oikeuksia. Jatketaan ilman.)\n');
+    return [];
+  }
+}
+
 // ── 1. Triage the guard findings that have no acknowledgment yet ──
 process.stderr.write('1/2 Ajetaan vahdit ja triagetaan uudet osumat…\n');
-const findings = astScan('aimeat/src');
+const astFindings = astScan('aimeat/src').map(f => ({ ...f, source: 'ast-grep' }));
+const findings = [...astFindings, ...fetchSemgrepFindings()];
 const fresh = findings
   .map(f => ({ ...f, fingerprint: fingerprintOf(f) }))
   .filter(f => !known.has(f.fingerprint));
@@ -58,68 +90,82 @@ const fresh = findings
 if (fresh.length === 0) {
   process.stderr.write('   Ei uusia osumia — kaikki jo kuitattu.\n');
 } else {
-  process.stderr.write(`   ${fresh.length} uutta osumaa AI-katselmointiin (malli: ${MODEL})…\n`);
-  const blocks = fresh.map((f, i) => {
-    const file = norm(f.file);
-    const line = (f.range?.start?.line ?? 0) + 1;
-    let context = '';
-    try {
-      const src = readFileSync(resolve(ROOT, file), 'utf8').split('\n');
-      const a = Math.max(0, line - 26);
-      const b = Math.min(src.length, line + 25);
-      context = src.slice(a, b).map((l, j) => `${a + j + 1}: ${l}`).join('\n');
-    } catch { context = '(file unreadable)'; }
-    return `### Finding ${i + 1}\nfingerprint: ${f.fingerprint}\nrule: ${f.ruleId}\nfile: ${file}:${line}\nmatched: ${String(f.text || '').slice(0, 300)}\ncontext:\n\`\`\`ts\n${context}\n\`\`\``;
-  });
+  const BATCH = 15;
+  process.stderr.write(`   ${fresh.length} uutta osumaa AI-katselmointiin (malli: ${MODEL}, erissä à ${BATCH})…\n`);
   const ruleDocs = GUARDS.map(g => `- rule \`${g.id}\`: ${g.why}\n  Triage guidance so far: ${g.triage}`).join('\n');
-  const prompt = [
+  const header = [
     'You are the triage reviewer of a security audit for the AIMEAT node (TypeScript, Express 5).',
-    'The ast-grep rules below over-report by design; your job is to decide, per finding, whether the',
-    'flagged site is a legitimate, known-safe pattern or something a human must confirm.',
+    'The rules over-report by design; your job is to decide, per finding, whether the flagged site',
+    'is a legitimate, known-safe pattern or something a human must confirm. Findings come from two',
+    'tools: ast-grep (structural) and Semgrep taint (interprocedural — it follows req.auth.sub',
+    'through variables and function calls into a storage argument; its rule file with the known',
+    'sanitizers is security/semantic-audit/semgrep/resolve-identity.yml).',
     '',
-    'Rule background (Finnish, from the audit report content):',
+    'ast-grep rule background (Finnish, from the audit report content):',
     ruleDocs,
     '',
     'Known-safe patterns: an agent/ecosystem-session branch where `sub` already IS the full identity;',
     'attribution fields (reviewedBy, performedBy, …) that record who acted and are never a retrieval',
     'key; inline GHII construction `${sub}@${nodeId}`; a door that also carries requireAuth()/',
     'requireScope() so the flagged check is not the only gate; ownership of a non-account resource.',
-    'You may Read any file in the repo (rules live in security/semantic-audit/ast-grep/, auth',
-    'middleware in aimeat/src/auth/middleware.ts) to verify how a flagged site actually behaves —',
-    'prefer reading over guessing when the context below is not conclusive.',
+    'You may Read any file in the repo (rules live in security/semantic-audit/, auth middleware in',
+    'aimeat/src/auth/middleware.ts) to verify how a flagged site actually behaves — prefer reading',
+    'over guessing when the context below is not conclusive.',
     '',
     'Verdicts: "legit" = provably one of the safe patterns; "confirm" = a human must look (default',
     'when uncertain). The reason must be ONE sentence, written in natural Finnish, naming the',
     'concrete evidence (what the surrounding code does), because it is printed in a Finnish report.',
     '',
-    blocks.join('\n\n'),
-    '',
-    'Respond with ONLY this JSON object, no prose around it:',
-    '{"verdicts":[{"fingerprint":"…","verdict":"legit"|"confirm","reason":"…"}]}',
-    `Include exactly ${fresh.length} verdicts, one per fingerprint listed above.`,
-  ].join('\n');
+  ];
+  const contextOf = (f) => {
+    const file = norm(f.file);
+    const line = (f.range?.start?.line ?? 0) + 1;
+    try {
+      const src = readFileSync(resolve(ROOT, file), 'utf8').split('\n');
+      const a = Math.max(0, line - 26);
+      const b = Math.min(src.length, line + 25);
+      return src.slice(a, b).map((l, j) => `${a + j + 1}: ${l}`).join('\n');
+    } catch { return '(file unreadable)'; }
+  };
 
-  const out = askClaude(prompt);
-  const byFp = new Map((out.verdicts || []).map(v => [v.fingerprint, v]));
   let legit = 0, confirm = 0;
-  for (const f of fresh) {
-    // Identical matched text in the same file shares a fingerprint; one entry covers them all.
-    if (known.has(f.fingerprint)) continue;
-    known.add(f.fingerprint);
-    const v = byFp.get(f.fingerprint);
-    const verdict = v?.verdict === 'legit' ? 'legit' : 'confirm';
-    verdict === 'legit' ? legit++ : confirm++;
-    store.entries.push({
-      fingerprint: f.fingerprint,
-      ruleId: f.ruleId,
-      file: norm(f.file),
-      line: (f.range?.start?.line ?? 0) + 1,
-      verdict,
-      reason: v?.reason || 'AI ei antanut verdiktiä — ihmisen katsottava.',
-      decidedBy: 'ai',
-      date: today,
-      commit: head,
+  for (let i = 0; i < fresh.length; i += BATCH) {
+    const batch = fresh.slice(i, i + BATCH).filter(f => !known.has(f.fingerprint));
+    if (!batch.length) continue;
+    const blocks = batch.map((f, j) => {
+      const line = (f.range?.start?.line ?? 0) + 1;
+      return `### Finding ${j + 1}\nfingerprint: ${f.fingerprint}\ntool: ${f.source}\nrule: ${f.ruleId}\nfile: ${norm(f.file)}:${line}\nmatched: ${String(f.text || '').slice(0, 300)}\ncontext:\n\`\`\`ts\n${contextOf(f)}\n\`\`\``;
     });
+    const prompt = [...header, blocks.join('\n\n'), '',
+      'Respond with ONLY this JSON object, no prose around it:',
+      '{"verdicts":[{"fingerprint":"…","verdict":"legit"|"confirm","reason":"…"}]}',
+      `Include exactly ${batch.length} verdicts, one per fingerprint listed above.`,
+    ].join('\n');
+
+    const out = askClaude(prompt);
+    const byFp = new Map((out.verdicts || []).map(v => [v.fingerprint, v]));
+    for (const f of batch) {
+      // Identical matched text in the same file shares a fingerprint; one entry covers them all.
+      if (known.has(f.fingerprint)) continue;
+      known.add(f.fingerprint);
+      const v = byFp.get(f.fingerprint);
+      const verdict = v?.verdict === 'legit' ? 'legit' : 'confirm';
+      verdict === 'legit' ? legit++ : confirm++;
+      store.entries.push({
+        fingerprint: f.fingerprint,
+        ruleId: f.ruleId,
+        file: norm(f.file),
+        line: (f.range?.start?.line ?? 0) + 1,
+        source: f.source,
+        ...(f.alertNumber !== undefined ? { alertNumber: f.alertNumber } : {}),
+        verdict,
+        reason: v?.reason || 'AI ei antanut verdiktiä — ihmisen katsottava.',
+        decidedBy: 'ai',
+        date: today,
+        commit: head,
+      });
+    }
+    process.stderr.write(`   erä ${Math.floor(i / BATCH) + 1}: ${batch.length} osumaa katselmoitu.\n`);
   }
   process.stderr.write(`   ✓ ${legit} kuitattu lailliseksi, ${confirm} odottaa ihmistä.\n`);
 }

@@ -1,0 +1,46 @@
+# CodeQL, advanced setup. Default setup analysed everything — 1214 open alerts on first run, most
+# of them rate-limiting notes on test files and vendored/minified libraries, which buries the number
+# the Security tab exists to show. Default setup cannot exclude paths, so this workflow replaces it
+# (default setup was turned off via the API on 2026-08-23) with the same query suite scoped to the
+# code we actually ship. Advisory like the other scanning workflows: findings land on the Security
+# tab; enforcement lives in ci.yml.
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '31 4 * * 1' # weekly refresh so alert state tracks main even in quiet weeks
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, python, actions]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          config: |
+            paths-ignore:
+              - 'aimeat/test/**'
+              - 'python/aimeat-crewai/tests/**'
+              - '**/dist/**'
+              - 'aimeat/public/lib/**'
+              - '**/*.min.js'
+              - 'docs/**'
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: codeql/${{ matrix.language }}

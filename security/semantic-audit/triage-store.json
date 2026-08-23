@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "lastInvariantReviewCommit": "a1cfe3ea",
+  "lastInvariantReviewCommit": "320ca253",
   "entries": [
     {
       "fingerprint": "63fd23f9d95d1917",
@@ -11,7 +11,8 @@
       "reason": "Haaraan tullaan vain kun kyseessä ei ole omistajan istunto (omistaja käsitellään erikseen riveillä 326-329), jolloin `sub` on agentin täysi tunnus, jolla työn providerGaii on tallennettukin.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "d889a37ef49d0604",
@@ -22,7 +23,8 @@
       "reason": "Sama rakenne kuin inboxissa: else-haara on agentti-istunto, jossa `sub` on täysi tunnus ja vastaa työn requesterGaii-kenttää sellaisenaan.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "c7255c62dbaab43b",
@@ -33,7 +35,8 @@
       "reason": "Vaikka ehto ei täsmäisi anonyymitilassa, heti perässä verrataan `req.auth.sub` myyjän tunnukseen ja vaaditaan voimassa oleva lisenssi (rivit 508-514), jota anonyymillä ei ole, joten vastaus on 402 eikä sovellus aukea.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "7da2aa31f4864f9e",
@@ -44,7 +47,8 @@
       "reason": "Sama ehto /v1/metrics-ovella: anonyymitilassa `req.auth` on aina asetettu, ja tarkistuksen jälkeen rekisteri palautetaan sellaisenaan ilman muuta suojaa.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "92fe1affaca254b9",
@@ -55,7 +59,8 @@
       "reason": "Tallennettu `ownerGaii` päätyy suoraan kirjoituksen kohteeksi (`targetGaii: otk.ownerGaii`, rivi 224), ja omistajan istunnossa `sub` on pelkkä tilinimi, jolloin muistiin kirjoitettu tietue menee väärään osoitteeseen.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "f5c37382fd27b411",
@@ -66,7 +71,8 @@
       "reason": "Sama kenttä luetaan hakutunnukseksi micro-memoryssa (`gaii = otk.ownerGaii`, micro-memory.ts:179), ja omistajan istunnossa `sub` on pelkkä tilinimi eikä täysi tunnus.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "9710bf233511ba32",
@@ -77,7 +83,8 @@
       "reason": "Rekisteröinti lukee omistajan `otk.params.owner`-kentästä ja rakentaa tunnuksen `buildGAII`-funktiolla (agents/registration.ts:51-70), joten tämä `ownerGaii` jää pelkäksi merkinnäksi siitä kuka avaimen loi.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "955c1a519adc71ad",
@@ -88,7 +95,8 @@
       "reason": "Haaraan päästään vain kun `parseGAII(req.auth!.sub)` tuottaa tuloksen (rivi 493), eli `sub` on jo täysi agenttitunnus.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "839227c18d1f88e2",
@@ -99,7 +107,8 @@
       "reason": "Ekosysteemihaarassa `sub` on sovelluksen oma GEAI-tunnus, joka on juuri se avain jolla ekosysteemisovellukset on tallennettu.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "f8730fe3d67d478e",
@@ -110,7 +119,8 @@
       "reason": "Istuntorivi kirjataan samalla `sub`-arvolla joka juuri myönnettiin tokeniin (rivi 540), ja istunnot haetaan sessionId:llä tai refresh-tiivisteellä, ei tällä kentällä.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "1bec12a464484117",
@@ -121,7 +131,8 @@
       "reason": "`lockedBy` on lukitsijan merkintä, ja sitä verrataan rivillä 58 täsmälleen samalla lausekkeella jolla se kirjoitetaan, joten haku ei voi osua toisen tietueeseen.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "b5242df42c55d87d",
@@ -132,7 +143,8 @@
       "reason": "`openedBy` kertoo kuka riidan avasi, ja samalla lausekkeella on rivillä 129 jo verrattu työn tilaajaan, eli kutsuja on agenttitunnuksellaan oikea osapuoli.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "642388bda04747e3",
@@ -143,7 +155,8 @@
       "reason": "Vertailu koskee instanssin omistajuutta eikä itse tiliä, ja operaattorirooli on erikseen sallittu, joten kyse ei ole tilin muutoksesta.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "ac2c6beb38da80f9",
@@ -154,7 +167,8 @@
       "reason": "Poisto-ovi on `requireOwnerPrincipal()`-tarkistuksen takana (rivi 265), joka torjuu agentit, ekosysteemisovellukset ja sovellustokenit, joten nimivertailu on vasta toinen kerros sen päällä.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "8f438dac8b42f4f5",
@@ -165,7 +179,8 @@
       "reason": "Haara ajetaan vain kun kyseessä ei ole omistajan istunto, jolloin `sub` on agentin tai ekosysteemisovelluksen täysi tunnus, jolla tiedostot on tallennettu.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "7d7ad9dc0bab3ae7",
@@ -176,7 +191,8 @@
       "reason": "Vienti on `requireOwnerPrincipal()`-tarkistuksen takana (rivi 33), joten pelkällä tilinimellä toimivat agentti- ja sovellustokenit torjutaan jo ennen tätä vertailua.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "ede725ece809132e",
@@ -187,7 +203,8 @@
       "reason": "`reviewedBy` merkitsee kuka moderoi, ja moderointioikeus on jo ratkaistu riveillä 131-147 operaattoriroolista ja organismin ylläpitäjyydestä.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
     },
     {
       "fingerprint": "0093d7b68f3be891",
@@ -198,7 +215,749 @@
       "reason": "Kutsun peruutus menee läpi roolilla ennen kuin `organism:invite` katsotaan, ja sama sana suodattaa vastaavan MCP-työkalun (mcp/catalog/scopes.ts:198), joten pinnalla luvattu rajaus ei päde tällä ovella.",
       "decidedBy": "ai",
       "date": "2026-08-23",
-      "commit": "a1cfe3ea"
+      "commit": "a1cfe3ea",
+      "source": "ast-grep"
+    },
+    {
+      "fingerprint": "22a3d9618bf1ac1f",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/work.ts",
+      "line": 358,
+      "source": "semgrep",
+      "alertNumber": 1311,
+      "verdict": "legit",
+      "reason": "Haara ajetaan vasta kun rivin 351 tarkistus on todennut, ettei kyse ole omistajan istunnosta, jolloin `sub` on agentin oma täysi tunnus, ja omistajan istunto haetaan erikseen kaikkien agenttien tunnuslistalla.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "16193c895c0bead5",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/work.ts",
+      "line": 331,
+      "source": "semgrep",
+      "alertNumber": 1310,
+      "verdict": "legit",
+      "reason": "Rivin 324 tarkistus ohjaa omistajan istunnon getAgentsByOwner-haaraan, joten tähän haaraan päätyy vain agentti- tai sovellusistunto, jonka `sub` on jo täysi tunnus.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "174ea8634cc7fc40",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/templates.ts",
+      "line": 512,
+      "source": "semgrep",
+      "alertNumber": 1309,
+      "verdict": "legit",
+      "reason": "authorGhii tallentuu keskusteluviestin kirjoittajamerkinnäksi, ja viestit luetaan aina ilmoituksen id:llä (getDiscussionsByListing), joten kenttää ei käytetä hakuavaimena.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "5e1ae1b73d91bfe1",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/templates.ts",
+      "line": 445,
+      "source": "semgrep",
+      "alertNumber": 1308,
+      "verdict": "confirm",
+      "reason": "Uusi arvostelu tallentaa `sub`:n sellaisenaan authorGhii-kenttään, joka on arvostelutaulun UNIQUE(listingId, authorGhii) -avain ja seuraavan kerran hakuavain, eikä täyttä tunnusta ratkaista missään.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "aa9ece485b1f1665",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/templates.ts",
+      "line": 429,
+      "source": "semgrep",
+      "alertNumber": 1307,
+      "verdict": "legit",
+      "reason": "Päivitys kohdistuu arvostelun omaan id:hen (existing.id), joka tulee jo tehdystä hausta, joten tähän kutsuun ei kulje tunnusta lainkaan.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "79bb9ecaeb632707",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/templates.ts",
+      "line": 425,
+      "source": "semgrep",
+      "alertNumber": 1306,
+      "verdict": "confirm",
+      "reason": "Olemassa olevaa arvostelua haetaan suoraan `req.auth!.sub`:lla, joka omistajan istunnossa on pelkkä tilin nimi eikä täysi tunnus, ja rivillä 402 on tästä vielä avoin TODO.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "7e880ebcd7edd022",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/templates.ts",
+      "line": 109,
+      "source": "semgrep",
+      "alertNumber": 1305,
+      "verdict": "legit",
+      "reason": "authorGhii ratkaistaan rivillä 86 resolveGhii-kutsulla, joka hakee omistajan GHII-tietueen nimen perusteella ja käyttää `sub`:ia vain varalla.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "2aa374eb930a13fe",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/prompts.ts",
+      "line": 140,
+      "source": "semgrep",
+      "alertNumber": 1304,
+      "verdict": "legit",
+      "reason": "Sama kutsu käsikirjareitillä: agenttitietue löytyy vain täydellä agenttitunnuksella, ja tulosta käytetään pelkkiin prompt-muuttujiin (luottamusluku, morsel-saldo), ei minkään tietueen valintaan.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "38425728af1991eb",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/packages.ts",
+      "line": 440,
+      "source": "semgrep",
+      "alertNumber": 1302,
+      "verdict": "legit",
+      "reason": "Tietueen ghii tulee rivin 381 resolveGhii-kutsusta, ja ovi vaatii sekä requireAuth()- että requireRole('owner')-tarkistuksen ennen sitä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "43814e1023c18ab1",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/packages.ts",
+      "line": 404,
+      "source": "semgrep",
+      "alertNumber": 1301,
+      "verdict": "legit",
+      "reason": "Ennen päivitystä rivi 391 vertaa paketin authorGhii-kenttää ratkaistuun ghii-tunnukseen ja torjuu muut 403:lla, ja päivitys osuu ilmoituksen omaan id:hen.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "f6c2050aaa7b2bfa",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/packages.ts",
+      "line": 363,
+      "source": "semgrep",
+      "alertNumber": 1300,
+      "verdict": "legit",
+      "reason": "ZIP-tuonnissa authorGhii tulee samasta resolveGhii-kutsusta ja rivin 182 nimitarkistus torjuu toisen tekijän saman nimisen paketin 409:llä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "5e8f0cd60037a527",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/memory/files.ts",
+      "line": 223,
+      "source": "semgrep",
+      "alertNumber": 1298,
+      "verdict": "legit",
+      "reason": "Rivin 210 tarkistus vie omistajan istunnon omaan haaraansa (GHII plus jokainen agentti), joten tähän haaraan jää vain agentti- tai sovellusistunto, jonka `sub` on täysi tunnus.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "cd926656df89481a",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/memory/crud.ts",
+      "line": 388,
+      "source": "semgrep",
+      "alertNumber": 1297,
+      "verdict": "legit",
+      "reason": "Omistajan istunto menee searchOwnerScope-haaraan, ja tähän haaraan päätyvä gaii on joko istunnon oma täysi tunnus tai ?agent=-parametri, joka on rivillä 361 tarkistettu kuuluvaksi samalle omistajalle.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "2b4192c25224b356",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/memory/crud.ts",
+      "line": 303,
+      "source": "semgrep",
+      "alertNumber": 1296,
+      "verdict": "legit",
+      "reason": "Omistajan istunto haarautuu aina ylempään listOwnerScope-kutsuun, joten tähän haaraan jää vain agentti- tai eco-istunto, jonka sub on jo täysi tunnus, tai ?agent=-parametri joka on juuri tarkistettu saman omistajan agentiksi.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "9bb515029f6b1336",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/memory/crud.ts",
+      "line": 259,
+      "source": "semgrep",
+      "alertNumber": 1295,
+      "verdict": "legit",
+      "reason": "Meta-haaran ternaari ohjaa omistajan istunnon listOwnerScopeMeta-kutsuun, joten storage.listMemoryMeta saa gaii:n vain agentti- tai eco-istunnolta, jonka sub on jo täysi tunnus, tai omistajan omaksi todennetulta ?agent=-tunnukselta.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "0ca24d65615a9e97",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/memory/crud.ts",
+      "line": 243,
+      "source": "semgrep",
+      "alertNumber": 1294,
+      "verdict": "legit",
+      "reason": "Laskurin omistajahaara kulkee countOwnerScopen kautta, ja tähän else-haaraan päätyy vain agentin tai eco-sovelluksen oma täysi tunnus tai rivillä 195 saman omistajan agentiksi tarkistettu ?agent=-arvo.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "3fffc9b8d53c4ff4",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/memory/bulk.ts",
+      "line": 151,
+      "source": "semgrep",
+      "alertNumber": 1293,
+      "verdict": "legit",
+      "reason": "Vientireitillä omistajan istunto menee listOwnerScopeen, ja tähän haaraan jää vain agentin tai eco-sovelluksen oma täysi tunnus tai ?agent= joka on rivillä 139 varmistettu kuuluvan samalle omistajalle.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "280e612f73c9c16d",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/matches.ts",
+      "line": 236,
+      "source": "semgrep",
+      "alertNumber": 1292,
+      "verdict": "legit",
+      "reason": "callerGhii on ratkaistu getGHIIByOwner(req.auth.owner):lla täydeksi GHII:ksi, ja rivin 211 jäsenyystarkistus on jo torjunut kutsujan joka ei ole osapuoli tässä matchissa.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "0d1605de0851cf62",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/matches.ts",
+      "line": 76,
+      "source": "semgrep",
+      "alertNumber": 1291,
+      "verdict": "legit",
+      "reason": "Haku kohdistuu jo haettujen match-rivien vastapuolten agentteihin eikä kutsujan tunnukseen, ja tulosta käytetään vain vastapuolen suostumuksen tarkistamiseen ennen tietojen näyttämistä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "9e2e17ce3deba49a",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/matches.ts",
+      "line": 74,
+      "source": "semgrep",
+      "alertNumber": 1290,
+      "verdict": "legit",
+      "reason": "owners-lista kootaan match-rivien vastapuolten GHII-tietueiden ownerName-kentistä, ei kutsujan sub-kentästä, ja sitä käytetään vain suostumuskartan rakentamiseen.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "b0fcc4a1afd26d53",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/matches.ts",
+      "line": 70,
+      "source": "semgrep",
+      "alertNumber": 1289,
+      "verdict": "legit",
+      "reason": "matchedGhiis muodostetaan jo haettujen ja kutsujalle kuuluvien match-rivien vastapuolista, joten kutsujan tunnus ei ole tämän haun avain.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "99d2033e5ac14730",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/matches.ts",
+      "line": 58,
+      "source": "semgrep",
+      "alertNumber": 1288,
+      "verdict": "legit",
+      "reason": "ghii ratkaistaan ennen hakua getGHIIByOwner(req.auth.owner):lla täydeksi GHII:ksi, ja poikkeustilanteen varapolku jää pelkkään nimeen joka ei vastaa yhtäkään tallennettua profiilitunnusta, joten haku palaa tyhjänä eikä toisen omistajan riveille.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "01f0a6effdf03e2b",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/instances/install.ts",
+      "line": 319,
+      "source": "semgrep",
+      "alertNumber": 1287,
+      "verdict": "legit",
+      "reason": "Instanssitietueen owner ja ownerGhii tulevat resolveGhii(storage, req.auth.owner, req.auth.sub):sta, eli täysi tunnus on ratkaistu ennen kirjoitusta.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "bbb3ec5008c55d8f",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/federation-sync/routing.ts",
+      "line": 349,
+      "source": "semgrep",
+      "alertNumber": 1286,
+      "verdict": "legit",
+      "reason": "Relay-haaran addTransaction kirjaa vain kuka hopin maksoi, ja varsinainen saldomuutos tehdään debitBalancella joka ratkaisee omistajan GHII:n sisäisesti.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "576466e5b5d19e41",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/federation-sync/routing.ts",
+      "line": 347,
+      "source": "semgrep",
+      "alertNumber": 1285,
+      "verdict": "legit",
+      "reason": "chargeRoutingFee vie sub-arvon debitBalanceen, joka ratkaisee sen resolveGhii:llä omistajan GHII:ksi ennen saldon päivitystä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "aa8ac2a7bd516762",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/extensions/instances.ts",
+      "line": 100,
+      "source": "semgrep",
+      "alertNumber": 1282,
+      "verdict": "legit",
+      "reason": "createdBy on attribuutiokenttä siitä kuka instanssin loi, eikä sillä haeta dataa; ainoa paikka joka hakee sillä, owner-erasure.ts, poistaa sekä GHII:llä että pelkällä nimellä.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "f8089eb911776fdb",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/cortex.ts",
+      "line": 298,
+      "source": "semgrep",
+      "alertNumber": 1281,
+      "verdict": "legit",
+      "reason": "Kirjoituksen kohteena on cortexin nimi eikä käyttäjätunnus, ja sitä edeltää sekä requireScope('cortex:write') että tarkistus existing.installedBy === req.auth!.owner.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "3e757f612d8182cc",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/catalogue.ts",
+      "line": 437,
+      "source": "semgrep",
+      "alertNumber": 1280,
+      "verdict": "legit",
+      "reason": "Poisto vaatii sekä actionId:n että saman providerGaii-arvon jolla julkaisu kirjoitettiin, joten se sulkeutuu kiinni eikä voi osua toisen omistajan tietueeseen.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "a6ebe3b54f30c3b4",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/catalogue.ts",
+      "line": 406,
+      "source": "semgrep",
+      "alertNumber": 1279,
+      "verdict": "confirm",
+      "reason": "requireRole('agent') päästää roolihierarkian kautta läpi myös omistajaistunnon, jolloin providerGaii tallentuu paljaana nimenä (alice) eikä täytenä tunnuksena, ja juuri tämä arvo näytetään luettelossa kenttänä provider_gaii ja se ohjaa poiston.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "76f958ecf5d0f869",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/auth.ts",
+      "line": 547,
+      "source": "semgrep",
+      "alertNumber": 1278,
+      "verdict": "legit",
+      "reason": "Istuntotietue kirjaa juuri sen principaalin jonka tokenia uusitaan, ja sama sub menee samalla rivillä myös issueJWT:hen, joten kyse on tunnuksesta itsestään eikä datan hakuavaimesta.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "f23ae3533147681b",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/auth.ts",
+      "line": 515,
+      "source": "semgrep",
+      "alertNumber": 1277,
+      "verdict": "legit",
+      "reason": "Haara on ekosysteemi-istunnon takana (req.auth!.roles.includes('ecosystem')), jolloin sub on jo valmiiksi täysi GEAI-tunnus.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "723162d4afa1827f",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/auth.ts",
+      "line": 496,
+      "source": "semgrep",
+      "alertNumber": 1276,
+      "verdict": "legit",
+      "reason": "Haaraehto vaatii parseGAII(req.auth!.sub) !== null, eli sub on jo täysi agenttitunnus ennen kuin sillä haetaan agenttia.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "d65cbcdc2d01c287",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/auth-otk.ts",
+      "line": 159,
+      "source": "semgrep",
+      "alertNumber": 1275,
+      "verdict": "legit",
+      "reason": "Osuma osoittaa Tier 0.5 -mintteihin jotka poistettiin tiedostosta 2026-08-23; auth-otk.ts on enää 85 riviä pitkä eikä riviä 111 tai 159 ole olemassa.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "0683987d574230d2",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/auth-otk.ts",
+      "line": 79,
+      "source": "semgrep",
+      "alertNumber": 1273,
+      "verdict": "legit",
+      "reason": "ownerGaii on tässä pelkkä kirjaus siitä kuka avaimen loi: lunastus routes/agents/registration.ts:ssä lukee otk.params.owner-kentän eikä ownerGaii:ta, ja reitti on requireRole('owner')-oven takana.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "1b33e10a431a3544",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/apps/read.ts",
+      "line": 509,
+      "source": "semgrep",
+      "alertNumber": 1272,
+      "verdict": "legit",
+      "reason": "Maksumuuri vertaa lisenssin ennen kuin sovelluksen tavut lähtevät ja epäonnistuu kiinni: sama raaka sub jolla osto kirjattiin ei voi osua useampaan lisenssiriviin kuin ratkaistu tunnus.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "04f045bbdd5afc1a",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/apps/fork-manage.ts",
+      "line": 87,
+      "source": "semgrep",
+      "alertNumber": 1271,
+      "verdict": "confirm",
+      "reason": "Sama käsittelijä ratkaisee kutsujan rivillä 68 resolveIdentity()-funktiolla mutta tarkistaa maksullisen lähteen lisenssin raa'alla req.auth!.sub-arvolla, eli forkkauksen kirjaus ja maksumuuri käyttävät eri koordinaattia.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "b3bb56011ad2f1a8",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/appeals.ts",
+      "line": 138,
+      "source": "semgrep",
+      "alertNumber": 1270,
+      "verdict": "legit",
+      "reason": "appealedBy on kirjaus siitä kuka valituksen teki eikä sillä haeta mitään, ja omistajuus on jo tarkistettu sitä ennen vertaamalla contentOwner kutsujaan ja agentin owner-kenttään.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "a8262f256a153cb7",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/app-store.ts",
+      "line": 292,
+      "source": "semgrep",
+      "alertNumber": 1269,
+      "verdict": "confirm",
+      "reason": "Osto tallentaa myyjäksi app.ownerGaii:n eli omistajan GHII:n, mutta tämä tarkistus etsii lisenssiä agenttien gaii-arvoilla ja ostajana raa'alla sub:lla, joten haun koordinaatit eivät vastaa sitä mitä kuittiin kirjoitettiin.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "cc4244e7e47846d5",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/app-store.ts",
+      "line": 254,
+      "source": "semgrep",
+      "alertNumber": 1268,
+      "verdict": "confirm",
+      "reason": "Kuitteihin kirjoitetaan sellerGaii = app.ownerGaii eli täysi GHII, mutta myyntilista haetaan raa'alla req.auth!.sub-arvolla, joka omistajaistunnossa on paljas nimi eikä täsmää koskaan kirjoitettuun.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "ce44c616ed66eabb",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/app-store.ts",
+      "line": 197,
+      "source": "semgrep",
+      "alertNumber": 1267,
+      "verdict": "legit",
+      "reason": "Ostot kirjoitetaan buyerGaii = req.auth!.sub ja luetaan täsmälleen samalla arvolla, joten lista palauttaa vain tämän saman principaalin omat kuitit.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "c38aa86153cc96a6",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/app-store.ts",
+      "line": 155,
+      "source": "semgrep",
+      "alertNumber": 1266,
+      "verdict": "confirm",
+      "reason": "Ostokuitti kirjataan raakana `req.auth!.sub`-arvona, eikä `createAppPurchase` kummassakaan tallennusajurissa ratkaise sitä GHII:ksi, joten omistajaistunnon `alice` ja saman ihmisen agentin `claude#alice@node` saavat eri ostohistorian vaikka morselit veloitetaan yhdestä ja samasta saldosta.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "93c8e66777ed156c",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/app-store.ts",
+      "line": 120,
+      "source": "semgrep",
+      "alertNumber": 1265,
+      "verdict": "legit",
+      "reason": "`addTransaction` kirjaa rivin `resolveGhii`-ratkaistulle omistajalle ja `getTransactions` hakee samalla ratkaisulla, joten raaka tunnus ei koskaan jää hakuavaimeksi.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "4b11cc9b256b064c",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/app-store.ts",
+      "line": 93,
+      "source": "semgrep",
+      "alertNumber": 1263,
+      "verdict": "legit",
+      "reason": "`debitBalance` kutsuu `resolveGhii`-funktiota ennen saldopäivitystä molemmissa ajureissa, joten agentin ja omistajan tunnus osuvat samaan GHII-saldoon.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "47b09aa973cfc336",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/app-store.ts",
+      "line": 81,
+      "source": "semgrep",
+      "alertNumber": 1262,
+      "verdict": "confirm",
+      "reason": "`hasValidLicense` vertaa `buyerGaii`-saraketta sellaisenaan eikä ratkaise tunnusta, joten omistajan ostama lisenssi ei löydy hänen agenttinsa tunnuksella ja sama sovellus voi tulla maksetuksi kahdesti.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "33dd07a3a8b52f72",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/agents/profile-metadata.ts",
+      "line": 413,
+      "source": "semgrep",
+      "alertNumber": 1261,
+      "verdict": "legit",
+      "reason": "Reitti on `requireRole('agent')`-suojattu, jolloin `req.auth!.sub` on jo täysi agenttitunnus ja `getAgent` hakee sillä täsmälleen kutsujan oman rivin.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "b998f2b83f2b3b16",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/agent-tasks/lifecycle.ts",
+      "line": 126,
+      "source": "semgrep",
+      "alertNumber": 1260,
+      "verdict": "legit",
+      "reason": "Kirjoitus tapahtuu vasta `canAccessTask`-tarkistuksen jälkeen, joka vertaa tehtävän `ownerGaii`-kenttää koottuun `${owner}@${nodeId}`-tunnukseen tai `agentGaii`-kenttää istunnon täyteen agenttitunnukseen, ja päivitysavain on tehtävän id eikä henkilön tunnus.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "ed9c91e6ed38ffd4",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/agent-tasks/create-read.ts",
+      "line": 196,
+      "source": "semgrep",
+      "alertNumber": 1259,
+      "verdict": "legit",
+      "reason": "Agenttihaarassa `req.auth!.sub` on täysi agenttitunnus, ja rivi 171 torjuu 403:lla jos se ei täsmää pyydettyyn agenttiin, joten hakuavain on tarkistettu.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "68daabf57324dc32",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/agent-tasks/create-read.ts",
+      "line": 195,
+      "source": "semgrep",
+      "alertNumber": 1258,
+      "verdict": "legit",
+      "reason": "Omistajahaara antaa `listAgentTasksByOwner`-kutsulle `resolve(req)`-ratkaistun tunnuksen, eli juuri sen ratkaisun jota sääntö vaatii.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "5ab7384a11a55f73",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/agent-tasks/create-read.ts",
+      "line": 185,
+      "source": "semgrep",
+      "alertNumber": 1257,
+      "verdict": "legit",
+      "reason": "Nopean polun agenttihaara käyttää samaa rivillä 171 tarkistettua täyttä agenttitunnusta, joten suodatettu sivutus kohdistuu vain kutsujan omiin tehtäviin.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "1a561f8f3d7f8504",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/agent-tasks/create-read.ts",
+      "line": 184,
+      "source": "semgrep",
+      "alertNumber": 1256,
+      "verdict": "legit",
+      "reason": "Nopean polun omistajahaara hakee `listAgentTasksByOwner`-kutsulla `resolve(req)`-ratkaistulla tunnuksella, joten pelkkä tilinimi ei päädy kantaan.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "94dce3f837d6353c",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/actions.ts",
+      "line": 187,
+      "source": "semgrep",
+      "alertNumber": 1255,
+      "verdict": "legit",
+      "reason": "`requireRole('agent')` takaa että `req.auth!.sub` on täysi agenttitunnus, ja `updateAction` käyttää sitä omistajuusehtona, joten toisen agentin toimintoa ei voi muokata.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "277ee326f4bd9fa8",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/actions.ts",
+      "line": 116,
+      "source": "semgrep",
+      "alertNumber": 1254,
+      "verdict": "legit",
+      "reason": "Ovi vaatii sekä `requireRole('agent')`- että `requireScope('work:publish')`-tarkistuksen, ja `deleteAction` saa toisena ehtona istunnon täyden agenttitunnuksen, joten poisto rajautuu kutsujan omiin toimintoihin.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "b82068dce25f86ef",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/actions.ts",
+      "line": 67,
+      "source": "semgrep",
+      "alertNumber": 1253,
+      "verdict": "legit",
+      "reason": "`providerGaii` saa arvokseen agenttiroolin varmistaman täyden tunnuksen, eli se kirjaa kuka julkaisi eikä ole asiakkaan antama id.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "c0870ec8fd6beb2c",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/routes/actions.ts",
+      "line": 57,
+      "source": "semgrep",
+      "alertNumber": 1252,
+      "verdict": "legit",
+      "reason": "Kiintiölaskenta hakee `listActionsByProvider`-kutsulla agenttiroolin varmistamalla täydellä tunnuksella, joten laskuri koskee vain kutsujan omia toimintoja.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "77517c5ae6f4a715",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/middleware/readiness-gate.ts",
+      "line": 71,
+      "source": "semgrep",
+      "alertNumber": 1251,
+      "verdict": "legit",
+      "reason": "Middleware päästää ei-agentit läpi heti rivillä 65, joten `sub` on tässä haarassa aina agentin täysi GAII-tunnus ja `getOnboarding` osuu oikeaan tietueeseen.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "d2ea5dd365bb9a1e",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/middleware/cors.ts",
+      "line": 140,
+      "source": "semgrep",
+      "alertNumber": 1250,
+      "verdict": "legit",
+      "reason": "Haku on ehdon `sub !== owner` sisällä, eli kyseessä on agentti-istunto jossa `sub` on jo täysi GAII, ja se on `getAgent`-haun oikea avain.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
+    },
+    {
+      "fingerprint": "5d1107cefb511e41",
+      "ruleId": "security.semantic-audit.semgrep.owner-data-must-resolve-identity",
+      "file": "aimeat/src/middleware/cors.ts",
+      "line": 132,
+      "source": "semgrep",
+      "alertNumber": 1249,
+      "verdict": "confirm",
+      "reason": "Tiedosto ei tuo `resolveIdentity`-funktiota lainkaan ja koodin oma kommentti sanoo `sub`:n olevan omistajaistunnossa pelkkä tilin nimi, joten `getMemory` haetaan tällöin ilman täyttä tunnusta.",
+      "decidedBy": "ai",
+      "date": "2026-08-23",
+      "commit": "320ca253"
     }
   ],
   "invariantFindings": [
@@ -235,6 +994,15 @@
       "file": "aimeat/src/services/message-alias.ts",
       "note": "resolveGroupTarget tulkitsee raa'an tyhjän to-kentän samaksi kuin support-osoite (addressedToSupport), joten solmulla jolla on support-upstream-naapuri pelkällä conversation_id:llä jatkettu tavallinen kahdenkeskinen viesti ohjautuu palveluntarjoajan tukiosoitteeseen ketjun oikean vastapuolen sijaan.",
       "commitRange": "HEAD~10..HEAD",
+      "date": "2026-08-23",
+      "status": "open"
+    },
+    {
+      "id": "c79482646695",
+      "invariant": 13,
+      "file": "aimeat/src/services/compliance-access.ts",
+      "note": "Portti ohittaa scope-tarkistuksen kokonaan silloin kun sanoja ei ole lainkaan (`if (scopes.length && !scopeIsCovered(...))`), ja koska MCP-istunnon scopet tulevat sellaisenaan agentin `defaultScopes`-kentästä, operaattoritilin agentti jolla ei ole yhtään myönnettyä sanaa läpäisee `aimeat_compliance_report scope:\"node\"` -kutsun ja saa koko noden raportin, vaikka HTTP-ovi `requireOperatorPrincipal(storage, 'compliance:read')` torjuisi saman kutsujan.",
+      "commitRange": "a1cfe3ea..HEAD",
       "date": "2026-08-23",
       "status": "open"
     }
