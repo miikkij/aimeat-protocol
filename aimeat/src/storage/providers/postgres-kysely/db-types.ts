@@ -942,6 +942,8 @@ export interface Conversation {
   id: string;
   kind: Generated<string>;
   participants: Json;
+  /** The one party to this thread on ANOTHER node. Not a participant: membership stays node-local. */
+  remote: Json | null;
   subject: string | null;
   updatedAt: Generated<Timestamp>;
 }

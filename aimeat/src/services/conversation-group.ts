@@ -42,7 +42,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { ConversationRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
-import type { DeliveryCtx } from './message-delivery.js';
+import { deliverDirectMessage, type DeliveryCtx } from './message-delivery.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { deliveryTargetFor, messagePreviewWithAttachments } from '../utils/messaging.js';
 import { notify } from './notify.js';
@@ -86,6 +86,10 @@ export interface CreateGroupInput {
   subject?: string;
   /** The named address this thread was opened through (`support@operators`), when there was one. */
   alias?: string;
+  /** Use this id instead of a fresh one, so both nodes know a cross-node ticket by the same name. */
+  id?: string;
+  /** The one party on another node. NOT a participant — see ConversationRecord.remote. */
+  remote?: ConversationRecord['remote'];
 }
 
 export type CreateGroupResult =
@@ -135,12 +139,15 @@ export async function createGroupConversation(ctx: DeliveryCtx, input: CreateGro
 
   const now = new Date().toISOString();
   const conversation = await storage.createConversation({
-    id: randomUUID(),
+    // A caller may name the thread when both sides have to know it by the same id. Nobody else does,
+    // and a collision is the caller's to detect: receiveRemoteSupportMessage checks before it asks.
+    id: input.id ?? randomUUID(),
     kind: 'group',
     subject: input.subject,
     participants,
     createdBy: input.createdBy,
     alias: input.alias,
+    remote: input.remote,
     createdAt: now,
     updatedAt: now,
   });
@@ -192,7 +199,17 @@ export async function sendGroupMessage(ctx: DeliveryCtx, input: GroupSendInput):
     originNodeId: config.nodeId,
     createdAt: now,
     deliveredAt: now,
+    // A thread with a party on another node: the sender's own row is the one that has to travel, so
+    // it names that party and starts queued. The other participants' copies are local and delivered.
+    senderCopy: convo.remote ? { recipientGhii: convo.remote.ghii, status: 'queued' } : undefined,
   });
+
+  // The answer leaves. deliverDirectMessage routes on the address it is GIVEN, so this works whatever
+  // the row says; the row matters for the retry sweep, which re-reads it and routes on recipientGhii.
+  if (convo.remote) {
+    const senderCopy = await storage.getDirectMessage(id, deliveryTargetFor(input.senderGhii));
+    if (senderCopy) await deliverDirectMessage(ctx, senderCopy, deliveryTargetFor(convo.remote.ghii));
+  }
 
   await storage.updateConversation(convo.id, {});
   emitChange('messages');
@@ -214,6 +231,16 @@ export interface FanOutMessage {
   originNodeId: string;
   createdAt: string;
   deliveredAt: string;
+  /**
+   * What the SENDER's own copy names as its recipient, and its status, when the thread has a party
+   * on another node.
+   *
+   * The sender's row is the one the retry job re-reads, and it computes the target node from
+   * `recipientGhii`. A group copy normally carries the thread's address, which parses to the node
+   * `operators` — no peer, so a queued reply would be retried forever against nothing. Naming the
+   * remote party makes the row routable, which is the whole reason the field exists.
+   */
+  senderCopy?: { recipientGhii: string; status: 'queued' };
 }
 
 /**
@@ -256,19 +283,20 @@ export async function fanOutToParticipants(
 
   let delivered = 0;
   for (const [mailbox, members] of mailboxes) {
+    const isSenderMailbox = mailbox === senderMailbox;
     await storage.createDirectMessage({
       id: msg.id,
       ownerGhii: mailbox,
       conversationId: convo.id,
       subject: convo.subject,
       senderGhii: msg.senderGhii,
-      recipientGhii: msg.recipientGhii,
+      recipientGhii: isSenderMailbox && msg.senderCopy ? msg.senderCopy.recipientGhii : msg.recipientGhii,
       body: msg.body,
       attachments: msg.attachments,
       interactive: msg.interactive,
       respondable: true,
-      status: 'delivered',
-      direction: mailbox === senderMailbox ? 'outbound' : 'inbound',
+      status: isSenderMailbox && msg.senderCopy ? msg.senderCopy.status : 'delivered',
+      direction: isSenderMailbox ? 'outbound' : 'inbound',
       replyToId: msg.replyToId,
       origin: msg.origin,
       originNodeId: msg.originNodeId,

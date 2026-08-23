@@ -31,11 +31,15 @@
  *     message reaches nobody, which is true rather than broken. Both send doors return the reason
  *     beside the count, because an agent reading a bare `delivered_to: 0` concludes the node failed.
  */
+import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
-import type { ConversationRecord } from '../storage/interface.js';
+import type { ConversationRecord, DirectMessageAttachment } from '../storage/interface.js';
 import type { DeliveryCtx } from './message-delivery.js';
+import type { PeerInfo } from './federation.js';
 import { listOperatorGhiis } from './operators.js';
-import { createGroupConversation, setParticipants } from './conversation-group.js';
+import { createGroupConversation, setParticipants, fanOutToParticipants } from './conversation-group.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
+import { deliveryTargetFor } from '../utils/messaging.js';
 
 /** The local part. Reserved in utils/gaii.ts so nobody registers an owner by this name. */
 export const SUPPORT_LOCAL_PART = 'support';
@@ -59,6 +63,44 @@ export function isAliasAddress(to: string, nodeId: string): boolean {
   const trimmed = to.trim().toLowerCase();
   return trimmed === `${SUPPORT_LOCAL_PART}@${OPERATORS_HOST}`
     || trimmed === `${SUPPORT_LOCAL_PART}@${nodeId.toLowerCase()}`;
+}
+
+/**
+ * The LONG form, `support@{thisNodeId}`, which always means THIS node's own operators.
+ *
+ * The two forms mean different things once a node has somebody answering support for it. The word
+ * form asks for "whoever answers support here", which on a managed instance is the people who run
+ * it. The long form names this node, and is the escape hatch for an owner who wants their own
+ * operators rather than their provider's. That distinction was already latent in isAliasAddress;
+ * this is it, said out loud.
+ */
+export function isLocalSupportAddress(to: string, nodeId: string): boolean {
+  return to.trim().toLowerCase() === `${SUPPORT_LOCAL_PART}@${nodeId.toLowerCase()}`;
+}
+
+/** Where `support@operators` is answered on this node. */
+export type SupportRoute =
+  | { kind: 'local' }
+  | { kind: 'upstream'; nodeId: string; address: string };
+
+/**
+ * Who answers support here: this node's own operators, or a peer that agreed to.
+ *
+ * A managed instance makes its buyer the local operator, so the address every agent is told to use
+ * resolves to the customer rather than to the people who actually run the node. `supportUpstream` on
+ * a peer row is the answer, and it lives THERE rather than in config so that the routing cannot
+ * outlive the link: a config key can name a peer that was removed, and every ticket then queues into
+ * a black hole for a week before it is declared undeliverable.
+ *
+ * A peer that may not deliver messages here cannot answer support either, so it is not a candidate.
+ * The PUT route refuses that combination up front; this is the second half of the same rule, for a
+ * flag turned off after the routing was set.
+ */
+export function resolveSupportRoute(peers: Map<string, PeerInfo>): SupportRoute {
+  const upstream = [...peers.values()].find(p =>
+    p.supportUpstream === true && p.status === 'active' && p.allowMessaging !== false);
+  if (!upstream) return { kind: 'local' };
+  return { kind: 'upstream', nodeId: upstream.nodeId, address: `${SUPPORT_LOCAL_PART}@${upstream.nodeId}` };
 }
 
 export type OpenSupportResult =
@@ -118,6 +160,8 @@ export function soleParticipantNote(convo: ConversationRecord, delivered: number
 export type GroupTarget =
   | { kind: 'none' }
   | { kind: 'group'; conversation: ConversationRecord }
+  /** Not a group here: an ordinary 1:1 to a support address on the node that answers for this one. */
+  | { kind: 'redirect'; to: string; conversationId: string; subject?: string }
   | { kind: 'refused'; status: number; code: string; message: string };
 
 /**
@@ -140,16 +184,32 @@ export async function resolveGroupTarget(
   senderGhii: string,
   input: { to: string; conversationId?: string; subject?: string },
 ): Promise<GroupTarget> {
+  const route = resolveSupportRoute(ctx.peers);
+  const addressedToSupport = !input.to?.trim() || isAliasAddress(input.to, config.nodeId);
+
   if (input.conversationId) {
     const existing = await ctx.storage.getConversation(input.conversationId);
     if (existing) {
       const fresh = await refreshSupportParticipants(ctx, config, existing);
       return { kind: 'group', conversation: fresh };
     }
+    // No record means a PAIR thread, which is what an upstream ticket is on this side. Continuing it
+    // has to reach the same thread id, or "pass the conversation id back" stops being true the
+    // moment support is answered somewhere else.
+    if (route.kind === 'upstream' && addressedToSupport) {
+      return { kind: 'redirect', to: route.address, conversationId: input.conversationId, subject: input.subject };
+    }
     return { kind: 'none' };
   }
 
   if (isAliasAddress(input.to, config.nodeId)) {
+    // The long form always means THIS node's own operators, whoever else answers support here.
+    if (route.kind === 'upstream' && !isLocalSupportAddress(input.to, config.nodeId)) {
+      // A fresh id per aliased send, exactly as the local path opens a fresh thread: a support
+      // request is a ticket, and gluing an unrelated question onto last week's is how a queue
+      // becomes unreadable.
+      return { kind: 'redirect', to: route.address, conversationId: randomUUID(), subject: input.subject };
+    }
     const opened = await openSupportThread(ctx, config, senderGhii, input.subject);
     if (!opened.ok) {
       return { kind: 'refused', status: 503, code: opened.code, message: opened.message };
@@ -158,6 +218,89 @@ export async function resolveGroupTarget(
   }
 
   return { kind: 'none' };
+}
+
+export type ReceiveSupportResult =
+  | { ok: true; conversationId: string; participants: string[]; delivered: number }
+  | { ok: false; status: number; code: string; message: string };
+
+/**
+ * A support message that arrived from a peer, addressed to this node's support address.
+ *
+ * The cross-node leg is an ordinary signed 1:1 DM to `support@{thisNodeId}`; what happens HERE is
+ * that the alias is resolved locally into this node's own group thread, whose participants are this
+ * node's own operators. That asymmetry is the whole trick: the sender's side is a pair thread, ours
+ * is a group, and `createGroupConversation`'s node-local invariant is never touched.
+ *
+ * Without this the frame 404s: the inbound route parses the delivery address, finds no owner called
+ * `support`, and reports the recipient does not exist here.
+ */
+export async function receiveRemoteSupportMessage(
+  ctx: DeliveryCtx,
+  config: AimeatConfig,
+  input: { sourceNode: string; senderGhii: string; conversationId: string; subject?: string; body: string; messageId: string; attachments?: DirectMessageAttachment[]; createdAt: string },
+): Promise<ReceiveSupportResult> {
+  const operators = await listOperatorGhiis(ctx.storage, config);
+  if (!operators.length) {
+    // 503, not 404 or 403. Those are terminal on the wire: deliverDirectMessage marks the sender's
+    // copy `undeliverable` and the ticket is lost. A node with no operator right now may have one in
+    // an hour, and the retry job is exactly the thing that should carry it there.
+    return { ok: false, status: 503, code: 'NO_OPERATORS', message: 'This node has no operator to receive support messages' };
+  }
+
+  const sender = parseGaiiLoose(input.senderGhii);
+  const existing = await ctx.storage.getConversation(input.conversationId);
+
+  // Does the stored thread genuinely belong to this correspondent? Compare owner AND node: isSameOwner
+  // compares the owner name alone, so any peer with an owner called `alice` would be writing into
+  // alice-from-somewhere-else's ticket.
+  const matches = !!existing
+    && existing.alias === SUPPORT_ADDRESS
+    && existing.remote?.nodeId === input.sourceNode
+    && parseGaiiLoose(existing.remote.ghii).owner === sender.owner
+    && parseGaiiLoose(existing.remote.ghii).node === sender.node;
+
+  let convo: ConversationRecord;
+  if (existing && matches) {
+    convo = await refreshSupportParticipants(ctx, config, existing);
+  } else {
+    // Either a first message, or an id that names somebody else's thread. In the second case open a
+    // FRESH local thread and remember the id the far side uses, rather than refusing: a customer must
+    // not lose a support request to an id collision, and an existing thread must not be posted into
+    // by a stranger who guessed its id. Both are served by not reusing it.
+    const created = await createGroupConversation(ctx, {
+      // Reuse the far side's id only when it is free, so both sides usually agree on one name.
+      id: existing ? undefined : input.conversationId,
+      createdBy: operators[0],
+      participants: operators,
+      subject: input.subject?.trim() || 'Support request',
+      alias: SUPPORT_ADDRESS,
+      remote: { ghii: input.senderGhii, nodeId: input.sourceNode, conversationId: input.conversationId },
+    });
+    if (!created.ok) return { ok: false, status: 503, code: 'NO_OPERATORS', message: created.message };
+    convo = created.conversation;
+  }
+
+  // Idempotent per mailbox: a retried frame must not write a second copy for anyone. The route's own
+  // check cannot help here, because there is no `support@{node}` mailbox to look in.
+  const already = await ctx.storage.getDirectMessage(input.messageId, deliveryTargetFor(convo.participants[0]));
+  if (already) return { ok: true, conversationId: convo.id, participants: convo.participants, delivered: 0 };
+
+  const now = new Date().toISOString();
+  const { delivered } = await fanOutToParticipants(ctx, convo, {
+    id: input.messageId,
+    senderGhii: input.senderGhii,
+    // The SHORT form, so an operator's row reads exactly as it does in a local support thread.
+    recipientGhii: SUPPORT_ADDRESS,
+    body: input.body,
+    attachments: input.attachments,
+    origin: 'federation',
+    originNodeId: input.sourceNode,
+    createdAt: input.createdAt || now,
+    deliveredAt: now,
+  });
+
+  return { ok: true, conversationId: convo.id, participants: convo.participants, delivered };
 }
 
 /**

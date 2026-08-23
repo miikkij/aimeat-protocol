@@ -34766,7 +34766,18 @@ paths:
         * A `conversation_id` naming an existing GROUP conversation posts into it, and `to` may then
           be omitted. A non-participant gets 403 `NOT_A_PARTICIPANT`.
 
-        A group conversation is currently node-local: every participant must live on this node.
+        SUPPORT ANSWERED ELSEWHERE. On a node where a peer carries `support_upstream` (a managed
+        instance, whose buyer is its own local operator), `support@operators` resolves to that peer
+        instead of to this node's operators. The sender writes the same address and needs to know
+        nothing: the message becomes an ordinary signed 1:1 to `support@{peerNodeId}`, which the
+        receiving node resolves into its own support thread, and the response carries `addressed_to`
+        plus a `note` saying where it went. Pass `conversation_id` back to continue the same ticket.
+        `support@{thisNodeId}` — the long form — always means THIS node's own operators and is the
+        escape hatch for an owner who wants their own people rather than their provider's.
+
+        A group conversation is currently node-local: every participant must live on this node. A
+        thread that arrived from a peer keeps that peer's party as a return address rather than as a
+        participant, which is how an answer travels back without a foreign member.
       tags: [Direct Messages]
       security:
         - BearerAuth: []

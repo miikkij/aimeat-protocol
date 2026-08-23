@@ -108,7 +108,10 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     }
     const input = parsed.data;
     const senderGhii = resolve(req);
-    const recipientGhii = input.to.trim();
+    let recipientGhii = input.to.trim();
+    // Overridden below when support here is answered by another node: the ordinary 1:1 path carries it.
+    let threadId = input.conversation_id;
+    let threadSubject = input.subject;
 
     // TARGET-058. An agent or app sending through REST is doing exactly what it does through
     // aimeat_dm_send: writing AI-authored text delivered to a named person. The MCP tool stamped it
@@ -136,6 +139,14 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     if (group.kind === 'refused') {
       res.status(group.status).json(error(config.nodeId, group.code, group.message));
       return;
+    }
+    // Support on this node is answered somewhere else. It is not a group HERE: it is an ordinary,
+    // signed 1:1 to that node's support address, which the receiving node resolves into its own
+    // support thread. The sender wrote `support@operators` and never learns any of this.
+    if (group.kind === 'redirect') {
+      recipientGhii = group.to;
+      threadId = group.conversationId;
+      threadSubject = group.subject ?? threadSubject;
     }
     if (group.kind === 'group') {
       const attachmentsForGroup = input.attachments ? mapMessageAttachments(input.attachments, senderGhii, config.nodeId) : undefined;
@@ -215,7 +226,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     // the Tracked Response evaluator, which sends automated replies server-side via the same helper.
     const result = await sendDirectMessage(deliveryCtx, {
       senderGhii, recipientGhii, body: input.body, replyToId: input.reply_to, attachments,
-      conversationId: input.conversation_id, subject: input.subject, interactive: input.interactive,
+      conversationId: threadId, subject: threadSubject, interactive: input.interactive,
       aiProvenanceId,
     });
     if (!result.ok) {
@@ -227,7 +238,16 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       return;
     }
 
-    res.status(201).json(success(config.nodeId, { message: result.message }, [
+    res.status(201).json(success(config.nodeId, {
+      message: result.message,
+      // Only on the redirect path, and additive: an existing caller reads the same `message` it always
+      // did. The sender wrote `support@operators` and is told where that went, once.
+      ...(group.kind === 'redirect' ? {
+        addressed_to: group.to,
+        conversation_id: result.message.conversationId,
+        note: 'Support on this node is answered by the people who run it, on another node. Pass conversation_id back to continue the same thread.',
+      } : {}),
+    }, [
       { description: 'View conversation', method: 'GET', url: `/v1/messages/conversations/${result.message.conversationId}` },
       { description: 'View inbox', method: 'GET', url: '/v1/messages/inbox' },
     ]));

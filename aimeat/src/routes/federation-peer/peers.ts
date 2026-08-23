@@ -331,7 +331,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
-        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, peer_mode, allow_federated_auth, federation_auth_scopes, tier } = req.body ?? {};
+        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, support_upstream, peer_mode, allow_federated_auth, federation_auth_scopes, tier } = req.body ?? {};
         if (url) peer.url = url;
         if (public_key) peer.publicKey = public_key;
         if (status) peer.status = status;
@@ -359,6 +359,28 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         if (typeof allow_federated_auth === 'boolean') peer.allowFederatedAuth = allow_federated_auth;
         if (Array.isArray(federation_auth_scopes)) peer.federationAuthScopes = federation_auth_scopes;
         Object.assign(peer, clampFlagsToTier(effectiveTier, peer));
+
+        // Where this node's `support@operators` is answered. Refused when another active peer already
+        // holds it, so "who answers support here" cannot become two answers: a support request going
+        // to two vendors at once serves neither of them, and the invalid state is better made
+        // unrepresentable than resolved later by whichever peer the iterator reached first.
+        if (typeof support_upstream === 'boolean') {
+            if (support_upstream) {
+                const held = [...peers.values()].find(p => p.nodeId !== nodeId && p.status === 'active' && p.supportUpstream);
+                if (held) {
+                    res.status(409).json(error(config.nodeId, 'ONE_UPSTREAM_ONLY',
+                        `Support on this node is already answered by ${held.nodeId}. Turn that off before pointing it here.`));
+                    return;
+                }
+                // Routing to a peer that cannot carry a message is a black hole with a green light.
+                if (peer.allowMessaging === false) {
+                    res.status(409).json(error(config.nodeId, 'MESSAGING_DISABLED',
+                        'This peer may not deliver messages here, so it cannot answer support. Enable allow_messaging first.'));
+                    return;
+                }
+            }
+            peer.supportUpstream = support_upstream;
+        }
         await storage.saveFederationPeer(peer);
 
         res.json(success(config.nodeId, {
@@ -372,6 +394,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             allow_messaging: peer.allowMessaging,
             allow_broadcast: peer.allowBroadcast,
             allow_settlement: peer.allowSettlement,
+            support_upstream: peer.supportUpstream ?? false,
             peer_mode: peer.peerMode,
             allow_federated_auth: peer.allowFederatedAuth,
             federation_auth_scopes: peer.federationAuthScopes,
