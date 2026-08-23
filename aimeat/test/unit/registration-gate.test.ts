@@ -23,14 +23,14 @@ const TENANT_OTHER = '99999999-9999-9999-9999-999999999999';
 const withMode = (mode: AimeatConfig['registrationMode']): AimeatConfig =>
   ({ ...loadConfig().config, registrationMode: mode });
 
-const VIAS: RegistrationVia[] = ['direct', 'oauth', 'invitation'];
+const VIAS: RegistrationVia[] = ['direct', 'oauth', 'invitation', 'provisioning'];
 
 /** true = this mode lets an account arrive this way. */
 const EXPECTED: Record<AimeatConfig['registrationMode'], Record<RegistrationVia, boolean>> = {
-  open: { direct: true, oauth: true, invitation: true },
-  oauth: { direct: false, oauth: true, invitation: true },
-  invite: { direct: false, oauth: false, invitation: true },
-  closed: { direct: false, oauth: false, invitation: false },
+  open: { direct: true, oauth: true, invitation: true, provisioning: true },
+  oauth: { direct: false, oauth: true, invitation: true, provisioning: true },
+  invite: { direct: false, oauth: false, invitation: true, provisioning: true },
+  closed: { direct: false, oauth: false, invitation: false, provisioning: false },
 };
 
 describe('Registration-mode rule table', () => {

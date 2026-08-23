@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-23 — Both unauthenticated agent mints answer 403 ACCOUNT_DISABLED for a
+ *     deactivated owner (BR-04): an emailed code must not outlive the account it belongs to.
  *   v1.5.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): register-web is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
  *   v1.4.0 — 2026-08-11 — Security audit H-2: both unauthenticated mints issue roles ['agent'] and
  *     stop copying the owner's owner/operator roles onto the token. A verification code and a magic
@@ -379,6 +381,13 @@ export function registerWebVerifyRoutes(
         // this token as an owner session either: the SDK auth modal discards it and runs a password
         // login (src/static/sdk-libs/auth/modal.js), and no SPA view fetches this route.
         const roles = ['agent'];
+        // Deactivated owner (BR-04): an emailed code must not resurrect a credential in the name
+        // of an account the organisation has switched off.
+        const mintOwner = await storage.getOwner(record.ownerName);
+        if (mintOwner?.disabledAt) {
+            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
+            return;
+        }
         const token = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,
@@ -528,6 +537,12 @@ export function registerWebVerifyRoutes(
         // mailbox; it does not make the holder the account's owner or the node's operator, and those
         // are ROLES, which no scope list narrows.
         const roles = ['agent'];
+        // Deactivated owner (BR-04) — same refusal as the verify-email mint above.
+        const linkMintOwner = await storage.getOwner(record.ownerName);
+        if (linkMintOwner?.disabledAt) {
+            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
+            return;
+        }
         const jwtToken = await issueJWT({
             sub: agent.gaii,
             owner: record.ownerName,

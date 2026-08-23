@@ -10,6 +10,8 @@
  *   showGoogleSignupModal · maybeShowGoogleSignup.
  * @usage import { maybeShowGoogleSignup } from './signup.js';  (boot calls it on load)
  * @version-history
+ *   v1.1.0 — 2026-08-24 — Finalize path maps a colon provider id (saml:contoso) to its
+ *     slash route (BR-04); OIDC ids pass through unchanged.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part3.ts (SDK-libs migration Phase 3).
  */
 import { api } from './session.js';
@@ -179,7 +181,8 @@ function showGoogleSignupModal(pending, i) {
     createBtn.textContent = i.signupCreating || 'Creating account...';
     errEl.style.display = 'none';
     try {
-      var res = await api('/v1/ghii/login/' + (pending.provider || 'google') + '/finalize', {
+      // SSO connections carry a colon id ('saml:contoso'); their finalize path is /saml/contoso/finalize.
+      var res = await api('/v1/ghii/login/' + (pending.provider || 'google').split(':').join('/') + '/finalize', {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify({ username: name, displayName: displayName }),

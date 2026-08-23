@@ -23031,12 +23031,366 @@ paths:
                               properties:
                                 id:
                                   type: string
-                                  enum: [google, casdoor, entra]
+                                  description: >
+                                    An OIDC provider id (google, casdoor, entra) or a LISTED SSO
+                                    connection as `saml:<connection-id>` (BR-04). Hidden SSO
+                                    connections never appear here.
                                 label:
                                   type: string
                                 loginUrl:
                                   type: string
                                   description: Same-node path to begin this provider's sign-in flow
+
+  # ============================================================
+  # BR-04: Organisation sign-in (SAML) and provisioning (SCIM)
+  # ============================================================
+
+  /v1/ghii/login/saml/{connectionId}:
+    get:
+      operationId: samlLoginStart
+      summary: Begin SAML organisation sign-in for one SSO connection
+      description: |
+        Redirects the browser to the connection's identity provider with a signed-in AuthnRequest.
+        The post-login `redirect` query parameter is parked server-side under the RelayState.
+        Gated on the runtime `sso.enabled` flag; a connection with no SAML configuration answers 404.
+      tags: [SSO]
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: redirect
+          in: query
+          required: false
+          schema: { type: string }
+          description: Same-site absolute path to land on after sign-in
+      responses:
+        '302': { description: Redirect to the identity provider's sign-in endpoint }
+        '404': { description: 'No such connection, or its SAML half is not configured' }
+        '503':
+          description: Organisation sign-in is not enabled on this node
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties: { error: { type: object, properties: { code: { example: FEATURE_DISABLED } } } }
+
+  /v1/ghii/login/saml/{connectionId}/acs:
+    post:
+      operationId: samlLoginAcs
+      summary: The SAML assertion consumer service (the IdP posts the Response here)
+      description: |
+        Validates the Response cryptographically first — signature against the connection's pinned
+        certificates, Audience, InResponseTo (unless the connection allows IdP-initiated sign-in)
+        and the validity window — and only then maps the identity: returning user by NameID, a
+        SCIM-provisioned account whose externalId equals the NameID (adopted, never duplicated),
+        a verified email inside the connection's domains, or the one-time username-choice step via
+        the pending-signup cookie. A deactivated account answers 403 ACCOUNT_DISABLED.
+      tags: [SSO]
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [SAMLResponse]
+              properties:
+                SAMLResponse: { type: string, description: Base64 SAML 2.0 Response }
+                RelayState: { type: string }
+      responses:
+        '302': { description: 'Signed in (session cookie set), or bounced to the username-choice step' }
+        '401': { description: The Response did not validate — nothing was read or written }
+        '403': { description: The account has been deactivated }
+        '503': { description: Organisation sign-in is not enabled on this node }
+
+  /v1/ghii/login/saml/{connectionId}/finalize:
+    post:
+      operationId: samlLoginFinalize
+      summary: Complete a first SAML sign-in with the chosen username
+      description: |
+        Same contract as /v1/ghii/login/{provider}/finalize: reads the signed pending-signup
+        cookie, applies the registration mode (a brand-new SAML account counts as an
+        identity-provider arrival), creates owner + GHII and establishes the session.
+      tags: [SSO]
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username: { type: string }
+                displayName: { type: string }
+      responses:
+        '200': { description: Account created and signed in }
+        '400': { description: 'No pending sign-up, or an invalid username' }
+        '403': { description: 'Registration is closed on this node, or the account is deactivated' }
+        '409': { description: 'Username taken, or the email belongs to an existing account' }
+
+  /v1/sso/{connectionId}/metadata:
+    get:
+      operationId: ssoSpMetadata
+      summary: The SP metadata document for one SSO connection (public — the IdP fetches it)
+      description: |
+        Also this SP's entityID: one URL to paste into an IdP console. Available before the IdP
+        half is configured, because the IdP console is configured FIRST. Gated on `sso.enabled`.
+      tags: [SSO]
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: SAML SP metadata
+          content:
+            application/xml:
+              schema: { type: string }
+        '404': { description: No such connection }
+        '503': { description: Organisation sign-in is not enabled on this node }
+
+  /v1/scim/v2/{connectionId}/Users:
+    get:
+      operationId: scimListUsers
+      summary: 'SCIM: list or filter this connection''s managed users'
+      description: |
+        The SCIM 2.0 surface (RFC 7644), served under /v1/scim/v2/{connectionId} — this entry
+        stands for the whole resource family (/Users, /Users/{id}, /ServiceProviderConfig,
+        /ResourceTypes, /Schemas; Groups are deliberately not declared in v1). Authentication is
+        the connection's own provisioning bearer, minted once by an operator; JWTs and PATs are
+        refused, and a valid token against another connection's path answers 403. Responses and
+        errors are SCIM-shaped (application/scim+json) — the one route family off the AIMEAT
+        envelope, because the protocol dictates the shape. Filters compare against the userName
+        the directory originally sent, verbatim.
+      tags: [SSO]
+      security: []
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: filter
+          in: query
+          required: false
+          schema: { type: string }
+          description: e.g. userName eq "ville@contoso.com"
+      responses:
+        '200':
+          description: SCIM ListResponse
+          content:
+            application/scim+json:
+              schema: { type: object }
+        '401': { description: 'Missing/unknown provisioning token, or a platform credential was presented' }
+        '403': { description: The token belongs to a different connection }
+        '503': { description: Provisioning is not enabled on this node }
+    post:
+      operationId: scimCreateUser
+      summary: 'SCIM: create (or adopt) a user'
+      description: |
+        Creates an account through the same provisioning core every other door uses; the account
+        is marked as managed by this connection and joins the bound organism. An existing,
+        locally-verified account whose email is in the connection's domains is ADOPTED instead of
+        duplicated; any other collision answers 409 uniqueness. `active: false` and DELETE both
+        deactivate (never erase), and refuse against an operator-role account.
+      tags: [SSO]
+      security: []
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/scim+json:
+            schema: { type: object }
+      responses:
+        '201':
+          description: SCIM User
+          content:
+            application/scim+json:
+              schema: { type: object }
+        '403': { description: Registration is closed on this node }
+        '409': { description: uniqueness — the user or the email already exists here }
+
+  /v1/admin/sso/connections:
+    get:
+      operationId: adminSsoList
+      summary: List SSO connections (operator)
+      description: Every connection with its configuration state and the SP details an IdP console asks for. Secrets are never returned.
+      tags: [SSO]
+      responses:
+        '200': { description: Connection list }
+        '403': { description: Operator role required }
+    post:
+      operationId: adminSsoCreate
+      summary: Create an SSO connection (operator)
+      description: |
+        The id is permanent — a URL segment, an identity key and a SAML Audience. Works with
+        `sso.enabled` off (a node is configured first, switched on second); answers 403
+        SEALED_CONFIG while `sso.connections_locked` is set.
+      tags: [SSO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, name]
+              properties:
+                id: { type: string, description: 'Slug: lowercase letters, digits, dashes; 2-31 chars' }
+                name: { type: string }
+                domains: { type: array, items: { type: string } }
+                organism_id: { type: string }
+                login_visibility: { type: string, enum: [listed, hidden] }
+                allow_idp_initiated: { type: boolean }
+      responses:
+        '201': { description: Created }
+        '400': { description: 'Invalid id, name or domains' }
+        '403': { description: 'Operator role required, or connection management is locked' }
+        '409': { description: A connection with this id already exists }
+
+  /v1/admin/sso/connections/{id}:
+    get:
+      operationId: adminSsoGet
+      summary: Read one SSO connection (operator)
+      tags: [SSO]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 'The connection, secrets redacted' }
+        '404': { description: Connection not found }
+    put:
+      operationId: adminSsoUpdate
+      summary: Update an SSO connection's mutable half (operator)
+      description: 'Name, domains, organism binding, sign-in visibility, IdP-initiated acceptance. Never the id; SAML goes through idp-metadata.'
+      tags: [SSO]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object }
+      responses:
+        '200': { description: Updated }
+        '403': { description: 'Operator role required, or connection management is locked' }
+        '404': { description: Connection not found }
+    delete:
+      operationId: adminSsoDelete
+      summary: Delete an SSO connection (operator)
+      description: 'Removes the door, not the people — accounts, data and memberships remain; recreating the id restores provisioning authority.'
+      tags: [SSO]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Deleted }
+        '403': { description: 'Operator role required, or connection management is locked' }
+        '404': { description: Connection not found }
+
+  /v1/admin/sso/connections/{id}/scim-token:
+    post:
+      operationId: adminSsoScimToken
+      summary: Mint the connection's SCIM provisioning token (operator)
+      description: 'Returned ONCE; only its SHA-256 is stored. Minting again replaces the previous token, which stops working immediately.'
+      tags: [SSO]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '201': { description: 'The raw token, shown this once' }
+        '403': { description: 'Operator role required, or connection management is locked' }
+        '404': { description: Connection not found }
+
+  /v1/admin/sso/connections/{id}/idp-metadata:
+    post:
+      operationId: adminSsoIdpMetadata
+      summary: Configure the SAML half from IdP metadata (operator)
+      description: |
+        Pass the metadata `url` (fetched through the SSRF-guarded outbound path — a private-network
+        IdP needs AIMEAT_ALLOW_PRIVATE_EGRESS) or the pasted `xml`. Nothing is saved unless the
+        document yields an entityID, an HTTP-Redirect SSO endpoint and a signing certificate.
+      tags: [SSO]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                url: { type: string }
+                xml: { type: string }
+                name_id_format: { type: string }
+      responses:
+        '200': { description: SAML half configured }
+        '400': { description: The document is not usable IdP metadata }
+        '403': { description: 'Operator role required, or connection management is locked' }
+        '404': { description: Connection not found }
+
+  /v1/admin/owners/{name}/disable:
+    post:
+      operationId: adminOwnerDisable
+      summary: Deactivate an account (operator)
+      description: |
+        The first "account exists but cannot act" state (BR-04): the flag is written first, then
+        every credential family acting in the account's name is ended — sessions (owner, agents,
+        ecosystem apps), personal access tokens, app grants, in-flight device authorizations, MCP
+        OAuth refresh tokens and live connect-tunnel sockets. The account, its knowledge and its
+        memberships remain. Reversible with /enable; an operator cannot deactivate themselves.
+      tags: [Admin]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: 'Deactivated, with counts of what was ended' }
+        '400': { description: You cannot deactivate your own account }
+        '403': { description: Operator role required }
+        '404': { description: Owner not found }
+
+  /v1/admin/owners/{name}/enable:
+    post:
+      operationId: adminOwnerEnable
+      summary: Reactivate a deactivated account (operator)
+      description: Clears the flag only — credentials ended by deactivation stay dead; the person signs in fresh.
+      tags: [Admin]
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Reactivated }
+        '403': { description: Operator role required }
+        '404': { description: Owner not found }
 
   # ============================================================
   # Phase 1.4: Directories

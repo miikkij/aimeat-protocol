@@ -10,6 +10,8 @@
  *   - createOwner/getOwner/listOwners/updateOwner: insert (UNIQUE→NAME_TAKEN), fetch, list, update
  *
  * @version-history
+ *   v1.1.0 — 2026-08-23 — Owner lifecycle columns (disabledAt/disabledBy/managedBy, BR-04) on read
+ *     and update; the spread-then-write update shape carries a null clear (reactivation) through.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
@@ -22,6 +24,9 @@ export function deserializeOwner(row: Record<string, unknown>): OwnerRecord {
     publicKey: row.publicKey as string,
     roles: JSON.parse(row.roles as string) as string[],
     createdAt: row.createdAt as string,
+    disabledAt: (row.disabledAt as string) ?? null,
+    disabledBy: (row.disabledBy as string) ?? null,
+    managedBy: (row.managedBy as string) ?? null,
   };
 }
 
@@ -59,12 +64,16 @@ export function updateOwner(db: Database.Database, name: string, updates: Partia
   if (!existing) return null;
   const updated = { ...existing, ...updates };
   db.prepare(
-    `UPDATE owners SET displayName = ?, publicKey = ?, roles = ?, createdAt = ? WHERE name = ?`
+    `UPDATE owners SET displayName = ?, publicKey = ?, roles = ?, createdAt = ?,
+       disabledAt = ?, disabledBy = ?, managedBy = ? WHERE name = ?`
   ).run(
     updated.displayName ?? null,
     updated.publicKey,
     JSON.stringify(updated.roles),
     updated.createdAt,
+    updated.disabledAt ?? null,
+    updated.disabledBy ?? null,
+    updated.managedBy ?? null,
     name,
   );
   return updated;

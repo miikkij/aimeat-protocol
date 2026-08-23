@@ -63,6 +63,7 @@ import { outboundMethods } from './methods/outbound.js';
 import { companyMethods } from './methods/companies.js';
 import { usageMethods } from './methods/usage.js';
 import { accountEventMethods } from './methods/account-events.js';
+import { ssoConnectionMethods } from './methods/sso-connections.js';
 
 /**
  * Marks the async context of an open transaction, so a write can tell whether it is a step OF the
@@ -204,6 +205,7 @@ Object.assign(
   companyMethods,
   usageMethods,
   accountEventMethods,
+  ssoConnectionMethods,
 );
 
 // Applied after the merge so it wraps every method group, including any added later.

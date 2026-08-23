@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-24",
+      "kind": "feature",
+      "title": {
+        "en": "Sign in with your organisation's own account",
+        "fi": "Kirjaudu organisaatiosi omilla tunnuksilla"
+      },
+      "body": {
+        "en": "An organisation can now connect its own identity provider — Microsoft Entra ID, Okta, or anything that speaks SAML. Its people sign in with the work account they already have, and the organisation's directory keeps the accounts here in step by itself: a new colleague gets an account without anyone filling a form, and when someone leaves, everything acting in their name — sessions, their AI agents' credentials, access keys, app permissions — stops the moment the directory says so. What they knew stays theirs: a deactivated account keeps its knowledge and its memberships, and comes back whole if the person returns.\n\nFor whoever runs the connection there is a setup guide in the admin dashboard that walks through the identity provider's console step by step and shows, for each step, what this service has actually seen — a real sign-in, the directory's first call — rather than what was configured. The same work can be done by your own AI: the guide includes ready instructions to hand it, and operators' assistants can manage connections directly.\n\nIf your account is managed this way, your profile's security page now says so, and names the organisation.",
+        "fi": "Organisaatio voi nyt kytkeä oman kirjautumisjärjestelmänsä — Microsoft Entra ID:n, Oktan tai minkä tahansa SAML-kielisen. Väki kirjautuu työtunnuksilla, jotka heillä jo on, ja organisaation käyttäjähakemisto pitää täkäläiset tilit ajan tasalla itsestään: uusi kollega saa tilin ilman että kukaan täyttää lomaketta, ja kun joku lähtee, kaikki hänen nimissään toimiva — istunnot, AI-agenttien tunnukset, käyttöavaimet, sovellusvaltuudet — pysähtyy sillä hetkellä kun hakemisto niin sanoo. Se mitä hän tiesi pysyy hänen omanaan: käytöstä poistettu tili säilyttää tietonsa ja jäsenyytensä, ja palaa ehjänä jos ihminen palaa.\n\nKytkennän hoitajalle on hallintapaneelissa käyttöönotto-opas, joka kulkee kirjautumisjärjestelmän konsolin läpi askel askeleelta ja näyttää joka askeleella, mitä tämä palvelu on oikeasti nähnyt — oikean kirjautumisen, hakemiston ensimmäisen yhteydenoton — eikä sitä, mitä on määritetty. Saman työn voi teettää omalla AI:lla: oppaassa on sille valmiit ohjeet, ja operaattorin avustaja voi hallita kytkentöjä suoraan.\n\nJos tilisi on hallinnoitu tällä tavalla, profiilisi turvallisuussivu kertoo sen nyt ja nimeää organisaation."
+      }
+    },
+    {
       "date": "2026-08-22",
       "kind": "fix",
       "title": {
