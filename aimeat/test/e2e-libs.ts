@@ -215,40 +215,6 @@ await test('data.delete — remove entry', async () => {
     assert(data.data.deleted === true, 'should report deleted');
 });
 
-// Micro-memory
-await test('data.micro.add — write micro-memory', async () => {
-    const data = await api(`/v1/mm?op=add&set=testset&key=score&value=100`);
-    assert(data.ok === true, `MM add failed: ${data.error?.message}`);
-});
-
-await test('data.micro.list — list micro-memory set', async () => {
-    const data = await api(`/v1/mm?op=list&set=testset`);
-    assert(data.ok === true, `MM list failed: ${data.error?.message}`);
-    assert(data.data.entries.score === '100', 'score mismatch');
-});
-
-await test('data.micro.mod — modify micro-memory', async () => {
-    const data = await api(`/v1/mm?op=mod&set=testset&key=score&value=200`);
-    assert(data.ok === true, `MM mod failed: ${data.error?.message}`);
-});
-
-await test('data.micro.batch — batch write', async () => {
-    const data = await api(`/v1/mm?op=batch&set=testset&key0=a&value0=1&key1=b&value1=2`);
-    assert(data.ok === true, `MM batch failed: ${data.error?.message}`);
-    assert(data.data.count === 2, `expected 2, got ${data.data.count}`);
-});
-
-await test('data.micro.del — delete micro-memory key', async () => {
-    const data = await api(`/v1/mm?op=del&set=testset&key=a`);
-    assert(data.ok === true, `MM del failed: ${data.error?.message}`);
-});
-
-await test('data.microSets — list all sets', async () => {
-    const data = await api(`/v1/mm?op=list`);
-    assert(data.ok === true, `MM list sets failed: ${data.error?.message}`);
-    assert(data.data.sets.length >= 1, 'should have at least 1 set');
-});
-
 // ═══════════════════════════════════════════════
 // Phase 2: aimeat-storage.js (File Upload/Download)
 // ═══════════════════════════════════════════════
@@ -735,7 +701,6 @@ await test('GET /v1/libs/aimeat-data.js — serves JavaScript', async () => {
     // The lib is componentized (SDK-libs migration): it attaches via _core `attach('data', …)`
     // rather than a literal `AIMEAT.data =`, so assert on stable data-surface markers instead.
     assert(text.includes('getPublic'), 'should expose the memory API (getPublic)');
-    assert(text.includes('micro'), 'should include micro-memory support');
     assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
 });
 

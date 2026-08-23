@@ -174,64 +174,6 @@ await test('Anonymous PRESIGNED mint INSIDE anonymous/* still works end to end',
     assert(result.size === 7, `Expected 7 raw bytes (no base64 inflation), got ${result.size}`);
 });
 
-// ─── Phase 3: Micro-memory without OTK ───
-console.log('\nPhase 3 — Micro-Memory (no OTK)');
-
-const mmSet = `anon-set-${Date.now()}`;
-
-await test('Add micro-memory entry without OTK', async () => {
-    const { status, body } = await json(`/v1/mm?op=add&set=${mmSet}&key=greeting&value=hello`);
-    assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.op === 'add', 'Expected op: add');
-    assert(body.data.key === 'greeting', 'Expected key: greeting');
-});
-
-await test('List micro-memory set without OTK', async () => {
-    const { status, body } = await json(`/v1/mm?op=list&set=${mmSet}`);
-    assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.data.entries.greeting === 'hello', 'Expected greeting=hello');
-});
-
-// `body.data.op` is the REQUEST PARAMETER echoed back, so asserting it proves only that the route
-// parsed the query string. Every mutating op below reads the set back afterwards instead.
-await test('Modify micro-memory entry without OTK — and the new value is stored', async () => {
-    const { status, body } = await json(`/v1/mm?op=mod&set=${mmSet}&key=greeting&value=world`);
-    assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.data.op === 'mod', 'Expected op: mod');
-    const after = await json(`/v1/mm?op=list&set=${mmSet}`);
-    assert(after.body.data.entries.greeting === 'world',
-        `the modified value must be stored, got ${JSON.stringify(after.body.data.entries)}`);
-});
-
-await test('Batch add micro-memory without OTK — and both keys are stored', async () => {
-    const { status, body } = await json(`/v1/mm?op=batch&set=${mmSet}&key0=a&value0=alpha&key1=b&value1=beta`);
-    assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.data.op === 'batch', 'Expected op: batch');
-    assert(body.data.count === 2, 'Expected count 2');
-    const after = await json(`/v1/mm?op=list&set=${mmSet}`);
-    assert(after.body.data.entries.a === 'alpha' && after.body.data.entries.b === 'beta',
-        `both batched keys must be stored, got ${JSON.stringify(after.body.data.entries)}`);
-});
-
-await test('Delete micro-memory entry without OTK — and it is actually gone', async () => {
-    const { status, body } = await json(`/v1/mm?op=del&set=${mmSet}&key=greeting`);
-    assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.data.op === 'del', 'Expected op: del');
-    assert(body.data.deleted === true, `Expected deleted: true, got ${JSON.stringify(body.data.deleted)}`);
-    const after = await json(`/v1/mm?op=list&set=${mmSet}`);
-    assert(after.body.data.entries.greeting === undefined,
-        `the deleted key must be gone from the set, got ${JSON.stringify(after.body.data.entries)}`);
-    // ...and the delete removed only what it was asked to.
-    assert(after.body.data.entries.a === 'alpha' && after.body.data.entries.b === 'beta',
-        `the other keys must survive the delete, got ${JSON.stringify(after.body.data.entries)}`);
-});
-
-await test('List all micro-memory sets without OTK', async () => {
-    const { status, body } = await json('/v1/mm?op=list');
-    assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.data.sets.length > 0, 'Expected at least one set');
-});
-
 // ─── Phase 4: Anonymous Prompts ───
 console.log('\nPhase 4 — Anonymous Prompts');
 
@@ -262,7 +204,6 @@ await test('Get share prompt', async () => {
     assert(body.data.share_prompt.length > 200, 'Expected substantial share prompt');
     assert(body.data.share_prompt.includes(NODE_ID), 'Share prompt should include node ID');
     assert(body.data.share_prompt.includes('/v1/memory'), 'Share prompt should include memory endpoints');
-    assert(body.data.share_prompt.includes('/v1/mm'), 'Share prompt should include micro-memory endpoints');
     assert(body.data.share_prompt.includes('Orient Yourself'), 'Share prompt should include orientation');
     assert(body.data.share_prompt.includes('Session Continuity'), 'Share prompt should include session continuity');
     assert(body.data.share_prompt.includes('handoff.pending'), 'Share prompt should include handoff convention');
@@ -333,8 +274,9 @@ await test('Normal tiers still work', async () => {
     assert(s0 === 200, `Tier 0: Expected 200, got ${s0}`);
     assert(b0.data.tier === '0', 'Expected tier 0');
 
+    // Tier 0.5 (keyed browse / micro-memory) was removed 2026-08-23 — the prompt tier is gone too.
     const { status: s05 } = await json('/v1/prompts/0.5');
-    assert(s05 === 200, `Tier 0.5: Expected 200, got ${s05}`);
+    assert(s05 === 400 || s05 === 404, `Tier 0.5 should be gone, got ${s05}`);
 });
 
 // ─── Phase 5: Co-existence with authenticated mode ───

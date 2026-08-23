@@ -88,16 +88,6 @@ export function consumeOtk(db: Database.Database, key: string, graceMs: number =
   return otk;
 }
 
-export function listOtksBySession(db: Database.Database, sessionId: string): OtkRecord[] {
-  const rows = db.prepare('SELECT * FROM otks WHERE sessionId = ?').all(sessionId) as Record<string, unknown>[];
-  return rows.map(r => deserializeOtk(r));
-}
-
-export function expireSessionOtks(db: Database.Database, sessionId: string): number {
-  const result = db.prepare('DELETE FROM otks WHERE sessionId = ?').run(sessionId);
-  return result.changes;
-}
-
 // ── Sessions ──
 
 export function createSession(db: Database.Database, session: { sessionId: string; gaii: string; owner: string; issuedAt: string; expiresAt: string }): void {

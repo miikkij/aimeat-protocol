@@ -62,11 +62,4 @@ export const otkMethods = {
       return toOtk(u);
     } catch (err) { throw dbError('consumeOtk', err); }
   },
-  async listOtksBySession(this: PostgresKyselyStorage, sessionId: string): Promise<OtkRecord[]> {
-    return (await this.db.selectFrom('Otk').selectAll().where('sessionId', '=', sessionId).execute()).map(toOtk);
-  },
-  async expireSessionOtks(this: PostgresKyselyStorage, sessionId: string): Promise<number> {
-    const r = await this.db.deleteFrom('Otk').where('sessionId', '=', sessionId).executeTakeFirst();
-    return Number(r.numDeletedRows ?? 0);
-  },
 };

@@ -281,7 +281,6 @@ export function bootstrapRouter(
               data: [
                 'memory - persistent JSON key-value store with visibility controls, tags, search, versioning',
                 'storage - binary file upload/download up to 5 GB with chunked upload',
-                'micro-memory - lightweight GET-based key-value for simple use cases',
               ],
               social: [
                 'boards - discussion boards with threads, replies, reactions, webhooks',
@@ -549,7 +548,6 @@ export function bootstrapRouter(
         description: 'The fundamental data layer every agent uses — memory, storage, wallet, actions, and work.',
         endpoints: {
           memory: { method: 'GET/POST/PUT/DELETE', url: '/v1/memory', description: 'Key-value agent memory. Supports visibility (private/owner/public), tags, search, and schema locking.', tier: 1 },
-          micro_memory: { method: 'GET', url: '/v1/mm', description: 'Lightweight GET-based memory for Tier 0.5. Works with OTK or access_code. No registration needed for password-protected sets.', tier: 0.5, help: '/v1/mm/help' },
           storage: { method: 'POST/GET/DELETE', url: '/v1/storage', description: 'Binary file storage (10MB per file, chunked upload for larger files)', tier: 1 },
           wallet: { method: 'GET', url: '/v1/wallet', description: 'Morsel balance, transaction history, and escrow holds', tier: 1 },
           actions: { method: 'CRUD', url: '/v1/actions', description: 'Publish and manage executable actions in the catalogue', tier: 1 },

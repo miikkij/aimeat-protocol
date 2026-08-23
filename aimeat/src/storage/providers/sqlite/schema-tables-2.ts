@@ -341,7 +341,6 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_subs_gaii ON board_subscriptions(gaii);
     CREATE INDEX IF NOT EXISTS idx_otks_sessionId ON otks(sessionId);
     CREATE INDEX IF NOT EXISTS idx_disputes_trackingCode ON disputes(trackingCode);
-    CREATE INDEX IF NOT EXISTS idx_micro_memory_gaii ON micro_memory(gaii);
     CREATE INDEX IF NOT EXISTS idx_storage_files_ownerGaii ON storage_files(ownerGaii);
     CREATE INDEX IF NOT EXISTS idx_ghii_ownerName ON ghiis(ownerName);
     -- idx_ghii_emailHash and idx_ghii_googleSub are created AFTER their safeAddColumn migrations

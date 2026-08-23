@@ -73,7 +73,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         res.json(success(config.nodeId, {
             self: {
                 node_id: config.nodeId,
-                capabilities: ['memory', 'micro_memory', 'actions', 'work', 'wallet', 'boards'],
+                capabilities: ['memory', 'actions', 'work', 'wallet', 'boards'],
             },
             peers: peerList,
             total: peerList.length,

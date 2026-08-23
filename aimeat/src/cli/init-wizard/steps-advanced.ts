@@ -189,35 +189,6 @@ export async function askAllAdvancedSettings(
   );
   if (storFileSize !== '10') settings.AIMEAT_STORAGE_MAX_FILE_SIZE_MB = storFileSize;
 
-  const mmSets = checkCancel(
-    await p.text({
-      message: t('init.microMemoryMaxSets'),
-      defaultValue: String(cfg.microMemoryMaxSetsPerAgent),
-      validate: val => validatePositiveNum(val, t),
-    }),
-    t,
-  );
-  if (mmSets !== '50') settings.AIMEAT_MICRO_MEMORY_MAX_SETS = mmSets;
-
-  const mmKeys = checkCancel(
-    await p.text({
-      message: t('init.microMemoryMaxKeysPerSet'),
-      defaultValue: String(cfg.microMemoryMaxKeysPerSet),
-      validate: val => validatePositiveNum(val, t),
-    }),
-    t,
-  );
-  if (mmKeys !== '100') settings.AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET = mmKeys;
-
-  const mmValueSize = checkCancel(
-    await p.text({
-      message: t('init.microMemoryMaxValueSize'),
-      defaultValue: String(cfg.microMemoryMaxValueSizeBytes),
-      validate: val => validatePositiveNum(val, t),
-    }),
-    t,
-  );
-  if (mmValueSize !== '16384') settings.AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE = mmValueSize;
 
   const maxActions = checkCancel(
     await p.text({

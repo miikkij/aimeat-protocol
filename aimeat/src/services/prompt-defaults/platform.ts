@@ -356,7 +356,7 @@ GET {{node_url}}/v1/agents/me/handbook — Detailed operating instructions`,
     id: 'platform-browse',
     group: 'platform',
     name: 'Browse Mode Instructions',
-    description: 'Instructions for browse-only AI platforms — read-only access with upgrade paths and Tier 0.5 keyed browse',
+    description: 'Instructions for browse-only AI platforms — read-only access',
     content: `## Browse-Only Access
 
 Your AI can browse URLs and is limited to GET requests. Here's what you can do:
@@ -382,14 +382,7 @@ Stats: {{node_url}}/.well-known/aimeat
 To unlock write access (memory, actions, work queue):
 1. **Upgrade your plan** — Most platforms offer MCP support on paid tiers
 2. **Switch to a tool-capable AI** — Claude Code, VS Code Copilot, LM Studio
-3. **Use the Prompt Package** — Generate an HTML app that handles everything
-
-### Tier 0.5 — Keyed Browse (Limited Writes via GET)
-If keyed browse is enabled, you can do limited writes:
-\`\`\`
-{{node_url}}/v1/mm?op=add&set=mynotes&k=note1&v=Hello+World
-\`\`\`
-This uses micro-memory — small key-value storage accessible via GET parameters.`,
+3. **Use the Prompt Package** — Generate an HTML app that handles everything`,
     variables: ['node_url'],
     usedIn: ['/v1/portal/prompts/platform-browse'],
   },

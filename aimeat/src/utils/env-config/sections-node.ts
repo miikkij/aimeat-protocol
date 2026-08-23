@@ -220,12 +220,6 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
       title: 'Features',
       entries: [
         {
-          envVar: 'AIMEAT_KEYED_BROWSE',
-          description: 'Allow browsing with API keys (Tier 0.5)',
-          value: config.keyedBrowseEnabled ? 'true' : 'false',
-          defaultVal: 'true',
-        },
-        {
           envVar: 'AIMEAT_EXTENDED_FEATURES',
           description: 'Enable boards, federation, storage, and validation features',
           value: config.extendedFeaturesEnabled ? 'true' : 'false',
@@ -277,30 +271,6 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
           description: 'Maximum single file upload size (MB)',
           value: String(config.storageMaxFileSizeMb),
           defaultVal: '10',
-        },
-        {
-          envVar: 'AIMEAT_MICRO_MEMORY_QUOTA_KB',
-          description: 'Maximum micro-memory storage per agent (KB)',
-          value: String(config.microMemoryQuotaKb),
-          defaultVal: '500',
-        },
-        {
-          envVar: 'AIMEAT_MICRO_MEMORY_MAX_SETS',
-          description: 'Maximum micro-memory sets per agent',
-          value: String(config.microMemoryMaxSetsPerAgent),
-          defaultVal: '50',
-        },
-        {
-          envVar: 'AIMEAT_MICRO_MEMORY_MAX_KEYS_PER_SET',
-          description: 'Maximum keys per micro-memory set',
-          value: String(config.microMemoryMaxKeysPerSet),
-          defaultVal: '100',
-        },
-        {
-          envVar: 'AIMEAT_MICRO_MEMORY_MAX_VALUE_SIZE',
-          description: 'Maximum micro-memory value size (bytes)',
-          value: String(config.microMemoryMaxValueSizeBytes),
-          defaultVal: '16384',
         },
         {
           envVar: 'AIMEAT_MAX_ACTIONS_PER_AGENT',

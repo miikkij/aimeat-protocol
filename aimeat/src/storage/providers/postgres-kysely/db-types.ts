@@ -1378,16 +1378,6 @@ export interface MessageDeliveryLog {
   targetNodeId: string;
 }
 
-export interface MicroMemory {
-  accessCode: string | null;
-  entries: Json;
-  gaii: string;
-  id: Generated<string>;
-  setName: string;
-  updatedAt: Timestamp;
-  visibility: string;
-}
-
 export interface Msm {
   actionsCount: number;
   authType: string;
@@ -2073,7 +2063,6 @@ export interface DB {
   Memory: Memory;
   MemoryVersion: MemoryVersion;
   MessageDeliveryLog: MessageDeliveryLog;
-  MicroMemory: MicroMemory;
   Msm: Msm;
   NodeKey: NodeKey;
   NotificationPreference: NotificationPreference;

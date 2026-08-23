@@ -231,17 +231,6 @@ export function applySchemaTables1(db: Database.Database): void {
       PRIMARY KEY (disputeId, sequence)
     );
 
-    -- ── Micro Memory ──
-    CREATE TABLE IF NOT EXISTS micro_memory (
-      gaii           TEXT NOT NULL,
-      setName        TEXT NOT NULL,
-      entries        TEXT NOT NULL DEFAULT '{}',
-      visibility     TEXT NOT NULL DEFAULT 'private',
-      accessCode     TEXT,
-      updatedAt      TEXT NOT NULL,
-      PRIMARY KEY (gaii, setName)
-    );
-
     -- ── Storage Files ──
     CREATE TABLE IF NOT EXISTS storage_files (
       ownerGaii      TEXT NOT NULL,

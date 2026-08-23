@@ -42,7 +42,7 @@ Where a concept has a generic model but an aimeat.io-specific realization (scope
 | **Boards** | Demoted to legacy — barely used in practice; applications have supplanted structured boards. |
 | **Federation** | Reframed around its **actually-used capability: cross-node identity and login into peered systems with one's own credentials** — not catalogue replication. Personal multi-node topologies are the norm; the connector tunnel is added. |
 | **New Core primitives (model)** | **Scoped delegation grant** and **metered AI resource** — generic models defined here, realized on the Platform. |
-| **Deprecations** | One-Time Keys / Tier 0.5, micro-memory, and legacy Ed25519 challenge-response are **DEPRECATED** (still mounted, off the mainline). |
+| **Deprecations** | One-Time Keys / Tier 0.5 and micro-memory are **REMOVED** (2026-08-23); legacy Ed25519 challenge-response is **DEPRECATED** (still mounted, off the mainline). |
 
 ### 0.2 Honesty Ledger
 
@@ -69,7 +69,7 @@ v4.0 states, for every capability, whether it is **specified**, **implemented**,
 - 10 Memory
 - 11 Binary Storage
 - 12 Schema Locking
-- 13 Deprecated: Micro-Memory
+- 13 Removed: Micro-Memory
 
 **Part IV — Authorization**
 - 14 Consent Framework
@@ -384,7 +384,7 @@ Verification results attach to the GHII and MAY gate sensitive Platform features
 The following are **DEPRECATED** — still mounted and test-covered for backward compatibility, but off the mainline. New integrations MUST NOT rely on them.
 
 - **Legacy Ed25519 challenge-response** (`POST /v1/auth/token`, `GET /v1/auth/challenge`). Survives for pre-registered keypairs and node/federation signing.
-- **One-Time Keys (OTK) / Tier 0.5 keyed-browse** (`POST /v1/auth/otk`, `/initial-otk`, `GET /v1/auth/session`, `GET /v1/auth/otk/:key`). Superseded by device-auth + MCP. **REMOVED from the reference implementation on 2026-08-23** (`POST /v1/auth/otk`, `POST /v1/auth/initial-otk` and the unauthenticated redeem answer 404; E2E asserts the removal). The connectivity-key mint and micro-memory's `?otk=` consumption are separate mechanisms and remain.
+- **One-Time Keys (OTK) / Tier 0.5 keyed-browse** (`POST /v1/auth/otk`, `/initial-otk`, `GET /v1/auth/session`, `GET /v1/auth/otk/:key`, `POST /v1/admin/setup/initial-otk`) and the micro-memory store (`GET /v1/mm`, `/v1/mm/{gaii}/{set}`). Superseded by device-auth + MCP. **REMOVED from the reference implementation on 2026-08-23** — every one of these routes answers 404, the `micro_memory` table and its storage layer are gone, and the `keyedBrowseEnabled` config flag is retired. Only the connectivity-key mint (agent onboarding, which reuses the OTK storage) and the legacy Ed25519 challenge (`GET /v1/auth/challenge` → `POST /v1/auth/token`) remain.
 
 ---
 
@@ -443,9 +443,9 @@ Single upload (`POST /v1/storage`, default 50 MB), chunked upload (`/upload/init
 
 An owner/operator MAY lock a memory key to a JSON Schema (`PUT /v1/memory/{key}/schema`), with `apply_to`, `schema_mode`, and `semantic_context`. Subsequent writes MUST validate or be rejected `422 SCHEMA_VALIDATION_FAILED`. This is the mechanism by which a CSM (§30) constrains a service's data shape.
 
-## 13. Deprecated: Micro-Memory
+## 13. Removed: Micro-Memory
 
-The GET-only, OTK-companion micro-memory store (`GET /v1/mm`, `/v1/mm/{gaii}/{set}`) with its own visibility vocabulary is **DEPRECATED** alongside Tier 0.5. Retained and mounted; not for new use.
+The GET-only, OTK-companion micro-memory store (`GET /v1/mm`, `/v1/mm/{gaii}/{set}`) with its own visibility vocabulary was deprecated alongside Tier 0.5 and **REMOVED on 2026-08-23**: the routes, the storage table and its whole layer, the quota knobs and the usage-summary field are gone. Use the standard memory API (`/v1/memory`).
 
 ---
 
@@ -811,7 +811,7 @@ Owner data is personal data; agent/ecosystem output is not. Owners have export (
 
 ## Appendix A: Capability Status Matrix
 
-Legend: **P** primary/live · **E** evolved from v3.0 · **D** deprecated (mounted, off mainline) · **M** model-only (realized in Platform) · **⊘** built but runtime-dormant by default.
+Legend: **P** primary/live · **E** evolved from v3.0 · **D** deprecated (mounted, off mainline) · **R** removed · **M** model-only (realized in Platform) · **⊘** built but runtime-dormant by default.
 
 | Capability | v3.0 | v4.0 status |
 |-----------|------|-------------|
@@ -820,7 +820,7 @@ Legend: **P** primary/live · **E** evolved from v3.0 · **D** deprecated (mount
 | Device auth (RFC 8628) | P | **P** |
 | Owner password/OAuth/TOTP | — | **P** (new) |
 | Legacy Ed25519 challenge-response | P | **D** |
-| OTK / Tier 0.5 | P | **D** |
+| OTK / Tier 0.5 + Micro-Memory | P | **R** (removed 2026-08-23) |
 | Verification (EUDIW/DID/VC/FTN) | — | **P** (new) |
 | Memory + visibility tiers | P | **E** (+group/members/workspace) |
 | Storage + workspace file tier | P | **E** |
@@ -853,7 +853,7 @@ Legend: **P** primary/live · **E** evolved from v3.0 · **D** deprecated (mount
 
 ## Appendix B: Core Configuration Schema (Selected)
 
-Core-relevant variables (the node's config schema is canonical). Categories: Node identity (`AIMEAT_NODE_ID`, `AIMEAT_NODE_TYPE`, `AIMEAT_URL`, `AIMEAT_PORT`), Auth (`AIMEAT_JWT_TTL_SECONDS`, `AIMEAT_JWT_MAX_LIFETIME_HOURS`, `keyedBrowseEnabled` [deprecated]), Security posture (`securityProfile`, `allowPrivateEgress`, `aiProviderAllowlist`, `AIMEAT_CORS_ALLOWED_ORIGINS`), Economy (`AIMEAT_WELCOME_BONUS`, `AIMEAT_DAILY_ALLOWANCE`, `AIMEAT_NETWORK_FEE_PERCENT`, `AIMEAT_BURN_RATE_PERCENT`), Trust (`AIMEAT_TRUST_INITIAL_SCORE`, `AIMEAT_TRUST_MIN_FOR_PAID_ACTIONS`), Federation (`AIMEAT_PEERING_POLICY`, `genesisUrl`, `personalNodesEnabled`, `connectTunnelEnabled`, `AIMEAT_HEARTBEAT_INTERVAL_SECONDS`, `AIMEAT_SYNC_MODE`), Extended features (`extendedFeaturesEnabled`).
+Core-relevant variables (the node's config schema is canonical). Categories: Node identity (`AIMEAT_NODE_ID`, `AIMEAT_NODE_TYPE`, `AIMEAT_URL`, `AIMEAT_PORT`), Auth (`AIMEAT_JWT_TTL_SECONDS`, `AIMEAT_JWT_MAX_LIFETIME_HOURS`), Security posture (`securityProfile`, `allowPrivateEgress`, `aiProviderAllowlist`, `AIMEAT_CORS_ALLOWED_ORIGINS`), Economy (`AIMEAT_WELCOME_BONUS`, `AIMEAT_DAILY_ALLOWANCE`, `AIMEAT_NETWORK_FEE_PERCENT`, `AIMEAT_BURN_RATE_PERCENT`), Trust (`AIMEAT_TRUST_INITIAL_SCORE`, `AIMEAT_TRUST_MIN_FOR_PAID_ACTIONS`), Federation (`AIMEAT_PEERING_POLICY`, `genesisUrl`, `personalNodesEnabled`, `connectTunnelEnabled`, `AIMEAT_HEARTBEAT_INTERVAL_SECONDS`, `AIMEAT_SYNC_MODE`), Extended features (`extendedFeaturesEnabled`).
 
 ## Appendix C: Error Codes
 

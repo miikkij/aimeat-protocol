@@ -178,7 +178,7 @@ export function AgentsCard({ owner, initialAgents }) {
   `;
 }
 
-/* "Usage" — quota usage bars (memory / storage / micro-memory) + resource counts. Backed by the
+/* "Usage" — quota usage bars (memory / storage) + resource counts. Backed by the
  * cached GET /v1/owner/usage endpoint (60s server-side TTL), so it's cheap to refetch on each
  * live-update. Surfaces the same kind of quota bar the Memory tab shows, for the whole account. */
 
@@ -270,8 +270,6 @@ export function UsageCard({ switchTab, initialUsage }) {
         `${u.memory.used_keys}/${u.memory.max_keys} ${t('profile.memory.keysWord') || 'keys'} · ${fmtBytes(u.memory.used_bytes)} / ${fmtBytes(u.memory.max_bytes)}`)}
       ${bar(t('profile.landing.usageStorage') || 'Files', u.storage,
         `${u.storage.used_files} ${t('profile.landing.usageFilesWord') || 'files'} · ${fmtBytes(u.storage.used_bytes)} / ${fmtBytes(u.storage.max_bytes)}`)}
-      ${bar(t('profile.landing.usageMicro') || 'Micro-memory', u.micro_memory,
-        `${u.micro_memory.used_sets}/${u.micro_memory.max_sets} ${t('profile.landing.usageSetsWord') || 'sets'} · ${fmtBytes(u.micro_memory.used_bytes)} / ${fmtBytes(u.micro_memory.max_bytes)}`)}
       ${aiLine(u.ai)}
       <div class="pf-usage-chips">
         ${chip(t('profile.landing.usageAgents') || 'Agents', c.agents, 'agents')}
