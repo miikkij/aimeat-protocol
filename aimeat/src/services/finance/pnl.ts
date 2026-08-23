@@ -47,7 +47,7 @@ function monthEnd(month: string): string {
   return `${month}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0')}`;
 }
 
-export async function pnlReport(storage: Storage, ownerGhii: string, fromMonth: string, toMonth: string): Promise<PnlReport> {
+export async function pnlReport(storage: Storage, ownerGhii: string, fromMonth: string, toMonth: string, organismId?: string): Promise<PnlReport> {
   if (!MONTH_RE.test(fromMonth) || !MONTH_RE.test(toMonth)) {
     throw new FinanceError('INVALID_PERIOD', 400, 'from and to must be months (yyyy-mm)');
   }
@@ -55,7 +55,9 @@ export async function pnlReport(storage: Storage, ownerGhii: string, fromMonth: 
   const from = `${fromMonth}-01`;
   const to = monthEnd(toMonth);
 
-  const vouchers = await storage.listVouchers({ ownerGhii, from, to, limit: 10000 });
+  // organismId narrows this to ONE company's books. Absent means every book this owner has, which
+  // is what a whole-account P&L was and still is.
+  const vouchers = await storage.listVouchers({ ownerGhii, organismId, from, to, limit: 10000 });
   const income = new Map<VoucherSource, PnlLine>();
   const expenses = new Map<VoucherSource, PnlLine>();
   let transferCount = 0;

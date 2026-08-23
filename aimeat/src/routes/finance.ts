@@ -33,6 +33,7 @@ import { buildFinvoiceXml } from '../services/finance/finvoice.js';
 import { renderInvoicePdf } from '../services/finance/invoice-pdf.js';
 import { submitInvoice, refreshDeliveryStatus } from '../services/finance/finvoice-operator.js';
 import { resolveFinanceOwner } from '../services/finance/accountant-access.js';
+import { resolveCompanyScope } from '../services/finance/company-scope.js';
 import { requireOwnCompany, CompanyError } from '../services/company/company-service.js';
 
 const PartySchema = z.object({
@@ -171,7 +172,9 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
       const type = (['invoice', 'credit_note'] as const).find((t) => t === req.query.type);
       const from = typeof req.query.from === 'string' ? req.query.from : undefined;
       const to = typeof req.query.to === 'string' ? req.query.to : undefined;
-      const query = { ownerGhii: owner, status, type, from, to };
+      const query = {
+        ownerGhii: owner, organismId: await resolveCompanyScope(storage, owner, req.query.company), status, type, from, to,
+      };
       const [rows, total] = await Promise.all([
         storage.listInvoices({ ...query, limit: perPage, offset: (page - 1) * perPage }),
         storage.countInvoices(query),

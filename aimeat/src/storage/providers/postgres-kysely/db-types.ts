@@ -635,6 +635,8 @@ export interface OutboundMessage {
   id: string;
   invoiceId: string | null;
   kind: string;
+  /** Which company sent it, as its organism. Null before 0049 and for owners with one company. */
+  organismId: string | null;
   ownerGhii: string;
   status: string;
   subject: string;

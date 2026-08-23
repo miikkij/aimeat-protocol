@@ -48,6 +48,7 @@ function toMessage(r: Selectable<MessageRow>): OutboundMessageRecord {
   return {
     id: r.id,
     ownerGhii: r.ownerGhii,
+    organismId: r.organismId ?? null,
     contactId: r.contactId,
     channel: r.channel as OutboundChannel,
     kind: r.kind as OutboundKind,
@@ -143,7 +144,7 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
 
   async createOutboundMessage(this: PostgresKyselyStorage, row: OutboundMessageRecord): Promise<void> {
     await this.db.insertInto('OutboundMessage').values({
-      id: row.id, ownerGhii: row.ownerGhii, contactId: row.contactId,
+      id: row.id, ownerGhii: row.ownerGhii, organismId: row.organismId ?? null, contactId: row.contactId,
       channel: row.channel, kind: row.kind, subject: row.subject,
       templateId: row.templateId, status: row.status, error: row.error,
       invoiceId: row.invoiceId, createdAt: row.createdAt,
@@ -171,13 +172,19 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
     return Number(r?.n ?? 0);
   },
 
-  async countOutboundMessagesSince(this: PostgresKyselyStorage, ownerGhii: string, sinceIso: string): Promise<number> {
-    const r = await this.db.selectFrom('OutboundMessage')
+  async countOutboundMessagesSince(this: PostgresKyselyStorage, ownerGhii: string, sinceIso: string, organismId?: string | null): Promise<number> {
+    // organismId undefined counts every send this owner made, which is what the cap has always
+    // been. Passed, it counts one company's — so two companies do not share one allowance and one
+    // busy company cannot silence the other.
+    let q = this.db.selectFrom('OutboundMessage')
       .select(sql<number>`count(*)`.as('n'))
       .where('ownerGhii', '=', ownerGhii)
       .where('status', '=', 'sent')
-      .where('createdAt', '>=', sinceIso)
-      .executeTakeFirst();
+      .where('createdAt', '>=', sinceIso);
+    if (organismId !== undefined) {
+      q = organismId === null ? q.where('organismId', 'is', null) : q.where('organismId', '=', organismId);
+    }
+    const r = await q.executeTakeFirst();
     return Number(r?.n ?? 0);
   },
 };

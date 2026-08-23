@@ -22,6 +22,14 @@
  *   credit notes · lazy overdue
  * @usage const svc = financeInvoiceService(storage); await svc.send(ownerGhii, id, ...);
  * @version-history
+ *   v1.1.0 — 2026-08-23 — A fiscal year belongs to ONE set of books, and the invoice number a
+ *     company shows is its own (TARGET-072). fiscalYearForDate took organismId and used it only
+ *     when creating a year, so a second company's booking found the first company's year for the
+ *     same dates and inherited its lock. And the displayed number now comes from a per-company
+ *     counter while numberSeq and the payment reference stay owner-level: the law wants gapless
+ *     numbering per kirjanpitovelvollinen, and the reference is what the payment webhook matches
+ *     on, so restarting it per company would mark the wrong customer paid. Voucher numbering was
+ *     already keyed per fiscal year and becomes per-company for free.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 1.
  */
 import { randomUUID } from 'node:crypto';
@@ -105,7 +113,16 @@ async function computeLines(storage: Storage, lines: LineInput[], rateDate: stri
  */
 export async function fiscalYearForDate(storage: Storage, ownerGhii: string, isoDate: string, organismId: string | null): Promise<FiscalYearRecord> {
   const years = await storage.listFiscalYears(ownerGhii);
-  const hit = years.find((y) => y.startDate <= isoDate && isoDate <= y.endDate);
+  // A FISCAL YEAR BELONGS TO ONE SET OF BOOKS. This function has taken organismId since the day it
+  // was written and used it only when CREATING a year; the lookup matched on dates alone. So a
+  // second company's booking found the FIRST company's year for the same dates and inherited its
+  // lock: close one company's books and the other company could no longer invoice, with an error
+  // naming a year that is not theirs. Nobody met it because organismId was null on every company
+  // until the company brain started writing it.
+  //
+  // Records made before this are `organismId: null` and keep matching each other, so an owner who
+  // never split their companies sees no change at all.
+  const hit = years.find((y) => (y.organismId ?? null) === organismId && y.startDate <= isoDate && isoDate <= y.endDate);
   if (hit) return hit;
   const now = new Date().toISOString();
   const year = isoDate.slice(0, 4);
@@ -226,8 +243,24 @@ export async function send(storage: Storage, ownerGhii: string, id: string, deli
     updatedAt: new Date().toISOString(),
   });
 
+  // TWO NUMBERS, AND THEY ANSWER DIFFERENT QUESTIONS.
+  //
+  // `numberSeq` stays OWNER-level and never restarts. The payment reference is derived from it and
+  // nothing else, and findInvoiceByReference is how the payment webhook decides which invoice was
+  // just paid — so two companies whose numbering both restarted at 1 would mint the same viite and
+  // the wrong customer would be marked paid. It also carries the unique index
+  // (ownerGhii, numberSeq), which a restart would collide on.
+  //
+  // `invoiceNumber` is what the law is actually about: gapless numbering per kirjanpitovelvollinen,
+  // which is the COMPANY. So the displayed number comes from a per-company counter. The counter
+  // table is keyed (ownerGhii, kind) and kind is free text, so this needs no column and no
+  // migration, and it is atomic by the same INSERT ... ON CONFLICT statement as every other
+  // counter. An owner with no company keeps the owner-level series exactly as before.
   const numberSeq = await storage.nextFinanceCounter(ownerGhii, 'invoice');
-  const invoiceNumber = `${invoiceDate.slice(0, 4)}-${numberSeq}`;
+  const displaySeq = inv.organismId
+    ? await storage.nextFinanceCounter(ownerGhii, `invoice:${inv.organismId}`)
+    : numberSeq;
+  const invoiceNumber = `${invoiceDate.slice(0, 4)}-${displaySeq}`;
   // Base '1' + zero-padded seq keeps the viite free of leading zeros and unique per seller.
   const base = `1${String(numberSeq).padStart(6, '0')}`;
   const referenceNumber = referenceStyle === 'rf' ? rfReference(base) : finnishReference(base);

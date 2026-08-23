@@ -30,6 +30,7 @@ import { buildFinvoiceXml } from '../services/finance/finvoice.js';
 import {
   resolveFinanceOwner, grantAccountant, revokeAccountant, listAccountants, listClients,
 } from '../services/finance/accountant-access.js';
+import { resolveCompanyScope } from '../services/finance/company-scope.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -106,6 +107,7 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
       const perPage = Math.min(200, Math.max(1, parseInt((req.query.per_page as string) ?? '50', 10) || 50));
       const q = {
         ownerGhii: owner,
+        organismId: await resolveCompanyScope(storage, owner, req.query.company),
         fiscalYearId: typeof req.query.fiscal_year_id === 'string' ? req.query.fiscal_year_id : undefined,
         source: ['stripe', 'checkout', 'invoice', 'receipt', 'manual', 'morsel'].includes(req.query.source as string)
           ? req.query.source as 'stripe' | 'checkout' | 'invoice' | 'receipt' | 'manual' | 'morsel' : undefined,
@@ -193,8 +195,12 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
 
   router.get('/v1/finance/fiscal-years', requireAuth(), requireScope('finance:read'), async (req, res) => {
     try {
-      const years = await storage.listFiscalYears(await resolveFinanceOwner(config, storage, req));
-      res.json(success(config.nodeId, { fiscal_years: years }));
+      const fyOwner = await resolveFinanceOwner(config, storage, req);
+      const scope = await resolveCompanyScope(storage, fyOwner, req.query.company);
+      const years = await storage.listFiscalYears(fyOwner);
+      res.json(success(config.nodeId, {
+        fiscal_years: scope ? years.filter((y) => (y.organismId ?? null) === scope) : years,
+      }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }
@@ -265,7 +271,8 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
         res.status(400).json(error(config.nodeId, 'INVALID_PERIOD', 'from (yyyy-mm) is required'));
         return;
       }
-      const report = await vatPeriodReport(storage, await resolveFinanceOwner(config, storage, req), from, to);
+      const vatOwner = await resolveFinanceOwner(config, storage, req);
+      const report = await vatPeriodReport(storage, vatOwner, from, to, await resolveCompanyScope(storage, vatOwner, req.query.company));
       res.json(success(config.nodeId, { report }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
@@ -282,7 +289,8 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
         res.status(400).json(error(config.nodeId, 'INVALID_PERIOD', 'from (yyyy-mm) is required'));
         return;
       }
-      const report = await pnlReport(storage, await resolveFinanceOwner(config, storage, req), from, to);
+      const pnlOwner = await resolveFinanceOwner(config, storage, req);
+      const report = await pnlReport(storage, pnlOwner, from, to, await resolveCompanyScope(storage, pnlOwner, req.query.company));
       res.json(success(config.nodeId, { report }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
@@ -296,7 +304,9 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
       const owner = await resolveFinanceOwner(config, storage, req);
       const from = typeof req.query.from === 'string' ? req.query.from : undefined;
       const to = typeof req.query.to === 'string' ? req.query.to : undefined;
-      const vouchers = await storage.listVouchers({ ownerGhii: owner, from, to, limit: 10000 });
+      const vouchers = await storage.listVouchers({
+        ownerGhii: owner, organismId: await resolveCompanyScope(storage, owner, req.query.company), from, to, limit: 10000,
+      });
       vouchers.sort((a, b) => a.voucherNumber - b.voucherNumber);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="tositteet.csv"');
@@ -311,7 +321,9 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
       const owner = await resolveFinanceOwner(config, storage, req);
       const from = typeof req.query.from === 'string' ? req.query.from : undefined;
       const to = typeof req.query.to === 'string' ? req.query.to : undefined;
-      const invoices = await storage.listInvoices({ ownerGhii: owner, from, to, limit: 10000 });
+      const invoices = await storage.listInvoices({
+        ownerGhii: owner, organismId: await resolveCompanyScope(storage, owner, req.query.company), from, to, limit: 10000,
+      });
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.setHeader('Content-Disposition', 'attachment; filename="laskut.csv"');
       res.send(invoicesCsv(invoices));
@@ -327,7 +339,8 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
       const from = typeof req.query.from === 'string' ? req.query.from : undefined;
       const to = typeof req.query.to === 'string' ? req.query.to : undefined;
       const invoices = await storage.listInvoices({
-        ownerGhii: owner, from, to, status: ['sent', 'paid', 'overdue', 'credited'], limit: 10000,
+        ownerGhii: owner, organismId: await resolveCompanyScope(storage, owner, req.query.company),
+        from, to, status: ['sent', 'paid', 'overdue', 'credited'], limit: 10000,
       });
       const entries = [];
       for (const inv of invoices) {
