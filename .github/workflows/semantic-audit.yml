@@ -47,6 +47,33 @@ jobs:
           sarif_file: semantic-audit.sarif
           category: semantic-audit
 
+  # The deeper interprocedural taint pass: Semgrep follows a value through assignments and across
+  # functions, which ast-grep cannot. Runs here on Linux because the developer machine is Windows
+  # (Semgrep needs WSL/Docker there, which this project does not use). Advisory, same as ast-grep.
+  semgrep-taint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Semgrep
+        run: pip install semgrep
+
+      - name: Run taint rules
+        continue-on-error: true
+        run: >
+          semgrep scan --config security/semantic-audit/semgrep
+          --sarif --output semgrep-taint.sarif aimeat/src
+
+      - name: Upload results to code scanning
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep-taint.sarif
+          category: semgrep-taint
+
   # The existing audit-gate ratchets and MCP surface-parity checks already gate ci.yml; this job
   # mirrors their state onto the same Security tab so every audit signal shares one pane. Advisory.
   audit-gates:

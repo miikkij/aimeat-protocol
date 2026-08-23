@@ -14,11 +14,13 @@ otherwise.
   intra-procedural: it matches a pattern and its surroundings, but does not follow a value through a
   variable across statements.
 - **Semgrep** (`semgrep/*.yml`) — true interprocedural taint (follows a value through assignments and
-  across functions). Stronger for the resolve-identity check; run it on a Linux runner when you want
-  the deeper pass. Not wired into CI yet.
+  across functions). Stronger for the resolve-identity check. Runs in CI on a Linux runner
+  (`semgrep-taint` job), SARIF category `semgrep-taint`.
 
 CI runs the ast-grep rules and uploads the SARIF to GitHub code scanning, so every finding is a
 tracked alert on the Security tab with a history — see `.github/workflows/semantic-audit.yml`.
+GitHub's CodeQL default setup is also enabled on the repo (2026-08-23), so the generic JS/TS query
+suite (injection, prototype pollution, ReDoS, …) lands on the same Security tab beside these rules.
 
 ```bash
 # Everything, locally (what CI runs):
@@ -93,6 +95,36 @@ First run over `src/routes`: 22 findings across the four rules.
 No confirmed live defect from the resolve-identity pass — the cross-owner boundary is handled
 correctly today. The owner-name and permission-word hits are review candidates, not automatic
 defects; that is what the rules are for.
+
+## AI triage and the triage store
+
+The rules over-report by design, so every finding gets triaged exactly once instead of re-read on
+every run. `pnpm audit:triage` (aimeat/) runs `claude -p` headless (read-only tools, opus by
+default, override with `AIMEAT_TRIAGE_MODEL`; binary resolved from `AIMEAT_CLAUDE_BIN`, PATH, or
+the newest Claude Code editor extension):
+
+1. **Finding triage** — each unacknowledged ast-grep finding is classified with its surrounding
+   code: `legit` (a known-safe pattern, with a one-sentence reason) or `confirm` (a human must
+   look). Verdicts land in `triage-store.json` (committed), keyed by a fingerprint of
+   rule + file + matched text — so an acknowledgment survives line drift but dies the moment the
+   matched code itself changes.
+2. **Non-static invariant review** — the git diff since `lastInvariantReviewCommit` is reviewed
+   against invariants 5, 13, 14 and 16 (the ones the table below marks as not statically
+   checkable). Concerns are stored as open `invariantFindings` and stay in the report until a
+   human closes them in the store.
+
+`pnpm audit:report` renders the store: acknowledged findings collapse with their reasons, and only
+unacknowledged or human-pending items count as "katsottavaa". A human resolves a `confirm` entry by
+fixing the code or editing the entry (`verdict: "legit"`, `decidedBy: "human"`, reason).
+`pnpm audit:full` = triage + report.
+
+## Dependencies and secrets in the same report
+
+The report also runs `pnpm audit --json` (known CVEs in the dependency tree; high/critical turn the
+verdict orange) and a full-git-history secret scan with gitleaks (`secrets-scan.mjs`: pinned
+version, auto-downloaded once into `secaudit/.tools/`, matches always redacted). A finding a human
+has reviewed and accepted is suppressed via `gitleaks-baseline.json` next to this file; anything
+outside the baseline turns the verdict red.
 
 ## Adding an invariant
 
