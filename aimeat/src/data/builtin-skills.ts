@@ -11,6 +11,11 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.10.0 -- 2026-08-23 -- hatchery-agent-requests (public). aimeat_schedule_create and
+ *     aimeat_extension_install have both told the reader to load `node:hatchery-agent-requests`
+ *     BEFORE building since July, and the skill did not exist: every agent that obeyed got
+ *     NOT_FOUND and then built the thing the instruction was written to prevent. Seeding is
+ *     create-if-missing, so an existing node needs an operator republish to pick it up.
  *   v1.9.0 -- 2026-08-11 -- aimeat-app-builder gains the spec token (carry it on publish, read
  *     `spec_check`) and what the publish now REFUSES (unparseable inline script, 404 asset URL)
  *     versus what it merely reports as `app_hints`. Seeding is create-if-missing, so an existing
@@ -38,6 +43,7 @@
  */
 
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
+import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -49,6 +55,7 @@ export interface BuiltinSkill {
 
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
+  HATCHERY_SKILL_ENTRY,
   {
     name: 'aimeat-node-guide',
     visibility: 'public',
