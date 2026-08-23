@@ -8,6 +8,13 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.7.0 — 2026-08-23 — Publishing consumes EVERY copy of the draft, not only the freshest one.
+ *     A draft is stored under whoever wrote it, so a record an agent proposed and its owner then
+ *     approved had two: the agent's under its GAII and the owner's under the GHII. Publishing
+ *     deleted one, the other survived, and a workspace read renders `draft || latest` — so the
+ *     record went on showing the PRE-DECISION value with an undecided badge for good. That is the
+ *     documented agent pattern breaking: an agent writes drafts, the owner reviews and publishes,
+ *     and the queue never empties. `.latest` already collapsed its forked copies; drafts did not.
  *   v1.6.0 — 2026-07-18 — collectWsRecords: the share-agnostic published-records collector; the public
  *     collector becomes a share-filter over it, and the new authenticated member-records route reads
  *     through it gated by canReadWs (one collection code path, two authz gates — no drift).
@@ -149,6 +156,24 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   // Schema-validated (the draft must be a valid object). Returns the new version number.
   // TARGET-009 S1: expectedVersion carries the publisher's optimistic lock into the write guards
   // (a namespace with requires_expected_version refuses a publish over a version it didn't read).
+  /**
+   * EVERY copy of this record's draft, across all the identities that may hold one.
+   *
+   * A workspace record can have a draft under more than one same-owner identity, because a draft is
+   * stored under whoever WROTE it: an agent writing into its owner's workspace stores the draft
+   * under its own GAII, and the owner reviewing it in an app stores theirs under the owner GHII.
+   * Publishing picked the freshest and consumed only that one, so the other survived — and since a
+   * workspace read renders `draft || latest`, the record went on showing the PRE-DECISION value
+   * with an undecided draft badge for good.
+   *
+   * That is the documented agent pattern breaking: an agent writes drafts, the owner reviews and
+   * publishes, and the queue never empties. Found on 2026-08-23 by promoting a research finding in
+   * the company brain and watching it stay in the queue with the fact already written.
+   * `.latest` already collapses its forked copies the same way (see the batch path); drafts did not.
+   */
+  const draftCopies = (items: MemoryRecord[], base: string): MemoryRecord[] =>
+    items.filter(r => r.key === `${base}.draft`);
+
   const publishDraft = async (
     organismId: string, ws: string | undefined, namespace: string, instance: string, publisher: string,
     expectedVersion?: number | null,
@@ -180,7 +205,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // cycle) must NOT append a byte-identical .version.N. Consume the draft and return without touching
     // .latest or firing the Tracked-Response side effect.
     if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
-      await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
+      for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
       return { ok: true, version: maxN, skipped: true };
     }
     // Honour the manifest's `versioned` flag (default true): a `versioned:false` space (e.g. a request
@@ -232,8 +257,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     emitMemoryWritten(latestOwner, `${base}.latest`);
     // Consume the draft — it was the proposal-for-publishing; now it's a frozen version + the new
     // .latest. Re-editing the published instance starts a fresh draft. (Without this the workspace
-    // shows a stale draft alongside the identical published copy.)
-    await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
+    // shows a stale draft alongside the identical published copy.) EVERY copy: see draftCopies.
+    for (const d of draftCopies(items, base)) await storage.deleteMemory(d.ownerGaii, `${base}.draft`);
     return { ok: true, version: n };
   };
 
@@ -310,7 +335,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       // Change-guard: an unchanged re-publish just consumes the draft (no new version/latest, no side
       // effect). Runs FIRST — a byte-identical write is never a guard conflict (mirrors checkWriteGuard).
       if (existingLatest && JSON.stringify(existingLatest.value) === JSON.stringify(draftValue)) {
-        if (!direct) toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });
+        if (!direct) for (const d of draftCopies(items, base)) toDelete.push({ ownerGaii: d.ownerGaii, key: `${base}.draft` });
         results.push({ instance, ok: true, version: maxN, skipped: true });
         continue;
       }
@@ -350,7 +375,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       toUpsert.push({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, visibility: vis, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
       // Collapse: any pre-existing .latest copy under a DIFFERENT owner is removed (single-owner key).
       for (const r of items) if (r.key === `${base}.latest` && r.ownerGaii !== latestOwner) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
-      if (!direct) toDelete.push({ ownerGaii: draft.ownerGaii, key: `${base}.draft` });   // consume the draft (none for a direct import)
+      // Consume the draft (none for a direct import) — EVERY copy of it, see draftCopies.
+      if (!direct) for (const d of draftCopies(items, base)) toDelete.push({ ownerGaii: d.ownerGaii, key: `${base}.draft` });
       toEmit.push({ owner: latestOwner, key: `${base}.latest` });
       results.push({ instance, ok: true, version: n });
     }
