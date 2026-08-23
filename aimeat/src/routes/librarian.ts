@@ -55,8 +55,11 @@ export function librarianRouter(config: AimeatConfig, storage: Storage): Router 
     if (roles.includes('owner') && !roles.includes('agent') && !roles.includes('ecosystem')) return true;
     const scopes = (req.auth as { scopes?: string[] } | undefined)?.scopes ?? [];
     if (scopes.includes('ai:use') || scopes.includes('*')) return true;
+    // The human sentence stays jargon-free; the machine-readable scope word rides in `details` so an
+    // agent reads exactly which permission to ask its owner for without the person meeting "ai:use".
     res.status(403).json(error(config.nodeId, 'FORBIDDEN',
-      'Sign in, or give your assistant permission to use AI on your behalf in Profile → Agents.'));
+      'Sign in, or give your assistant permission to use AI on your behalf in Profile → Agents.',
+      undefined, { required_scope: 'ai:use' }));
     return false;
   }
 
