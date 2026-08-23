@@ -65,6 +65,37 @@ function sortByDependencies(
   return order;
 }
 
+// ── Helper: the name an installed component is registered under ───────
+
+/**
+ * `{packageName}-{owner}-{shortId}-{componentId}`, plus `.html` when the component is an app and
+ * its id does not already carry it.
+ *
+ * AN APP COMPONENT'S ID IS ITS FILENAME. Nothing between here and storage adds a suffix: the
+ * registrar writes `filename: registeredAs` verbatim. But two other places decide "is this an app"
+ * by looking for `.html` on that filename — the publish-time subdomain provisioning
+ * (`services/app-publish.ts`) and the app-host path form (`routes/subdomains.ts`) — so a component
+ * named `app-admin` installs an app that skips both: no subdomain until something opens it through
+ * the apex, and a 404 on the shared path form, which is exactly the address a listing hands out for
+ * an app that has no subdomain yet. `app-publish.ts` records that this same symptom "reads as a
+ * broken app rather than a missing mapping", and it had already been fixed once for ordinary apps.
+ *
+ * Appending here rather than asking package authors to remember: it repairs every package at once,
+ * it cannot be forgotten, and it is idempotent, so a package that already writes `app-shop.html`
+ * passes through untouched. The COMPONENT ID does not move — dependencies and migration prompts
+ * address components by id — and `ensureAppSubdomain` strips the suffix before building a label, so
+ * no subdomain changes either.
+ *
+ * Only NEW installs. An app already installed under a bare filename keeps it.
+ */
+function registeredNameFor(
+  packageName: string, owner: string, shortId: string,
+  comp: { id: string; type: PackageComponentType },
+): string {
+  const base = `${packageName}-${owner}-${shortId}-${comp.id}`;
+  return comp.type === 'app' && !/\.html?$/i.test(base) ? `${base}.html` : base;
+}
+
 // ── Register install route ────────────────────────────────────────────
 
 export function registerInstallRoutes(
@@ -135,7 +166,7 @@ export function registerInstallRoutes(
       return {
         componentId: comp.id,
         type: comp.type,
-        registeredAs: `${pkg!.name}-${owner}-${shortId}-${comp.id}`,
+        registeredAs: registeredNameFor(pkg!.name, owner, shortId, comp),
         originalHash: comp.contentHash,
         customized: false,
       };
