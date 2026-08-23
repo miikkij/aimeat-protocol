@@ -293,8 +293,6 @@
       "howStep3": "Then answer the questions on each entry. They decide the risk class, and no machine can answer them: whether something decides a matter about a person, or publishes on a subject of public interest, is a judgement. An unanswered question leaves the entry with no class, and the entry stays in the list at the top until you answer.",
       "howMonthly": "A report saves itself once a month, on the first day of the following month, and past months are kept. If you want one now, run it from the Scheduler tab, the job called Monthly Compliance Report.",
       "howAgent": "Nothing needs installing or switching on. The questions are ready, and nothing is saved until you press Save.",
-      "proposalsNote": "These have been used here and are written down nowhere. The models and apps are filled in from what actually ran; you answer the questions.",
-      "proposalAdd": "Add",
       "limit": {
         "no-record": "These counts describe content a provenance record exists for. Content with NO record is unstated and does not appear here: an absent record is not evidence that a person wrote something.",
         "this-node-only": "Only what runs here. Anything published on a partner installation, on somebody's own personal one, or anywhere else, is outside every number on this page.",
@@ -310,7 +308,15 @@
         "owner-register-is-the-operators": "The record of what AI is used for is kept by whoever runs this installation, not by you. Below are the entries that name your account. If something of yours is missing, that is a conversation with them rather than something you can fix here.",
         "owner-provenance-off": "Recording is switched off on this installation, which is not your setting. Nothing was recorded, so every number above is zero for that reason and not because you did nothing."
       },
-      "howIntro": "This page compares two things: what has actually been done with AI here, and what has been written down about it. The difference appears at the top under \"Needs a look\", and it is what an audit asks about."
+      "howIntro": "This page compares two things: what has actually been done with AI here, and what has been written down about it. The difference appears at the top under \"Needs a look\", and it is what an audit asks about.",
+      "draftAction": "Fill these in for me",
+      "drafting": "Working…",
+      "draftNote": "AI has been run here and that is already known. Press below and the entries are composed by which agent or app called each model, the titles and descriptions come from what you wrote about those agents yourself, and the questions that can be answered from the record are answered for you. Nothing is saved until you press Save.",
+      "draftLoaded": "Composed {entries} entries, {answered} answers from the record. Look them over and save.",
+      "draftFailed": "The draft could not be composed.",
+      "answerFromEvidence": "from the record",
+      "answerFromAi": "AI draft",
+      "answerFromHuman": "your answer"
     }
   },
   "admin.messages.desc": "Delivery telemetry for user-to-user messages. No message content or participant identities are shown.",

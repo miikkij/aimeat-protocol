@@ -11044,6 +11044,45 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
 
+  /v1/admin/compliance/draft:
+    get:
+      operationId: getComplianceDraft
+      summary: The node's own first draft of the register, composed from what actually ran
+      tags: [Compliance, Admin]
+      description: >
+        Node operator only (`compliance:read`). Stored nowhere: this composes a proposed register out
+        of the activity already recorded, so an operator opening the surface for the first time is
+        handed something to review rather than an empty form.
+
+        Grouped by which agent or app called each model, NOT by the model - twelve models on a real
+        installation are however many things called them, and a model id is not a use of AI. Each
+        entry's title, description and systems are the ones whoever created that agent wrote.
+
+        Two questions are answered from the record and marked `evidence` in `answerSources`: whether
+        the principal has any provenance record at all, and whether a person was ever recorded
+        reviewing its output. Every other answer is left empty rather than guessed. An answer that
+        reads as considered when nobody considered it is the failure this whole surface exists to
+        prevent, so filling those is a person's job, or a model's working for them, and the register
+        records which.
+
+        Response `data`: `{ usecases, counts: { entries, answeredFromEvidence, leftToAnswer }, notes }`.
+        Save it with PUT /v1/admin/compliance/usecases.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since_days
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 3650, default: 30 }
+          description: How far back to look for activity.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /v1/admin/compliance/usecases:
     get:
       operationId: getComplianceUseCases
@@ -11073,8 +11112,19 @@ paths:
         Node operator only, and `compliance:write` specifically - an agent holding `compliance:read`
         is refused here. Replaces the whole register: send every use case you want to keep, because
         what you send is what remains.
+
+        `?dry_run=true` validates and returns what WOULD be stored without storing it, so a caller
+        can show somebody the result and let them approve it before the real write. The preview runs
+        after validation, so what it shows is what would actually land, and it names any answer with
+        no recorded source.
       security:
         - BearerAuth: []
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          schema: { type: boolean }
+          description: Return what would be stored, storing nothing.
       requestBody:
         required: true
         content:
@@ -11116,6 +11166,14 @@ paths:
                         description: >
                           questionId to answer. A question left unanswered leaves the use case
                           unclassified and puts it in the report's gap list - never the mildest class.
+                      answerSources:
+                        type: object
+                        additionalProperties: { type: string, enum: [human, ai, evidence] }
+                        description: >
+                          questionId to who produced that answer. An auditor's question is which of
+                          the three, and a register that could not tell them apart would answer it
+                          wrongly by omission - the confident-sounding ones would all read as
+                          considered. Absent reads as unknown, never as human.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

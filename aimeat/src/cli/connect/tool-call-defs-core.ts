@@ -31,12 +31,13 @@ import type { ApiResponse } from './api-client.js';
  * the caller would read the resulting 404 as "the report is empty" rather than "you asked for
  * something that is not a thing".
  */
-function compliancePart(input: JsonObject): 'usecases' | 'questionnaire' {
+function compliancePart(input: JsonObject, allowDraft = false): 'draft' | 'usecases' | 'questionnaire' {
     const part = requiredString(input, 'part');
-    if (part !== 'usecases' && part !== 'questionnaire') {
-        throw new Error(`part has to be "usecases" or "questionnaire", not "${part}"`);
+    const allowed = allowDraft ? ['draft', 'usecases', 'questionnaire'] : ['usecases', 'questionnaire'];
+    if (!allowed.includes(part)) {
+        throw new Error(`part has to be one of ${allowed.map(a => `"${a}"`).join(', ')}, not "${part}"`);
     }
-    return part;
+    return part as 'draft' | 'usecases' | 'questionnaire';
 }
 
 /**
@@ -307,12 +308,15 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_compliance_register_read',
-        handler: ({ client }, input) => client.get(`/v1/admin/compliance/${compliancePart(input)}`),
+        handler: ({ client }, input) => client.get(`/v1/admin/compliance/${compliancePart(input, true)}${query({
+            since_days: optionalNumber(input, 'since_days'),
+        })}`),
     },
     {
         name: 'aimeat_compliance_register_write',
         handler: ({ client }, input) => client.put(
-            `/v1/admin/compliance/${compliancePart(input)}`, requiredRecord(input, 'value'),
+            `/v1/admin/compliance/${compliancePart(input)}${optionalBoolean(input, 'dry_run') ? '?dry_run=true' : ''}`,
+            requiredRecord(input, 'value'),
         ),
     },
     {
