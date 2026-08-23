@@ -19,8 +19,9 @@ otherwise.
 
 CI runs the ast-grep rules and uploads the SARIF to GitHub code scanning, so every finding is a
 tracked alert on the Security tab with a history — see `.github/workflows/semantic-audit.yml`.
-GitHub's CodeQL default setup is also enabled on the repo (2026-08-23), so the generic JS/TS query
-suite (injection, prototype pollution, ReDoS, …) lands on the same Security tab beside these rules.
+CodeQL runs beside them as an advanced-setup workflow (`.github/workflows/codeql.yml`, since
+2026-08-23; default setup was turned off because it cannot exclude paths and buried the signal
+under 1214 alerts on tests and vendored libs), scoped with paths-ignore to the code we ship.
 
 ```bash
 # Everything, locally (what CI runs):
@@ -103,11 +104,13 @@ every run. `pnpm audit:triage` (aimeat/) runs `claude -p` headless (read-only to
 default, override with `AIMEAT_TRIAGE_MODEL`; binary resolved from `AIMEAT_CLAUDE_BIN`, PATH, or
 the newest Claude Code editor extension):
 
-1. **Finding triage** — each unacknowledged ast-grep finding is classified with its surrounding
-   code: `legit` (a known-safe pattern, with a one-sentence reason) or `confirm` (a human must
-   look). Verdicts land in `triage-store.json` (committed), keyed by a fingerprint of
-   rule + file + matched text — so an acknowledgment survives line drift but dies the moment the
-   matched code itself changes.
+1. **Finding triage** — each unacknowledged finding is classified with its surrounding code:
+   `legit` (a known-safe pattern, with a one-sentence reason) or `confirm` (a human must look).
+   Findings come from ast-grep (local scan) AND from the Semgrep taint alerts the CI job uploaded
+   to code scanning (fetched via `gh api`, since Semgrep does not run on Windows; the fingerprint
+   uses the flagged line's current local text). Verdicts land in `triage-store.json` (committed),
+   keyed by a fingerprint of rule + file + matched text — so an acknowledgment survives line drift
+   but dies the moment the matched code itself changes. Claude calls are batched, 15 findings each.
 2. **Non-static invariant review** — the git diff since `lastInvariantReviewCommit` is reviewed
    against invariants 5, 13, 14 and 16 (the ones the table below marks as not statically
    checkable). Concerns are stored as open `invariantFindings` and stay in the report until a

@@ -52,7 +52,9 @@ for (const f of findings) {
   else if (!ack) freshFindings.push(hit);
 }
 const liveFps = new Set(findings.map(fingerprintOf));
-const pendingConfirm = store.entries.filter(e => e.verdict === 'confirm' && liveFps.has(e.fingerprint));
+// Semgrep runs only in CI, so its entries cannot be liveness-checked against a local scan; they
+// stay listed until a human resolves them or the alert closes on the Security tab.
+const pendingConfirm = store.entries.filter(e => e.verdict === 'confirm' && (liveFps.has(e.fingerprint) || e.source === 'semgrep'));
 const openInvariants = store.invariantFindings.filter(f => f.status === 'open');
 const errorLevel = findings.filter(f => (f.severity || 'warning') === 'error').length;
 // Katsottavaa on vain se mitä kukaan ei ole vielä kuitannut: triagemattomat + ihmistä odottavat.
