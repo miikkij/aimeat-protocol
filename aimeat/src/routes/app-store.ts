@@ -18,6 +18,13 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   v1.2.0 — 2026-08-23 — SECURITY (audit AI-triage, invariant 1): purchases and licences key on the
+ *     buyer's OWNER GHII (ownerGhiiOf(resolveIdentity(...))), the same identity the wallet debits,
+ *     instead of the raw `sub`. The raw form split one person's licences across two coordinates (bare
+ *     name for an owner session, agent GAII for an agent), so an owner's purchase was invisible to
+ *     their own agent and an app could be paid for twice. license-check now looks the seller up by
+ *     the app owner's GHII (what the receipt stored) instead of iterating agent GAIIs that no receipt
+ *     was keyed on.
  *   v1.1.1 — 2026-07-14 — Fee rounding through the money.ts chokepoint (percentFee)
  *   v1.1.0 — 2026-07-13 — Fee leg routed via settleMarketplaceFee (operator|burn), TARGET-033 phase 2
  *   v1.0.0 — 2026-03-13 — Renamed from marketplace.ts to app-store.ts; routes /v1/marketplace/* → /v1/app-store/*
@@ -28,6 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { sign } from '../auth/keypair.js';
 import { settleMarketplaceFee } from '../services/marketplace-fee.js';
@@ -36,6 +44,16 @@ import { percentFee } from '../commerce/money.js';
 export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
 
+    // The coordinate a purchase and a licence key on: the buyer's OWNER GHII, the same identity the
+    // wallet debits. `req.auth!.sub` is the bare owner name on an owner session and the agent GAII on
+    // an agent session, so keying receipts on it split one person's licences across two coordinates —
+    // the owner's purchase was invisible to their own agent and the app could be paid for twice
+    // (audit AI-triage 2026-08-23, invariant 1). resolveIdentity turns an owner session into its
+    // GHII; ownerGhiiOf collapses an agent (or ecosystem) principal to the same owner GHII. The
+    // seller side already keys on `app.ownerGaii`, which is that same `owner@node` form.
+    const ownerCoordinate = (req: { auth?: { sub: string; owner: string; roles: string[] } }): string =>
+        ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+
     // POST /v1/app-store/purchase — Purchase an app
     router.post('/v1/app-store/purchase', requireAuth(), async (req, res) => {
         if (!config.marketplaceEnabled) {
@@ -43,7 +61,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        const buyerGaii = req.auth!.sub;
+        const buyerGaii = ownerCoordinate(req);
         const buyerOwner = req.auth!.owner;
         const { app_filename, app_owner } = req.body ?? {};
 
@@ -193,7 +211,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/purchases — List buyer's purchases
     router.get('/v1/app-store/purchases', requireAuth(), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = ownerCoordinate(req);
         const purchases = await storage.listAppPurchasesByBuyer(gaii);
 
         res.json(success(config.nodeId, {
@@ -213,7 +231,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/purchases/:txId — Get specific purchase (includes full content)
     router.get('/v1/app-store/purchases/:txId', requireAuth(), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = ownerCoordinate(req);
         const txId = req.params.txId as string;
 
         const purchase = await storage.getAppPurchase(txId);
@@ -250,7 +268,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/sales — List seller's sales
     router.get('/v1/app-store/sales', requireAuth(), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = ownerCoordinate(req);
         const sales = await storage.listAppPurchasesBySeller(gaii);
 
         res.json(success(config.nodeId, {
@@ -271,7 +289,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
 
     // GET /v1/app-store/license-check — Check if user has valid license for an app
     router.get('/v1/app-store/license-check', requireAuth(), async (req, res) => {
-        const gaii = req.auth!.sub;
+        const gaii = ownerCoordinate(req);
         const appFilename = req.query.app_filename as string;
         const appOwner = req.query.app_owner as string;
 
@@ -280,18 +298,13 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Look up seller gaii
-        const agents = await storage.getAgentsByOwner(appOwner);
-        if (agents.length === 0) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Owner "${appOwner}" not found`));
-            return;
-        }
-
-        let hasLicense = false;
-        for (const agent of agents) {
-            hasLicense = await storage.hasValidLicense(gaii, agent.gaii, appFilename);
-            if (hasLicense) break;
-        }
+        // The seller coordinate is the app owner's GHII — the exact value the purchase receipt stored
+        // as sellerGaii (app.ownerGaii = `owner@node`). The old code looked the seller up by iterating
+        // getAgentsByOwner() and checking each agent GAII, which no receipt was ever keyed on, so a
+        // valid licence read as false and an owner with no agents 404'd on their own app (audit
+        // AI-triage 2026-08-23, invariant 1).
+        const sellerGhii = `${appOwner}@${config.nodeId}`;
+        const hasLicense = await storage.hasValidLicense(gaii, sellerGhii, appFilename);
 
         res.json(success(config.nodeId, {
             app_filename: appFilename,

@@ -126,6 +126,8 @@ const ALL_SUITES = [
     'test/e2e-app-screenshot-capture.ts',
     'test/e2e-app-publish-gate.ts',
     'test/e2e-app-fork.ts',
+    'test/e2e-app-store-license.ts',
+    'test/e2e-catalogue-identity.ts',
     'test/e2e-app-protect.ts',
     'test/e2e-app-descriptions.ts',
     'test/e2e-app-copyscan.ts',
