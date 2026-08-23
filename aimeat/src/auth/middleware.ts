@@ -10,8 +10,15 @@
  *   - requireRole / requireScope / requireExternalPrincipal / requireLocalSession: authorization gates
  *   - requireOwnerPrincipal: the account-security gate (password, recovery address, 2FA, deletion)
  *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
+ *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   v1.7.0 — 2026-08-23 — requireOperatorPrincipal() takes the scope word as a parameter, defaulting
+ *     to the organism-repair one so its two existing call sites read as before. The compliance
+ *     surface (BR-02) is the second door of this shape and needs two different words; a near-copy
+ *     per door is how three copies of the scope test came to live in this file, none of them aware
+ *     of the exception the vocabulary module holds. The refusal path moved to ./deny.ts in the same
+ *     change, because this file was one line under the 800-line ceiling.
  *   v1.6.0 — 2026-08-15 — The three scope gates ask utils/scope-coverage.ts instead of each writing
  *     the wildcard rule out again. All three read `scopes.includes('*')` and passed, so the nine
  *     words in SCOPES_OUTSIDE_WILDCARD — which exist BECAUSE no wildcard may carry them — were
@@ -48,12 +55,9 @@ import { ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, scopeIsCovered 
 import { setRefreshCookie, readRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import type { AimeatConfig } from '../config.js';
-import { getStats } from '../services/stats.js';
-import { getPromMetrics } from '../services/prometheus.js';
-import { recordAuthFailure, type AuthFailureContext } from '../services/auth-audit.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { resourceMetadataUrl } from '../services/protected-resource.js';
+import { deny401, deny403, setDenyConfig } from './deny.js';
 
 // P3-7: Reference to storage for session revocation checks
 let _sessionStorage: Storage | null = null;
@@ -63,6 +67,7 @@ let _config: AimeatConfig | null = null;
 export function initSessionAuth(storage: Storage, config?: AimeatConfig): void {
   _sessionStorage = storage;
   _config = config ?? null;
+  setDenyConfig(_config);
 }
 
 const _lastSeenCache = new Map<string, number>();
@@ -460,10 +465,16 @@ export function requireOwnerPrincipal() {
  * (SCOPES_OUTSIDE_WILDCARD), nobody was grandfathered onto it, and `app` principals are refused
  * outright, because an app grant is consent to use the account and never consent to act as the node.
  *
+ * WHY THE WORD IS A PARAMETER. Organism repair was the first door of this shape and is the default,
+ * so its two call sites read exactly as before. The compliance report (BR-02) is the second, and it
+ * needs two different words for reading and writing. A near-copy of this function per door is how
+ * three copies of the scope test came to live in this file, none of them knowing about the exception
+ * the vocabulary module was written to hold — so the door varies by its word, not by its code.
+ *
  * Federated sessions are refused for the same reason requireRole('operator') refuses them: operator
  * power stops at this node's own front door.
  */
-export function requireOperatorPrincipal(storage: Storage) {
+export function requireOperatorPrincipal(storage: Storage, scope: string = OPERATOR_ORGANISM_REPAIR_SCOPE) {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {
       deny401(req, res, 'Authentication required');
@@ -490,9 +501,9 @@ export function requireOperatorPrincipal(storage: Storage) {
       deny403(req, res, 'ACCESS_DENIED', 'Node operator required');
       return;
     }
-    if (!(req.auth.scopes ?? []).includes(OPERATOR_ORGANISM_REPAIR_SCOPE)) {
+    if (!(req.auth.scopes ?? []).includes(scope)) {
       logger.warn(`[operator-scope-denied] ${req.auth.sub} on ${req.method} ${req.path}`);
-      deny403(req, res, 'SCOPE_DENIED', `Scope "${OPERATOR_ORGANISM_REPAIR_SCOPE}" required. The node operator grants it per agent, ` +
+      deny403(req, res, 'SCOPE_DENIED', `Scope "${scope}" required. The node operator grants it per agent, ` +
         'and no wildcard carries it.');
       return;
     }
@@ -716,83 +727,4 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
-/**
- * What the refusal log needs, lifted off the request.
- *
- * This is the ONE place that reads a Request for the audit, which is why the service itself takes
- * plain data: a door hands over what it knows, and a surface that is not HTTP can hand over the
- * same shape without pretending to be one.
- */
-function auditContext(req: Request): AuthFailureContext {
-  return {
-    method: req.method,
-    path: req.path,
-    ip: req.ip ?? req.socket?.remoteAddress ?? '',
-    host: String(req.headers.host ?? ''),
-    userAgent: String(req.headers['user-agent'] ?? ''),
-    authorization: typeof req.headers.authorization === 'string' ? req.headers.authorization : undefined,
-    hasCookie: !!req.headers.cookie,
-    principal: req.auth
-      ? {
-        sub: req.auth.sub, owner: req.auth.owner, roles: req.auth.roles,
-        ...(req.auth.app ? { app: req.auth.app } : {}),
-        ...(req.auth.anonymous ? { anonymous: true } : {}),
-      }
-      : undefined,
-  };
-}
-
-/**
- * Refuse an unauthenticated request with 401 AND the RFC 9728 discovery hint. The
- * `resource_metadata` parameter names the protected-resource metadata of the ORIGIN the client
- * actually reached (apex, app origin, portfolio origin), which is how an MCP client learns where
- * to get a token without having been told out of band. Header omitted when the config was never
- * wired (unit tests constructing middleware standalone) — the 401 body is unchanged either way.
- */
-/**
- * Refuse an unauthenticated request with 401 AND the RFC 9728 discovery hint.
- *
- * The counter and the refusal log live HERE rather than at each call site. They used to be four
- * lines copied in front of twelve of the fourteen `deny401` calls, which meant two doors refused
- * people without counting them: `aimeat_auth_failures_total` has been reading low, and the operator
- * reading it had no way to know by how much.
- */
-function deny401(req: Request, res: Response, message: string): void {
-  const stats = getStats();
-  if (stats) stats.increment('auth_failures_total');
-  const prom = getPromMetrics();
-  if (prom) prom.authFailuresTotal.inc();
-  recordAuthFailure(auditContext(req), { status: 401, code: 'AUTH_REQUIRED', reason: message });
-  if (_config && !res.headersSent) {
-    res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, _config)}"`);
-  }
-  res.status(401).json(errorEnvelope('AUTH_REQUIRED', message));
-}
-
-/**
- * Refuse an AUTHENTICATED request that lacks the authority: wrong role, missing scope, a principal
- * class the door does not serve.
- *
- * These are the most informative lines in the refusal log and the ones nothing was recording. A 401
- * is usually a stranger with nothing; a 403 is a real, named principal reaching for a door it may
- * not open, and that is either a misconfigured integration or somebody testing the fence.
- */
-function deny403(req: Request, res: Response, code: string, message: string): void {
-  recordAuthFailure(auditContext(req), { status: 403, code, reason: message });
-  res.status(403).json(errorEnvelope(code, message));
-}
-
-function errorEnvelope(code: string, message: string) {
-  return {
-    ok: false,
-    protocol: 'aimeat',
-    version: 'v1',
-    timestamp: new Date().toISOString(),
-    error: { code, message },
-    hints: {
-      next_actions: [
-        { description: 'Authenticate to get a JWT token', method: 'POST', url: '/v1/auth/token' },
-      ],
-    },
-  };
-}
+// The refusal path lives in ./deny.ts — extracted for max-file-lines.

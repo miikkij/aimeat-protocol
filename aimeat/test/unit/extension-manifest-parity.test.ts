@@ -80,6 +80,23 @@ actions:
     output: { type: object }
 `;
 
+/** An extension that gates an app: the manifest field whose check needs the installer's name. */
+const APP_MANIFEST = `metadata:
+  name: appgated
+  version: "1.0.0"
+  description: "Gates its owner app"
+  author: alice
+config:
+  app: alice/tool.html
+actions:
+  - id: ping
+    method: post
+    path: /ping
+    script: ping.js
+    input: { type: object }
+    output: { type: object }
+`;
+
 /** A priced EXCHANGE provider — every one of these fields used to vanish on the ZIP path. */
 const PRICED_MANIFEST = `metadata:
   name: pricedext
@@ -140,7 +157,7 @@ describe('manifest shape validation', () => {
 
     it('a ZIP with a mis-typed field returns a validation result, never a thrown error', async () => {
         const manifest = GOOD_MANIFEST.replace('method: post', 'method: { a: 1 }');
-        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': manifest, 'scripts/ping.js': SCRIPT }), config);
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': manifest, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(parsed.ok).toBe(false);
         expect(parsed.code).toBe('INVALID_MANIFEST');
         expect(parsed.error).toContain('method');
@@ -149,7 +166,7 @@ describe('manifest shape validation', () => {
 
 describe('ZIP install builds the same record as the inline install', () => {
     it('carries per-action pricing (tollMorsels, commercial, payMoney, exchange)', async () => {
-        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config);
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(parsed.ok).toBe(true);
         const action = parsed.record!.actions[0];
         expect(action.tollMorsels).toBe(3);
@@ -159,14 +176,14 @@ describe('ZIP install builds the same record as the inline install', () => {
     });
 
     it('marks `type: secret` config so the value is encrypted at rest', async () => {
-        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config);
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(parsed.ok).toBe(true);
         expect(parsed.record!.config.__secretKeys).toEqual(['apiKey']);
     });
 
     it('produces a record identical to the inline builder, field for field', async () => {
-        const inline = buildExtensionRecordFromManifest(PRICED_MANIFEST, SCRIPTS, config, 'upload', 'FIXED');
-        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config);
+        const inline = buildExtensionRecordFromManifest(PRICED_MANIFEST, SCRIPTS, config, 'parityowner', 'FIXED');
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': PRICED_MANIFEST, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(inline.ok).toBe(true);
         expect(parsed.ok).toBe(true);
         if (!inline.ok) return;
@@ -176,8 +193,39 @@ describe('ZIP install builds the same record as the inline install', () => {
 
     it('rejects invalid pricing on the ZIP path too (it used to skip the validator entirely)', async () => {
         const manifest = PRICED_MANIFEST.replace('payMorsels: 10', 'payMorsels: -5');
-        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': manifest, 'scripts/ping.js': SCRIPT }), config);
+        const parsed = await parseExtensionZip(makeZip({ 'manifest.yaml': manifest, 'scripts/ping.js': SCRIPT }), config, 'parityowner');
         expect(parsed.ok).toBe(false);
         expect(parsed.error).toContain('payMorsels');
+    });
+});
+
+/**
+ * The ZIP door knows who asked for the upload URL, and until 2026-08-23 it did not tell the builder:
+ * it passed the literal string `upload` as the installer. The cortex ZIP path beside it has always
+ * taken an ownerName. Nothing looked broken, because the route overwrote installedBy afterwards, so
+ * the placeholder only surfaced in the one check that reads the installer BEFORE the record exists:
+ * an extension declaring config.app was told its own app belonged to somebody else, and the
+ * recommended upload path was closed to every extension that gates an app.
+ */
+describe('the ZIP path is told who is installing', () => {
+    const zip = () => makeZip({ 'manifest.yaml': APP_MANIFEST, 'scripts/ping.js': SCRIPT });
+
+    it('accepts config.app when it names the installer own app', async () => {
+        const parsed = await parseExtensionZip(zip(), config, 'alice');
+        expect(parsed.error).toBeUndefined();
+        expect(parsed.ok).toBe(true);
+        expect(parsed.record!.installedBy).toBe('alice');
+    });
+
+    it('still refuses config.app naming another owner app', async () => {
+        const parsed = await parseExtensionZip(zip(), config, 'bob');
+        expect(parsed.ok).toBe(false);
+        expect(parsed.code).toBe('INVALID_MANIFEST');
+        expect(parsed.error).toContain('alice');
+    });
+
+    it('reads the owner out of a full GAII, so an agent upload is attributed to its human', async () => {
+        const parsed = await parseExtensionZip(zip(), config, 'claude#alice@aimeat-local-001-dev');
+        expect(parsed.ok).toBe(true);
     });
 });

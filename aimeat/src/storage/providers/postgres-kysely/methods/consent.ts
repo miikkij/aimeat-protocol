@@ -7,11 +7,14 @@
  *   recipient/pattern matchers (services/consent + pattern-utils + gaii) so access decisions are
  *   identical across backends. Translated 1:1 from the Prisma implementation.
  * @version-history
+ *   v1.2.0 — 2026-08-23 — consentFacets(), the node-wide SQL roll-up the compliance report reads
+ *     (BR-02). The day bucket casts to UTC because grantedAt is a timestamp here and an ISO string
+ *     on SQLite; without it the two backends would bucket a near-midnight grant differently.
  *   v1.0.0 — 2026-07-15 — Phase 5: consent on Postgres+Kysely.
  *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive.
  */
-import type { Selectable } from 'kysely';
-import type { ConsentAuditEntry, ConsentRecord } from '../../../interface.js';
+import { sql, type Selectable } from 'kysely';
+import type { ConsentAuditEntry, ConsentFacet, ConsentFacetQuery, ConsentRecord } from '../../../interface.js';
 import { matchesRecipient } from '../../../../services/consent.js';
 import { parseGaiiLoose } from '../../../../utils/gaii.js';
 import { consentMatchPattern } from '../../../pattern-utils.js';
@@ -94,6 +97,28 @@ export const consentMethods = {
     }
     return results;
   },
+  async consentFacets(this: PostgresKyselyStorage, query?: ConsentFacetQuery): Promise<ConsentFacet[]> {
+    // `AT TIME ZONE 'UTC'` is load-bearing, not decoration. grantedAt is a timestamp here and an ISO
+    // string on SQLite, where the day is the first ten characters and therefore always UTC. Without
+    // the cast this bucket would follow the database server's zone, and the two backends would
+    // disagree about which day a grant made near midnight belongs to — a difference that shows up
+    // only as a compliance report whose daily numbers do not reconcile between two nodes.
+    let q = this.db.selectFrom('Consent as c')
+      .select([
+        'c.status as status',
+        'c.scope as scope',
+        sql<string>`to_char(c."grantedAt" AT TIME ZONE 'UTC', 'YYYY-MM-DD')`.as('day'),
+        sql<string>`COUNT(*)`.as('n'),
+      ])
+      .groupBy(['c.status', 'c.scope', 'day']);
+    if (query?.ownerGhii) q = q.where('c.ownerGaii', '=', query.ownerGhii);
+    if (query?.since) q = q.where('c.grantedAt', '>=', new Date(query.since));
+    const rows = await q.execute();
+    // COUNT() comes back as a bigint string on this driver; Number() is exact well past any
+    // plausible grant count.
+    return rows.map(r => ({ status: r.status, scope: r.scope, day: r.day, count: Number(r.n) }));
+  },
+
   async expireStaleConsents(this: PostgresKyselyStorage, before: string): Promise<number> {
     const r = await this.db.updateTable('Consent').set({ status: 'expired' })
       .where('status', '=', 'active').where('expires', 'is not', null).where('expires', '<', new Date(before)).executeTakeFirst();

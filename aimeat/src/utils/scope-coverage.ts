@@ -30,6 +30,9 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.3.0 — 2026-08-23 — COMPLIANCE_READ_SCOPE / COMPLIANCE_WRITE_SCOPE (BR-02). The read word is
+ *     outside the wildcard as firmly as the write one: the report assembles every account's AI
+ *     activity into one document, and that is a disclosure nobody but the operator consented to.
  *   v1.2.0 — 2026-08-15 — OPERATOR_ORGANISM_REPAIR_SCOPE, the operator's break-glass over an
  *     organism's ownership. Outside the wildcard from the day it exists: the incident it answers was
  *     an unscoped agent handing away an organism, so a repair word that "Full access" carries would
@@ -83,6 +86,28 @@ export const ACCOUNT_SECURITY_SCOPE = 'account:security';
 export const OPERATOR_ORGANISM_REPAIR_SCOPE = 'operator:organism-repair';
 
 /**
+ * The node-wide compliance report and the register behind it: read, and write.
+ *
+ * The report is every account's AI activity on this node in one document — which models ran, whose
+ * agents published without a label, how many grants are live. Nobody consented to that being
+ * assembled for anyone but the operator, so the read word is as load-bearing as the write one, and
+ * both are out of every wildcard. "Full access" is one click, and nobody clicking it is deciding
+ * that an agent may pull the node's whole compliance picture.
+ *
+ * Split in two because they fail differently. Reading is a disclosure; writing changes what the
+ * report SAYS about the node, and a register somebody else edited is a record of nothing. An agent
+ * that keeps the register current is exactly the use this is built for, and it needs the write word
+ * on its own tick rather than as a side effect of being allowed to read.
+ *
+ * Enforced by requireOperatorPrincipal(storage, scope) in auth/middleware.ts on the HTTP door and by
+ * the same resolution on the MCP tools, so the two doors answer alike. Nobody is grandfathered onto
+ * either (services/scope-vocabulary-migration.ts has no entry): they name a capability that did not
+ * exist before, so no agent can lose one it had.
+ */
+export const COMPLIANCE_READ_SCOPE = 'compliance:read';
+export const COMPLIANCE_WRITE_SCOPE = 'compliance:write';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -113,8 +138,10 @@ const OWN_TICK_SCOPES = [
     'social:members',          // change who may read a shared board
 ] as const;
 
-export const SCOPES_OUTSIDE_WILDCARD: readonly string[] =
-    [WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE, ...OWN_TICK_SCOPES];
+export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
+    WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE,
+    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, ...OWN_TICK_SCOPES,
+];
 
 /** True when `scope` is one of the scopes only an exact grant can confer. */
 export function isOutsideWildcard(scope: string): boolean {

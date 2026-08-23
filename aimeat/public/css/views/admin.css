@@ -985,3 +985,90 @@
 .adm-tier-ladder-row { display: grid; grid-template-columns: 7rem 1fr; gap: 0.6rem; align-items: baseline; }
 .adm-tier-ladder-row dt { font-weight: 600; }
 .adm-tier-ladder-row dd { margin: 0; color: var(--muted); }
+/* ── Compliance tab (BR-02) ── */
+/* Sections read top to bottom as an argument: what needs doing, what this does not cover, then the
+   evidence. The attention section is the only coloured one on the page, so it cannot be missed and
+   nothing else competes with it. */
+.adm-cmp-section { margin: 1.5rem 0; }
+.adm-cmp-section h3 { margin: 0 0 0.4rem; }
+.adm-cmp-section--attention {
+  border-left: 3px solid var(--danger);
+  padding-left: 0.9rem;
+}
+.adm-cmp-count {
+  background: var(--danger); color: #fff; border-radius: var(--radius-full);
+  padding: 0.05rem 0.5rem; font-size: 0.8rem; margin-left: 0.35rem;
+}
+.adm-cmp-scope { color: var(--muted); font-size: 0.85rem; margin: 0.2rem 0 1rem; }
+/* Body size, not small print: these sentences are part of the measurement. */
+.adm-cmp-note { color: var(--muted); max-width: 62rem; margin: 0.2rem 0 0.7rem; }
+.adm-cmp-small { font-size: 0.8rem; color: var(--muted); }
+.adm-cmp-hint { display: block; color: var(--muted); font-size: 0.78rem; margin-top: 0.15rem; }
+
+/* What the node already saw, offered as one-click entries. Set apart from the register list so it
+   reads as the node's suggestion rather than as something already written down. */
+.adm-cmp-proposals {
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+  padding: 0.7rem 0.9rem; margin: 0.6rem 0 1rem;
+}
+.adm-cmp-proposal-list { list-style: none; margin: 0.3rem 0 0; padding: 0; }
+.adm-cmp-proposal-list li {
+  display: flex; align-items: center; gap: 0.7rem;
+  flex-wrap: wrap; margin: 0.4rem 0;
+}
+.adm-cmp-steps { margin: 0.3rem 0 0.8rem; padding-left: 1.3rem; }
+.adm-cmp-steps li { margin: 0.5rem 0; max-width: 62rem; }
+.adm-cmp-gaps, .adm-cmp-limits, .adm-cmp-qs { margin: 0.4rem 0; padding-left: 1.1rem; }
+.adm-cmp-gaps li, .adm-cmp-limits li { margin: 0.45rem 0; max-width: 62rem; }
+.adm-cmp-gap-kind { display: block; font-weight: 600; }
+.adm-cmp-gap-detail { color: var(--muted); }
+.adm-cmp-qs li { margin: 0.4rem 0; }
+.adm-cmp-qs .adm-cmp-q-text { display: block; }
+
+.adm-cmp-risk {
+  display: inline-block; padding: 0.1rem 0.5rem; border-radius: var(--radius-full);
+  font-size: 0.78rem; font-weight: 600; color: #fff;
+}
+.adm-cmp-risk--danger { background: var(--danger); }
+.adm-cmp-risk--warn   { background: var(--warn); }
+.adm-cmp-risk--ok     { background: var(--success); }
+/* Unclassified is deliberately NOT green: it means nobody has looked, and a calm colour there would
+   read as a pass. Outlined instead, so it looks unfinished, which it is. */
+.adm-cmp-risk--dim {
+  background: transparent; color: var(--muted); border: 1px dashed var(--border);
+}
+
+.adm-cmp-editor {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 1rem; margin: 0.6rem 0 1.2rem;
+}
+.adm-cmp-editor label { display: block; margin: 0.6rem 0; }
+.adm-cmp-editor label > span:first-child { display: block; font-size: 0.85rem; margin-bottom: 0.2rem; }
+.adm-cmp-editor input[type="text"], .adm-cmp-editor textarea, .adm-cmp-editor select {
+  width: 100%; max-width: 42rem;
+}
+.adm-cmp-editor-row { display: flex; flex-wrap: wrap; gap: 1rem; }
+.adm-cmp-editor-row > label { flex: 1 1 20rem; }
+.adm-cmp-sub { margin: 1.2rem 0 0.2rem; }
+.adm-cmp-q-text { font-weight: 500; }
+.adm-cmp-q-help { display: block; color: var(--muted); font-size: 0.8rem; margin: 0.1rem 0 0.25rem; }
+.adm-cmp-q-todo {
+  margin-left: 0.4rem; font-size: 0.72rem; font-weight: 600;
+  color: var(--warn); text-transform: uppercase; letter-spacing: 0.03em;
+}
+.adm-cmp-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.8rem; }
+
+/* Print / save as PDF.
+   Scoped to body.adm-compliance-active because every view's CSS is preloaded globally — an unscoped
+   @media print block here would hide the chrome on every other page in the SPA. */
+@media print {
+  body.adm-compliance-active .topnav,
+  body.adm-compliance-active .adm-sidebar,
+  body.adm-compliance-active .adm-header,
+  body.adm-compliance-active .adm-cmp-no-print,
+  body.adm-compliance-active .adm-toast { display: none !important; }
+  body.adm-compliance-active .adm-cmp-print-area { width: 100%; margin: 0; padding: 0; }
+  body.adm-compliance-active .adm-cmp-section { break-inside: avoid; }
+  body.adm-compliance-active h3 { break-after: avoid; }
+  @page { margin: 1.8cm; }
+}
