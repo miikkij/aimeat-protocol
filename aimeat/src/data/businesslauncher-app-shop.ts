@@ -1,0 +1,354 @@
+/**
+ * @file businesslauncher-app-shop.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The shop front of the BUSINESSLAUNCHER package, inlined for install.
+ *
+ *   GENERATED FILE — do not edit by hand. Edit packages/businesslauncher/app-shop.html and re-run
+ *   `node packages/build-businesslauncher-pkg.mjs`.
+ * @version-history
+ *   v1.0.0 — 2026-08-23 — Initial (TARGET-070).
+ */
+export const APP_SHOP = `<!DOCTYPE html>
+<!-- AIMEAT App Manifest
+name: Shop
+version: 1.0.0
+description: The shop front — what is for sale, what is left, the terms, and a way to get in touch. Opens without an account.
+entry: index.html
+-->
+<!--
+  @file app-shop.html
+  @description The PUBLIC face of a BUSINESSLAUNCHER shop. Everything a visitor needs to decide is
+    readable with no account: the catalogue, how many are left, the delivery and privacy terms, and
+    a contact form. Signing in is asked for at exactly one moment — taking a hold on something.
+
+    IT READS, IT DOES NOT DECIDE. The shelf number on a card is a display value from a public
+    mirror; the record that decides a sale is private and is read inside the same compare-and-swap
+    that takes the units. So a card can be a moment out of date and still never oversell: the
+    refusal comes from the shop, not from this page.
+
+    Everything goes through AIMEAT.shop (the cortex lib). This app never calls /v1/ext/ itself.
+  @structure boot -> loadPublic -> renderGrid -> openItem -> hold | renderPage | contact
+  @usage published app; the address a person gives out is their company's front page.
+  @version-history
+    v1.0.0 — 2026-08-23 — Initial (TARGET-070).
+-->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- The reads need no session at all. The one scope is for the moment a buyer takes a hold: an
+       app grant needs a word, and this is the narrowest one the vocabulary has. -->
+  <meta name="aimeat-scopes" content="memory:read" />
+  <title>Shop</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+  <!-- The node paints two permanent marks over the bottom corners of every served app and tells the
+       app how tall that strip is. Reserving the space is the app's job, and reading the variable is
+       the contract: a hardcoded number is wrong on the next viewport. The fallback matches today's
+       geometry so the file also lays out correctly opened straight from disk. -->
+  <style>
+    .chrome-clear { padding-bottom: calc(var(--aimeat-chrome-bottom, 56px) + 12px); }
+  </style>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
+  <!-- Two rows on a phone, one on a desktop. Crammed into a single row at 390 the shop's own name
+       collapsed to one letter and the sign-in control wrapped onto two lines: the name is the first
+       thing the page has to say, so it gets the row and the search drops below it.
+       The bar is full width, its CONTENT is not: it shares the same max-w-5xl column as the grid and
+       the footer. Left at page padding it started at x=16 while the products started at x=144, and
+       the shop's own name did not line up with anything it named. -->
+  <header class="bg-base-200 shadow-sm sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 py-2 flex items-center gap-2">
+      <span id="shop-name" class="text-lg font-bold truncate flex-1 min-w-0">Shop</span>
+      <button id="lang" class="btn btn-ghost btn-sm px-2 shrink-0">FI</button>
+      <span id="login" class="shrink-0"></span>
+    </div>
+    <div id="search-row" class="max-w-5xl mx-auto px-4 pb-2" hidden>
+      <input id="search" class="input input-bordered input-sm w-full max-w-md" placeholder="Search" />
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-5xl mx-auto p-4">
+    <div id="notice" class="alert mb-4" hidden></div>
+    <div id="grid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+    <div id="empty" class="text-center opacity-60 py-16" hidden></div>
+  </main>
+
+  <!-- The bottom strip belongs to the node's own marks. Without the reserve the "Updated" date sat
+       under the badge on a phone and under it again at 1280, where the badge is far wider. -->
+  <footer class="bg-base-200 mt-8 px-4 py-6 text-sm chrome-clear">
+    <div class="max-w-5xl mx-auto flex flex-wrap gap-4 items-center">
+      <button data-page="delivery" class="btn btn-ghost px-2 page-link" hidden></button>
+      <button data-page="terms" class="btn btn-ghost px-2 page-link" hidden></button>
+      <button data-page="privacy" class="btn btn-ghost px-2 page-link" hidden></button>
+      <button id="contact-btn" class="btn btn-ghost px-2" hidden></button>
+      <span id="updated" class="opacity-60 ml-auto"></span>
+    </div>
+  </footer>
+
+  <!-- One overlay, three uses: an item, a policy page, the contact form. -->
+  <div id="overlay" class="fixed inset-0 bg-black/60 z-50 items-center justify-center p-4" style="display:none">
+    <div class="card bg-base-200 max-w-lg w-full max-h-[90vh] overflow-y-auto">
+      <div id="overlay-body" class="card-body gap-3"></div>
+    </div>
+  </div>
+
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-data.js"></script>
+  <!-- The policy pages are markdown, written by a person or by their agent. Rendered as plain text
+       the reader sees "# Ehdot" with the hash still on it. This lib is the node's own safe renderer
+       (no innerHTML, hrefs sanitised), which matters because the text is not always hand-written. -->
+  <script src="/v1/libs/aimeat-markdown.js"></script>
+  <script src="/v1/libs/aimeat-intake.js"></script>
+  <script src="/v1/cortex/businesslauncher-shop/libs/businesslauncher-shop.js"></script>
+  <script>
+  (function () {
+    'use strict';
+
+    var T = {
+      en: {
+        empty: 'Nothing is for sale here yet.',
+        left: 'left', soldOut: 'Sold out', hold: 'Hold one while I pay',
+        holding: 'Held for you', signIn: 'Sign in to hold this', signingIn: 'Opening sign-in…', close: 'Close',
+        contact: 'Get in touch', send: 'Send', sent: 'Thank you. We will be in touch.',
+        name: 'Your name', email: 'Your email', message: 'What would you like to ask?',
+        delivery: 'Delivery', terms: 'Terms', privacy: 'Privacy',
+        writtenBy: 'Written by', updated: 'Updated', offline: 'This shop is not set up yet.',
+      },
+      fi: {
+        empty: 'Täällä ei ole vielä mitään myynnissä.',
+        left: 'jäljellä', soldOut: 'Loppu', hold: 'Varaa yksi maksun ajaksi',
+        holding: 'Varattu sinulle', signIn: 'Kirjaudu varataksesi', signingIn: 'Avataan kirjautuminen…', close: 'Sulje',
+        contact: 'Ota yhteyttä', send: 'Lähetä', sent: 'Kiitos. Palaamme asiaan.',
+        name: 'Nimesi', email: 'Sähköpostisi', message: 'Mitä haluaisit kysyä?',
+        delivery: 'Toimitusehdot', terms: 'Ehdot', privacy: 'Tietosuoja',
+        writtenBy: 'Kirjoittanut', updated: 'Päivitetty', offline: 'Tätä kauppaa ei ole vielä otettu käyttöön.',
+      },
+    };
+    var lang = (navigator.language || 'en').slice(0, 2) === 'fi' ? 'fi' : 'en';
+    function t(k) { return (T[lang] && T[lang][k]) || T.en[k] || k; }
+
+    var session = null, shop = null, cat = null, avail = {}, pages = null, items = [];
+    var $ = function (id) { return document.getElementById(id); };
+    function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+    function money(n, currency) {
+      if (n == null || isNaN(Number(n))) return '';
+      return (Number(n) / 100).toFixed(2) + ' ' + (currency || '');
+    }
+
+    function openOverlay(html) { $('overlay-body').innerHTML = html; $('overlay').style.display = 'flex'; }
+    function closeOverlay() { $('overlay').style.display = 'none'; }
+    $('overlay').onclick = function (e) { if (e.target === $('overlay')) closeOverlay(); };
+
+    function unitsFor(sku) { var n = avail && avail[sku]; return typeof n === 'number' ? n : null; }
+
+    // A shop whose photos are not taken yet is not a broken shop, and a grid of grey boxes with a dot
+    // in them says it is. The product's own initials are always there and read as a choice.
+    function monogram(name) {
+      // Words that start with a digit are sizes and counts, not names: "Paahtopavut 500 g" gave "P5",
+      // which reads as a product code rather than as initials.
+      var parts = String(name || '').trim().split(/\\s+/).filter(function (w) { return /^[^\\W\\d_]/.test(w); });
+      if (!parts.length) return '';
+      return (parts[0].charAt(0) + (parts[1] ? parts[1].charAt(0) : '')).toUpperCase();
+    }
+
+    function render() {
+      // A search box over nothing is furniture. It appears when there is something to search.
+      $('search-row').hidden = items.length === 0;
+      var q = $('search').value.toLowerCase().trim();
+      var shown = items.filter(function (it) {
+        if (!q) return true;
+        return ((it.name || '') + ' ' + (it.description || '')).toLowerCase().indexOf(q) !== -1;
+      });
+      $('empty').hidden = shown.length > 0;
+      $('empty').textContent = cat ? t('empty') : t('offline');
+      var grid = $('grid');
+      grid.innerHTML = '';
+      shown.forEach(function (it) {
+        var left = unitsFor(it.sku);
+        var card = document.createElement('div');
+        card.className = 'card bg-base-200 shadow cursor-pointer hover:ring-2 hover:ring-primary transition';
+        card.innerHTML =
+          (it.image
+            ? '<figure class="aspect-square overflow-hidden"><img src="' + esc(it.image) + '" alt="" class="w-full h-full object-cover" /></figure>'
+            : '<figure class="aspect-square bg-base-300 flex items-center justify-center text-4xl font-bold opacity-30">' + esc(monogram(it.name)) + '</figure>') +
+          '<div class="card-body p-3 gap-1">' +
+          '<h3 class="font-semibold text-sm truncate">' + esc(it.name) + '</h3>' +
+          '<div class="text-primary font-bold text-sm">' + esc(money(it.priceMinor, cat && cat.currency)) + '</div>' +
+          '<div class="text-xs opacity-70">' + (left === null ? '' : (left > 0 ? left + ' ' + t('left') : t('soldOut'))) + '</div>' +
+          '</div>';
+        card.onclick = function () { openItem(it); };
+        grid.appendChild(card);
+      });
+    }
+
+    function openItem(it) {
+      var left = unitsFor(it.sku);
+      var canHold = left === null || left > 0;
+      openOverlay(
+        (it.image ? '<img src="' + esc(it.image) + '" alt="" class="rounded-lg w-full object-contain max-h-72" />' : '') +
+        '<h2 class="text-xl font-bold">' + esc(it.name) + '</h2>' +
+        '<div class="text-primary font-bold text-lg">' + esc(money(it.priceMinor, cat && cat.currency)) + '</div>' +
+        '<p class="whitespace-pre-wrap opacity-90">' + esc(it.description || '') + '</p>' +
+        '<div id="item-left" class="text-sm opacity-70">' + (left === null ? '' : (left > 0 ? left + ' ' + t('left') : t('soldOut'))) + '</div>' +
+        '<div id="hold-msg" class="text-sm"></div>' +
+        '<div class="flex gap-2 justify-end pt-2">' +
+        '<button id="ov-close" class="btn btn-ghost px-4">' + esc(t('close')) + '</button>' +
+        (canHold ? '<button id="ov-hold" class="btn btn-primary px-4">' + esc(session ? t('hold') : t('signIn')) + '</button>' : '') +
+        '</div>'
+      );
+      $('ov-close').onclick = closeOverlay;
+      if (canHold) {
+        $('ov-hold').onclick = function () { takeHold(it); };
+      }
+    }
+
+    async function takeHold(it) {
+      var msg = $('hold-msg');
+      if (!session) {
+        // AIMEAT.auth.login() is the NON-interactive path: on an app origin it restores a session
+        // that already exists and answers null otherwise. Asking a visitor to sign in and then
+        // calling that is a dead end, and the overlay covers the pill that would have worked. So the
+        // house control is pressed for them rather than reimplemented here.
+        try { session = await AIMEAT.auth.login(); } catch (err) { session = null; }
+        if (!session) {
+          var pill = document.getElementById('aimeat-login-btn');
+          if (pill) { pill.click(); } else if (AIMEAT.auth.showLoginModal) { AIMEAT.auth.showLoginModal(); }
+          msg.className = 'text-sm opacity-70';
+          msg.textContent = t('signingIn');
+          return;
+        }
+      }
+      $('ov-hold').disabled = true;
+      var res = await AIMEAT.shop.reserve(session, { sku: it.sku, qty: 1, minutes: 15 })
+        .catch(function (err) { return { ok: false, error: String(err && err.message || err) }; });
+      if (res && res.ok) {
+        msg.className = 'text-sm text-success';
+        // The reservation id is for the shop, not for the buyer. What a buyer needs to know is how
+        // long the thing is theirs.
+        msg.textContent = t('holding');
+        // The shelf moved, so the page should say so rather than keep the number it opened with —
+        // in the panel they are looking at as well as on the cards behind it.
+        await loadAvailability();
+        var leftNow = unitsFor(it.sku);
+        var leftEl = $('item-left');
+        if (leftEl) leftEl.textContent = leftNow === null ? '' : (leftNow > 0 ? leftNow + ' ' + t('left') : t('soldOut'));
+        render();
+      } else {
+        msg.className = 'text-sm text-error';
+        msg.textContent = (res && res.error) || t('soldOut');
+        $('ov-hold').disabled = false;
+      }
+    }
+
+    function openPage(name) {
+      var page = pages && pages[name];
+      if (!page) return;
+      openOverlay(
+        '<h2 class="text-xl font-bold">' + esc(page.title || name) + '</h2>' +
+        '<div id="page-body" class="opacity-90"></div>' +
+        '<div class="text-xs opacity-60 pt-2">' + esc(t('writtenBy')) + ': ' + esc(page.writtenBy || '') + '</div>' +
+        '<div class="flex justify-end pt-2"><button id="ov-close" class="btn btn-ghost px-4">' + esc(t('close')) + '</button></div>'
+      );
+      // Rendered, not printed: a reader should not see the markdown syntax. Falls back to plain
+      // text if the lib did not load, because unreadable prose beats a blank page.
+      if (window.AIMEAT && AIMEAT.md && AIMEAT.md.render) {
+        AIMEAT.md.render(page.markdown, '#page-body');
+      } else {
+        $('page-body').className = 'opacity-90 whitespace-pre-wrap';
+        $('page-body').textContent = page.markdown;
+      }
+      $('ov-close').onclick = closeOverlay;
+    }
+
+    function openContact() {
+      var form = shop && shop.contact;
+      if (!form) return;
+      openOverlay(
+        '<h2 class="text-xl font-bold">' + esc(t('contact')) + '</h2>' +
+        '<input id="c-name" class="input input-bordered" placeholder="' + esc(t('name')) + '" />' +
+        '<input id="c-email" type="email" class="input input-bordered" placeholder="' + esc(t('email')) + '" />' +
+        '<textarea id="c-msg" rows="4" class="textarea textarea-bordered" placeholder="' + esc(t('message')) + '"></textarea>' +
+        '<div id="c-result" class="text-sm"></div>' +
+        '<div class="flex gap-2 justify-end pt-2">' +
+        '<button id="ov-close" class="btn btn-ghost px-4">' + esc(t('close')) + '</button>' +
+        '<button id="c-send" class="btn btn-primary px-4">' + esc(t('send')) + '</button></div>'
+      );
+      $('ov-close').onclick = closeOverlay;
+      $('c-send').onclick = async function () {
+        $('c-send').disabled = true;
+        try {
+          // Public Intake is the ONE anonymous-write path on this node, and the submission lands as
+          // a record owned by the shop rather than by whoever filled the form in.
+          await AIMEAT.intake.submit(form.org, form.ws, form.formId, {
+            name: $('c-name').value, email: $('c-email').value, message: $('c-msg').value,
+          });
+          $('c-result').className = 'text-sm text-success';
+          $('c-result').textContent = t('sent');
+        } catch (err) {
+          $('c-result').className = 'text-sm text-error';
+          $('c-result').textContent = String(err && err.message || err);
+          $('c-send').disabled = false;
+        }
+      };
+    }
+
+    async function loadAvailability() {
+      var a = await AIMEAT.shop.availability();
+      avail = (a && a.units) || {};
+    }
+
+    async function boot() {
+      $('lang').textContent = lang === 'fi' ? 'EN' : 'FI';
+      $('lang').onclick = function () { lang = lang === 'fi' ? 'en' : 'fi'; paint(); };
+      $('search').oninput = render;
+
+      shop = await AIMEAT.shop.shop();
+      var meta = shop;
+      if (meta && meta.name) $('shop-name').textContent = meta.name;
+
+      cat = await AIMEAT.shop.catalog();
+      items = (cat && Array.isArray(cat.items)) ? cat.items : [];
+      pages = await AIMEAT.shop.pages();
+      await loadAvailability();
+
+      // The sign-in control, on the first screen a visitor sees. Without it the page can only TELL
+      // somebody to sign in and give them nothing to press: the app-origin bridge restores a
+      // session silently when there is one, and the interactive path needs a real click.
+      AIMEAT.auth.mountLoginButton('#login', { compactPill: true });
+
+      // A session may already exist (the app-origin bridge). Not having one is normal and costs
+      // the visitor nothing until they reach for a hold.
+      try { session = await AIMEAT.auth.login(); } catch (err) { session = null; }
+      AIMEAT.auth.on('login', function (s) { session = s; paint(); });
+
+      paint();
+    }
+
+    function paint() {
+      $('lang').textContent = lang === 'fi' ? 'EN' : 'FI';
+      $('updated').textContent = cat && cat.updated ? t('updated') + ' ' + String(cat.updated).slice(0, 10) : '';
+      Array.prototype.forEach.call(document.querySelectorAll('.page-link'), function (btn) {
+        var name = btn.getAttribute('data-page');
+        var has = !!(pages && pages[name]);
+        btn.hidden = !has;
+        if (has) { btn.textContent = t(name); btn.onclick = function () { openPage(name); }; }
+      });
+      var contactBtn = $('contact-btn');
+      // Where an enquiry goes is a property of the SHOP, not of a product list: a shop can take
+      // enquiries before it has anything to sell, and republishing a catalogue must not silently
+      // change the address a message is sent to.
+      contactBtn.hidden = !(shop && shop.contact);
+      contactBtn.textContent = t('contact');
+      contactBtn.onclick = openContact;
+      render();
+    }
+
+    boot();
+  })();
+  </script>
+</body>
+</html>
+`;

@@ -33,24 +33,38 @@ entry: index.html
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
+  <!-- The node paints two permanent marks over the bottom corners of every served app and tells the
+       app how tall that strip is. Reserving the space is the app's job, and reading the variable is
+       the contract: a hardcoded number is wrong on the next viewport. -->
+  <style>
+    .chrome-clear { padding-bottom: calc(var(--aimeat-chrome-bottom, 56px) + 12px); }
+  </style>
 </head>
 <body class="bg-base-100 text-base-content min-h-screen flex flex-col">
-  <nav class="navbar bg-base-200 px-4 shadow-sm gap-2">
-    <div class="flex-1 min-w-0"><span class="text-lg font-bold">Back office</span>
-      <span id="ws-name" class="opacity-60 text-sm ml-2"></span></div>
-    <button id="agent-prompt" class="btn-outline px-3 text-sm" hidden>Copy agent prompt</button>
-    <span id="login"></span>
+  <!-- The bars run full width, their CONTENT shares the same max-w-4xl column as the page below.
+       At page padding the title started at x=16 while the content it titled started at x=224. -->
+  <nav class="navbar bg-base-200 shadow-sm">
+    <div class="max-w-4xl mx-auto w-full px-4 flex items-center gap-2">
+      <div class="flex-1 min-w-0"><span class="text-lg font-bold">Back office</span>
+        <span id="ws-name" class="opacity-60 text-sm ml-2"></span></div>
+      <button id="agent-prompt" class="btn btn-outline px-3 text-sm" hidden>Copy agent prompt</button>
+      <span id="login"></span>
+    </div>
   </nav>
 
-  <div id="tabs" class="tabs tabs-bordered px-4 pt-3" hidden>
-    <button class="tab tab-active" data-tab="home">To do</button>
-    <button class="tab" data-tab="products">Products</button>
-    <button class="tab" data-tab="stock">Shelf</button>
-    <button class="tab" data-tab="pages">Pages</button>
-    <button class="tab" data-tab="enquiries">Enquiries</button>
+  <div id="tabs-row" class="w-full" hidden>
+    <div id="tabs" class="tabs tabs-bordered max-w-4xl mx-auto px-4 pt-3">
+      <button class="tab tab-active" data-tab="home">To do</button>
+      <button class="tab" data-tab="products">Products</button>
+      <button class="tab" data-tab="stock">Shelf</button>
+      <button class="tab" data-tab="pages">Pages</button>
+      <button class="tab" data-tab="enquiries">Enquiries</button>
+    </div>
   </div>
 
-  <main id="app" class="flex-1 w-full max-w-4xl mx-auto p-4"></main>
+  <!-- chrome-clear: the node's two permanent marks own the bottom strip, and this page has no footer
+       to absorb them, so the last row of a long form would sit underneath. -->
+  <main id="app" class="flex-1 w-full max-w-4xl mx-auto p-4 chrome-clear"></main>
 
   <!-- The crew-defs this app ships with. They travel with the package and wait for a runtime:
        deploying one is a pointer task onto the owner's own fleet, which is not part of this node.
@@ -141,6 +155,9 @@ entry: index.html
 
   <script src="/v1/libs/aimeat-auth.js"></script>
   <script src="/v1/libs/aimeat-data.js"></script>
+  <!-- The workspace reads and writes go through this one. Without it AIMEAT.organism is undefined
+       and the whole back office stops at "sign in", having signed the person in. -->
+  <script src="/v1/libs/aimeat-organism.js"></script>
   <script src="/v1/libs/aimeat-intake.js"></script>
   <script src="/v1/cortex/businesslauncher-shop/libs/businesslauncher-shop.js"></script>
   <script>
@@ -158,9 +175,12 @@ entry: index.html
 
     // ── boot ────────────────────────────────────────────────────────────────
     async function boot() {
-      AIMEAT.auth.on('login', function () { start(); });
+      // The control has to be on the screen that asks for it. Telling somebody to sign in while
+      // rendering nothing they can press is the same as telling them nothing.
+      AIMEAT.auth.mountLoginButton('#login', { compactPill: true });
+      AIMEAT.auth.on('login', function () { started = false; start(); });
       session = await AIMEAT.auth.login().catch(function () { return null; });
-      if (!session) { say('<p class="opacity-70">Sign in to run your shop.</p>'); return; }
+      if (!session) { say('<p class="opacity-70">Sign in to run your shop — the button is at the top right.</p>'); return; }
       start();
     }
 
@@ -177,7 +197,7 @@ entry: index.html
       if (candidates.length === 1) return openWorkspace(candidates[0].org, candidates[0].ws);
       if (candidates.length === 0) return renderSetup();
       say('<h2 class="text-lg font-bold mb-3">Which shop?</h2>' + candidates.map(function (c, i) {
-        return '<button class="btn-outline w-full justify-start mb-2 px-4" data-pick="' + i + '">' + esc(c.label) + '</button>';
+        return '<button class="btn btn-outline w-full justify-start mb-2 px-4" data-pick="' + i + '">' + esc(c.label) + '</button>';
       }).join(''));
       Array.prototype.forEach.call(document.querySelectorAll('[data-pick]'), function (b) {
         b.onclick = function () { var c = candidates[Number(b.getAttribute('data-pick'))]; openWorkspace(c.org, c.ws); };
@@ -232,7 +252,7 @@ entry: index.html
         'so nobody else can read or edit them. This app cannot create that space for you. Paste the text below ' +
         'into your own AI once, then reload this page.</p>' +
         '<div class="mockup-code text-xs whitespace-pre-wrap p-3" id="setup-box"></div>' +
-        '<button class="btn-primary px-4 mt-3" id="copy-setup">Copy</button>');
+        '<button class="btn btn-primary px-4 mt-3" id="copy-setup">Copy</button>');
       $('setup-box').textContent = setupPrompt();
       $('copy-setup').onclick = async function (e) {
         await navigator.clipboard.writeText(setupPrompt());
@@ -244,7 +264,7 @@ entry: index.html
       CTX = { org: org, ws: ws };
       var meta = await AIMEAT.organism.read(org, ws).catch(function () { return null; });
       $('ws-name').textContent = (meta && meta.manifest && meta.manifest.name) || ws;
-      $('tabs').hidden = false;
+      $('tabs-row').hidden = false;
       $('agent-prompt').hidden = false;
       $('agent-prompt').onclick = async function (e) {
         await navigator.clipboard.writeText(agentPrompt());
@@ -295,7 +315,7 @@ entry: index.html
       if (tab === 'products') return paintList(SPACES.catalog, 'Products', 'The whole catalogue is one record. Publish sends a copy to the shop front.');
       if (tab === 'pages') return paintList(SPACES.policy, 'Pages', 'Privacy, terms and delivery, as the shop front shows them.');
       if (tab === 'stock') return paintStock();
-      if (tab === 'enquiries') return paintList(SPACES.leads, 'Enquiries', 'What came in through the contact form.');
+      if (tab === 'enquiries') return paintEnquiries();
     }
 
     /** The resume: what is not done yet, in the order it wants doing. */
@@ -308,6 +328,7 @@ entry: index.html
       if (!pages || !pages.terms) steps.push({ label: 'Write your terms', why: 'A buyer should be able to read them before they buy.', act: 'goto:pages' });
       var avail = await AIMEAT.shop.availability();
       if (!avail) steps.push({ label: 'Say what is on the shelf', why: 'Without it the shop cannot hold anything for a buyer.', act: 'goto:stock' });
+      if (shopMeta && !shopMeta.contact) steps.push({ label: 'Open a way to get in touch', why: 'Until you do, the shop front shows no contact form and nothing can reach the Enquiries tab.', act: 'contact' });
 
       if (!steps.length) {
         say('<div class="alert alert-success">Your shop is open and has everything it needs.</div>');
@@ -319,7 +340,7 @@ entry: index.html
           return '<div class="card bg-base-200 mb-3"><div class="card-body p-4 gap-1">' +
             '<div class="font-semibold">' + (i + 1) + '. ' + esc(s.label) + '</div>' +
             '<div class="text-sm opacity-70">' + esc(s.why) + '</div>' +
-            '<div class="pt-2"><button class="btn-primary px-4" data-act="' + esc(s.act) + '">Do this</button></div>' +
+            '<div class="pt-2"><button class="btn btn-primary px-4" data-act="' + esc(s.act) + '">Do this</button></div>' +
             '</div></div>';
         }).join(''));
       Array.prototype.forEach.call(document.querySelectorAll('[data-act]'), function (b) {
@@ -336,6 +357,36 @@ entry: index.html
         var res = await AIMEAT.shop.admin(session, 'configure', { name: name, currency: 'EUR' });
         shopMeta = await AIMEAT.shop.shop();
         if (!res || !res.ok) alert((res && res.error) || 'Could not save that.');
+        return paintHome();
+      }
+      if (act === 'contact') {
+        // Public Intake is the node's own anonymous-write path and the ONLY one. Defining the form
+        // here pins the destination server-side: a submission is written as a record owned by this
+        // shop, in this space, with only these three fields, whoever sends it and whatever else they
+        // put in the body. The shop then stores a POINTER at the form, never a destination the front
+        // could be talked into changing.
+        try {
+          var form = await AIMEAT.intake.defineForm({
+            organism_id: CTX.org, ws: CTX.ws, namespace: 'shop.' + SPACES.leads,
+            title: 'Get in touch',
+            allowed_fields: ['name', 'email', 'message'],
+            required_fields: ['message'],
+            // The submitter never sends these: the node stamps them per submission, so every enquiry
+            // has an id and a time even though the form asks for neither.
+            defaults: { id: '{{uuid}}', receivedAt: '{{now}}' },
+            // A field a person never sees and a robot fills in. Filled means dropped.
+            honeypot_field: 'website',
+            max_per_day: 200,
+            mode: 'publish',
+          });
+          var saved = await AIMEAT.shop.admin(session, 'configure', {
+            contact: { org: CTX.org, ws: CTX.ws, formId: form.form_id },
+          });
+          if (!saved || !saved.ok) throw new Error((saved && saved.error) || 'Could not save that.');
+          shopMeta = await AIMEAT.shop.shop();
+        } catch (err) {
+          alert(String((err && err.message) || err));
+        }
         return paintHome();
       }
       if (act.indexOf('goto:') === 0) {
@@ -355,17 +406,55 @@ entry: index.html
         '<p class="opacity-70 text-sm mb-4">' + esc(blurb) + '</p>' +
         (itemsIn.length
           ? itemsIn.map(function (it) {
+            // A row that says only its own id tells the owner nothing. Say what is in it: how many
+            // products a catalogue holds, or the title of a page.
+            var v = it.value || {};
+            var what = v.title || v.name
+              || (Array.isArray(v.items) ? v.items.length + ' products' + (v.currency ? ' · ' + v.currency : '') : '')
+              || (Array.isArray(v.rows) ? v.rows.length + ' prices' : '');
             return '<div class="card bg-base-200 mb-2"><div class="card-body p-3 flex-row items-center gap-3">' +
               '<span class="font-mono text-xs opacity-60">' + esc(it.id) + '</span>' +
-              '<span class="flex-1 truncate">' + esc((it.value && (it.value.title || it.value.name)) || '') + '</span>' +
+              '<span class="flex-1 truncate">' + esc(what) + '</span>' +
               '</div></div>';
           }).join('')
           : '<div class="opacity-60">Nothing here yet. Your AI can fill this in — copy the agent prompt at the top.</div>') +
-        (space === SPACES.catalog ? '<button id="publish" class="btn-primary px-4 mt-4">Publish to the shop front</button><div id="pub-msg" class="text-sm mt-2"></div>' : '') +
-        (space === SPACES.policy ? '<button id="publish-pages" class="btn-primary px-4 mt-4">Publish the pages</button><div id="pub-msg" class="text-sm mt-2"></div>' : ''));
+        (space === SPACES.catalog ? '<button id="publish" class="btn btn-primary px-4 mt-4">Publish to the shop front</button><div id="pub-msg" class="text-sm mt-2"></div>' : '') +
+        (space === SPACES.policy ? '<button id="publish-pages" class="btn btn-primary px-4 mt-4">Publish the pages</button><div id="pub-msg" class="text-sm mt-2"></div>' : ''));
 
       if ($('publish')) $('publish').onclick = function () { publishCatalog(itemsIn); };
       if ($('publish-pages')) $('publish-pages').onclick = function () { publishPages(itemsIn); };
+    }
+
+    /** What came in through the contact form, and the switch that opens it in the first place. */
+    async function paintEnquiries() {
+      var on = !!(shopMeta && shopMeta.contact);
+      var index = await AIMEAT.organism.read(CTX.org, CTX.ws).catch(function () { return null; });
+      var rows = ((index && index.spaces) || []).filter(function (s) { return s.name === SPACES.leads; })[0];
+      var itemsIn = (rows && rows.items) || [];
+      say('<h2 class="text-lg font-bold mb-1">Enquiries</h2>' +
+        '<p class="opacity-70 text-sm mb-4">What came in through the contact form on the shop front.</p>' +
+        (on
+          ? ''
+          : '<div class="card bg-base-200 mb-4"><div class="card-body p-4 gap-2">' +
+            '<div class="font-semibold">The contact form is not open yet</div>' +
+            '<div class="text-sm opacity-70">Turning it on puts a "Get in touch" button on the shop front. ' +
+            'A message can be sent without an account, and it arrives here as a record you own.</div>' +
+            '<div class="pt-1"><button id="open-contact" class="btn btn-primary px-4">Open the contact form</button></div>' +
+            '</div></div>') +
+        (itemsIn.length
+          ? itemsIn.map(function (it) {
+            var v = it.value || {};
+            return '<div class="card bg-base-200 mb-2"><div class="card-body p-3 gap-1">' +
+              '<div class="flex items-center gap-2 flex-wrap">' +
+              '<span class="font-semibold">' + esc(v.name || 'Someone') + '</span>' +
+              (v.email ? '<span class="opacity-70 text-sm">' + esc(v.email) + '</span>' : '') +
+              '<span class="opacity-50 text-xs ml-auto">' + esc(String(v.receivedAt || '').slice(0, 16).replace('T', ' ')) + '</span>' +
+              '</div>' +
+              '<div class="whitespace-pre-wrap text-sm">' + esc(v.message || '') + '</div>' +
+              '</div></div>';
+          }).join('')
+          : '<div class="opacity-60">' + (on ? 'Nothing has come in yet.' : '') + '</div>'));
+      if ($('open-contact')) $('open-contact').onclick = function () { doAct('contact'); };
     }
 
     async function publishCatalog(itemsIn) {
@@ -402,7 +491,7 @@ entry: index.html
               '<span class="flex-1 truncate">' + esc(it.name) + ' <span class="opacity-50 text-xs font-mono">' + esc(it.sku) + '</span></span>' +
               '<input type="number" min="0" class="input input-bordered input-sm w-24 stock-in" data-sku="' + esc(it.sku) + '" value="' + esc(String(units[it.sku] == null ? 0 : units[it.sku])) + '" />' +
               '</div>';
-          }).join('') + '<button id="save-stock" class="btn-primary px-4 mt-3">Save</button><div id="stock-msg" class="text-sm mt-2"></div>'
+          }).join('') + '<button id="save-stock" class="btn btn-primary px-4 mt-3">Save</button><div id="stock-msg" class="text-sm mt-2"></div>'
           : '<div class="opacity-60">Add what you sell first.</div>'));
       if ($('save-stock')) $('save-stock').onclick = async function () {
         var out = {};

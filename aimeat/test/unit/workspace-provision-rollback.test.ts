@@ -92,7 +92,7 @@ describe('provisionWorkspace rollback', () => {
     });
 
     it('the happy path provisions the schema, the manifest, the readme and the registry entry', async () => {
-        const res = await provisionWorkspace(storage as never, loadConfig({}), input());
+        const res = await provisionWorkspace(storage as never, loadConfig().config, input());
         const left = await leftovers(storage, res.ws);
         expect(left.manifest).not.toBeNull();
         expect(left.readme).not.toBeNull();
@@ -104,7 +104,7 @@ describe('provisionWorkspace rollback', () => {
 
     it('a failure writing the readme leaves nothing behind', async () => {
         const guarded = failingAt(storage, /\.meta\.readme$/);
-        await expect(provisionWorkspace(guarded, loadConfig({}), input())).rejects.toThrow(/readme/);
+        await expect(provisionWorkspace(guarded, loadConfig().config, input())).rejects.toThrow(/readme/);
 
         // The ws id is generated inside, so sweep every key under the organism instead.
         const rows = await storage.listMemory(OWNER_GHII, { prefix: `organism.${ORG}.` });
@@ -113,10 +113,10 @@ describe('provisionWorkspace rollback', () => {
 
     it('a failure appending to the registry leaves nothing behind and keeps the registry as it was', async () => {
         // A registry that already holds one workspace: the rollback must restore exactly this.
-        const first = await provisionWorkspace(storage as never, loadConfig({}), input({ name: 'First' }));
+        const first = await provisionWorkspace(storage as never, loadConfig().config, input({ name: 'First' }));
 
         const guarded = failingAt(storage, /\.meta\.workspaces$/);
-        await expect(provisionWorkspace(guarded, loadConfig({}), input({ name: 'Second' }))).rejects.toThrow(/workspaces/);
+        await expect(provisionWorkspace(guarded, loadConfig().config, input({ name: 'Second' }))).rejects.toThrow(/workspaces/);
 
         const reg = await storage.getMemory(OWNER_GHII, `organism.${ORG}.meta.workspaces`);
         const ids = (reg?.value as { workspaces: { id: string }[] }).workspaces.map(w => w.id);
@@ -144,7 +144,7 @@ describe('provisionWorkspace rollback', () => {
             },
         }) as unknown as Storage;
 
-        await expect(provisionWorkspace(stubborn, loadConfig({}), input()))
+        await expect(provisionWorkspace(stubborn, loadConfig().config, input()))
             .rejects.toThrow(/Partial rollback — these were left behind: .*meta\.manifest/);
     });
 });

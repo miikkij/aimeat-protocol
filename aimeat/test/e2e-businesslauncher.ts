@@ -111,9 +111,9 @@ await test('A dry run shows the whole plan and creates nothing', async () => {
     assert(plan.dry_run === true, 'not marked as a dry run');
     assert(plan.componentCount === 4, `Expected 4 components, got ${plan.componentCount}`);
     // The engine and the lib must come before the apps, or the apps keep the author's short names.
-    assert(plan.installOrder.indexOf('ext-shop') < plan.installOrder.indexOf('app-shop'),
+    assert(plan.installOrder.indexOf('ext-shop') < plan.installOrder.indexOf('app-shop.html'),
         `extension must install before the shop app: ${plan.installOrder.join(' → ')}`);
-    assert(plan.installOrder.indexOf('cortex-shop') < plan.installOrder.indexOf('app-back-office'),
+    assert(plan.installOrder.indexOf('cortex-shop') < plan.installOrder.indexOf('app-back-office.html'),
         `cortex must install before the back office: ${plan.installOrder.join(' → ')}`);
 
     const after = await json('/v1/apps', { headers: authed(ownerToken) });
@@ -151,7 +151,7 @@ await test('The shop engine is live, with its three actions', async () => {
 
 await test("The apps point at THIS instance's engine, not the author's short name", async () => {
     const ext = installed.find(c => c.type === 'extension')!;
-    const shop = installed.find(c => c.componentId === 'app-shop')!;
+    const shop = installed.find(c => c.componentId === 'app-shop.html')!;
     const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(shop.registeredAs)}`);
     const html = await res.text();
     assert(res.status === 200, `Expected 200 serving the shop app, got ${res.status}`);
@@ -165,7 +165,7 @@ await test("The apps point at THIS instance's engine, not the author's short nam
 await test('The back office brought its agents with it', async () => {
     const { status, body } = await json('/v1/apps', { headers: authed(ownerToken) });
     assert(status === 200, `Expected 200, got ${status}`);
-    const back = installed.find(c => c.componentId === 'app-back-office')!;
+    const back = installed.find(c => c.componentId === 'app-back-office.html')!;
     const apps = (body.data as unknown as { apps: Array<{ filename: string; manifest: { cortex?: { agents?: Array<{ agent_name: string }> } } }> }).apps;
     const row = apps.find(a => a.filename === back.registeredAs);
     assert(!!row, 'the back office is not in the catalogue listing');
@@ -195,7 +195,7 @@ await test('The shop ships one schedule, and it costs no tokens', async () => {
 });
 
 await test('A stranger can open the shop front without an account', async () => {
-    const shop = installed.find(c => c.componentId === 'app-shop')!;
+    const shop = installed.find(c => c.componentId === 'app-shop.html')!;
     const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(shop.registeredAs)}`);
     assert(res.status === 200, `Expected 200 with no auth, got ${res.status}`);
     const html = await res.text();

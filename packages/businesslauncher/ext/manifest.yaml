@@ -25,8 +25,8 @@ actions:
   - id: admin
     method: POST
     path: /admin
-    description: Owner operations, refused for anyone but the person who installed this shop. op configure (the shop's name and currency), publish_catalog (write the public copy the storefront reads), publish_pages (privacy, terms and delivery as the storefront shows them), set_stock (units on the shelf, absolute), commit (a sale completed, drop the hold without returning units), sweep (expired holds go back on the shelf).
-    input: { type: object, properties: { op: { type: string }, name: { type: string }, currency: { type: string }, catalog: { type: object }, pages: { type: object }, units: { type: object }, reservationId: { type: string } }, required: [op] }
+    description: Owner operations, refused for anyone but the person who installed this shop. op configure (the shop's name, currency, and where an enquiry from the shop front is sent), publish_catalog (write the public copy the storefront reads), publish_pages (privacy, terms and delivery as the storefront shows them), set_stock (units on the shelf, absolute), commit (a sale completed, drop the hold without returning units), sweep (expired holds go back on the shelf).
+    input: { type: object, properties: { op: { type: string }, name: { type: string }, currency: { type: string }, contact: { type: object }, catalog: { type: object }, pages: { type: object }, units: { type: object }, reservationId: { type: string } }, required: [op] }
     output: { type: object, properties: { ok: { type: boolean }, error: { type: string } } }
     script: admin.js
   - id: reserve
