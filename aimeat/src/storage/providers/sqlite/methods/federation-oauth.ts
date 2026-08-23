@@ -331,10 +331,12 @@ export const federationOauthMethods = {
 
   async saveFederationPeer(this: SqliteStorage, peer: FederationPeerRecord): Promise<void> {
     this.db.prepare(
-      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO federation_peers (nodeId, url, publicKey, status, addedAt, lastSeen, shareCatalogue, replicateMemory, allowRouting, allowMessaging, allowBroadcast, allowSettlement, supportUpstream, peerMode, allowFederatedAuth, federationAuthScopes, tier, availability, expiresAt, heartbeatOk, heartbeatTotal, availabilityWindow, availabilityPct, softwareVersion, nodeCardHash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(peer.nodeId, peer.url, peer.publicKey, peer.status, peer.addedAt, peer.lastSeen,
       peer.shareCatalogue ? 1 : 0, peer.replicateMemory ? 1 : 0, peer.allowRouting ? 1 : 0,
+      peer.allowMessaging ? 1 : 0, peer.allowBroadcast ? 1 : 0, peer.allowSettlement ? 1 : 0,
+      peer.supportUpstream ? 1 : 0,
       peer.peerMode || 'federation', peer.allowFederatedAuth ? 1 : 0,
       (peer.federationAuthScopes ?? []).join(','),
       peer.tier ?? 'member', peer.availability ?? null, peer.expiresAt ?? null,
@@ -354,6 +356,12 @@ export const federationOauthMethods = {
       shareCatalogue: r.shareCatalogue === 1,
       replicateMemory: r.replicateMemory === 1,
       allowRouting: r.allowRouting === 1,
+      // The migration backfills these three to 1 and supportUpstream to 0, so a peer that predates
+      // the columns keeps exactly what it could already do and gains no support routing.
+      allowMessaging: r.allowMessaging === 1,
+      allowBroadcast: r.allowBroadcast === 1,
+      allowSettlement: r.allowSettlement === 1,
+      supportUpstream: r.supportUpstream === 1,
       peerMode: (r.peerMode as FederationPeerRecord['peerMode']) || 'federation',
       allowFederatedAuth: r.allowFederatedAuth === 1,
       federationAuthScopes: ((r.federationAuthScopes as string) || '').split(',').filter(Boolean),
