@@ -3106,6 +3106,16 @@
       "copied": "Copied — paste it in your AI chat",
       "proof": "Already running here:",
       "tour": "Not sure what this can do? Take the tour →",
+      "businesslauncher": {
+        "title": "A shop that is open by this afternoon",
+        "lead": "One yes puts up a shop anyone can browse, a back office to run it from, and stock that cannot sell the same thing twice.",
+        "ask": "I want to open a shop. Walk me through it.",
+        "step1": "Say what you sell and who buys it. That one answer shapes the rest.",
+        "step2": "See the whole plan before anything exists, then say yes once.",
+        "step3": "Your products, prices and pages get a space of your own that nobody else can read.",
+        "step4": "Fill it in as far as you like. The back office shows what is still missing, in order.",
+        "step5": "Take cards when you are ready, asked for separately and never assumed."
+      },
       "marketplace": {
         "title": "A shop that takes cards, coins and agents",
         "lead": "One checkout that accepts a card, a stablecoin or another agent's money — and pays out to you.",

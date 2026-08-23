@@ -3094,6 +3094,16 @@
       "copied": "Kopioitu — liitä se tekoälychattiisi",
       "proof": "Täällä pyörii jo:",
       "tour": "Etkö ole varma mihin tämä pystyy? Käy kierroksella →",
+      "businesslauncher": {
+        "title": "Kauppa joka on auki iltapäivällä",
+        "lead": "Yksi kyllä pystyttää kaupan jota kuka tahansa voi selata, takahuoneen josta sitä pyöritetään, ja varaston joka ei myy samaa kappaletta kahdesti.",
+        "ask": "Haluan avata kaupan. Ohjaa minut läpi.",
+        "step1": "Kerro mitä myyt ja kuka ostaa. Se yksi vastaus ratkaisee loput.",
+        "step2": "Näet koko suunnitelman ennen kuin mitään on olemassa, ja sanot kerran kyllä.",
+        "step3": "Tuotteet, hinnat ja sivut saavat oman tilansa jota kukaan muu ei näe.",
+        "step4": "Täytä sen verran kuin jaksat. Takahuone näyttää mitä puuttuu ja missä järjestyksessä.",
+        "step5": "Ota kortit käyttöön silloin kun itse haluat. Sitä kysytään erikseen eikä oleteta."
+      },
       "marketplace": {
         "title": "Kauppa jossa maksavat kortit, kolikot ja agentit",
         "lead": "Yksi kassa joka ottaa vastaan kortin, stablecoinin tai toisen agentin rahat — ja tilittää sinulle.",

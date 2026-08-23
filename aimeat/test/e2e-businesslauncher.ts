@@ -74,6 +74,26 @@ await test('The shop package is in the catalogue', async () => {
     groupId = found!.packageGroupId;
 });
 
+// The whole reason this is a new tier rather than a deepened marketplace playbook: prompt content
+// is only re-synced from the repo for the generator, builders and tiers groups, so editing an
+// existing playbook never reaches a node that has already seeded it. A NEW id does. This is that
+// claim, checked rather than argued.
+await test('The playbook is served, and it needs no account to read', async () => {
+    const res = await fetch(`${BASE}/v1/prompts/playbook/businesslauncher?format=txt`);
+    assert(res.status === 200, `Expected 200, got ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('dry run') || text.includes('DRY RUN'), 'the playbook never mentions the dry run');
+    assert(!text.includes('{{node_url}}'), 'the node_url variable was left unsubstituted');
+});
+
+// The prompt route serves only ids that are in the PLAYBOOKS array, so a 200 for this one beside a
+// 404 for a made-up one is the proof that the playbook is registered — without standing up the whole
+// onboarding funnel, which is what /v1/home/state would need and which is a different feature's test.
+await test('Only a registered playbook is served at all', async () => {
+    const missing = await fetch(`${BASE}/v1/prompts/playbook/not-a-playbook`);
+    assert(missing.status === 404, `Expected 404 for an unknown playbook, got ${missing.status}`);
+});
+
 // ─── The one approval ───────────────────────────────────────────────
 console.log('\nInstalling');
 

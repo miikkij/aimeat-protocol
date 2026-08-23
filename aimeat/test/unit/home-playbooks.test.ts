@@ -13,9 +13,14 @@
  *   v1.0.0 — 2026-08-19 — With the playbooks.
  */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { openPlaybooks, PLAYBOOKS } from '../../src/services/home-playbooks.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 /** A storage that knows about exactly the subdomains it is given. */
 const storageWith = (sites: Record<string, { enabled: boolean }>): Storage => ({
@@ -40,10 +45,30 @@ describe('the playbooks a node offers', () => {
     expect(off.map(p => p.id)).toContain('page');
   });
 
-  it('carries every playbook a step count the locale files must answer for', async () => {
+  // The name of this case used to be the whole of it: it asserted a positive number and never
+  // opened a locale file. The client renders steps BY COUNT and drops anything that resolves to
+  // nothing, so a step key that was never written disappears in silence and the recipe is a step
+  // short with no error anywhere. This reads en.json, which is the source of truth for what keys
+  // exist; fi and es fall back to English by design and are the locale gate's business.
+  it('carries every playbook a step count the locale files really answer for', async () => {
+    const en = JSON.parse(readFileSync(resolve(HERE, '../../locales/en.json'), 'utf8')) as {
+      home: { playbooks: Record<string, Record<string, string>> };
+    };
     const open = await openPlaybooks(storageWith({}), cfg());
-    for (const pb of open) expect(pb.steps).toBeGreaterThan(0);
     expect(open.length).toBeGreaterThanOrEqual(3);
+
+    for (const pb of PLAYBOOKS) {
+      const block = en.home.playbooks[pb.id];
+      expect(block, `home.playbooks.${pb.id} is missing from en.json`).toBeTruthy();
+      for (const key of ['title', 'lead', 'ask']) {
+        expect(block[key], `home.playbooks.${pb.id}.${key} is missing`).toBeTruthy();
+      }
+      for (let i = 1; i <= pb.steps; i++) {
+        expect(block['step' + i], `home.playbooks.${pb.id}.step${i} is missing, and a missing step renders as nothing`).toBeTruthy();
+      }
+      // One past the count would render nowhere, so it is written and never seen.
+      expect(block['step' + (pb.steps + 1)], `home.playbooks.${pb.id} has a step${pb.steps + 1} the client never reads`).toBeUndefined();
+    }
   });
 
   it('proves a playbook only with apps THIS node actually serves', async () => {
