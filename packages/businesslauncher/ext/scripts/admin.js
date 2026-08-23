@@ -59,10 +59,15 @@ export default async function (ctx, input) {
         stock[sku] = Math.floor(n);
       }
       const next = { stock: stock, reservations: inv.reservations || {} };
+      // PRIVATE: this record names who holds what, and an ext namespace is world-readable by
+      // default. The public shelf number goes in `availability`, counts only, no identities.
       const wrote = read
-        ? await ctx.memory.set('inventory', next, { ifVersion: read.version })
-        : await ctx.memory.set('inventory', next, { ifVersion: 0 });
-      if (wrote.ok) return { ok: true, stock: stock };
+        ? await ctx.memory.set('inventory', next, { ifVersion: read.version, visibility: 'private' })
+        : await ctx.memory.set('inventory', next, { ifVersion: 0, visibility: 'private' });
+      if (wrote.ok) {
+        await ctx.memory.set('availability', { units: stock, updated: now });
+        return { ok: true, stock: stock };
+      }
     }
     return { ok: false, error: 'too much contention on the inventory — try again' };
   }
@@ -82,7 +87,9 @@ export default async function (ctx, input) {
       delete reservations[id];
       const wrote = await ctx.memory.set('inventory', {
         stock: inv.stock || {}, reservations: reservations,
-      }, { ifVersion: read.version });
+      }, { ifVersion: read.version, visibility: 'private' });
+      // No availability mirror here on purpose: committing a sale drops the hold and returns
+      // nothing to the shelf, so the public number did not move.
       if (wrote.ok) return { ok: true, committed: id };
     }
     return { ok: false, error: 'too much contention on the inventory — try again' };
@@ -111,8 +118,11 @@ export default async function (ctx, input) {
       if (expired.length === 0) return { ok: true, expired: 0 };
       const wrote = await ctx.memory.set('inventory', {
         stock: stock, reservations: reservations,
-      }, { ifVersion: read.version });
-      if (wrote.ok) return { ok: true, expired: expired.length, ids: expired };
+      }, { ifVersion: read.version, visibility: 'private' });
+      if (wrote.ok) {
+        await ctx.memory.set('availability', { units: stock, updated: now });
+        return { ok: true, expired: expired.length, ids: expired };
+      }
     }
     return { ok: false, error: 'too much contention on the inventory — try again' };
   }
