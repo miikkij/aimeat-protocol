@@ -953,3 +953,35 @@
 .adm-metrics-ledger-hint { color: var(--muted); font-size: 0.82rem; }
 .adm-metrics-ledger tr:last-child td { border-top: 2px solid var(--border); font-weight: 600; }
 .adm-metrics-ledger tr:last-child .adm-metrics-ledger-hint { font-weight: 400; }
+
+/* ── Federation: one peer's rung on the ladder ── */
+/* The capabilities a tier forbids are shown and disabled rather than hidden. Hiding them would make
+   the tiers look like unrelated feature sets; disabling them shows that the ladder is one thing and
+   which rung this peer is on. A checkbox that ticked and then bounced back on reload — which is what
+   an editable control would do against the server's clamp — reads as a broken screen, not a rule. */
+/* A fixed width, not a minimum: with only a min-width this column took whatever the longest line
+   wanted, and the table then ran past its scroll container. The page reports no overflow either way,
+   because the table scrolls inside its own box — which is exactly how a clipped column hides from a
+   measurement and not from a reader. */
+.adm-peer-policy { display: flex; flex-direction: column; gap: 0.15rem; width: 13rem; }
+.adm-peer-policy-note { color: var(--muted); font-size: 0.75rem; margin: 0.3rem 0 0; }
+.adm-peer-policy-row { display: flex; align-items: center; gap: 0.35rem; }
+.adm-peer-policy-row input[disabled] { cursor: not-allowed; }
+.adm-peer-policy-locked { font-size: 0.7rem; opacity: 0.55; cursor: help; }
+.adm-peer-policy-mode { font-size: 0.75rem; padding: 2px 4px; margin-top: 0.25rem; max-width: 12rem; }
+/* Support routing is not a capability, it is a decision about where people's help requests go. The
+   rule above it separates the two so it does not read as a seventh permission. */
+.adm-peer-policy-support { margin-top: 0.4rem; padding-top: 0.4rem; border-top: 1px solid var(--border); }
+
+/* The tier + availability badges. Was an inline style on the <td>, which made the cell a flex
+   container and floated the badge to the middle of a tall row instead of sitting with its data. */
+.adm-peer-tier { display: flex; gap: 4px; flex-wrap: wrap; align-items: flex-start; }
+
+/* The ladder, once. Collapsed by default: an operator who knows the tiers does not need to re-read
+   them, and one who does not needs them in one place rather than repeated down a column. */
+.adm-tier-ladder { margin: 0.5rem 0 0.9rem; font-size: 0.85rem; }
+.adm-tier-ladder summary { cursor: pointer; color: var(--blue); }
+.adm-tier-ladder-list { margin: 0.6rem 0 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.adm-tier-ladder-row { display: grid; grid-template-columns: 7rem 1fr; gap: 0.6rem; align-items: baseline; }
+.adm-tier-ladder-row dt { font-weight: 600; }
+.adm-tier-ladder-row dd { margin: 0; color: var(--muted); }
