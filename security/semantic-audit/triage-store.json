@@ -968,7 +968,8 @@
       "note": "Ensikontaktin portti päästää tuntemattoman lähettäjän läpi pelkästään sillä perusteella, että vastaanottajan postilaatikossa on jo viestejä kehyksen mukanaan tuomassa conversation_id:ssä, eikä se mitenkään sido tuota tunnusta lähettäjään; koska keskustelutunnus on julkinen ja determinististi laskettava kahdesta identiteetistä (conversationIdFor), naapurisolmulla oleva vieras voi laskea vastaanottajan olemassa olevan ketjun tunnuksen ja saada yhteydenottonsa automaattisesti hyväksytyksi.",
       "commitRange": "HEAD~10..HEAD",
       "date": "2026-08-23",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu committissa ae74bbb0, regressiotesti federation-messages 5b."
     },
     {
       "id": "ab8e33419f98",
@@ -1007,7 +1008,8 @@
       "note": "Portti ohittaa scope-tarkistuksen kokonaan silloin kun sanoja ei ole lainkaan (`if (scopes.length && !scopeIsCovered(...))`), ja koska MCP-istunnon scopet tulevat sellaisenaan agentin `defaultScopes`-kentästä, operaattoritilin agentti jolla ei ole yhtään myönnettyä sanaa läpäisee `aimeat_compliance_report scope:\"node\"` -kutsun ja saa koko noden raportin, vaikka HTTP-ovi `requireOperatorPrincipal(storage, 'compliance:read')` torjuisi saman kutsujan.",
       "commitRange": "a1cfe3ea..HEAD",
       "date": "2026-08-23",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu committissa ae74bbb0, yksikkötesti compliance-access.test.ts."
     }
   ]
 }
