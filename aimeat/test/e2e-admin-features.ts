@@ -428,26 +428,26 @@ await test('GET /v1/admin/config \u2192 200, schema has expected paths', async (
 await test('PUT /v1/admin/config \u2192 update a boolean config', async () => {
     // Read current value
     const { body: getBody } = await json('/v1/admin/config', authed());
-    const currentVal = getBody.data.schema['features.keyed_browse_enabled'].value;
+    const currentVal = getBody.data.schema['features.extended_features_enabled'].value;
 
     // Toggle value
     const newVal = !currentVal;
     const { status, body } = await json('/v1/admin/config', authed({
         method: 'PUT',
-        body: JSON.stringify({ changes: [{ path: 'features.keyed_browse_enabled', value: newVal }] }),
+        body: JSON.stringify({ changes: [{ path: 'features.extended_features_enabled', value: newVal }] }),
     }));
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.ok === true, 'ok');
     assert(Array.isArray(body.data?.applied), 'has applied array');
     assert(body.data.applied.length === 1, 'one change applied');
-    assert(body.data.applied[0].path === 'features.keyed_browse_enabled', 'correct path');
+    assert(body.data.applied[0].path === 'features.extended_features_enabled', 'correct path');
     assert(body.data.applied[0].new_value === newVal, 'new value matches');
     assert(body.data.applied[0].old_value === currentVal, 'old value matches');
 
     // Restore original value
     await json('/v1/admin/config', authed({
         method: 'PUT',
-        body: JSON.stringify({ changes: [{ path: 'features.keyed_browse_enabled', value: currentVal }] }),
+        body: JSON.stringify({ changes: [{ path: 'features.extended_features_enabled', value: currentVal }] }),
     }));
 });
 
