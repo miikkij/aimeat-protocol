@@ -3186,7 +3186,8 @@
       "favTitle": "Your favourite apps",
       "modeLabel": "Which apps to show",
       "saved": "Last saved",
-      "used": "Last opened"
+      "used": "Last opened",
+      "noneOpened": "Nothing opened on this device yet."
     },
     "playbooks": {
       "title": "What would you like to set up?",
@@ -3249,7 +3250,7 @@
       "more": "How this works →"
     },
     "ach": {
-      "title": "Achievements",
+      "title": "Tried so far",
       "mat": "Welcome mat up",
       "agent": "Agent home",
       "chat": "First conversation",

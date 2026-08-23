@@ -9,6 +9,14 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v2.4.0 — 2026-08-23 — The finished home reads as BANDS (.koti-band): one rule between "what
+ *     you have made", "what would you like to set up" and "what has happened", the same rule the
+ *     header wears, in place of five sections each bringing its own margin and no edge. The band
+ *     title steps up from the row label (it was 0.82rem beside a 0.78rem category word, two levels
+ *     drawn as one). The named rows (.koti-row) go two-column, label left and chips right, so
+ *     shared spaces, knowledge and apps line up as a list. Achievement chips turn square-cornered
+ *     so a round pill means "open/fold" and a square chip means "a thing". (Jouni, on his own
+ *     account: the eye ran around and settled nowhere.)
  *   v2.3.0 — 2026-08-19 — .koti-pb* (the folded playbooks and the one that opens) and .koti-trust
  *     (the AI-labelling and data-ownership line at the foot).
  *   v2.2.0 — 2026-08-18 — .koti-things-named (spaces and packages by name), .koti-ach* (the
@@ -322,9 +330,36 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
 .koti-b-app-plans { margin: 0.35rem 0 0; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; }
 .koti-b-app-docs { display: inline-block; margin-top: 0.4rem; font-size: 0.85rem; }
 
+/* ── The bands of the finished home. One rule between them, the header's rule, and the spacing
+   inside a band comes from one place instead of every section bringing its own margin. The status
+   pieces at the top (mailbox, chat door, fleet line) sit outside any band: they are "now", under
+   the nameplate. A band with nothing to say is not rendered at all, so no empty rule is drawn. ── */
+.koti-band {
+  margin-top: 1.8rem; padding-top: 1.4rem;
+  border-top: 1px solid var(--border);
+}
+/* The band title outranks the row label below it: a size step and a darker ink, so the two
+   levels (WHAT YOU HAVE MADE / shared spaces) no longer draw as one. */
+.koti-band-title {
+  font-size: 0.92rem; text-transform: uppercase; letter-spacing: 1.4px;
+  color: var(--text-dim); font-weight: 700; margin: 0 0 0.9rem;
+}
+/* Inside a band, successive rows keep one rhythm. */
+.koti-band > * + * { margin-top: 1rem; }
+.koti-band > .koti-band-title + * { margin-top: 0; }
+
 /* ── What you have made: each count is a door to its surface. Zero rows never render. ── */
-.koti-things { margin-top: 2rem; }
 .koti-things-row { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+/* A named row: the category word in a fixed left column, the chips in the right, so shared
+   spaces, knowledge and apps line up as one list rather than three clouds. Narrow: the word
+   takes its own line above the chips. */
+.koti-row { display: flex; align-items: flex-start; gap: 0.6rem 1rem; }
+.koti-row-label { flex: 0 0 11rem; padding-top: 0.55rem; }
+.koti-row-body { flex: 1 1 auto; min-width: 0; align-items: center; }
+@media (max-width: 640px) {
+  .koti-row { flex-direction: column; gap: 0.35rem; }
+  .koti-row-label { flex: none; padding-top: 0; }
+}
 .koti-thing {
   display: inline-flex; align-items: baseline; gap: 0.45rem;
   padding: 0.55rem 0.9rem;
@@ -335,9 +370,8 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
 .koti-thing:hover { border-color: var(--accent); }
 .koti-thing-n { font-size: 1.05rem; font-weight: 700; color: var(--accent); }
 .koti-thing-label { font-size: 0.88rem; color: var(--text-dim); }
-/* The named rows: which spaces, which packages. The category word sits as a quiet prefix. */
-.koti-things-named { margin-top: 0.6rem; align-items: center; }
-.koti-things-cat { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+/* The category word of a named row: which spaces, which packages, which apps. */
+.koti-things-cat { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; line-height: 1.3; }
 .koti-thing--named { padding: 0.4rem 0.3rem 0.4rem 0.75rem; gap: 0.2rem; }
 .koti-thing--named .koti-thing-label { color: var(--text); }
 .koti-thing--named .koti-thing-n { font-size: 0.85rem; }
@@ -357,8 +391,11 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
 }
 .koti-fold:hover { border-color: var(--accent); color: var(--text); }
 .koti-fold--on { border-style: solid; border-color: var(--accent); color: var(--text); }
-.koti-things-explain { margin: 1rem 0 0.4rem; font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; }
+/* The knowledge explainer closes the band as one quiet line (it used to sit between two rows and
+   cut the list in half); the same words ride on the row label as a tooltip. */
+.koti-band > .koti-things-explain { margin-top: 1.2rem; font-size: 0.82rem; color: var(--muted); line-height: 1.5; }
 .koti-apps-mode { display: inline-flex; gap: 0.35rem; align-items: center; margin-left: 0.4rem; }
+.koti-apps-none { font-size: 0.85rem; color: var(--text-dim); }
 
 /* The mailbox and the fleet: two one-line status doors under the greeting. */
 .koti-mailbox, .koti-fleet {
@@ -386,7 +423,6 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
 }
 
 /* ── Playbooks: folded outcomes. Closed they are a row of names; open, one shows its steps. ── */
-.koti-pb { margin-top: 2rem; }
 .koti-pb-lead { margin: -0.4rem 0 0.8rem; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; }
 .koti-pb-tour { font-size: 0.85rem; color: var(--accent); text-decoration: none; align-self: center; }
 .koti-pb-tour:hover { text-decoration: underline; }
@@ -413,12 +449,12 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
 .koti-trust a { color: var(--accent); text-decoration: none; }
 .koti-trust a:hover { text-decoration: underline; }
 
-/* ── Achievements: what has been tried, and doors to what has not. ── */
-.koti-ach { margin-top: 2rem; }
+/* ── Achievements: what has been tried, and doors to what has not. A square-cornered chip like
+   .koti-thing, never the round .koti-fold pill: round means open/fold, square means a thing. ── */
 .koti-ach-chip {
   display: inline-flex; align-items: center; gap: 0.4rem;
-  padding: 0.4rem 0.75rem;
-  border: 1px dashed var(--border); border-radius: var(--radius-full);
+  padding: 0.35rem 0.7rem;
+  border: 1px dashed var(--border); border-radius: 10px;
   font-size: 0.85rem; color: var(--text-dim); text-decoration: none;
   transition: border-color .15s;
 }
@@ -432,12 +468,10 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
 .koti-chatdoor-ai { margin: 0.3rem 0 0; font-size: 0.82rem; color: var(--text-dim); }
 .koti-ach-toggle { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
 
-/* ── The feed: what has happened. Quiet by design — it reports, it does not compete. ── */
-.koti-feed { margin-top: 2.5rem; }
-.koti-feed-title {
-  font-size: 0.82rem; text-transform: uppercase; letter-spacing: 1.4px;
-  color: var(--muted); font-weight: 700; margin: 0 0 0.9rem;
-}
+/* ── The feed: what has happened. Quiet by design — it reports, it does not compete. On the
+   finished home it is a band (.koti-band, the rule); on the onboarding home it keeps its own gap.
+   The title rule lives with .koti-band-title above. ── */
+.koti-feed:not(.koti-band) { margin-top: 2.5rem; }
 /* The quiet nudge: when nothing has happened for days, the feed opens with the next move
    instead of a list that ends in the past. A door, not an alarm. */
 .koti-feed-quiet {

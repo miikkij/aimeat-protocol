@@ -3174,7 +3174,8 @@
       "favTitle": "Tus aplicaciones favoritas",
       "modeLabel": "Qué aplicaciones mostrar",
       "saved": "Últimas guardadas",
-      "used": "Últimas abiertas"
+      "used": "Últimas abiertas",
+      "noneOpened": "En este dispositivo aún no se ha abierto ninguna app."
     },
     "playbooks": {
       "title": "¿Qué te gustaría montar?",
@@ -3237,7 +3238,7 @@
       "more": "Cómo funciona →"
     },
     "ach": {
-      "title": "Logros",
+      "title": "Probado hasta ahora",
       "mat": "Felpudo puesto",
       "agent": "Agente en casa",
       "chat": "Primera conversación",

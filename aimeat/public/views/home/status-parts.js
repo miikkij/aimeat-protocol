@@ -12,9 +12,17 @@
  *   spills: the person stars what matters, the rest folds away, and the fold says how much it
  *   holds. The first version showed every chip it had, which on the developer's own account was
  *   the wall of noise this file exists to prevent.
- * @structure MailboxRow · FleetLine · ChatDoor · Things · FavoriteApps · Playbooks · TrustLine · Achievements
+ * @structure MailboxRow · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   v1.3.0 — 2026-08-23 — The home reads as bands. Things IS the "what you have made" band and
+ *     takes the apps row as its child; every named row (spaces, knowledge, apps, tried-so-far)
+ *     goes through one NamedRow frame — label left, content right — so they line up as a list;
+ *     the knowledge explainer leaves the middle of the list for a tooltip on its label and one
+ *     line at the band's foot; Achievements becomes a row inside the setup band (index.js),
+ *     titled "Tried so far", instead of a fourth section nobody was looking for. Found on the
+ *     way: "Last opened" on a device with no recents hid the whole apps row, switch included, so
+ *     the remembered choice had no way back; the row now stays and says so.
  *   v1.2.0 — 2026-08-19 — Playbooks (folded outcomes with steps, live proof and both roads: the
  *     agent or your own AI) and TrustLine (AI labelling + data ownership, stated as what the
  *     system does).
@@ -120,11 +128,25 @@ export function ChatDoor({ chatStatus, mcpNames }) {
 }
 
 /**
+ * One named row: the category word in a fixed left column, the content on the right. Every row
+ * under a band title goes through this frame (spaces, knowledge, apps, tried so far), which is
+ * what makes them line up as a list instead of reading as separate clouds. `title` is the
+ * explainer that rides on the label as a tooltip, when the word alone is not enough.
+ */
+export function NamedRow({ label, title, className, children }) {
+  return html`
+    <div class="koti-row ${className || ''}">
+      <span class="koti-things-cat koti-row-label" title=${title || undefined}>${label}</span>
+      <div class="koti-things-row koti-row-body">${children}</div>
+    </div>`;
+}
+
+/**
  * One starrable, foldable chip list. Starred rows always show, then the newest unstarred up to the
  * fold; the fold names how many it hides. The star is the person's own mark, kept in home.prefs —
  * starring is how "always show this one" is said without a settings page.
  */
-function ChipRow({ label, rows, starred, onStar, fold }) {
+function ChipRow({ label, title, rows, starred, onStar, fold }) {
   const [open, setOpen] = useState(false);
   if (!rows.length) return null;
   const isStar = (id) => starred.includes(id);
@@ -133,8 +155,7 @@ function ChipRow({ label, rows, starred, onStar, fold }) {
   const shown = open ? [...stars, ...rest] : [...stars, ...rest.slice(0, Math.max(0, fold - stars.length))];
   const hidden = rows.length - shown.length;
   return html`
-    <div class="koti-things-row koti-things-named">
-      <span class="koti-things-cat">${label}</span>
+    <${NamedRow} label=${label} title=${title}>
       ${shown.map((r) => html`
         <span class="koti-thing koti-thing--named" key=${r.id}>
           <a class="koti-thing-door" href=${r.href}>
@@ -154,7 +175,7 @@ function ChipRow({ label, rows, starred, onStar, fold }) {
         <button type="button" class="koti-fold" onClick=${() => setOpen(false)}>
           ${tr('home.things.showLess', 'Show less')}
         </button>`}
-    </div>`;
+    <//>`;
 }
 
 /** Newest-first by the row's own updated stamp; rows with no stamp keep their input order. */
@@ -163,11 +184,13 @@ function byUpdated(rows) {
 }
 
 /**
- * What the person has made here. Counts as doors, then the shared spaces they belong to and the
- * knowledge they structured, BY NAME — a count says you have things somewhere, a name says which.
- * Every chip opens the thing itself, not a tab that merely contains it.
+ * What the person has made here: the "what you have made" BAND. Counts as doors, then the shared
+ * spaces they belong to and the knowledge they structured, BY NAME — a count says you have things
+ * somewhere, a name says which. Every chip opens the thing itself, not a tab that merely contains
+ * it. `children` is the apps row (FavoriteApps), rendered as the last named row so the band is one
+ * list; the knowledge explainer closes the band rather than cutting the list in half.
  */
-export function Things({ usage, orgs, packages, prefs, onStar }) {
+export function Things({ usage, orgs, packages, prefs, onStar, children }) {
   const rows = [
     { n: usage?.counts?.apps?.used, key: 'home.things.apps', fallback: 'Apps', href: '/v1/profile?tab=apps' },
     { n: usage?.memory?.used_keys, key: 'home.things.memory', fallback: 'Notes and records', href: '/v1/profile?tab=memory' },
@@ -183,9 +206,10 @@ export function Things({ usage, orgs, packages, prefs, onStar }) {
   })));
   if (!rows.length && !orgRows.length && !pkgRows.length) return null;
   const starred = prefs?.stars ?? [];
+  const explain = tr('home.things.knowledgeExplain', 'Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and — when you choose — other people to use.');
   return html`
-    <section class="koti-things">
-      <h2 class="koti-feed-title">${tr('home.things.title', 'What you have made')}</h2>
+    <section class="koti-band koti-things">
+      <h2 class="koti-band-title">${tr('home.things.title', 'What you have made')}</h2>
       ${rows.length > 0 && html`
         <div class="koti-things-row">
           ${rows.map((r) => html`
@@ -196,12 +220,10 @@ export function Things({ usage, orgs, packages, prefs, onStar }) {
         </div>`}
       <${ChipRow} label=${tr('home.things.organisms', 'Shared spaces')} rows=${orgRows}
         starred=${starred} onStar=${onStar} fold=${FOLD_AFTER} />
-      ${pkgRows.length > 0 && html`
-        <p class="koti-things-explain">
-          ${tr('home.things.knowledgeExplain', 'Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and — when you choose — other people to use.')}
-        </p>`}
-      <${ChipRow} label=${tr('home.things.knowledge', 'Structured knowledge')} rows=${pkgRows}
+      <${ChipRow} label=${tr('home.things.knowledge', 'Structured knowledge')} title=${explain} rows=${pkgRows}
         starred=${starred} onStar=${onStar} fold=${FOLD_AFTER} />
+      ${children}
+      ${pkgRows.length > 0 && html`<p class="koti-things-explain">${explain}</p>`}
     </section>`;
 }
 
@@ -238,24 +260,28 @@ export function FavoriteApps({ apps, favorites, owner, prefs, onMode }) {
       .map((a) => ({ id: `${owner}/${a.filename}`, name: appName(a, a.filename), updatedAt: a.updated_at || a.created_at, href: appUrl(owner, a.filename) })))
       .slice(0, 6);
   }
-  if (!rows.length) return null;
+  // "Last opened" on a device that has opened nothing yet used to return null here, and with the
+  // row went the switch that could bring "last saved" back: the choice was remembered and the
+  // way out was gone. The row stays, says so, and keeps its switch.
+  const noneOpened = !rows.length && favRefs.length === 0 && mode === 'used';
+  if (!rows.length && !noneOpened) return null;
+  // A named row inside the "what you have made" band (Things renders it as its child), in line
+  // with the spaces and the knowledge above it rather than a section of its own.
   return html`
-    <section class="koti-things koti-apps">
-      <h2 class="koti-feed-title">${title}</h2>
-      <div class="koti-things-row">
-        ${rows.map((r) => html`
-          <a class="koti-thing koti-thing--named" key=${r.id} href=${r.href} target="_blank" rel="noopener">
-            <span class="koti-thing-label">${r.name}</span>
-          </a>`)}
-        ${favRefs.length === 0 && html`
-          <span class="koti-apps-mode" role="group" aria-label=${tr('home.apps.modeLabel', 'Which apps to show')}>
-            <button type="button" class="koti-fold ${mode === 'saved' ? 'koti-fold--on' : ''}"
-              onClick=${() => onMode('saved')}>${tr('home.apps.saved', 'Last saved')}</button>
-            <button type="button" class="koti-fold ${mode === 'used' ? 'koti-fold--on' : ''}"
-              onClick=${() => onMode('used')}>${tr('home.apps.used', 'Last opened')}</button>
-          </span>`}
-      </div>
-    </section>`;
+    <${NamedRow} label=${title}>
+      ${noneOpened && html`<span class="koti-apps-none">${tr('home.apps.noneOpened', 'Nothing opened on this device yet.')}</span>`}
+      ${rows.map((r) => html`
+        <a class="koti-thing koti-thing--named" key=${r.id} href=${r.href} target="_blank" rel="noopener">
+          <span class="koti-thing-label">${r.name}</span>
+        </a>`)}
+      ${favRefs.length === 0 && html`
+        <span class="koti-apps-mode" role="group" aria-label=${tr('home.apps.modeLabel', 'Which apps to show')}>
+          <button type="button" class="koti-fold ${mode === 'saved' ? 'koti-fold--on' : ''}"
+            onClick=${() => onMode('saved')}>${tr('home.apps.saved', 'Last saved')}</button>
+          <button type="button" class="koti-fold ${mode === 'used' ? 'koti-fold--on' : ''}"
+            onClick=${() => onMode('used')}>${tr('home.apps.used', 'Last opened')}</button>
+        </span>`}
+    <//>`;
 }
 
 /**
@@ -288,9 +314,10 @@ export function Playbooks({ playbooks, tour }) {
       setTimeout(() => setCopied(null), 2500);
     } catch (e) { swallowed('playbooks: copy', e); }
   };
+  // The band title ("What would you like to set up?") is the band's, drawn by index.js, so the
+  // tried-so-far row beside this one sits under the same heading.
   return html`
-    <section class="koti-pb">
-      <h2 class="koti-feed-title">${tr('home.playbooks.title', 'What would you like to set up?')}</h2>
+    <div class="koti-pb">
       <p class="koti-pb-lead">${tr('home.playbooks.lead', 'Each one is a real thing you can do here, with the steps and the prompt that gets it done.')}</p>
       <div class="koti-things-row">
         ${playbooks.map((pb) => html`
@@ -332,7 +359,7 @@ export function Playbooks({ playbooks, tour }) {
             </button>
           </div>
         </div>`)}
-    </section>`;
+    </div>`;
 }
 
 /**
@@ -356,6 +383,10 @@ export function TrustLine() {
  * achievement that can drift from the thing it celebrates is a lie waiting to happen. The one
  * exception is the Experience Center, which the node cannot observe: its chip marks itself when
  * the person goes. Hidden entirely by the settings toggle (home.prefs.hideAchievements).
+ *
+ * A named row ("Tried so far") inside the setup band, under the playbooks: what has been tried
+ * and what has not is the same subject as what you could set up, and as a section of its own it
+ * was a fourth heading nobody was looking for.
  */
 export function Achievements({ state, usage, markers, chatStatus, orgs, packages, prefs, onTried }) {
   if (prefs?.hideAchievements) return null;
@@ -373,16 +404,13 @@ export function Achievements({ state, usage, markers, chatStatus, orgs, packages
       href: 'https://experience-center.apps.aimeat.io', external: true },
   ];
   return html`
-    <section class="koti-ach">
-      <h2 class="koti-feed-title">${tr('home.ach.title', 'Achievements')}</h2>
-      <div class="koti-things-row">
-        ${list.map((a) => html`
-          <a class="koti-ach-chip ${a.done ? 'koti-ach-chip--done' : ''}" key=${a.id} href=${a.href}
-             target=${a.external ? '_blank' : undefined} rel=${a.external ? 'noopener' : undefined}
-             onClick=${a.id === 'experience' && !a.done ? () => onTried('experience') : undefined}>
-            <span class="koti-ach-mark" aria-hidden="true">${a.done ? '✓' : '·'}</span>
-            ${tr(a.key, a.fallback)}
-          </a>`)}
-      </div>
-    </section>`;
+    <${NamedRow} label=${tr('home.ach.title', 'Tried so far')} className="koti-ach">
+      ${list.map((a) => html`
+        <a class="koti-ach-chip ${a.done ? 'koti-ach-chip--done' : ''}" key=${a.id} href=${a.href}
+           target=${a.external ? '_blank' : undefined} rel=${a.external ? 'noopener' : undefined}
+           onClick=${a.id === 'experience' && !a.done ? () => onTried('experience') : undefined}>
+          <span class="koti-ach-mark" aria-hidden="true">${a.done ? '✓' : '·'}</span>
+          ${tr(a.key, a.fallback)}
+        </a>`)}
+    <//>`;
 }

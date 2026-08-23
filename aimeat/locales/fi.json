@@ -3174,7 +3174,8 @@
       "favTitle": "Suosikkiappisi",
       "modeLabel": "Mitkä appit näytetään",
       "saved": "Viimeksi tallennetut",
-      "used": "Viimeksi avatut"
+      "used": "Viimeksi avatut",
+      "noneOpened": "Tällä laitteella ei ole vielä avattu yhtään appia."
     },
     "playbooks": {
       "title": "Mitä haluaisit perustaa?",
@@ -3237,7 +3238,7 @@
       "more": "Näin se toimii →"
     },
     "ach": {
-      "title": "Saavutukset",
+      "title": "Kokeiltu tähän asti",
       "mat": "Tervetuloamatto pystyssä",
       "agent": "Agentti kotona",
       "chat": "Ensimmäinen keskustelu käyty",

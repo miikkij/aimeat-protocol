@@ -16,6 +16,10 @@
  * @structure default HomeView; internal: Welcome, StepList, DimmedStep
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   v2.6.0 — 2026-08-23 — The finished home reads as BANDS: the status pieces under the nameplate,
+ *     then three ruled bands (what you have made, with the apps row inside it · what you could
+ *     set up, with the playbooks and the tried-so-far row · what has happened). Jouni, on his own
+ *     account: eight blocks at one weight and no edge between them, the eye settled nowhere.
  *   v2.5.0 — 2026-08-19 — Playbooks (folded, from /v1/home/state) and the trust line at the foot.
  *   v2.4.0 — 2026-08-19 — Prod round: the "Your home is up and running" hero is gone (this is the
  *     dashboard; the nameplate already says who and the pieces say what), the mat line calls the
@@ -268,12 +272,20 @@ export default function HomeView({ navigate }) {
         <${MailboxRow} mail=${mail} />
         <${ChatDoor} chatStatus=${chatStatus} mcpNames=${mcpNames} />
         <${FleetLine} agent=${state.agent} />
-        <${Things} usage=${usage} orgs=${orgs} packages=${packages} prefs=${prefs} onStar=${toggleStar} />
-        <${FavoriteApps} apps=${ownApps} favorites=${favorites} owner=${state.owner} prefs=${prefs} onMode=${setAppsMode} />
-        <${Playbooks} playbooks=${playbooks} tour=${EXPERIENCE_CENTER} />
-        <${Achievements} state=${state} usage=${usage} markers=${markers} chatStatus=${chatStatus}
-          orgs=${orgs} packages=${packages} prefs=${prefs} onTried=${markTried} />
-        <${HomeFeed} items=${feed} />
+        ${/* Three ruled bands under the status pieces: what you have made · what you could set up
+              (playbooks, and what has been tried so far) · what has happened. Things draws its own
+              band, and a band with nothing to say draws no rule. */''}
+        <${Things} usage=${usage} orgs=${orgs} packages=${packages} prefs=${prefs} onStar=${toggleStar}>
+          <${FavoriteApps} apps=${ownApps} favorites=${favorites} owner=${state.owner} prefs=${prefs} onMode=${setAppsMode} />
+        <//>
+        ${(playbooks.length > 0 || !prefs?.hideAchievements) && html`
+          <section class="koti-band koti-setup">
+            <h2 class="koti-band-title">${tr('home.playbooks.title', 'What would you like to set up?')}</h2>
+            <${Playbooks} playbooks=${playbooks} tour=${EXPERIENCE_CENTER} />
+            <${Achievements} state=${state} usage=${usage} markers=${markers} chatStatus=${chatStatus}
+              orgs=${orgs} packages=${packages} prefs=${prefs} onTried=${markTried} />
+          </section>`}
+        <${HomeFeed} items=${feed} band=${true} />
         <${OpenItemsList} maxAgeDays=${7} />
         <${InstallCta} />
         <${TrustLine} />
