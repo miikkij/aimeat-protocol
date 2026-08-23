@@ -367,6 +367,10 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'defaultAgentScopes', dotPath: 'scopes.default_agent_scopes', envVar: 'AIMEAT_DEFAULT_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Default agent capability scopes (comma-separated)' },
   { key: 'maxAgentScopes', dotPath: 'scopes.max_agent_scopes', envVar: 'AIMEAT_MAX_AGENT_SCOPES', type: 'string', validate: v => typeof v === 'string' && (v as string).length > 0, immutable: false, description: 'Max available agent scopes (comma-separated, * = all)' },
 
+  // ── Enterprise SSO (BR-04; mutable — an organisation node's host seals these) ──
+  { key: 'ssoEnabled', dotPath: 'sso.enabled', envVar: 'AIMEAT_SSO_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable organisation sign-in (SAML) and provisioning (SCIM) doors' },
+  { key: 'ssoConnectionsLocked', dotPath: 'sso.connections_locked', envVar: 'AIMEAT_SSO_CONNECTIONS_LOCKED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Freeze SSO connection management (every admin write answers 403)' },
+
   // ── Cortex Extensions (mutable) ──
   { key: 'cortexEnabled', dotPath: 'cortex.enabled', envVar: 'AIMEAT_CORTEX_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable manifest-based cortex extensions' },
   { key: 'cortexMaxInstalled', dotPath: 'cortex.max_installed', envVar: 'AIMEAT_CORTEX_MAX_INSTALLED', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000, immutable: false, description: 'Max installed cortex modules', range: '1-1000' },

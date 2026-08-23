@@ -10,6 +10,9 @@
  * @structure ProvisionEmailTakenError; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.4.0 — 2026-08-24 — via: 'provisioning' (BR-04 SCIM): an organisation's directory pushing an
+ *     account is an administrator's act, refused only under `closed`; and it never triggers the
+ *     first-owner→operator self-heal, so a directory sync cannot crown a node's operator.
  *   v1.3.0 — 2026-08-21 — The 'oauth' registration mode: a first sign-in through a configured
  *     identity provider creates the account, the password doors stay refused. The mode an
  *     organisation node wants — who exists is decided in the IdP (for Entra, the tenant allowlist
@@ -43,13 +46,15 @@ export class ProvisionEmailTakenError extends Error {
 
 /**
  * How a new account is arriving. The registration-mode gate decides by this:
- *  - 'direct'     — anyone who found the door: API/web registration, the self-service invite request
- *  - 'oauth'      — a first sign-in through an OIDC provider (an existing linked account is a LOGIN
- *                   and is never gated)
- *  - 'invitation' — a member of this node minted an invitation (email invite, code key) and someone
- *                   is redeeming it
+ *  - 'direct'       — anyone who found the door: API/web registration, the self-service invite request
+ *  - 'oauth'        — a first sign-in through an external identity provider, OIDC or SAML (an
+ *                     existing linked account is a LOGIN and is never gated)
+ *  - 'invitation'   — a member of this node minted an invitation (email invite, code key) and someone
+ *                     is redeeming it
+ *  - 'provisioning' — an organisation's directory pushed the account over SCIM (BR-04): an
+ *                     administrator's act, not a visitor's, so only `closed` refuses it
  */
-export type RegistrationVia = 'direct' | 'oauth' | 'invitation';
+export type RegistrationVia = 'direct' | 'oauth' | 'invitation' | 'provisioning';
 
 /** Thrown by provisionOwner when config.registrationMode refuses this creation. Callers map it to
  *  403 REGISTRATION_CLOSED. Routes SHOULD also refuse at the door with registrationRefusal() so the
@@ -64,15 +69,16 @@ export class RegistrationClosedError extends Error {
  * Does the node's registration mode refuse an account arriving this way? Returns the refusal
  * message, or null when the creation may proceed. One rule table, read everywhere:
  *
- *              direct   oauth   invitation
- *   open        yes      yes      yes
- *   oauth       no       yes      yes
- *   invite      no       no       yes
- *   closed      no       no       no
+ *              direct   oauth   invitation   provisioning
+ *   open        yes      yes      yes           yes
+ *   oauth       no       yes      yes           yes
+ *   invite      no       no       yes           yes
+ *   closed      no       no       no            no
  */
 export function registrationRefusal(config: AimeatConfig, via: RegistrationVia): string | null {
   const mode = config.registrationMode;
   if (mode === 'closed') return 'This node does not accept new accounts.';
+  if (via === 'provisioning') return null;  // the operator configured the connection; only `closed` refuses
   if (mode === 'invite' && via !== 'invitation') {
     return 'This node creates new accounts by invitation only. Ask a member of this node to send you an invitation.';
   }
@@ -139,12 +145,14 @@ export async function provisionOwner(
 
   const keyPair = await generateKeyPair();
 
-  // First real owner becomes operator (self-heal: also promote if no operator exists anywhere).
+  // First real owner becomes operator (self-heal: also promote if no operator exists anywhere) —
+  // EXCEPT over SCIM (BR-04 R13's flip side): a directory sync is nobody's decision to run this
+  // node, so the first Entra-provisioned user on a fresh node must not be crowned its operator.
   const allOwners = await storage.listOwners();
   const realOwners = allOwners.filter(o => o.name !== 'anonymous');
   const hasOperator = allOwners.some(o => o.roles.includes('operator'));
   const roles: string[] = ['owner'];
-  if (realOwners.length === 0 || !hasOperator) roles.push('operator');
+  if (opts.via !== 'provisioning' && (realOwners.length === 0 || !hasOperator)) roles.push('operator');
 
   const owner = await storage.createOwner({
     name: username,

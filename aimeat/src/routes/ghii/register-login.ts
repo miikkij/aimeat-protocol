@@ -6,6 +6,8 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-23 — Password login answers 403 ACCOUNT_DISABLED for a deactivated account
+ *     (BR-04) — after the password check (no state disclosure), before the login-count write.
  *   v1.4.0 — 2026-08-18 — Registration-mode gate (open|invite|closed): POST /v1/ghii is a direct door, 403 REGISTRATION_CLOSED when the node is invite-only or closed.
  *   v1.3.1 — 2026-08-12 — POST /v1/ghii now answers WEAK_PASSWORD for a TOO SHORT password as well.
  *     The schema's own min(8) refused it first as VALIDATION_ERROR, so the handler's strength check
@@ -635,6 +637,15 @@ export function registerRegisterLoginRoutes(
                 res.status(401).json(error(config.nodeId, 'INVALID_TOTP', 'Invalid TOTP code or backup code.'));
                 return;
             }
+        }
+
+        // Deactivated account (BR-04): refused AFTER the password check on purpose — answering
+        // before it would tell anyone who types a username whether the account is disabled.
+        // Refused BEFORE the login-count write and the session, so nothing records a "login".
+        const preSessionOwner = await storage.getOwner(loginName);
+        if (preSessionOwner?.disabledAt) {
+            res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'This account has been deactivated'));
+            return;
         }
 
         // Password (+ TOTP if enabled) verified — track login

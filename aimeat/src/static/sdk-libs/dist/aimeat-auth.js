@@ -489,7 +489,7 @@
         btn.addEventListener("click", function() {
           var id = btn.getAttribute("data-provider");
           var back = encodeURIComponent(location.pathname + location.search + location.hash);
-          location.href = NODE_URL + "/v1/ghii/login/" + id + "?redirect=" + back;
+          location.href = NODE_URL + "/v1/ghii/login/" + id.split(":").join("/") + "?redirect=" + back;
         });
       });
       function showView(view) {
@@ -2258,7 +2258,7 @@
       createBtn.textContent = i.signupCreating || "Creating account...";
       errEl.style.display = "none";
       try {
-        var res = await api("/v1/ghii/login/" + (pending.provider || "google") + "/finalize", {
+        var res = await api("/v1/ghii/login/" + (pending.provider || "google").split(":").join("/") + "/finalize", {
           method: "POST",
           credentials: "include",
           body: JSON.stringify({ username: name, displayName })

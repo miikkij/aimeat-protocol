@@ -186,6 +186,18 @@ export function pinnedEnv(target: RunnerTarget): Record<string, string> {
         AIMEAT_CASDOOR_OAUTH_CLIENT_ID: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_ID ?? '',
         AIMEAT_CASDOOR_OAUTH_CLIENT_SECRET: process.env.AIMEAT_CASDOOR_OAUTH_CLIENT_SECRET ?? '',
         AIMEAT_CASDOOR_OAUTH_REDIRECT_URI: process.env.AIMEAT_CASDOOR_OAUTH_REDIRECT_URI ?? '',
+        // Entra was the one provider NOT pinned here, so a developer's .env leaked a live client
+        // into the test server. Same rule, same shape.
+        AIMEAT_ENTRA_OAUTH_ENABLED: process.env.AIMEAT_ENTRA_OAUTH_ENABLED ?? 'false',
+        AIMEAT_ENTRA_OAUTH_TENANT: process.env.AIMEAT_ENTRA_OAUTH_TENANT ?? 'common',
+        AIMEAT_ENTRA_ALLOWED_TENANTS: process.env.AIMEAT_ENTRA_ALLOWED_TENANTS ?? '',
+        AIMEAT_ENTRA_OAUTH_CLIENT_ID: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
+        AIMEAT_ENTRA_OAUTH_CLIENT_SECRET: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
+        AIMEAT_ENTRA_OAUTH_REDIRECT_URI: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',
+        // Enterprise SSO (BR-04): OFF at boot; a suite that needs it flips sso.enabled at runtime
+        // through PUT /v1/admin/config, the same way e2e-registration-mode flips its mode.
+        AIMEAT_SSO_ENABLED: process.env.AIMEAT_SSO_ENABLED ?? 'false',
+        AIMEAT_SSO_CONNECTIONS_LOCKED: process.env.AIMEAT_SSO_CONNECTIONS_LOCKED ?? 'false',
 
         // ── Credentials that reach a third party, pinned EMPTY ──
         // The server falls back to ./aimeat/.env for any key NOT already present in its env

@@ -27,7 +27,10 @@ export function applySchemaTables1(db: Database.Database): void {
       displayName    TEXT,
       publicKey      TEXT NOT NULL,
       roles          TEXT NOT NULL DEFAULT '[]',
-      createdAt      TEXT NOT NULL
+      createdAt      TEXT NOT NULL,
+      disabledAt     TEXT,               -- deactivated when set (BR-04); NULL = active
+      disabledBy     TEXT,               -- operator name or sso:<connection id>
+      managedBy      TEXT                -- SSO connection id owning this account's lifecycle (SCIM)
     );
 
     -- ── Agents ──
