@@ -306,5 +306,314 @@ await test('17. the caretaker is unreachable without a session, and installing n
     'the refused install left an instance behind');
 });
 
+console.log('\nPhase 5 — a finding is not a fact');
+
+// The workspace the app builds at setup, built here directly so the schema can be exercised
+// server-side. Only the two spaces this phase needs; the app's manifest carries six.
+let org = '';
+let ws = '';
+const NS_FACT = 'brain.fact';
+const NS_FINDING = 'brain.finding';
+const draftKey = (namespace: string, id: string): string => `organism.${org}.w.${ws}.${namespace}.${id}.draft`;
+
+await test('18. the workspace locks a schema that refuses a claim with no address', async () => {
+  const made = await json('/v1/organisms', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ name: 'Brain org', visibility: 'private' }),
+  });
+  assert(made.status === 201 || made.status === 200, `organism failed: ${made.status} ${JSON.stringify(made.body).slice(0, 200)}`);
+  org = made.body.data?.id ?? made.body.data?.organism?.id;
+  assert(org, `no organism id in ${JSON.stringify(made.body).slice(0, 200)}`);
+
+  const wsRes = await json(`/v1/organisms/${encodeURIComponent(org)}/workspaces`, {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      name: 'Brain',
+      manifest: {
+        manifestVersion: '1.0', id: 'brain', name: 'Brain', kind: 'project', status: 'active',
+        objectTypes: [
+          { name: 'fact', namespace: NS_FACT, schemaRef: 'brain.fact', backing: 'memory', writeRole: 'member', mode: 'records', contract: 'brain' },
+          { name: 'finding', namespace: NS_FINDING, schemaRef: 'brain.finding', backing: 'memory', writeRole: 'member', mode: 'records' },
+        ],
+      },
+      schemas: {
+        [NS_FACT]: {
+          type: 'object', additionalProperties: true, required: ['id', 'claim', 'kind', 'as_of'],
+          properties: {
+            id: { type: 'string' }, claim: { type: 'string' },
+            kind: { type: 'string', enum: ['anchored', 'observed'] },
+            source_ref: { type: 'string' }, as_of: { type: 'string' }, review_after: { type: 'string' },
+            note: { type: 'string' },
+          },
+        },
+        [NS_FINDING]: {
+          type: 'object', additionalProperties: true, required: ['id', 'claim', 'source_url', 'accessed'],
+          properties: {
+            id: { type: 'string' }, claim: { type: 'string' },
+            source_url: { type: 'string' }, accessed: { type: 'string' },
+            found_by: { type: 'string' }, status: { type: 'string', enum: ['new', 'promoted', 'discarded'] },
+          },
+        },
+      },
+    }),
+  });
+  assert(wsRes.status === 200 || wsRes.status === 201, `workspace failed: ${wsRes.status} ${JSON.stringify(wsRes.body).slice(0, 300)}`);
+  ws = wsRes.body.data?.ws ?? wsRes.body.data?.id;
+  assert(ws, `no ws id in ${JSON.stringify(wsRes.body).slice(0, 200)}`);
+});
+
+await test('19. a claim with no address is REFUSED, which is the whole point of the space', async () => {
+  // The counter-example this schema was written against is the house's own market-scan: four
+  // thousand words, no per-claim sources, one wrong price, published as settled. A research
+  // agent that cannot say where something came from is producing that, and this refuses to
+  // store it rather than storing it and hoping somebody notices.
+  const r = await json('/v1/memory', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      key: draftKey(NS_FINDING, 'finding-bare'), visibility: 'private',
+      value: { id: 'finding-bare', claim: 'Everyone is switching to weekly billing', accessed: '2026-08-23' },
+    }),
+  });
+  assert(r.status === 400 || r.body?.ok === false,
+    `a finding with no source_url must be refused, got ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+});
+
+await test('20. a finding WITH an address is accepted, and it lands as a draft', async () => {
+  const r = await json('/v1/memory', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      key: draftKey(NS_FINDING, 'finding-1'), visibility: 'private',
+      value: {
+        id: 'finding-1', claim: 'Villa Textiles moved to weekly billing in June',
+        source_url: 'https://example.test/villa/pricing', accessed: '2026-08-23',
+        found_by: 'research agent', status: 'new',
+      },
+    }),
+  });
+  assert(r.status === 200 || r.status === 201, `accepted finding refused: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+  // A DRAFT, deliberately. An agent that could publish straight into what the company knows would
+  // be deciding what is true on the owner's behalf.
+  const read = await json(`/v1/memory/${encodeURIComponent(draftKey(NS_FINDING, 'finding-1'))}`, { headers: authed(A.token) });
+  assert(read.status === 200, `the draft must be readable by its owner, got ${read.status}`);
+});
+
+await test('21. promoting writes an OBSERVED fact whose source is the address it came from', async () => {
+  // What the app's promote button does, asserted at the level that survives a redesign: the claim
+  // carries over, the address becomes the fact's source, the kind is observed (never anchored —
+  // anchored means a document the owner holds), and it carries a date to look again.
+  const factId = 'fact-from-finding';
+  const wrote = await json('/v1/memory', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      key: draftKey(NS_FACT, factId), visibility: 'private',
+      value: {
+        id: factId, claim: 'Villa Textiles moved to weekly billing in June', kind: 'observed',
+        source_ref: 'https://example.test/villa/pricing', as_of: '2026-08-23', review_after: '2027-02-19',
+      },
+    }),
+  });
+  assert(wrote.status === 200 || wrote.status === 201, `the promoted fact was refused: ${wrote.status} ${JSON.stringify(wrote.body).slice(0, 200)}`);
+
+  const read = await json(`/v1/memory/${encodeURIComponent(draftKey(NS_FACT, factId))}`, { headers: authed(A.token) });
+  const v = read.body.data?.value ?? read.body.data;
+  assert(v?.kind === 'observed', `a promoted finding must never be anchored, got ${v?.kind}`);
+  assert(v?.source_ref === 'https://example.test/villa/pricing', `the address did not carry over: ${v?.source_ref}`);
+  assert(v?.review_after, 'an observed fact with no review date is one nobody set a life span for');
+});
+
+await test('22. an ANCHORED fact claiming a web address is still storable, and that is a judgement call the schema leaves open', async () => {
+  // Deliberately not enforced. The schema cannot tell a URL the owner controls from one they do
+  // not, and a rule that guessed would refuse somebody's own published price list. The promote
+  // path is where the decision is made, and it always writes observed.
+  const r = await json('/v1/memory', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      key: draftKey(NS_FACT, 'fact-anchored-url'), visibility: 'private',
+      value: { id: 'fact-anchored-url', claim: 'Our own price list', kind: 'anchored', source_ref: 'https://example.test/us/prices', as_of: '2026-08-23' },
+    }),
+  });
+  assert(r.status === 200 || r.status === 201, `the schema should allow this: ${r.status}`);
+});
+
+await test('23. a stranger cannot read this brain’s findings', async () => {
+  const r = await json(`/v1/memory/${encodeURIComponent(draftKey(NS_FINDING, 'finding-1'))}`, { headers: authed(B.token) });
+  assert(r.status === 403 || r.status === 404,
+    `another owner must not read the findings, got ${r.status} ${JSON.stringify(r.body).slice(0, 150)}`);
+});
+
+console.log('\nPhase 5b — an agent proposes, the owner decides, and the queue empties');
+
+await test('23b. an AGENT’s draft is consumed when its OWNER publishes the record', async () => {
+  // THE DOCUMENTED PATTERN, end to end: an agent writes findings as drafts and the owner decides.
+  // A draft is stored under whoever WROTE it, so this record has an agent-owned draft; the owner
+  // then edits it (marking it promoted) and publishes. Until 2026-08-23 the publish consumed only
+  // the freshest draft, the agent's survived, and a workspace read renders `draft || latest` — so
+  // the record kept showing the agent's PRE-DECISION value with an undecided badge for good. The
+  // owner's queue never emptied, however many times they decided.
+  const agentTok = await makeAgent(A, ['memory:read', 'memory:write', 'organism:read']);
+  const id = 'finding-two-drafts';
+
+  const byAgent = await json('/v1/memory', {
+    method: 'POST', headers: authed(agentTok),
+    body: JSON.stringify({
+      key: draftKey(NS_FINDING, id), visibility: 'private',
+      value: { id, claim: 'Weekly billing is spreading', source_url: 'https://example.test/billing', accessed: '2026-08-23', status: 'new' },
+    }),
+  });
+  assert(byAgent.status === 200 || byAgent.status === 201, `the agent could not propose: ${byAgent.status} ${JSON.stringify(byAgent.body).slice(0, 200)}`);
+
+  // The owner decides: same record, now marked promoted, written under the OWNER's identity.
+  const byOwner = await json('/v1/memory', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      key: draftKey(NS_FINDING, id), visibility: 'private',
+      value: { id, claim: 'Weekly billing is spreading', source_url: 'https://example.test/billing', accessed: '2026-08-23', status: 'promoted' },
+    }),
+  });
+  assert(byOwner.status === 200 || byOwner.status === 201, `the owner could not decide: ${byOwner.status}`);
+
+  const pub = await json(`/v1/organisms/${encodeURIComponent(org)}/publish`, {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ ws, namespace: NS_FINDING, id }),
+  });
+  assert(pub.status === 200, `publish failed: ${pub.status} ${JSON.stringify(pub.body).slice(0, 200)}`);
+
+  // NO DRAFT LEFT ANYWHERE. Counted across the owner's own identities, which is where the second
+  // copy lived and where a per-identity delete could not see it.
+  const drafts = await json(`/v1/memory?include=meta&owner_scope=true&prefix=${encodeURIComponent(draftKey(NS_FINDING, id))}`,
+    { headers: authed(A.token) });
+  const left = (drafts.body.data?.items ?? []).length;
+  assert(left === 0, `the owner decided and ${left} draft copy/copies survived — the queue never empties`);
+
+  // …and what the record now SAYS is the decision, not the proposal.
+  const latest = await json(`/v1/memory/${encodeURIComponent(`organism.${org}.w.${ws}.${NS_FINDING}.${id}.latest`)}`, { headers: authed(A.token) });
+  const v = latest.body.data?.value ?? latest.body.data;
+  assert(v?.status === 'promoted', `the published record must carry the decision, got ${JSON.stringify(v?.status)}`);
+});
+
+console.log('\nPhase 6 — the key budget, at the size the design says production reaches');
+
+/** Publish a whole space in ONE request, the way an import does. */
+async function bulkPublish(namespace: string, records: Array<{ id: string; value: unknown }>): Promise<number> {
+  const r = await json(`/v1/organisms/${encodeURIComponent(org)}/workspace/records/publish`, {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ ws, namespace, records }),
+  });
+  assert(r.status === 200 || r.status === 201, `bulk publish failed: ${r.status} ${JSON.stringify(r.body).slice(0, 250)}`);
+  return r.body.data?.published ?? records.length;
+}
+
+/**
+ * How many keys this owner actually holds under one prefix.
+ *
+ * NO `count=true`, deliberately. That branch is CACHED for sixty seconds and it runs BEFORE the
+ * meta branch, so `include=meta&count=true` is cached too — a before-and-after inside one test run
+ * reads the same number twice and reports a growth of zero. This test printed exactly that, twice,
+ * and it was believable both times: a budget measurement that cannot see the writes it just made
+ * is the shape of check that certifies a store nobody looked at. `include=meta` alone returns
+ * `total` from a live listing.
+ */
+async function keyCount(prefix?: string): Promise<number> {
+  const qs = `?include=meta&owner_scope=true${prefix ? `&prefix=${encodeURIComponent(prefix)}` : ''}`;
+  const r = await json(`/v1/memory${qs}`, { headers: authed(A.token) });
+  const d = r.body.data ?? r.body;
+  return Number(d?.total ?? (Array.isArray(d?.items) ? d.items.length : 0));
+}
+
+await test('24. a brain at the design’s stated size stays inside the 1000-key budget', async () => {
+  // THE NUMBER THE DESIGN COMMITTED TO: 200 facts, 100 findings and a year of caretaker reports.
+  // Measured rather than reasoned about, because the shape rule here has a history: a 941-key
+  // article store sat next to a working 448 kB single key in the same namespace, and nobody noticed
+  // until somebody counted.
+  // Measured per SPACE and summed. The workspace-root prefix answers 5 for a store that holds
+  // hundreds, because the owner-scope meta listing does not treat it as a plain string prefix — a
+  // shorter prefix returning fewer rows than a longer one is the tell, and a budget measured
+  // through it would report a clean bill for a store it never looked at.
+  const spaceKeys = async (): Promise<number> =>
+    (await keyCount(`organism.${org}.w.${ws}.${NS_FACT}.`)) + (await keyCount(`organism.${org}.w.${ws}.${NS_FINDING}.`));
+  const before = await spaceKeys();
+
+  const facts = Array.from({ length: 200 }, (_, i) => ({
+    id: `bulk-fact-${i}`,
+    value: {
+      id: `bulk-fact-${i}`, claim: `Measured claim number ${i}`,
+      kind: i % 3 === 0 ? 'observed' : 'anchored', as_of: '2026-08-23',
+      ...(i % 3 === 0 ? { review_after: '2027-02-19' } : {}),
+    },
+  }));
+  const findings = Array.from({ length: 100 }, (_, i) => ({
+    id: `bulk-finding-${i}`,
+    value: {
+      id: `bulk-finding-${i}`, claim: `Something found number ${i}`,
+      source_url: `https://example.test/found/${i}`, accessed: '2026-08-23', status: 'new',
+    },
+  }));
+
+  await bulkPublish(NS_FACT, facts);
+  await bulkPublish(NS_FINDING, findings);
+
+  const after = await spaceKeys();
+  const factKeys = await keyCount(`organism.${org}.w.${ws}.${NS_FACT}.`);
+  const perRecord = (after - before) / 300;
+
+  // The records have to BE somewhere. A budget test that measures the wrong keyspace reports a
+  // clean bill for a store it never looked at — and the first version of this test did exactly
+  // that, printing a growth of zero because the no-prefix owner listing does not include workspace
+  // keys at all.
+  assert(factKeys >= 200, `the 200 published facts must be keys under this workspace, counted ${factKeys}`);
+
+  console.log(`      before ${before} · after ${after} · 300 records → ${after - before} keys (${perRecord.toFixed(1)} per record) · facts alone ${factKeys}`);
+
+  // TWO KEYS PER PUBLISHED RECORD, not one: the live `.latest` and the `.version.1` beside it. That
+  // is the floor, and it is not tunable — maxVersions caps how many versions a record KEEPS, and a
+  // record published once already has one. So the design's stated size costs about 700 keys of the
+  // default 1000, not 350. It fits, with less room than the plan assumed.
+  assert(perRecord <= 2.5, `expected about two keys per published record, measured ${perRecord.toFixed(2)}`);
+  assert(after < 1000,
+    `a brain this size must fit the default 1000-key ceiling, and it took ${after}. ` +
+    'If this fails, the shape is wrong and the per-item keys belong in a per-period record.');
+});
+
+await test('24b. settled findings can be cleared, which is what keeps the ceiling reachable', async () => {
+  // The one space that grows without an owner deciding anything is findings: an agent that looks
+  // every week writes every week. At two keys each they are the fastest road to the ceiling, and a
+  // finding that has been promoted or discarded has already done its job — the fact it became
+  // carries the address it came from.
+  const before = await keyCount(`organism.${org}.w.${ws}.${NS_FINDING}.`);
+  const ids = Array.from({ length: 40 }, (_, i) => `bulk-finding-${i}`);
+  const r = await json(`/v1/organisms/${encodeURIComponent(org)}/workspace/records/delete`, {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ ws, namespace: NS_FINDING, ids }),
+  });
+  assert(r.status === 200, `clearing settled findings failed: ${r.status} ${JSON.stringify(r.body).slice(0, 200)}`);
+  const after = await keyCount(`organism.${org}.w.${ws}.${NS_FINDING}.`);
+  const gone = (await json(`/v1/memory/${encodeURIComponent(`organism.${org}.w.${ws}.${NS_FINDING}.bulk-finding-0.latest`)}`, { headers: authed(A.token) })).status;
+  console.log(`      cleared 40 findings · finding keys ${before} → ${after} · a cleared one now reads ${gone} · route said ${JSON.stringify(r.body.data ?? r.body).slice(0, 120)}`);
+  // The record is GONE from the space, which is the contract that matters: the owner cleared it and
+  // it no longer comes back on a read. Whether its version history is reclaimed at the same moment
+  // is the version-pruning job's business, not this feature's, so this asserts the read and reports
+  // the key count rather than asserting a number this feature does not own.
+  assert(gone === 404 || gone === 403, `a cleared finding must stop reading back, got ${gone}`);
+});
+
+await test('25. the caretaker’s own records do not grow with time or with the number of sources', async () => {
+  // The register is ONE key holding every source, and the report is ONE key overwritten each run.
+  // That is the difference between a brain that lasts a year and one that fills its owner's
+  // keyspace: a weekly report written as its own key is 52 keys a year, per brain, forever.
+  const before = await keyCount(`ext:${extName}`);
+  for (let i = 0; i < 12; i++) {
+    await callBrain(A.token, {
+      op: 'put_source',
+      source: { id: `bulk-source-${i}`, kind: 'web', cadence_days: 7, coverage_note: `Only slice ${i}.` },
+    });
+  }
+  for (let i = 0; i < 5; i++) await callBrain(A.token, { op: 'sweep' });
+  const after = await keyCount(`ext:${extName}`);
+  assert(after === before,
+    `twelve more sources and five more weekly checks must add no keys at all, but the count went ${before} -> ${after}`);
+  const state = await callBrain(A.token, { op: 'state' });
+  assert(state.sources.length >= 12, `the sources are still there: ${state.sources.length}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
 if (failed > 0) process.exit(1);

@@ -49,8 +49,12 @@ entry: index.html
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <!-- company:write is here for ONE field: pointing the company at the organism its knowledge lives
        in, once, during setup. Without that link a brain sits beside a company that has never heard
-       of it, which is the exact state every company on this platform was in before this app. -->
-  <meta name="aimeat-scopes" content="memory:read memory:write organism:read organism:write company:read company:write" />
+       of it, which is the exact state every company on this platform was in before this app.
+       memory:delete is here for ONE act: clearing findings the owner has already decided about.
+       Measured reason, not tidiness — a published record costs two keys and the default ceiling is
+       a thousand, and findings are the only space here that grows without anybody choosing to grow
+       it. Without this the queue is a one-way door. -->
+  <meta name="aimeat-scopes" content="memory:read memory:write memory:delete organism:read organism:write company:read company:write" />
   <title>Company brain</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
@@ -105,7 +109,7 @@ entry: index.html
       ['einvoiceAddress', 'E-invoice address'], ['einvoiceOperator', 'E-invoice operator'],
     ];
 
-    var session = null, company = null, companies = [], CTX = null, brainState = null, records = {};
+    var session = null, company = null, companies = [], CTX = null, brainState = null, records = {}, schedules = [];
     var $ = function (id) { return document.getElementById(id); };
     function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
     function app() { return $('app'); }
@@ -374,17 +378,87 @@ entry: index.html
       var spaces = (ws && ws.spaces) || [];
       for (var i = 0; i < spaces.length; i++) {
         records[spaces[i].namespace || spaces[i].name] = (spaces[i].items || []).map(function (it) {
-          return it.value || {};
+          // \`value\` is the DRAFT when there is one, which is what makes the findings section work
+          // at all: an agent writes findings as drafts on purpose, and a reader that only saw
+          // published records would show an empty page while the queue filled up behind it.
+          var v = it.value || {};
+          v.__draft = it.status === 'draft' || it.status === 'draft+published';
+          return v;
         });
       }
       brainState = await AIMEAT.brain.state(session).catch(function () { return null; });
+      // THE LIVE STATE, JOINED AT READ TIME. GET /v1/schedules needs no scope beyond being signed
+      // in, so a stopped clock shows the second somebody opens this page rather than a week later
+      // when the caretaker next runs. The caretaker itself is in this list too.
+      var sch = await session.fetch('/v1/schedules').catch(function () { return null; });
+      var sd = (sch && sch.data) ? sch.data : sch;
+      schedules = Array.isArray(sd) ? sd : ((sd && sd.schedules) || []);
       render();
+    }
+
+    /** One schedule by id, or null. */
+    function scheduleById(id) {
+      if (!id) return null;
+      for (var i = 0; i < schedules.length; i++) if (schedules[i] && schedules[i].id === id) return schedules[i];
+      return null;
+    }
+
+    /**
+     * What a source's clock is doing, in the words somebody would use about it.
+     *
+     * Returns null when the source names no clock, which is a real answer and not a gap: an upload
+     * somebody brings by hand has no clock and should not be nagged about one.
+     */
+    function clockLine(s) {
+      if (!s || !s.schedule_id) return null;
+      var job = scheduleById(s.schedule_id);
+      // NAMED A CLOCK THAT IS NOT THERE. Worth saying out loud: the schedule was deleted, or the
+      // id was never right, and either way this feed is waiting for something that will not come.
+      if (!job) return { text: 'It names a clock this account does not have.', bad: true };
+      if (!job.enabled) return { text: 'Its clock is switched off.', bad: true };
+      if (job.lastRunResult === 'error') {
+        return { text: 'Its clock ran and failed' + (job.lastRunError ? ': ' + job.lastRunError : '.'), bad: true };
+      }
+      var last = job.lastRunAt ? 'last ran ' + String(job.lastRunAt).slice(0, 10) : 'has not run yet';
+      var next = job.nextRunAt ? ', next ' + String(job.nextRunAt).slice(0, 10) : '';
+      return { text: 'Its clock is running: ' + last + next + '.', bad: false };
     }
 
     function facts() { return records[NS.fact] || records.fact || []; }
     function gaps() { return records[NS.gap] || records.gap || []; }
     function findings() { return records[NS.finding] || records.finding || []; }
     function sources() { return (brainState && brainState.sources) || []; }
+
+    /** Findings nobody has decided about yet. A promoted or discarded one has left the queue. */
+    function openFindings() {
+      return findings().filter(function (f) { return f && f.source_url && (f.status || 'new') === 'new'; });
+    }
+
+    /**
+     * Findings already decided, still stored.
+     *
+     * Worth offering to clear, and the reason is a measured number rather than tidiness: a published
+     * record costs TWO keys, the live one and the version beside it, and the default ceiling is a
+     * thousand per person. An agent that looks every week writes every week, so findings are the
+     * one space here that grows without anybody choosing to grow it. A promoted one has already
+     * done its job — the fact it became carries the address it came from.
+     */
+    function settledFindings() {
+      return findings().filter(function (f) { return f && f.id && (f.status === 'promoted' || f.status === 'discarded'); });
+    }
+
+    /**
+     * When an observed fact should be looked at again, offered rather than assumed.
+     *
+     * Six months is a guess and it is shown as an editable date for exactly that reason: the right
+     * interval belongs to whoever knows the subject, and a hidden default would be this app
+     * deciding how long somebody else's knowledge stays true.
+     */
+    function defaultReview() {
+      var d = new Date();
+      d.setDate(d.getDate() + 180);
+      return d.toISOString().slice(0, 10);
+    }
 
     // ── what is waiting for the person ──────────────────────────────────────
     /**
@@ -405,9 +479,12 @@ entry: index.html
       if (quiet.length) {
         return { what: quiet[0].id + ' has gone quiet', why: quiet[0].last_ok_at ? 'Last delivered ' + String(quiet[0].last_ok_at).slice(0, 10) + '.' : 'It has never delivered anything.' };
       }
-      var fresh = findings().filter(function (f) { return f && (f.status || 'new') === 'new'; });
+      var fresh = openFindings();
       if (fresh.length) {
-        return { what: 'Somebody found this and it is still a draft: ' + fresh[0].claim, why: 'Promote it to a fact, or discard it.' };
+        return {
+          what: 'Somebody went and looked, and this is waiting on you: ' + fresh[0].claim,
+          why: 'Say whether it is true, or discard it. Until you do, it is not part of what this company knows.',
+        };
       }
       var open = gaps();
       if (open.length) return { what: open[0].what, why: open[0].why || 'Nobody has filled this in yet.' };
@@ -453,6 +530,42 @@ entry: index.html
       }
       html += '</section>';
 
+      // ── what somebody found, still waiting on you ──
+      //
+      // A FINDING IS NOT A FACT, and this section is where that distinction earns its keep. An
+      // agent that went and looked writes findings, as drafts, and the schema refuses one with no
+      // source_url. Turning a finding into a fact is the owner's move and nobody else's: the
+      // moment an agent could do it, the brain would start filling with things it decided were
+      // true, and the whole provenance story would be decoration.
+      var open = openFindings();
+      if (open.length) {
+        html += '<section class="mb-6"><h2 class="text-lg font-bold mb-2">Somebody went and looked ' +
+          '<span class="opacity-50 text-sm font-normal">' + open.length + '</span></h2>' +
+          '<p class="opacity-70 text-sm mb-2">Drafts. Nothing here is part of what you know until you say so.</p>';
+        html += '<ul class="divide-y divide-base-300">' + open.map(function (f, i) {
+          return '<li class="py-3"><div>' + esc(f.claim) + '</div>' +
+            '<div class="opacity-60 text-xs mt-0.5">' +
+            (f.found_by ? esc(f.found_by) + ' · ' : '') + esc(f.accessed || '') + '</div>' +
+            // The address is the point of the record, so it is a link rather than a footnote: the
+            // owner deciding whether this is true will want to open it.
+            '<div class="text-xs mt-0.5"><a class="link" target="_blank" rel="noopener noreferrer" href="' +
+            esc(f.source_url) + '">' + esc(f.source_url) + '</a></div>' +
+            '<div class="flex gap-2 items-center flex-wrap mt-2">' +
+            '<button class="btn btn-primary btn-sm px-3" data-promote="' + i + '">Yes, this is true</button>' +
+            '<input type="date" class="input input-bordered input-sm" data-review="' + i + '" value="' + esc(defaultReview()) + '" title="Check again after" />' +
+            '<button class="btn btn-ghost btn-sm px-3" data-discard="' + i + '">Discard</button>' +
+            '</div></li>';
+        }).join('') + '</ul></section>';
+      }
+
+      var settled = settledFindings();
+      if (settled.length) {
+        html += '<div class="mb-6 flex items-center gap-3 flex-wrap">' +
+          '<button class="btn btn-ghost btn-sm px-3" id="clear-settled">Clear ' + settled.length + ' settled</button>' +
+          '<span class="opacity-70 text-sm">Already decided. Clearing them frees room; the facts they became keep their sources.</span>' +
+          '</div>';
+      }
+
       // ── where this comes from ──
       html += '<section class="mb-6"><h2 class="text-lg font-bold mb-2">Where this comes from</h2>';
       if (!ss.length) {
@@ -470,15 +583,35 @@ entry: index.html
             (s.coverage_note ? 'Does not cover: ' + esc(s.coverage_note) : 'Nobody has said what this does not cover.') +
             '</div>' +
             '<div class="opacity-60 text-xs mt-0.5">Last delivered ' + esc(when) +
-            (s.last_error ? ' · ' + esc(s.last_error) : '') + '</div></div>' +
+            (s.last_error ? ' · ' + esc(s.last_error) : '') + '</div>' +
+            // JOINED WHEN THIS RENDERS, against the owner's live schedule list. A clock that was
+            // switched off yesterday says so now, rather than staying quiet until the caretaker's
+            // next weekly run notices the silence.
+            (function () {
+              var c = clockLine(s);
+              if (c) return '<div class="text-xs mt-0.5 ' + (c.bad ? 'text-warning' : 'opacity-60') + '">' + esc(c.text) + '</div>';
+              // A connected account's health is not readable from here: an app may ask to PUBLISH to
+              // the accounts somebody connected, and there is no word in the grant vocabulary for
+              // reading the list. Rather than guess, point at the place that knows.
+              if (s.kind === 'connection') {
+                return '<div class="text-xs mt-0.5 opacity-60">A connected account. ' +
+                  '<a class="link" target="_top" href="/v1/profile?tab=connections">Check it in your profile</a>.</div>';
+              }
+              return '<div class="text-xs mt-0.5 opacity-60">No clock. You feed this by hand.</div>';
+            })() + '</div>' +
             '<span class="badge badge-sm ' + (s.status === 'broken' ? 'badge-error' : s.status === 'late' ? 'badge-warning' : 'badge-ghost') + '">' +
             esc(s.status || 'ok') + '</span></div></li>';
         }).join('') + '</ul>';
       }
-      html += '<div class="mt-3 flex gap-2 items-center">' +
+      // The caretaker is a schedule like any other, so its own state is in the list we just read.
+      // Saying when it next runs is what makes "Never checked" reassuring rather than alarming.
+      var keeper = schedules.filter(function (j) { return j && /-ext-brain$/.test(String(j.extensionName || '')); })[0];
+      html += '<div class="mt-3 flex gap-2 items-center flex-wrap">' +
         '<button class="btn btn-outline btn-sm px-3" id="check-now">Check now</button>' +
         '<span class="opacity-60 text-xs" id="check-note">' +
         (rep ? 'Last checked ' + esc(String(rep.generatedAt).slice(0, 10)) + ' · ' + rep.checked + ' looked at, ' + rep.late + ' quiet, ' + rep.broken + ' broken' : 'Never checked') +
+        (keeper && keeper.enabled && keeper.nextRunAt ? ' · checks itself again ' + esc(String(keeper.nextRunAt).slice(0, 10)) : '') +
+        (keeper && !keeper.enabled ? ' · its weekly check is switched off' : '') +
         '</span></div>';
       html += '</section>';
 
@@ -506,6 +639,13 @@ entry: index.html
         '<option value="web">Something on the web</option><option value="chat">A conversation</option>' +
         '<option value="extension">Something running here</option></select>' +
         '<input id="s-days" type="number" min="0" class="input input-bordered w-28" placeholder="Every N days" />' +
+        // Naming the clock is what makes "its clock stopped" possible on the next open. Offered as
+        // the owner's OWN schedules rather than a text field, because an id typed from memory is a
+        // pointer at nothing, and this page would then report that as a fault in the feed.
+        '<select id="s-sched" class="select select-bordered"><option value="">No clock</option>' +
+        schedules.map(function (j) {
+          return '<option value="' + esc(j.id) + '">' + esc(j.displayName || j.name || j.id) + '</option>';
+        }).join('') + '</select>' +
         '<button class="btn btn-primary px-4" id="s-add">Add</button></div></div></details>';
 
       // The chat path, which is the one we prefer. It sits with the work rather than in the title
@@ -519,10 +659,66 @@ entry: index.html
       wire();
     }
 
+    /**
+     * A finding becomes a fact. The claim carries over, the ADDRESS becomes the fact's source, and
+     * the kind is always 'observed': somebody looked at the world and reported what they saw, so it
+     * wears out and it says when to look again. Nothing an agent found is ever anchored — anchored
+     * means a document the owner holds, and a web page is not that however good it is.
+     *
+     * The finding is then marked promoted rather than deleted. Where a fact came from is part of
+     * what the fact is, and removing the finding would leave the fact pointing at an address with
+     * no record of who fetched it, when, or what else they saw.
+     */
+    async function promote(f, reviewAfter) {
+      var id = 'fact-' + Date.now().toString(36);
+      await AIMEAT.organism.writeDraft(CTX.org, CTX.ws, NS.fact, id, {
+        id: id, claim: f.claim, kind: 'observed',
+        source_ref: f.source_url, as_of: today(),
+        review_after: reviewAfter || defaultReview(),
+        note: f.found_by ? 'Found by ' + f.found_by + '.' : 'Promoted from a finding.',
+      });
+      await AIMEAT.organism.publish(CTX.org, CTX.ws, NS.fact, id).catch(function () { return null; });
+      await settle(f, 'promoted');
+    }
+
+    /** Mark a finding decided, and publish it so it stops being a draft in somebody's queue. */
+    async function settle(f, status) {
+      var next = {};
+      for (var k in f) { if (Object.prototype.hasOwnProperty.call(f, k) && k !== '__draft') next[k] = f[k]; }
+      next.status = status;
+      await AIMEAT.organism.writeDraft(CTX.org, CTX.ws, NS.finding, f.id, next);
+      await AIMEAT.organism.publish(CTX.org, CTX.ws, NS.finding, f.id).catch(function () { return null; });
+    }
+
     function wire() {
       $('agent-prompt').onclick = async function (e) {
         await navigator.clipboard.writeText(agentPrompt()); e.target.textContent = 'Copied';
       };
+      var open = openFindings();
+      Array.prototype.forEach.call(document.querySelectorAll('[data-promote]'), function (b) {
+        b.onclick = async function () {
+          b.disabled = true;
+          var i = Number(b.getAttribute('data-promote'));
+          var picked = document.querySelector('[data-review="' + i + '"]');
+          await promote(open[i], picked && picked.value);
+          await load();
+        };
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-discard]'), function (b) {
+        b.onclick = async function () {
+          b.disabled = true;
+          await settle(open[Number(b.getAttribute('data-discard'))], 'discarded');
+          await load();
+        };
+      });
+      if ($('clear-settled')) {
+        $('clear-settled').onclick = async function (e) {
+          e.target.disabled = true;
+          await AIMEAT.organism.deleteRecords(CTX.org, CTX.ws, NS.finding,
+            settledFindings().map(function (f) { return f.id; })).catch(function () { return null; });
+          await load();
+        };
+      }
       $('check-now').onclick = async function (e) {
         e.target.disabled = true;
         $('check-note').textContent = 'Checking…';
@@ -550,6 +746,7 @@ entry: index.html
           id: id, kind: $('s-kind').value, feeds: $('s-feeds').value.trim(),
           coverage_note: $('s-cover').value.trim(),
           cadence_days: Number($('s-days').value || 0),
+          schedule_id: $('s-sched').value,
         });
         await load();
       };
