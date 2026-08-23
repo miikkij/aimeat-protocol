@@ -9,6 +9,8 @@
  *   The step list is deliberately plain. The screen has one job at a time, so anything that draws
  *   the eye away from the open step is working against it.
  * @version-history
+ *   v2.5.0 — 2026-08-23 — Row rhythm: 1.3rem between a band's rows against 0.6rem inside one,
+ *     so categories read apart (Jouni: a lump). The knowledge-explain foot line keeps its gap.
  *   v2.4.0 — 2026-08-23 — The finished home reads as BANDS (.koti-band): one rule between "what
  *     you have made", "what would you like to set up" and "what has happened", the same rule the
  *     header wears, in place of five sections each bringing its own margin and no edge. The band
@@ -344,8 +346,9 @@ body:has(.koti) .page-content { background: color-mix(in srgb, var(--accent) 4%,
   font-size: 0.92rem; text-transform: uppercase; letter-spacing: 1.4px;
   color: var(--text-dim); font-weight: 700; margin: 0 0 0.9rem;
 }
-/* Inside a band, successive rows keep one rhythm. */
-.koti-band > * + * { margin-top: 1rem; }
+/* Inside a band, successive rows keep one rhythm: clearly more air between rows (1.3rem) than
+   between the chips inside one (0.6rem), so the categories read apart instead of as one lump. */
+.koti-band > * + * { margin-top: 1.3rem; }
 .koti-band > .koti-band-title + * { margin-top: 0; }
 
 /* ── What you have made: each count is a door to its surface. Zero rows never render. ── */

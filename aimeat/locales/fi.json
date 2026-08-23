@@ -3152,8 +3152,8 @@
     "readyTitle": "Kotisi on valmis.",
     "readySub": "Tervetuloamattosi on paikallaan ja ensimmäinen agenttisi on kotona.",
     "matCompact": "Tervetuloamattosi:",
-    "webpage": "Verkkosivusi — tekoälysi tekemä:",
-    "identityHint": "GHII — pysyvä osoitteesi. Ihmiset, kodit ja agentit kaikkialla löytävät sinut sillä.",
+    "webpage": "Verkkosivusi, tekoälysi tekemä:",
+    "identityHint": "GHII: pysyvä osoitteesi. Ihmiset, kodit ja agentit kaikkialla löytävät sinut sillä.",
     "chatDoor": {
       "lede": "Agenttisi on chatissa. Sano mitä tarvitset, niin se ryhtyy töihin.",
       "cta": "Jatka keskustelua"
@@ -3164,8 +3164,9 @@
       "organisms": "Jaetut tilat",
       "memory": "Muistiinpanot ja tietueet",
       "files": "Tiedostot",
+      "assets": "Aineistot",
       "knowledge": "Jäsennelty tietosi",
-      "knowledgeExplain": "Jäsenneltyä tietoa: mitä olet järjestänyt talteen AI-chateistasi omien älyjesi, appiesi ja — kun niin haluat — muiden käyttöön.",
+      "knowledgeExplain": "Jäsenneltyä tietoa: mitä olet järjestänyt talteen AI-chateistasi omien älyjesi, appiesi ja, kun niin haluat, muiden käyttöön.",
       "star": "Pidä tämä aina näkyvissä",
       "showAll": "Näytä kaikki ({n})",
       "showLess": "Näytä vähemmän"
@@ -3177,8 +3178,8 @@
       "houseModel": "Talon chat vastaa mallilla {model}."
     },
     "mail": {
-      "unread": "{n} lukematonta — käy katsomassa",
-      "empty": "Postilaatikko — ei uutta"
+      "unread": "{n} lukematonta, käy katsomassa",
+      "empty": "Postilaatikko: ei uutta"
     },
     "fleet": {
       "oneOk": "Agenttisi on kotona ja kunnossa.",
@@ -3197,9 +3198,10 @@
     "playbooks": {
       "title": "Mitä haluaisit perustaa?",
       "lead": "Jokainen näistä on oikeasti tehtävissä täällä, ja mukana tulevat askeleet ja kehote joka vie perille.",
+      "row": "Pystytettävää",
       "ask": "Pyydä agenttiani",
       "copy": "Kopioi omalle tekoälylleni",
-      "copied": "Kopioitu — liitä se tekoälychattiisi",
+      "copied": "Kopioitu. Liitä se tekoälychattiisi",
       "proof": "Täällä pyörii jo:",
       "tour": "Etkö ole varma mihin tämä pystyy? Käy kierroksella →",
       "businesslauncher": {
@@ -3214,12 +3216,12 @@
       },
       "marketplace": {
         "title": "Kauppa jossa maksavat kortit, kolikot ja agentit",
-        "lead": "Yksi kassa joka ottaa vastaan kortin, stablecoinin tai toisen agentin rahat — ja tilittää sinulle.",
+        "lead": "Yksi kassa joka ottaa vastaan kortin, stablecoinin tai toisen agentin rahat, ja tilittää sinulle.",
         "ask": "Haluan perustaa kaupan joka ottaa vastaan kortit, stablecoinin ja agenttiostot. Opasta minut läpi.",
         "step1": "Kerro mitä myyt: tavaraa, palvelua vai työtä jonka agenttisi tekevät toisille.",
         "step2": "Kytke raha. Kortit kulkevat maksunvälittäjäsi kautta, USDC ja EURC tilittyvät suoraan osoitteeseesi.",
         "step3": "Agenttisi julkaisee kaupan appina, jolla on oma verkko-osoite.",
-        "step4": "Myynti varataan, veloitetaan ja tilitetään sinulle — ja voit jakaa tuoton niiden kesken jotka olivat mukana."
+        "step4": "Myynti varataan, veloitetaan ja tilitetään sinulle, ja voit jakaa tuoton niiden kesken jotka olivat mukana."
       },
       "accounts": {
         "title": "Tilisi kytkettyinä",
@@ -3236,7 +3238,7 @@
         "ask": "Laita oma sivuni pystyyn ja anna minulle osoite.",
         "step1": "Kerro agentillesi kuka olet ja mitä sivun pitäisi sanoa.",
         "step2": "Se julkaisee sivun ja antaa sinulle osoitteen.",
-        "step3": "Muuta sitä pyytämällä — mitään editoria ei tarvitse opetella.",
+        "step3": "Muuta sitä pyytämällä. Mitään editoria ei tarvitse opetella.",
         "step4": "Lisää ne osat jotka näkyvät vain valituille, silloin kun haluat."
       },
       "instance": {
@@ -3244,7 +3246,7 @@
         "lead": "Koko homma omalla koneellasi tai pilvessäsi: omat sääntösi, oma datasi, omat kulusi.",
         "ask": "Mietin AIMEATin ajamista omalla koneellani. Auta päättämään, ja asenna se sitten.",
         "step1": "Mieti mitä haluat, mitä tämä paikka ei sinulle anna.",
-        "step2": "Asenna se — yksi komento, ja se vastaa omassa osoitteessasi.",
+        "step2": "Asenna se: yksi komento, ja se vastaa omassa osoitteessasi.",
         "step3": "Tuo tavarasi mukana: muistit, tiedostot, tilat ja agentit kaikki siirtyvät.",
         "step4": "Päätä omat sääntösi, ja federoi muiden kanssa vain jos haluat."
       }
@@ -3281,10 +3283,10 @@
       "promptLabel": "Kehote",
       "promptShort": "Lyhyempi kehote",
       "copy": "Kopioi kehote",
-      "copied": "Kopioitu — liitä se tekoälychattiisi",
+      "copied": "Kopioitu. Liitä se tekoälychattiisi",
       "loading": "Ladataan…",
       "pasteLabel": "Liitä tähän se mitä tekoälysi antoi",
-      "pastePlaceholder": "Kaikki mitä se kirjoitti käy — selitykset ja kaikki.",
+      "pastePlaceholder": "Kaikki mitä se kirjoitti käy, selitykset ja kaikki.",
       "submit": "Tässä minun tervetuloamattoni",
       "sending": "Luetaan…",
       "view": "Katso se",
@@ -3314,7 +3316,7 @@
       "modeSteps": "Tee askel askeleelta",
       "promptLabel": "Kehote",
       "copy": "Kopioi kehote",
-      "copied": "Kopioitu — liitä se tekoälychattiisi",
+      "copied": "Kopioitu. Liitä se tekoälychattiisi",
       "doneManual": "Olen aloittanut",
       "waitTitle": "Odotetaan että agenttisi koputtaa ovelle.",
       "waitBody": "Seuraava siirto on tekoälychatissasi: sen pitää ajaa kehote ja näyttää sinulle koodi. Kun se tekee niin, pyyntö ilmestyy tähän ja sinä hyväksyt sen.",
@@ -3327,7 +3329,7 @@
       "stateProduction": "Yhdistetty ja kotona.",
       "stateIdle": "Täällä, mutta hiljaa juuri nyt.",
       "stateOnboarding": "Asettuu taloksi.",
-      "stateNew": "Juuri saapunut — ei ole vielä aloittanut.",
+      "stateNew": "Juuri saapunut, ei ole vielä aloittanut.",
       "stateProblem": "Se on törmännyt johonkin. Katsotaanko yhdessä?",
       "stateSystem": "Osa taloa.",
       "othersProblem": "Katsotaanko, mitä muille {count} apurille kuuluu?",
@@ -3345,8 +3347,8 @@
       "againTitle": "Tee sitten matto uudestaan sillä",
       "againBody": "Sama kehote, uusi sovellus. Liitä sen vastaus tähän, niin jatketaan siitä. Ensimmäinen mattosi säilyy kunnes tämä korvaa sen.",
       "submit": "Tässä on uusi",
-      "stillB": "Sekään ei osaa avata yhteyttä. Yllä oleva lista on se tarkistettu — sovelluksen pitää olla siitä.",
-      "ledePlan": "{app} teki sen, ja {app} osaa avata yhteyden kotiisi — mutta vain maksullisilla tasoillaan, etkä sinun mukaasi ole niillä. Seuraava askel tarvitsee siis joko sen tason tai toisen sovelluksen.",
+      "stillB": "Sekään ei osaa avata yhteyttä. Yllä oleva lista on se tarkistettu; sovelluksen pitää olla siitä.",
+      "ledePlan": "{app} teki sen, ja {app} osaa avata yhteyden kotiisi, mutta vain maksullisilla tasoillaan, etkä sinun mukaasi ole niillä. Seuraava askel tarvitsee siis joko sen tason tai toisen sovelluksen.",
       "yours": "Se jota jo käytät"
     },
     "feed": {
@@ -3445,7 +3447,7 @@
         "entered": "Menit lukemaan viestisi."
       },
       "copyPrompt": "Kopioi kehote",
-      "copied": "Kopioitu — liitä se tekoälychattiisi"
+      "copied": "Kopioitu. Liitä se tekoälychattiisi"
     },
     "settings": {
       "open": "Asetukset",
@@ -4325,9 +4327,9 @@
     "agentDoorTitle": "Anna tekoälysi hoitaa tämä",
     "agentDoorSub": "Kopioi kehote omaan tekoälychattiisi. Jos se pystyy, sähköpostiisi tulee linkki ja tilisi on valmis.",
     "agentDoorCopy": "Kopioi kehote",
-    "agentDoorCopied": "Kopioitu — liitä se tekoälychattiisi",
+    "agentDoorCopied": "Kopioitu. Liitä se tekoälychattiisi",
     "agentDoorAfter": "Se kysyy sinulta vain sähköpostiosoitteesi. Käyttäjänimen valitset itse jälkeenpäin, linkistä.",
-    "agentDoorMcp": "Varaudu konfiguroimaan sille konnektori myöhemmin — se on se askel joka päästää sen kotiisi suoraan.",
+    "agentDoorMcp": "Varaudu konfiguroimaan sille konnektori myöhemmin; se on se askel joka päästää sen kotiisi suoraan.",
     "agentDoorCannot": "Jos se sanoo ettei pysty, se on ihan kelpo vastaus. Rekisteröidy silloin alta.",
     "registerHome": "Rekisteröi kotisi",
     "registerHomeSub": "Jos sinulla ei vielä ole pääsyä.",

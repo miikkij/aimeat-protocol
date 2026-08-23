@@ -27,6 +27,7 @@
  * @structure WelcomeDoor({ onNavigate })
  * @usage import { WelcomeDoor } from '/views/home/welcome-door.js';
  * @version-history
+ *   (2026-08-23) Em-dashes swept from the fallback strings (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 8).
  *   v1.2.0 — 2026-08-08 — Renders nothing at all when signed in. The go-home card and the
  *     new/old switch do not belong on the marketing page; the switch lives in the home's settings.
@@ -117,14 +118,14 @@ export function WelcomeDoor({ onNavigate }) {
             text=${prompt}
             className="btn-primary"
             label=${tr('landing.agentDoorCopy', 'Copy the prompt')}
-            copiedLabel=${tr('landing.agentDoorCopied', 'Copied — paste it in your AI chat')}
+            copiedLabel=${tr('landing.agentDoorCopied', 'Copied. Paste it in your AI chat')}
             onCopied=${() => setOpen(true)} />
         </div>
 
         ${open && html`
           <div class="koti-door-after">
             <p>${tr('landing.agentDoorAfter', 'It will ask you for your email address and nothing else. You choose your own username afterwards, from the link.')}</p>
-            <p>${tr('landing.agentDoorMcp', 'Be ready to set up a connector for it later — that is the step that lets it reach your home directly.')}</p>
+            <p>${tr('landing.agentDoorMcp', 'Be ready to set up a connector for it later; that is the step that lets it reach your home directly.')}</p>
             <p>${tr('landing.agentDoorCannot', 'If it says it cannot, that is a fine answer. Register below instead.')}</p>
           </div>`}
       </div>

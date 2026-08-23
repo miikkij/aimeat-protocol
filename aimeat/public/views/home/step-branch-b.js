@@ -23,6 +23,7 @@
  *   in a toast, because the person needs them next to the thing they must change.
  * @usage import { StepBranchB } from './step-branch-b.js';
  * @version-history
+ *   (2026-08-23) Em-dashes swept from the fallback strings (banned in every surface).
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 5).
  */
 import { h } from 'preact';
@@ -75,7 +76,7 @@ export function StepBranchB({ state, onChanged }) {
       if (r.data?.branch === 'B') {
         // Still an app that cannot. Say so without starting over, and keep their text.
         setErrText(tr('home.branchB.stillB',
-          'That one cannot open a connection either. The list above is the checked one — the app has to be from it.'));
+          'That one cannot open a connection either. The list above is the checked one; the app has to be from it.'));
       } else {
         onChanged(r.data);
       }
@@ -109,7 +110,7 @@ export function StepBranchB({ state, onChanged }) {
 
       <p class="koti-step-lede">
         ${theirs
-          ? tr('home.branchB.ledePlan', '{app} made it, and {app} can open a connection to your home — but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.')
+          ? tr('home.branchB.ledePlan', '{app} made it, and {app} can open a connection to your home, but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.')
               .replace(/\{app\}/g, theirs.label)
           : tr('home.branchB.lede', 'You made it with {app}. It can write, but it cannot open a connection to your home yet, so the next step needs a different app.')
               .replace('{app}', appName)}
@@ -156,7 +157,7 @@ export function StepBranchB({ state, onChanged }) {
           prompt=${prompt}
           className=${hasPaste ? 'btn-outline' : 'btn-primary'}
           copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
-          copiedLabel=${tr('home.mat.copied', 'Copied — paste it in your AI chat')} />
+          copiedLabel=${tr('home.mat.copied', 'Copied. Paste it in your AI chat')} />
 
         <label class="koti-paste-label" for="koti-b-paste">
           ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
@@ -166,7 +167,7 @@ export function StepBranchB({ state, onChanged }) {
           class="koti-paste"
           rows="7"
           spellcheck="false"
-          placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine — explanation and all.')}
+          placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine, explanation and all.')}
           value=${paste}
           onInput=${(e) => setPaste(e.target.value)}></textarea>
 

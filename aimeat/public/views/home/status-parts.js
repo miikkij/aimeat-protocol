@@ -15,6 +15,10 @@
  * @structure MailboxRow · FleetLine · ChatDoor · NamedRow · Things · FavoriteApps · Playbooks · TrustLine · Achievements
  * @usage import { MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Achievements } from '/views/home/status-parts.js';
  * @version-history
+ *   v1.4.0 — 2026-08-23 — Jouni's second round on prod: the count tiles become the Assets row
+ *     and the playbook pills the To-set-up row, so every row in a band hangs on the same label
+ *     column; the em-dash (banned in every surface) is swept out of the fallback strings; the
+ *     trust line gets its missing space before the How-this-works link.
  *   v1.3.0 — 2026-08-23 — The home reads as bands. Things IS the "what you have made" band and
  *     takes the apps row as its child; every named row (spaces, knowledge, apps, tried-so-far)
  *     goes through one NamedRow frame — label left, content right — so they line up as a list;
@@ -61,8 +65,8 @@ export function MailboxRow({ mail }) {
       <span class="koti-mailbox-icon" aria-hidden="true">${unread > 0 ? '📬' : '📪'}</span>
       <span class="koti-mailbox-text">
         ${unread > 0
-          ? tr('home.mail.unread', '{n} unread — go have a look').replace('{n}', String(unread))
-          : tr('home.mail.empty', 'Mailbox — nothing new')}
+          ? tr('home.mail.unread', '{n} unread, go have a look').replace('{n}', String(unread))
+          : tr('home.mail.empty', 'Mailbox: nothing new')}
       </span>
     </a>`;
 }
@@ -206,18 +210,18 @@ export function Things({ usage, orgs, packages, prefs, onStar, children }) {
   })));
   if (!rows.length && !orgRows.length && !pkgRows.length) return null;
   const starred = prefs?.stars ?? [];
-  const explain = tr('home.things.knowledgeExplain', 'Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and — when you choose — other people to use.');
+  const explain = tr('home.things.knowledgeExplain', 'Structured knowledge: what you have organised out of your AI chats, for your AIs, your apps and, when you choose, other people to use.');
   return html`
     <section class="koti-band koti-things">
       <h2 class="koti-band-title">${tr('home.things.title', 'What you have made')}</h2>
       ${rows.length > 0 && html`
-        <div class="koti-things-row">
+        <${NamedRow} label=${tr('home.things.assets', 'Assets')}>
           ${rows.map((r) => html`
             <a class="koti-thing" key=${r.key} href=${r.href}>
               <span class="koti-thing-n">${r.n}</span>
               <span class="koti-thing-label">${tr(r.key, r.fallback)}</span>
             </a>`)}
-        </div>`}
+        <//>`}
       <${ChipRow} label=${tr('home.things.organisms', 'Shared spaces')} rows=${orgRows}
         starred=${starred} onStar=${onStar} fold=${FOLD_AFTER} />
       <${ChipRow} label=${tr('home.things.knowledge', 'Structured knowledge')} title=${explain} rows=${pkgRows}
@@ -319,7 +323,7 @@ export function Playbooks({ playbooks, tour }) {
   return html`
     <div class="koti-pb">
       <p class="koti-pb-lead">${tr('home.playbooks.lead', 'Each one is a real thing you can do here, with the steps and the prompt that gets it done.')}</p>
-      <div class="koti-things-row">
+      <${NamedRow} label=${tr('home.playbooks.row', 'To set up')}>
         ${playbooks.map((pb) => html`
           <button type="button" key=${pb.id}
             class="koti-fold ${open === pb.id ? 'koti-fold--on' : ''}"
@@ -329,7 +333,7 @@ export function Playbooks({ playbooks, tour }) {
           </button>`)}
         ${tour && html`<a class="koti-pb-tour" href=${tour} target="_blank" rel="noopener">
           ${tr('home.playbooks.tour', 'Not sure what this can do? Take the tour →')}</a>`}
-      </div>
+      <//>
       ${playbooks.filter((pb) => pb.id === open).map((pb) => html`
         <div class="koti-pb-open" key=${pb.id}>
           <p class="koti-pb-what">${tr(`home.playbooks.${pb.id}.lead`, '')}</p>
@@ -354,7 +358,7 @@ export function Playbooks({ playbooks, tour }) {
             </button>
             <button type="button" class="btn-outline" onClick=${() => copyPrompt(pb)}>
               ${copied === pb.id
-                ? tr('home.playbooks.copied', 'Copied — paste it in your AI chat')
+                ? tr('home.playbooks.copied', 'Copied. Paste it in your AI chat')
                 : tr('home.playbooks.copy', 'Copy for my own AI')}
             </button>
           </div>
@@ -371,7 +375,9 @@ export function Playbooks({ playbooks, tour }) {
 export function TrustLine() {
   return html`
     <section class="koti-trust">
-      <p>${tr('home.trust.ai', 'AI-made content carries its label here, as the EU AI Act asks.')}
+      ${/* The explicit space matters: HTM collapses the line break, and the link sat glued to the
+            sentence's full stop ("...asks.How this works"). */''}
+      <p>${tr('home.trust.ai', 'AI-made content carries its label here, as the EU AI Act asks.')}${' '}
         <a href="/v1/transparency">${tr('home.trust.more', 'How this works →')}</a></p>
       <p>${tr('home.trust.data', 'Your data is yours: export it or delete it, and nothing is shared until you share it.')}</p>
     </section>`;

@@ -18,6 +18,7 @@
  *   connected agent, shown on an initialised home with its details in a details/summary section.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   (2026-08-23) Em-dashes swept from the copied and state fallbacks (banned in every surface).
  *   v1.2.0 — 2026-08-16 — The card invites instead of alarming: "It has hit a snag. Shall we take
  *     a look?" and the fleet line stops reading out the damage count — the number of problems
  *     lives one click away, on the page that can act on it. A count of worries is not what
@@ -191,7 +192,7 @@ export function StepAgent({ onChanged, showToast }) {
             prompt=${prompt}
             className=${waiting ? 'btn-outline' : 'btn-primary'}
             copyLabel=${tr('home.agent.copy', 'Copy the prompt')}
-            copiedLabel=${tr('home.agent.copied', 'Copied — paste it in your AI chat')}
+            copiedLabel=${tr('home.agent.copied', 'Copied. Paste it in your AI chat')}
             onCopied=${() => setWaiting(true)} />
         ` : html`
           <ol class="koti-manual">
@@ -233,7 +234,7 @@ const STATE_TEXT = {
   production: ['home.agent.stateProduction', 'Connected and at home.'],
   idle: ['home.agent.stateIdle', 'Here, but quiet just now.'],
   onboarding: ['home.agent.stateOnboarding', 'Settling in.'],
-  new: ['home.agent.stateNew', 'Just arrived — it has not started yet.'],
+  new: ['home.agent.stateNew', 'Just arrived, it has not started yet.'],
   problem: ['home.agent.stateProblem', 'It has hit a snag. Shall we take a look?'],
   system: ['home.agent.stateSystem', 'Part of the house.'],
 };

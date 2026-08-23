@@ -26,6 +26,7 @@
  * @structure OpenItemsList({ maxAgeDays })
  * @usage html`<${OpenItemsList} />` — or `maxAgeDays={7}` to hide rows that have gone stale
  * @version-history
+ *   (2026-08-23) Em-dashes swept from the copied and suggestion fallbacks (banned in every surface).
  *   v1.1.0 — 2026-08-18 — `maxAgeDays`: a surface can ask for fresh items only. An eight-day-old
  *     "Haluan luoda" at the top of the home is an inbox of guilt, not a status; a row an agent is
  *     WORKING on stays regardless of age, because active work never goes stale by sitting there.
@@ -121,7 +122,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
           text=${prompt}
           className="btn-primary btn-sm"
           label=${tr('openItems.copyPrompt', 'Take these into your AI chat')}
-          copiedLabel=${tr('openItems.copied', 'Copied — paste it in your chat')} />
+          copiedLabel=${tr('openItems.copied', 'Copied. Paste it in your chat')} />
       </div>
 
       <ul class="open-items-list">
@@ -138,7 +139,7 @@ export function OpenItemsList({ maxAgeDays } = {}) {
                  in three said it. Two lines, two facts. */''}
               <div class="open-items-meta">
                 ${i.closes_when
-                  ? tr('openItems.suggestion', 'Suggestion — it goes away once this is done')
+                  ? tr('openItems.suggestion', 'Suggestion: it goes away once this is done')
                   : i.agent
                     ? `${escHtml(String(i.agent).split('#')[0])} ${tr('openItems.isDoing', 'is doing this')}`
                     : `${originLabel(i.origin)} · ${timeAgo(i.createdAt)}`}
