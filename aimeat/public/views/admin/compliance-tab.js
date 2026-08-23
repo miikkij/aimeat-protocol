@@ -253,6 +253,7 @@ export default function ComplianceTab() {
       <${RegisterSection}
         usecases=${report.register.usecases}
         questionnaire=${questionnaire}
+        gaps=${report.gaps}
         saving=${saving}
         onSave=${saveRegister}
       />

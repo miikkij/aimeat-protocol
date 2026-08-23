@@ -288,11 +288,13 @@
       "print": "Tulosta tai tallenna PDF:ksi",
       "csv": "Lataa CSV",
       "howTitle": "Näin pääset alkuun",
-      "howStep1": "Kirjaa jokainen asia, johon tekoälyä täällä käytetään. Yksi merkintä per käyttötapa: mistä on kyse, millä malleilla se pyörii, mitkä julkaistut apit siihen liittyvät.",
-      "howStep2": "Vastaa jokaisen merkinnän kysymyksiin. Jos jätät yhden vastaamatta, merkinnällä ei ole luokkaa ja se nousee ylimmäksi. Se on tarkoitus: mikään ei saa näyttää hyväksytyltä silloin, kun kukaan ei ole katsonut sitä.",
-      "howStep3": "Lue \"Vaatii katsomista\". Siellä näkyy malli, joka on ollut käytössä mutta jota yksikään merkintä ei mainitse. Juuri tämä ero on sivun idea: jos mitään ei ole kirjattu, kaikki lasketaan dokumentoimattomaksi.",
-      "howMonthly": "Kunkin kuukauden raportti kirjoittuu itsestään seuraavan kuun ensimmäisenä päivänä ja jää talteen. Voit ajaa sen etuajassa Ajastin-välilehdeltä, työ nimeltä Monthly Compliance Report.",
-      "howAgent": "Oma tekoälysi voi pitää tätä ajan tasalla puolestasi: anna sille oikeus \"compliance:read\" raportin lukemiseen ja \"compliance:write\" kirjausten muuttamiseen. Molemmat annetaan agenttikohtaisesti Profiilissa, eikä kumpikaan tule Täysien oikeuksien mukana."
+      "howStep1": "Pyydä omaa tekoälyäsi tekemään se. MCP:n yli se lukee tämän raportin ja pitää kirjaukset ajan tasalla: \"Lue vaatimustenmukaisuusraportti täältä ja kirjaa mihin me tekoälyä käytämme.\" Anna sille ensin oikeudet \"compliance:read\" ja \"compliance:write\" agenttikohtaisesti Profiilissa.",
+      "howStep2": "Tai lähde siitä, mikä on jo huomattu. Kaikki mitä täällä on käytetty mutta mitä ei ole kirjattu mihinkään, ehdotetaan alla mallit ja apit valmiiksi täytettyinä. Lisäät sen yhdellä klikkauksella.",
+      "howStep3": "Vastaa sitten kunkin merkinnän kysymyksiin. Tätä osaa ei voi päätellä eikä kenenkään pidä arvata: se, päättääkö käyttö jotain ihmisestä tai julkaiseeko se yleisesti merkittävästä aiheesta, on harkintaa. Jos jätät yhden vastaamatta, merkinnällä ei ole luokkaa ja se pysyy ylimpänä.",
+      "howMonthly": "Kunkin kuukauden raportti kirjoittuu seuraavan kuun ensimmäisenä päivänä ja jää talteen. Voit ajaa sen etuajassa Ajastin-välilehdeltä, työ nimeltä Monthly Compliance Report.",
+      "howAgent": "Mitään ei tarvitse kytkeä päälle. Kysymyssarja tarjoillaan valmiina, eikä mitään tallennu ennen ensimmäistä tallennusta.",
+      "proposalsNote": "Käytetty täällä, ei kirjattu mihinkään. Mallit ja apit on täytetty sen mukaan mitä oikeasti ajettiin; sinä annat vastaukset.",
+      "proposalAdd": "Lisää"
     }
   },
   "admin.messages.desc": "Toimitustelemetria käyttäjien välisille viesteille. Viestien sisältöä tai osapuolten henkilöllisyyttä ei näytetä.",
