@@ -2859,8 +2859,8 @@
       "note": "Tier 0.5 -mintit poistettiin kokonaan, mutta deprekoitu micro-memoryn ?otk=-kirjoituspolku ja adminin initial-OTK-mintti jäävät eläviksi ilman lippua, oletusta ja poistoversiota, ja micro-memory neuvoo yhä hakemaan avaimen juuri poistetusta POST /v1/auth/initial-otk -reitistä.",
       "commitRange": "320ca253..HEAD",
       "date": "2026-08-23",
-      "status": "open",
-      "resolution": "Roikkuva vihje micro-memoryssa korjattu (ei enää osoita poistettuun reittiin). Admin initial-otk -mintin ja micro-memory ?otk= -alijärjestelmän täysi poisto on erillinen, kehittäjän päätettävä laajennus."
+      "status": "closed",
+      "resolution": "Ratkaistu committissa 304f95e6: micro-memory / Tier 0.5 -alijärjestelmä poistettu kokonaan (reitit, storage, config, promptit, openapi, RFC, testit). keyedBrowseEnabled-lippu poistettu. Vain connectivity-key-mint ja legacy-challenge jäävät."
     }
   ]
 }
