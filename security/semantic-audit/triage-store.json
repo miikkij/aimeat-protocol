@@ -977,7 +977,8 @@
       "note": "PUT /v1/federation/peers/:nodeId kirjoittaa tier- ja lippumuutokset suoraan elävään peers-Mapin olioon ennen kuin support_upstream-tarkistukset ehtivät hylätä pyynnön 409:llä, joten hylätty pyyntö on silti ehtinyt muuttaa sitä mitä kaikki portit tästä eteenpäin valvovat, ja muistissa oleva tila eroaa tallennetusta.",
       "commitRange": "HEAD~10..HEAD",
       "date": "2026-08-23",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu committissa 3570f97d, regressiotesti mukana (S10b / I7 / S10c)."
     },
     {
       "id": "5334aae4c04d",
@@ -986,7 +987,8 @@
       "note": "consumeLinkInvite kuluttaa kertakäyttöisen kutsun ennen validateOutboundUrl-tarkistusta, joten 400 INVALID_URL -hylkäys jättää kutsun käytetyksi vaikka liitosta ei syntynyt.",
       "commitRange": "HEAD~10..HEAD",
       "date": "2026-08-23",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu committissa 3570f97d, regressiotesti mukana (S10b / I7 / S10c)."
     },
     {
       "id": "b6204d3970ce",
@@ -995,7 +997,8 @@
       "note": "resolveGroupTarget tulkitsee raa'an tyhjän to-kentän samaksi kuin support-osoite (addressedToSupport), joten solmulla jolla on support-upstream-naapuri pelkällä conversation_id:llä jatkettu tavallinen kahdenkeskinen viesti ohjautuu palveluntarjoajan tukiosoitteeseen ketjun oikean vastapuolen sijaan.",
       "commitRange": "HEAD~10..HEAD",
       "date": "2026-08-23",
-      "status": "open"
+      "status": "closed",
+      "resolution": "Korjattu committissa 3570f97d, regressiotesti mukana (S10b / I7 / S10c)."
     },
     {
       "id": "c79482646695",
