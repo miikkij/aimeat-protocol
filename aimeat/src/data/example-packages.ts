@@ -10,6 +10,9 @@
  * @usage
  *   import { getExamplePackages, buildRecords } from '../data/example-packages.js';
  * @version-history
+ *   v1.5.0 — 2026-08-23 — The company-brain package (TARGET-071). Three components and no memory
+ *     one: its knowledge lives in the owner's own workspace, and the app finds that workspace by
+ *     the contract its manifest declares rather than by a stored id.
  *   v1.0.0 — 2026-03-16 — initial implementation, extracted from seed-digital-signage.ts
  *   v1.1.0 — 2026-03-16 — fix admin app: pass version for optimistic locking on
  *     memory PUT, fix double-stringification of values; fix memoryInit entries format
@@ -32,6 +35,7 @@ import { digitalSignagePackage } from './digital-signage-package.js';
 import { aimeatIamPackage } from './aimeat-iam-package.js';
 import { aimeatMarketplacePackage } from './aimeat-marketplace-package.js';
 import { businesslauncherPackage } from './businesslauncher-package.js';
+import { companyBrainPackage } from './company-brain-package.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -66,7 +70,10 @@ function generateVersion(): string {
 
 /** Get all example package definitions. */
 export function getExamplePackages(): ExamplePackageDef[] {
-  return [digitalSignagePackage(), aimeatIamPackage(), aimeatMarketplacePackage(), businesslauncherPackage()];
+  return [
+    digitalSignagePackage(), aimeatIamPackage(), aimeatMarketplacePackage(),
+    businesslauncherPackage(), companyBrainPackage(),
+  ];
 }
 
 /**
