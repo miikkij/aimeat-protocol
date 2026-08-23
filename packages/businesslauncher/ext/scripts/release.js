@@ -27,8 +27,11 @@ export default async function (ctx, input) {
 
     const wrote = await ctx.memory.set('inventory', {
       stock: stock, reservations: reservations,
-    }, { ifVersion: read.version });
-    if (wrote.ok) return { ok: true, released: id, left: stock[held.sku] };
+    }, { ifVersion: read.version, visibility: 'private' });
+    if (wrote.ok) {
+      await ctx.memory.set('availability', { units: stock, updated: ctx.now() });
+      return { ok: true, released: id, left: stock[held.sku] };
+    }
   }
   return { ok: false, error: 'too much contention on the inventory — try again' };
 }

@@ -34,10 +34,16 @@ export default async function (ctx, input) {
     stock[sku] = have - qty;
     reservations[id] = { sku: sku, qty: qty, expiresAt: expiresAt, by: caller, at: ctx.now() };
 
+    // PRIVATE: this record names who holds what, and an ext namespace is world-readable by default.
     const wrote = await ctx.memory.set('inventory', {
       stock: stock, reservations: reservations,
-    }, { ifVersion: read.version });
-    if (wrote.ok) return { ok: true, reservationId: id, left: stock[sku], expiresAt: expiresAt };
+    }, { ifVersion: read.version, visibility: 'private' });
+    if (wrote.ok) {
+      // The public shelf number, carrying counts and no identities. A display value: the binding
+      // refusal happens above, against the private record, so a stale mirror cannot oversell.
+      await ctx.memory.set('availability', { units: stock, updated: ctx.now() });
+      return { ok: true, reservationId: id, left: stock[sku], expiresAt: expiresAt };
+    }
     // Somebody else moved the inventory. Read it again and decide against what is really there.
   }
   return { ok: false, error: 'too much contention on the inventory — try again' };

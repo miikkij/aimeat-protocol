@@ -90,6 +90,23 @@ describe('businesslauncher shop engine', () => {
         expect((record?.value as { items: unknown[] }).items).toHaveLength(1);
     });
 
+    // An ext namespace is world-readable, so anything written the default way is served to
+    // strangers. The record that names who holds what must not be one of those.
+    it('who holds what is private; the shelf number is public and names nobody', async () => {
+        await run(storage, 'admin.js', OWNER, { op: 'set_stock', units: { mug: 3 } });
+        await run(storage, 'reserve.js', BUYER, { sku: 'mug', qty: 1, reservationId: 'r1', expiresAt: isoIn(60_000) });
+
+        const inventory = await storage.getMemory(EXT_OWNER, 'inventory');
+        expect(inventory?.visibility).toBe('private');
+        expect(JSON.stringify(inventory?.value)).toContain(BUYER);
+
+        const availability = await storage.getMemory(EXT_OWNER, 'availability');
+        expect(availability?.visibility).toBe('public');
+        expect((availability?.value as { units: Record<string, number> }).units.mug).toBe(2);
+        // The public copy carries counts and nothing else.
+        expect(JSON.stringify(availability?.value)).not.toContain(BUYER);
+    });
+
     it('a hold takes the units off the shelf, and the same id twice is one hold', async () => {
         await run(storage, 'admin.js', OWNER, { op: 'set_stock', units: { mug: 3 } });
 
