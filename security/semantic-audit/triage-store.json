@@ -2045,12 +2045,11 @@
       "source": "codeql",
       "alertNumber": 100,
       "severity": "high",
-      "verdict": "confirm",
-      "reason": "Render-sinkin aggregaatti: konkreettiset injektiokohdat (favorites/detail onclick-argumentit) korjattu jsArg:lla samassa commitissa; jäljelle jää yli kymmenen HTML-palasen kooste jonka jokaista osaa ei voi koneellisesti todistaa turvalliseksi. Katselmoitava kokonaisuutena, ei todettu aukko.",
-      "decidedBy": "ai",
+      "verdict": "legit",
+      "reason": "Manuaalinen auditointi 2026-08-23: render-sinkin 13 palasta käyty läpi yksitellen — jokainen escapeaa app/käyttäjädatan sinkissä (escapeHtml arvoihin, jsArg onclickeihin, metaItem escapeaa, ODPS-kentät escapeHtml-textareoihin). Väärä positiivinen, ei aukkoa.",
+      "decidedBy": "human",
       "date": "2026-08-23",
-      "commit": "cd95d3ed",
-      "note": "concrete-fixes-applied"
+      "commit": "cd95d3ed"
     },
     {
       "fingerprint": "f1b03774146ae0c1",
