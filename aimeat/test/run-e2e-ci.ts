@@ -219,6 +219,7 @@ const ALL_SUITES = [
     'test/e2e-presence.ts',
     'test/e2e-federation-visiting.ts',
     'test/e2e-federation-contact-link.ts',
+    'test/federation-support.ts',
     'test/e2e-federation-policy.ts',
     'test/e2e-federation-nodeinfo.ts',
     'test/e2e-federation-book.ts',

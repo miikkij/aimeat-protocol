@@ -221,6 +221,9 @@ export function initializeSchema(db: Database.Database): void {
   // Which peer answers this node's support@operators. DEFAULT 0: a migration must never invent
   // somebody's support routing.
   safeAddColumn('federation_peers', 'supportUpstream', 'INTEGER NOT NULL DEFAULT 0');
+  // A support thread that arrived from a peer keeps the one party who lives on the other node, so
+  // the answer has somewhere to go. NOT a participant: membership stays node-local.
+  safeAddColumn('conversations', 'remote', 'TEXT');
   // The tier a peering request was APPROVED at. Without it the key-exchange auto-add re-admits a
   // de-peered contact link at 'member', because the approved request outlives the peer row.
   safeAddColumn('peering_requests', 'tier', 'TEXT');

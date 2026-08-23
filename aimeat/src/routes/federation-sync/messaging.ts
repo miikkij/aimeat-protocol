@@ -27,7 +27,9 @@ import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { notify } from '../../services/notify.js';
 import { parseGaiiLoose, isSameOwner } from '../../utils/gaii.js';
-import { messagePreview, conversationIdFor } from '../../utils/messaging.js';
+import { messagePreview, conversationIdFor, deliveryTargetFor } from '../../utils/messaging.js';
+import { isAliasAddress, receiveRemoteSupportMessage } from '../../services/message-alias.js';
+import { listOperatorGhiis } from '../../services/operators.js';
 import { generateDownloadToken } from '../../services/download-token.js';
 import { duplicateMessageAttachments } from '../../services/attachment-duplication.js';
 
@@ -183,6 +185,49 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // `deliveryGhii`, so fall back to the recipient itself (prior behaviour).
         const recipientGhii: string = message.recipientGhii;
         const deliveryGhii: string = message.deliveryGhii ?? recipientGhii;
+
+        // Addressed to this node's SUPPORT, not to a person on it. Resolved here, before the owner
+        // lookup below, which would find no owner called `support` and answer 404 RECIPIENT_NOT_FOUND
+        // — the sender would be told their provider does not exist.
+        //
+        // No first-contact gate on this path, matching the local support thread: someone asking for
+        // help must not land in a request queue nobody opens. The control over an abusive peer is
+        // revoking the link, which is the same control that created it.
+        if (isAliasAddress(deliveryGhii, config.nodeId)) {
+            const received = await receiveRemoteSupportMessage({ config, storage, peers }, config, {
+                sourceNode: source_node,
+                senderGhii: message.senderGhii,
+                conversationId: message.conversationId,
+                subject: message.subject ?? undefined,
+                body: message.body ?? '',
+                messageId: message.id,
+                attachments: normalizeInboundAttachments(message.attachments, message.senderGhii, source_node),
+                createdAt: message.createdAt,
+            });
+            if (!received.ok) {
+                res.status(received.status).json(error(config.nodeId, received.code, received.message));
+                return;
+            }
+            emitChange('messages');
+            // Wake any agent among the operators, the same signal a 1:1 DM sends.
+            for (const participant of received.participants) {
+                if (participant === deliveryTargetFor(participant)) continue;
+                emitDelivery({
+                    target: participant, kind: 'dm.inbound', id: message.id,
+                    payload: {
+                        id: message.id, conversationId: received.conversationId,
+                        subject: message.subject ?? null, senderGhii: message.senderGhii,
+                        preview: messagePreview(message.body ?? ''),
+                        attachments: message.attachments?.length ?? 0,
+                        createdAt: message.createdAt ?? new Date().toISOString(), interactive: null,
+                    },
+                });
+                try { emitResourceUpdated(participant, 'aimeat://dm/inbox'); } catch (err) { logger.warn('POST /v1/federation/message: no live MCP session', { error: String(err) }); }
+            }
+            res.json(success(config.nodeId, { delivered: true, state: 'accepted', conversation_id: received.conversationId }));
+            return;
+        }
+
         const parsedDelivery = parseGaiiLoose(deliveryGhii);
         if (parsedDelivery.node !== config.nodeId) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Recipient is not hosted on this node'));
@@ -202,7 +247,27 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         }
         let state = contact?.state;
         if (!state) {
-            const autoAccept = isSameOwner(message.senderGhii, deliveryGhii);
+            // A first contact from a stranger is held. Three things are not that.
+            //
+            // (2) is the general one and it fixes a class rather than a case: an answer arrives from a
+            // DIFFERENT identity than the one that was written to, and the gate reads it as a cold
+            // approach. Support is where it bites hardest — you write to `support@{node}` and a named
+            // person answers — but any thread whose other side has more than one identity has it.
+            // If this mailbox, or the agent the message is addressed to, already holds a message in
+            // this conversation, then somebody here started it and the question has been answered.
+            //
+            // (3) covers the genuinely cold case: the people who answer support for this node writing
+            // to the operator who pointed support at them. Deliberately narrow — an operator only, not
+            // every human on the node, because on a fifty-person managed instance the link was agreed
+            // by the operator alone and is not a licence to approach their colleagues.
+            const knownThread = message.conversationId
+                ? (await Promise.all([...new Set([deliveryGhii, recipientGhii])].map(async mailbox =>
+                    (await storage.listConversation(mailbox, message.conversationId)).messages.length > 0))).some(Boolean)
+                : false;
+            const fromOurSupport = peer.supportUpstream === true
+                && (await listOperatorGhiis(storage, config)).includes(deliveryGhii);
+
+            const autoAccept = isSameOwner(message.senderGhii, deliveryGhii) || knownThread || fromOurSupport;
             state = autoAccept ? 'accepted' : 'pending';
             await storage.setContactState(deliveryGhii, message.senderGhii, state, message.id);
         }
