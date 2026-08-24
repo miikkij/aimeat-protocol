@@ -60,6 +60,26 @@ describe('classifyKey: the organism plumbing is the node, not the workspace', ()
     expect(f.tier).toBe('platform-prefix');
     expect(f.family).toBe('organism.<id>.meta.*');
   });
+
+  // Found in a browser on a real account: a bare `organism.<id>.meta` with nothing after it read as
+  // "nothing says what this is". The trailing dot was doing work it should not have been doing.
+  it('reads a bare organism.<id>.meta as platform too', () => {
+    expect(classifyKey('organism.1df3736b-8672-4765-a99d-5b065f7f5da0.meta').tier).toBe('platform-prefix');
+  });
+});
+
+describe('classifyKey: the `.w.` segment is what marks a workspace record, not the id spelling', () => {
+  // The same browser run: this account's workspaces are named `ws1`, not `ws-mslunjvcgxj`, and every
+  // record in them was called unexplained. On a node where workspace records are half the keyspace,
+  // that is the most confident wrong answer this classifier can give.
+  it.each([
+    'organism.1df3736b-8672-4765-a99d-5b065f7f5da0.w.ws1.meta.manifest',
+    'organism.1df3736b-8672-4765-a99d-5b065f7f5da0.w.ws1.shared.pages.intro.latest',
+  ])('%s is a workspace record', key => {
+    const f = classifyKey(key);
+    expect(f.tier).toBe('declared-space');
+    expect(f.area).toBe('organism');
+  });
 });
 
 describe('classifyKey: reserved beats everything, because the server acts on it', () => {

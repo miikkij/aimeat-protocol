@@ -305,6 +305,18 @@ async function publish(token: string, filename: string, content: string) {
         assert(r.status === 200, `name ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(typeof r.body.data.key === 'string' && r.body.data.key.startsWith('datamap.'),
             `it writes ONE memory record: ${JSON.stringify(r.body.data)}`);
+
+        // The claim in this test's own title, which it did NOT assert until a browser run showed the
+        // named group still sitting in the list — with the count one HIGHER, because the record
+        // holding the name was itself undescribed.
+        const after = await json('/v1/datamap/coverage', { headers: auth(o.token) });
+        const a = after.body.data;
+        assert(!(a.roots ?? []).some((x: { family: string }) => x.family === family),
+            `"${family}" is still listed as unexplained after being named`);
+        assert(a.unexplainedFamilies < before.body.data.unexplainedFamilies,
+            `naming a group must lower the count: ${before.body.data.unexplainedFamilies} → ${a.unexplainedFamilies}`);
+        assert(a.byTier['owner-named'] > before.body.data.byTier['owner-named'],
+            'a group the owner described counts as described');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

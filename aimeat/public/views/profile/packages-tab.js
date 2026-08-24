@@ -67,7 +67,10 @@ const COMP_TYPE_META = {
  * component's own declaration, and the sentence stays empty because nobody wrote one.
  */
 function pkgDataMap(inst) {
-  const comps = (inst && inst.components) || [];
+  // `installedComponents` is what the card itself reads, and it is the only one populated. Reading
+  // `components` here made every package on the node say "stores nothing", which is not an empty
+  // answer but a confident wrong one: a browser run showed eight packages all claiming it.
+  const comps = (inst && inst.installedComponents) || [];
   const storing = comps.filter(c => ['memory', 'csm', 'msm'].includes(c.type));
   return {
     spec: 'aimeat.datamap/1',

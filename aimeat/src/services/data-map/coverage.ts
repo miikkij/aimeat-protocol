@@ -20,6 +20,10 @@
  * @structure CoverageReport · buildCoverage(storage, config, ownerName)
  * @usage import { buildCoverage } from './coverage.js';
  * @version-history
+ *   v1.1.0 — 2026-08-25 — The names the owner has already given are read back, so describing a group
+ *     moves it out of the unexplained column. Before this, saving a name left the row exactly where
+ *     it was and ADDED one undescribed key (the record holding the name), so the only action the view
+ *     offers made its own number worse. Found by driving the form in a browser.
  *   v1.0.0 — 2026-08-25 — Initial, for TARGET-073.
  */
 import type { Storage } from '../../storage/interface.js';
@@ -74,12 +78,26 @@ export async function buildCoverage(
     agentNames: agents.map(a => a.name),
   };
 
+  // What this person has already said, in their own words. Read BEFORE the fold, because a group they
+  // described must leave the list: the view offers exactly one action, and an action that changes
+  // nothing visible is worse than no action. The browser found this on the first real save.
+  const stated = new Set<string>();
+  for (const rec of await storage.listMemory(ownerGhii, { prefix: 'datamap.' })) {
+    const family = (rec.value as { family?: unknown } | null)?.family;
+    if (typeof family === 'string' && family) stated.add(family);
+  }
+
   const rows = await storage.listMemoryMetaForOwners(namespaces);
   const byTier: Record<string, number> = {};
   const roots = new Map<string, { keys: number; bytes: number; lastWritten: string; sample: string[] }>();
 
   for (const row of rows) {
-    const f = classifyKey(row.key, hints);
+    const raw = classifyKey(row.key, hints);
+    // A name the owner gave it outranks "nothing says what this is", and nothing else: a stated name
+    // never overrides a fixed shape or a program's own declaration, which are stronger evidence.
+    const f = raw.tier === 'none' && stated.has(raw.family)
+      ? { ...raw, tier: 'owner-named' as const, by: 'stated' }
+      : raw;
     byTier[f.tier] = (byTier[f.tier] ?? 0) + 1;
     if (f.tier !== 'none') continue;
     const cur = roots.get(f.family) ?? { keys: 0, bytes: 0, lastWritten: '', sample: [] };
