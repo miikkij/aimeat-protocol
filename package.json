@@ -1,6 +1,6 @@
 {
   "name": "aimeat-protocol",
-  "version": "3.6.0",
+  "version": "3.7.0",
   "private": true,
   "description": "AIMEAT — the Linux of AI: an open, federated, self-hosted AI operating system. Humans, AI agents, and local LLMs share apps, knowledge, and capabilities on nodes you own.",
   "type": "module",
