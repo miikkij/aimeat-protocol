@@ -361,5 +361,48 @@ await test('20. deleting a stream takes its collected months with it', async () 
   assert(after.body.data.counted === false, 'a deleted stream must stop counting');
 });
 
+
+console.log('\nPhase 7 — a published page counts its own readers, including the AI ones');
+
+await test('21. a page is counted only once its owner has opted it in', async () => {
+  const filename = `signalpage${Date.now().toString(36).slice(-5)}.html`;
+  const html = '<!doctype html><html><body><h1>Kevatkampanja</h1></body></html>';
+  const pub = await json('/v1/apps', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      filename, content: Buffer.from(html, 'utf-8').toString('base64'),
+      name: 'Signals page', description: 'campaign landing', category: 'utility', tags: ['demo'],
+    }),
+  });
+  assert(pub.status === 201, `publish failed: ${pub.status} ${JSON.stringify(pub.body)}`);
+
+  // Before opting in, fetching the page must write nothing at all.
+  await raw(`/v1/apps/${A.owner}/${filename}`, CHATGPT_ASKED);
+  const streamId = `page-${filename.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}`;
+  const before = await json(`/v1/signals/streams/${streamId}/report`, { headers: authed(A.token) });
+  assert(before.status === 404, `an unmeasured page must have no stream, got ${before.status}`);
+
+  // Opting in is creating the stream the convention names.
+  const made = await json('/v1/signals/streams', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ stream_id: streamId, label: 'Campaign page', channel: 'page' }),
+  });
+  assert(made.status === 200, `stream creation failed: ${made.status} ${JSON.stringify(made.body)}`);
+
+  // A person, an AI that was asked, and a crawler.
+  await raw(`/v1/apps/${A.owner}/${filename}`, CHROME);
+  await raw(`/v1/apps/${A.owner}/${filename}`, CHATGPT_ASKED);
+  await raw(`/v1/apps/${A.owner}/${filename}`, GPTBOT);
+  await new Promise((r) => setTimeout(r, 500));   // the serve path deliberately does not await the count
+
+  const after = await json(`/v1/signals/streams/${streamId}/report`, { headers: authed(A.token) });
+  assert(after.status === 200, `expected a report, got ${after.status}`);
+  assert(after.body.data.totals.hits === 3, `expected 3 page views, got ${after.body.data.totals.hits}`);
+  assert(after.body.data.totals.classes.human === 1, `expected 1 human, got ${JSON.stringify(after.body.data.totals.classes)}`);
+  assert(after.body.data.totals.aiAgents['chatgpt:asked'] === 1, `expected an asked-AI fetch, got ${JSON.stringify(after.body.data.totals.aiAgents)}`);
+  assert(after.body.data.totals.aiAgents['chatgpt'] === 1, `expected a crawler fetch, got ${JSON.stringify(after.body.data.totals.aiAgents)}`);
+  assert(after.body.data.totals.channels.page === 3, 'the hits must be attributed to the page channel');
+});
+
 console.log(`\n═══ ${passed} passed, ${failed} failed ═══`);
 process.exit(failed > 0 ? 1 : 0);

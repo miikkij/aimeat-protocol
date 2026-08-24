@@ -91,6 +91,16 @@ that travels without its meaning gets repeated to a customer as something it is 
   answer. A name without the suffix is a crawler building a model or an index. The first is a lead,
   the second is shelf presence.
 
+## Counting a page nobody clicked on
+
+A published page is counted when a stream named after it already exists: `cadence.html` counts into
+`page-cadence-html`. That is the whole opt-in — no setting, no per-page switch, and nothing is
+measured until the owner creates the stream. Serving a page nobody measures costs no database read,
+and creating the stream takes effect on the next request rather than when a cache expires.
+
+This is the only door that sees an AI crawler at all, because those clients run no JavaScript and
+load no images.
+
 ## The doors
 
 | Door | Auth | For |
