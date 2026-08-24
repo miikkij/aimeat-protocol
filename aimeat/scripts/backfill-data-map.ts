@@ -26,6 +26,14 @@
  *   cd aimeat && pnpm exec node --import tsx scripts/backfill-data-map.ts --db postgres-kysely --db-url "$DATABASE_URL"
  *   Add --apply to write. Without it it only reports. --owner <name> limits it to one account.
  * @version-history
+ *   v1.2.0 — 2026-08-25 — It reads the NODE'S OWN configuration, applying the database overrides
+ *     the server applies at boot. Without that step a script runs on the shipped defaults, and the
+ *     production apply refused all 146 writes with "Memory key limit reached (1000)" for an owner
+ *     already holding 6,152 keys — proof enough on its own that 1000 was never the real ceiling. The
+ *     same skip is what put the wrong node id on every lookup in v1.0.0. One missing step, two
+ *     different failures, both of which read as a finding about the node.
+ *     Also: the ceiling in force is printed in the report, and a run refuses up front when there is
+ *     not enough room for one key per app — 146 identical refusals bury their own message.
  *   v1.1.0 — 2026-08-25 — Three fixes, all found by the first production run, which reported 113
  *     apps as storing nothing and would have written 113 empty maps as a success.
  *       - The owner identity comes from the RECORD (app.ownerGaii), not from `${ownerName}@${config
@@ -43,7 +51,9 @@
  *   v1.0.0 — 2026-08-24 — Initial, for TARGET-073.
  */
 import { createStorage } from '../src/storage/storage-factory.js';
-import { loadConfig } from '../src/config.js';
+import { loadConfig, applyConfigOverrides } from '../src/config.js';
+import { ConfigProvenance } from '../src/services/config-provenance.js';
+import { ALL_CONFIG_MAP } from '../src/services/config-schema.js';
 import { parseAppScopes } from '../src/services/protected-resource.js';
 import { parseDataMapMeta } from '../src/services/data-map/data-map-meta.js';
 import { deriveDataMap } from '../src/services/data-map/data-map-derive.js';
@@ -65,6 +75,20 @@ async function main() {
     provider, sqlitePath: arg('db-path'), dbUrl: arg('db-url'),
   });
   const { config } = loadConfig();
+
+  // THE NODE'S OWN SETTINGS, not this script's compiled-in defaults. A node keeps its configuration
+  // in the database and applies it at boot (server-bootstrap/config-init.ts); a script that skips
+  // that step runs against the shipped defaults instead. On production that meant a key ceiling of
+  // 1000 while the node runs a far higher one, and every one of 146 writes was refused with
+  // "Memory key limit reached (1000)" — for an owner already holding 6,152 keys, which is proof
+  // enough on its own that 1000 was never the real ceiling. The same skip is what put the wrong node
+  // id on every lookup in the run before that. One step, two classes of failure.
+  const provenance = new ConfigProvenance();
+  provenance.initDefaults(Object.keys(ALL_CONFIG_MAP));
+  const overrides = await applyConfigOverrides(config, storage, provenance);
+  if (overrides.applied.length > 0) {
+    console.log(`  read ${overrides.applied.length} setting(s) from this node's own configuration`);
+  }
   const at = new Date().toISOString();
 
   // adminView, because a PARKED app still stores what it stores. Without it listApps hides parked
@@ -83,6 +107,7 @@ async function main() {
   console.log('  ──────────────────────────────────────────────────────────────');
   console.log(`  apps on this node          ${apps.length}`);
   console.log(`  in scope                   ${targets.length}${onlyOwner ? `  (owner ${onlyOwner})` : ''}`);
+  console.log(`  key ceiling in force       ${config.memoryMaxKeysPerAgent}   (one map is one key per app)`);
 
   // PREFLIGHT. Every app storing nothing is possible; every app storing nothing while most of them
   // ask for memory scopes is a broken read, and the difference is worth refusing to write over.
@@ -112,6 +137,21 @@ async function main() {
     console.log('');
     console.log('  Note: these owners hold 0 memory keys. On a new node that is normal. On an account');
     console.log('  that has been in use it means the identity is wrong — check before applying.');
+  }
+
+  // HEADROOM, checked once instead of discovered 146 times. One map is one key, so a run needs as
+  // many free keys as it has apps in scope. Learning that from 146 identical refusals is how the
+  // real message gets buried in its own repetition.
+  const needed = targets.length;
+  const ceiling = config.memoryMaxKeysPerAgent;
+  if (needed > 0 && probeKeys + needed > ceiling) {
+    refuseToWrite = true;
+    console.log('');
+    console.log('  REFUSING TO WRITE. There is not enough room under the key ceiling:');
+    console.log(`    these owners hold ${probeKeys} keys, the ceiling in force is ${ceiling},`);
+    console.log(`    and ${needed} more are needed — one per app.`);
+    console.log('    If this node runs a higher ceiling than the number above, this script is not');
+    console.log("    reading the node's own configuration, and that is the thing to fix.");
   }
 
   for (const app of targets) {
