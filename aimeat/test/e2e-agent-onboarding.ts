@@ -528,6 +528,60 @@ await test('14. POST start to get a fresh onboarding with test task', async () =
         `onboarding test task should be created active, got ${taskBody.data.task.status}`);
 });
 
+await test('14b. Completing the test task with NO plan is refused (PLAN_REQUIRED)', async () => {
+    // The jam this closes: accept_test_task passes only when the test task carries todos, and
+    // complete_test_task used to pass on a task completed without any. That combination is
+    // permanent -- a done task refuses a plan -- so the agent sat at 6/7 with no call left to make.
+    // Every task-runner agent reached it: its tasks are auto-activated and never appear as 'queued',
+    // which is the only state the aimeat-crewai daemon used to propose plans on.
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ message: 'Done without ever planning it' }),
+    });
+    assert(status === 409, `expected 409, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'PLAN_REQUIRED', `expected PLAN_REQUIRED, got ${body.error?.code}`);
+    assert(String(body.error?.message).includes('propose'),
+        `the refusal must name the call that is missing: ${body.error?.message}`);
+
+    // Refused before the write: the task is untouched, so the plan is still proposable. Tests 23
+    // and 25 below then walk the same task through propose -> complete and both steps pass.
+    const { body: after } = await json(`/v1/agents/${agentName}/tasks/${fullTestTaskId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(after.data.task.status === 'active',
+        `refused completion must leave the task active, got ${after.data.task.status}`);
+    assert(!after.data.task.completedAt, 'refused completion must not stamp completedAt');
+});
+
+await test('14c. A NORMAL task still completes with no todos', async () => {
+    // The guard is the onboarding smoke test's alone. Plenty of real tasks are one-shot and carry no
+    // plan; refusing those would be a different bug in the same place.
+    const { status: createStatus, body: created } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Plain task, no plan', description: 'One shot, no todos' }),
+    });
+    assert(createStatus === 201 || createStatus === 200, `create status ${createStatus}: ${JSON.stringify(created)}`);
+    const plainId = created.data.task.id;
+
+    if (created.data.task.status === 'queued') {
+        const { status: startStatus } = await json(`/v1/agents/${agentName}/tasks/${plainId}/start`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(startStatus === 200, `POST start status ${startStatus}`);
+    }
+
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks/${plainId}/complete`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ message: 'Finished' }),
+    });
+    assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.status === 'done', `expected done, got ${body.data.task.status}`);
+});
+
 await test('15. Step 1: authenticate is auto-passed', async () => {
     const { body } = await json(`/v1/agents/${agentName}/onboarding`, {
         headers: { Authorization: `Bearer ${ownerToken}` },

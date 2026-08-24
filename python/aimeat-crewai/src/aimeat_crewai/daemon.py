@@ -14,6 +14,12 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  0.21.0 -- PROPOSE also picks up PLAN-LESS ACTIVE tasks. It polled 'queued' only, and a task-runner
+    agent has no queued tasks -- the node auto-activates them on create, and the Hello Integration
+    test task is born active for every mode. So the plan was never proposed and EXECUTE completed the
+    task with an empty TODO list. On the test task that stranded Hello Integration at 6/7 for good
+    (accept_test_task needs todos; complete_test_task passed regardless; a done task refuses a plan).
+    See `_has_no_live_plan` + the PROPOSE phase in the poll loop.
   0.16.5 -- Unified wake (the general event-responsiveness fix). When the serve daemon exposes it, the
     idle wait parks on /local/wake/next, which resolves the instant ANY push source (task/record/dm/
     message) arrives -- without consuming -- so a multi-source agent wakes on EVERY source instead of
@@ -302,6 +308,23 @@ def _poll_tasks(api: _Api, status: str = "queued") -> list[dict[str, Any]]:
         return body.get("data", {}).get("tasks", []) or []
     except Exception:
         return []
+
+
+def _has_no_live_plan(task: dict[str, Any]) -> bool:
+    """True when this task carries no TODO that is still part of its plan.
+
+    Mirrors the node's own rule (`canProposeTodos`, src/services/agent-task-rules.ts): a todo marked
+    'outdated' is history, anything else is a live plan, and a plan may be proposed on a queued, a
+    revision_requested or a PLAN-LESS ACTIVE task. That last case is the one this predicate is for --
+    see the PROPOSE phase in the poll loop.
+
+    Pure, so it is unit-testable without a node.
+    """
+    todos = task.get("todos") or []
+    return not any(
+        isinstance(t, dict) and t.get("status") != "outdated"
+        for t in todos
+    )
 
 
 def _fetch_max_concurrent(api: _Api) -> int:
@@ -769,8 +792,8 @@ def _default_propose_crew(task: dict[str, Any], liaison: Any) -> Any:
         tasks=[
             Task(
                 description=(
-                    f"You are the AIMEAT Liaison. AIMEAT task {task_id} is queued for "
-                    f"this crew (title: {title}).\n\n"
+                    f"You are the AIMEAT Liaison. AIMEAT task {task_id} is waiting for a "
+                    f"plan from this crew (title: {title}).\n\n"
                     f"---\n{description}\n---\n\n"
                     f"Propose a TODO plan for completing this task. Call "
                     f"`aimeat_task_propose_todos` ONCE with task_id='{task_id}' and a "
@@ -888,18 +911,20 @@ def run_crew_daemon(
 
     The daemon runs the AIMEAT task lifecycle in two phases per poll cycle:
 
-      PROPOSE: Pick up tasks in status='queued' that the daemon has not
-        proposed yet, run the propose-phase crew (which calls
+      PROPOSE: Pick up every task with no plan yet -- status='queued', and
+        status='active' whose TODO list is empty -- that the daemon has not
+        proposed on, and run the propose-phase crew (which calls
         aimeat_task_propose_todos once and stops). Owner approval (or
-        task-runner mode's auto-activation) then flips the task to 'active'.
+        task-runner mode's auto-activation) then flips a queued task to
+        'active'.
       EXECUTE: Pick up tasks in status='active' (or 'stalled') the daemon
         has not yet completed, run the caller's build_crew (which should
         finish the work and call aimeat_task_complete).
 
     For task-runner mode agents the AIMEAT node auto-activates tasks on
-    create, so the daemon's PROPOSE phase still runs (idempotent propose
-    of todos) and the same task is picked up by EXECUTE in the SAME cycle
-    or the next one -- no owner approval required.
+    create, so they are never 'queued' at all -- PROPOSE catches them on
+    the plan-less-active side, and EXECUTE picks the same task up in the
+    SAME cycle with the plan already on it. No owner approval required.
 
     Args:
         agent_name: The AIMEAT agent name (e.g. "demo-crew"). Must have a
@@ -1390,11 +1415,34 @@ def run_crew_daemon(
 
                 if "tasks" in listen_set and should_poll:
                     next_poll_due = time.monotonic() + safety_net_s
-                    # PROPOSE phase: queued tasks the daemon hasn't proposed yet.
-                    # Owner-created tasks land in 'queued'; the daemon proposes a
-                    # plan and waits for owner approval (or for task-runner mode's
-                    # auto-active route to flip the task to 'active' directly).
-                    for task in _poll_tasks(api, status="queued"):
+                    # PROPOSE phase: every task with no plan yet, in either state it
+                    # can be in.
+                    #
+                    #   'queued'                -- owner-created and waiting for a plan
+                    #                              and the owner's approval.
+                    #   'active' with no plan   -- nobody is going to queue it. A
+                    #      task-runner agent's tasks are auto-activated on create, and
+                    #      the Hello Integration test task is born active for EVERY
+                    #      mode. Polling 'queued' alone therefore never saw them, so
+                    #      the plan was never proposed and EXECUTE completed the task
+                    #      unplanned. On the test task that jammed Hello Integration
+                    #      at 6/7 forever: onboarding step accept_test_task passes
+                    #      only when the task carries todos, complete_test_task passed
+                    #      anyway, and a done task refuses a plan -- no call could get
+                    #      the agent out. Every task-runner crew hit it.
+                    #
+                    # The node permits exactly this set (canProposeTodos, node
+                    # src/services/agent-task-rules.ts), and since AIMEAT 1.x it
+                    # REFUSES to complete a plan-less onboarding test task, so a
+                    # runner that skips PROPOSE now hears about it instead of
+                    # silently stranding itself.
+                    #
+                    # EXECUTE re-polls below, so a task planned in this cycle is
+                    # picked up in the SAME cycle with its todos already on it.
+                    plan_needed = _poll_tasks(api, status="queued") + [
+                        t for t in _poll_tasks(api, status="active") if _has_no_live_plan(t)
+                    ]
+                    for task in plan_needed:
                         if stop["flag"]:
                             break
                         task_id = task.get("id")

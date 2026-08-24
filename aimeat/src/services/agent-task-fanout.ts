@@ -36,6 +36,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.3.0 — 2026-08-24 — completeTask() refuses a plan-less Hello Integration test task. It used to
+ *     succeed, which passed onboarding step 10 and jammed step 9 for good. Reason on the gate.
  *   v1.2.0 — 2026-08-14 — completeTask(). The last writing tool surface: aimeat_task_complete wrote
  *     the same two records POST /v1/agents/:name/tasks/:id/complete writes, and the two copies had
  *     drifted three ways. The reasons are on the function.
@@ -57,6 +59,7 @@ import { reclaimTaskLiveTrace } from '../routes/agent-tasks/helpers.js';
 import { recordPublicActivity } from './public-activity.js';
 import { emitChange } from './event-bus.js';
 import { provenanceForWrite, type DeclaredProvenance } from './ai-provenance.js';
+import { isOnboardingTestTask } from './onboarding-test-task.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
@@ -230,6 +233,31 @@ export async function completeTask(
         return {
             ok: false, status: 409, code: 'INVALID_STATE',
             message: `Only active or stalled tasks can be completed (current: ${task.status})`,
+        };
+    }
+
+    // THE ONBOARDING SMOKE TEST IS NOT DONE UNTIL IT HAS BEEN PLANNED, and this is the only place
+    // that can say so before the fact.
+    //
+    // Hello Integration is two steps over one task: `accept_test_task` passes when the task carries
+    // todos, `complete_test_task` when it reaches done. Nothing connected them, so completing the
+    // task unplanned passed step 10 and left step 9 pending — and PERMANENTLY, because a done task
+    // refuses a plan (canProposeTodos, services/agent-task-rules.ts). The agent sat at 6/7 with no
+    // call it could make to get out, and re-running /start only bought it a fresh task to strand
+    // itself on. Every task-runner agent hit it: their tasks are auto-activated, and the test task is
+    // born active for every mode, so a runner that proposes plans on QUEUED tasks alone never
+    // proposes one here. That is the aimeat-crewai daemon, among others.
+    //
+    // Refuse before you write. The task stays active, so the plan it names is still proposable, and
+    // the runtime hears WHICH call is missing instead of being told it succeeded.
+    const hasLivePlan = (task.todos ?? []).some(t => t.status !== 'outdated');
+    if (!hasLivePlan && await isOnboardingTestTask(deps.storage, task)) {
+        return {
+            ok: false, status: 409, code: 'PLAN_REQUIRED',
+            message: 'This is your Hello Integration test task and it has no plan yet. Propose one '
+                + 'first (aimeat_task_propose_todos, or POST /v1/agents/{name}/tasks/'
+                + `${task.id}/propose-todos) with 2-6 todos, then complete the task. Completing it `
+                + 'unplanned would leave onboarding step accept_test_task stuck for good.',
         };
     }
 

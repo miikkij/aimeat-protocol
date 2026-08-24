@@ -8,19 +8,23 @@
  *   an agent registered through POST /v1/agents (the OAuth-consent "create agent" path) got the
  *   twelve-step flow with a required step 9 and an empty task queue, and sat there with nothing to
  *   accept and nothing telling it why.
- * @structure createOnboardingTestTask(storage, agentGaii, ownerGhii, steps, titles?) — creates the
- *   task, stamps its id into the accept step's details, returns the id (null when the flow has no
- *   accept step).
+ * @structure
+ *   - createOnboardingTestTask(storage, agentGaii, ownerGhii, steps, titles?) — creates the task,
+ *     stamps its id into the accept step's details, returns the id (null when the flow has no
+ *     accept step).
+ *   - isOnboardingTestTask(storage, task) — is this task THE smoke test of its agent's onboarding
  * @usage
  *   const steps = createDefaultSteps(mode);
  *   await createOnboardingTestTask(storage, gaii, `${owner}@${config.nodeId}`, steps);
  *   await storage.createOnboarding({ agentGaii: gaii, status: 'in_progress', startedAt: now, steps });
  * @version-history
+ *   v1.1.0 — 2026-08-24 — isOnboardingTestTask(), for the completion guard in
+ *     services/agent-task-fanout.ts. Reason on the function.
  *   v1.0.0 — 2026-08-24 — Extracted from routes/agent-onboarding.ts (onboarding/start) so the two
  *     registration paths that created onboarding without a test task can stop doing that.
  */
 import { randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AgentTaskRecord } from '../storage/interface.js';
 import type { AgentOnboardingStep } from '../storage/interface.js';
 
 /**
@@ -74,4 +78,26 @@ export async function createOnboardingTestTask(
   });
   acceptStep.details = { testTaskId };
   return testTaskId;
+}
+
+/**
+ * Is `task` the Hello Integration smoke test of the agent it belongs to?
+ *
+ * The id is stamped in one place — the `accept_test_task` step's `details.testTaskId`, written by
+ * the function above — so that stamp is the only thing that answers this. Nothing on the task record
+ * marks it, deliberately: a flag there would be a second copy of the same fact, on the storage
+ * layer, needing both providers and a migration to say what one read already says.
+ *
+ * Called only on the plan-less completion path (services/agent-task-fanout.ts), so a normal
+ * completion pays nothing for it.
+ */
+export async function isOnboardingTestTask(
+  storage: Storage,
+  task: Pick<AgentTaskRecord, 'id' | 'agentGaii'>,
+): Promise<boolean> {
+  const onboarding = await storage.getOnboarding(task.agentGaii);
+  if (!onboarding) return false;
+  const details = onboarding.steps.find(s => s.id === 'accept_test_task')?.details as
+    Record<string, unknown> | undefined;
+  return details?.testTaskId === task.id;
 }
