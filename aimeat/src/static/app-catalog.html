@@ -2344,6 +2344,61 @@
 .od-err { color: var(--accent); }
 /* Measured delivery time offered as the basis for a commitment (never as the commitment itself). */
 .od-measured { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    /* ── The data map, inside App Detail ─────────────────────────────────────────────────────
+       The one screen where a map is read in full. Fixed grid with minmax and never an `auto`
+       column: a per-row auto column re-measures per row and drifts out of line by the width of
+       the longest family name. The basis chip is the only column with a background, which makes
+       it the anchor an alignment check can measure. */
+    .dtl-dm-banner {
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border: 1px dashed var(--border-hover);
+      border-radius: var(--radius-sm, 12px);
+      background: var(--bg-subtle);
+      color: var(--text);
+      font-size: .85rem;
+    }
+
+    .dtl-dm-rows { display: flex; flex-direction: column; gap: 8px; }
+
+    .dtl-dm-row {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm, 12px);
+      padding: 10px 12px;
+      background: var(--bg-dim);
+    }
+
+    .dtl-dm-row-off { border-color: var(--border-hover); }
+
+    .dtl-dm-head {
+      display: grid;
+      grid-template-columns: minmax(8rem, 2fr) minmax(4.5rem, .7fr) minmax(12rem, 2.2fr) minmax(4.5rem, .6fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .dtl-dm-head-simple { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+
+    .dtl-dm-family { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+    .dtl-dm-rights { font-size: .78rem; color: var(--text-dim); }
+
+    .dtl-dm-basis { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; text-align: right; }
+    .dtl-dm-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--bg-subtle); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+    .dtl-dm-note { font-size: .72rem; color: var(--text-muted); }
+
+    .dtl-dm-personal { font-size: .78rem; color: var(--text-dim); }
+    .dtl-dm-personal-unstated { color: var(--text-muted); font-style: italic; }
+
+    .dtl-dm-why { margin-top: 6px; font-size: .8rem; color: var(--text-dim); }
+    .dtl-dm-why-missing { color: var(--text-muted); font-style: italic; }
+    .dtl-dm-detail { margin-top: 4px; font-size: .76rem; color: var(--text-muted); }
+    .dtl-dm-sub { margin: 14px 0 6px; font-size: .8rem; color: var(--text-dim); }
+
+    @media (max-width: 640px) {
+      .dtl-dm-head { grid-template-columns: 1fr; gap: 4px; }
+      .dtl-dm-basis { align-items: flex-start; text-align: left; }
+    }
 </style>
 </head>
 <body data-active-view="library">
@@ -2846,6 +2901,33 @@
       "mode.caption": "Local apps",
       "mode.caption.title": "These toggle which browser-local apps you see — not server visibility",
       "search.ph": "Search apps...",
+      "datamap.title": "Where this puts what",
+      "datamap.loading": "Reading…",
+      "datamap.none": "This app has no data map yet. One is written the next time it is published.",
+      "datamap.unreadable": "Its data map could not be read just now.",
+      "datamap.storesNothing": "This app stores nothing.",
+      "datamap.derivedNote": "Nobody has checked this. AIMEAT worked it out from what this app asked to be allowed to do, so treat it as a first draft rather than an answer.",
+      "datamap.noWhy": "Nobody has said why this is here.",
+      "datamap.deleteMeans": "Deleting:",
+      "datamap.deleteUnknown": "Nobody has answered this yet.",
+      "datamap.elsewhereTitle": "Not ours to keep, or not settled yet",
+      "datamap.elsewhere.work-in-progress": "Half done, and nobody has decided where it belongs",
+      "datamap.elsewhere.copy-of-anothers-record": "A copy. The original is somebody else's",
+      "datamap.elsewhere.already-left": "Already sent. It cannot be called back",
+      "datamap.elsewhere.account-in-a-foreign-system": "A login somewhere we do not run",
+      "datamap.basis.locked": "Fixed shape",
+      "datamap.basis.declared": "Stated",
+      "datamap.basis.platform": "Built in",
+      "datamap.basis.named": "You named it",
+      "datamap.basis.unknown": "Unexplained",
+      "datamap.basisNote.locked": "A workspace record. The store refuses anything that does not fit the shape.",
+      "datamap.basisNote.declared": "The program said in advance that it writes here.",
+      "datamap.basisNote.platform": "A part of AIMEAT itself writes here and decides what goes in.",
+      "datamap.basisNote.named": "The name matches something you own, so this is yours.",
+      "datamap.basisNote.unknown": "Nothing says what this is or why it is here.",
+      "datamap.personal.yes": "Yes",
+      "datamap.personal.no": "No",
+      "datamap.personal.unstated": "Not said",
       "action.add": "➕ Add app",
       "action.create": "Create",
       "action.generate": "✨ Generate with AI",
@@ -3463,6 +3545,33 @@
       "mode.caption": "Paikalliset appit",
       "mode.caption.title": "Nämä valitsevat mitkä selain-paikalliset appit näet — ei server-näkyvyyttä",
       "search.ph": "Etsi sovelluksia...",
+      "datamap.title": "Minne tämä panee mitä",
+      "datamap.loading": "Luetaan…",
+      "datamap.none": "Tällä sovelluksella ei ole vielä datakarttaa. Se syntyy seuraavassa julkaisussa.",
+      "datamap.unreadable": "Datakarttaa ei juuri nyt saatu luettua.",
+      "datamap.storesNothing": "Tämä sovellus ei tallenna mitään.",
+      "datamap.derivedNote": "Tätä ei ole kukaan tarkistanut. AIMEAT päätteli sen siitä mitä sovellus pyysi saada tehdä, joten lue se luonnoksena eikä vastauksena.",
+      "datamap.noWhy": "Kukaan ei ole kertonut miksi tämä on täällä.",
+      "datamap.deleteMeans": "Poistaminen:",
+      "datamap.deleteUnknown": "Tähän ei ole vielä vastattu.",
+      "datamap.elsewhereTitle": "Ei meidän pidettävää, tai vielä ratkaisematta",
+      "datamap.elsewhere.work-in-progress": "Kesken, eikä kukaan ole päättänyt minne se kuuluu",
+      "datamap.elsewhere.copy-of-anothers-record": "Kopio. Alkuperäinen on jonkun muun",
+      "datamap.elsewhere.already-left": "Lähtenyt jo. Sitä ei saa takaisin",
+      "datamap.elsewhere.account-in-a-foreign-system": "Tunnus järjestelmässä jota emme pyöritä",
+      "datamap.basis.locked": "Kiinteä muoto",
+      "datamap.basis.declared": "Kerrottu",
+      "datamap.basis.platform": "Sisäänrakennettu",
+      "datamap.basis.named": "Sinä nimesit",
+      "datamap.basis.unknown": "Selittämätön",
+      "datamap.basisNote.locked": "Työtilan tietue. Varasto ei ota vastaan sitä mikä ei sovi muotoon.",
+      "datamap.basisNote.declared": "Ohjelma kertoi etukäteen kirjoittavansa tänne.",
+      "datamap.basisNote.platform": "AIMEATin oma osa kirjoittaa tänne ja päättää mitä sinne menee.",
+      "datamap.basisNote.named": "Nimi osuu johonkin mitä omistat, joten tämä on sinun.",
+      "datamap.basisNote.unknown": "Mikään ei kerro mitä tämä on tai miksi se on täällä.",
+      "datamap.personal.yes": "Kyllä",
+      "datamap.personal.no": "Ei",
+      "datamap.personal.unstated": "Ei kerrottu",
       "action.add": "➕ Lisää sovellus",
       "action.create": "Luo",
       "action.generate": "✨ Luo tekoälyllä",
@@ -4467,6 +4576,115 @@
       });
     }
     return html;
+  }
+
+  // src/static/app-catalog/js/data-map-model.js
+  var TIERS = ["schema-locked", "declared-space", "platform-prefix", "owner-named", "none"];
+  function tierRank(tier) {
+    const i = TIERS.indexOf(tier);
+    return i < 0 ? 0 : TIERS.length - i;
+  }
+  function covers(pattern, family) {
+    if (typeof pattern !== "string" || typeof family !== "string") return false;
+    const star = pattern.indexOf("*");
+    if (star < 0) return pattern === family;
+    return family.startsWith(pattern.slice(0, star));
+  }
+  function contradictions(map, observed) {
+    const held = map && map.held || [];
+    const seen = observed || [];
+    const undeclared = seen.filter((o) => !held.some((r) => covers(r.grant && r.grant.pattern, o.family)));
+    const dead = held.filter((r) => (r.grant && r.grant.rights || []).includes("write") && seen.length > 0 && !seen.some((o) => covers(r.grant.pattern, o.family)));
+    return { undeclared, dead };
+  }
+  function mapState(map, observed) {
+    if (!map) return "empty";
+    const rows = [...map.held || [], ...map.elsewhere || []];
+    const { undeclared } = contradictions(map, observed);
+    if (undeclared.length > 0) return "contradicted";
+    if (rows.length === 0) return "empty";
+    return map.source === "derived" ? "derived" : "declared";
+  }
+  function orderRows(map, observed) {
+    const held = [...map && map.held || []];
+    const { undeclared, dead } = contradictions(map, observed);
+    const isContradicted = (r) => dead.includes(r) || undeclared.some((o) => covers(r.grant && r.grant.pattern, o.family));
+    return held.sort((a, b) => {
+      const c = Number(isContradicted(b)) - Number(isContradicted(a));
+      if (c !== 0) return c;
+      const w = Number(!String(b.why || "").trim()) - Number(!String(a.why || "").trim());
+      if (w !== 0) return w;
+      return tierRank((a.basis || {}).tier) - tierRank((b.basis || {}).tier);
+    });
+  }
+
+  // src/static/app-catalog/js/data-map.js
+  function basisCell(tier) {
+    var key = { "schema-locked": "locked", "declared-space": "declared", "platform-prefix": "platform", "owner-named": "named" }[tier] || "unknown";
+    return '<span class="dtl-dm-basis dtl-dm-basis-' + key + '"><span class="dtl-dm-chip">' + escapeHtml(t("datamap.basis." + key)) + '</span><span class="dtl-dm-note">' + escapeHtml(t("datamap.basisNote." + key)) + "</span></span>";
+  }
+  function rowHtml(row, disagrees) {
+    var g = row.grant || {};
+    var personal = row.personalData === "yes" ? "yes" : row.personalData === "no" ? "no" : "unstated";
+    var why = String(row.why || "").trim();
+    return '<div class="dtl-dm-row' + (disagrees ? " dtl-dm-row-off" : "") + '"><div class="dtl-dm-head"><span class="dtl-dm-family">' + escapeHtml(g.pattern || "") + '</span><span class="dtl-dm-rights">' + escapeHtml((g.rights || []).join(", ")) + "</span>" + basisCell((row.basis || {}).tier) + '<span class="dtl-dm-personal dtl-dm-personal-' + personal + '">' + escapeHtml(t("datamap.personal." + personal)) + '</span></div><div class="dtl-dm-why' + (why ? "" : " dtl-dm-why-missing") + '">' + escapeHtml(why || t("datamap.noWhy")) + '</div><div class="dtl-dm-detail"><span>' + escapeHtml(t("datamap.deleteMeans")) + "</span> " + escapeHtml(row.deletion && row.deletion.says || t("datamap.deleteUnknown")) + "</div></div>";
+  }
+  function dataMapHtmlFor(map) {
+    if (!map) {
+      return '<p class="dtl-desc">' + escapeHtml(t("datamap.none")) + "</p>";
+    }
+    var held = map.held || [];
+    var elsewhere = map.elsewhere || [];
+    if (held.length === 0 && elsewhere.length === 0) {
+      return '<p class="dtl-desc">' + escapeHtml(t("datamap.storesNothing")) + "</p>";
+    }
+    var state = mapState(map, []);
+    var out = "";
+    if (state === "derived") {
+      out += '<div class="dtl-dm-banner">' + escapeHtml(t("datamap.derivedNote")) + "</div>";
+    }
+    var off = contradictions(map, []);
+    var rows = orderRows(map, []);
+    out += '<div class="dtl-dm-rows">';
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var bad = off.undeclared.some(function(o) {
+        return covers((r.grant || {}).pattern, o.family);
+      });
+      out += rowHtml(r, bad);
+    }
+    out += "</div>";
+    if (elsewhere.length > 0) {
+      out += '<h4 class="dtl-dm-sub">' + escapeHtml(t("datamap.elsewhereTitle")) + '</h4><div class="dtl-dm-rows">';
+      for (var j = 0; j < elsewhere.length; j++) {
+        var e = elsewhere[j];
+        out += '<div class="dtl-dm-row"><div class="dtl-dm-head-simple"><span class="dtl-dm-family">' + escapeHtml((e.grant || {}).pattern || "") + '</span><span class="dtl-dm-rights">' + escapeHtml(t("datamap.elsewhere." + e.status)) + '</span></div><div class="dtl-dm-why">' + escapeHtml(e.where || "") + '</div><div class="dtl-dm-detail">' + escapeHtml(e.deletion && e.deletion.says || "") + "</div></div>";
+      }
+      out += "</div>";
+    }
+    return out;
+  }
+  function dataMapSectionHtml() {
+    return '<div class="dtl-section" id="detail-data-map"><h3>' + escapeHtml(t("datamap.title")) + '</h3><p class="dtl-desc">' + escapeHtml(t("datamap.loading")) + "</p></div>";
+  }
+  function loadDataMapInto(owner, filename, stamp) {
+    var el = document.getElementById("detail-data-map");
+    if (!el) return;
+    var head = "<h3>" + escapeHtml(t("datamap.title")) + "</h3>";
+    if (!stamp || !stamp.docKey) {
+      el.innerHTML = head + '<p class="dtl-desc">' + escapeHtml(t("datamap.none")) + "</p>";
+      return;
+    }
+    var config = loadConfig();
+    var base4 = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    fetch(base4 + "/v1/datamap/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename)).then(function(r) {
+      return r.ok ? r.json() : null;
+    }).then(function(j) {
+      var map = j && j.data && j.data.data_map;
+      el.innerHTML = head + dataMapHtmlFor(map);
+    }).catch(function() {
+      el.innerHTML = head + '<p class="dtl-desc">' + escapeHtml(t("datamap.unreadable")) + "</p>";
+    });
   }
 
   // src/static/app-catalog/js/cortex.js
@@ -6660,7 +6878,11 @@
         ) + "</div>";
       }
     }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    var dataMapHtml = dataMapSectionHtml();
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + dataMapHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    var dmOwner = detailServerOwner(app);
+    var dmFile = app.publishedFilename || "";
+    if (dmOwner && dmFile) loadDataMapInto(dmOwner, dmFile, { docKey: "apps." + dmFile.replace(/\.html$/i, "") + ".datamap" });
   }
   function detailCheckpointRows(app) {
     var owner = detailServerOwner(app);

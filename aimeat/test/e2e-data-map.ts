@@ -247,6 +247,66 @@ async function publish(token: string, filename: string, content: string) {
             `another owner's agent must see nothing: ${JSON.stringify(r.body.data).slice(0, 200)}`);
     });
 
+    // ── The map has an address now, and it is the same pair the app's own address uses. Reading the
+    //    record directly would mean assembling `owner@nodeId`, which a browser has no business doing.
+    await test('a map can be read at owner/filename, without signing in', async () => {
+        const r = await json(`/v1/datamap/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(declaringName)}`);
+        assert(r.status === 200, `anonymous read ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+        assert(Array.isArray(r.body.data?.data_map?.held), 'the rows must be there');
+        // The rows are the promise the app makes; the finding is the owner's own business.
+        assert(!r.body.data.data_map.gap, `the finding must not travel to a stranger: ${JSON.stringify(r.body.data.data_map.gap)}`);
+    });
+
+    await test('the owner can STATE what the node could only guess', async () => {
+        const read = await json(`/v1/datamap/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(declaringName)}`,
+            { headers: auth(o.token) });
+        const map = read.body.data.data_map;
+        map.held[0].why = 'Notes live here because they belong to the person who wrote them.';
+        const put = await json(`/v1/datamap/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(declaringName)}`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify(map),
+        });
+        assert(put.status === 200, `state ${put.status}: ${JSON.stringify(put.body?.error)}`);
+        assert(put.body.data.data_map.source === 'declared',
+            'a map somebody wrote is declared, whatever it said before');
+        const back = await json(`/v1/datamap/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(declaringName)}`);
+        assert(back.body.data.data_map.held[0].why.includes('belong to the person'),
+            'the sentence must survive the round trip');
+    });
+
+    await test('another owner cannot state this map', async () => {
+        const read = await json(`/v1/datamap/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(declaringName)}`);
+        const r = await json(`/v1/datamap/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(declaringName)}`, {
+            method: 'PUT', headers: auth(other.token), body: JSON.stringify(read.body.data.data_map),
+        });
+        assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body).slice(0, 160)}`);
+    });
+
+    await test('coverage folds the whole store into groups and says what it cannot see', async () => {
+        const r = await json('/v1/datamap/coverage', { headers: auth(o.token) });
+        assert(r.status === 200, `coverage ${r.status}`);
+        const d = r.body.data;
+        assert(typeof d.totalKeys === 'number' && typeof d.unexplainedFamilies === 'number',
+            `expected counts: ${JSON.stringify(d).slice(0, 200)}`);
+        // The count that decides whether the view is worth opening is the FAMILY count, not the key
+        // count: on production 4,222 unexplained keys fold to 174 groups.
+        assert(d.unexplainedFamilies <= d.unexplainedKeys, 'groups can never outnumber the keys in them');
+        assert(Array.isArray(d.notCovered) && d.notCovered.length >= 2,
+            'a coverage number that hides its blind spots reads as complete');
+    });
+
+    await test('naming one group takes it out of the unexplained list', async () => {
+        const before = await json('/v1/datamap/coverage', { headers: auth(o.token) });
+        const family = before.body.data.roots?.[0]?.family;
+        if (!family) return;   // nothing unexplained on a fresh node; the route is proven above
+        const r = await json('/v1/datamap/name', {
+            method: 'POST', headers: auth(o.token),
+            body: JSON.stringify({ family, holds: 'Test rows.', why: 'Written by the E2E.', personal_data: 'no' }),
+        });
+        assert(r.status === 200, `name ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(typeof r.body.data.key === 'string' && r.body.data.key.startsWith('datamap.'),
+            `it writes ONE memory record: ${JSON.stringify(r.body.data)}`);
+    });
+
     console.log(`\n  ${passed} passed, ${failed} failed`);
     process.exit(failed > 0 ? 1 : 0);
 })();

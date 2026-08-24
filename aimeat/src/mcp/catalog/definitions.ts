@@ -49,6 +49,7 @@ import { packagesTools } from './definitions/packages.js';
 import { commerceTools } from './definitions/commerce.js';
 import { exchangeTools } from './definitions/exchange.js';
 import { complianceTools } from './definitions/compliance.js';
+import { dataMapTools } from './definitions/data-map.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...agentMessagingTools,
@@ -61,6 +62,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...companyTools,
     ...exchangeTools,
     ...complianceTools,
+    ...dataMapTools,
 ];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));

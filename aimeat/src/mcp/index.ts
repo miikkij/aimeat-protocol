@@ -91,6 +91,7 @@ import type { PeerInfo } from '../services/federation.js';
 import { resolveSupportRoute } from '../services/message-alias.js';
 import { registerCoreTools } from './core.js';
 import { registerComplianceTools } from './compliance.js';
+import { registerDataMapTools } from './data-map.js';
 import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
@@ -284,6 +285,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerSkillsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOperatorConfigTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerComplianceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
+        registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes);
         registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerCatalogueTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerMemoryExtendedTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

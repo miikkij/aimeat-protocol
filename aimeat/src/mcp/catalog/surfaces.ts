@@ -98,6 +98,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
     agent: [
         'aimeat_image_generate',
         'aimeat_memory_read', 'aimeat_memory_write', 'aimeat_memory_list', 'aimeat_memory_search', 'aimeat_memory_read_public',
+        'aimeat_datamap_get', 'aimeat_datamap_set', 'aimeat_memory_hands',
         'aimeat_storage_upload', 'aimeat_storage_download', 'aimeat_storage_delete',
         'aimeat_datapackage_publish', 'aimeat_datapackage_export',
         // NOTE: aimeat_task_request_changes is connector-only (owner tool, not registered on the

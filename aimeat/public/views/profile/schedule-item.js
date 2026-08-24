@@ -10,6 +10,8 @@
  *   timezone, purpose + the kind-specific payload). Handles pause/resume, run-now,
  *   edit (PATCH), and cancel itself; calls onChanged() to let the parent refetch.
  * @version-history
+ *   2026-08-25 — What a job READS and WRITES, as two named facts on the card. They were carried
+ *     all along and shown only inside the edit form, appended to the prompt as an unlabelled arrow.
  *   v1.0.0 -- 2026-06-03 -- Initial editable schedule card
  *   v1.1.0 -- 2026-06-05 -- "Run now" reads the trigger outcome and reports it:
  *     a warning toast when no task was created (a previous run is still active,
@@ -53,6 +55,23 @@ export function formatUntil(iso) {
   return parts.join(' ') || '0s';
 }
 
+/**
+ * What an `ai` schedule reads and writes, as two named facts.
+ *
+ * Only this kind: an `agent_task` writes through the agent, so its map is the agent's, and an
+ * `extension` writes into its own namespace, so its map is the extension's. Inventing a third answer
+ * to one question is how three surfaces end up disagreeing.
+ */
+function scheduleIo(s, t) {
+  if (s.type !== 'ai') return null;
+  const c = s.input || {};
+  const reads = (c.inputKeys || []).join(', ');
+  return {
+    reads: reads || t('profile.scheduler.readsNothing'),
+    writes: c.outputKey || t('profile.scheduler.autoKey'),
+  };
+}
+
 /** What a schedule produces each fire (title + body) for display. */
 function describeDispatch(s) {
   if (s.type === 'agent_task') {
@@ -60,9 +79,9 @@ function describeDispatch(s) {
     return { title: tmpl.title || '', body: tmpl.description || '' };
   }
   if (s.type === 'ai') {
-    const c = s.input || {};
-    const io = `${(c.inputKeys || []).join(', ') || '—'} → ${c.outputKey || t('profile.scheduler.autoKey')}`;
-    return { title: c.prompt || '', body: io };
+    // The keys used to be appended to the prompt as an unlabelled arrow, which reads as part of the
+    // prompt. They are their own block now — see scheduleIo below.
+    return { title: (s.input || {}).prompt || '', body: '' };
   }
   if (s.type === 'extension') {
     return { title: `${s.extensionName || ''}${s.actionId ? ' / ' + s.actionId : ''}`, body: '' };
@@ -126,6 +145,8 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
 
   const d = describeDispatch(s);
 
+  const io = scheduleIo(s, t);
+
   return html`
     <div class="sch-card" id=${'sch-card-' + s.id}>
       <div class="sch-card-head">
@@ -155,6 +176,15 @@ export default function ScheduleItem({ schedule: s, onChanged, showToast }) {
           <div class="sch-dispatch-label">${t('profile.scheduler.dispatches')}</div>
           ${d.title ? html`<div class="sch-dispatch-title">${d.title}</div>` : null}
           ${d.body ? html`<div class="sch-dispatch-body">${d.body}</div>` : null}
+        </div>`}
+
+      ${/* WHAT IT READS AND WHAT IT WRITES, said in words. An `ai` schedule has carried these all
+            along and showed them only inside the edit form, appended to the prompt as an arrow. A
+            job that writes into your store every night should say so on its face. */ ''}
+      ${io && html`
+        <div class="sch-card-io">
+          <div><span class="sch-meta-k">${t('profile.scheduler.reads')}:</span> ${io.reads}</div>
+          <div><span class="sch-meta-k">${t('profile.scheduler.writes')}:</span> ${io.writes}</div>
         </div>`}
 
       ${s.purpose && !editing ? html`<div class="sch-muted sch-purpose">${s.purpose}</div>` : null}

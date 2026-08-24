@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-08-25 — The data map section, between ABOUT and EDIT WITH AI. Until it existed the map
+ *     was written, stamped and summarised everywhere and there was nowhere to read one in full.
  *   v1.7.0 — 2026-08-17 — Delete deletes: the Actions button routes an own published app to the
  *     node delete (it only emptied a page-session record before, so the app came back), is hidden
  *     on an app that is not ours, and the duplicate "Remove from server" leaves the manage row.
@@ -34,6 +36,7 @@
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, currentOwnerName } from './util.js';
 import { saveApp, deleteApp } from './db.js';
 import { dtlBtn, showConfirm, showNotice } from './ui.js';
+import { dataMapSectionHtml, loadDataMapInto } from './data-map.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
 import { getPromotion, setPromotion, loadPromoted } from './promote.js';
@@ -639,8 +642,20 @@ function renderDetailView() {
     }
   }
 
+  // WHERE THIS APP PUTS WHAT, next to ABOUT because ABOUT is already the "what is this" block. The
+  // section renders a placeholder and fills itself in from /v1/datamap/apps/{owner}/{filename}; this
+  // is the one screen where a map can be read in full, and the strip on the profile Apps tab points
+  // here.
+  var dataMapHtml = dataMapSectionHtml();
+
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + dataMapHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+
+  var dmOwner = detailServerOwner(app);
+  var dmFile = app.publishedFilename || '';
+  // Only a PUBLISHED app has a map: the record is keyed by owner and filename on the node, and a
+  // browser-local draft has neither.
+  if (dmOwner && dmFile) loadDataMapInto(dmOwner, dmFile, { docKey: 'apps.' + dmFile.replace(/\.html$/i, '') + '.datamap' });
 }
 
 // ── Working-copy history (checkpoints) ────────────────────────────────────────

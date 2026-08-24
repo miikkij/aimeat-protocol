@@ -378,6 +378,36 @@ export const coreTools: ConnectCliToolDefinition[] = [
         },
     },
     {
+        // THE THIRD SURFACE. A fleet daemon calls /local/call/<tool>, which dispatches here, and a
+        // parameter that exists on the two MCP surfaces and not in this table is dropped in silence.
+        // Every published parameter is forwarded, and test/unit/cli-tool-param-forwarding.test.ts
+        // invokes this handler against a recording client to prove each one leaves the process.
+        name: 'aimeat_datamap_get',
+        handler: ({ client }, input) => {
+            const app = optionalString(input, 'app');
+            if (!app) return client.get('/v1/datamap/coverage');
+            const slash = app.indexOf('/');
+            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
+            return client.get(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}`
+                + `/${encodeURIComponent(app.slice(slash + 1))}`);
+        },
+    },
+    {
+        name: 'aimeat_datamap_set',
+        handler: ({ client }, input) => {
+            const app = requiredString(input, 'app');
+            const slash = app.indexOf('/');
+            if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
+            return client.put(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}`
+                + `/${encodeURIComponent(app.slice(slash + 1))}`, requiredRecord(input, 'data_map'));
+        },
+    },
+    {
+        name: 'aimeat_memory_hands',
+        handler: ({ client }, input) =>
+            client.get(`/v1/memory/${encodeURIComponent(requiredString(input, 'key'))}/hands`),
+    },
+    {
         name: 'aimeat_compliance_register_read',
         handler: ({ client }, input) => client.get(`/v1/admin/compliance/${compliancePart(input, true)}${query({
             since_days: optionalNumber(input, 'since_days'),
