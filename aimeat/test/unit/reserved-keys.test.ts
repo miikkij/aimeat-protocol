@@ -16,11 +16,13 @@
  *   agent writing in its own namespace, and the one agent the owner handed
  *   `memory:write-reserved` are asserted to still get through.
  * @structure
- *   - the list itself: the six prefixes, and no accidental removal
+ *   - the list itself: the seven prefixes, and no accidental removal
  *   - isReservedServerKey: prefix matching, including the near-misses that must NOT match
  *   - appMayWriteKey: owner passes, app refused, delegated agent refused, reserved grant passes
  * @usage cd aimeat && pnpm exec vitest run test/unit/reserved-keys.test.ts
  * @version-history
+ *   v1.x — 2026-08-24 — `signals.` is the seventh: an unauthenticated public door reads
+ *     `signals.stream.*` before it agrees to write into the owner's namespace.
  *   v1.x — 2026-08-16 — `chat.` is the sixth. A conversation is what the person said and what the
  *     agent did for them; an app-grant token able to append to one could put words in either
  *     mouth, including instructions the next turn would read as the person's own.
@@ -36,9 +38,9 @@ const ACCOUNTANTS_KEY = 'finance.accountants';
 const PSP_KEY = 'commerce.psp';
 
 describe('the list holds every prefix the server reads and acts on', () => {
-    it('carries all six, and a removal is a test failure rather than a silent regression', () => {
+    it('carries all seven, and a removal is a test failure rather than a silent regression', () => {
         expect([...RESERVED_OWNER_KEY_PREFIXES].sort()).toEqual(
-            ['ai-usage.', 'chat.', 'commerce.', 'finance.', 'openrouter.', 'profile.'],
+            ['ai-usage.', 'chat.', 'commerce.', 'finance.', 'openrouter.', 'profile.', 'signals.'],
         );
     });
 

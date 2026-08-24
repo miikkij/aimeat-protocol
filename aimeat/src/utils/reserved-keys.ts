@@ -18,6 +18,13 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   v1.5.0 — 2026-08-24 — `signals.` joins the list. `signals.stream.*` is what an UNAUTHENTICATED
+ *     public door reads before it agrees to write into this owner's namespace: it decides whether
+ *     the stream exists, whether it is on, and whether per-recipient detail is kept. A granted app
+ *     that could forge one could switch on collection the owner never asked for, or turn off the
+ *     one they rely on. Cost of adding it, measured rather than assumed: nothing writes this prefix
+ *     today (it is new), and the legitimate writer is the owner-side route in routes/signals.ts,
+ *     which never passes through this gate — the shape this file already names as the safe one.
  *   v1.4.0 — 2026-08-16 — `chat.` joins the list. A conversation is what the person said and what
  *     the agent did on their behalf, and an app-grant token that could append to one could put
  *     words in either mouth — including instructions the next turn would read as the person's own.
@@ -64,7 +71,7 @@
  * keys all use.
  */
 export const RESERVED_OWNER_KEY_PREFIXES = [
-  'openrouter.', 'ai-usage.', 'profile.', 'finance.', 'commerce.', 'chat.',
+  'openrouter.', 'ai-usage.', 'profile.', 'finance.', 'commerce.', 'chat.', 'signals.',
 ] as const;
 
 /** True iff `key` falls under a reserved, server-trusted owner-namespace prefix. */
