@@ -9,6 +9,12 @@
  *   v1.0.0 — 2026-07-13 — Extracted from engine.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — askHumanInput: deliver a human-input step's question to the owner (in-app
  *     inbox + push, best-effort) and return the templated question snapshot to pin into the run.
+ *   v1.3.0 — 2026-08-24 — A dispatched agent task carries the run's variables (`var.<name>`) and the
+ *     assembled `deliverable_key`. An offer names its output as a template and only the engine knows
+ *     what the variables are, so an agent had no way to find the key it was being judged on: it
+ *     invented one, wrote a good result where nothing reads, and the step went output-red. Keying a
+ *     pipeline on `{date}` was the only shape that worked, because that is the one variable an agent
+ *     can derive unaided.
  *   v1.2.0 — 2026-08-15 — TARGET-063 A3: dispatchExtensionStep — run one of the owner's own
  *     extension actions on this node, in the sandbox, with no agent and no model. It completes
  *     through the SAME onPushTerminal as an ecosystem step, so its success_signal decides green or
@@ -87,6 +93,30 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
     // Sandbox run: tell the agent the key prefix to write under (signals read under it too), so a
     // test run doesn't clobber production keys. A cooperating agent honors it; the node can't force it.
     if (run.keyPrefix) scope.push({ name: 'wf-key-prefix', value: run.keyPrefix, type: 'text', description: 'prefix all deliverable keys with this' });
+    // THE RUN'S VARIABLES, AND THE FINISHED KEY THEY BUILD. An offer names its output as a template
+    // (`julkaisu.{ref}.aineisto`); only the engine knows what `{ref}` is on this run. Until these
+    // went out, an agent had no way to find out: it either invented a value — writing a perfectly
+    // good result to a key nobody reads, while the step went output-red — or the whole pipeline had
+    // to be keyed on `{date}`, the one variable an agent can work out for itself. Measured on
+    // 2026-08-24: the editor agent ran twice, wrote twice, and both results landed under ids it had
+    // made up.
+    //
+    // Both forms go, because they answer different questions. The variables let a step build any key
+    // it needs (a step may write more than its one deliverable, and it reads its inputs by the same
+    // templates). `deliverable_key` is the exact string the success signal will look at, prefix and
+    // all, assembled the way every other consumer assembles it — so "where do I write" needs no
+    // reconstruction and cannot drift from what is checked.
+    for (const [name, value] of Object.entries(run.vars ?? {})) {
+      scope.push({ name: `var.${name}`, value: String(value), type: 'text', description: `workflow variable {${name}}` });
+    }
+    if (resolved?.deliverableKey) {
+      scope.push({
+        name: 'deliverable_key',
+        value: (run.keyPrefix ?? '') + template(resolved.deliverableKey, run.vars ?? {}),
+        type: 'memory_key',
+        description: 'write your result to THIS key — it is the one the success signal reads',
+      });
+    }
     const record: AgentTaskRecord = {
       id: randomUUID(), agentGaii, ownerGaii: ownerGhii,
       title: loc(step.description) || `${run.workflowId} · ${step.id}`,
