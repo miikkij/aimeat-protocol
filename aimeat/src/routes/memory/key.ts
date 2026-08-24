@@ -27,6 +27,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
+import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
@@ -351,6 +352,11 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       record = await storage.setMemory(newRecord);
     }
 
+    // Who has had their hands on this key. `gaii` is the caller, `effectiveGaii` the namespace it
+    // lands in — an agent writing into its owner's store is both, and that is the difference the
+    // tally exists to hold.
+    recordMemoryTouch({ ownerGaii: effectiveGaii, key, writerPrincipal: gaii, kind: 'write' });
+
     // C.3: Event-driven replication queue integration
     if (peers) {
       enqueueMemoryReplication(effectiveGaii, key, config, storage, peers).catch(err => {
@@ -459,6 +465,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     record.allowedOrigins = allowed_origins === null ? undefined : allowed_origins;
     record.updatedAt = new Date().toISOString();
     await storage.setMemory(record);
+    recordMemoryTouch({ ownerGaii: record.ownerGaii, key: record.key, writerPrincipal: gaii, kind: 'write' });
 
     // C.3: Event-driven replication queue integration
     if (peers) {

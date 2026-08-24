@@ -67,6 +67,13 @@ export interface WorkspaceRecordWrite {
     /** The provenance record for THIS value. Attached, never inherited from `prev`: new bytes are a
      *  new claim, and content-free meta writes make no claim at all. */
     aiProvenanceId?: string;
+    /**
+     * WHO is writing — a GHII, a GAII or a GEAI. Not the same as `owner`, which is the namespace it
+     * lands in: an agent writing a workspace record on its member's behalf is the member's owner and
+     * the agent's hand, and the write tally exists to tell those apart. Omitted means the caller
+     * cannot name a principal, and then nothing is counted rather than something wrong being.
+     */
+    principal?: string;
 }
 
 /**
@@ -115,7 +122,7 @@ export async function writeWorkspaceRecord(
     // workflow never started, a subscribed ecosystem app was never told, and the record waited for
     // the next scheduled federation sync. Same act, same consequences, whichever door it came in.
     emitChange('memory');
-    await afterMemoryWrite(deps, input.owner, input.key, !!prev);
+    await afterMemoryWrite(deps, input.owner, input.key, !!prev, input.principal);
 }
 
 /**

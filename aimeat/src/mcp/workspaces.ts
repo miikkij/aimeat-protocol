@@ -222,7 +222,10 @@ export function registerWorkspaceTools(
     const writeRecord = (
         key: string, value: unknown, prev: MemoryRecord | null, owner: string = ownerGhii,
         aiProvenanceId?: string,
-    ): Promise<void> => writeWorkspaceRecord({ storage, config }, { key, value, owner, prev, aiProvenanceId });
+    ): Promise<void> => writeWorkspaceRecord({ storage, config },
+        // `owner` is the namespace, `principal` is the hand. An agent writing a member's record is
+        // both, and the write tally is what tells them apart.
+        { key, value, owner, prev, aiProvenanceId, principal: agentGaii });
 
     // ── workspace-access helpers (shared with the GET/POST workspace-access routes) ──
     const bareOwner = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[1] : gaii).split('@')[0];

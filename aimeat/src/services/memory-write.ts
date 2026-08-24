@@ -60,6 +60,7 @@ import { getActiveWorkflowEngine } from './workflow/engine.js';
 import { emitEcosystemMemoryWrite } from './ecosystem-events.js';
 import { runAutomationRecipesForWrite } from './ecosystem-automation.js';
 import { logger } from '../utils/logger.js';
+import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
 import { parseGAII } from '../utils/gaii.js';
 
@@ -329,7 +330,7 @@ export async function writeMemoryRecord(
     //    runs here rather than in each caller's tail — which is where it used to live, on one door
     //    only. A caller that cannot offer an optional piece (a node with no peers has no replication
     //    queue; a tool call has no HTTP response) simply omits it, and the rest still happens.
-    await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing);
+    await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, caller.principal);
 
     return { ok: true, record, shadowedBy };
 }
@@ -358,8 +359,19 @@ export async function afterMemoryWrite(
     gaii: string,
     key: string,
     existed: boolean,
+    /**
+     * WHO wrote it, which is not the namespace it lands in: an agent writing into its owner's store
+     * is the owner's `gaii` and the agent's hand, and telling those two apart is the whole point of
+     * the tally. Optional only so a caller that genuinely cannot name a principal — a node-internal
+     * write — records nothing rather than a placeholder, which would be worse than silence.
+     */
+    writerPrincipal?: string,
 ): Promise<void> {
     const { storage, config } = deps;
+
+    // Who has had their hands on this key. Synchronous, unawaited by contract, and the first sighting
+    // of a (key, principal) pair is written straight through — see write-tally-buffer.ts.
+    if (writerPrincipal) recordMemoryTouch({ ownerGaii: gaii, key, writerPrincipal, kind: 'write' });
 
     // Event-driven replication: the scheduled sync would pick the record up later, so a failure
     // here costs latency rather than the record.
