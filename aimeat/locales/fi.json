@@ -4696,6 +4696,7 @@
     "newAgentDisplayName": "Näyttönimi (valinnainen)",
     "newAgentDisplayNameHint": "esim. Minun Claude-agentti",
     "newAgentNameHint": "Nimestä tulee agentin tunniste: kaikki, mitä agentti täällä tekee, kirjataan sen nimiin, ja sama nimi näkyy agenttilistassasi, tapahtumissa ja agentin kirjoittamien tietojen vieressä.",
+    "homeNamed": "Nimi tulee kodistasi: annoit sen agentillesi jo siellä, joten tässä syntyy se sama agentti, ei toista.",
     "newAgentNameError": "Nimen on oltava 3-64 merkkiä: pienet kirjaimet, numerot ja väliviivat. Nimen alku ja loppu kirjaimella tai numerolla.",
     "createBtn": "Luo",
     "cancelBtn": "Peruuta",

@@ -4692,6 +4692,7 @@
     "newAgentDisplayName": "Nombre visible (opcional)",
     "newAgentDisplayNameHint": "por ejemplo, Mi agente de Claude",
     "newAgentNameHint": "El nombre se convierte en la identidad del agente: todo lo que haga aquí queda registrado bajo ese nombre, y lo verás en tu lista de agentes, en la actividad y junto a lo que el agente escriba.",
+    "homeNamed": "Este nombre viene de tu hogar: ya se lo diste a tu agente allí, así que aquí se crea ese mismo agente, no uno más.",
     "newAgentNameError": "El nombre tiene que tener de 3 a 64 caracteres: solo minúsculas, números y guiones. Tiene que empezar y terminar por una letra o un número.",
     "createBtn": "Crear",
     "cancelBtn": "Cancelar",
