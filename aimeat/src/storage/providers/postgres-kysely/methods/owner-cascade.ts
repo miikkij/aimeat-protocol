@@ -35,6 +35,7 @@
  */
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
+import { pseudonymiseTallyWriterDb } from './memory-tally.js';
 
 /** A Kysely handle: the root connection or an open transaction. */
 type Db = Kysely<DB>;
@@ -47,6 +48,14 @@ type Db = Kysely<DB>;
 export async function cascadeDeleteIdentityData(db: Db, gaii: string): Promise<void> {
   // Memory and micro-memory
   await db.deleteFrom('Memory').where('ownerGaii', '=', gaii).execute();
+
+  // The write tally for THIS namespace. A deleted username is released for reuse, so a surviving row
+  // would hand the next registrant somebody else's history. Rows where this identity was the WRITER
+  // into somebody ELSE'S namespace are deliberately NOT deleted here — they are that owner's record
+  // of who touched their data, and removing them would turn their "four hands" into three. Those are
+  // pseudonymised instead, by pseudonymiseTallyWriter, called from deleteOwner.
+  await db.deleteFrom('MemoryWriteTally').where('ownerGaii', '=', gaii).execute();
+  await db.deleteFrom('MemoryFamilyTally').where('ownerGaii', '=', gaii).execute();
 
   // Actions offered by this identity
   await db.deleteFrom('Action').where('providerGaii', '=', gaii).execute();
@@ -135,6 +144,13 @@ export async function deleteOwnerCascade(db: Db, name: string): Promise<boolean>
 
   const ghiis = await db.selectFrom('Ghii').select('ghii').where('ownerName', '=', name).execute();
   for (const g of ghiis) await cascadeDeleteIdentityData(db, g.ghii);
+
+  // What this person WROTE into somebody else's namespace is that other owner's record of who
+  // touched their data, so it is pseudonymised rather than deleted — removing it would silently turn
+  // their "four hands" into three. Runs before the GHII rows go, because the node id comes from one.
+  const nodeId = ghiis[0]?.ghii.split('@')[1] ?? '';
+  if (nodeId) await pseudonymiseTallyWriterDb(db, name, nodeId);
+
   await db.deleteFrom('Ghii').where('ownerName', '=', name).execute();
 
   // Personal nodes carry mailbox items, push subscriptions and notification preferences by node id.

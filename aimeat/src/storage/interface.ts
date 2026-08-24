@@ -39,6 +39,7 @@ import type { OwnerRepository } from './repositories/owner.repository.js';
 import type { AgentRepository } from './repositories/agent.repository.js';
 import type { EcosystemAppRepository } from './repositories/ecosystem-app.repository.js';
 import type { MemoryRepository } from './repositories/memory.repository.js';
+import type { MemoryTallyRepository } from './repositories/memory-tally.repository.js';
 import type { ActionRepository } from './repositories/action.repository.js';
 import type { WorkRepository } from './repositories/work.repository.js';
 import type { WalletRepository } from './repositories/wallet.repository.js';
@@ -99,7 +100,7 @@ import type { CompanyRepository } from './repositories/company.repository.js';
 import type { SsoConnectionRepository } from './repositories/sso-connection.repository.js';
 
 export interface Storage extends
-  OwnerRepository, AgentRepository, MemoryRepository,
+  OwnerRepository, AgentRepository, MemoryRepository, MemoryTallyRepository,
   ActionRepository, WorkRepository, WalletRepository,
   BoardRepository, OtkRepository, DisputeRepository,
   FileRepository, IdentityRepository,

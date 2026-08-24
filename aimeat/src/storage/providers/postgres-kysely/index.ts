@@ -49,6 +49,7 @@ import { outboundMethods } from './methods/outbound.js';
 import { companyMethods } from './methods/companies.js';
 import { usageMethods } from './methods/usage.js';
 import { accountEventMethods } from './methods/account-events.js';
+import { memoryTallyMethods } from './methods/memory-tally.js';
 import { ssoConnectionMethods } from './methods/sso-connections.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
@@ -155,6 +156,7 @@ Object.assign(
   companyMethods,
   usageMethods,
   accountEventMethods,
+  memoryTallyMethods,
   ssoConnectionMethods,
   capabilityMethods,
   knowledgeMethods,

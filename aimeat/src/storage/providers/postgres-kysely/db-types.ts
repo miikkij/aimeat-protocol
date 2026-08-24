@@ -349,6 +349,29 @@ export interface SsoConnection {
   updatedAt: Generated<Timestamp>;
 }
 
+/** The memory write tally: who has had their hands on a key, and how often. Permanent, no prune. */
+export interface MemoryWriteTally {
+  ownerGaii: string;
+  key: string;
+  writerPrincipal: string;
+  writeCount: Generated<string>;
+  deleteCount: Generated<string>;
+  firstAt: string;
+  lastAt: string;
+}
+
+/** The same, folded to the key family, with the basis it was identified on at the time of writing. */
+export interface MemoryFamilyTally {
+  ownerGaii: string;
+  keyFamily: string;
+  writerPrincipal: string;
+  tier: Generated<string>;
+  writeCount: Generated<string>;
+  deleteCount: Generated<string>;
+  firstAt: string;
+  lastAt: string;
+}
+
 export interface AccountEvent {
   id: string;
   ownerGhii: string;
@@ -2027,6 +2050,8 @@ export interface DB {
   UsageRollup: UsageRollup;
   UsageRollupState: UsageRollupState;
   AccountEvent: AccountEvent;
+  MemoryWriteTally: MemoryWriteTally;
+  MemoryFamilyTally: MemoryFamilyTally;
   AccountEventArchive: AccountEventArchive;
   SsoConnection: SsoConnection;
   AiProvenance: AiProvenance;
