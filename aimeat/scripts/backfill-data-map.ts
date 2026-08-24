@@ -26,6 +26,20 @@
  *   cd aimeat && pnpm exec node --import tsx scripts/backfill-data-map.ts --db postgres-kysely --db-url "$DATABASE_URL"
  *   Add --apply to write. Without it it only reports. --owner <name> limits it to one account.
  * @version-history
+ *   v1.1.0 — 2026-08-25 — Three fixes, all found by the first production run, which reported 113
+ *     apps as storing nothing and would have written 113 empty maps as a success.
+ *       - The owner identity comes from the RECORD (app.ownerGaii), not from `${ownerName}@${config
+ *         .nodeId}`. The script's own node id went on the front, every keyed lookup missed, no app's
+ *         bytes were read, and so no app had any scope words to derive from. The listing and the
+ *         lookup can no longer disagree, because they now use the same string.
+ *       - adminView, so PARKED and operator-hidden apps are included. A parked app still stores what
+ *         it stores. Without it the run silently covered 137 of 169 apps and called itself complete.
+ *       - It refuses to write when the first app's bytes cannot be read, and warns when the owners
+ *         hold zero memory keys. The first is unambiguous; the second is normal on a new node, which
+ *         is why it warns rather than refusing.
+ *     The refusal is defence in depth and I could not make it fire after the identity fix, because
+ *     that fix closes the only path I know of. What IS verified is the answer: the same database that
+ *     produced "every app stores nothing" now reports 3 of 4 asking to store something.
  *   v1.0.0 — 2026-08-24 — Initial, for TARGET-073.
  */
 import { createStorage } from '../src/storage/storage-factory.js';
@@ -53,8 +67,16 @@ async function main() {
   const { config } = loadConfig();
   const at = new Date().toISOString();
 
-  const { apps } = await storage.listApps({ limit: 1000, offset: 0 });
-  // One row per (owner, filename): listApps already collapses to the latest version.
+  // adminView, because a PARKED app still stores what it stores. Without it listApps hides parked
+  // and operator-hidden apps from anyone who is not their owner, and a script has no viewer — on
+  // production that silently dropped 32 of 169 apps from a run that reported itself complete.
+  const page = 200;
+  const apps: Awaited<ReturnType<typeof storage.listApps>>['apps'] = [];
+  for (let offset = 0; ; offset += page) {
+    const chunk = await storage.listApps({ limit: page, offset, adminView: true });
+    apps.push(...chunk.apps);
+    if (apps.length >= chunk.total || chunk.apps.length === 0) break;
+  }
   const targets = apps.filter(a => !onlyOwner || a.ownerName === onlyOwner);
 
   console.log(`\n  Data map backfill — ${provider}${apply ? '' : '  (REPORT ONLY, pass --apply to write)'}`);
@@ -62,17 +84,49 @@ async function main() {
   console.log(`  apps on this node          ${apps.length}`);
   console.log(`  in scope                   ${targets.length}${onlyOwner ? `  (owner ${onlyOwner})` : ''}`);
 
+  // PREFLIGHT. Every app storing nothing is possible; every app storing nothing while most of them
+  // ask for memory scopes is a broken read, and the difference is worth refusing to write over.
+  // Measured on production 2026-08-24: 84 of 168 apps declare aimeat-scopes, 73 of them memory:write.
+  let refuseToWrite = false;
+
   const byCode = new Map<string, number>();
-  let declared = 0, derived = 0, storesNothing = 0, alreadyHad = 0, written = 0, failed = 0;
+  let declared = 0, derived = 0, storesNothing = 0, alreadyHad = 0, written = 0, failed = 0, unreadable = 0, askedForSomething = 0;
+
+  // A first pass that only READS, so the refusal is decided before a single write happens. Two
+  // symptoms mean the lookups are missing rather than the apps being empty: bytes that will not load
+  // at all, and an owner whose whole key store reads as zero.
+  const probeKeys = await storage.countMemory([...new Set(targets.map(a => a.ownerGaii))]);
+  const probeBytes = targets.length > 0 ? await storage.getApp(targets[0].ownerGaii, targets[0].filename) : null;
+  // Bytes that will not load is UNAMBIGUOUS: the app row is there in the listing and the lookup for
+  // the same app misses, so the identity is wrong and every map would come out empty.
+  if (targets.length > 0 && !probeBytes) {
+    refuseToWrite = true;
+    console.log('');
+    console.log('  REFUSING TO WRITE. The bytes of the first app in scope could not be read, so the');
+    console.log('  identity these lookups use is wrong. Every map would come out empty, and every one');
+    console.log('  would be a lie about a real app.');
+  }
+  // Zero memory keys only WARNS. On a live account it is the same tell, but a fresh node with one
+  // app and nothing stored yet is a legitimate state, and refusing there would be wrong.
+  if (targets.length > 0 && probeKeys === 0) {
+    console.log('');
+    console.log('  Note: these owners hold 0 memory keys. On a new node that is normal. On an account');
+    console.log('  that has been in use it means the identity is wrong — check before applying.');
+  }
 
   for (const app of targets) {
     const appId = app.filename.replace(/\.html$/i, '');
-    const ownerGhii = `${app.ownerName}@${config.nodeId}`;
+    // The identity from the RECORD, never one composed from config. Composing it put the script's
+    // own node id on the front, and when that differed from the stored one — which is exactly what
+    // happened the first time this ran on production — every lookup missed, every app read as
+    // storing nothing, and the run reported 113 empty maps as a success.
+    const ownerGhii = app.ownerGaii;
     const existing = await readAppDataMap(storage, ownerGhii, appId);
     if (existing) { alreadyHad++; continue; }
 
     const full = await storage.getApp(ownerGhii, app.filename);
-    const html = full && /html/i.test(full.mimeType) ? full.data.toString('utf8') : '';
+    if (!full) { unreadable++; console.log(`    ? ${app.ownerName}/${app.filename}: its bytes could not be read`); continue; }
+    const html = /html/i.test(full.mimeType) ? full.data.toString('utf8') : '';
     const scopes = html ? parseAppScopes(html) : [];
     const declaredMeta = html ? parseDataMapMeta(html) : null;
 
@@ -88,10 +142,12 @@ async function main() {
     });
 
     if (declaredMeta) declared++; else derived++;
+    if (scopes.some(s => s.startsWith('memory:') || s.startsWith('storage:') || s.startsWith('organism:'))) askedForSomething++;
     if (lint.map.held.length === 0) storesNothing++;
     if (lint.map.gap) byCode.set(lint.map.gap.code, (byCode.get(lint.map.gap.code) ?? 0) + 1);
 
     if (!apply) continue;
+    if (refuseToWrite) continue;
     const res = await writeAppDataMap(
       { storage, config },
       { principal: ownerGhii, targetGaii: ownerGhii, roles: ['owner'], scopes: ['*'] },
@@ -105,9 +161,16 @@ async function main() {
   }
 
   console.log(`  already had a map          ${alreadyHad}`);
+  if (unreadable > 0) console.log(`  BYTES UNREADABLE           ${unreadable}   <- a lookup missed; nothing was derived for these`);
   console.log(`  the app stated its own     ${declared}`);
   console.log(`  worked out by the node     ${derived}`);
+  console.log(`  asks to store something    ${askedForSomething}`);
   console.log(`  stores nothing at all      ${storesNothing}`);
+  if (askedForSomething > 0 && storesNothing >= targets.length - alreadyHad) {
+    refuseToWrite = true;
+    console.log('    ^ every app came out empty while some of them ask for memory or storage.');
+    console.log('      That is a broken read, not a node full of static apps.');
+  }
   if (apply) console.log(`  written                    ${written}${failed ? `   (${failed} failed)` : ''}`);
   console.log('\n  what each one would be told:');
   for (const [code, n] of [...byCode].sort((a, b) => b[1] - a[1])) {
@@ -115,14 +178,17 @@ async function main() {
   }
 
   // The sizing the write tally's table was gated on, printed where somebody deciding will see it.
-  const memoryKeys = await storage.countMemory(
-    [...new Set(targets.map(a => `${a.ownerName}@${config.nodeId}`))],
-  );
+  const memoryKeys = await storage.countMemory([...new Set(targets.map(a => a.ownerGaii))]);
   console.log('\n  the write tally, for scale:');
   console.log(`    memory keys held by these owners   ${memoryKeys}`);
   console.log('    the tally starts EMPTY and gains one row per (key, principal) pair as things are');
   console.log('    written from now on. Nothing seeds it: the writer was never recorded before it existed.');
 
+  if (refuseToWrite) {
+    console.log('');
+    console.log('  Nothing was written, on purpose. Fix the reads and run the report again.');
+    process.exit(2);
+  }
   if (!apply) console.log('\n  Nothing was written. Re-run with --apply.\n');
   else console.log(`\n  ${written} map(s) written. Each one says of itself that nobody has checked it.\n`);
 }
