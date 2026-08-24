@@ -51,8 +51,9 @@ export const SUPPORT_LOCAL_PART = 'support';
 /**
  * The host part of the short form: `support@operators`.
  *
- * It is deliberately NOT a node id. A node id is `aimeat-{region}-{nnn}-{name}` and nobody memorises
- * one; "operators" is a word, which is the entire reason the address works. The long form
+ * It is deliberately NOT a node id. A node id carries at least two hyphen-separated segments
+ * (`aimeat-fi-001-genesis`) and nobody memorises one; "operators" is a single word, which both
+ * keeps it outside the node grammar and is the entire reason the address works. The long form
  * `support@{nodeId}` is accepted too and is what a sender on another node would use once group
  * threads cross nodes.
  */
