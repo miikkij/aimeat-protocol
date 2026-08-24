@@ -33,6 +33,8 @@ import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
 
 const BARS = ['schema-locked', 'declared-space', 'platform-prefix', 'owner-named', 'none'];
+/** How many groups the list draws. The rest are counted in a line under it, never dropped in silence. */
+const ROOTS_SHOWN = 50;
 const BAR_KEY = {
   'schema-locked': 'locked', 'declared-space': 'declared',
   'platform-prefix': 'platform', 'owner-named': 'named', none: 'unknown',
@@ -105,6 +107,12 @@ export function DataWalletCoverage({ showToast }) {
   }
 
   const total = report.totalKeys || 1;
+  // The list is the drill-down, not the archive. An account with 70 unexplained groups renders 70
+  // rows and reads as a wall, so the largest are shown and the remainder is SAID rather than
+  // dropped: a cap nobody mentions reads as "that is all of it".
+  const all = report.roots ?? [];
+  const shown = all.slice(0, ROOTS_SHOWN);
+  const rest = (report.unexplainedFamilies ?? all.length) - shown.length;
   return html`
     <div class="dwc">
       <h3 class="dwc-title">${t('dataMapCoverage.title')}</h3>
@@ -133,11 +141,13 @@ export function DataWalletCoverage({ showToast }) {
       </div>
 
       <div class="dwc-roots">
-        ${(report.roots ?? []).map(r => html`
+        ${shown.map(r => html`
           <div class="dwc-root" key=${r.family}>
             <div class="dwc-root-head">
               <span class="dwc-family">${r.family}</span>
-              <span class="dwc-count">${t('dataMapCoverage.root.count', { n: r.keys })}</span>
+              <span class="dwc-count">${r.keys === 1
+                ? t('dataMapCoverage.root.countOne')
+                : t('dataMapCoverage.root.count', { n: r.keys })}</span>
               <span class="dwc-when">${r.lastWritten ? timeAgo(r.lastWritten) : ''}</span>
               <button class="btn-outline btn-sm" onClick=${() => setNaming(naming === r.family ? null : r.family)}>
                 ${t('dataMapCoverage.sayWhatThisIs')}
@@ -150,12 +160,16 @@ export function DataWalletCoverage({ showToast }) {
                 onSaved=${() => { setNaming(null); loadRef.current(); }} />` : null}
           </div>`)}
       </div>
+      ${rest > 0 ? html`
+        <p class="dwc-more">${t('dataMapCoverage.moreGroups', { n: shown.length, rest })}</p>` : null}
 
       <ul class="dwc-limits">
         ${(report.notCovered ?? []).map(line => html`<li key=${line}>${line}</li>`)}
       </ul>
-      <p class="dwc-asof">${t('dataMapCoverage.asOf', { at: new Date(report.asOf).toLocaleString() })}
-        · ${Math.round((report.identified / total) * 100)}%</p>
+      <p class="dwc-asof">
+        ${t('dataMapCoverage.asOf', { at: new Date(report.asOf).toLocaleString() })}
+        ${' · '}${Math.round((report.identified / total) * 100)}%
+      </p>
     </div>`;
 }
 

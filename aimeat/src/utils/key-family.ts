@@ -133,6 +133,9 @@ export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: st
   { prefix: 'libpack.proofs.', writtenBy: 'services/contribution-proofs.ts' },
   { prefix: 'notebook.inbox.', writtenBy: 'services/notify.ts' },
   { prefix: 'settings.', writtenBy: 'services/proactive-mode.ts (settings.proactive, settings.ui_track)' },
+  // What the owner typed into "Say what this is". Without this entry, describing a group ADDS an
+  // undescribed key, so the one action offered by the coverage view made its own number worse.
+  { prefix: 'datamap.', writtenBy: 'routes/data-map.ts (what the owner said a group is)' },
 ] as const;
 
 /** A version-history row: the immutable snapshot of an earlier value of the key it hangs off. */
@@ -218,10 +221,17 @@ function familyFrom(key: string, keepSegments: number): string {
   return `${out}*`;
 }
 
-/** `organism.<uuid>.w.<ws>.<space>.<id>.<state>` — a workspace record, the commonest key on the node. */
-const WORKSPACE_KEY = /^organism\.([^.]+)\.w\.(ws-[^.]+)\.([^.]+)\./;
-/** `organism.<uuid>.meta.*` / `.shared.*` / `.member.<name>.*` — the node's own organism plumbing. */
-const ORGANISM_PLUMBING = /^organism\.([^.]+)\.(meta|shared|member)\./;
+/**
+ * `organism.<uuid>.w.<ws>.<space>.<id>.<state>` — a workspace record, the commonest key on the node.
+ *
+ * The literal `w` in the third segment is the whole discriminator. Requiring the workspace id to
+ * start with `ws-` was wrong and the browser found it: a dev account's `ws1` workspaces read as
+ * "nothing says what these are", and on a node where workspace records are half the keyspace that is
+ * the most confident wrong answer this classifier can give.
+ */
+const WORKSPACE_KEY = /^organism\.([^.]+)\.w\.([^.]+)\.([^.]+)\./;
+/** `organism.<uuid>.meta` / `.shared.*` / `.member.<name>.*` — the node's own organism plumbing. */
+const ORGANISM_PLUMBING = /^organism\.([^.]+)\.(meta|shared|member)(\.|$)/;
 
 function matchesPattern(key: string, pattern: string): boolean {
   const star = pattern.indexOf('*');
