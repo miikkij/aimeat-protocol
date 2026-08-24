@@ -10,6 +10,8 @@
  *     audit log with day-range selector, GDPR export button
  * @usage Loaded by profile.js route as a lazy tab component.
  * @version-history
+ *   v1.6.0 — 2026-08-25 — The coverage view, above the permission summary. That card counts memory
+ *     keys without saying which, and this is the drill-down it is asking for.
  *   v1.5.0 — 2026-08-24 — Live update is filtered and split by concern. It was a raw
  *     `aimeat-live-update` listener with no domain filter, so every tick of every domain re-ran all
  *     three reads; `memory` alone emits from thirty places. Consents + audit follow `consent`, and
@@ -37,6 +39,7 @@ import * as consentService from '/js/services/consent.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
+import { DataWalletCoverage } from './data-wallet-coverage.js';
 
 export default function DataWalletTab({ session, showToast }) {
   const [consents, setConsents] = useState(null);
@@ -158,6 +161,11 @@ export default function DataWalletTab({ session, showToast }) {
 
   return html`
     <div class="section-title">\u{1F6E1}\uFE0F ${t('profile.tabs.dataWallet')}</div>
+
+      ${/* What is stored here that nobody has described. Above the totals, because the summary
+            card below counts memory keys without saying which, and this is the drill-down that
+            counter is asking for. */ ''}
+      <${DataWalletCoverage} showToast=${showToast} />
 
     ${permSummary && html`
       <div class="card dw-summary-card">

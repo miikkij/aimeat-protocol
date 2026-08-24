@@ -234,3 +234,16 @@
   .sch-cal-legend { margin-left: 0; width: 100%; }
   .sch-cal-cell { min-height: 52px; }
 }
+
+/* What a scheduled job reads and what it writes, on the card. These were carried all along and
+   shown only inside the edit form, appended to the prompt as an unlabelled arrow — a job that
+   writes into your store every night should say so on its face. */
+.sch-card-io {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2) var(--sp-4);
+  margin-top: var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+

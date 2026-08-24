@@ -9690,6 +9690,111 @@ paths:
                           used_bytes:
                             type: integer
 
+  /v1/datamap/apps/{owner}/{filename}:
+    get:
+      summary: Where a published app puts what
+      description: |
+        The map an app makes about its own storage: which groups of keys it holds, whose they are,
+        who reads them, how long they stay, what deleting one does, and WHY it is there rather than
+        somewhere else. Each row says on what basis it is known, and a row that can cite nothing is a
+        finding rather than a blank.
+
+        Public for a public app, because this is the promise the app makes to whoever installs it and
+        an agent weighing it has not signed in. The publish check's `gap` is the owner's own
+        unfinished business and is stripped for everyone else.
+      tags: [Apps]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The map, and the summary that rides on the manifest.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          app: { type: string }
+                          data_map: { type: object, description: The full document. }
+                          stamp:
+                            allOf: [{ $ref: '#/components/schemas/DataMapStamp' }]
+                            nullable: true
+        '404': { description: No such app, or it has no map yet }
+    put:
+      summary: State where an app puts what
+      description: |
+        REPLACES the map — read it first and send the whole thing back. This is how a draft the node
+        worked out becomes something a person actually said.
+
+        The account is the check, not the role: an owner session and that owner's agent both write
+        here, and a different person never does. A granted app is refused outright; it is scoped to
+        one app and must not restate another one's promises.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: The whole map document, carrying spec "aimeat.datamap/1". }
+      responses:
+        '200':
+          description: Stored. `hints` says what is still unfinished; it never refuses.
+        '400': { description: Not a data map }
+        '403': { description: Another account's map, or a granted app }
+        '404': { description: No such app }
+        '422': { description: The map could not be stored }
+
+  /v1/datamap/coverage:
+    get:
+      summary: What is stored here that nobody has described
+      description: |
+        The account's whole keyspace folded into groups, with a count per basis and the unexplained
+        groups biggest first. The fold happens on the server: the heaviest account on this node holds
+        18,446 keys, and what crosses the wire is about 27 rows.
+
+        `notCovered` is part of the answer. A coverage figure that hides its own blind spots reads as
+        complete, which is the failure this whole feature exists to prevent.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: The report }
+        '403': { description: The session does not carry memory:read }
+
+  /v1/datamap/name:
+    post:
+      summary: Say what one group of keys is
+      description: |
+        The cheapest way to make a coverage number better: a person names one group and it stops
+        being unexplained. Writes ONE memory record and needs no republish of anything, because a map
+        is about the store rather than about a manifest.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [family]
+              properties:
+                family: { type: string, example: 'uutiset.<date>.*' }
+                holds: { type: string }
+                why: { type: string }
+                personal_data: { type: string, enum: [yes, no, unstated] }
+                retention: { type: string }
+                readers: { type: string }
+      responses:
+        '200': { description: Saved }
+        '400': { description: No family named }
+
   /v1/memory/{key}/hands:
     get:
       summary: Who has written to this key, and how often

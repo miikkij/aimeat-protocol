@@ -287,6 +287,11 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_memory_search: 'memory:read',
     aimeat_memory_read_public: 'memory:read',
     aimeat_memory_write: 'memory:write',
+    // No new word for the data map. It reads and writes a memory record, and a `datamap:*` word
+    // would be a permission that has to be enforced on every door or does not exist (invariant 15).
+    aimeat_datamap_get: 'memory:read',
+    aimeat_datamap_set: 'memory:write',
+    aimeat_memory_hands: 'memory:read',
 
     // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it
     // does not gate a TOOL — it gates one optional PARAMETER (`ai_provenance`) on nine of them.

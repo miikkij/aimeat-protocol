@@ -23,6 +23,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-08-25 — The three data-map tools.
  *   v1.x — 2026-08-23 — Annotation for aimeat_package_install: a write, not destructive, and NOT
  *     idempotent — each install mints a fresh instance with its own component names, so a host that
  *     retries on a timeout leaves two copies.
@@ -341,6 +342,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_admin_owner_disable: { title: 'Admin: Deactivate Account', readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     aimeat_admin_owner_enable: { title: 'Admin: Reactivate Account', readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     aimeat_compliance_report: { title: 'Compliance: Node Report', readOnlyHint: true },
+    aimeat_datamap_get: { title: 'Data map: read', readOnlyHint: true },
+    aimeat_datamap_set: { title: 'Data map: state it', destructiveHint: true, idempotentHint: true },
+    aimeat_memory_hands: { title: 'Memory: who has written here', readOnlyHint: true },
     aimeat_compliance_register_read: { title: 'Compliance: Read Register', readOnlyHint: true },
     // destructiveHint: it REPLACES the document rather than merging into it, so a partial write
     // silently drops every entry the caller did not resend.

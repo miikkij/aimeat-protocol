@@ -9987,5 +9987,20 @@
   "dataMap.elsewhere.account-in-a-foreign-system": "A login somewhere we do not run",
   "dataMap.state.needsFinishing": "Unfinished",
   "dataMap.stripGap": "something to finish",
-  "dataMap.declaredNeverUsed": "{count} of these have not been written to yet. That may just mean the program has not done it, so it is worth a look rather than a fix."
+  "dataMap.declaredNeverUsed": "{count} of these have not been written to yet. That may just mean the program has not done it, so it is worth a look rather than a fix.",
+  "profile.scheduler.reads": "Reads",
+  "profile.scheduler.writes": "Writes",
+  "profile.scheduler.readsNothing": "nothing",
+  "dataMapCoverage.title": "What is stored here that nobody has described",
+  "dataMapCoverage.oneLine": "{total} things are stored for you. {keys} of them, in {groups} groups, have nothing saying what they are.",
+  "dataMapCoverage.noneUnknown": "Everything stored for you can be described. Nothing here is a mystery.",
+  "dataMapCoverage.sayWhatThisIs": "Say what this is",
+  "dataMapCoverage.root.count": "{n} things",
+  "dataMapCoverage.asOf": "Counted {at}",
+  "dataMapCoverage.saved": "Saved. That group is described now.",
+  "dataMapCoverage.form.holds": "What is in it",
+  "dataMapCoverage.form.why": "Why it is here",
+  "dataMapCoverage.form.personal": "Is it about a person",
+  "dataMapCoverage.form.save": "Save",
+  "dataMapCoverage.form.cancel": "Cancel"
 }

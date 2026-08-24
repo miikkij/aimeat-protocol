@@ -39,6 +39,10 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.4.0 — 2026-08-25 — The publish writes the map DOCUMENT as well as stamping the summary.
+ *     The stamp names a key, and with nothing at that key every surface that opens a map said "no
+ *     data map yet" about an app it had just stamped. Best-effort: a publish that already happened
+ *     must not fail because a side record could not be stored.
  *   v1.3.0 — 2026-08-24 — The data map (TARGET-073): the node drafts where this app puts what
  *     from the permissions it asks for and the document its owner wrote, stamps the SUMMARY on the
  *     manifest beside `aiPosture`, and WARNS rather than refusing. Refusing would break the next
@@ -71,7 +75,7 @@ import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
 import { parseAppScopes } from './protected-resource.js';
 import { parseDataMapMeta } from './data-map/data-map-meta.js';
-import { collectAppDerivationInput, deriveAndStamp, stampFor } from './data-map/data-map-store.js';
+import { collectAppDerivationInput, deriveAndStamp, stampFor, writeAppDataMap } from './data-map/data-map-store.js';
 import { lintDataMap, type DataMapLintResult } from './data-map/data-map-lint.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
@@ -306,6 +310,24 @@ export async function publishApp(
       declaresNothing: !declaredMeta && !derivationInput.declaredDoc,
     });
     manifest.dataMap = stampFor(dataMapLint.map, filename.replace(/\.html$/i, ''));
+
+    // AND THE DOCUMENT, not only the summary. The stamp names a key; if nothing is at that key the
+    // summary points at nothing, every surface that opens a map says "no data map yet" for an app
+    // that was just stamped, and the promise the stamp makes is empty. Best-effort: a publish that
+    // already happened must not fail because a side record could not be stored, and the next publish
+    // writes it again. The derivation read any existing document first, so an owner's own statement
+    // is carried through here rather than overwritten by a fresh draft.
+    try {
+      await writeAppDataMap(
+        { storage, config },
+        { principal: ownerGhii, targetGaii: ownerGhii, roles: ['owner'], scopes: ['memory:write'] },
+        filename.replace(/\.html$/i, ''), dataMapLint.map,
+      );
+    } catch (err) {
+      logger.warn('publish: the data map document could not be stored, the stamp stands alone', {
+        app: `${ownerName}/${filename}`, error: String(err),
+      });
+    }
   }
 
   // The spec state of THIS publish, kept where the owner can still find it later. Deliberately not

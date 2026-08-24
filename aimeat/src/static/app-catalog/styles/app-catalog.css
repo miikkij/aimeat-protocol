@@ -2336,3 +2336,58 @@
 .od-err { color: var(--accent); }
 /* Measured delivery time offered as the basis for a commitment (never as the commitment itself). */
 .od-measured { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    /* ── The data map, inside App Detail ─────────────────────────────────────────────────────
+       The one screen where a map is read in full. Fixed grid with minmax and never an `auto`
+       column: a per-row auto column re-measures per row and drifts out of line by the width of
+       the longest family name. The basis chip is the only column with a background, which makes
+       it the anchor an alignment check can measure. */
+    .dtl-dm-banner {
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border: 1px dashed var(--border-hover);
+      border-radius: var(--radius-sm, 12px);
+      background: var(--bg-subtle);
+      color: var(--text);
+      font-size: .85rem;
+    }
+
+    .dtl-dm-rows { display: flex; flex-direction: column; gap: 8px; }
+
+    .dtl-dm-row {
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm, 12px);
+      padding: 10px 12px;
+      background: var(--bg-dim);
+    }
+
+    .dtl-dm-row-off { border-color: var(--border-hover); }
+
+    .dtl-dm-head {
+      display: grid;
+      grid-template-columns: minmax(8rem, 2fr) minmax(4.5rem, .7fr) minmax(12rem, 2.2fr) minmax(4.5rem, .6fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    .dtl-dm-head-simple { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+
+    .dtl-dm-family { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+    .dtl-dm-rights { font-size: .78rem; color: var(--text-dim); }
+
+    .dtl-dm-basis { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; text-align: right; }
+    .dtl-dm-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--bg-subtle); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
+    .dtl-dm-note { font-size: .72rem; color: var(--text-muted); }
+
+    .dtl-dm-personal { font-size: .78rem; color: var(--text-dim); }
+    .dtl-dm-personal-unstated { color: var(--text-muted); font-style: italic; }
+
+    .dtl-dm-why { margin-top: 6px; font-size: .8rem; color: var(--text-dim); }
+    .dtl-dm-why-missing { color: var(--text-muted); font-style: italic; }
+    .dtl-dm-detail { margin-top: 4px; font-size: .76rem; color: var(--text-muted); }
+    .dtl-dm-sub { margin: 14px 0 6px; font-size: .8rem; color: var(--text-dim); }
+
+    @media (max-width: 640px) {
+      .dtl-dm-head { grid-template-columns: 1fr; gap: 4px; }
+      .dtl-dm-basis { align-items: flex-start; text-align: left; }
+    }
