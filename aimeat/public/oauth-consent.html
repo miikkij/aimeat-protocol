@@ -2,11 +2,26 @@
 <!--
   @file oauth-consent.html
   @description The OAuth consent page for MCP connectors (claude.ai, ChatGPT, …): the owner signs
-    in, picks or creates the agent the connector will act as, sees honestly what THAT AGENT may do,
+    in, picks or creates the agent the connector will act as, chooses how much that agent may do,
     approves, and is either redirected back or shown an auth code to paste. Standalone — it is NOT
-    part of the SPA, so it carries its own styles — but it reads the shared i18n runtime and the
-    shared consent vocabulary instead of private copies.
+    part of the SPA, so it carries its own styles — but it reads the shared i18n runtime, the
+    shared theme controller, the shared scope model and the shared consent vocabulary instead of
+    private copies.
   @version-history
+    v1.3.0 — 2026-08-24 — The owner decides the permission level HERE, before approving, instead
+        of approving whatever the agent happens to hold and then walking to Profile › Agents to
+        widen it. Same picker as the device-authorization page (keep current / read-only /
+        standard / full / custom checkboxes over the shared scope model); a change is saved
+        through the same PATCH /v1/agents/:name/scopes the agents tab uses, BEFORE the auth code
+        is issued, so the minted token (src/mcp/oauth.ts reads the agent record at exchange time)
+        carries exactly what was chosen. The page also gains the light theme it never had:
+        light-first tokens with a [data-theme="dark"] override, the SPA's no-flash boot snippet
+        and its 'aimeat-theme' storage key, and a visible ☀|☾ switch, so the choice follows the
+        person into the SPA and back. Two sentences the flow was missing: the agent NAME is the
+        identity everything the agent does is recorded under (under the name field), and the
+        grant covers only this AIMEAT account at this address, no other system (in the permission
+        section). Inline layout styles moved into classes; the snake_case fields the agents
+        endpoint actually returns (display_name, morsel_balance) are read as such.
     v1.2.0 — 2026-08-17 — The scope box stops lying and stops scaring. It said a static
         "Full access: memory, wallet, actions, boards, storage" no matter what — but the minted
         token acts as the SELECTED AGENT and the MCP session reads that agent's record
@@ -29,10 +44,43 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Authorize — AIMEAT</title>
+  <!-- No-flash theme boot: same snippet and storage key as spa.html, so the choice made on
+       either surface carries to the other. Plain inline JS (NOT a module — modules defer and
+       reintroduce the flash). Unset key = follow OS. -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
+        var theme = (stored === 'light' || stored === 'dark')
+          ? stored
+          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
   <style>
-    :root { --bg:#0d0d12; --card:#16161f; --border:#2a2a3a; --text:#e8e8f0;
+    /* Light first, dark as the override — the same order theme.css uses. The literals track
+       theme.css (--bg/--text light values) so the two surfaces read as one product. */
+    :root {
+      --bg:#FAFAF8; --card:#FFFFFF; --border:#E5E7EB; --text:#1A1A2E;
+      --muted:#6B7280; --accent:#7C5CD6; --success:#10B981; --danger:#DC2626;
+      --approve-fg:#FFFFFF;
+      --surface:rgba(0,0,0,.03);
+      --accent-soft:rgba(124,92,214,.06); --accent-soft-strong:rgba(124,92,214,.12);
+      --accent-soft-border:rgba(124,92,214,.28);
+      --wallet-bg:rgba(217,119,6,.08); --wallet-border:rgba(217,119,6,.3);
+    }
+    [data-theme="dark"] {
+      --bg:#0d0d12; --card:#16161f; --border:#2a2a3a; --text:#e8e8f0;
       --muted:#8888aa; --accent:#a78bfa; --success:#4ade80; --danger:#ff6b6b;
-      --love1:#E8564A; }
+      --approve-fg:#000000;
+      --surface:rgba(255,255,255,.03);
+      --accent-soft:rgba(130,100,255,.06); --accent-soft-strong:rgba(130,100,255,.12);
+      --accent-soft-border:rgba(130,100,255,.3);
+      --wallet-bg:rgba(255,180,0,.08); --wallet-border:rgba(255,180,0,.25);
+    }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif;
       min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1rem; }
@@ -40,7 +88,7 @@
       padding:2rem; max-width:480px; width:100%; }
     h1 { font-size:1.4rem; margin-bottom:.5rem; }
     .subtitle { color:var(--muted); font-size:.9rem; margin-bottom:1.5rem; }
-    .platform-badge { background:rgba(130,100,255,.1); border:1px solid rgba(130,100,255,.3);
+    .platform-badge { background:var(--accent-soft); border:1px solid var(--accent-soft-border);
       border-radius:.5rem; padding:.75rem 1rem; margin-bottom:1.5rem; font-size:.9rem; }
     .platform-name { font-weight:700; color:var(--accent); }
     label { display:block; font-size:.85rem; color:var(--muted); margin-bottom:.25rem; }
@@ -48,32 +96,51 @@
       border-radius:.5rem; color:var(--text); font-size:.9rem; margin-bottom:.75rem; }
     input:focus, select:focus { outline:none; border-color:var(--accent); }
     .agent-option { display:flex; justify-content:space-between; align-items:center; padding:.6rem .75rem;
-      background:rgba(255,255,255,.03); border:1px solid transparent; border-radius:.5rem;
+      background:var(--surface); border:1px solid transparent; border-radius:.5rem;
       margin-bottom:.4rem; cursor:pointer; transition:border-color .15s; }
     .agent-option:hover { border-color:var(--border); }
-    .agent-option.selected { background:rgba(130,100,255,.12); border-color:rgba(130,100,255,.3); }
+    .agent-option.selected { background:var(--accent-soft-strong); border-color:var(--accent-soft-border); }
     .agent-name { font-weight:600; }
-    .agent-gaii { font-size:.75rem; color:var(--muted); font-family:monospace; }
-    .agent-balance { font-size:.8rem; color:var(--muted); }
-    .scope-list { background:rgba(255,255,255,.03); border-radius:.5rem; padding:.75rem 1rem;
+    .agent-gaii { font-size:.75rem; color:var(--muted); font-family:monospace; overflow-wrap:anywhere; }
+    .agent-balance { font-size:.8rem; color:var(--muted); flex:none; white-space:nowrap; margin-left:.5rem; }
+    .select-agent-title { font-size:.9rem; margin-bottom:.5rem; font-weight:600; }
+    .scope-section { background:var(--surface); border-radius:.5rem; padding:.75rem 1rem;
       margin:.75rem 0; font-size:.85rem; }
-    .scope-summary { margin-top:.35rem; }
+    .scope-section-title { font-weight:600; margin-bottom:.35rem; }
+    .scope-only-here { color:var(--muted); font-size:.82rem; margin-bottom:.6rem; }
+    .scope-acts-as { margin-bottom:.6rem; }
+    .scope-radio { display:flex; align-items:flex-start; gap:.5rem; padding:.5rem .6rem;
+      background:var(--card); border:1px solid transparent; border-radius:.5rem;
+      margin-bottom:.4rem; cursor:pointer; transition:border-color .15s; }
+    .scope-radio:hover { border-color:var(--border); }
+    .scope-radio.selected { background:var(--accent-soft-strong); border-color:var(--accent-soft-border); }
+    .scope-radio input[type="radio"] { width:auto; margin:.15rem 0 0; accent-color:var(--accent); }
+    .scope-radio-content { flex:1; }
+    .scope-radio-name { font-weight:600; font-size:.85rem; }
+    .scope-radio-desc { font-size:.75rem; color:var(--muted); margin-top:.1rem; }
+    .custom-scopes { padding:.5rem .6rem; background:var(--card); border-radius:.5rem;
+      margin-bottom:.4rem; display:none; max-height:16rem; overflow-y:auto; }
+    .custom-scopes.visible { display:block; }
+    .scope-checkbox { display:flex; align-items:center; gap:.5rem; padding:.25rem 0; font-size:.82rem; }
+    .scope-checkbox input[type="checkbox"] { width:auto; margin:0; accent-color:var(--accent); }
+    .scope-token { font-size:.72rem; color:var(--muted); font-family:'Courier New',monospace; }
     .scope-toggle { background:none; border:none; color:var(--accent); font-size:.82rem;
       cursor:pointer; padding:.35rem 0 0; text-align:left; }
-    .scope-exact { margin:.5rem 0 0; padding-left:1.1rem; }
+    .scope-exact { margin:.5rem 0 0; padding-left:1.1rem; display:none; }
+    .scope-exact.visible { display:block; }
     .scope-exact li { margin-bottom:.3rem; }
     .scope-exact code { font-family:'Courier New',monospace; font-size:.72rem; color:var(--muted); }
     .boundary-list { margin:.75rem 0 0; padding-left:1.1rem; font-size:.82rem; color:var(--muted); }
     .boundary-list li { margin-bottom:.3rem; }
     .priming-line { font-size:.85rem; margin-bottom:.25rem; }
     .priming-line--spaced { margin-bottom:.75rem; }
-    .wallet-note { background:rgba(255,180,0,.08); border:1px solid rgba(255,180,0,.25);
+    .wallet-note { background:var(--wallet-bg); border:1px solid var(--wallet-border);
       border-radius:.5rem; padding:.6rem .75rem; font-size:.82rem; margin-bottom:1rem; color:var(--muted); }
     .btn-row { display:flex; gap:.75rem; margin-top:1.25rem; }
     .btn { flex:1; padding:.65rem 1rem; border:none; border-radius:.5rem; font-size:.9rem;
       font-weight:600; cursor:pointer; transition:opacity .15s; }
     .btn:hover { opacity:.85; }
-    .btn-approve { background:var(--success); color:#000; }
+    .btn-approve { background:var(--success); color:var(--approve-fg); }
     .btn-deny { background:transparent; border:1px solid var(--border); color:var(--muted); }
     .btn:disabled { opacity:.4; cursor:not-allowed; }
     .error-msg { color:var(--danger); font-size:.85rem; margin-top:.5rem; min-height:1.2em; }
@@ -81,30 +148,52 @@
       margin-bottom:.4rem; cursor:pointer; border:1px dashed var(--border); border-radius:.5rem;
       color:var(--accent); font-size:.85rem; transition:border-color .15s; }
     .create-agent-row:hover { border-color:var(--accent); }
-    .create-agent-form { padding:.6rem .75rem; background:rgba(130,100,255,.06);
-      border:1px solid rgba(130,100,255,.2); border-radius:.5rem; margin-bottom:.4rem; }
+    .create-agent-form { padding:.6rem .75rem; background:var(--accent-soft);
+      border:1px solid var(--accent-soft-border); border-radius:.5rem; margin-bottom:.4rem; }
     .create-agent-form input { margin-bottom:.4rem; }
     .create-agent-form .btn-row { margin-top:.5rem; }
+    .name-identity-hint { font-size:.78rem; color:var(--muted); margin:-0.15rem 0 .6rem; line-height:1.45; }
     .btn-sm { padding:.4rem .75rem; border:none; border-radius:.35rem; font-size:.8rem;
       font-weight:600; cursor:pointer; }
-    .btn-sm-accent { background:var(--accent); color:#000; }
+    .btn-sm-accent { background:var(--accent); color:var(--card); }
     .btn-sm-muted { background:transparent; border:1px solid var(--border); color:var(--muted); }
     /* Same two class names the SPA's shared copy control uses (.btn-copy-inline / .copied), so
        the auth-code copy button behaves and confirms identically on this standalone page. */
     .btn-copy-inline { flex:none; white-space:nowrap; }
-    .btn-sm.copied { background:var(--success); }
+    .btn-sm.copied { background:var(--success); color:var(--approve-fg); }
+    .auth-code-row { display:flex; align-items:center; gap:.5rem; background:var(--bg);
+      border:1px solid var(--border); border-radius:.5rem; padding:.6rem .75rem;
+      margin-bottom:1rem; font-family:monospace; font-size:.8rem; word-break:break-all; }
+    .auth-code-value { flex:1; }
+    .auth-code-label { margin-bottom:.5rem; font-size:.9rem; }
+    .auth-code-hint { color:var(--muted); font-size:.82rem; }
+    .login-prompt { margin:1rem 0; font-size:.9rem; }
+    .hidden { display:none; }
+    #loading { text-align:center; padding:2rem; color:var(--muted); }
+    /* The ☀|☾ switch: same segmented shape the login pill uses, so the control reads as the
+       same instrument here as everywhere else. */
+    .theme-switch { position:fixed; top:.85rem; right:.85rem; display:flex; background:var(--card);
+      border:1px solid var(--border); border-radius:999px; overflow:hidden; }
+    .theme-switch button { border:none; background:transparent; color:var(--muted);
+      padding:.3rem .6rem; font-size:.9rem; line-height:1; cursor:pointer; }
+    .theme-switch button[aria-pressed="true"] { color:var(--accent); background:var(--surface); }
   </style>
 </head>
 <body>
+  <div class="theme-switch" id="themeSwitch"></div>
   <div class="consent-card" id="app">
-    <div id="loading" style="text-align:center;padding:2rem;color:var(--muted)">Loading...</div>
+    <div id="loading">Loading...</div>
   </div>
 
   <script type="module">
     import { copyToClipboard } from '/js/utils.js';
     import { loadTranslations, t as translate } from '/js/i18n.js';
+    import { getTheme, setTheme } from '/js/theme.js';
     import { scopeSentence, areaLine, presetSummary, boundaryLines } from '/js/consent-vocab.js';
-    import { detectTemplate, expandScopes } from '/views/profile/agents/scope-model.js';
+    import {
+      SCOPE_TEMPLATES, SCOPE_DOMAINS,
+      detectTemplate, expandScopes, collapseScopes,
+    } from '/views/profile/agents/scope-model.js';
 
     // XSS-safe HTML escape
     const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -123,46 +212,26 @@
     await loadTranslations();
     const t = (key, vars) => translate(key.includes('.') ? key : 'oauthConsent.' + key, vars);
 
+    // ── Theme switch: both options visible, the active one marked, stored in the same
+    // 'aimeat-theme' key the SPA reads, via the SPA's own controller module. ──
+    (function wireThemeSwitch() {
+      const wrap = document.getElementById('themeSwitch');
+      const label = (mode) => translate(mode === 'light' ? 'nav.themeToLight' : 'nav.themeToDark');
+      wrap.innerHTML = ['light', 'dark'].map((mode) =>
+        `<button type="button" data-mode="${mode}" aria-pressed="${getTheme() === mode}"
+           title="${escHtml(label(mode))}" aria-label="${escHtml(label(mode))}">${mode === 'light' ? '☀' : '☾'}</button>`
+      ).join('');
+      wrap.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+        setTheme(b.dataset.mode);
+        wrap.querySelectorAll('button').forEach((x) =>
+          x.setAttribute('aria-pressed', String(x.dataset.mode === b.dataset.mode)));
+      }));
+    })();
+
     // The three boundary sentences — what this grant can NEVER reach — shared with every other
     // consent surface via consent-vocab.js.
     const boundaryHtml = () =>
       `<ul class="boundary-list">${boundaryLines(t).map((l) => `<li>${escHtml(l)}</li>`).join('')}</ul>`;
-
-    /**
-     * The honest scope box for ONE agent: the minted token acts as this agent, so what the
-     * connector may do is exactly the agent's permission set — summarised from its real
-     * default_scopes, with the exact sentence list one click away.
-     */
-    function scopeBoxHtml(agent) {
-      const scopes = agent?.default_scopes ?? ['*'];
-      const tpl = detectTemplate(scopes);
-      const summary = tpl === 'custom'
-        ? `${escHtml(t('appGrant.worksWith'))} ${escHtml(areaLine(scopes, t))}`
-        : escHtml(presetSummary(tpl, t));
-      const exact = [...expandScopes(scopes)];
-      return `
-        <div class="scope-list">
-          <strong>${escHtml(t('actsAs', { client: clientName }))}</strong>
-          <div class="scope-summary">${summary}</div>
-          <button type="button" class="scope-toggle" id="scopeToggle">${escHtml(t('appGrant.showDetails', { n: exact.length }))}</button>
-          <ul class="scope-exact" id="scopeExact" style="display:none">
-            ${exact.map((s) => `<li>${escHtml(scopeSentence(s, t))} <code>${escHtml(s)}</code></li>`).join('')}
-          </ul>
-        </div>`;
-    }
-
-    function wireScopeToggle() {
-      const toggle = document.getElementById('scopeToggle');
-      if (!toggle) return;
-      toggle.addEventListener('click', () => {
-        const list = document.getElementById('scopeExact');
-        const open = list.style.display !== 'none';
-        list.style.display = open ? 'none' : 'block';
-        toggle.textContent = open
-          ? t('appGrant.showDetails', { n: list.children.length })
-          : t('appGrant.hideDetails');
-      });
-    }
 
     const app = document.getElementById('app');
 
@@ -173,12 +242,45 @@
     let session = null;
     let agents = [];
     let selectedAgent = null;
+    // The permission decision. 'keep' leaves the agent exactly as it is (the safe default: a
+    // returning full-access agent must not be narrowed by a click that meant "yes, connect").
+    let selectedPreset = 'keep';
+    let customScopes = new Set();
 
     // session.owner may be a string or { name: string } depending on the endpoint
     const getOwnerName = () => {
       const o = session?.owner;
       return typeof o === 'string' ? o : o?.name || session?.username || '';
     };
+
+    const agentScopes = (agent) => agent?.default_scopes ?? ['*'];
+
+    /** One sentence for what the agent may do RIGHT NOW — the desc of the "keep current" option. */
+    function currentAccessSummary(agent) {
+      const scopes = agentScopes(agent);
+      const tpl = detectTemplate(scopes);
+      return tpl === 'custom'
+        ? `${t('appGrant.worksWith')} ${areaLine(scopes, t)}`
+        : presetSummary(tpl, t);
+    }
+
+    /** The scope array the current selection would grant (what the exact list describes). */
+    function effectiveScopes() {
+      if (selectedPreset === 'keep') return agentScopes(selectedAgent);
+      if (selectedPreset === 'custom') return collapseScopes(customScopes, agentScopes(selectedAgent));
+      return SCOPE_TEMPLATES[selectedPreset] || SCOPE_TEMPLATES.standard;
+    }
+
+    /** What to SAVE before approving: null means "keep", i.e. nothing to save. */
+    function scopesToSave() {
+      if (selectedPreset === 'keep') return null;
+      return effectiveScopes();
+    }
+
+    // Preset button labels come from the SPA's own label keys, so every door uses one word.
+    const presetLabel = (p) => p === 'keep'
+      ? translate('profile.agents.pendingRequests.keepCurrent')
+      : translate(`profile.agents.scopeUi.${{ readonly: 'readOnly', standard: 'standard', full: 'fullAccess', custom: 'custom' }[p]}`);
 
     // Restore an existing browser session from the httpOnly refresh cookie.
     // POST /v1/auth/refresh is the session-restore endpoint (GET /v1/auth/session is the
@@ -234,6 +336,22 @@
       return d.data?.agent;
     }
 
+    /**
+     * Persist a changed permission level through the SAME route the agents tab uses, so the scope
+     * validation and the ownership check live in one place. Runs BEFORE the auth code is issued:
+     * the token exchange (src/mcp/oauth.ts) reads the agent record at exchange time, so what was
+     * chosen here is exactly what the connector's token will carry.
+     */
+    async function saveScopes(agentName, scopes, jwt) {
+      const r = await fetch(`/v1/agents/${encodeURIComponent(agentName)}/scopes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+        body: JSON.stringify({ scopes }),
+      });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error?.message || t('scopeSaveFailed'));
+    }
+
     function deny() {
       if (redirectUri) {
         const url = new URL(redirectUri);
@@ -259,7 +377,7 @@
         </div>
         <p class="priming-line">${escHtml(t('consent.priming.oauth', { client: clientName }))}</p>
         ${boundaryHtml()}
-        <p style="margin:1rem 0;font-size:.9rem">${escHtml(t('loginRequired'))}</p>
+        <p class="login-prompt">${escHtml(t('loginRequired'))}</p>
         <form id="loginForm">
           <label>${escHtml(t('usernameLabel'))}</label>
           <input type="text" id="username" required autocomplete="username" />
@@ -300,10 +418,11 @@
         <div class="create-agent-form">
           <label>${escHtml(t('newAgentName'))}</label>
           <input type="text" id="newAgentName" placeholder="e.g. claude-mcp" minlength="3" maxlength="64" required />
+          <p class="name-identity-hint">${escHtml(t('newAgentNameHint'))}</p>
           <label>${escHtml(t('newAgentDisplayName'))}</label>
           <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint'))}" />
           <div id="createError" class="error-msg"></div>
-          <div class="btn-row" style="margin-top:.5rem">
+          <div class="btn-row">
             <button type="button" class="btn-sm btn-sm-muted" id="cancelCreate">${escHtml(t('cancelBtn'))}</button>
             <button type="button" class="btn-sm btn-sm-accent" id="confirmCreate">${escHtml(t('createBtn'))}</button>
           </div>
@@ -336,13 +455,99 @@
       });
     }
 
+    /**
+     * The permission chooser for the SELECTED agent: the same presets and the same custom
+     * checkbox list as the device-authorization page and the agents tab, over the one shared
+     * scope model — so every door grants the same sets and describes them with one vocabulary.
+     */
+    function scopeSectionHtml() {
+      const presetKeys = ['keep', 'readonly', 'standard', 'full', 'custom'];
+      const radios = presetKeys.map((p) => {
+        const desc = p === 'keep' ? currentAccessSummary(selectedAgent) : presetSummary(p, t);
+        return `
+        <label class="scope-radio ${selectedPreset === p ? 'selected' : ''}" data-preset="${escHtml(p)}">
+          <input type="radio" name="scopePreset" value="${escHtml(p)}" ${selectedPreset === p ? 'checked' : ''} />
+          <div class="scope-radio-content">
+            <div class="scope-radio-name">${escHtml(presetLabel(p))}</div>
+            <div class="scope-radio-desc">${escHtml(desc)}</div>
+          </div>
+        </label>`;
+      }).join('');
+
+      // The custom list is the editor vocabulary itself — every domain and permission the node
+      // enforces, each with its localized sentence — seeded from what the agent holds now.
+      const checkboxes = SCOPE_DOMAINS.flatMap((d) => d.permissions.map((p) => {
+        const s = `${d.key}:${p}`;
+        return `
+        <label class="scope-checkbox">
+          <input type="checkbox" value="${escHtml(s)}" ${customScopes.has(s) ? 'checked' : ''} />
+          <span>${escHtml(scopeSentence(s, t))} <code class="scope-token">${escHtml(s)}</code></span>
+        </label>`;
+      })).join('');
+
+      const exact = [...expandScopes(effectiveScopes())];
+      return `
+        <div class="scope-section">
+          <div class="scope-section-title">${escHtml(translate('agentConsentPage.scopeLabel'))}</div>
+          <p class="scope-only-here">${escHtml(t('onlyHere', { host: location.host }))}</p>
+          <p class="scope-acts-as">${escHtml(t('actsAs', { client: clientName }))}</p>
+          ${radios}
+          <div class="custom-scopes ${selectedPreset === 'custom' ? 'visible' : ''}" id="customScopes">
+            ${checkboxes}
+          </div>
+          <button type="button" class="scope-toggle" id="scopeToggle">${escHtml(t('appGrant.showDetails', { n: exact.length }))}</button>
+          <ul class="scope-exact" id="scopeExact">${exactListHtml(exact)}</ul>
+        </div>`;
+    }
+
+    const exactListHtml = (exact) =>
+      exact.map((s) => `<li>${escHtml(scopeSentence(s, t))} <code>${escHtml(s)}</code></li>`).join('');
+
+    /** Re-describe the effective grant after any selection change, without rebuilding the radios. */
+    function refreshExactList() {
+      const exact = [...expandScopes(effectiveScopes())];
+      const list = document.getElementById('scopeExact');
+      const toggle = document.getElementById('scopeToggle');
+      list.innerHTML = exactListHtml(exact);
+      toggle.textContent = list.classList.contains('visible')
+        ? t('appGrant.hideDetails')
+        : t('appGrant.showDetails', { n: exact.length });
+    }
+
+    function wireScopeSection() {
+      const toggle = document.getElementById('scopeToggle');
+      toggle.addEventListener('click', () => {
+        const list = document.getElementById('scopeExact');
+        list.classList.toggle('visible');
+        refreshExactList();
+      });
+      document.querySelectorAll('input[name="scopePreset"]').forEach((radio) => {
+        radio.addEventListener('change', () => {
+          selectedPreset = radio.value;
+          document.querySelectorAll('.scope-radio').forEach((el) => {
+            el.classList.toggle('selected', el.dataset.preset === selectedPreset);
+          });
+          document.getElementById('customScopes').classList.toggle('visible', selectedPreset === 'custom');
+          refreshExactList();
+        });
+      });
+      document.querySelectorAll('#customScopes input[type="checkbox"]').forEach((cb) => {
+        cb.addEventListener('change', () => {
+          customScopes = new Set(
+            Array.from(document.querySelectorAll('#customScopes input[type="checkbox"]:checked')).map((el) => el.value),
+          );
+          refreshExactList();
+        });
+      });
+    }
+
     function renderApproval() {
       if (agents.length === 0) {
         app.innerHTML = `
           <h1>${escHtml(t('title'))}</h1>
           <p class="subtitle">${escHtml(t('noAgentsCreate'))}</p>
           <div id="createContainer"></div>
-          <div class="btn-row" style="margin-top:1rem">
+          <div class="btn-row">
             <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
           </div>
         `;
@@ -356,14 +561,17 @@
       const prevIdx = prevGaii ? agents.findIndex(a => a.gaii === prevGaii) : -1;
       const selIdx = prevIdx >= 0 ? prevIdx : 0;
       selectedAgent = agents[selIdx];
+      // The picker describes THIS agent: seed the custom list from what it holds, and start at
+      // "keep" so approving without touching anything changes nothing.
+      customScopes = expandScopes(agentScopes(selectedAgent));
 
       const agentListHtml = agents.map((a, i) => `
         <div class="agent-option ${i === selIdx ? 'selected' : ''}" data-idx="${i}">
           <div>
-            <div class="agent-name">${escHtml(a.displayName || a.name)}</div>
+            <div class="agent-name">${escHtml(a.display_name || a.displayName || a.name)}</div>
             <div class="agent-gaii">${escHtml(a.gaii)}</div>
           </div>
-          <div class="agent-balance">${escHtml(a.morselBalance || 0)} ${escHtml(t('morsels'))}</div>
+          <div class="agent-balance">${escHtml(a.morsel_balance ?? a.morselBalance ?? 0)} ${escHtml(t('morsels'))}</div>
         </div>
       `).join('');
 
@@ -374,11 +582,11 @@
           ${escHtml(t('platformLabel'))} <span class="platform-name">${escHtml(clientName)}</span>
         </div>
         <p class="priming-line priming-line--spaced">${escHtml(t('consent.priming.oauth', { client: clientName }))}</p>
-        <p style="font-size:.9rem;margin-bottom:.5rem;font-weight:600">${escHtml(t('selectAgent'))}</p>
+        <p class="select-agent-title">${escHtml(t('selectAgent'))}</p>
         <div id="agentList">${agentListHtml}</div>
         <div class="create-agent-row" id="showCreateBtn">+ ${escHtml(t('createNewAgent'))}</div>
-        <div id="inlineCreateContainer" style="display:none"></div>
-        <div id="scopeBox">${scopeBoxHtml(selectedAgent)}</div>
+        <div id="inlineCreateContainer" class="hidden"></div>
+        <div id="scopeArea">${scopeSectionHtml()}</div>
         ${boundaryHtml()}
         <div class="wallet-note">${escHtml(t('agentPays'))}</div>
         <div id="approveError" class="error-msg"></div>
@@ -388,25 +596,29 @@
         </div>
       `;
 
-      // Agent selection — the scope box describes the SELECTED agent, so it re-renders on switch.
+      // Agent selection — the permission section describes the SELECTED agent, so switching
+      // re-seeds it (back to "keep", custom list from the new agent's real scopes).
       document.querySelectorAll('.agent-option').forEach(el => {
         el.addEventListener('click', () => {
           document.querySelectorAll('.agent-option').forEach(e => e.classList.remove('selected'));
           el.classList.add('selected');
           selectedAgent = agents[parseInt(el.dataset.idx)];
-          document.getElementById('scopeBox').innerHTML = scopeBoxHtml(selectedAgent);
-          wireScopeToggle();
+          selectedPreset = 'keep';
+          customScopes = expandScopes(agentScopes(selectedAgent));
+          document.getElementById('scopeArea').innerHTML = scopeSectionHtml();
+          wireScopeSection();
         });
       });
-      wireScopeToggle();
+      wireScopeSection();
 
       document.getElementById('showCreateBtn').addEventListener('click', () => {
-        document.getElementById('showCreateBtn').style.display = 'none';
+        document.getElementById('showCreateBtn').classList.add('hidden');
         const container = document.getElementById('inlineCreateContainer');
-        container.style.display = 'block';
+        container.classList.remove('hidden');
         renderCreateForm(container, (newAgent) => {
           // Re-render with new agent auto-selected
           selectedAgent = agents.find(a => a.gaii === newAgent?.gaii) || agents[agents.length - 1];
+          selectedPreset = 'keep';
           renderApproval();
         });
       });
@@ -415,11 +627,28 @@
       document.getElementById('approveBtn').addEventListener('click', async () => {
         const btn = document.getElementById('approveBtn');
         const errEl = document.getElementById('approveError');
+        errEl.textContent = '';
+
+        // A custom pick with nothing ticked is a refusal wearing an approve button. Checked on
+        // the ticks themselves: collapseScopes() maps an empty set to ['catalogue:read'], so the
+        // collapsed array is never empty.
+        if (selectedPreset === 'custom' && customScopes.size === 0) {
+          errEl.textContent = translate('agentConsentPage.selectOne');
+          return;
+        }
+        const chosen = scopesToSave();
+
         btn.disabled = true;
         btn.textContent = t('approving');
-        errEl.textContent = '';
         try {
           const jwt = session.jwt || session.token;
+          // Refuse before you write, in order: the permission change lands first, and a failure
+          // there stops the approval — otherwise the connector would be minted a token carrying
+          // an access level the owner just declined.
+          if (chosen) {
+            await saveScopes(selectedAgent.name, chosen, jwt);
+            selectedAgent.default_scopes = chosen;
+          }
           const r = await fetch('/v1/mcp/authorize-consent', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -447,12 +676,12 @@
               const code = escHtml(d.code);
               app.innerHTML = `
                 <h1>${escHtml(t('doneTitle'))}</h1>
-                <p style="margin-bottom:.5rem;font-size:.9rem">${escHtml(t('authCodeLabel'))}</p>
-                <div style="display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--border);border-radius:.5rem;padding:.6rem .75rem;margin-bottom:1rem;font-family:monospace;font-size:.8rem;word-break:break-all">
-                  <span style="flex:1" id="codeValue">${code}</span>
+                <p class="auth-code-label">${escHtml(t('authCodeLabel'))}</p>
+                <div class="auth-code-row">
+                  <span class="auth-code-value" id="codeValue">${code}</span>
                   <button id="copyBtn" class="btn-sm btn-sm-accent btn-copy-inline">${escHtml(t('common.copy'))}</button>
                 </div>
-                <p style="color:var(--muted);font-size:.82rem">${escHtml(t('authCodeHint'))}</p>
+                <p class="auth-code-hint">${escHtml(t('authCodeHint'))}</p>
               `;
               // This page is outside the SPA (no Preact), so it cannot mount <CopyButton>; it uses
               // the same shared copyToClipboard helper the component does — which is what gives it
