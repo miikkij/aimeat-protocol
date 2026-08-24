@@ -19,11 +19,13 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   ast-grep:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -52,6 +54,9 @@ jobs:
   # (Semgrep needs WSL/Docker there, which this project does not use). Advisory, same as ast-grep.
   semgrep-taint:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
@@ -78,6 +83,9 @@ jobs:
   # mirrors their state onto the same Security tab so every audit signal shares one pane. Advisory.
   audit-gates:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
