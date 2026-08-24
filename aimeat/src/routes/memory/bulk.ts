@@ -14,6 +14,7 @@ import { ZipArchive } from 'archiver';
 import type { MemoryRecord } from '../../storage/interface.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { checkMemoryQuota } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
@@ -486,6 +487,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       createdAt: existing?.createdAt || now,
       updatedAt: now,
     });
+
+    recordMemoryTouch({ ownerGaii: callerGaii, key, writerPrincipal: callerGaii, kind: 'write' });
 
     emitResourceUpdated(callerGaii, `aimeat://memory/${encodeURIComponent(key)}`);
     emitResourceListChanged(callerGaii);

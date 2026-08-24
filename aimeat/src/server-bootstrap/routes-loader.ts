@@ -78,6 +78,7 @@ import { schemaRouter } from '../routes/schemas.js';
 import { consentRouter } from '../routes/consent.js';
 import { permissionsRouter } from '../routes/permissions.js';
 import { memoryRouter } from '../routes/memory.js';
+import { memoryHandsRouter } from '../routes/memory-hands.js';
 import { librarianRouter } from '../routes/librarian.js';
 import { discoverRouter } from '../routes/discover.js';
 import { livingRouter } from '../routes/living.js';
@@ -223,6 +224,7 @@ import { initStats } from '../services/stats.js';
 import { configureAuthAudit } from '../services/auth-audit.js';
 import { initTelemetryBuffer } from '../services/telemetry-buffer.js';
 import { initUsageBuffer } from '../services/usage/usage-buffer.js';
+import { initWriteTallyBuffer } from '../services/data-map/write-tally-buffer.js';
 import { initConsentAuditBuffer } from '../services/consent-audit-buffer.js';
 import { createMetricsRegistry } from '../services/prometheus.js';
 import { metricsMiddleware } from '../middleware/metrics.js';
@@ -283,6 +285,9 @@ export async function mountRoutes(
   // The one write door for the usage call stream: every measured call, whichever surface it came
   // through, buffers here and flushes on an interval so a request never waits on a metrics write.
   initUsageBuffer(storage);
+  // The write tally starts collecting here. It fills only from now on: the writer was never
+  // recorded before this, so there is no history to seed it from.
+  initWriteTallyBuffer(storage);
 
   // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
   initConsentAuditBuffer(storage);
@@ -484,6 +489,10 @@ export async function mountRoutes(
   app.use(permissionsRouter(config, storage));  // Phase 0.3 — permission listing API
   app.use(schemaRouter(config, storage));  // MUST be before memoryRouter (Phase 0.1)
   app.use('/v1/memory', workspaceAccessMiddleware(config, storage));  // Phase 2.3 — organism workspace access
+  // Who has had their hands on a key. MUST be before memoryRouter: that router serves
+  // /v1/memory/:namespace/:key for public reads, which matches /v1/memory/<key>/hands and answers
+  // "Public memory not found" for it. Two segments, two meanings, and the first one mounted wins.
+  app.use(memoryHandsRouter(config, storage));
   app.use(memoryRouter(config, storage, stats, notifyDirectoryChange, peers));
   app.use(librarianRouter(config, storage));  // Tier-1 fan-across full-text retrieval
   app.use(discoverRouter(config, storage));   // Master directory — unified cross-domain discovery

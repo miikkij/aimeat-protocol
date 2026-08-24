@@ -12,6 +12,7 @@
  *     a prompt. The routes refuse it now too; this covers jobs stored before that gate existed.
  */
 import type { AimeatConfig } from '../config.js';
+import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 import type { Storage, ScheduledJobRecord } from '../storage/interface.js';
 import type { JobRunResult } from './scheduler.js';
 import { completeForOwner } from './ai-completion.js';
@@ -90,6 +91,11 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   });
+
+  // The highest-volume single writer on this node: a per-minute schedule is one tally row and a
+  // rising count, where an append log would have been one row per fire. `schedule:{id}` is the same
+  // identity string the AI ledger already uses for this job, so the two agree about whose hand it was.
+  recordMemoryTouch({ ownerGaii: owner, key: outputKey, writerPrincipal: `schedule:${job.id}`, kind: 'write' });
 
   return { reads, writes: [outputKey] };
 }

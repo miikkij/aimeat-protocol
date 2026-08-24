@@ -52,6 +52,7 @@ import { notify } from './notify.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { recordMemoryTouch } from './data-map/write-tally-buffer.js';
 
 /** How long one guest-initiated outbound call may take. Same ceiling every copy used. */
 const FETCH_TIMEOUT_MS = 30_000;
@@ -360,6 +361,12 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             // namespace.
             set: async (key, value, opts) => {
                 await enforceExtensionMemoryLimits(config, storage, extMemoryOwner, key, value);
+                // The extension is both the namespace and the hand: it writes into `ext:{name}`,
+                // which nothing else may write. Called from every success path below rather than
+                // once at the top, so a refused compare-and-swap is not counted as a write.
+                const noteWrite = (): void => recordMemoryTouch({
+                    ownerGaii: extMemoryOwner, key, writerPrincipal: extMemoryOwner, kind: 'write',
+                });
                 const existing = await storage.getMemory(extMemoryOwner, key);
                 const now = new Date().toISOString();
                 const record = {
@@ -378,6 +385,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
 
                 if (opts?.ifVersion === undefined) {
                     const written = await storage.setMemory(record);
+                    noteWrite();
                     return { ok: true, version: written?.version ?? record.version };
                 }
 
@@ -387,10 +395,11 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                     if (!storage.createMemoryIfAbsent) {
                         if (existing) return { ok: false, version: existing.version };
                         const written = await storage.setMemory({ ...record, version: 1 });
+                        noteWrite();
                         return { ok: true, version: written?.version ?? 1 };
                     }
                     const created = await storage.createMemoryIfAbsent({ ...record, version: 1 });
-                    if (created) return { ok: true, version: created.version };
+                    if (created) { noteWrite(); return { ok: true, version: created.version }; }
                     const now2 = await storage.getMemory(extMemoryOwner, key);
                     return { ok: false, version: now2?.version ?? null };
                 }
@@ -402,10 +411,11 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                     // last-write-wins here would be the very defect the guard was asked for.
                     if (existing.version !== opts.ifVersion) return { ok: false, version: existing.version };
                     const written = await storage.setMemory(record);
+                    noteWrite();
                     return { ok: true, version: written?.version ?? record.version };
                 }
                 const swapped = await storage.setMemoryIfVersion(record, opts.ifVersion);
-                if (swapped) return { ok: true, version: swapped.version };
+                if (swapped) { noteWrite(); return { ok: true, version: swapped.version }; }
                 const current = await storage.getMemory(extMemoryOwner, key);
                 return { ok: false, version: current?.version ?? null };
             },
@@ -415,7 +425,14 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 return records.map(r => ({ key: r.key, value: r.value }));
             },
 
-            delete: async (key) => storage.deleteMemory(extMemoryOwner, key),
+            delete: async (key) => {
+                const gone = await storage.deleteMemory(extMemoryOwner, key);
+                // A delete is a hand on the key too, and the row stays behind to say whose.
+                if (gone) recordMemoryTouch({
+                    ownerGaii: extMemoryOwner, key, writerPrincipal: extMemoryOwner, kind: 'delete',
+                });
+                return gone;
+            },
 
             getPublic: async (namespace, key) => {
                 let record = await storage.getMemory(namespace, key);

@@ -33,6 +33,8 @@ import type { Router } from 'express';
 import type { MemoryRecord } from '../../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
+import { resolveIdentity } from '../../utils/gaii.js';
+import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
@@ -263,6 +265,12 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         logger.warn('memory patch: replication enqueue failed, leaving it to the scheduled sync', { key, error: String(err) });
       });
     }
+
+    // `gaii` is where it LANDED — an owner-scope write redirects it — so the hand is resolved from
+    // the session instead, which is the only thing that names who actually did this.
+    recordMemoryTouch({
+      ownerGaii: gaii, key, writerPrincipal: resolveIdentity(req.auth!, config.nodeId), kind: 'write',
+    });
 
     emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);
     if (created) emitResourceListChanged(gaii);

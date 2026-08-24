@@ -433,6 +433,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     await shutdownTelemetryBuffer();
     const { shutdownUsageBuffer } = await import('./services/usage/usage-buffer.js');
     await shutdownUsageBuffer();
+    const { shutdownWriteTallyBuffer } = await import('./services/data-map/write-tally-buffer.js');
+    await shutdownWriteTallyBuffer();
     const { shutdownConsentAuditBuffer } = await import('./services/consent-audit-buffer.js');
     await shutdownConsentAuditBuffer();
     const { shutdownCache } = await import('./services/cache.js');

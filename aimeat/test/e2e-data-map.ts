@@ -197,6 +197,56 @@ async function publish(token: string, filename: string, content: string) {
         assert(!seen.manifest?.dataMap?.gap, 'the finding must not travel inside the manifest either');
     });
 
+    // ── The write tally. It starts empty and fills from here on; nothing seeds it, because the
+    //    writer was never recorded before this existed. ─────────────────────────────────────────
+    await test('a write leaves a trace of WHOSE hand it was, not just whose namespace', async () => {
+        const agent = await connectAgent(o.token, o.name, `dmwrite${Date.now()}`, ['memory:read', 'memory:write']);
+        const key = `tallytest.${Date.now()}`;
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(agent.token),
+            body: JSON.stringify({ key, value: { n: 1 }, visibility: 'private' }),
+        });
+        assert(w.status === 200 || w.status === 201, `write ${w.status}: ${JSON.stringify(w.body).slice(0, 200)}`);
+
+        // The first sighting of a (key, principal) pair is written straight through, so it is
+        // readable immediately — the COUNT may lag a flush window, the FACT never does.
+        const r = await json(`/v1/memory/${encodeURIComponent(key)}/hands`, { headers: auth(o.token) });
+        assert(r.status === 200, `hands ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+        const hands = r.body.data?.hands ?? [];
+        assert(hands.some((h: any) => h.writer === agent.gaii),
+            `the agent's own hand must be on the key: ${JSON.stringify(hands).slice(0, 200)}`);
+        assert(hands[0].writes >= 1, `the count must be there too: ${JSON.stringify(hands[0])}`);
+        // A count that hides what it cannot see reads as complete. Both limits travel with it.
+        assert(Array.isArray(r.body.data.not_covered) && r.body.data.not_covered.length >= 2,
+            'the answer must say what it does not cover');
+    });
+
+    await test('the tally counts hands and not events', async () => {
+        const agent = await connectAgent(o.token, o.name, `dmcount${Date.now()}`, ['memory:read', 'memory:write']);
+        const key = `tallycount.${Date.now()}`;
+        for (let i = 0; i < 3; i++) {
+            const w = await json('/v1/memory', {
+                method: 'POST', headers: auth(agent.token),
+                body: JSON.stringify({ key, value: { n: i }, visibility: 'private' }),
+            });
+            assert(w.status === 200 || w.status === 201, `write ${i} was ${w.status}`);
+        }
+        const r = await json(`/v1/memory/${encodeURIComponent(key)}/hands`, { headers: auth(o.token) });
+        const mine = (r.body.data?.hands ?? []).filter((h: any) => h.writer === agent.gaii);
+        // Three writes by one hand is ONE row. An append log would have been three.
+        assert(mine.length === 1, `one hand, one row — got ${mine.length}: ${JSON.stringify(mine)}`);
+    });
+
+    await test('an agent cannot ask about an account it is not in', async () => {
+        const theirAgent = await connectAgent(other.token, other.name, `dmnosy${Date.now()}`, ['memory:read']);
+        const r = await json(`/v1/memory/${encodeURIComponent('tallytest.anything')}/hands`, { headers: auth(theirAgent.token) });
+        // It resolves against the CALLER's own identity, so this is not a refusal — it is an empty
+        // answer about their own store, which is the stronger property: there is no key to name that
+        // reaches somebody else's tally.
+        assert(r.status === 200 && (r.body.data?.hands ?? []).length === 0,
+            `another owner's agent must see nothing: ${JSON.stringify(r.body.data).slice(0, 200)}`);
+    });
+
     console.log(`\n  ${passed} passed, ${failed} failed`);
     process.exit(failed > 0 ? 1 : 0);
 })();
