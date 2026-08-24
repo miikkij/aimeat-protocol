@@ -13,6 +13,9 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.4.1 — 2026-08-24 — SECURITY (CodeQL js/xss-through-dom): the provider id is read back from the
+ *     DOM before it is spliced into the login URL, so it is validated to the provider-id shape (a
+ *     slug, optionally scheme:tenant) first; a tampered data-provider no longer steers navigation.
  *   v1.4.0 — 2026-08-24 — SSO connection buttons (BR-04): a colon provider id (saml:contoso)
  *     navigates to its slash login path; no icon is fine, the organisation name is the label.
  *   v1.3.0 — 2026-08-12 — The language switch is generated from MODAL_LANGS instead of two written-out
@@ -321,7 +324,11 @@ export function showLoginModal(opts, renderBtn) {
     // Social sign-in — full-page navigation to the provider's OIDC start endpoint.
     modal.querySelectorAll('.aimeat-oauth-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        var id = btn.getAttribute('data-provider');
+        var id = btn.getAttribute('data-provider') || '';
+        // `id` is read back from the DOM, so treat it as untrusted here even though it was escaped
+        // when written. A provider id is a slug, optionally `scheme:tenant` for an SSO connection;
+        // anything else is a tampered attribute and must not steer the navigation.
+        if (!/^[a-z0-9_-]+(?::[a-z0-9_-]+)?$/i.test(id)) return;
         var back = encodeURIComponent(location.pathname + location.search + location.hash);
         // SSO connections carry a colon id ('saml:contoso'); their login path is /saml/contoso.
         location.href = NODE_URL + '/v1/ghii/login/' + id.split(':').join('/') + '?redirect=' + back;

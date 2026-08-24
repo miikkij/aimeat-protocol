@@ -28,6 +28,9 @@
  * @usage countPageView(storage, { ownerGhii: app.ownerGaii, name: filename, userAgent: … });
  * @version-history
  *   v1.0.0 — 2026-08-24 — Initial, with the signals collector.
+ *   v1.0.1 — 2026-08-24 — SECURITY (CodeQL js/polynomial-redos): the edge-dash trim in pageStreamId
+ *     used `/^-+|-+$/g`, which backtracks quadratically on a long adversarial page name. Replaced
+ *     with a single-character trim, safe because the run-collapse before it leaves one dash at most.
  */
 import type { Storage } from '../../storage/interface.js';
 import { getStream, recordHit, streamsRevision } from './signal-service.js';
@@ -42,7 +45,14 @@ import { logger } from '../../utils/logger.js';
  * exists (a campaign is usually set up that way) and nothing has to be linked up afterwards.
  */
 export function pageStreamId(name: string): string {
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 55);
+  // The run-collapse leaves at most ONE dash at each edge, so a single-character trim finishes the
+  // job. Written without a `+` before an anchor on purpose: `/-+$/` backtracks quadratically on a
+  // long adversarial run, and `name` is a stranger-supplied page name.
+  const slug = name.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-/, '')
+    .replace(/-$/, '')
+    .slice(0, 55);
   return `page-${slug || 'unnamed'}`;
 }
 

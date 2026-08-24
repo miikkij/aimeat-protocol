@@ -487,7 +487,8 @@
       });
       modal.querySelectorAll(".aimeat-oauth-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
-          var id = btn.getAttribute("data-provider");
+          var id = btn.getAttribute("data-provider") || "";
+          if (!/^[a-z0-9_-]+(?::[a-z0-9_-]+)?$/i.test(id)) return;
           var back = encodeURIComponent(location.pathname + location.search + location.hash);
           location.href = NODE_URL + "/v1/ghii/login/" + id.split(":").join("/") + "?redirect=" + back;
         });
