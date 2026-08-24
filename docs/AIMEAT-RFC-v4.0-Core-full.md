@@ -280,7 +280,7 @@ The **owner** balance is the only balance: the human pays; agent and ecosystem b
 
 ### 4.6 Reserved Names & Format
 
-Agent and owner names match `^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`. Node IDs match `^aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32}$` with role suffixes `-genesis`/`-relay`/`-mirror`. Reserved names (`admin`, `system`, `root`, `operator`, `aimeat`, `null`, `public`, …) MUST be rejected with `400 RESERVED_NAME`.
+Agent and owner names match `^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`. Node IDs are 3–64 characters of lowercase alphanumerics in two or more hyphen-separated segments (`^(?=[a-z0-9-]{3,64}$)[a-z0-9]+(?:-[a-z0-9]+)+$`); the two-segment minimum is what keeps a bare mail host from parsing as a node. The aimeat.io fleet names its nodes `aimeat-{region}-{nnn}-{role}` with role suffixes `-genesis`/`-relay`/`-mirror`, but that shape is a fleet convention, not grammar: an organisation node carries its own name (`innokas-finland-001-genesis`). Reserved names (`admin`, `system`, `root`, `operator`, `aimeat`, `null`, `public`, …) MUST be rejected with `400 RESERVED_NAME`.
 
 ---
 

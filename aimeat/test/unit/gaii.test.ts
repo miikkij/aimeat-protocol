@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import {
     parseGAII,
+    parseGEAI,
     buildGAII,
     validateAgentName,
     validateOwnerName,
     validateNodeId,
     isValidGAII,
+    isValidGHII,
     RESERVED_NAMES,
 } from '../../src/utils/gaii.js';
 
@@ -42,8 +44,49 @@ describe('parseGAII', () => {
         expect(parseGAII('My-Agent#my-owner@aimeat-us-001-dev')).toBeNull();
     });
 
-    it('rejects invalid node format', () => {
-        expect(parseGAII('my-agent#my-owner@invalid-node')).toBeNull();
+    // The node grammar carried a hardcoded `aimeat-` brand prefix until 2026-08-24, which made
+    // every identity on an organisation node (innokas-finland-001-genesis) unparseable: MCP
+    // task_create answered "Could not resolve caller identity" to a caller whose token the same
+    // server had minted. The grammar is now any 3-64 chars of lowercase alphanumerics in at least
+    // two hyphen-separated segments; the old test asserting `invalid-node` fails is inverted below
+    // because it asserted exactly the prefix requirement this change removes.
+    it('parses identities on nodes without the aimeat- prefix', () => {
+        const result = parseGAII('claude-mcp-work#jounimiikki@innokas-finland-001-genesis');
+        expect(result).toEqual({
+            agent: 'claude-mcp-work',
+            owner: 'jounimiikki',
+            node: 'innokas-finland-001-genesis',
+            full: 'claude-mcp-work#jounimiikki@innokas-finland-001-genesis',
+        });
+        expect(parseGAII('my-agent#my-owner@invalid-node')).not.toBeNull();
+    });
+
+    it('still rejects a node id with no hyphen (an email host, not a node)', () => {
+        expect(parseGAII('my-agent#my-owner@localhost')).toBeNull();
+    });
+});
+
+describe('parseGEAI', () => {
+    it('parses an ecosystem identity on a non-aimeat node', () => {
+        const result = parseGEAI('eco:drum-news#jounimiikki@innokas-finland-001-genesis');
+        expect(result).toEqual({
+            app: 'drum-news',
+            owner: 'jounimiikki',
+            node: 'innokas-finland-001-genesis',
+            full: 'eco:drum-news#jounimiikki@innokas-finland-001-genesis',
+        });
+    });
+});
+
+describe('isValidGHII', () => {
+    it('accepts owner identities on any hyphenated node', () => {
+        expect(isValidGHII('jounimiikki@innokas-finland-001-genesis')).toBe(true);
+        expect(isValidGHII('alice@aimeat-local-001-dev')).toBe(true);
+    });
+
+    it('rejects an email address (hyphenless host)', () => {
+        expect(isValidGHII('alice@gmail')).toBe(false);
+        expect(isValidGHII('alice@gmail.com')).toBe(false);
     });
 });
 
@@ -100,14 +143,21 @@ describe('validateOwnerName', () => {
 });
 
 describe('validateNodeId', () => {
-    it('accepts valid node IDs', () => {
+    it('accepts valid node IDs, branded or not', () => {
         expect(validateNodeId('aimeat-us-001-dev')).toBeNull();
         expect(validateNodeId('aimeat-eu-042-production')).toBeNull();
+        expect(validateNodeId('innokas-finland-001-genesis')).toBeNull();
+        expect(validateNodeId('not-a-node')).toBeNull();
     });
 
     it('rejects invalid node IDs', () => {
-        expect(validateNodeId('not-a-node')).not.toBeNull();
+        expect(validateNodeId('gmail')).not.toBeNull();
         expect(validateNodeId('aimeat-US-001-dev')).not.toBeNull();
+        expect(validateNodeId('-leading-hyphen')).not.toBeNull();
+        expect(validateNodeId('trailing-hyphen-')).not.toBeNull();
+        expect(validateNodeId('double--hyphen')).not.toBeNull();
+        expect(validateNodeId('has.dots-in-it')).not.toBeNull();
+        expect(validateNodeId(`${'a'.repeat(63)}-b`)).not.toBeNull();
         expect(validateNodeId('')).not.toBeNull();
     });
 });

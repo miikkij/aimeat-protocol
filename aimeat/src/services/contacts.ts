@@ -308,7 +308,8 @@ export async function listContactsMerged(
  * be asked of a local id, so without a shape test anything with an `@` in it was admitted as "a
  * GHII on some other node" — an email address landed in the address book as a person on a node
  * called `example.com`, which every consumer then read as a human and failed on. The node part
- * has a grammar (`aimeat-{region}-{nnn}-{name}`); a mail host does not fit it.
+ * has a grammar (hyphen-separated lowercase segments, two at minimum, no dots); a mail host does
+ * not fit it.
  */
 function isIdentityShaped(contactId: string): boolean {
   const kind = contactKind(contactId);

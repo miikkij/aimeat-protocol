@@ -3803,7 +3803,7 @@
     "useCaseCustomDesc": "Saltar a la configuración completa",
     "nodeId": "ID del nodo",
     "nodeIdHint": "Nombre único de este nodo en la red",
-    "nodeIdInvalid": "El ID del nodo tiene que tener la forma: aimeat-{region}-{number}-{name} (por ejemplo, aimeat-fi-001-home)",
+    "nodeIdInvalid": "El ID del nodo tiene que tener entre 3 y 64 caracteres: letras minúsculas y números en dos o más partes separadas por guiones (por ejemplo, aimeat-fi-001-home)",
     "port": "Puerto",
     "portHint": "Puerto HTTP en el que escucha el servidor",
     "portInvalid": "El puerto tiene que estar entre 1 y 65535",

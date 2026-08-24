@@ -15,6 +15,10 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.5.0 — 2026-08-24 — Node-id grammar loses the hardcoded `aimeat-` prefix: any 3-64 chars of
+ *     lowercase alphanumerics in two or more hyphen-separated segments. The prefix made every
+ *     strict parse fail on the first organisation node (innokas-finland-001-genesis), which broke
+ *     MCP task_create for callers the same server had authenticated.
  *   v1.4.0 — 2026-08-13 — `isExternalPrincipal`: does this identity act FOR a person, or is it the
  *     person. Session rows share an owner column, so the device list and "sign out everywhere" need
  *     to tell the human's own sign-ins from their agents'.
@@ -31,17 +35,24 @@ import { randomBytes } from 'node:crypto';
 // GAII format: agent#owner@node
 // agent: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
 // owner: ^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$
-// node:  ^aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32}$
+// node:  3-64 chars of lowercase alphanumerics in TWO OR MORE hyphen-separated segments.
+//   The grammar required a literal `aimeat-` brand prefix until 2026-08-24, and the first
+//   organisation node (innokas-finland-001-genesis) proved that wrong in production: every strict
+//   parse on that node returned null, so MCP task_create told a caller holding a token the same
+//   server had minted "Could not resolve caller identity", while the loose parsers kept working.
+//   The fleet's `aimeat-{region}-{nnn}-{role}` shape is a naming convention now, not grammar.
+//   The two-segment minimum is load-bearing: it is what keeps a bare mail host (`alice@gmail`)
+//   from parsing as a federated identity — see isValidGHII.
 // GEAI format: eco:{app}#{owner}@{node}  (the `eco:` prefix is the discriminator)
 
 const AGENT_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 const OWNER_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
-const NODE_RE = /^aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32}$/;
-const GAII_RE = /^([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32})$/;
+const NODE_RE = /^(?=[a-z0-9-]{3,64}$)[a-z0-9]+(?:-[a-z0-9]+)+$/;
+const GAII_RE = /^([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(?=[a-z0-9-]{3,64}$)([a-z0-9]+(?:-[a-z0-9]+)+)$/;
 
 /** The literal prefix that distinguishes a GEAI (ecosystem app) from a GAII (agent). */
 export const ECO_PREFIX = 'eco:';
-const GEAI_RE = /^eco:([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(aimeat-[a-z]{2,10}-[0-9]{3}-[a-z0-9-]{1,32})$/;
+const GEAI_RE = /^eco:([a-z0-9][a-z0-9-]{1,62}[a-z0-9])#([a-z0-9][a-z0-9-]{1,62}[a-z0-9])@(?=[a-z0-9-]{3,64}$)([a-z0-9]+(?:-[a-z0-9]+)+)$/;
 
 // 'support' and 'operators' are the two halves of `support@operators`, the named address that
 // reaches whoever runs this node (services/message-alias.ts). An owner or agent registered under
@@ -122,7 +133,7 @@ export function validateOwnerName(name: string): string | null {
 }
 
 export function validateNodeId(nodeId: string): string | null {
-  if (!NODE_RE.test(nodeId)) return 'Node ID must match format: aimeat-{region}-{number}-{name}';
+  if (!NODE_RE.test(nodeId)) return 'Node ID must be 3-64 lowercase alphanumeric characters in two or more hyphen-separated segments, e.g. aimeat-fi-001-genesis';
   return null;
 }
 
@@ -138,9 +149,9 @@ export function isValidGAII(gaii: string): boolean {
  * which is a registration policy. An account that exists under a name the reserved list gained
  * later is still a real person, and a shape test that refuses them would make them unaddressable.
  *
- * The node half is what does the work. It has a grammar (`aimeat-{region}-{nnn}-{name}`) and a mail
- * host does not fit it, so this is what separates a federated identity from an email address that
- * merely contains an `@`.
+ * The node half is what does the work. Its grammar demands two or more hyphen-separated segments
+ * and refuses dots, and a mail host (`gmail`, `gmail.com`) fits neither, so this is what separates
+ * a federated identity from an email address that merely contains an `@`.
  */
 export function isValidGHII(id: string): boolean {
   if (id.startsWith(ECO_PREFIX) || id.includes('#')) return false;
