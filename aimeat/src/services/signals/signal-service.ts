@@ -28,6 +28,9 @@
  * @usage await recordHit(storage, { ownerGhii, streamId, event: 'open', userAgent });
  * @version-history
  *   v1.0.0 — 2026-08-24 — Initial: the generic hit collector.
+ *   v1.0.1 — 2026-08-24 — SECURITY (CodeQL js/prototype-polluting-assignment): `subject` is the one
+ *     map key a stranger supplies, so a prototype key (`__proto__`) let a public hit reach
+ *     Object.prototype through rec.subjects. Rejected at source and read back with Object.hasOwn.
  */
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import {
@@ -63,6 +66,14 @@ export const streamsRevision = (): number => streamsVersion;
 function bump<K extends string>(obj: Partial<Record<K, number>>, key: K): void {
   obj[key] = (obj[key] ?? 0) + 1;
 }
+
+/**
+ * Keys that are not data: assigning to one reaches an object's prototype rather than adding an entry.
+ * `subject` is the one map key here a stranger controls (it rides in on the public hit), so it is
+ * checked against this set before it is ever used to index rec.subjects. The other dynamic keys are
+ * an allowlisted event/channel, a fixed visitor class, or an aiAgent name from a closed table.
+ */
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
 // ── Streams ───────────────────────────────────────────────────────────────────────────────────
 
@@ -237,8 +248,12 @@ export async function recordHit(storage: Storage, input: HitInput): Promise<HitO
     ? (input.event as SignalEvent) : 'view';
   const channel = (SIGNAL_CHANNELS as readonly string[]).includes(input.channel ?? '')
     ? (input.channel as SignalChannel) : stream.channel;
-  const subject = stream.perSubject && input.subject
+  const rawSubject = stream.perSubject && input.subject
     ? String(input.subject).trim().slice(0, MAX_SUBJECT_LEN) : null;
+  // A stranger picks this value and it becomes a map key below, so a prototype key would let them
+  // reach Object.prototype through rec.subjects. Reject it: the hit still counts in the totals, it
+  // simply is not tracked under that subject.
+  const subject = rawSubject && !FORBIDDEN_KEYS.has(rawSubject) ? rawSubject : null;
   const ref = input.ref ? String(input.ref).trim().slice(0, MAX_REF_LEN) : null;
   const visitor = classifyVisitor(input.userAgent);
 
@@ -279,7 +294,9 @@ export async function recordHit(storage: Storage, input: HitInput): Promise<HitO
       rec.days[day] = dayCounts;
 
       if (subject) {
-        const known = rec.subjects[subject];
+        // Own-property read only: an inherited name (`toString` and the like) must never masquerade
+        // as an existing subject and hand back a builtin off the prototype chain.
+        const known = Object.hasOwn(rec.subjects, subject) ? rec.subjects[subject] : undefined;
         if (known) {
           known.lastAt = now;
           bump(known.events, event);
