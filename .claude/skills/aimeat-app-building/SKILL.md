@@ -76,6 +76,23 @@ does this answer?*
 | owner memory, `visibility: public` | what somebody not signed in must read (never people) | the person |
 | the extension's namespace | a rule enforced server-side with no human present | the extension |
 
+**Four rows nobody draws, and they are the ones an audit lands on.** The table above is what the
+node holds and can hand back. These are not, and each answers *can you delete it* differently:
+
+| What | Where the real one is | What deleting it means |
+|---|---|---|
+| work with no final state yet: a draft, a half-done send, a hold, an approval waiting | your workspace, unsettled | delete it, and say what happens to the work it was part of |
+| a copy of somebody else's record: a registry lookup, an enrichment | THEIR system | your copy goes, theirs does not, and it returns on the next fetch |
+| what has already left: an email delivered, a webhook posted | the recipient's inbox | you cannot. All you hold is the record that it happened |
+| a credential for a system you do not run | your store, encrypted | the connection stops; the other system is unaffected |
+
+The last row of that table is the one to design against. An erasure request cannot reach a message
+delivered last week, so decide BEFORE building what you keep about it: an opaque token instead of an
+address, a hash instead of the value, the fact of a send instead of its content. **Deliberate
+non-holding only exists if you chose it early.** And in-flight work needs its own answer on screen:
+finished, still running, or given up on — a row that renders identically in all three is a lie the
+person will repeat.
+
 **Owner memory is the wrong default and it wins by being one line shorter.** Group data stored per
 person follows the PERSON between groups while staying invisible to their own TEAM — wrong in both
 directions at once. The CADENCE campaign work (2026-08-24) made that mistake four times in one
