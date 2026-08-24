@@ -154,8 +154,17 @@ export function lintDataMap(input: DataMapLintInput): DataMapLintResult {
     }
   }
 
+  // FINDINGS 5-7 ARE ABOUT A STATEMENT SOMEBODY MADE, so they are asked only of the rows somebody
+  // wrote. A wholly derived map has no author yet: holding it to a declaration's standard fires
+  // three findings at once on every app on day one, and the one true thing to say about it —
+  // "nobody has confirmed this" — would then be outranked by three that misdescribe it. Findings 1-4
+  // stay unconditional: they compare rows against permissions, which is true of a draft too.
+  const authored = map.source !== 'derived';
+  const declaredHeld = map.held.filter(r => r.source === 'declared');
+  const declaredRows = authored ? [...declaredHeld, ...map.elsewhere.filter(r => r.source === 'declared')] : [];
+
   // 5. Deletion unanswered. The question a deletion request arrives asking.
-  const unanswered = rows.filter(r => r.deletion.effect === 'unknown');
+  const unanswered = declaredRows.filter(r => r.deletion.effect === 'unknown');
   if (unanswered.length > 0) {
     found.push({
       code: 'DATAMAP_DELETION_UNANSWERED',
@@ -169,7 +178,7 @@ export function lintDataMap(input: DataMapLintInput): DataMapLintResult {
   }
 
   // 6. The map does not meet what its own declared shape requires.
-  const violations = checkFormRequirements(map);
+  const violations = authored ? checkFormRequirements(map) : [];
   if (violations.length > 0) {
     found.push({
       code: 'DATAMAP_FORM_INCOMPLETE',
@@ -181,8 +190,8 @@ export function lintDataMap(input: DataMapLintInput): DataMapLintResult {
   }
 
   // 7. Rows nobody has explained. The whole point of the map, so it is a finding rather than a blank.
-  const noWhy = map.held.filter(r => !r.why.trim());
-  if (noWhy.length > 0 && !input.declaresNothing) {
+  const noWhy = declaredHeld.filter(r => !r.why.trim());
+  if (authored && noWhy.length > 0 && !input.declaresNothing) {
     found.push({
       code: 'DATAMAP_NO_WHY',
       message: `${noWhy.length} row(s) do not say why the data is there.`,

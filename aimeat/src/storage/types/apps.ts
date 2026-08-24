@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema, system-prompt, and package/template record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-24 — AppManifest gains `dataMap` (TARGET-073): the SUMMARY of where this app
+ *     puts what. On the manifest for the same reason aiPosture is; the map itself is a public memory
+ *     record at the address in `docKey`, because its rows carry a sentence each.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — AppManifest gains `cortex.agents` (Agent-Bundled Apps Slice 1):
  *     declarative crew-defs an app ships, validated at publish (crew-def-schemas.ts).
@@ -18,6 +21,7 @@
  */
 import type { SemanticAnnotation, SemanticContext } from './common.js';
 import type { AppAiPosture } from '../../services/app-ai-posture.js';
+import type { DataMapStamp } from '../../services/data-map/data-map-types.js';
 
 /**
  * The `cortex` section of an app manifest. `agents` carries the DECLARATIVE crew-defs
@@ -69,6 +73,20 @@ export interface AppManifest {
    * app has. See services/app-ai-posture.ts.
    */
   aiPosture?: AppAiPosture;
+  /**
+   * The SUMMARY of this app's data map — what it stores, in how many rows, on how weak a basis, and
+   * how much of it nobody has explained. Here for the same reason `aiPosture` is: a JSON blob on both
+   * providers, so no migration and no second place to keep in sync, and it rides along with every
+   * mechanism that already copies a manifest.
+   *
+   * The summary only. The map itself is a memory record at `apps.{appId}.datamap` (see
+   * services/data-map/data-map-store.ts), because the rows carry a sentence each — why this data is
+   * HERE and not somewhere else — and prose belongs in a record rather than on a manifest that every
+   * listing loads. `stamp.docKey` is the address, so nothing has to guess it.
+   *
+   * `gap` inside it is OWNER-ONLY, like `aiPosture.gap`: `publicDataMap()` strips it.
+   */
+  dataMap?: DataMapStamp;
   /**
    * Present only when the LAST publish did not carry the build spec that was in force at the time
    * (services/app-spec-gate.ts). A clean publish stores nothing and clears whatever was here, so

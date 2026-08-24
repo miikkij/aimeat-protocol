@@ -262,6 +262,9 @@ const ALL_SUITES = [
     // on which one you came through — and three of the four said no, in silence.
     'test/e2e-app-publish-provenance-doors.ts',
     'test/e2e-app-ai-posture.ts',
+    // Where a published app says it puts what, the draft the node makes when it says nothing, and
+    // the check that reports the difference — asserting at every door that it WARNS and never blocks.
+    'test/e2e-data-map.ts',
     'test/e2e-notifications.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',

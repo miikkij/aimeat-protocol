@@ -6,6 +6,10 @@
  *   /v1/admin/apps/similar, /v1/admin/apps/watermark/decode, /v1/admin/apps/:owner/:filename/moderate,
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-24 — The catalogue carries `data_map`, on exactly the terms the AI posture
+ *     travels on: the rows are public, because where an app puts data is the promise it makes to
+ *     whoever installs it and an agent needs that before it touches anything; the publish check's
+ *     `gap` is the owner's own business and publicDataMap() strips it for everyone else.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — catalogue listing metrics via 3 batch queries (downloads/forks/screenshots), was 3N
  *   v1.2.0 — 2026-07-16 — GET /v1/apps carries has_draft for the viewer's OWN apps (one
@@ -30,6 +34,7 @@ import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import { publicPosture } from '../../services/app-ai-posture.js';
+import { publicDataMap } from '../../services/data-map/data-map-types.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 
@@ -97,9 +102,17 @@ export function registerCatalogueAdminRoutes(
             // `specCheck` travels with the gap: whether the last publish carried the build spec is
             // the owner's own business, and a public "built without reading the manual" badge would
             // be a punishment nobody agreed to.
+            // The data map travels on exactly the same terms as the posture, and for the same reason.
+            // Where an app puts what is the promise it makes to whoever installs it, and an agent
+            // deciding whether to use it needs that before it touches anything — so the rows are
+            // public. The publish check's finding is the owner's own unfinished business, so
+            // publicDataMap() strips it for everyone else.
+            const dataMap = app.manifest.dataMap;
+            const shownDataMap = isOwn ? dataMap : (dataMap ? publicDataMap(dataMap) : undefined);
             const shownManifest = isOwn ? app.manifest : {
                 ...app.manifest,
                 ...(posture ? { aiPosture: shownPosture } : {}),
+                ...(dataMap ? { dataMap: shownDataMap } : {}),
                 ...(app.manifest.specCheck ? { specCheck: undefined } : {}),
             };
             return {
@@ -108,6 +121,7 @@ export function registerCatalogueAdminRoutes(
                 version_number: app.versionNumber,
                 manifest: shownManifest,
                 ai_posture: shownPosture ?? null,
+                data_map: shownDataMap ?? null,
                 ...(isOwn && app.manifest.specCheck ? { spec_check: app.manifest.specCheck } : {}),
                 size: app.size,
                 mime_type: app.mimeType,

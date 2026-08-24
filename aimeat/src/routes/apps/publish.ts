@@ -8,6 +8,9 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.3.0 — 2026-08-24 — The publish response carries `data_map` and `data_map_hints`, on the same
+ *     terms as `ai_posture` / `ai_hints`: what the node now believes, and what to fix. Neither has
+ *     ever been able to turn a publish into a refusal.
  *   v2.2.0 — 2026-08-11 — Both modes carry `spec_token` / `spec_ack` (the presigned handshake puts
  *     them in the token, as it does for the provenance declaration), and the response document gains
  *     `spec_check`, `app_hints` and `next_steps`. A blocking artifact finding comes back as 422
@@ -266,6 +269,10 @@ export function registerPublishRoutes(
             // response. `ai_posture` is what the node now believes; `ai_hints` is what to fix.
             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+            // Where this app puts what. Same split as above: `data_map` is what the node now believes,
+            // `data_map_hints` is what to fix, and neither ever turned this into a refusal.
+            ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),
+            ...(out.dataMapLint?.hints.length ? { data_map_hints: out.dataMapLint.hints } : {}),
             spec_check: out.specCheck,
             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
             ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),
