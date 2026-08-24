@@ -55,6 +55,34 @@ When editing that prompt or any app-building guidance, verify every API claim ag
 - user data, including translations and settings → `AIMEAT.data.get(key)`, never `getPublic('ext:...')`
 - extension actions → `export default async function(ctx, input) { ... }`
 
+### If several people share the app: draw the data map first
+
+A **group application** is one where several people work on the same thing, somebody owns it, a
+person may belong to more than one of them, and not everyone may do everything. The full guidance is
+in the node-served spec (`GET /v1/prompts/build-app`, section "If several people share it"), because
+that is what every builder fetches. Two things belong here as well, because they decide the work
+before any code is written.
+
+**The data map is a deliverable, and the owner approves it before the first `set()`.** Columns: what
+· where it lives · who owns it · who can read it · what happens when a member leaves · is it
+personal data. The last two are also exactly what a GDPR audit asks for, so this table is worth
+keeping rather than drawing once. Four homes, and one question picks between them — *whose question
+does this answer?*
+
+| Home | For | Owner |
+|---|---|---|
+| organism workspace, schema-locked record | the shared work, and the group's own settings | the organism |
+| owner memory | this person's view, and ONE pointer saying which group they are in | the person |
+| owner memory, `visibility: public` | what somebody not signed in must read (never people) | the person |
+| the extension's namespace | a rule enforced server-side with no human present | the extension |
+
+**Owner memory is the wrong default and it wins by being one line shorter.** Group data stored per
+person follows the PERSON between groups while staying invisible to their own TEAM — wrong in both
+directions at once. The CADENCE campaign work (2026-08-24) made that mistake four times in one
+feature: campaigns, pipeline stages, follow-up thresholds and the permission binding. Nothing had
+shipped, so it cost a rewrite instead of a migration. → appdev pitfalls
+`group-apps/group-data-in-owner-memory` and `group-apps/new-space-needs-a-heal-step`.
+
 ### Memory record shape, decided before the first `set()`
 
 An app that treats memory as a cell-per-fact burns the key budget and gains nothing. The measured
