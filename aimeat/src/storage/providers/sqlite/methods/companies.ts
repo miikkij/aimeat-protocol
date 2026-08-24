@@ -50,6 +50,7 @@ function where(query: CompanyQuery): { sql: string; params: unknown[] } {
   const clauses: string[] = ['1 = 1'];
   const params: unknown[] = [];
   if (query.ownerGhii) { clauses.push('ownerGhii = ?'); params.push(query.ownerGhii); }
+  if (query.organismId) { clauses.push('organismId = ?'); params.push(query.organismId); }
   if (query.status) { clauses.push('status = ?'); params.push(query.status); }
   return { sql: clauses.join(' AND '), params };
 }
