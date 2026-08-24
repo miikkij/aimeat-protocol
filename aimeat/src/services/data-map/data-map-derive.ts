@@ -77,25 +77,28 @@ const UNKNOWN_DELETION: DeletionAnswer = {
 const UNTIL_DELETED: RetentionAnswer = { kind: 'until-deleted' };
 
 /**
- * What deleting a memory family does, when the node is the only thing holding it.
+ * What deleting a memory family does.
+ *
+ * ALWAYS ANSWERABLE, and the app's own delete permission does not change the answer. The record sits
+ * in the owner's own store, so the owner's delete removes it whether or not the program was granted
+ * `memory:delete`; that permission says who can press the button, not what the button does. Reading
+ * it as "unknown" made a derived map report a missing deletion answer for every app that writes and
+ * cannot delete — 73 of 168 in production — which is a finding that fires on the ordinary case and
+ * teaches people to ignore findings.
  *
  * The tally is named in `survives` on purpose and on every such row. A permanent count of who has
  * touched a key is the point of that ledger, and a map that quietly left it out would be describing
  * a deletion that does not happen.
  */
-function memoryDeletion(canDelete: boolean): DeletionAnswer {
-  return canDelete
-    ? {
-      effect: 'gone',
-      says: 'Deleting removes the record. Nothing else here holds a copy of it.',
-      alsoRemoves: ['versions', 'history'],
-      survives: ['the count of who wrote to this key, and when'],
-    }
-    : {
-      effect: 'unknown',
-      says: '',
-      survives: ['the count of who wrote to this key, and when'],
-    };
+function memoryDeletion(appCanDelete: boolean): DeletionAnswer {
+  return {
+    effect: 'gone',
+    says: appCanDelete
+      ? 'Deleting removes the record. This app can do it itself, and so can you. Nothing else here holds a copy.'
+      : 'Deleting removes the record. This app cannot do it — you can. Nothing else here holds a copy.',
+    alsoRemoves: ['versions', 'history'],
+    survives: ['the count of who wrote to this key, and when'],
+  };
 }
 
 function grant(area: string, pattern: string, rights: ('read' | 'write')[]): EcoDataAreaGrant {

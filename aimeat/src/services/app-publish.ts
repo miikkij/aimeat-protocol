@@ -39,6 +39,11 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.3.0 — 2026-08-24 — The data map (TARGET-073): the node drafts where this app puts what
+ *     from the permissions it asks for and the document its owner wrote, stamps the SUMMARY on the
+ *     manifest beside `aiPosture`, and WARNS rather than refusing. Refusing would break the next
+ *     publish of all 169 apps already on the node, and a map is a statement about storage rather
+ *     than a property of the bytes.
  *   v1.2.0 — 2026-08-11 — Three additions, all on the shared path so no door can miss them: the
  *     ARTIFACT CHECK (services/app-artifact-lint.ts) refuses a publish whose inline script does not
  *     parse or whose asset URL this node answers 404 for — the first thing here that blocks, because
@@ -64,6 +69,10 @@ import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
 import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
+import { parseAppScopes } from './protected-resource.js';
+import { parseDataMapMeta } from './data-map/data-map-meta.js';
+import { collectAppDerivationInput, deriveAndStamp, stampFor } from './data-map/data-map-store.js';
+import { lintDataMap, type DataMapLintResult } from './data-map/data-map-lint.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { ensureAppSubdomain } from '../routes/subdomains.js';
@@ -149,6 +158,8 @@ export interface PublishAppResult {
   mobileHints: string[];
   /** The AI transparency check, or null for a non-HTML bundle. */
   aiLint: AppAiLintResult | null;
+  /** Where this app puts what, and what the check made of it. Null for a non-HTML bundle. */
+  dataMapLint: DataMapLintResult | null;
   aiProvenanceId?: string;
   /** Did the publisher carry the current build spec? Warns; never refuses. */
   specCheck: AppSpecCheck;
@@ -269,6 +280,33 @@ export async function publishApp(
   // publish that gets worked around, and the app then ships with less transparency, not more.
   const aiLint = isHtml ? lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture) : null;
   if (aiLint) manifest.aiPosture = aiLint.posture;
+
+  // WHERE THIS APP PUTS WHAT, on the same terms as the posture above: the node drafts it from the
+  // permissions the app asks for and the document the owner has written, stamps the SUMMARY on the
+  // manifest, and warns rather than refusing (decision, 2026-08-24). Refusing here would break the
+  // next publish of all 169 apps in production, and a map is a statement about storage rather than a
+  // property of the bytes — the one blocking check on this path refuses things that are broken, not
+  // things that are unfinished.
+  let dataMapLint: DataMapLintResult | null = null;
+  if (isHtml) {
+    const html = data.toString('utf8');
+    const declaredMeta = parseDataMapMeta(html);
+    const at = new Date().toISOString();
+    const derivationInput = await collectAppDerivationInput(
+      storage, config,
+      { ownerName, filename, html, scopes: parseAppScopes(html), usesCortex: manifest.usesCortex },
+      at, declaredMeta,
+    );
+    const { map } = deriveAndStamp(derivationInput);
+    dataMapLint = lintDataMap({
+      map,
+      scopes: parseAppScopes(html),
+      programId: filename.replace(/\.html$/i, ''),
+      at,
+      declaresNothing: !declaredMeta && !derivationInput.declaredDoc,
+    });
+    manifest.dataMap = stampFor(dataMapLint.map, filename.replace(/\.html$/i, ''));
+  }
 
   // The spec state of THIS publish, kept where the owner can still find it later. Deliberately not
   // carried forward: a clean publish clears it, so the field answers "how was this version put
@@ -425,6 +463,7 @@ export async function publishApp(
     forkable,
     downloadUrl,
     mobileHints: isHtml ? lintAppHtmlForMobile(data.toString('utf8')) : [],
+    dataMapLint,
     aiLint,
     ...(aiProvenanceId ? { aiProvenanceId } : {}),
     specCheck,

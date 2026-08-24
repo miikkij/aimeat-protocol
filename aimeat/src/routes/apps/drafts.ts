@@ -6,6 +6,8 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.5.0 — 2026-08-24 — The draft-publish response carries `data_map` / `data_map_hints` too, so
+ *     the third publish door says the same thing as the other two.
  *   v2.4.0 — 2026-08-16 — Four routes for incremental editing: .../draft/write appends a piece,
  *     .../draft/replace does an exact old to new, .../draft/lines returns a bounded range, and
  *     .../draft/seed copies a published version back into the slot. PUT .../draft takes the WHOLE
@@ -449,6 +451,8 @@ export function registerDraftRoutes(
             ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+            ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),
+            ...(out.dataMapLint?.hints.length ? { data_map_hints: out.dataMapLint.hints } : {}),
             spec_check: out.specCheck,
             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
             ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),

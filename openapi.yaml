@@ -2749,6 +2749,51 @@ components:
             message: { type: string, description: Written for the model that built the app — it names the exact calls to add. }
             at: { type: string, format: date-time }
 
+    DataMapStamp:
+      type: object
+      description: >
+        The SUMMARY of where a published program puts what (TARGET-073) — how many rows, on how weak
+        a basis, and how much of it nobody has explained. Stored on the app manifest for the same
+        reason the AI posture is. The map ITSELF, with a sentence per row saying why the data is
+        there and what deleting it means, is a public memory record at the address in `docKey`.
+
+        The rows are public: where an app puts data is the promise it makes to whoever installs it,
+        and an agent deciding whether to use it needs that before it touches anything. The `gap`
+        member is OWNER-ONLY and is stripped from every response served to anyone else.
+      properties:
+        spec: { type: string, example: aimeat.datamap/1 }
+        form:
+          type: string
+          enum: [single-person, private, shared, group, organism-workspace, mixed]
+          description: The shape of the program, which decides what its map has to contain.
+        source:
+          type: string
+          enum: [declared, derived, mixed]
+          description: >
+            `declared` — somebody wrote this. `derived` — the node worked it out from the permissions
+            the app asks for and nobody has confirmed it. The difference is the whole point: a
+            derived map is a draft, and it never presents itself as the owner's statement.
+        heldRows: { type: integer, description: Rows describing what this node holds. }
+        elsewhereRows: { type: integer, description: "Rows for what is unresolved, or is somebody else's." }
+        weakestTier:
+          type: string
+          enum: [schema-locked, declared-space, platform-prefix, owner-named, none]
+          description: The weakest basis anywhere in the map — what a reader should trust the whole of it to.
+        rowsWithoutWhy: { type: integer, description: Rows that say where data goes and not why it goes there. }
+        docKey: { type: string, example: apps.cadence.datamap, description: Where the full map lives. }
+        at: { type: string, format: date-time }
+        gap:
+          type: object
+          nullable: true
+          description: >
+            OWNER-ONLY. The publish check's finding. The publish WARNS and proceeds; it NEVER blocks —
+            a map is a statement about storage rather than a property of the bytes, and a gate that
+            refused would break the next publish of every app already on the node.
+          properties:
+            code: { type: string, example: DATAMAP_MISSING }
+            message: { type: string }
+            at: { type: string, format: date-time }
+
     AppSpecCheck:
       type: object
       description: >-
@@ -2812,6 +2857,10 @@ components:
           allOf: [{ $ref: '#/components/schemas/AppAiPosture' }]
           nullable: true
           description: The app's AI transparency posture, or null when it has none. The `gap` member appears only for the app's own owner.
+        data_map:
+          allOf: [{ $ref: '#/components/schemas/DataMapStamp' }]
+          nullable: true
+          description: Where this app puts what, or null when it has no map. The `gap` member appears only for the app's own owner.
 
     # === Package & Template Schemas ===
     PackageComponent:
@@ -19077,6 +19126,12 @@ paths:
             worded for the model that built the app, so the fix happens in the same session. The
             publish NEVER fails on a transparency finding.
 
+            `data.data_map` says where this app puts what, and `data.data_map_hints` carries the
+            non-blocking findings about it. An app that declares nothing still gets a map — the node
+            drafts one from the permissions the app asks for and marks it `derived`, because an
+            absent map and an empty one read alike to a person and only one of them is a finding. The
+            publish NEVER fails on a data-map finding either.
+
             `data.spec_check` says whether the publisher carried the current build spec, and
             `data.app_hints` carries non-blocking artifact findings (theme tokens, the head
             declarations, unscoped reads of agent-written data), each with the id of the curated
@@ -19101,6 +19156,16 @@ paths:
                               ai_hints:
                                 type: array
                                 description: Non-blocking AI-transparency findings. Never a reason to reject a publish.
+                                items: { type: string }
+                              data_map:
+                                allOf: [{ $ref: '#/components/schemas/DataMapStamp' }]
+                                nullable: true
+                                description: Where this app puts what, as the node now believes it.
+                              data_map_hints:
+                                type: array
+                                description: >
+                                  Non-blocking data-map findings, worded for the model that built the app —
+                                  each names the exact line to paste. Never a reason to reject a publish.
                                 items: { type: string }
                               spec_check:
                                 $ref: '#/components/schemas/AppSpecCheck'
@@ -20448,6 +20513,13 @@ paths:
                           ai_hints:
                             type: array
                             description: Non-blocking AI-transparency findings. Never a reason to reject a publish.
+                            items: { type: string }
+                          data_map:
+                            allOf: [{ $ref: '#/components/schemas/DataMapStamp' }]
+                            nullable: true
+                          data_map_hints:
+                            type: array
+                            description: Non-blocking data-map findings. Never a reason to reject a publish.
                             items: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft to publish }

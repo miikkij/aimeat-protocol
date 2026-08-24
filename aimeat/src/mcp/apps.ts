@@ -11,6 +11,8 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.14.0 — 2026-08-24 — Both publish tools return `data_map` / `data_map_hints`, so an agent
+ *     publishing an app is told where the node believes that app puts things.
  *   v1.13.0 — 2026-08-11 — August 2026 audit step 8: the draft save, the draft promotion and the
  *     delete go through services/app-lifecycle.ts, the same functions the HTTP routes call. Three
  *     divergences went with the duplication. The delete removed ONE bucket and left the app's
@@ -274,6 +276,8 @@ export function registerAppsTools(
                             ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
                             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
                             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+                            ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),
+                            ...(out.dataMapLint?.hints.length ? { data_map_hints: out.dataMapLint.hints } : {}),
                             ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
                             spec_check: out.specCheck,
                             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
@@ -398,6 +402,8 @@ export function registerAppsTools(
                             note: 'Draft published as the new live version; the draft slot is cleared.',
                             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
                             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+                            ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),
+                            ...(out.dataMapLint?.hints.length ? { data_map_hints: out.dataMapLint.hints } : {}),
                             ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
                             spec_check: out.specCheck,
                             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
