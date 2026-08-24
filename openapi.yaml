@@ -47196,6 +47196,19 @@ paths:
                 invoice_id: { type: string }
                 reply_to: { type: string, format: email }
                 from_name: { type: string, maxLength: 140 }
+                company_id: { type: string, maxLength: 80, description: 'Send AS this registered company: with its own SMTP identity the mail leaves through ITS server, from ITS domain, and the send log records which company spoke.' }
+                links:
+                  type: array
+                  maxItems: 10
+                  description: 'Buttons the message carries, as DATA rather than markup. The body is escaped on its way into the layout so no caller can put an anchor or an image into a message this node sends in its owner''s name; naming the label and the address separately keeps links possible without giving that up. Only http(s) addresses survive.'
+                  items:
+                    type: object
+                    required: [label, url]
+                    properties:
+                      label: { type: string, maxLength: 120 }
+                      url: { type: string, format: uri, maxLength: 600 }
+                signal_stream_id: { type: string, maxLength: 64, description: 'Count opens of this message into this signal stream. The stream must already exist AND belong to the sender: a stream id is a public string, so an unverified one would let an account write counts into another''s report. Ignored when it names a stream the sender does not own.' }
+                signal_subject: { type: string, maxLength: 64, description: 'The sender''s own opaque token for this recipient. Never an address and never a name: the node counts per token and never learns who it stands for, which is what keeps "who opened it" answerable by the sender alone.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
