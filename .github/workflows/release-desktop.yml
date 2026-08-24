@@ -14,11 +14,13 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write # create the GitHub Release and upload installer assets
+  contents: read
 
 jobs:
   build-windows:
     runs-on: windows-latest
+    permissions:
+      contents: write # create the GitHub Release and upload installer assets
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

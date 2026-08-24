@@ -17,11 +17,13 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read          # checkout
+      security-events: write  # upload the analysis to code scanning
     strategy:
       fail-fast: false
       matrix:
@@ -32,10 +34,13 @@ jobs:
       - uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           languages: ${{ matrix.language }}
-          # security-extended adds the lower-severity precision-2 queries on top of the default
-          # code-scanning suite. The volume that once made this a triage burden is now carried by
-          # the AI-triage pass in security/semantic-audit, so the extra coverage is worth taking.
-          queries: security-extended
+          # Default query suite, deliberately. security-extended was tried on 2026-08-24 and added
+          # ~197 findings on this codebase — almost all from its low-precision audit queries
+          # (log-injection, user-controlled-bypass, remote-property-injection, http-to-file-access),
+          # which are noise here and buried the handful the tab exists to show. The default suite is
+          # GitHub's high-confidence set; it is what surfaced the five real findings we fixed. Depth,
+          # when wanted, belongs in a periodic security-extended run fed to the AI-triage pass, not on
+          # the always-on tab.
           config: |
             paths-ignore:
               - 'aimeat/test/**'
