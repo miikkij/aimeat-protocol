@@ -48,6 +48,15 @@ const SendSchema = z.object({
   from_name: z.string().max(140).optional(),
   /** Send as this company: its own SMTP identity is used when it has one. */
   company_id: z.string().max(80).optional(),
+  /** Buttons, as data. The server builds the anchors; see SendInput.links for why. */
+  links: z.array(z.object({
+    label: z.string().max(120),
+    url: z.string().url().max(600),
+  })).max(10).optional(),
+  /** Count opens of this message into a signal stream the sender owns. */
+  signal_stream_id: z.string().max(64).optional(),
+  /** The sender's own opaque token for this recipient. Never an address, never a name. */
+  signal_subject: z.string().max(64).optional(),
 }).strict();
 
 /**
@@ -180,6 +189,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         templateId: b.template_id, variables: b.variables,
         invoiceId: b.invoice_id, replyTo: b.reply_to, fromName: b.from_name,
         companyId: b.company_id,
+        links: b.links, signalStreamId: b.signal_stream_id, signalSubject: b.signal_subject,
       });
       res.json(success(config.nodeId, {
         message: result.log, channel: result.channel, status: result.status,

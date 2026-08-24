@@ -169,6 +169,8 @@ tags:
     description: The company registry — a company is a first-class entity like an app, and registering one claims {slug}.co.<apex> as its address
   - name: Outbound
     description: The outbound messaging door — saved recipient registry, policied send (inbox-first, opt-out, bounce suppression, daily limit), append-only send log, public unsubscribe
+  - name: Signals
+    description: Hit collection — one generic counter behind every channel (email opens and clicks, published page fetches, QR scans, an app's own events), a monthly roll-up per stream, and a report that separates people from machines and names the AI that came
   - name: Finance
     description: Company-in-a-box bookkeeping — sales invoices (Finvoice 3.0), append-only vouchers, VAT registry/report, fiscal years, accountant exports, and PSP webhooks that book vouchers
   - name: Notifications
@@ -47194,6 +47196,19 @@ paths:
                 invoice_id: { type: string }
                 reply_to: { type: string, format: email }
                 from_name: { type: string, maxLength: 140 }
+                company_id: { type: string, maxLength: 80, description: 'Send AS this registered company: with its own SMTP identity the mail leaves through ITS server, from ITS domain, and the send log records which company spoke.' }
+                links:
+                  type: array
+                  maxItems: 10
+                  description: 'Buttons the message carries, as DATA rather than markup. The body is escaped on its way into the layout so no caller can put an anchor or an image into a message this node sends in its owner''s name; naming the label and the address separately keeps links possible without giving that up. Only http(s) addresses survive.'
+                  items:
+                    type: object
+                    required: [label, url]
+                    properties:
+                      label: { type: string, maxLength: 120 }
+                      url: { type: string, format: uri, maxLength: 600 }
+                signal_stream_id: { type: string, maxLength: 64, description: 'Count opens of this message into this signal stream. The stream must already exist AND belong to the sender: a stream id is a public string, so an unverified one would let an account write counts into another''s report. Ignored when it names a stream the sender does not own.' }
+                signal_subject: { type: string, maxLength: 64, description: 'The sender''s own opaque token for this recipient. Never an address and never a name: the node counts per token and never learns who it stands for, which is what keeps "who opened it" answerable by the sender alone.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -47230,6 +47245,115 @@ paths:
       responses:
         '200': { description: Confirmation page (text/html) }
         '400': { description: Malformed link }
+
+  /v1/signals/streams:
+    post:
+      operationId: saveSignalStream
+      tags: [Signals]
+      summary: Define (or update) what is measured
+      description: 'Creates a signal stream and returns the two PUBLIC addresses that count for it: a tracking image and a JSON hit. A stream is the unit of measurement (a campaign, a page, a channel) and holds no destination URL — the node counts and never forwards. Requires scope signals:write. Refused with 409 TOO_MANY_STREAMS past the per-owner ceiling.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stream_id]
+              properties:
+                stream_id: { type: string, description: 'Slug of [a-z0-9-], 2-64 characters. It is a public address, so it stays predictable.' }
+                label: { type: string, maxLength: 200 }
+                channel: { type: string, enum: [email, social, page, qr, app, other] }
+                per_subject: { type: boolean, description: 'Roll up per opaque recipient token so "who opened this" is answerable. False keeps totals and forgets who.' }
+                group: { type: string, maxLength: 80, nullable: true }
+                enabled: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    get:
+      operationId: listSignalStreams
+      tags: [Signals]
+      summary: List this owner's streams and their public addresses
+      description: 'Requires scope signals:read.'
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/signals/streams/{streamId}:
+    delete:
+      operationId: deleteSignalStream
+      tags: [Signals]
+      summary: Delete a stream and everything it collected
+      description: 'The public addresses stop counting immediately. Requires scope signals:write.'
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: streamId, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/signals/streams/{streamId}/report:
+    get:
+      operationId: readSignalReport
+      tags: [Signals]
+      summary: What this stream collected
+      description: 'Totals by event, channel and visitor class, per-day counts, and the named AI fetchers seen (a name ending in ":asked" means a person asked an AI something and it fetched this to answer). The payload carries a `reading` block saying what each number is worth, because an open count is an estimate and a click is an act. `subjects=true` adds the per-recipient roll-up. Requires scope signals:read.'
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: streamId, in: path, required: true, schema: { type: string } }
+        - { name: from, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: 'First month, YYYY-MM. Defaults to the current month.' }
+        - { name: to, in: query, required: false, schema: { type: string, pattern: '^\d{4}-\d{2}$' }, description: 'Last month, YYYY-MM.' }
+        - { name: subjects, in: query, required: false, schema: { type: string, enum: ['true'] } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/signals/{owner}/{streamId}/px.svg:
+    get:
+      operationId: signalPixel
+      tags: [Signals]
+      summary: Tracking image (PUBLIC, no auth)
+      description: 'Counts a hit and answers a 1x1 transparent SVG that no cache may keep. An unknown stream, a disabled one and a stream over its daily cap all answer the SAME bytes, so the address never discloses which campaigns exist. No IP address is stored. `s` is an opaque token the SENDER minted: the node counts per token and never learns the person behind it.'
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'The account name the stream belongs to.' }
+        - { name: streamId, in: path, required: true, schema: { type: string } }
+        - { name: s, in: query, required: false, schema: { type: string, maxLength: 64 }, description: 'Opaque subject token.' }
+        - { name: e, in: query, required: false, schema: { type: string, enum: [open, click, view, scan, custom] } }
+        - { name: c, in: query, required: false, schema: { type: string, enum: [email, social, page, qr, app, other] } }
+        - { name: r, in: query, required: false, schema: { type: string, maxLength: 64 }, description: 'Which link or item inside the stream.' }
+      responses:
+        '200': { description: 'A 1x1 transparent SVG (image/svg+xml), never cached.' }
+
+  /v1/signals/{owner}/{streamId}/hit:
+    post:
+      operationId: signalHit
+      tags: [Signals]
+      summary: Count a hit (PUBLIC, no auth)
+      description: 'What a script can send: a click-through page, an app event, a QR landing. Answers `counted` and nothing else — an unknown stream, a disabled one and one over its cap are indistinguishable in the response. No IP address is stored.'
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: streamId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: { type: string, enum: [open, click, view, scan, custom] }
+                channel: { type: string, enum: [email, social, page, qr, app, other] }
+                subject: { type: string, maxLength: 64, nullable: true }
+                ref: { type: string, maxLength: 64, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
 
   /v1/finance/invoices/{id}/deliver-finvoice:
     post:

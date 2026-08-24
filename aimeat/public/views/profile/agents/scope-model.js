@@ -140,6 +140,9 @@ export const SCOPE_DOMAINS = [
   // so an owner could neither grant nor revoke them here while an agent used them daily.
   { key: 'finance',   permissions: ['read', 'write'] },
   { key: 'outbound',  permissions: ['send'] },
+  // signals:read is the half that names people: it answers "who opened this, and when". Kept
+  // apart from write so an agent can run a campaign's counters without being handed the readers.
+  { key: 'signals',   permissions: ['read', 'write'] },
   { key: 'company',   permissions: ['read', 'write'] },
   { key: 'connections', permissions: ['read', 'write', 'use'] },
   { key: 'notifications', permissions: ['send'] },

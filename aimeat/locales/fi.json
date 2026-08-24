@@ -585,7 +585,8 @@
       "exchange": "kauppapaikka",
       "finance": "kirjanpitosi",
       "outbound": "sähköposti yhteystiedoillesi",
-      "company": "yrityksesi"
+      "company": "yrityksesi",
+      "signals": "viestiesi ja sivujesi tavoittavuus"
     },
     "scopeText": {
       "task": {
@@ -6382,6 +6383,10 @@
           "compliance": {
             "read": "Lukea vaatimustenmukaisuusraportin: jokaisen tilin tekoälytoiminta täällä yhtenä asiakirjana, mukaan lukien kenen agentit julkaisivat ilman merkintää. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. \"Täydet oikeudet\" ei sisällä sitä.",
             "write": "Muuttaa sitä, mitä vaatimustenmukaisuusraportti kertoo tapahtuvan: listaa siitä mihin tekoälyä käytetään, ja kysymyksiä jotka ratkaisevat kunkin riskiluokan. Toimii vain sille, joka pyörittää tätä asennusta. Lukeminen ja muuttaminen ovat eri lupia, eikä \"Täydet oikeudet\" sisällä kumpaakaan."
+          },
+          "signals": {
+            "read": "Näe kuka avasi, klikkasi tai kävi lukemassa sen mitä lähetit tai julkaisit.",
+            "write": "Luo laskurit kampanjoille, linkeille ja sivuille joiden tavoittavuutta seuraat."
           }
         },
         "domainAi": "Tekoäly",
@@ -6402,7 +6407,8 @@
         "domainOperator": "Tämän noden ylläpito",
         "permInvoke": "Aja",
         "domainPackages": "Paketit",
-        "domainCompliance": "Vaatimustenmukaisuus"
+        "domainCompliance": "Vaatimustenmukaisuus",
+        "domainSignals": "Tavoittavuus"
       },
       "deviceAuth": {
         "title": "Laitehyväksyntä",
