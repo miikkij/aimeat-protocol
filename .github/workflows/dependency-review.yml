@@ -1,0 +1,40 @@
+# Dependency review: on every PR, diff the dependency manifests and FAIL the PR if it introduces a
+# dependency that carries a known vulnerability or a copyleft licence the project cannot ship under.
+#
+# This mechanises the dependency-management guideline ("Licenses (GPL/AGPL need approval)"). AIMEAT
+# is MIT top to bottom, and an AGPL dependency reaching a HOSTED node (aimeat.io) would trigger a
+# whole-platform source-disclosure obligation — so a GPL/AGPL dep must be a deliberate, approved
+# decision, not something that slips in with a lockfile bump. LGPL is intentionally NOT denied: it is
+# weak copyleft that a dynamically-linked MIT product carries fine, and denying it would block common
+# libraries the policy never meant to.
+#
+# Needs the repository dependency graph (turned on with Dependabot alerts). Free on this public repo.
+
+name: Dependency review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write # for the summary comment on a failing PR
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # A serious known vulnerability in a newly-added dependency stops the PR; lower severities
+          # surface in the summary without blocking, matching the advisory-first stance of the other
+          # scanners while still refusing the ones that matter.
+          fail-on-severity: high
+          # The copyleft licences that would reach the whole platform. SPDX ids, both -only and
+          # -or-later, so a manifest expressed either way is caught.
+          deny-licenses: >-
+            GPL-2.0-only, GPL-2.0-or-later, GPL-3.0-only, GPL-3.0-or-later,
+            AGPL-3.0-only, AGPL-3.0-or-later
+          comment-summary-in-pr: on-failure

@@ -25,9 +25,9 @@ jobs:
   ast-grep:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
@@ -42,7 +42,7 @@ jobs:
         run: node security/semantic-audit/normalize-sarif.mjs semantic-audit.sarif
 
       - name: Upload results to code scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: semantic-audit.sarif
           category: semantic-audit
@@ -53,9 +53,9 @@ jobs:
   semgrep-taint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
 
@@ -69,7 +69,7 @@ jobs:
           --sarif --output semgrep-taint.sarif aimeat/src
 
       - name: Upload results to code scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: semgrep-taint.sarif
           category: semgrep-taint
@@ -79,11 +79,11 @@ jobs:
   audit-gates:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
           cache: pnpm
@@ -99,7 +99,7 @@ jobs:
         run: node ../security/semantic-audit/checks-to-sarif.mjs audit-gates.sarif
 
       - name: Upload results to code scanning
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           sarif_file: aimeat/audit-gates.sarif
           category: audit-gates

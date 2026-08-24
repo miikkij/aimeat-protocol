@@ -27,11 +27,15 @@ jobs:
       matrix:
         language: [javascript-typescript, python, actions]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           languages: ${{ matrix.language }}
+          # security-extended adds the lower-severity precision-2 queries on top of the default
+          # code-scanning suite. The volume that once made this a triage burden is now carried by
+          # the AI-triage pass in security/semantic-audit, so the extra coverage is worth taking.
+          queries: security-extended
           config: |
             paths-ignore:
               - 'aimeat/test/**'
@@ -48,6 +52,6 @@ jobs:
               - exclude:
                   id: js/missing-rate-limiting
 
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@42947a340483f03ba47bb1a039b2c519aab3df85 # v3
         with:
           category: codeql/${{ matrix.language }}
