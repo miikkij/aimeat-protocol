@@ -48,6 +48,17 @@ export class SignalError extends Error {
 
 const nowIso = (): string => new Date().toISOString();
 
+/**
+ * Bumped whenever any stream is created, changed or deleted.
+ *
+ * The page-view counter keeps a short negative cache so serving an app that nobody measures costs
+ * no database read, and this is what stops that cache from outliving the owner's decision: turning
+ * measurement on took effect a minute later without it, which the first page-view test caught by
+ * counting zero. A version number rather than a callback, so nothing has to import backwards.
+ */
+let streamsVersion = 0;
+export const streamsRevision = (): number => streamsVersion;
+
 /** Bump `obj[key]` by one, treating an absent key as zero. */
 function bump<K extends string>(obj: Partial<Record<K, number>>, key: K): void {
   obj[key] = (obj[key] ?? 0) + 1;
@@ -129,6 +140,7 @@ export async function saveStream(
     visibility: 'owner', tags: ['signal-stream'], ttlHours: null,
     version: (existing?.version ?? 0) + 1, createdAt: cfg.createdAt, updatedAt: now,
   } as MemoryRecord);
+  streamsVersion++;
   return cfg;
 }
 
@@ -144,6 +156,7 @@ export async function deleteStream(
     if (await storage.deleteMemory(ownerGhii, row.key)) monthsRemoved++;
   }
   const deleted = existing ? await storage.deleteMemory(ownerGhii, streamKey(streamId)) : false;
+  streamsVersion++;
   return { deleted, monthsRemoved };
 }
 
