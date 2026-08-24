@@ -228,8 +228,46 @@ function composeAppPrompt(
   body += '```\n';
   body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n';
   body += 'A key is a plain string: `get(key)` / `getPublic(gaii, key)` always return the LATEST value — never append a version, index or `:0`/`:N` suffix to a key, and read back the SAME key you wrote (a store-as-`x` / read-as-`x:0` mismatch just 404s and your UI shows nothing). To page a large list, store it as ONE array under one key (or shard with your OWN explicit id scheme), not a magic version suffix.\n';
-  body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) or organism workspaces as an app\'s data layer. When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n';
+  body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) as an app\'s data layer, and do not use an organism workspace for a PERSONAL app\'s data. **A group application is the exception and the workspace is exactly where its data belongs — see the group section below before you choose.** When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n';
   body += 'If you RENDER content an agent wrote, read it with `getPublicEntry(gaii, key)` instead: it returns the same entry plus `provenance` — how that content was made, including the model and the `sources` the writer declared. `getPublic()` returns the bare value and cannot carry it. Showing agent-written text with no origin, when the node is holding the record that explains it, is the gap the label is meant to close.\n\n';
+
+  // A GROUP app is a different shape and the rules above are not enough for it. Added 2026-08-24
+  // after the CADENCE campaign work, where four separate defects were the same defect: data put in
+  // the easiest place to reach rather than the place it belongs. Campaigns and pipeline settings
+  // went into one person's own memory, so they followed that person between two CRMs AND were
+  // invisible to their own team — wrong in both directions at once. Every one was cheap only
+  // because nothing had shipped.
+  body += '### If several people share it: a GROUP application\n';
+  body += 'A group app is one where several people work on the SAME thing, somebody owns it, a person may belong to more than one of them, and not everyone may do everything. A CRM, a project space, a shift roster, a shared inventory. It is a different shape from a personal app, and the single biggest source of defects in one is **putting data where it was easiest to reach rather than where it belongs**.\n';
+  body += '\n';
+  body += '**Draw the DATA MAP first, and get the person to approve it before you write a line.** Not documentation — a decision. Every row you get wrong is a rewrite if you are lucky and a migration if you are not, and this same table is what an auditor asks for under GDPR: who is the controller of each thing, who can read it, and what happens to it when somebody leaves.\n';
+  body += '\n';
+  body += '| What | Where it lives | Who owns it | Who can read it | When a member leaves | Personal data? |\n';
+  body += '|---|---|---|---|---|---|\n';
+  body += '| the shared records | organism workspace, `records` space, locked schema | the organism | its members | keeps it; access ends with membership | usually yes |\n';
+  body += '| long text nobody lists | workspace, a SECOND record under the same id | the organism | its members | as above | usually yes |\n';
+  body += '| the group\'s settings | workspace, one `config` record | the organism | its members | keeps it | no |\n';
+  body += '| this person\'s own view | owner memory (`myapp.ui`) | the person | only them | goes with them | no |\n';
+  body += '| which group they are in | owner memory, ONE pointer key | the person | only them | goes with them | no |\n';
+  body += '| something a stranger must read | owner memory, `visibility: public` | the person | anyone | stays public | it must not be |\n';
+  body += '| a rule enforced server-side | the extension\'s own namespace | the extension | whoever it decides | unaffected | avoid |\n';
+  body += '\n';
+  body += '**The question that picks the home, asked of every single thing the app stores:** *whose question does this answer?* If the colleague who takes this over tomorrow needs it, it belongs to the group. If it is one person\'s view of the group\'s work, it is theirs. If somebody who is not signed in has to read it, it is a public record and it had better contain no people. If a sandboxed job has to read it without a human present, it is the extension\'s.\n';
+  body += '\n';
+  body += '**Owner memory is the wrong default here, and it is the default because it is the easiest thing to call.** `AIMEAT.data.set()` is one line and a workspace record is three, so the app fills up with group data stored per person. That is not merely untidy: it makes the data follow the PERSON between groups while staying invisible to their own TEAM. Two members of the same group end up looking at the same work through different settings, and neither can see the other.\n';
+  body += '\n';
+  body += '**Assume from day one that a person belongs to more than one.** The moment a second group exists, everything you left in owner memory bleeds between them. Ship the switcher with the app rather than after it, keep exactly ONE owner-level key — the pointer saying which group they are in — and put the group\'s NAME somewhere permanently visible. Somebody who has just switched must never have to guess whose data is on the screen; that is worse than not being able to switch at all.\n';
+  body += '\n';
+  body += '**Declaring a space only helps workspaces created afterwards.** Adding an objectType to your manifest does nothing for the workspaces that already exist, and a write to a space an older manifest does not declare goes nowhere — silently. Ship a heal step that reads the manifest on load, adds what is missing (`PUT /v1/organisms/:id/workspace` with `add_object_types` + `schemas`) and is a no-op afterwards. It is creator/admin only, so let a plain member\'s attempt fail quietly.\n';
+  body += '\n';
+  body += '**If you move data between homes, carry it over ONCE, and only when the copy actually landed.** Stamp the old record when the new one is written; without the stamp the migration copies the first group\'s data into every group the person visits, which is the bleed you were fixing. And never stamp before checking the write succeeded — that turns a failed migration into permanent data loss. Copy rather than delete, so somebody moving between an updated and a not-yet-updated surface keeps working.\n';
+  body += '\n';
+  body += '**Permissions come in two layers and they answer different questions.** The PLATFORM decides whether this group may touch the thing at all (organism membership, scopes, ownership) and enforces it at the door. Your app decides which member does what — draft, send, approve, read the numbers — and `aimeat-iam` is the ready-made way to hold that. Do not confuse them in the UI: if the underlying action is a node route the user can call directly, your layer is process control between colleagues and not a lock. Say so on the screen. A permission somebody believes in and does not have is worse than no permission at all.\n';
+  body += '\n';
+  body += '**A consent list keys on the thing it protects, not on the actor.** Unsubscribes, do-not-contact flags, approvals: if two members of one group keep their own copies, a person who opted out of one member\'s message is contacted by the next, and both believe they honoured it. Key it to the group, the company or the account the promise was made to.\n';
+  body += '\n';
+  body += '**"Who may act as X" is a different question from "who owns X".** A mail identity, a payment account, a published address: one person registers it and the group uses it. Bind it to the group (the organism), check membership at the moment of use rather than storing an approval, and let removal from the group end the ability with the next request.\n';
+  body += '\n';
 
   // Reading what the owner's AGENTS produced. This is the single most common "my app shows
   // nothing" cause for fleet-facing apps: agent output is NOT in the owner's namespace, and an
