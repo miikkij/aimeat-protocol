@@ -126,7 +126,7 @@ export const appsMethods = {
   async updateAppMeta(this: SqliteStorage,
     ownerGaii: string,
     filename: string,
-    meta: { name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection; cortex?: AppManifestCortex | null },
+    meta: { name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection; cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap'] },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
     // shows). Read the current manifest, merge only the supplied fields, write
@@ -141,6 +141,7 @@ export const appsMethods = {
     if (meta.description !== undefined) manifest.description = meta.description;
     if (meta.descriptions !== undefined) manifest.descriptions = meta.descriptions;
     if (meta.protection !== undefined) manifest.protection = meta.protection;
+    if (meta.dataMap !== undefined) manifest.dataMap = meta.dataMap;
     // Agent-Bundled Apps: replace the crew-def section in place (null clears it).
     if (meta.cortex !== undefined) {
       if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;

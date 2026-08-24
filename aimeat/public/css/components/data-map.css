@@ -1,0 +1,233 @@
+/**
+ * @file public/css/components/data-map.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The data map panel. Every colour and space comes from theme.css; nothing here is a
+ *   literal except the grid template itself.
+ *
+ *   THE GRID IS FIXED, WITH NO `auto` COLUMN. A per-row grid carrying an auto column re-measures per
+ *   row and drifts out of line by the width of the longest family name, which is the exact failure
+ *   the alignment check looks for. `minmax()` everywhere, and the basis chip — the one column with a
+ *   background — is the asymmetric anchor that check measures.
+ *
+ *   The `derived` banner is full width, above the first row, at body size. It is the whole design
+ *   decision: on day one every map is a draft, and a corner badge would read as decoration.
+ * @version-history
+ *   v1.0.0 - 2026-08-24 - Initial creation for TARGET-073, the surfaces half.
+ */
+
+.dm-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--sp-4);
+  margin: var(--sp-4) 0;
+}
+
+.dm-title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--text-lg);
+  color: var(--text);
+}
+
+.dm-subtitle {
+  margin: var(--sp-4) 0 var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+/* ── The banner. Full width, in the reading path, body size. ───────────────────────────────── */
+.dm-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--sp-4);
+  font-size: var(--text-base);
+}
+
+.dm-banner-derived {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn);
+  color: var(--text);
+}
+
+.dm-banner-contradicted {
+  background: var(--danger-bg);
+  border: 1px solid var(--danger);
+  color: var(--text);
+}
+
+.dm-banner-text { flex: 1 1 22rem; }
+.dm-banner-actions { display: flex; gap: var(--sp-2); }
+
+/* ── Rows. One grid template, shared by the header and every row. ──────────────────────────── */
+.dm-rows { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.dm-head,
+.dm-row-head {
+  display: grid;
+  grid-template-columns:
+    minmax(8rem, 2fr)     /* what */
+    minmax(5rem, 0.7fr)   /* reads or writes */
+    minmax(14rem, 2.4fr)  /* how this is known */
+    minmax(5rem, 0.6fr);  /* about a person */
+  gap: var(--sp-3);
+  align-items: start;
+  width: 100%;
+  text-align: left;
+}
+
+.dm-head {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 0 var(--sp-2) var(--sp-2);
+}
+
+.dm-row {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: var(--sp-3) var(--sp-2);
+  background: var(--bg-card);
+}
+
+.dm-row-disagrees { border-color: var(--danger); }
+
+.dm-row-head {
+  background: none;
+  border: 0;
+  padding: 0 var(--sp-2);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.dm-row-head-static { cursor: default; }
+
+/* An "elsewhere" row is two facts and a sentence, not four columns. Reusing the held-row grid put a
+   sentence in a 5rem column and broke it across four lines. */
+.dm-elsewhere-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  align-items: baseline;
+  padding: 0 var(--sp-2);
+}
+
+.dm-elsewhere-status { font-size: var(--text-sm); color: var(--text-dim); }
+
+.dm-note { margin: var(--sp-3) 0 0; font-size: var(--text-sm); color: var(--text-muted); }
+
+.dm-family {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.dm-rights { font-size: var(--text-sm); color: var(--text-dim); }
+
+/* The asymmetric anchor: the only column with a background, and the only right-aligned one. */
+.dm-basis { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; text-align: right; }
+
+.dm-basis-chip {
+  display: inline-block;
+  padding: 2px var(--sp-2);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dim);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.dm-basis-unknown .dm-basis-chip { background: var(--danger-bg); color: var(--danger); }
+.dm-basis-locked .dm-basis-chip { background: var(--success-bg); color: var(--success); }
+
+/* Body text, never a tooltip: a chip on its own is a word nobody outside this repo knows. */
+.dm-basis-note { font-size: var(--text-xs); color: var(--text-muted); }
+
+.dm-personal { font-size: var(--text-sm); color: var(--text-dim); }
+.dm-personal-yes { color: var(--warn); }
+.dm-personal-unstated { color: var(--text-muted); font-style: italic; }
+
+.dm-why {
+  padding: var(--sp-2) var(--sp-2) 0;
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.dm-why-missing { color: var(--danger); }
+
+.dm-detail {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) 1fr;
+  gap: var(--sp-2) var(--sp-3);
+  margin: var(--sp-3) 0 0;
+  padding: var(--sp-3) var(--sp-2) 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.dm-detail dt { color: var(--text-muted); }
+.dm-detail dd { margin: 0; color: var(--text); overflow-wrap: anywhere; }
+
+.dm-survives { margin-top: 2px; color: var(--text-muted); font-size: var(--text-xs); }
+.dm-mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+
+.dm-finding {
+  padding: var(--sp-3);
+  border-radius: var(--radius-sm);
+  background: var(--danger-bg);
+  color: var(--text);
+  font-size: var(--text-sm);
+  margin-bottom: var(--sp-3);
+}
+
+.dm-finding-list { margin: var(--sp-2) 0 0; padding-left: var(--sp-4); }
+
+/* An empty map is a SENTENCE and a date. Never a table with no rows. */
+.dm-empty { margin: 0; color: var(--text-dim); font-size: var(--text-sm); }
+.dm-checked { color: var(--text-muted); }
+
+/* ── The one-line strip, for a card that must not open into a whole panel. ─────────────────── */
+.dm-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: baseline;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--text-dim);
+}
+
+.dm-strip-state { font-size: var(--text-xs); color: var(--text-muted); }
+.dm-strip-summary { font-size: var(--text-sm); }
+.dm-strip-derived { border-style: dashed; }
+.dm-strip-unfinished { border-color: var(--warn); }
+.dm-strip-gap { font-size: var(--text-xs); color: var(--warn); }
+.dm-strip-contradicted { border-color: var(--danger); }
+
+.dm-collapse { margin-top: var(--sp-3); }
+
+/* Phone: the grid becomes one column, and the basis stops being right-aligned against nothing. */
+@media (max-width: 640px) {
+  .dm-head { display: none; }
+
+  .dm-row-head {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .dm-basis { align-items: flex-start; text-align: left; }
+}
