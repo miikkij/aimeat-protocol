@@ -43,10 +43,17 @@ function readAll(dir: string): string {
         .join('\n');
 }
 
-/** Tables in the Postgres schema that carry an owner-scoped column. */
+/**
+ * Tables in the Postgres schema that carry an owner-scoped column.
+ *
+ * `IF NOT EXISTS` is optional in the pattern, and it has to be: without it this scan silently skipped
+ * every table written in that style, which on 2026-08-24 was four of them — GroupShare (0033),
+ * AgentUsageEventArchive (0036) and the two tally tables (0050). A gate that cannot see a table
+ * reports green about it, which is worse than reporting nothing, because green is read as checked.
+ */
 function ownerScopedTables(schema: string): Map<string, string[]> {
     const tables = new Map<string, string[]>();
-    const re = /CREATE TABLE "(\w+)" \(([\s\S]*?)\n\);/g;
+    const re = /CREATE TABLE (?:IF NOT EXISTS )?"(\w+)" \(([\s\S]*?)\n\);/g;
     let m: RegExpExecArray | null;
     while ((m = re.exec(schema))) {
         const [, table, body] = m;

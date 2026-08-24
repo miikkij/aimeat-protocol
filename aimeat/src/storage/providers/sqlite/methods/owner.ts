@@ -28,6 +28,7 @@ import type {
 } from '../../../interface.js';
 import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
+import { pseudonymiseWriter } from '../repos/memory-tally.js';
 import type { SqliteStorage } from '../index.js';
 import { searchTextMemory, countMemory as countMemoryRepo, sumMemoryBytes as sumMemoryBytesRepo, sumMemoryBytesForOwners as sumMemoryBytesForOwnersRepo, archivedSql, archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo, unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo } from '../repos/memory.js';
 
@@ -108,6 +109,13 @@ export const ownerMethods = {
       for (const row of ghiiRows) {
         this.cascadeDeleteAgentData(row.ghii);
       }
+
+      // What this person WROTE into somebody else's namespace is that other owner's record of who
+      // touched their data, so it is pseudonymised rather than deleted — removing it would silently
+      // turn their "four hands" into three. The node id comes from a GHII, so this runs while one is
+      // still readable.
+      const tallyNodeId = ghiiRows[0]?.ghii.split('@')[1] ?? '';
+      if (tallyNodeId) pseudonymiseWriter(this.db, name, tallyNodeId);
 
       // 4. Delete GHII records for this owner
       this.db.prepare('DELETE FROM ghiis WHERE ownerName = ?').run(name);

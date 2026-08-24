@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.3.0 — 2026-08-24 — The memory write tally: who has had their hands on a key, and how
+ *     often. Permanent, no prune. Mirrors Postgres 0050.
  *   v1.2.0 — 2026-08-17 — Account events: the per-owner "what has happened" window and its archive.
  *     Mirrors Postgres 0042.
  *   v1.1.0 — 2026-08-14 — Usage telemetry: the hot call stream, the two archive tables, the
@@ -442,6 +444,49 @@ export function applySchemaTables4(db: Database.Database): void {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_sso_connections_scim_hash
       ON sso_connections(scimTokenHash) WHERE scimTokenHash IS NOT NULL;
+
+    -- ── Memory write tally (TARGET-073) ──────────────────────────────────
+    -- Who has had their hands on a memory key, and how often. THERE IS NO PRUNE JOB, and that is
+    -- deliberate — every other rollup here keeps a window and this one keeps everything, because the
+    -- count IS the record: a key gets rewritten, the value changes, and how many hands were on it is
+    -- what nobody can reconstruct afterwards. A column on the memory row could not hold it (the next write
+    -- overwrites it, so it would only name the last writer) and the row has to outlive the key.
+    --
+    -- An upsert, not a log. Measured 2026-08-24 on this node's heaviest owner: 18,446 keys carrying
+    -- 990,452 lifetime writes, six of them over 10,800 each. Rows grow with distinct
+    -- (key, principal) pairs, never with write volume.
+    --
+    -- It starts EMPTY and fills as things are written. Nothing seeds it and nothing can: the writer
+    -- was never recorded, so there is no history to read back. Mirrors Postgres 0050.
+    CREATE TABLE IF NOT EXISTS memory_write_tally (
+      ownerGaii       TEXT    NOT NULL,
+      key             TEXT    NOT NULL,
+      writerPrincipal TEXT    NOT NULL,
+      writeCount      INTEGER NOT NULL DEFAULT 0,
+      deleteCount     INTEGER NOT NULL DEFAULT 0,
+      firstAt         TEXT    NOT NULL,
+      lastAt          TEXT    NOT NULL,
+      PRIMARY KEY (ownerGaii, key, writerPrincipal)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mwt_owner_key ON memory_write_tally(ownerGaii, key);
+    CREATE INDEX IF NOT EXISTS idx_mwt_writer ON memory_write_tally(writerPrincipal);
+
+    -- The same count folded to the key FAMILY, which is what a data-map row renders. The tier column is the
+    -- basis the family was identified on AT THE TIME OF WRITING, stored rather than recomputed so a
+    -- later improvement to the classifier cannot silently rewrite what was true a year ago.
+    CREATE TABLE IF NOT EXISTS memory_family_tally (
+      ownerGaii       TEXT    NOT NULL,
+      keyFamily       TEXT    NOT NULL,
+      writerPrincipal TEXT    NOT NULL,
+      tier            TEXT    NOT NULL DEFAULT '',
+      writeCount      INTEGER NOT NULL DEFAULT 0,
+      deleteCount     INTEGER NOT NULL DEFAULT 0,
+      firstAt         TEXT    NOT NULL,
+      lastAt          TEXT    NOT NULL,
+      PRIMARY KEY (ownerGaii, keyFamily, writerPrincipal)
+    );
+    CREATE INDEX IF NOT EXISTS idx_mft_owner_family ON memory_family_tally(ownerGaii, keyFamily);
+    CREATE INDEX IF NOT EXISTS idx_mft_writer ON memory_family_tally(writerPrincipal);
 
   `);
 }

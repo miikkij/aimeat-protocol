@@ -24,6 +24,13 @@ export const cascadeMethods = {
   cascadeDeleteAgentData(this: SqliteStorage, gaii: string): void {
     // Memory
     this.db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(gaii);
+    // The write tally for THIS namespace. A deleted username is released for reuse, so a surviving
+    // row would hand the next registrant somebody else's history. Rows where this identity was the
+    // WRITER into somebody ELSE'S namespace are deliberately NOT deleted here — they are that
+    // owner's record of who touched their data, and removing them would turn their "four hands" into
+    // three. Those are pseudonymised instead, by pseudonymiseTallyWriter, called from deleteOwner.
+    this.db.prepare('DELETE FROM memory_write_tally WHERE ownerGaii = ?').run(gaii);
+    this.db.prepare('DELETE FROM memory_family_tally WHERE ownerGaii = ?').run(gaii);
     // Micro-memory
     // Actions
     this.db.prepare('DELETE FROM actions WHERE providerGaii = ?').run(gaii);
