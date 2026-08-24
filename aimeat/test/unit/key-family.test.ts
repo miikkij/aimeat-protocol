@@ -110,6 +110,21 @@ describe('classifyKey: what the owner owns', () => {
     expect(f.by).toBe('app:tictactoe');
   });
 
+  it('reads crews.<agent>.* as that agent\'s deliverables', () => {
+    // 1094 of 1098 crews.* keys on the production owner name one of that owner's own agents. No node
+    // code writes this prefix, so without the agent list every one of them is unexplained.
+    const f = classifyKey('crews.news-fetcher.2026-08-24.raw', { agentNames: ['news-fetcher', 'joker'] });
+    expect(f.tier).toBe('owner-named');
+    expect(f.by).toBe('agent:news-fetcher');
+    expect(f.family).toBe('crews.news-fetcher.*');
+  });
+
+  it('leaves crews.<name>.* unexplained when no such agent exists', () => {
+    // The four that did not match were agents named in a prompt and never built. Claiming to know
+    // what those hold would be exactly the wrong answer.
+    expect(classifyKey('crews.julkaisu-linkedin.x', { agentNames: ['news-fetcher'] }).tier).toBe('none');
+  });
+
   it('matches an extension namespace', () => {
     const f = classifyKey('ext:mroom-weather.latest', { extNames: ['mroom-weather'] });
     expect(f.tier).toBe('owner-named');
