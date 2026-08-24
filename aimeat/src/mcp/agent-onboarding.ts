@@ -13,6 +13,9 @@
  *   import { registerAgentOnboardingTools } from './agent-onboarding.js';
  *   registerAgentOnboardingTools(mcp, storage, config, getAgentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.2.0 -- 2026-08-24 -- The status hints carry `stuck` (failed steps, or a pending
+ *     accept_test_task whose task does not exist) via the shared buildStuckHint(); this surface
+ *     never named support@operators before, and the REST route's hint fired only on 'failed'.
  *   v1.0.0 -- 2026-05-28 -- Add public MCP Hello Integration lifecycle tools
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -34,7 +37,7 @@ import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { OnboardingStepId } from '../models/agent-onboarding-schemas.js';
-import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
+import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding-guide.js';
 import { createT, DEFAULT_LOCALE } from '../i18n.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
@@ -86,12 +89,14 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
     const testTaskId = (testTaskStep?.details as Record<string, unknown> | undefined)?.testTaskId as string | undefined;
     const hints: Record<string, unknown> = {};
 
+    let testTaskFound = false;
     if (testTaskId) {
         // Driver contract: hints.test_task_id is ALWAYS present when a test task exists --
         // connectors fill the {test_task_id} placeholder from it, so gating it on a specific
         // task status starved them into calling propose_todos with an empty task id.
         hints.test_task_id = testTaskId;
         const task = await storage.getAgentTask(testTaskId);
+        testTaskFound = !!task;
         if (task?.status === 'active') {
             hints.test_task_active = true;
             hints.message = 'Your test task is active. Execute the todos and complete the task to finish Hello Integration.';
@@ -106,6 +111,12 @@ async function buildOnboardingStatus(agentGaii: string, storage: Storage): Promi
     const agentName = getAgentName(agentGaii);
     const summary = buildOnboardingSummary(onboarding.steps);
     if (pendingSteps.length > 0) hints.next_step = summary.next_required_step ?? pendingSteps[0].id;
+
+    // Failed steps and the missing-test-task jam name who to ask (support@operators). Shared with
+    // GET /v1/agents/:name/onboarding; this surface simply never carried the hint before.
+    const testTaskMissing = testTaskStep?.status === 'pending' && (!testTaskId || !testTaskFound);
+    const stuck = buildStuckHint(onboarding.steps, agentName, testTaskMissing);
+    if (stuck) hints.stuck = stuck;
 
     const resolveText = createT(DEFAULT_LOCALE);
     const onboardingOut = {

@@ -12,9 +12,14 @@
  *   - enrichSteps()            -- per-step descriptionText + howTo (on a copy, never persisted)
  *   - buildStepGuide()         -- { [stepId]: StepHowTo } for the steps in this agent's flow
  *   - buildOnboardingSummary() -- required/optional counts + completable + next_required_step
+ *   - buildStuckHint()         -- failed steps / missing test task → support@operators + self-heal
  * @usage
  *   import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
  * @version-history
+ *   v1.2.0 -- 2026-08-24 -- buildStuckHint(): the escalation hint moves here from the REST route
+ *                            (the MCP status tool never had it) and gains the pending-jam shape: an
+ *                            accept_test_task step whose task does not exist can never pass, and
+ *                            until now the status said 'pending' forever and named nobody to ask.
  *   v1.0.0 -- 2026-06-30 -- Initial creation: deterministic Hello Integration completion guidance.
  *   v1.1.0 -- 2026-07-14 -- Substitute {test_task_id} server-side from the accept_test_task step's
  *                            details.testTaskId (it was emitted as a literal placeholder, and the
@@ -130,5 +135,43 @@ export function buildOnboardingSummary(steps: AgentOnboardingStep[]): Onboarding
     completable: required.every(s => s.status === 'passed'),
     next_required_step: required.find(s => s.status !== 'passed')?.id ?? null,
     optional_pending: optional.filter(s => s.status === 'pending').map(s => s.id),
+  };
+}
+
+/**
+ * The "you are stuck, and here is who to ask" hint, shared by the REST GET and the MCP status tool
+ * so neither surface can drift.
+ *
+ * Two conditions produce it. A step with status 'failed' is where an agent starts inventing
+ * remedies: it has tried, it has been told no, and without this nothing in the response said there
+ * was anyone to ask. And a PENDING accept_test_task with no task behind it is the same jam without
+ * the status ever saying so — the server failed to create the test task (or the task was deleted),
+ * the step can never pass, and the agent polls an empty queue forever. That second shape is exactly
+ * where the first organisation node's connector agent sat on 2026-08-24, with no escalation address
+ * anywhere in what it read.
+ *
+ * `testTaskMissing` is the caller's verdict (it has already fetched the task record when the step
+ * details carry an id): true when the accept step is pending and either no testTaskId exists or the
+ * task it names is gone.
+ *
+ * Returns null when nothing is stuck, so callers can spread it conditionally.
+ */
+export function buildStuckHint(
+  steps: AgentOnboardingStep[],
+  agentName: string,
+  testTaskMissing: boolean,
+): Record<string, unknown> | null {
+  const failed = steps.filter(s => s.status === 'failed').map(s => s.id);
+  if (failed.length === 0 && !testTaskMissing) return null;
+  return {
+    ...(failed.length > 0 ? { steps: failed } : {}),
+    ...(testTaskMissing
+      ? {
+          missing_test_task: true,
+          self_heal: `The test task this flow requires does not exist, so accept_test_task can never pass as-is. POST /v1/agents/${agentName}/onboarding/start recreates it; steps already passed keep their status.`,
+        }
+      : {}),
+    ask: 'support@operators',
+    how: 'POST /v1/messages { "to": "support@operators", "subject": "<the step that will not pass>", "body": "<what you tried and what the node answered>" }, or aimeat_dm_send with the same fields. It reaches everyone who runs this node in one thread they answer in.',
   };
 }
