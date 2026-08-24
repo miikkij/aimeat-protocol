@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-08-24 — The onboarding test task comes from services/onboarding-test-task.ts
+ *     like every other creation path, which changes its status from 'queued' to 'active' and adds
+ *     the 'started' event: the smoke test needs no owner approval, and the onboarding validator
+ *     was auto-activating it on the first todos anyway.
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — Same-owner auto-approval (Agent-Bundled Apps): a device-authorize call
  *     authenticated as the SAME owner (owner session or that owner's agent, e.g. crew-forge
@@ -42,7 +46,7 @@
  *     test/e2e-agent-reapproval.ts.
  */
 import type { Router, Request } from 'express';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, DeviceAuthorizationRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
@@ -56,6 +60,7 @@ import { optionalAuth } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
+import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
@@ -243,26 +248,10 @@ async function approveDeviceAuth(
 
   const existingOnboarding = await storage.getOnboarding(gaii);
   if (!existingOnboarding) {
-    // Test task only when the agent's Hello Integration includes accept_test_task
-    const acceptStepDA = onboardingSteps.find(s => s.id === 'accept_test_task');
-    if (acceptStepDA) {
-      const testTaskId = randomUUID();
-      await storage.createAgentTask({
-        id: testTaskId,
-        agentGaii: gaii,
-        ownerGaii: `${request.ownerName}@${config.nodeId}`,
-        title: 'Onboarding verification',
-        description: 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
-        status: 'queued',
-        scope: [],
-        rules: [],
-        todos: [],
-        verification: { userExpects: 'Agent completes the onboarding test task successfully', technicalChecks: [] },
-        createdAt: now,
-        updatedAt: now,
-      });
-      acceptStepDA.details = { testTaskId };
-    }
+    // Test task only when the agent's Hello Integration includes accept_test_task. The shared
+    // helper creates it 'active' (this path built its own 'queued' copy until 2026-08-24): the
+    // owner-approval gate guards real tasks, and the smoke test is not one.
+    await createOnboardingTestTask(storage, gaii, `${request.ownerName}@${config.nodeId}`, onboardingSteps);
     await storage.createOnboarding({
       agentGaii: gaii,
       status: 'in_progress',

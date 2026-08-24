@@ -1,0 +1,77 @@
+/**
+ * @file onboarding-test-task.ts
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The one place the Hello Integration test task is created. Every path that creates an
+ *   onboarding whose flow carries `accept_test_task` calls this, because the paths that built the
+ *   task inline drifted (queued vs active) and the paths that forgot it entirely stranded the agent:
+ *   an agent registered through POST /v1/agents (the OAuth-consent "create agent" path) got the
+ *   twelve-step flow with a required step 9 and an empty task queue, and sat there with nothing to
+ *   accept and nothing telling it why.
+ * @structure createOnboardingTestTask(storage, agentGaii, ownerGhii, steps, titles?) — creates the
+ *   task, stamps its id into the accept step's details, returns the id (null when the flow has no
+ *   accept step).
+ * @usage
+ *   const steps = createDefaultSteps(mode);
+ *   await createOnboardingTestTask(storage, gaii, `${owner}@${config.nodeId}`, steps);
+ *   await storage.createOnboarding({ agentGaii: gaii, status: 'in_progress', startedAt: now, steps });
+ * @version-history
+ *   v1.0.0 — 2026-08-24 — Extracted from routes/agent-onboarding.ts (onboarding/start) so the two
+ *     registration paths that created onboarding without a test task can stop doing that.
+ */
+import { randomUUID } from 'node:crypto';
+import type { Storage } from '../storage/interface.js';
+import type { AgentOnboardingStep } from '../storage/interface.js';
+
+/**
+ * Create the Hello Integration smoke-test task and stamp its id into the `accept_test_task` step.
+ *
+ * The task is created `active` for EVERY mode: the owner-approval gate (queued → owner /start →
+ * active) exists to guard REAL tasks, and the onboarding smoke test is a throwaway the agent should
+ * be able to propose todos on, execute and complete without the owner clicking anything. The
+ * `started` event is appended so the task's history matches an owner-approved start.
+ *
+ * Mutates `steps` in place (details.testTaskId) and returns the task id, or null when the flow
+ * carries no `accept_test_task` step (nothing is created then).
+ */
+export async function createOnboardingTestTask(
+  storage: Storage,
+  agentGaii: string,
+  ownerGhii: string,
+  steps: AgentOnboardingStep[],
+  titles?: { title: string; description: string },
+): Promise<string | null> {
+  const acceptStep = steps.find(s => s.id === 'accept_test_task');
+  if (!acceptStep) return null;
+
+  const testTaskId = randomUUID();
+  const now = new Date().toISOString();
+  await storage.createAgentTask({
+    id: testTaskId,
+    agentGaii,
+    ownerGaii: ownerGhii,
+    title: titles?.title ?? 'Onboarding verification',
+    description: titles?.description
+      ?? 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
+    status: 'active',
+    scope: [],
+    rules: [],
+    todos: [],
+    verification: {
+      userExpects: 'Agent completes the onboarding test task successfully',
+      technicalChecks: [],
+    },
+    createdAt: now,
+    updatedAt: now,
+    lastEventAt: now,
+  });
+  await storage.appendTaskEvent({
+    id: randomUUID(),
+    taskId: testTaskId,
+    type: 'started',
+    message: 'Onboarding test task auto-started (Hello Integration smoke test — no owner approval needed)',
+    timestamp: now,
+  });
+  acceptStep.details = { testTaskId };
+  return testTaskId;
+}

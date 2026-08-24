@@ -12,6 +12,14 @@
  *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
+ *   v1.8.0 -- 2026-08-24 -- The stuck hint comes from the shared buildStuckHint() and now also
+ *                            fires on a PENDING accept_test_task whose task does not exist: that
+ *                            jam showed as an ordinary pending step forever, so no escalation
+ *                            address was ever named at the exact point it was needed.
+ *   v1.7.0 -- 2026-08-24 -- The test-task creation in /onboarding/start moves to
+ *                            services/onboarding-test-task.ts, shared with device-auth and both
+ *                            registration paths (two of which created no task at all and stranded
+ *                            the agent at step 9).
  *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
  *   v1.1.0 -- 2026-05-24 -- Add readiness override + auto-complete on step confirm
@@ -44,7 +52,7 @@
 
 import { Router, type Request } from 'express';
 import { refreshOnboarding, confirmOnboardingStep } from '../services/onboarding-progress.js';
-import { randomUUID } from 'node:crypto';
+import { createOnboardingTestTask } from '../services/onboarding-test-task.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -53,7 +61,7 @@ import { buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { createDefaultSteps } from '../models/agent-onboarding-schemas.js';
-import { enrichSteps, buildStepGuide, buildOnboardingSummary } from '../services/onboarding-guide.js';
+import { enrichSteps, buildStepGuide, buildOnboardingSummary, buildStuckHint } from '../services/onboarding-guide.js';
 import { calculateReadiness } from '../services/readiness-scorer.js';
 import { detectPlatform } from '../services/platform-detector.js';
 import { createT, detectLocale } from '../i18n.js';
@@ -164,9 +172,11 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     const testTaskStep = onboarding.steps.find(s => s.id === 'accept_test_task');
     const testTaskId = (testTaskStep?.details as Record<string, unknown> | undefined)?.testTaskId as string | undefined;
     let testTaskStatus: string | undefined;
+    let testTaskFound = false;
     if (testTaskId) {
       const task = await storage.getAgentTask(testTaskId);
       testTaskStatus = task?.status;
+      testTaskFound = !!task;
     }
     const hints: Record<string, unknown> = {};
     // Driver contract: hints.test_task_id is ALWAYS present when a test task exists -- connectors
@@ -187,18 +197,11 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       hints.next_step = summary.next_required_step ?? pendingSteps[0].id;
     }
 
-    // A step that has FAILED is where an agent starts inventing remedies. It has tried, it has been
-    // told no, and until now nothing in this response said there was anyone to ask — so it guessed,
-    // or it stopped, and its owner found out days later through a human. Name the address here, at
-    // the exact point of being stuck.
-    const failedSteps = onboarding.steps.filter(s => s.status === 'failed');
-    if (failedSteps.length > 0) {
-      hints.stuck = {
-        steps: failedSteps.map(s => s.id),
-        ask: 'support@operators',
-        how: 'POST /v1/messages { "to": "support@operators", "subject": "<the step that will not pass>", "body": "<what you tried and what the node answered>" }, or aimeat_dm_send with the same fields. It reaches everyone who runs this node in one thread they answer in.',
-      };
-    }
+    // Failed steps, and the pending jam a missing test task causes, name who to ask — shared with
+    // the MCP status tool via services/onboarding-guide.ts so the two surfaces cannot drift.
+    const testTaskMissing = testTaskStep?.status === 'pending' && (!testTaskId || !testTaskFound);
+    const stuck = buildStuckHint(onboarding.steps, agentName, testTaskMissing);
+    if (stuck) hints.stuck = stuck;
 
     // Post-onboarding checklist -- surfaces the SKILL.md "After Onboarding" items as a
     // machine-readable signal alongside the onboarding step list. commands_registered
@@ -295,46 +298,14 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     }
 
     // Create a test task whenever the agent's Hello Integration includes
-    // accept_test_task / complete_test_task (both task-runner and the full flows do).
-    const acceptStep = steps.find(s => s.id === 'accept_test_task');
-    if (acceptStep) {
-      const testTaskId = randomUUID();
-      const testNow = new Date().toISOString();
-      // The onboarding test task is a throwaway smoke test, NOT real work, so it is created
-      // 'active' for EVERY mode -- the agent can propose todos, execute, and complete it
-      // immediately without the owner having to click "Start" in the dashboard. The owner-
-      // approval gate (queued -> owner /start -> active) exists to guard REAL tasks; it does
-      // not belong on the Hello Integration smoke test. Real tasks still follow the mode gate
-      // (task-runner auto-activates on create; other modes stay queued -- see agent-tasks.ts).
-      const testTask = {
-        id: testTaskId,
-        agentGaii,
-        ownerGaii: `${req.auth!.owner}@${config.nodeId}`,
-        title: t(req, 'agentOnboarding.errors.testTaskTitle'),
-        description: t(req, 'agentOnboarding.errors.testTaskDescription'),
-        status: 'active' as const,
-        scope: [],
-        rules: [],
-        todos: [],
-        verification: {
-          userExpects: 'Agent completes the onboarding test task successfully',
-          technicalChecks: [],
-        },
-        createdAt: testNow,
-        updatedAt: testNow,
-        lastEventAt: testNow,
-      };
-      await storage.createAgentTask(testTask);
-      // Record the auto-start so the task's event history matches an owner-approved start.
-      await storage.appendTaskEvent({
-        id: randomUUID(),
-        taskId: testTaskId,
-        type: 'started',
-        message: 'Onboarding test task auto-started (Hello Integration smoke test — no owner approval needed)',
-        timestamp: testNow,
-      });
-      acceptStep.details = { testTaskId };
-    }
+    // accept_test_task / complete_test_task (both task-runner and the full flows do). The
+    // shared helper (services/onboarding-test-task.ts) creates it 'active' for every mode and
+    // records the auto-start; the owner-approval gate guards real tasks, and the smoke test is
+    // not one. This route passes the requester's locale for the title and description.
+    await createOnboardingTestTask(storage, agentGaii, `${req.auth!.owner}@${config.nodeId}`, steps, {
+      title: t(req, 'agentOnboarding.errors.testTaskTitle'),
+      description: t(req, 'agentOnboarding.errors.testTaskDescription'),
+    });
 
     const now = new Date().toISOString();
 

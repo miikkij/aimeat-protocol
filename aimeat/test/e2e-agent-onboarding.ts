@@ -916,6 +916,61 @@ await test('32. Setup second agent for auto-check tests', async () => {
     agent2Token = await getToken(agent2Gaii, agent2PrivKey, true);
 });
 
+await test('32b. Registration itself creates the test task (no /start needed)', async () => {
+    // Direct registration (POST /v1/agents) created an onboarding whose required step 9
+    // (accept_test_task) had no task behind it, so an agent that never called /onboarding/start
+    // sat at step 9 with an empty queue. This asserts the hole the 2026-08-24 fix closed: the
+    // test task exists and is active straight after registration.
+    const { status, body } = await json(`/v1/agents/${agent2Name}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const taskStep = body.data.onboarding.steps.find((s: any) => s.id === 'accept_test_task');
+    assert(taskStep, 'accept_test_task step missing from registration-created onboarding');
+    const regTaskId = taskStep.details?.testTaskId;
+    assert(typeof regTaskId === 'string' && regTaskId.length > 0,
+        'registration-created onboarding should carry a testTaskId');
+    const { status: tStatus, body: tBody } = await json(`/v1/agents/${agent2Name}/tasks/${regTaskId}`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(tStatus === 200, `test task fetch: status ${tStatus}: ${JSON.stringify(tBody)}`);
+    assert(tBody.data.task.status === 'active',
+        `registration test task should be active, got ${tBody.data.task.status}`);
+});
+
+await test('32c. A pending accept_test_task with no task behind it names support@operators', async () => {
+    // Build the jam an agent on the first organisation node actually sat in: the step is pending
+    // and the task it waits for does not exist. Before the 2026-08-24 fix the status showed an
+    // ordinary pending step forever and named nobody to ask.
+    const { body: obBody } = await json(`/v1/agents/${agent2Name}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    const jamTaskId = obBody.data.onboarding.steps.find((s: any) => s.id === 'accept_test_task').details.testTaskId;
+    // Active tasks refuse deletion, so pause first (owner door), then delete.
+    const { status: pauseStatus } = await json(`/v1/agents/${agent2Name}/tasks/${jamTaskId}/pause`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(pauseStatus === 200, `pause: status ${pauseStatus}`);
+    const { status: delStatus } = await json(`/v1/agents/${agent2Name}/tasks/${jamTaskId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(delStatus === 200, `delete: status ${delStatus}`);
+
+    const { status, body } = await json(`/v1/agents/${agent2Name}/onboarding`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const stuck = body.data.hints?.stuck;
+    assert(stuck, 'hints.stuck should be present when the test task is missing');
+    assert(stuck.missing_test_task === true, `stuck.missing_test_task should be true, got ${JSON.stringify(stuck)}`);
+    assert(stuck.ask === 'support@operators', `stuck.ask should name support@operators, got ${stuck.ask}`);
+    assert(typeof stuck.self_heal === 'string' && stuck.self_heal.includes('/onboarding/start'),
+        'stuck.self_heal should point at /onboarding/start');
+    // Test 33 calls /onboarding/start, which recreates the test task; the jam ends there.
+});
+
 await test('33. Start onboarding for second agent', async () => {
     const { status, body } = await json(`/v1/agents/${agent2Name}/onboarding/start`, {
         method: 'POST',

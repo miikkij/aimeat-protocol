@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-24 — Both registration paths create the Hello Integration test task (via
+ *     services/onboarding-test-task.ts) instead of an onboarding whose required step 9 had nothing
+ *     to accept; the direct path also passes the agent's mode to createDefaultSteps so a
+ *     task-runner gets the task-runner flow.
  *   v1.2.0 — 2026-08-13 — The created agent records `registeredBy`: this door is owner-only, so it
  *     is the owner's own name.
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
@@ -28,6 +32,7 @@ import { fireHook } from '../../utils/fire-hook.js';
 import { AgentRegistrationSchema, validateBody } from '../../models/schemas.js';
 import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
+import { createOnboardingTestTask } from '../../services/onboarding-test-task.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { VALID_MODES } from './constants.js';
 
@@ -119,6 +124,10 @@ export function registerRegistrationRoutes(
       });
     }
 
+    // Step 9 (accept_test_task) is required in this flow, so the task it accepts must exist NOW.
+    // Until 2026-08-24 only the device-auth and onboarding/start paths created it, and an agent
+    // registered here sat at step 9 with an empty queue and no explanation.
+    await createOnboardingTestTask(storage, gaii, `${owner}@${config.nodeId}`, connectSteps);
     await storage.createOnboarding({
       agentGaii: gaii,
       status: 'in_progress',
@@ -277,7 +286,9 @@ export function registerRegistrationRoutes(
     emitChange('agents');
 
     // ── Auto-start Hello Integration onboarding (direct registration path) ──
-    const regOnboardingSteps = createDefaultSteps();
+    // The agent's mode decides its flow: a task-runner registered here got the full interactive
+    // twelve steps because this call passed no mode while the record above stored one.
+    const regOnboardingSteps = createDefaultSteps(agent.mode);
     regOnboardingSteps[0].status = 'passed';
     regOnboardingSteps[0].validatedAt = now;
     regOnboardingSteps[0].validationMethod = 'automatic';
@@ -296,6 +307,9 @@ export function registerRegistrationRoutes(
       });
     }
 
+    // Same reason as the connect path above: a required accept_test_task step with no task to
+    // accept strands the agent at step 9.
+    await createOnboardingTestTask(storage, gaii, `${owner}@${config.nodeId}`, regOnboardingSteps);
     await storage.createOnboarding({
       agentGaii: gaii,
       status: 'in_progress',
