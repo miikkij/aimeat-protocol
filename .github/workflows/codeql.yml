@@ -17,11 +17,13 @@ on:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read          # checkout
+      security-events: write  # upload the analysis to code scanning
     strategy:
       fail-fast: false
       matrix:

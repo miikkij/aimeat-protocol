@@ -10,6 +10,9 @@ on:
       - 'context7.json'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   refresh:
     runs-on: ubuntu-latest
