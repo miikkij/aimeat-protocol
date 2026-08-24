@@ -9690,6 +9690,68 @@ paths:
                           used_bytes:
                             type: integer
 
+  /v1/memory/{key}/hands:
+    get:
+      summary: Who has written to this key, and how often
+      description: |
+        The question a deletion request arrives asking, and one nothing on this node could answer
+        before: a key gets rewritten, the value changes, and who touched it was never written down.
+        A column on the record could not hold this — the next write would overwrite it, so it would
+        only ever name the last writer.
+
+        Owner-scoped: the answer unions the caller's own namespace with every agent acting in their
+        name, because a namespace is not an account — an agent writing its own copy of a key lands
+        under the agent, and an owner asking about their own key must not be told nobody touched it.
+
+        `not_covered` is part of the answer and not a footnote. Counting began the day the tally
+        shipped, so a key written before that and never written since has no hands here and never
+        will; and it counts the doors a principal comes through, not the places the node writes to
+        your store on its own behalf. A number that hides either reads as complete when it is not.
+      tags: [Memory]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The hands on this key, newest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key: { type: string }
+                          hands:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                writer:
+                                  type: string
+                                  description: The principal that wrote — a GHII, GAII, GEAI, `ext:{name}` or `schedule:{id}`. An erased account appears as `erased:{hash}`.
+                                writes: { type: integer }
+                                deletes: { type: integer }
+                                first_at: { type: string, format: date-time }
+                                last_at: { type: string, format: date-time }
+                                namespace: { type: string, description: Whose store the key is in, which is not the same as whose hand wrote it. }
+                          counted_doors:
+                            type: array
+                            description: Which ways of writing this number covers, in plain words.
+                            items: { type: string }
+                          not_covered:
+                            type: array
+                            description: What this number cannot see. Travels with every answer.
+                            items: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: The session does not carry memory:read }
+
   /v1/memory/{key}:
     get:
       operationId: readMemory
@@ -34546,6 +34608,13 @@ paths:
         agent may also pass `deliverable_key` — the memory key (under its own
         namespace) where it published the task's output — which is stored on the
         task so the owner UI can link straight to the deliverable.
+
+
+        One task refuses to be completed unplanned: the Hello Integration test
+        task, with `409 PLAN_REQUIRED`, until a TODO plan has been proposed on
+        it. Onboarding step `accept_test_task` passes only when that task
+        carries todos, and a completed task accepts no plan, so completing it
+        first would leave the step unpassable for good.
       tags: [Agent Tasks]
       security:
         - BearerAuth: []
