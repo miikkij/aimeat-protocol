@@ -55,6 +55,7 @@ import { commerceWebhooksRouter } from '../routes/commerce-webhooks.js';
 import { financeRouter } from '../routes/finance.js';
 import { financeLedgerRouter } from '../routes/finance-ledger.js';
 import { outboundRouter } from '../routes/outbound.js';
+import { signalsRouter } from '../routes/signals.js';
 import { companiesRouter } from '../routes/companies.js';
 
 // Routes
@@ -447,6 +448,7 @@ export async function mountRoutes(
   app.use(financeRouter(config, storage));                // Finance: invoices (Finvoice 3.0) — company-in-a-box phase 1
   app.use(financeLedgerRouter(config, storage));          // Finance: vouchers, VAT registry/report, fiscal years, exports
   app.use(outboundRouter(config, storage));               // Outbound door: contact registry, policied send, public unsubscribe
+  app.use(signalsRouter(config, storage));                // Signals: hit collection (tracking image + JSON hit), owner reports
   app.use(companiesRouter(config, storage));              // Company registry — {slug}.co.<apex> addresses
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
