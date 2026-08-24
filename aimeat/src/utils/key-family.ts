@@ -19,6 +19,11 @@
  *   classifyKey(key, hints?) · familyOf(key, hints?) · baseKeyOf(key)
  * @usage import { classifyKey } from '../utils/key-family.js';
  * @version-history
+ *   v1.1.0 — 2026-08-24 — `agentNames` and the `crews.<agent>.*` rule, found by running v1.0.0 over
+ *     the production owner's WHOLE keyspace (18 446 keys) rather than the 1000-key sample it was
+ *     written against. `crews.` is the convention an agent's deliverables land under, no node code
+ *     writes it, and 1094 of its 1098 keys name one of that owner's own agents — the single largest
+ *     block of avoidably unexplained keys on the node.
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 (data map), step 1. The prefix list was
  *     measured against production rather than read off the source: `changelog.` (23 keys in the
  *     sample), `listing.`, `news.` and `salesboard.` look like platform families and are written by
@@ -69,7 +74,19 @@ export interface KeyFamilyHints {
   appNames?: string[];
   /** Installed extension names, for the owner-named tier. */
   extNames?: string[];
+  /**
+   * This owner's agent names. Worth its own hint because of `crews.<agent>.*`, the convention an
+   * agent's deliverables land under — it is documented in the browser SDK and written into the
+   * app-building prompt, and no node code writes it, so nothing else can identify it.
+   *
+   * Measured 2026-08-24 on the production owner: 1094 of 1098 `crews.*` keys carry the name of one
+   * of that owner's own 86 agents. Without this hint every one of them is unexplained.
+   */
+  agentNames?: string[];
 }
+
+/** `crews.<agent>.<whatever>` — where an agent's deliverables land, by convention rather than by rule. */
+const CREWS_KEY = /^crews\.([^.]+)\./;
 
 /**
  * Owner-namespace prefixes a part of the node itself writes and reads.
@@ -260,7 +277,19 @@ export function classifyKey(key: string, hints: KeyFamilyHints = {}): KeyFamily 
     return { family: declared.pattern, tier: 'declared-space', by: declared.by, area: areaOf(base) };
   }
 
-  // 7. The name matches something this owner owns. A hint, not a promise — nothing enforces it.
+  // 7. An agent's deliverables. `crews.<agent>.*` is a convention the SDK and the app-building prompt
+  //    both write, and nothing on the node enforces it — hence owner-named rather than declared.
+  const crew = CREWS_KEY.exec(base);
+  if (crew && (hints.agentNames ?? []).includes(crew[1])) {
+    return {
+      family: `crews.${crew[1]}.*`,
+      tier: 'owner-named',
+      by: `agent:${crew[1]}`,
+      area: 'memory',
+    };
+  }
+
+  // 8. The name matches something this owner owns. A hint, not a promise — nothing enforces it.
   const head = split(base)[0].text;
   if (head && (hints.appNames ?? []).includes(head)) {
     return { family: familyFrom(base, 2), tier: 'owner-named', by: `app:${head}`, area: 'memory' };
@@ -270,7 +299,7 @@ export function classifyKey(key: string, hints: KeyFamilyHints = {}): KeyFamily 
     return { family: `ext:${extHead}.*`, tier: 'owner-named', by: `extension:${extHead}`, area: 'extension' };
   }
 
-  // 8. Nothing says what this is. The family is a guess from the shape of the key, and the empty
+  // 9. Nothing says what this is. The family is a guess from the shape of the key, and the empty
   //    `by` is the honest part: there is nothing to cite.
   return { family: familyFrom(base, 2), tier: 'none', by: '', area: areaOf(base) };
 }
