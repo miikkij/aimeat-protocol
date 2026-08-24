@@ -18,6 +18,12 @@
  *   connected agent, shown on an initialised home with its details in a details/summary section.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   v1.3.0 — 2026-08-24 — The name the person gives is RECORDED (memory key `home.agent-name`,
+ *     private), not just embedded in the connect prompt. Until now it lived only in this
+ *     component's state, so the OAuth consent page — a different door into the same account —
+ *     could not see it, asked for a name again, and a second agent could be born from one
+ *     person's one intention. The consent page now prefills and preselects from this record,
+ *     so the name is given once and both doors lead to the same agent.
  *   (2026-08-23) Em-dashes swept from the copied and state fallbacks (banned in every surface).
  *   v1.2.0 — 2026-08-16 — The card invites instead of alarming: "It has hit a snag. Shall we take
  *     a look?" and the fleet line stops reading out the damage count — the number of problems
@@ -159,7 +165,18 @@ export function StepAgent({ onChanged, showToast }) {
           <div class="koti-actions">
             <button type="button" class=${cleanName ? 'btn-primary' : 'btn-outline'}
               disabled=${!cleanName}
-              onClick=${() => { setAgentName(cleanName); setNamed(true); }}>
+              onClick=${() => {
+                setAgentName(cleanName); setNamed(true);
+                // Record the name where OTHER doors can see it: the OAuth consent page (a
+                // connector arriving before this prompt is ever pasted) prefills from this key,
+                // so one intention cannot become two agents. Overwritten on rename; the agent
+                // itself is still only ever created through an approval.
+                api('/v1/memory', { method: 'POST', body: JSON.stringify({
+                  key: 'home.agent-name',
+                  value: { name: cleanName, recordedAt: new Date().toISOString(), source: 'home-step-agent' },
+                  visibility: 'private',
+                }) }).catch((e) => swallowed('home/step-agent: name record', e));
+              }}>
               ${tr('home.agent.nameSubmit', 'That is its name')}
             </button>
           </div>

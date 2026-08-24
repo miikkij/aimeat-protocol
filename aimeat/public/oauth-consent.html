@@ -8,6 +8,13 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.4.0 — 2026-08-24 — The name given at home is not asked twice. Home's step 2 records the
+        chosen agent name (memory key `home.agent-name`); this page reads it with the owner's
+        session and, when no agent carries it yet, prefills the create form with it and says
+        where it came from — and when that agent already exists, preselects it instead of the
+        list's first. Before this, a connector arriving before the home prompt was pasted asked
+        for a name the person had already given, and a second agent could be born from one
+        person's one intention.
     v1.3.1 — 2026-08-24 — Light is the default, not the OS preference: with no stored choice the
         page opens light, and only an explicit dark pick (the ☾ button here or in the SPA) darkens
         it. Same-day developer decision on seeing both: light is the doorstep mood.
@@ -154,6 +161,7 @@
     .create-agent-form input { margin-bottom:.4rem; }
     .create-agent-form .btn-row { margin-top:.5rem; }
     .name-identity-hint { font-size:.78rem; color:var(--muted); margin:-0.15rem 0 .6rem; line-height:1.45; }
+    .name-from-home { color:var(--accent); }
     .btn-sm { padding:.4rem .75rem; border:none; border-radius:.35rem; font-size:.8rem;
       font-weight:600; cursor:pointer; }
     .btn-sm-accent { background:var(--accent); color:var(--card); }
@@ -243,6 +251,10 @@
     let session = null;
     let agents = [];
     let selectedAgent = null;
+    // The name the person already gave their agent at home (memory key `home.agent-name`,
+    // written by home's step 2). Empty when they never named one. It decides which agent is
+    // preselected, and prefills the create form so the name is never asked twice.
+    let homeAgentName = '';
     // The permission decision. 'keep' leaves the agent exactly as it is (the safe default: a
     // returning full-access agent must not be narrowed by a click that meant "yes, connect").
     let selectedPreset = 'keep';
@@ -315,6 +327,18 @@
       const d = await r.json();
       if (!d.ok) throw new Error(d.error?.message || 'Login failed');
       return d.data;
+    }
+
+    async function fetchHomeAgentName(jwt) {
+      try {
+        const r = await fetch('/v1/memory/home.agent-name?soft=1', {
+          headers: { Authorization: 'Bearer ' + jwt },
+        });
+        const d = await r.json();
+        const n = d.ok && d.data?.value?.name;
+        return typeof n === 'string' ? n : '';
+      } catch {}
+      return '';
     }
 
     async function fetchAgents(ownerName, jwt) {
@@ -406,7 +430,10 @@
           );
           session = data;
           const loginOwner = typeof data.owner === 'string' ? data.owner : data.owner?.name || data.username;
-          agents = await fetchAgents(loginOwner, data.jwt || data.token);
+          [agents, homeAgentName] = await Promise.all([
+            fetchAgents(loginOwner, data.jwt || data.token),
+            fetchHomeAgentName(data.jwt || data.token),
+          ]);
           renderApproval();
         } catch (err) {
           errEl.textContent = err.message;
@@ -415,10 +442,14 @@
     }
 
     function renderCreateForm(container, onCreated) {
+      // The name given at home is filled in rather than asked again — unless an agent already
+      // carries it, in which case the list above is where that name lives.
+      const prefill = homeAgentName && !agents.some((a) => a.name === homeAgentName) ? homeAgentName : '';
       container.innerHTML = `
         <div class="create-agent-form">
           <label>${escHtml(t('newAgentName'))}</label>
-          <input type="text" id="newAgentName" placeholder="e.g. claude-mcp" minlength="3" maxlength="64" required />
+          <input type="text" id="newAgentName" placeholder="e.g. claude-mcp" minlength="3" maxlength="64" required value="${escHtml(prefill)}" />
+          ${prefill ? `<p class="name-identity-hint name-from-home">${escHtml(t('homeNamed'))}</p>` : ''}
           <p class="name-identity-hint">${escHtml(t('newAgentNameHint'))}</p>
           <label>${escHtml(t('newAgentDisplayName'))}</label>
           <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint'))}" />
@@ -557,10 +588,12 @@
         return;
       }
 
-      // Keep previous selection if valid, otherwise default to first
+      // Keep previous selection if valid; with none, prefer the agent whose name the person
+      // already chose at home; otherwise default to first.
       const prevGaii = selectedAgent?.gaii;
       const prevIdx = prevGaii ? agents.findIndex(a => a.gaii === prevGaii) : -1;
-      const selIdx = prevIdx >= 0 ? prevIdx : 0;
+      const homeIdx = homeAgentName ? agents.findIndex(a => a.name === homeAgentName) : -1;
+      const selIdx = prevIdx >= 0 ? prevIdx : (homeIdx >= 0 ? homeIdx : 0);
       selectedAgent = agents[selIdx];
       // The picker describes THIS agent: seed the custom list from what it holds, and start at
       // "keep" so approving without touching anything changes nothing.
@@ -716,9 +749,11 @@
     // Boot
     session = await checkSession();
     if (session) {
-      const ownerName = getOwnerName();
       const jwt = session.jwt || session.token;
-      agents = await fetchAgents(ownerName, jwt);
+      [agents, homeAgentName] = await Promise.all([
+        fetchAgents(getOwnerName(), jwt),
+        fetchHomeAgentName(jwt),
+      ]);
       renderApproval();
     } else {
       renderLogin();
