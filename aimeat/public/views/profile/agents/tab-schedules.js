@@ -7,6 +7,7 @@
  *   internal (the agent's self-reported mirror, read-only). Lets the owner create
  *   a new schedule targeting this agent (reusing the master view's CreateForm).
  * @version-history
+ *   v1.3.0 -- 2026-08-24 -- Live update listens on 'scheduler'; 'schedules' is emitted by nobody.
  *   v1.2.0 -- 2026-07-17 -- Dispatched / agent-internal groups become pf-agd-cards.
  *   v1.1.0 -- 2026-07-17 -- Style unification: canonical agent-detail section headers
  *     (pf-agd-section-header/-title) instead of scheduler-view headings, pf-agd-empty
@@ -44,7 +45,8 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
   loadRef.current = loadData;
   useEffect(() => {
     loadData();
-    return onLiveUpdate(['schedules', 'agent-tasks'], () => loadRef.current());
+    // 'scheduler' is the domain the emitters send; 'schedules' is emitted by nobody.
+    return onLiveUpdate(['scheduler', 'agent-tasks'], () => loadRef.current());
   }, [loadData]);
 
   if (loading) return html`<div class="sch-loading">${t('profile.scheduler.loading')}</div>`;

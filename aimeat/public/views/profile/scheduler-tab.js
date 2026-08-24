@@ -13,6 +13,9 @@
  *   - jumpToSchedule — scroll to + flash a schedule's card/row when its calendar event is clicked
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v1.2.0 -- 2026-08-24 -- Live update listens on 'scheduler', the domain the emitters actually send.
+ *     It listened on 'schedules', which nothing emits, so this tab had never refreshed on a schedule
+ *     change. A domain is a free-form string with no allowlist, so the typo could only go quiet.
  *   v1.1.0 -- 2026-07-16 -- Mount folds schedules + agents into GET /v1/scheduler/tab (getSchedulerTab);
  *     occurrences stay a range-driven request; individual reads kept as fallback.
  *   v1.0.0 -- 2026-06-03 -- Initial master scheduler view
@@ -94,7 +97,11 @@ export default function SchedulerTab({ showToast }) {
   loadRef.current = loadData;
   useEffect(() => {
     loadData();
-    return onLiveUpdate(['schedules', 'agent-tasks'], () => loadRef.current());
+    // 'scheduler', not 'schedules': that is the word every emitter sends (schedule-write.ts,
+    // admin-scheduler.ts, scheduler.ts, mcp/agent-schedules.ts). Nothing emits 'schedules', so this
+    // tab never once refreshed when a schedule changed. A domain is a free-form string with no
+    // allowlist, so the typo could not fail — it just went quiet.
+    return onLiveUpdate(['scheduler', 'agent-tasks'], () => loadRef.current());
   }, [loadData]);
 
   if (loading) return html`<div class="sch-loading">${t('profile.scheduler.loading')}</div>`;

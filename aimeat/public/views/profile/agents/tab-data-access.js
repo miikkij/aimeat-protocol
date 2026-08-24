@@ -5,6 +5,9 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   v1.11.0 -- 2026-08-24 -- Live update also follows 'agent-directives', which is where the memory
+ *     areas this panel edits actually live. routes/agent-directives.ts emits it from three places and
+ *     nothing subscribed, so the panel never saw its own writes.
  *   v1.10.0 -- 2026-07-17 -- Card layout: tags/areas/knowledge/skills sections pair up in
  *     the shared pf-agd-card-grid; stored keys + scope summary span full width.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
@@ -191,7 +194,9 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
     // full-tab "Loading..." overlay. Showing the spinner on every tick
     // (the SSE bus debounces to ~500ms but still fires often) made the
     // whole panel flash blank every time anything changed server-side.
-    return onLiveUpdate(['memory', 'agents', 'skills'], () => loadRef.current({ showSpinner: false }));
+    // 'agent-directives' is where the memory areas actually live, and routes/agent-directives.ts
+    // emits it from three places. Nothing subscribed to it, so this panel never saw its own writes.
+    return onLiveUpdate(['memory', 'agents', 'skills', 'agent-directives'], () => loadRef.current({ showSpinner: false }));
   }, []);
 
   async function openSkillPicker() {

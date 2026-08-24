@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-08-24 — Live update listens on 'scheduler'; 'schedules' is emitted by nobody, so the next-job
+ *     card never followed a schedule change.
  *   2026-07-19 — Re-add the orphaned OpenRouter Settings item (route id 'generator') to the Build & Share
  *     group — it lost its menu entry when the Generator feature was removed, leaving the AI-provider key
  *     config reachable only by deep link.
@@ -142,7 +144,8 @@ export function AgentsCard({ owner, initialAgents }) {
   useEffect(() => { if (initialAgents) setAgents(seedAgents(initialAgents)); }, [initialAgents]);
   useEffect(() => { loadSchedules(); }, [loadSchedules]);   // schedules aren't in the composite
   const liveRef = useRef(load); liveRef.current = load;
-  useEffect(() => onLiveUpdate(['agents', 'agent-tasks', 'schedules'], () => liveRef.current()), []);
+  // 'scheduler' is the domain the emitters send; 'schedules' is emitted by nobody.
+  useEffect(() => onLiveUpdate(['agents', 'agent-tasks', 'scheduler'], () => liveRef.current()), []);
 
   if (!agents || (agents.length === 0 && !nextJob)) return null;
   const todayStr = new Date().toDateString();
