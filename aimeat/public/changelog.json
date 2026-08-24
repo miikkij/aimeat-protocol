@@ -5,6 +5,18 @@
       "date": "2026-08-24",
       "kind": "feature",
       "title": {
+        "en": "Decide what your AI may do the moment you connect it",
+        "fi": "Päätä heti yhdistäessä, mitä tekoälysi saa tehdä"
+      },
+      "body": {
+        "en": "When you connect an AI service such as claude.ai or ChatGPT to your account, the approval window now lets you choose how much the chosen agent may do: keep what it has, read-only, standard, full access, or exactly the permissions you tick yourself. Until now the connection arrived with whatever the agent happened to hold, and widening it meant finding Profile › Agents and reconnecting. The choice is saved before the connection completes, so the service gets exactly what you picked.\n\nThe window also says two things it should always have said: the agent's name becomes the identity everything it does here is recorded under, and the permissions cover only your AIMEAT account at this address, no other system.\n\nBoth approval pages now open in a bright, light look, with a switch in the corner if you prefer dark.",
+        "fi": "Kun yhdistät tiliisi AI-palvelun, vaikkapa claude.ain tai ChatGPT:n, hyväksyntäikkunassa voi nyt valita, kuinka paljon valittu agentti saa tehdä: pidä nykyiset oikeudet, vain luku, vakio, täysi pääsy, tai juuri ne oikeudet, jotka itse ruksaat. Tähän asti yhteys sai sen, mitä agentilla sattui olemaan, ja laajentaminen vaati profiilin Agentit-välilehden löytämistä ja uudelleenyhdistämistä. Valinta tallentuu ennen kuin yhteys valmistuu, joten palvelu saa täsmälleen sen, minkä valitsit.\n\nIkkuna sanoo nyt myös kaksi asiaa, jotka siitä puuttuivat: agentin nimestä tulee tunniste, jonka nimiin kaikki sen täällä tekemä kirjataan, ja oikeudet koskevat vain AIMEAT-tiliäsi tässä osoitteessa, eivät mitään muuta järjestelmää.\n\nMolemmat hyväksyntäsivut avautuvat nyt vaaleina, ja kulmassa on kytkin, jos pidät tummasta."
+      }
+    },
+    {
+      "date": "2026-08-24",
+      "kind": "feature",
+      "title": {
         "en": "Sign in with your organisation's own account",
         "fi": "Kirjaudu organisaatiosi omilla tunnuksilla"
       },

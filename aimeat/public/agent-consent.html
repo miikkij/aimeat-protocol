@@ -7,6 +7,12 @@
     scope model and the shared consent vocabulary, so its presets and sentences can never diverge
     from the SPA's AgentConsent panel again.
   @version-history
+    v1.2.0 — 2026-08-24 — The light theme the page never had, same treatment as oauth-consent
+        the same day: light-first tokens with a [data-theme="dark"] override, the no-flash boot
+        snippet on the SPA's 'aimeat-theme' storage key (unset = light, an explicit dark choice
+        kept), a visible ☀|☾ switch via the shared /js/theme.js controller, and every
+        rgba(255,255,255,…)/rgba(130,100,255,…) literal replaced by the shared tokens so both
+        themes actually render.
     v1.1.0 — 2026-08-17 — Three private copies deleted, one behavior change. The inline EN/FI
         string table (29 of its keys absent from locales) is replaced by /js/i18n.js over
         agentConsentPage.* + the shared consent.* keys; the page-private SCOPE_PRESETS — whose
@@ -23,9 +29,39 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Agent Authorization — AIMEAT</title>
+  <!-- No-flash theme boot: same storage key as spa.html and oauth-consent.html, so the choice
+       carries between them. Plain inline JS (NOT a module — modules defer and reintroduce the
+       flash). Unset key = LIGHT, deliberately not the OS preference: this is a doorstep page,
+       and it opens bright. An explicit dark choice is kept. -->
+  <script>
+    (function () {
+      try {
+        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
+        document.documentElement.dataset.theme = stored === 'dark' ? 'dark' : 'light';
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light';
+      }
+    })();
+  </script>
   <style>
-    :root { --bg:#0d0d12; --card:#16161f; --border:#2a2a3a; --text:#e8e8f0;
-      --muted:#8888aa; --accent:#a78bfa; --success:#4ade80; --danger:#ff6b6b; }
+    /* Light first, dark as the override — the same tokens oauth-consent.html carries, tracking
+       theme.css light values, so the two consent doors read as one product. */
+    :root {
+      --bg:#FAFAF8; --card:#FFFFFF; --border:#E5E7EB; --text:#1A1A2E;
+      --muted:#6B7280; --accent:#7C5CD6; --success:#10B981; --danger:#DC2626;
+      --approve-fg:#FFFFFF;
+      --surface:rgba(0,0,0,.03);
+      --accent-soft:rgba(124,92,214,.06); --accent-soft-strong:rgba(124,92,214,.12);
+      --accent-soft-border:rgba(124,92,214,.28);
+    }
+    [data-theme="dark"] {
+      --bg:#0d0d12; --card:#16161f; --border:#2a2a3a; --text:#e8e8f0;
+      --muted:#8888aa; --accent:#a78bfa; --success:#4ade80; --danger:#ff6b6b;
+      --approve-fg:#000000;
+      --surface:rgba(255,255,255,.03);
+      --accent-soft:rgba(130,100,255,.06); --accent-soft-strong:rgba(130,100,255,.12);
+      --accent-soft-border:rgba(130,100,255,.3);
+    }
     * { box-sizing:border-box; margin:0; padding:0; }
     body { background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,sans-serif;
       min-height:100vh; display:flex; align-items:center; justify-content:center; padding:1rem; }
@@ -38,12 +74,12 @@
       border-radius:.5rem; color:var(--text); font-size:.9rem; margin-bottom:.75rem; }
     input:focus { outline:none; border-color:var(--accent); }
     .user-code-display { text-align:center; padding:1rem; margin:.75rem 0;
-      background:rgba(130,100,255,.08); border:1px solid rgba(130,100,255,.25);
+      background:var(--accent-soft); border:1px solid var(--accent-soft-border);
       border-radius:.75rem; }
     .user-code-value { font-family:'Courier New',monospace; font-size:2rem; font-weight:700;
       letter-spacing:.25em; color:var(--accent); }
     .user-code-hint { font-size:.8rem; color:var(--muted); margin-top:.4rem; }
-    .agent-info { background:rgba(255,255,255,.03); border-radius:.5rem; padding:.75rem 1rem;
+    .agent-info { background:var(--surface); border-radius:.5rem; padding:.75rem 1rem;
       margin:.75rem 0; font-size:.85rem; }
     .agent-info-row { display:flex; justify-content:space-between; padding:.25rem 0; }
     .agent-info-label { color:var(--muted); }
@@ -51,15 +87,15 @@
     .scope-section { margin:.75rem 0; }
     .scope-section-title { font-size:.9rem; font-weight:600; margin-bottom:.5rem; }
     .scope-radio { display:flex; align-items:flex-start; gap:.5rem; padding:.5rem .75rem;
-      background:rgba(255,255,255,.03); border:1px solid transparent; border-radius:.5rem;
+      background:var(--surface); border:1px solid transparent; border-radius:.5rem;
       margin-bottom:.4rem; cursor:pointer; transition:border-color .15s; }
     .scope-radio:hover { border-color:var(--border); }
-    .scope-radio.selected { background:rgba(130,100,255,.12); border-color:rgba(130,100,255,.3); }
+    .scope-radio.selected { background:var(--accent-soft-strong); border-color:var(--accent-soft-border); }
     .scope-radio input[type="radio"] { width:auto; margin:0; margin-top:.15rem; accent-color:var(--accent); }
     .scope-radio-content { flex:1; }
     .scope-radio-name { font-weight:600; font-size:.85rem; }
     .scope-radio-desc { font-size:.75rem; color:var(--muted); margin-top:.1rem; }
-    .custom-scopes { padding:.5rem .75rem; background:rgba(255,255,255,.03); border-radius:.5rem;
+    .custom-scopes { padding:.5rem .75rem; background:var(--surface); border-radius:.5rem;
       margin-top:.4rem; display:none; }
     .custom-scopes.visible { display:block; }
     .scope-checkbox { display:flex; align-items:center; gap:.5rem; padding:.25rem 0; font-size:.82rem; }
@@ -68,14 +104,14 @@
     .btn { flex:1; padding:.65rem 1rem; border:none; border-radius:.5rem; font-size:.9rem;
       font-weight:600; cursor:pointer; transition:opacity .15s; }
     .btn:hover { opacity:.85; }
-    .btn-approve { background:var(--success); color:#000; }
+    .btn-approve { background:var(--success); color:var(--approve-fg); }
     .btn-deny { background:transparent; border:1px solid var(--danger); color:var(--danger); }
     .btn:disabled { opacity:.4; cursor:not-allowed; }
     .error-msg { color:var(--danger); font-size:.85rem; margin-top:.5rem; min-height:1.2em; }
     .success-msg { text-align:center; padding:1.5rem 0; }
     .success-msg h2 { color:var(--success); margin-bottom:.5rem; }
     .success-msg .gaii { font-family:monospace; font-size:.85rem; color:var(--accent);
-      background:rgba(130,100,255,.1); padding:.3rem .6rem; border-radius:.3rem; display:inline-block; margin-top:.5rem; }
+      background:var(--accent-soft); padding:.3rem .6rem; border-radius:.3rem; display:inline-block; margin-top:.5rem; }
     .denied-msg { text-align:center; padding:1.5rem 0; }
     .denied-msg h2 { color:var(--muted); margin-bottom:.5rem; }
     .expired-msg { text-align:center; padding:1.5rem 0; }
@@ -84,10 +120,10 @@
     .polling-guidance-note { font-size:.85rem; color:var(--muted); margin-bottom:.75rem; line-height:1.5; }
     .gaii-block { margin:.75rem 0; }
     .gaii-label { font-size:.8rem; color:var(--muted); margin-bottom:.3rem; }
-    .polling-hint { margin-top:.75rem; padding:.75rem 1rem; background:rgba(130,100,255,.06);
-      border:1px solid rgba(130,100,255,.2); border-radius:.5rem; font-size:.82rem; color:var(--muted); line-height:1.5; }
+    .polling-hint { margin-top:.75rem; padding:.75rem 1rem; background:var(--accent-soft);
+      border:1px solid var(--accent-soft-border); border-radius:.5rem; font-size:.82rem; color:var(--muted); line-height:1.5; }
     .polling-hint code { font-family:'Courier New',monospace; color:var(--accent);
-      background:rgba(130,100,255,.12); padding:.1rem .35rem; border-radius:.25rem; }
+      background:var(--accent-soft-strong); padding:.1rem .35rem; border-radius:.25rem; }
     .msg-muted { color:var(--muted); }
     .boundary-list { margin:.75rem 0 0; padding-left:1.1rem; font-size:.82rem; color:var(--muted); }
     .boundary-list li { margin-bottom:.3rem; }
@@ -99,9 +135,16 @@
     .spinner { display:inline-block; width:1.5rem; height:1.5rem; border:2px solid var(--border);
       border-top-color:var(--accent); border-radius:50%; animation:spin .6s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    /* The ☀|☾ switch: same segmented shape the login pill and oauth-consent.html use. */
+    .theme-switch { position:fixed; top:.85rem; right:.85rem; display:flex; background:var(--card);
+      border:1px solid var(--border); border-radius:999px; overflow:hidden; }
+    .theme-switch button { border:none; background:transparent; color:var(--muted);
+      padding:.3rem .6rem; font-size:.9rem; line-height:1; cursor:pointer; }
+    .theme-switch button[aria-pressed="true"] { color:var(--accent); background:var(--surface); }
   </style>
 </head>
 <body>
+  <div class="theme-switch" id="themeSwitch"></div>
   <div class="consent-card" id="app">
     <div id="loading">
       <div class="spinner"></div>
@@ -111,6 +154,7 @@
 
   <script type="module">
     import { loadTranslations, t as translate } from '/js/i18n.js';
+    import { getTheme, setTheme } from '/js/theme.js';
     import { scopeSentence, presetSummary, boundaryLines } from '/js/consent-vocab.js';
     import { SCOPE_TEMPLATES, SCOPE_DOMAINS } from '/views/profile/agents/scope-model.js';
 
@@ -123,6 +167,22 @@
     // a bare key is agentConsentPage.*; a dotted key (consent.*, profile.*) passes through.
     await loadTranslations();
     const t = (key, vars) => translate(key.includes('.') ? key : 'agentConsentPage.' + key, vars);
+
+    // ── Theme switch: both options visible, the active one marked, stored in the same
+    // 'aimeat-theme' key the SPA reads, via the SPA's own controller module. ──
+    (function wireThemeSwitch() {
+      const wrap = document.getElementById('themeSwitch');
+      const label = (mode) => translate(mode === 'light' ? 'nav.themeToLight' : 'nav.themeToDark');
+      wrap.innerHTML = ['light', 'dark'].map((mode) =>
+        `<button type="button" data-mode="${mode}" aria-pressed="${getTheme() === mode}"
+           title="${escHtml(label(mode))}" aria-label="${escHtml(label(mode))}">${mode === 'light' ? '☀' : '☾'}</button>`
+      ).join('');
+      wrap.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+        setTheme(b.dataset.mode);
+        wrap.querySelectorAll('button').forEach((x) =>
+          x.setAttribute('aria-pressed', String(x.dataset.mode === b.dataset.mode)));
+      }));
+    })();
 
     // The three boundary sentences — shared with every other consent surface.
     const boundaryHtml = () =>
