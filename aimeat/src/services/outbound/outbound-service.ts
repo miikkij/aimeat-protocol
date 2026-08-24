@@ -51,6 +51,8 @@ import { buildFinvoiceXml } from '../finance/finvoice.js';
 import { requireOwnInvoice } from '../finance/invoice-service.js';
 import { resolveCompanySender, sendAsCompany } from '../company/company-smtp.js';
 import { isValidEmail } from '../../utils/email-validator.js';
+import { getStream } from '../signals/signal-service.js';
+import { buildOutboundBody } from './email-body.js';
 
 export class OutboundError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {
@@ -196,6 +198,24 @@ export async function setOptOut(storage: Storage, contact: OutboundContactRecord
   return updated;
 }
 
+/**
+ * The tracking image URL for one send, or null.
+ *
+ * Two refusals rather than one, and both matter: the sender must NAME a stream (nobody is measured
+ * by default) and must OWN it (a stream id is a public string, so trusting the request would let
+ * one account write counts into another's campaign report from a message that account never sent).
+ */
+async function openPixelUrl(
+  config: AimeatConfig, storage: Storage, ownerGhii: string, input: SendInput,
+): Promise<string | null> {
+  if (!input.signalStreamId || !input.signalSubject) return null;
+  const stream = await getStream(storage, ownerGhii, input.signalStreamId);
+  if (!stream || !stream.enabled) return null;
+  const owner = ownerGhii.split('@')[0];
+  return `${config.baseUrl}/v1/signals/${encodeURIComponent(owner)}/${encodeURIComponent(stream.streamId)}/px.svg`
+    + `?e=open&c=email&s=${encodeURIComponent(input.signalSubject.slice(0, 64))}`;
+}
+
 export interface SendInput {
   contactId: string;
   kind: OutboundKind;
@@ -218,6 +238,25 @@ export interface SendInput {
    * used — a fallback, not a failure.
    */
   companyId?: string;
+  /**
+   * Buttons the message carries, as DATA rather than as markup.
+   *
+   * The body is escaped on its way into the layout, deliberately, so a caller cannot put an anchor
+   * or an image into a message this node sends in its owner's name. That is the right default and
+   * it also made a link impossible, which is what a campaign is mostly made of. So the caller names
+   * the label and the address and the SERVER builds the anchor. Only http(s) survives: a
+   * `javascript:` or `data:` address in a mail somebody's customer opens is not a link.
+   */
+  links?: Array<{ label: string; url: string }>;
+  /**
+   * Count opens of this message into this signal stream, against this opaque recipient token.
+   *
+   * The stream must already exist and belong to the sender. The token is the SENDER's own: this
+   * node stores it and never learns the person behind it, which is what keeps "who opened it"
+   * answerable by the sender and by nobody else.
+   */
+  signalStreamId?: string;
+  signalSubject?: string;
 }
 
 export interface SendResult {
@@ -344,13 +383,14 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       error = 'EMAIL_DISABLED';
     } else {
       const unsubscribeUrl = `${config.baseUrl}/v1/outbound/unsubscribe?token=${contact.optOutToken}`;
-      const optOutFooter = input.kind === 'marketing'
-        ? `<p style="font-size:12px;color:#888">Et halua näitä viestejä? <a href="${unsubscribeUrl}">Peru tilaus</a> / Unsubscribe</p>`
-        : '';
-      const htmlBody = body.split(/\n{2,}/).map((p) => `<p>${escapeHtml(p).replaceAll('\n', '<br>')}</p>`).join('') + optOutFooter;
-      const textBody = input.kind === 'marketing'
-        ? `${body}\n\n--\nPeru tilaus / Unsubscribe: ${unsubscribeUrl}`
-        : body;
+      // The two halves are built by services/outbound/email-body.ts, which is pure and therefore
+      // testable: the escaping and the scheme check are the parts that must not drift, and they
+      // get their own unit test rather than being reachable only through a configured SMTP server.
+      const { htmlBody, textBody } = buildOutboundBody({
+        body, kind: input.kind, unsubscribeUrl,
+        links: input.links,
+        trackingUrl: await openPixelUrl(config, storage, ownerGhii, input),
+      });
       const { html, text } = outboundEmailHtml(subject, htmlBody, textBody, 'fi', input.fromName ? { brand: input.fromName } : undefined);
       // A company's own sending identity wins over the node's shared sender.
       if (companySender) {
@@ -378,10 +418,6 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   const log = await writeLog(storage, ownerGhii, contact.id, channel, input.kind, subject, input.templateId ?? null, status, error, invoiceId, organismId);
   emitChange('outbound', ownerGhii);
   return { log, channel, status };
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 async function writeLog(
