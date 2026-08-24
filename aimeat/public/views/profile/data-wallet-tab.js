@@ -10,6 +10,10 @@
  *     audit log with day-range selector, GDPR export button
  * @usage Loaded by profile.js route as a lazy tab component.
  * @version-history
+ *   v1.5.0 — 2026-08-24 — Live update is filtered and split by concern. It was a raw
+ *     `aimeat-live-update` listener with no domain filter, so every tick of every domain re-ran all
+ *     three reads; `memory` alone emits from thirty places. Consents + audit follow `consent`, and
+ *     the permission summary follows `memory` and `files` as well, because it counts both.
  *   v1.4.0 — 2026-07-18 — Vaihe 2d: the bespoke `audit-table` → canonical generic <DataTable>
  *     (rows/headers), unifying its look with the node-wide table style. The consents `consent-table`
  *     stays hand-rolled (its per-row `dw-expiring` highlight isn't expressible via DataTable).
@@ -32,6 +36,7 @@ import { DataTable } from '/components/DataTable.js';
 import * as consentService from '/js/services/consent.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { swallowed } from '/js/swallowed.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 
 export default function DataWalletTab({ session, showToast }) {
   const [consents, setConsents] = useState(null);
@@ -81,14 +86,19 @@ export default function DataWalletTab({ session, showToast }) {
     } catch (err) { swallowed('data-wallet-tab', err); setPermSummary(null); }
   }
 
-  // Live update listener
-  const loadAllRef = useRef(() => { loadConsents(); loadAudit(auditDays); loadPermSummary(); });
-  loadAllRef.current = () => { loadConsents(); loadAudit(auditDays); loadPermSummary(); };
-  useEffect(() => {
-    const handler = () => loadAllRef.current();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, []);
+  // Live update, one subscription per concern.
+  //
+  // This used to be a raw `aimeat-live-update` listener with NO domain filter, so every tick of every
+  // domain — and `memory` alone emits from thirty places — re-ran all three reads. On an account with
+  // a busy agent that is three requests a second for data that had not changed. Consents and the audit
+  // trail both move only on `consent`; the permission summary counts memory keys and storage files, so
+  // it also follows `memory` and `files`.
+  const loadConsentSideRef = useRef(null);
+  loadConsentSideRef.current = () => { loadConsents(); loadAudit(auditDays); loadPermSummary(); };
+  const loadPermSummaryRef = useRef(null);
+  loadPermSummaryRef.current = () => { loadPermSummary(); };
+  useEffect(() => onLiveUpdate(['consent'], () => loadConsentSideRef.current()), []);
+  useEffect(() => onLiveUpdate(['memory', 'files'], () => loadPermSummaryRef.current()), []);
 
   async function handleGrant(body) {
     try {

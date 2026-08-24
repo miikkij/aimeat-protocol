@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Profile tab for HTML app management — upload, gallery, access code editing.
  * @version-history
+ *   v1.8.0 — 2026-08-24 — Live update, both halves. The tab had no subscription at all, so an app
+ *     published from a chat stayed stale until a reload; it now follows 'apps' and 'skills'. The inner
+ *     AppAgents had an UNFILTERED listener and fans out one request per bundled agent, so a tick of
+ *     any domain cost N requests for deploy state only 'agents'/'agent-tasks' can change.
  *   v1.7.0 — 2026-07-17 — Agent-Bundled Apps Slice 2: the Deploy action opens a panel with a
  *     crew-def inspector (crew/tools/tasks) + runner and organism pickers instead of one-click
  *     defaulting to crew-forge.
@@ -42,6 +46,7 @@ import * as skillsService from '/js/services/skills.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { recordRecent } from '/js/recents.js';
 import { swallowed } from '/js/swallowed.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 
 /**
  * Per-app bound skills (2d): the skills that teach agents how to use THIS app.
@@ -155,12 +160,13 @@ function AppAgents({ owner, filename, agents, showToast, session }) {
     setStatuses(next);
   }, [owner, filename, agents]);
 
-  useEffect(() => {
-    loadStatuses();
-    const handler = () => loadStatuses();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [loadStatuses]);
+  // Filtered. This was a raw listener with no domain filter, and loadStatuses fans out one request
+  // PER bundled agent definition — so a tick of any domain at all (memory emits from thirty places)
+  // cost N requests for deploy state that only 'agents' and 'agent-tasks' can change.
+  useEffect(() => { loadStatuses(); }, [loadStatuses]);
+  const loadStatusesRef = useRef(loadStatuses);
+  loadStatusesRef.current = loadStatuses;
+  useEffect(() => onLiveUpdate(['agents', 'agent-tasks'], () => loadStatusesRef.current()), []);
 
   async function openPanel(def) {
     if (openDef === def.agent_name) { setOpenDef(null); return; }
@@ -307,6 +313,14 @@ export default function AppsTab({ session, showToast, onStats }) {
     if (session) loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // The tab itself had NO live-update subscription: publishing an app from a chat left this list
+  // showing the old version until a reload. Deliberately NOT 'memory' for the promoted doc this tab
+  // also reads — memory emits from thirty places and loadData is two requests, which is the very
+  // noise the data-wallet fix removed. Promotion is edited from this tab and reloads directly.
+  const loadDataRef = useRef(null);
+  loadDataRef.current = () => { if (session) loadData(); };
+  useEffect(() => onLiveUpdate(['apps', 'skills'], () => loadDataRef.current()), []);
 
   async function loadData() {
     try {
