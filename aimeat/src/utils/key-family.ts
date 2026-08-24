@@ -19,6 +19,9 @@
  *   classifyKey(key, hints?) · familyOf(key, hints?) · baseKeyOf(key)
  * @usage import { classifyKey } from '../utils/key-family.js';
  * @version-history
+ *   v1.1.1 — 2026-08-24 — SECURITY (CodeQL js/loop-bound-injection): split() scanned to the caller's
+ *     key length; bounded by MAX_KEY_LEN so an over-long string cannot force O(n) work. No change for
+ *     a real key, which runs to tens of characters.
  *   v1.1.0 — 2026-08-24 — `agentNames` and the `crews.<agent>.*` rule, found by running v1.0.0 over
  *     the production owner's WHOLE keyspace (18 446 keys) rather than the 1000-key sample it was
  *     written against. `crews.` is the convention an agent's deliverables land under, no node code
@@ -157,18 +160,27 @@ const GENERATED_CHUNK = /(^|[-_])(?=[a-z0-9]{8,}(?:[-_]|$))(?=[a-z0-9]*\d)[a-z0-
 /** How many leading segments a family may name before the tail becomes `*`. */
 const MAX_FAMILY_SEGMENTS = 4;
 
+/**
+ * A memory key is a storage ADDRESS, short by construction — real ones run to tens of characters.
+ * Bounding the scan here keeps an over-long caller-supplied string from turning family grouping into
+ * O(n) work on demand; a genuine key is far under the cap, so this changes nothing for real input.
+ */
+const MAX_KEY_LEN = 1024;
+
 /** A key is dotted, but some apps use slashes. Both separate; both are preserved in the family. */
 function split(key: string): { text: string; sep: string }[] {
   const out: { text: string; sep: string }[] = [];
   let start = 0;
-  for (let i = 0; i < key.length; i++) {
+  // Bound the scan by a constant, not by the caller's key length (js/loop-bound-injection).
+  const scanLen = Math.min(key.length, MAX_KEY_LEN);
+  for (let i = 0; i < scanLen; i++) {
     const ch = key[i];
     if (ch === '.' || ch === '/') {
       out.push({ text: key.slice(start, i), sep: ch });
       start = i + 1;
     }
   }
-  out.push({ text: key.slice(start), sep: '' });
+  out.push({ text: key.slice(start, MAX_KEY_LEN), sep: '' });
   return out;
 }
 
