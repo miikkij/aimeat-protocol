@@ -176,11 +176,10 @@ export function EcoTechDetails({ app, appSubs, onUnsubscribe, onSubscribe, setSu
             <div class="pf-eco-chips">
               ${(app.scopes || []).map(s => html`<span class="pf-eco-chip" key=${s}>${s}</span>`)}
             </div>
-            ${(app.data_areas || []).length > 0 && html`
-              <div class="pf-eco-areas">
-                ${app.data_areas.map((g, i) => html`
-                  <div class="pf-eco-area" key=${i}>${g.area}: <span class="pf-eco-mono">${g.pattern}</span> (${(g.rights || []).join(', ')})</div>`)}
-              </div>`}
+            ${/* The areas this app may write used to be listed HERE, three disclosures deep. A
+                  statement of what an outside app puts into your store is the opposite of a
+                  technical detail, so it is now its own section on the card, above the list of what
+                  it actually wrote — claim first, then evidence. See ecosystem-tab.js. */ ''}
           </div>
 
           <div class="pf-eco-tech-section">

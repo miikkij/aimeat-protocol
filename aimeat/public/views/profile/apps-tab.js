@@ -47,6 +47,7 @@ import { getNodeUrl } from '/js/services/auth.js';
 import { recordRecent } from '/js/recents.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
+import { DataMapStamp } from '/components/DataMap.js';
 
 /**
  * Per-app bound skills (2d): the skills that teach agents how to use THIS app.
@@ -544,6 +545,10 @@ export default function AppsTab({ session, showToast, onStats }) {
             <button class=${a.parked ? 'btn-success btn-sm' : 'btn-outline btn-sm'} onClick=${() => handleTogglePark(a)}>${a.parked ? (t('profile.apps.unpark') || 'Unpark') : (t('profile.apps.park') || 'Park')}</button>
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
           </div>
+          ${/* Where this app puts what, as one line. The card shows the STAMP and never fetches the
+                map: this list runs to 169 apps on the production node, and a per-card fetch of a
+                whole document is the shape that has taken a surface down here before. */ ''}
+          <${DataMapStamp} stamp=${a.data_map} href=${`/app-catalog.html#${encodeURIComponent(`${a.owner || session.owner}/${a.filename || a.name}`)}`} />
           <${AppSkills} owner=${a.owner || session.owner} filename=${a.filename || a.name} showToast=${showToast} />
           ${a.manifest?.cortex?.agents?.length ? html`<${AppAgents} owner=${a.owner || session.owner} filename=${a.filename || a.name} agents=${a.manifest.cortex.agents} showToast=${showToast} session=${session} />` : ''}
           ${editingMeta === a.filename ? html`

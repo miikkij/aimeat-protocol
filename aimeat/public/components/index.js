@@ -7,6 +7,8 @@
  *   `import { Modal, ConfirmDialog, Markdown } from '/components/index.js'`)
  *   over deep-importing the individual component files.
  * @version-history
+ *   v1.10.0 — 2026-08-24 — export DataMap: the ONE data map, wherever one is shown. Six surfaces
+ *     were about to grow six vocabularies for the same thing, three of them already live.
  *   v1.9.0 — 2026-08-01 — TARGET-058 Phase 3: export AiLabel + AiInteractionNotice + euIconFor —
  *     the ONE visible AI-transparency label. No surface hand-rolls a badge; if it is awkward to
  *     import somewhere, fix the component rather than forking it.
@@ -48,6 +50,7 @@ export { Pagination, LoadMore } from './Pagination.js';
 export { KeyValueRow } from './KeyValueRow.js';
 export { SearchBar } from './SearchBar.js';
 export { DataTable } from './DataTable.js';
+export { DataMap } from './DataMap.js';
 export { Collapsible } from './Collapsible.js';
 export { Markdown, sanitizeHref } from './Markdown.js';
 export { useViewCSS } from './useViewCSS.js';

@@ -94,6 +94,14 @@ export interface AppRepository {
             descriptions?: Record<string, string>;
             protection?: import('../interface.js').AppProtection;
             cortex?: import('../interface.js').AppManifestCortex | null;
+            /**
+             * The data map's SUMMARY. Written here by the one-off backfill, which gives an app that
+             * was published before the map existed something the listings can show without waiting
+             * for its author to republish it. The publish path owns this field in every other case;
+             * this is the second writer and it exists only because the first one cannot reach 169
+             * apps that are already live.
+             */
+            dataMap?: import('../interface.js').AppManifest['dataMap'];
         },
     ): Promise<boolean>;
     /**
