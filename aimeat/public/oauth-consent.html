@@ -8,6 +8,9 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.3.1 — 2026-08-24 — Light is the default, not the OS preference: with no stored choice the
+        page opens light, and only an explicit dark pick (the ☾ button here or in the SPA) darkens
+        it. Same-day developer decision on seeing both: light is the doorstep mood.
     v1.3.0 — 2026-08-24 — The owner decides the permission level HERE, before approving, instead
         of approving whatever the agent happens to hold and then walking to Profile › Agents to
         widen it. Same picker as the device-authorization page (keep current / read-only /
@@ -44,17 +47,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Authorize — AIMEAT</title>
-  <!-- No-flash theme boot: same snippet and storage key as spa.html, so the choice made on
-       either surface carries to the other. Plain inline JS (NOT a module — modules defer and
-       reintroduce the flash). Unset key = follow OS. -->
+  <!-- No-flash theme boot: same storage key as spa.html, so the choice made on either surface
+       carries to the other. Plain inline JS (NOT a module — modules defer and reintroduce the
+       flash). Unset key = LIGHT, deliberately not the OS preference: this is the doorstep a
+       first-time visitor lands on, and it opens bright. An explicit dark choice is kept. -->
   <script>
     (function () {
       try {
         var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
-        var theme = (stored === 'light' || stored === 'dark')
-          ? stored
-          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        document.documentElement.dataset.theme = theme;
+        document.documentElement.dataset.theme = stored === 'dark' ? 'dark' : 'light';
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
       }
