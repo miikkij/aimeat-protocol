@@ -585,7 +585,8 @@
       "exchange": "el mercado",
       "finance": "tu contabilidad",
       "outbound": "correo a tus contactos",
-      "company": "tus empresas"
+      "company": "tus empresas",
+      "signals": "el alcance de tus mensajes y páginas"
     },
     "scopeText": {
       "task": {
@@ -6373,6 +6374,10 @@
           "compliance": {
             "read": "Leer el informe de cumplimiento: la actividad de IA de todas las cuentas aquí, en un solo documento, incluyendo qué agentes publicaron sin etiqueta. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. \"Acceso total\" no lo incluye.",
             "write": "Cambiar lo que el informe de cumplimiento dice que está pasando: la lista de para qué se usa la IA, y las preguntas que deciden la clase de riesgo de cada uso. Solo funciona para quien administra esta instalación. Leer y cambiar son permisos separados, y \"Acceso total\" no incluye ninguno de los dos."
+          },
+          "signals": {
+            "read": "Ver quién abrió, hizo clic o visitó lo que enviaste y publicaste.",
+            "write": "Crear contadores para las campañas, los enlaces y las páginas que quieres medir."
           }
         },
         "domainAi": "IA",
@@ -6393,7 +6398,8 @@
         "domainOperator": "Administración de este nodo",
         "permInvoke": "Ejecutar",
         "domainPackages": "Paquetes",
-        "domainCompliance": "Cumplimiento"
+        "domainCompliance": "Cumplimiento",
+        "domainSignals": "Alcance"
       },
       "deviceAuth": {
         "title": "Autorización de dispositivo",

@@ -81,6 +81,12 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'finance:read': 'Read your bookkeeping: invoices, vouchers, VAT reports and exports',
   'finance:write': 'Create and send invoices and book accounting vouchers on your behalf',
   'outbound:send': 'Send email/messages to your saved outbound contacts on your behalf (opt-outs and daily limits always apply)',
+  // Measuring what was reached. Split in two because they are different favours: setting up a
+  // counter is housekeeping, while READING one tells you who opened what and when — the closest
+  // thing this node holds to watching a named person, even though it stores no address and no IP.
+  // An app that measures its own campaign needs the first; handing over the second is a decision.
+  'signals:write': 'Set up counters for what you send and publish (campaigns, links, pages)',
+  'signals:read': 'Read what those counters collected, including which recipients opened or clicked',
   // A company is an addressable public identity, so claiming one and pointing its address
   // somewhere are separate from reading the registry.
   'company:read': 'See the companies you have registered and their addresses',

@@ -87,6 +87,17 @@ export type OutboundStatus = 'sent' | 'failed' | 'suppressed' | 'skipped';
 export interface OutboundMessageRecord {
   id: string;
   ownerGhii: string;
+  /**
+   * WHICH COMPANY SENT IT, as the organism its books live under — the same key the finance records
+   * use, so one company's sending and one company's invoicing agree about what a company is.
+   *
+   * The send door has taken a `company_id` since it was written, and it reached the SMTP identity
+   * and stopped there: the log recorded who the OWNER was and nothing about which of their
+   * companies had spoken. So an owner with two companies had one sending reputation, one daily
+   * cap, and no way to answer "what did this company send". Null for an owner who has never split
+   * their companies, which is every send made before 2026-08-23.
+   */
+  organismId: string | null;
   contactId: string;
   channel: OutboundChannel;
   kind: OutboundKind;

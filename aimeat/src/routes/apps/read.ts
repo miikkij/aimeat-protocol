@@ -55,6 +55,7 @@ import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import { recordAppOpen } from '../../services/usage/record-app-open.js';
+import { countPageView } from '../../services/signals/page-views.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
@@ -638,6 +639,12 @@ export function registerReadRoutes(
         storage.incrementAppDownloads(app.ownerGaii, filename).catch(err => { logger.warn('body: continuing after a suppressed failure', { error: String(err) }); });
         // The lifetime counter above answers "how many"; this answers when, and by whom.
         recordAppOpen({ appOwnerGaii: app.ownerGaii, filename, viewer: req.auth?.sub });
+        // And this answers WHAT KIND of visitor, which the other two cannot: an AI crawler runs no
+        // script and loads no image, so a page fetch is the only place it is visible. No-op unless
+        // the owner opted this page in by creating its stream. Never awaited.
+        countPageView(storage, {
+            ownerGaii: app.ownerGaii, name: filename, userAgent: req.get('user-agent'),
+        });
 
         res.send(body);
     });

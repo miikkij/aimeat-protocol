@@ -585,7 +585,8 @@
       "exchange": "the marketplace",
       "finance": "your bookkeeping",
       "outbound": "email to your contacts",
-      "company": "your companies"
+      "company": "your companies",
+      "signals": "what your messages and pages reach"
     },
     "scopeText": {
       "task": {
@@ -6394,6 +6395,10 @@
           "compliance": {
             "read": "Read the compliance report: every account's AI activity here in one document, including whose agents published without a label. Only works for whoever runs this installation; on any other account this permission does nothing. \"Full access\" does not include it.",
             "write": "Change what the compliance report says is going on: the list of what AI is used for, and the questions that decide each one's risk class. Only works for whoever runs this installation. Reading and changing are separate permissions, and \"Full access\" includes neither."
+          },
+          "signals": {
+            "read": "See who opened, clicked or visited what you sent and published.",
+            "write": "Set up counters for the campaigns, links and pages you want measured."
           }
         },
         "domainAi": "AI",
@@ -6414,7 +6419,8 @@
         "domainOperator": "Running this node",
         "permInvoke": "Run",
         "domainPackages": "Packages",
-        "domainCompliance": "Compliance"
+        "domainCompliance": "Compliance",
+        "domainSignals": "Reach"
       },
       "deviceAuth": {
         "title": "Device Authorization",
