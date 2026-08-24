@@ -103,6 +103,7 @@ export const companyMethods: CompanyRepository & ThisType<PostgresKyselyStorage>
   async listCompanies(this: PostgresKyselyStorage, query: CompanyQuery): Promise<CompanyRecord[]> {
     let q = this.db.selectFrom('Company').selectAll();
     if (query.ownerGhii) q = q.where('ownerGhii', '=', query.ownerGhii);
+    if (query.organismId) q = q.where('organismId', '=', query.organismId);
     if (query.status) q = q.where('status', '=', query.status);
     q = q.orderBy('createdAt', 'desc');
     if (query.limit !== undefined) q = q.limit(query.limit);
@@ -114,6 +115,7 @@ export const companyMethods: CompanyRepository & ThisType<PostgresKyselyStorage>
   async countCompanies(this: PostgresKyselyStorage, query: CompanyQuery): Promise<number> {
     let q = this.db.selectFrom('Company').select(sql<number>`count(*)`.as('n'));
     if (query.ownerGhii) q = q.where('ownerGhii', '=', query.ownerGhii);
+    if (query.organismId) q = q.where('organismId', '=', query.organismId);
     if (query.status) q = q.where('status', '=', query.status);
     const r = await q.executeTakeFirst();
     return Number(r?.n ?? 0);

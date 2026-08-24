@@ -82,6 +82,11 @@ export interface CompanyRecord {
 
 export interface CompanyQuery {
   ownerGhii?: string;
+  /**
+   * The organism a company is bound to. Reading by organism is how a member finds the companies
+   * their group shares with them, without scanning every company on the node.
+   */
+  organismId?: string;
   status?: CompanyStatus;
   limit?: number;
   offset?: number;

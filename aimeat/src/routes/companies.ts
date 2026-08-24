@@ -33,6 +33,7 @@ import type { CompanyRecord } from '../models/company-schemas.js';
 import {
   setCompanySmtp, getCompanySmtpPublic, deleteCompanySmtp,
 } from '../services/company/company-smtp.js';
+import { listSendableCompanies } from '../services/outbound/company-sender-access.js';
 import {
   publishCompanyPortfolio, getCompanyPortfolio, deleteCompanyPortfolio,
 } from '../services/company/company-portfolio.js';
@@ -173,6 +174,34 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
       ...result,
       address: config.coHost ? `${result.slug}.${config.coHost}` : null,
     }));
+  });
+
+  /* GET /v1/companies/sendable — the companies this caller may send AS, and from which address.
+   *
+   * A separate read rather than a widening of GET /v1/companies, which means "the companies I
+   * registered" and is relied on to mean exactly that. This answers a different question — "whose
+   * name may I speak in" — and the two answers differ the moment a team shares a company: an
+   * organism's active members may send as a company bound to that organism without owning it.
+   *
+   * It carries the from-address so a picker needs one call instead of one per company, and it
+   * carries `via` so a person can see WHY a company is on their list. The password is not part of
+   * any of this; `has_own_server` is the whole of what a chooser needs to know.
+   *
+   * Registered before /v1/companies/:id, or Express reads "sendable" as an id.
+   */
+  router.get('/v1/companies/sendable', requireAuth(), requireScope('company:read'), async (req, res) => {
+    const rows = await listSendableCompanies(storage, resolve(req));
+    const companies = await Promise.all(rows.map(async ({ company, via }) => {
+      const smtp = await storage.getCompanySmtp(company.id);
+      return {
+        id: company.id, name: company.name, slug: company.slug,
+        organism_id: company.organismId, via,
+        from_address: smtp?.fromAddress ?? null,
+        from_name: smtp?.fromName ?? null,
+        has_own_server: !!smtp,
+      };
+    }));
+    res.json(success(config.nodeId, { companies }));
   });
 
   router.get('/v1/companies', requireAuth(), requireScope('company:read'), async (req, res) => {

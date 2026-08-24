@@ -313,6 +313,7 @@ const ALL_SUITES = [
     'test/e2e-finance-per-company.ts',
     'test/e2e-outbound.ts',
     'test/e2e-signals.ts',
+    'test/e2e-outbound-organism-sender.ts',
     'test/e2e-companies.ts',
     'test/e2e-money-audit.ts',
     'test/e2e-x402.ts',

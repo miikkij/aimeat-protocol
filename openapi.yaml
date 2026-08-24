@@ -47456,6 +47456,18 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
 
   # ── Companies (company-in-a-box: the co origin) ─────────────────────────────
+  /v1/companies/sendable:
+    get:
+      operationId: listSendableCompanies
+      tags: [Companies]
+      summary: The companies this caller may send AS, and from which address
+      description: 'A different question from GET /v1/companies ("the companies I registered"), and the two answers differ the moment a team shares one: an ACTIVE member of the organism a company is bound to may send as that company without owning it. `via` says which route reached it. Carries the sending address so a picker needs one call rather than one per company; `has_own_server` is false when the company would fall back to the node''s shared sender. The SMTP password is never part of any read. Requires scope company:read.'
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/companies:
     get:
       operationId: listCompanies

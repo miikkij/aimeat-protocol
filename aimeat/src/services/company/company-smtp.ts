@@ -14,8 +14,14 @@
  *      descriptors and the fact of who sent when.
  *
  * @structure setCompanySmtp · getCompanySmtpPublic · resolveCompanySender · sendAsCompany
- * @usage const sender = await resolveCompanySender(config, storage, ownerGhii, companyId);
+ * @usage const sender = await resolveCompanySender(config, storage, sendingCompany.company);
  * @version-history
+ *   v1.1.0 — 2026-08-24 — resolveCompanySender no longer authorizes. Sending as a company is no
+ *     longer the same question as owning it (an organism's members may speak for a company bound
+ *     to that organism), and a second copy of that rule here would drift from the one that
+ *     decides. It takes the already-granted company and builds the transport. Returns null when
+ *     the company has no identity of its own, which is the honest fallback to the node's shared
+ *     sender rather than a failure.
  *   v1.0.0 — 2026-08-07 — Per-company sending identity for the outbound door.
  */
 import { createTransport } from 'nodemailer';
@@ -27,6 +33,7 @@ import type { EmailAttachment } from '../email.js';
 import { encrypt, decrypt, getEncryptionKey } from '../encryption.js';
 import { logger } from '../../utils/logger.js';
 import { CompanyError, requireOwnCompany } from './company-service.js';
+import type { CompanyRecord } from '../../models/company-schemas.js';
 
 export interface CompanySmtpInput {
   host: string;
@@ -104,14 +111,17 @@ export interface CompanySender {
 }
 
 /**
- * Resolves the company's sending identity for a send. Returns null when the company has
- * none — the caller then falls back to the node's shared sender, which is the honest
- * default rather than a failure.
+ * Build the transport for a company whose right to speak has ALREADY been decided.
+ *
+ * It used to re-check ownership here, which was the whole authorization for sending as a company
+ * and is now too narrow: a company bound to an organism may also be spoken for by that organism's
+ * members. Two checks in two places would drift, so this one takes the company the caller was
+ * granted (services/outbound/company-sender-access.ts) and does no authorizing of its own. The
+ * type is the reminder: you cannot call this without having resolved access first.
  */
 export async function resolveCompanySender(
-  config: AimeatConfig, storage: Storage, ownerGhii: string, companyId: string,
+  config: AimeatConfig, storage: Storage, company: CompanyRecord,
 ): Promise<CompanySender | null> {
-  const company = await requireOwnCompany(storage, ownerGhii, companyId);
   const smtp = await storage.getCompanySmtp(company.id);
   if (!smtp) return null;
   let password: string | null = null;

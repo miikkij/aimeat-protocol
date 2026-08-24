@@ -50,6 +50,7 @@ import { renderInvoicePdf } from '../finance/invoice-pdf.js';
 import { buildFinvoiceXml } from '../finance/finvoice.js';
 import { requireOwnInvoice } from '../finance/invoice-service.js';
 import { resolveCompanySender, sendAsCompany } from '../company/company-smtp.js';
+import { resolveSendingCompany } from './company-sender-access.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { getStream } from '../signals/signal-service.js';
 import { buildOutboundBody } from './email-body.js';
@@ -280,27 +281,41 @@ async function loadTemplate(storage: Storage, ownerGhii: string, templateId: str
 
 /** The send. Every outcome is logged; only policy violations throw. */
 export async function sendOutbound(config: AimeatConfig, storage: Storage, ownerGhii: string, input: SendInput): Promise<SendResult> {
-  const contact = await requireOwnContact(storage, ownerGhii, input.contactId);
-
-  // WHICH COMPANY IS SPEAKING, resolved before the first log line rather than at the SMTP step.
+  // WHICH COMPANY IS SPEAKING, resolved before anything else, because it decides WHOSE BOOK this
+  // send belongs to and every gate below reads that book.
+  //
   // `company_id` reached the sender identity and stopped there, so a refused send — a suppression,
   // an opt-out, a full allowance — was recorded with no company on it at all. The rows that say
   // why something did NOT go out are the ones an owner reads when a company's sending looks wrong.
-  // A company that is not this owner's contributes no scope rather than an error: the SMTP
-  // resolution below refuses it by name, and this line is not the place that decides.
-  const sendingCompany = input.companyId ? await storage.getCompany(input.companyId) : undefined;
-  const organismId = sendingCompany && sendingCompany.ownerGhii === ownerGhii
-    ? sendingCompany.organismId : null;
+  //
+  // An unauthorised company is refused HERE rather than silently ignored. It used to contribute no
+  // scope and fall through to the shared sender, which meant a caller could believe they had sent
+  // as a company they may not speak for. Naming something you are not allowed to name is an error.
+  const sender = input.companyId
+    ? await resolveSendingCompany(storage, ownerGhii, input.companyId)
+    : null;
+  if (input.companyId && !sender) {
+    throw new OutboundError('NOT_FOUND', 404, 'Company not found');
+  }
+  const organismId = sender ? sender.company.organismId : null;
+
+  // THE BOOK. Recipients, opt-outs, suppression, the daily allowance and the log all belong to the
+  // company once one is named, not to whoever pressed send. Without this a person who unsubscribed
+  // from one member's campaign is mailed by the next member, who has no way of knowing — a promise
+  // broken by two people who each believed they were keeping it.
+  const bookOwner = sender ? sender.bookOwner : ownerGhii;
+
+  const contact = await requireOwnContact(storage, bookOwner, input.contactId);
 
   // Gate 2: suppression beats everything.
   if (contact.suppressedAt) {
-    const log = await writeLog(storage, ownerGhii, contact.id, 'email', input.kind, input.subject ?? '(suppressed)', input.templateId ?? null, 'suppressed', `Address suppressed after ${contact.bounceCount} bounces`, input.invoiceId ?? null, organismId);
+    const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(suppressed)', input.templateId ?? null, 'suppressed', `Address suppressed after ${contact.bounceCount} bounces`, input.invoiceId ?? null, organismId);
     throw Object.assign(new OutboundError('SUPPRESSED', 422, 'Recipient address is suppressed (bounces); clear it on the contact first'), { log });
   }
 
   // Gate 3: opt-out blocks marketing only.
   if (contact.optedOut && input.kind === 'marketing') {
-    const log = await writeLog(storage, ownerGhii, contact.id, 'email', input.kind, input.subject ?? '(opted out)', input.templateId ?? null, 'skipped', 'Recipient has opted out of marketing', input.invoiceId ?? null, organismId);
+    const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(opted out)', input.templateId ?? null, 'skipped', 'Recipient has opted out of marketing', input.invoiceId ?? null, organismId);
     throw Object.assign(new OutboundError('OPTED_OUT', 422, 'Recipient has opted out of marketing messages'), { log });
   }
 
@@ -311,7 +326,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   // else's sending. A send that names no company keeps counting against the owner-wide total,
   // which is what every account had before and still has.
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const sentToday = await storage.countOutboundMessagesSince(ownerGhii, since, organismId ?? undefined);
+  const sentToday = await storage.countOutboundMessagesSince(bookOwner, since, organismId ?? undefined);
   if (sentToday >= config.outboundDailyLimit) {
     throw new OutboundError('DAILY_LIMIT', 429, `Outbound daily limit reached (${config.outboundDailyLimit}/24h)`);
   }
@@ -320,7 +335,7 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   let subject: string;
   let body: string;
   if (input.templateId) {
-    const tpl = await loadTemplate(storage, ownerGhii, input.templateId);
+    const tpl = await loadTemplate(storage, bookOwner, input.templateId);
     const vars = input.variables ?? {};
     subject = substitute(tpl.subject, vars);
     body = substitute(tpl.body, vars);
@@ -333,6 +348,9 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   const attachments: EmailAttachment[] = [];
   let invoiceId: string | null = null;
   if (input.invoiceId) {
+    // The CALLER's invoice, deliberately, not the company's book. An invoice is finance, which has
+    // its own cross-owner rule (finance.accountants); letting a sending permission reach somebody
+    // else's invoices would be a second, quieter door into the books.
     const invoice = await requireOwnInvoice(storage, ownerGhii, input.invoiceId).catch(() => {
       throw new OutboundError('NOT_FOUND', 404, 'Invoice not found');
     });
@@ -362,6 +380,9 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       ? `\n\n(${attachments.map((a) => a.filename).join(', ')} — lataa liitteet lähettäjän palvelusta)`
       : '';
     const result = await sendDirectMessage({ config, storage, peers: new Map() }, {
+      // The AIMEAT inbox channel carries the CALLER, never the company's owner. This message is
+      // genuinely from the person who sent it, and stamping somebody else's identity on it would
+      // be impersonation inside the recipient's own inbox.
       senderGhii: ownerGhii,
       recipientGhii: contact.ghii,
       body: `**${subject}**\n\n${body}${noteLine}`,
@@ -375,8 +396,8 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     const emailSvc = getActiveEmailService();
     // A company with its own SMTP does not need the node's shared transport configured:
     // "the node cannot send" and "this company cannot send" are different facts.
-    const companySender = input.companyId
-      ? await resolveCompanySender(config, storage, ownerGhii, input.companyId)
+    const companySender = sender
+      ? await resolveCompanySender(config, storage, sender.company)
       : null;
     if (!companySender && !emailSvc?.enabled) {
       status = 'failed';
@@ -389,6 +410,9 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       const { htmlBody, textBody } = buildOutboundBody({
         body, kind: input.kind, unsubscribeUrl,
         links: input.links,
+        // The counter belongs to whoever set it up, which is the caller: they created the stream
+        // under their own identity and their campaign report reads it back. Sharing the book does
+        // not mean sharing the measurement.
         trackingUrl: await openPixelUrl(config, storage, ownerGhii, input),
       });
       const { html, text } = outboundEmailHtml(subject, htmlBody, textBody, 'fi', input.fromName ? { brand: input.fromName } : undefined);
