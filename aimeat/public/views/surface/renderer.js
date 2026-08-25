@@ -31,6 +31,7 @@ import { h, Component } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
+import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
@@ -113,11 +114,23 @@ function componentFor(id, onReady) {
   return undefined;   // still loading
 }
 
-/** The operator's own heading for a block, in this reader's language, or nothing. */
+/**
+ * A block's heading. The operator's own words win; otherwise a named heading this node already has
+ * in every language it speaks; otherwise nothing. That order is what lets the built-in layout carry
+ * a localized band title without freezing it into English.
+ */
 function titleOf(block, locale) {
-  const t = block?.titles;
-  if (!t || typeof t !== 'object') return '';
-  return t[locale] || t[locale?.split('-')[0]] || t.en || '';
+  const own = block?.titles;
+  if (own && typeof own === 'object') {
+    const mine = own[locale] || own[locale?.split('-')[0]] || own.en;
+    if (mine) return mine;
+  }
+  const key = block?.props?.titleKey;
+  if (typeof key === 'string' && key) {
+    const words = t(key);
+    if (words && words !== key) return words;
+  }
+  return '';
 }
 
 function Block({ block, ctx, freeform, locale }) {

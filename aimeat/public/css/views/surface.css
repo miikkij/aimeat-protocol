@@ -15,21 +15,30 @@
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 
-/* A group with a heading. The blocks inside keep their own spacing; this is the frame. */
+/* A group with a heading. The blocks inside keep their own spacing; this is the frame.
+   These numbers are the home's own band (.koti-band in views/home.css), matched deliberately: the
+   band that groups the playbooks with the achievements strip was drawn by the home before the engine
+   existed, and it has to look the same afterwards. It lives here rather than there because the front
+   page can group blocks too, and a rule the portal needs does not belong in the home's stylesheet. */
 .sf-band {
-  margin: 2rem 0;
+  margin-top: 1.8rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--border);
 }
 
 .sf-band-title {
-  font-size: var(--text-sm);
-  font-weight: 600;
+  font-size: 0.92rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-muted);
-  margin: 0 0 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border-subtle);
+  letter-spacing: 1.4px;
+  color: var(--text-dim);
+  font-weight: 700;
+  margin: 0 0 0.9rem;
 }
+
+/* Inside a band, successive rows keep one rhythm: more air between rows than between the chips
+   inside one, so the categories read apart instead of as one lump. */
+.sf-band > * + * { margin-top: 1.3rem; }
+.sf-band > .sf-band-title + * { margin-top: 0; }
 
 /* A passage the operator wrote. Three framings, because an aside and a section of the page are
    not the same thing and an operator can tell which one they meant. */

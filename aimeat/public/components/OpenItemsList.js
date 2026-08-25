@@ -41,6 +41,7 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { apiGet } from '/js/api.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { listOpenItems, switchOff } from '/js/services/open-items.js';
+import { onLiveUpdate } from '/lib/live-updates.js';
 import { CardMenu } from '/components/CardMenu.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -96,11 +97,12 @@ export function OpenItemsList({ maxAgeDays } = {}) {
 
   // Every surface showing server data re-fetches on this. It matters more here than anywhere: the
   // AI switches these on and off while the person is looking at the page.
-  useEffect(() => {
-    const handler = () => load();
-    window.addEventListener('aimeat-live-update', handler);
-    return () => window.removeEventListener('aimeat-live-update', handler);
-  }, [load]);
+  //
+  // Named domains rather than a raw listener on everything. The unfiltered version re-read this
+  // list twice on every SSE event of any kind — a message arriving re-fetched the open items and
+  // their prompt — which is measurable on the home, where this sits beside blocks that had already
+  // been narrowed. 'open-items' is what services/open-items.js emits when the person acts here.
+  useEffect(() => onLiveUpdate(['open-items', 'agent-tasks', 'work', 'tasks'], () => load()), [load]);
 
   // The menu closes itself on the click, so there is no row-level busy state to show: the list
   // simply reloads under it.

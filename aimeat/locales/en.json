@@ -3714,7 +3714,8 @@
       "toProfile": "Go back to the old profile",
       "hereProfile": "You are using the old profile.",
       "toHome": "Try the new home"
-    }
+    },
+    "loadFailed": "Your home could not be loaded just now. Try again in a moment."
   },
   "home.mat.improve": "Make my welcome page better",
   "home.mat.teachDots": "The three dots in the corner are how you act on anything here. Every card has them, always in that same corner.",
@@ -10260,9 +10261,6 @@
         },
         "trust": {
           "label": "AI labelling and data ownership"
-        },
-        "settings-door": {
-          "label": "Way into settings"
         },
         "steps": {
           "label": "Setup path for someone new"

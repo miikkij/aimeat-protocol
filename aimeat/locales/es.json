@@ -3572,7 +3572,8 @@
       "toProfile": "Volver al perfil antiguo",
       "hereProfile": "Estás usando el perfil antiguo.",
       "toHome": "Prueba el hogar nuevo"
-    }
+    },
+    "loadFailed": "Tu página de inicio no se ha podido cargar ahora. Inténtalo dentro de un momento."
   },
   "home.mat.improve": "Mejorar mi página de bienvenida",
   "home.mat.teachDots": "Los tres puntos de la esquina son la forma de actuar sobre cualquier cosa de aquí. Todas las tarjetas los tienen, siempre en esa misma esquina.",
@@ -9975,9 +9976,6 @@
         },
         "trust": {
           "label": "Etiquetado de IA y propiedad de los datos"
-        },
-        "settings-door": {
-          "label": "Entrada a los ajustes"
         },
         "steps": {
           "label": "Recorrido para quien empieza"

@@ -57,6 +57,12 @@ const COMMON_BLOCKS: readonly SurfaceBlockDef[] = [
                 default: 'band',
                 description: 'Whether the group is framed with a heading and a rule, or just stacked.',
             },
+            titleKey: {
+                type: 'string',
+                maxLength: 120,
+                default: '',
+                description: 'A named heading this node already has words for, in every language it speaks. Your own heading, if you set one, wins over it.',
+            },
         },
         maxPerSurface: 6,
         container: true,
@@ -168,13 +174,19 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         b('home.chat-door'),
         b('home.fleet'),
         b('home.things'),
-        b('home.playbooks'),
-        b('home.achievements'),
+        // The playbooks and the achievements strip share one titled band, exactly as they do today.
+        // This is why the schema has a nesting level at all: a flat list cannot say "these two go
+        // together under this heading", and the band is what makes the page read as sections.
+        {
+            id: 'common.band',
+            key: 'band.setup',
+            props: { tone: 'band', titleKey: 'home.playbooks.title' },
+            children: [b('home.playbooks'), b('home.achievements')],
+        },
         b('home.feed'),
         b('home.open-items'),
         b('home.install-cta'),
         b('home.trust'),
-        b('home.settings-door'),
     ],
     'home-onboarding': [
         b('home.nameplate'),
@@ -182,7 +194,6 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         b('home.install-cta'),
         b('home.feed'),
         b('home.trust'),
-        b('home.settings-door'),
     ],
 };
 
