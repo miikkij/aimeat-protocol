@@ -18,6 +18,13 @@
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2 per docs/datakartta-maaritelma.md.
  */
 
+/**
+ * The spec this build understands. A stamp or a map carrying anything else was written by a version
+ * with different rules — the previous one GUESSED a map when an app said nothing — so it is read as
+ * "no map" rather than as a map. Both renderers check it, which is why it lives here.
+ */
+export const DATA_MAP_SPEC = 'aimeat.datamap/2';
+
 /** Every axis, value → i18n key suffix. The key is `dataMap.<axis>.<value>`. */
 export const AXES = ['form', 'where', 'kind', 'use', 'owner', 'readers', 'writer', 'shape', 'kept', 'loss'];
 
@@ -108,7 +115,7 @@ export function placesOf(map) {
 
 /** The four states a map can be in. The one a reader must not miss is `contradicted`. */
 export function stateOf(map) {
-  if (!map || map.source === 'none') return 'missing';
+  if (!map || map.spec !== DATA_MAP_SPEC || map.source === 'none') return 'missing';
   if (contradictionOf(map)) return 'contradicted';
   if ((map.held || []).some(r => !String(r.why || '').trim())) return 'unfinished';
   return 'stated';

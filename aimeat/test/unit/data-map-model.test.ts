@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, VALUES,
+  labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, VALUES, DATA_MAP_SPEC,
 } from '../../public/components/data-map/model.js';
 
 const ROOT = join(import.meta.dirname, '../..');
@@ -122,6 +122,13 @@ describe('stateOf', () => {
   it('a map nobody wrote is missing, and that is never guessed away', () => {
     expect(stateOf(null)).toBe('missing');
     expect(stateOf(map({ source: 'none' }))).toBe('missing');
+  });
+
+  // Found on the production node: 110 apps still carried a stamp from the version that DERIVED a
+  // map from permission words, and the list read those as written maps — the same lie, one layer up.
+  it('a map from an older spec is missing, because that version guessed', () => {
+    expect(stateOf(map({ spec: 'aimeat.datamap/1' }))).toBe('missing');
+    expect(DATA_MAP_SPEC).toBe('aimeat.datamap/2');
   });
   it('a contradiction outranks an unfinished row', () => {
     expect(stateOf(map({ form: 'group', held: [row({ why: '' })] }))).toBe('contradicted');
