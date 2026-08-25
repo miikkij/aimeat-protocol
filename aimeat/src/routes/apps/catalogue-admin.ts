@@ -240,6 +240,15 @@ export function registerCatalogueAdminRoutes(
                 operator_hidden_by: app.operatorHiddenBy ?? null,
                 operator_hidden_at: app.operatorHiddenAt ?? null,
                 operator_hide_reason: app.operatorHideReason ?? null,
+                // Search visibility, on the operator's own listing as well as the public one. The
+                // Discovery tab reads this list because it is the one that carries EVERY app
+                // including the parked and hidden ones — an operator's tally that quietly omitted
+                // them would disagree with the counts beside it.
+                seo_state: appSeoState(app, config),
+                operator_seo_blocked: !!app.operatorSeoBlocked,
+                operator_seo_blocked_by: app.operatorSeoBlockedBy ?? null,
+                operator_seo_blocked_at: app.operatorSeoBlockedAt ?? null,
+                operator_seo_block_reason: app.operatorSeoBlockReason ?? null,
                 downloads,
                 forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,

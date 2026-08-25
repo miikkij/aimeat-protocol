@@ -37,6 +37,7 @@ import CorsTab         from './admin/cors-tab.js';
 import MaintenanceTab  from './admin/maintenance-tab.js';
 import HooksTab        from './admin/hooks-tab.js';
 import PortalTab       from './admin/portal-tab.js';
+import DiscoveryTab    from './admin/discovery-tab.js';
 import StatsTab        from './admin/stats-tab.js';
 import DatabaseTab     from './admin/database-tab.js';
 import MetricsTab      from './admin/metrics-tab.js';
@@ -89,6 +90,7 @@ const NAV_GROUPS = [
     { id: 'maintenance',  key: 'dashboard.maintenance',component: MaintenanceTab },
     { id: 'hooks',        key: 'dashboard.hooks',      component: HooksTab },
     { id: 'portal',       key: 'dashboard.portal',     component: PortalTab },
+    { id: 'discovery',    key: 'dashboard.seo.tab',    component: DiscoveryTab },
     { id: 'subdomains',   key: 'admin.subdomains.title', component: SubdomainsAdminTab },
     { id: 'stats',        key: 'dashboard.stats',      component: StatsTab },
     { id: 'database',     key: 'dashboard.database',   component: DatabaseTab },
