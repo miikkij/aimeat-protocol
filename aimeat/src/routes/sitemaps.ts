@@ -22,6 +22,8 @@ import type { Storage } from '../storage/interface.js';
 import { sitemapPages } from '../data/public-pages.js';
 import { apexOnly } from './agent-docs.js';
 import { appSeoIndexable } from '../services/app-seo.js';
+import { resolvePublishedPortfolio } from './portfolio.js';
+import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 
 /** Register `/sitemap.xml` and `/sitemap-index.xml` on the given router. */
 export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -88,11 +90,47 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
       }
     }
 
+    // The people. One sitemap for every portfolio whose owner asked to be findable, listed here
+    // rather than inline because it is one document per node rather than one per person.
+    sitemaps.push(`${b}/sitemap-portfolios.xml`);
+
     res.type('application/xml').send([
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
       ...sitemaps.map((u) => `  <sitemap><loc>${u}</loc><lastmod>${now}</lastmod></sitemap>`),
       '</sitemapindex>',
+    ].join('\n'));
+  });
+
+  /**
+   * The portfolios their owners asked to have found.
+   *
+   * A page carrying somebody's name and their work is the one place where "listed on this node"
+   * and "listed in Google" are genuinely different questions, so they are two switches: `enabled`
+   * publishes the portfolio and puts it on the member showcase, `seoIndex` lets a search engine
+   * list it. Off until asked, like an app.
+   *
+   * Empty rather than absent when nobody has asked. A 404 here would read to a crawler as a broken
+   * reference from the index that names it.
+   */
+  router.get('/sitemap-portfolios.xml', apexOnly, async (_req, res) => {
+    const b = config.baseUrl.replace(/\/$/, '');
+    const now = new Date().toISOString().split('T')[0];
+    const urls: string[] = [];
+    if (config.seoIndexing !== 'off') {
+      const owners = await storage.listOwners();
+      for (const owner of owners) {
+        const resolved = await resolvePublishedPortfolio(storage, owner.name);
+        if (!resolved.ok) continue;
+        if (!portfolioSeoIndexable(resolved.portfolioConfig as PortfolioSeoConfig, config)) continue;
+        urls.push(`${b}/v1/portfolio/${encodeURIComponent(owner.name)}`);
+      }
+    }
+    res.type('application/xml').send([
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...urls.map((u) => `  <url><loc>${u}</loc><lastmod>${now}</lastmod><changefreq>weekly</changefreq><priority>0.6</priority></url>`),
+      '</urlset>',
     ].join('\n'));
   });
 }

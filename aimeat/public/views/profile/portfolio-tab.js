@@ -33,6 +33,7 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
   // undefined = loading, null = no config, object = config
   const [cfg, setCfg] = useState(undefined);
+  const [seoBusy, setSeoBusy] = useState(false);
 
   const load = () => apiGet('/v1/portfolio/config')
     .then(r => setCfg(r?.data?.config || null))
@@ -57,6 +58,24 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   if (!cfg?.enabled) return null; // forwarding to the builder
 
   const url = `${window.location.origin}/v1/portfolio/${encodeURIComponent(session.owner)}`;
+
+  const handleSeoToggle = async () => {
+    setSeoBusy(true);
+    try {
+      const next = !cfg.seoIndex;
+      // The PUT merges over what is already stored, so this changes the one field and leaves the
+      // rest of the portfolio config exactly where it was.
+      await apiPut('/v1/portfolio/config', { ...cfg, seoIndex: next, tags: ['portfolio'] });
+      setCfg({ ...cfg, seoIndex: next });
+      showToast?.(next
+        ? tr('portfolio.builder.seoOnOk', 'Search engines can find your portfolio. They usually take a few days.')
+        : tr('portfolio.builder.seoOffOk', 'Taken out of search engines.'));
+    } catch (e) {
+      showToast?.(e.message || 'Failed', true);
+    } finally {
+      setSeoBusy(false);
+    }
+  };
 
   const handleUnpublish = () => {
     confirm(tr('portfolio.builder.unpublishConfirm', 'Unpublish your portfolio? The public page stops working until you publish again.'), async () => {
@@ -98,6 +117,27 @@ export default function PortfolioTab({ session, navigate, showToast }) {
           <a class="btn-outline btn-sm" href=${url} target="_blank">${tr('portfolio.builder.visitBtn', 'Visit')}</a>
           <button class="btn-outline btn-sm" onClick=${() => navigate('/v1/portfolio')}>${tr('portfolio.builder.editBtn', 'Edit in builder')}</button>
           <button class="btn-danger btn-sm" onClick=${handleUnpublish}>${tr('portfolio.builder.unpublish', 'Unpublish')}</button>
+        </div>
+      </div>
+
+      <!-- Two switches, not one. Publishing puts the page online and on this node's member
+           showcase; letting a search engine list a page carrying your own name is a separate
+           question, and it is the one worth asking separately. Off until asked. -->
+      <div class="card">
+        <div class="mem-item">
+          <span class="mem-key">${tr('portfolio.builder.seoLabel', 'Search engines')}</span>
+          <span>${cfg.seoIndex
+            ? tr('portfolio.builder.seoOn', 'Your portfolio can be found in search engines.')
+            : tr('portfolio.builder.seoOff', 'Your portfolio is not in search engines. The page works and can be shared by link.')}</span>
+        </div>
+        <div class="card-actions">
+          <button class=${cfg.seoIndex ? 'btn-outline btn-sm' : 'btn-primary btn-sm'}
+                  disabled=${seoBusy}
+                  onClick=${handleSeoToggle}>
+            ${cfg.seoIndex
+              ? tr('portfolio.builder.seoTurnOff', 'Take it out of search engines')
+              : tr('portfolio.builder.seoTurnOn', 'Let search engines find it')}
+          </button>
         </div>
       </div>
       <${ConfirmUI} />

@@ -166,7 +166,13 @@ function locs(xml: string): string[] {
         assert(!idx.body.includes('<urlset'), 'an index must not carry <urlset> entries');
         assert(idx.body.includes(`${BASE}/sitemap.xml`), 'the index does not name the page sitemap');
         for (const m of idx.body.matchAll(/<loc>([^<]+)<\/loc>/g)) {
-            assert(m[1].endsWith('/sitemap.xml'), `an index entry must point at a sitemap: ${m[1]}`);
+            // The rule is that an index entry points at a SITEMAP rather than at a page. This used
+            // to test it by requiring the literal filename `sitemap.xml`, which is a convention and
+            // not a rule — sitemaps.org names no filename — so the first legitimately-named
+            // sibling (`sitemap-portfolios.xml`, the people who asked to be found) failed an
+            // assertion about naming while satisfying the one about structure.
+            assert(/\/sitemap[a-z-]*\.xml$/.test(m[1]),
+                `an index entry must point at a sitemap: ${m[1]}`);
         }
     });
 

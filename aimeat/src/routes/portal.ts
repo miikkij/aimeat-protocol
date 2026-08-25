@@ -71,6 +71,8 @@ import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 // Shell serving and public-file lookup live in the sibling; re-exported because bootstrap.ts and
 // static-files.ts have imported them from here since before the split.
 import { BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
+import { resolvePublishedPortfolio } from './portfolio.js';
+import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 export { serveSpa, resolvePublicFile } from './portal-spa.js';
 import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
@@ -437,10 +439,22 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // Portfolio public view — /v1/portfolio/:username (parameterized, serves SPA)
-  router.get('/v1/portfolio/:username', (_req, res) => {
+  //
+  // One route, as many pages as there are people, so the public-page registry cannot hold it and
+  // the head metadata is built per person instead. Until now this called serveSpa with no route
+  // path at all: a page carrying somebody's name and work described itself to a search engine as
+  // the node's generic front door, with no title, no description and no canonical of its own.
+  router.get('/v1/portfolio/:username', async (req, res) => {
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
-      serveSpa(res, spaPath, config);
+      const username = String(req.params.username ?? '');
+      const resolved = await resolvePublishedPortfolio(storage, username);
+      const cfg = resolved.ok ? (resolved.portfolioConfig as PortfolioSeoConfig) : null;
+      // Search visibility is the person's own decision and it is off until they make it. The
+      // header is the half that stops a LISTING: a name somebody else linked to is indexed from
+      // the link text alone when only robots.txt refuses.
+      if (!portfolioSeoIndexable(cfg, config)) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      serveSpa(res, spaPath, config, undefined, portfolioPage(username, cfg, config));
     } else {
       res.redirect(302, '/spa.html');
     }

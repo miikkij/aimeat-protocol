@@ -98,6 +98,7 @@ import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales } from '../services/app-seo.js';
+import { portfolioSeoIndexable, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
@@ -506,6 +507,13 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return portfolioNotFound();
       const resolved = await resolvePublishedPortfolio(storage, sub);
       if (!resolved.ok || !resolved.html) return portfolioNotFound();
+      // The same decision the apex portfolio route makes, on the origin the person actually hands
+      // out. Two switches, deliberately: publishing a portfolio puts it on this node's own member
+      // showcase, and letting a search engine list a page carrying somebody's name is a separate
+      // question they answer separately.
+      if (!portfolioSeoIndexable(resolved.portfolioConfig as PortfolioSeoConfig, config)) {
+        res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      }
       servePortfolio(res, resolved.html, resolved.portfolioConfig, csp);
       return;
     }
