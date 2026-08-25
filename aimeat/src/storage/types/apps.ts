@@ -375,7 +375,7 @@ export interface SchemaRecord {
 // Node Portal (Site)
 export interface SiteChangeLogEntry {
   id: string;
-  action: 'template_upload' | 'template_delete' | 'import' | 'cache_invalidate' | 'app_publish' | 'app_update' | 'app_delete' | 'memory_set' | 'memory_delete';
+  action: 'template_upload' | 'template_delete' | 'import' | 'cache_invalidate' | 'app_publish' | 'app_update' | 'app_delete' | 'memory_set' | 'memory_delete' | 'layout_set' | 'layout_delete' | 'layout_restore';
   summary: string;
   changedBy: string;
   changedAt: string;
