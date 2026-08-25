@@ -97,6 +97,22 @@ export function scopeOwnerGhii(config: AimeatConfig, scope: SkillScope, owner?: 
   return scope === 'node' ? `system@${config.nodeId}` : `${owner}@${config.nodeId}`;
 }
 
+/**
+ * The SKILL.md a node-scope skill currently holds, or null when there is none.
+ *
+ * Here rather than in the caller because the key convention lives here: skill-seeds.ts has to
+ * compare what the node holds against what the repo ships, and a second copy of
+ * `skills.{name}.files.SKILL.md` in another file is a second place for that convention to drift.
+ */
+export async function readNodeSkillBody(
+  storage: Storage, config: AimeatConfig, name: string,
+): Promise<string | null> {
+  const ownerGaii = scopeOwnerGhii(config, 'node');
+  if (!await storage.getMemory(ownerGaii, manifestKey(name))) return null;
+  const file = await storage.getMemory(ownerGaii, fileKey(name, 'SKILL.md'));
+  return file ? String(file.value) : null;
+}
+
 const manifestKey = (name: string): string => `skills.${name}.manifest`;
 const filePrefix = (name: string): string => `skills.${name}.files.`;
 const fileKey = (name: string, path: string): string => `${filePrefix(name)}${path}`;

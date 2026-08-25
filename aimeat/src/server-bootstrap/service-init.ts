@@ -132,10 +132,15 @@ export async function initializeServices(
     .then(() => {})
     .catch(err => logger.error('Failed to seed system prompts', { error: String(err) }));
 
-  // Seed built-in node-scope skills (operator + user runbooks) — create-if-missing,
-  // operator edits never overwritten.
+  // Bring the built-in node-scope skills into step with this build. A skill edited on THIS node is
+  // left alone and named in the log; an untouched one follows the repo. Before 2026-08-25 this was
+  // create-if-missing, which could not tell those two apart and so never updated anything.
   seedBuiltinSkills(storage, config)
-    .then(count => { if (count > 0) logger.info(`Seeded ${count} built-in skill(s)`); })
+    .then(r => {
+      const moved = r.created + r.updated + r.adopted;
+      if (moved > 0) logger.info(`Built-in skills: ${r.created} created, ${r.updated} updated, ${r.adopted} adopted, ${r.unchanged} already current`);
+      if (r.diverged.length > 0) logger.info(`Built-in skills edited on this node, left as they are: ${r.diverged.join(', ')}`);
+    })
     .catch(err => logger.error('Failed to seed built-in skills', { error: String(err) }));
 
   // Auto-install bundled cortex extensions (aimeat-ui-*, aimeat-canvas, aimeat-charts)
