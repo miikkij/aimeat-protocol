@@ -110,6 +110,10 @@ const DELEGATES: Record<string, string> = {
     // and the emit went with the write. Each was verified by reading the domain out of the service
     // rather than trusting the delegation: a tool that hands its write to a silent service is the
     // same defect as a tool that never emitted, and it hides better.
+    'src/mcp/surface-layout.ts': "services/surface-layout/service.ts, which emits 'site' on every state "
+        + 'change it makes: storing a layout, reverting one, restoring a version and writing a passage. '
+        + 'The HTTP routes used to emit for themselves and the tool did not, which is what this gate '
+        + 'found; the emit moved to the one place both doors go through.',
     'src/mcp/agent-capabilities.ts': "services/agent-profile-write.ts, which emits 'agent-capabilities'",
     'src/mcp/agent-management.ts': "services/agent-profile-write.ts, which emits 'agents'",
     'src/mcp/appdev-pitfalls.ts': "services/memory-write.ts and services/appdev-kb.ts, both emitting 'memory'",

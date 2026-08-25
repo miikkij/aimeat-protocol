@@ -96,6 +96,10 @@ export const SCOPE_EXEMPT_TOOLS = new Set<string>([
     'aimeat_admin_sso_scim_token',
     'aimeat_admin_owner_disable',
     'aimeat_admin_owner_enable',
+    // Reading how a page is arranged, and the catalogue of blocks this node can serve. Gated in the
+    // handler on the operator, like the admin tools above it, and there is nothing here to narrow:
+    // a layout is a list of block names, and the front page's describes a page anyone can look at.
+    'aimeat_surface_layout_get',
     'aimeat_agent_capabilities_report',              // Identity is resolved once from the session at agent-capabilities
     'aimeat_agent_telemetry_report',                 // Every write is keyed to `agentGaii` from the session closure (agent-telemetry
     'aimeat_capabilities_vouch',                     // gated in the handler on the operator role, not by a scope
@@ -262,6 +266,10 @@ export const TOOL_SCOPES: Record<string, string> = {
 
     // Stores a file, or takes one back — the same permission over the same namespace.
     aimeat_portfolio_publish:                 'storage:write',
+    // Arranging the node's pages. The write word is one no wildcard carries, because what it
+    // changes is what everyone sees on arrival. The read half is in SCOPE_EXEMPT_TOOLS with its
+    // reason: it is gated on the operator in the handler, and no scope word narrows an operator.
+    aimeat_surface_layout_set:                'site:layout-write',
     aimeat_storage_upload:                    'storage:write',
     aimeat_storage_delete:                    'storage:write',
 

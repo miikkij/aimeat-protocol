@@ -216,6 +216,10 @@ const AI_PROVENANCE_REQUIRED = [
   'aimeat_exchange_work_deliver',
   'aimeat_knowledge_contribute',
   'aimeat_memory_write',
+  // A free-form passage in a page layout is prose on the front page or on every member's home, and
+  // an AI is exactly who an operator asks to write one. The rest of a layout is block names and
+  // carries no authorship at all; the passage is the part that does.
+  'aimeat_surface_layout_set',
   'aimeat_message_send',
   'aimeat_task_complete',
   'aimeat_workspace_comment',
