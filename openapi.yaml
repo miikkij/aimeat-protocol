@@ -648,18 +648,190 @@ components:
       description: |
         Public header navigation configuration. `order` lists the public link ids in
         display order; `hidden` is the subset that should not be rendered. Known ids:
-        `try`, `howItWorks`, `business`, `devView`, `help`.
+        `howItWorks`, `learn`, `exchange`, `business`, `help`. (`try` and `devView` were
+        removed on 2026-08-09; a stored order naming either is filtered out on read, so no
+        node needed a migration.)
       properties:
         order:
           type: array
           items:
             type: string
-          example: [try, howItWorks, business, devView, help]
+          example: [howItWorks, learn, exchange, business, help]
         hidden:
           type: array
           items:
             type: string
           example: [business]
+
+    SurfaceBlockInstance:
+      type: object
+      description: |
+        One block on a page. `id` names it in this node's registry, `key` is its own address
+        within the layout — which is what lets a settings change or a passage keep pointing at
+        the right block after a reorder.
+      required: [id, key]
+      properties:
+        id:
+          type: string
+          example: home.mailbox
+        key:
+          type: string
+          description: Unique within the layout. Equals `id` for a block that may appear once.
+          example: home.mailbox
+        props:
+          type: object
+          description: The block's own settings, each checked against what that block declares.
+          additionalProperties: true
+        titles:
+          type: object
+          description: |
+            The operator's own heading for this block, per language. Absent means the block's
+            normal localized heading is used, which is the recommended state — a single string
+            would end localization for that block.
+          additionalProperties:
+            type: string
+          example: { en: "Who to ask", fi: "Keneltä kysyt" }
+        hidden:
+          type: boolean
+          description: Kept in the layout but not rendered, so parking a block does not lose its settings.
+        children:
+          type: array
+          description: Only a container block carries these, and only one level deep.
+          items:
+            $ref: '#/components/schemas/SurfaceBlockInstance'
+
+    SurfaceLayout:
+      type: object
+      description: One surface's arrangement, stored and returned as a whole.
+      required: [v, surface, binding, blocks, meta]
+      properties:
+        v:
+          type: integer
+          enum: [1]
+          description: Record schema version. A reader meeting a higher number serves the built-in layout.
+        surface:
+          type: string
+          enum: [portal, home, home-onboarding]
+        binding:
+          type: object
+          description: |
+            What this layout is bound to. Only `{ kind: "node" }` is written today; the field
+            exists so a narrower scope can be added later without migrating stored layouts.
+          properties:
+            kind: { type: string, enum: [node] }
+        blocks:
+          type: array
+          description: The array IS the render order.
+          items:
+            $ref: '#/components/schemas/SurfaceBlockInstance'
+        freeform:
+          type: object
+          description: Block key to where that block's words are stored.
+          additionalProperties:
+            type: object
+            properties:
+              ref: { type: string }
+              format: { type: string, enum: [markdown] }
+        meta:
+          type: object
+          properties:
+            updatedAt: { type: string, format: date-time }
+            updatedBy: { type: string }
+            source:
+              type: string
+              enum: [admin, import, mcp, default]
+            note: { type: string }
+
+    SurfaceLayoutSubmission:
+      type: object
+      description: |
+        A layout as it is sent in. Same shape as SurfaceLayout minus the fields the node fills
+        in, and with one addition: a free-form block may carry its words inline as `body`,
+        which is what one paste from an AI looks like. The node splits those out to their own
+        records so the layout itself stays small.
+      required: [blocks]
+      properties:
+        v: { type: integer, enum: [1] }
+        blocks:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/SurfaceBlockInstance'
+              - type: object
+                properties:
+                  body:
+                    type: string
+                    description: A free-form block's words, in Markdown. Split out on write.
+        freeform:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              ref: { type: string }
+              format: { type: string, enum: [markdown] }
+        meta:
+          type: object
+          properties:
+            note:
+              type: string
+              description: One line on what this change was for. Shown in the change log.
+
+    ResolvedSurfaceLayout:
+      type: object
+      description: |
+        What a surface should render, plus how the node arrived at it. `source` is `stored`
+        when the operator has configured this surface and `default` when the built-in layout
+        is being served — which happens when nothing is stored, when the stored value could
+        not be read, or when repairing it left nothing.
+      required: [layout, source, degraded]
+      properties:
+        layout:
+          $ref: '#/components/schemas/SurfaceLayout'
+        freeform:
+          type: object
+          description: The words behind each free-form block, keyed by block key.
+          additionalProperties:
+            type: string
+        source:
+          type: string
+          enum: [stored, default]
+        degraded:
+          type: boolean
+          description: True when the stored value had to be repaired or replaced.
+        problems:
+          type: array
+          description: One line per repair, for the operator. Never shown to a visitor.
+          items:
+            type: string
+
+    SurfaceBlockDefinition:
+      type: object
+      description: One block this node offers, as the admin form and the AI prompt both read it.
+      properties:
+        id: { type: string }
+        label_key:
+          type: string
+          description: The locale key for what an OPERATOR calls this block.
+        locale_stem:
+          type: string
+          description: The stem for the words the block itself shows a reader.
+        summary:
+          type: string
+          description: One sentence in plain words.
+        max_per_surface: { type: integer }
+        container:
+          type: boolean
+          description: Whether it holds other blocks.
+        live_domains:
+          type: array
+          items: { type: string }
+          description: Which live-update domains its data depends on.
+        props:
+          type: object
+          description: |
+            Each setting the block takes, by name, declaring its type and what it means. The
+            admin form is drawn from this and the AI prompt is generated from it.
+          additionalProperties: true
 
     ErrorDetail:
       type: object
@@ -28776,6 +28948,400 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/HeaderNavConfig'
+        '409':
+          description: Portal is read-only (load-balancer mode)
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /v1/site/layout/portal:
+    get:
+      operationId: getPortalLayout
+      summary: Which blocks the node's front page is built from
+      description: |
+        The public front page's layout: an ordered list of blocks, each naming a registry
+        id and its settings, plus the operator's free-form passages keyed by block. No
+        authentication required (Tier 0) — the SPA reads this before anyone has signed in,
+        and it describes a page anyone can already look at.
+
+        A node that has never been configured answers with the built-in layout and
+        `source: "default"`. A stored layout that could not be read is repaired or replaced
+        by the built-in one rather than failing, so this route always returns a page.
+      tags: [Site]
+      responses:
+        '200':
+          description: The portal's layout
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolvedSurfaceLayout'
+
+  /v1/site/layout/{surface}:
+    parameters:
+      - name: surface
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [portal, home, home-onboarding]
+    get:
+      operationId: getSurfaceLayout
+      summary: Which blocks a surface is built from
+      description: |
+        The layout for one surface. A member surface needs a session: it is what this node
+        shows its own people on their own home page.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The surface's layout
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolvedSurfaceLayout'
+        '404':
+          description: No surface by that name
+    put:
+      operationId: setSurfaceLayout
+      summary: Store a surface layout
+      description: |
+        Replace a surface's layout. The whole submission is checked before anything is
+        stored: an unknown block, a block that does not belong on this surface, one this
+        node cannot serve, a duplicate key, too many copies, a setting of the wrong type or
+        outside its range, grouping more than one level deep, or an empty layout are each
+        refused with the block named and nothing written.
+
+        A free-form block may carry its words inline as `body`; they are split out to their
+        own record so the layout stays small. Those words are Markdown: script, iframe,
+        object, embed, form, inline event handlers and `javascript:` links are refused.
+
+        Needs the node operator, in person or as an agent carrying `site:layout-write` — a
+        word no wildcard hands out, because this changes what everyone sees on arrival.
+        Blocked in load-balancer mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SurfaceLayoutSubmission'
+      responses:
+        '200':
+          description: The stored layout
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolvedSurfaceLayout'
+        '403':
+          description: Not the node operator, or the principal does not carry `site:layout-write`
+        '409':
+          description: Portal is read-only (load-balancer mode)
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      operationId: deleteSurfaceLayout
+      summary: Go back to the built-in layout
+      description: |
+        Remove the stored layout so the surface renders the layout this node ships. The
+        operator's free-form passages are left where they are. Operator-only. Blocked in
+        load-balancer mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The built-in layout, now in effect
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolvedSurfaceLayout'
+        '409':
+          description: Portal is read-only (load-balancer mode)
+
+  /v1/site/layout/{surface}/reset:
+    parameters:
+      - name: surface
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [portal, home, home-onboarding]
+    post:
+      operationId: resetSurfaceLayout
+      summary: Start from the built-in layout
+      description: |
+        Store the layout this node ships as an editable starting point. Different from
+        DELETE: this leaves a stored record to change, while DELETE leaves none at all.
+        Operator-only. Blocked in load-balancer mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The stored layout
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolvedSurfaceLayout'
+        '409':
+          description: Portal is read-only (load-balancer mode)
+
+  /v1/site/layout/{surface}/versions:
+    parameters:
+      - name: surface
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [portal, home, home-onboarding]
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          default: 50
+          maximum: 200
+    get:
+      operationId: listSurfaceLayoutVersions
+      summary: What this layout used to be
+      description: |
+        Earlier versions of a surface's layout, newest first. Every write archives the
+        value it replaced, so this is the undo history. Operator-only.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Earlier versions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          versions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                version: { type: integer }
+                                recorded_at: { type: string, format: date-time }
+                                changed_by: { type: string, nullable: true }
+
+  /v1/site/layout/{surface}/restore:
+    parameters:
+      - name: surface
+        in: path
+        required: true
+        schema:
+          type: string
+          enum: [portal, home, home-onboarding]
+    post:
+      operationId: restoreSurfaceLayout
+      summary: Put an earlier version back
+      description: |
+        Restore a version named by number. It is checked again before it is written: a
+        version naming a block that has since left this node is refused by name rather than
+        restored into a page that renders wrong. Operator-only. Blocked in load-balancer
+        mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version:
+                  type: integer
+                  description: Which version to go back to, from the versions listing.
+      responses:
+        '200':
+          description: The restored layout, now in effect
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ResolvedSurfaceLayout'
+        '404':
+          description: No such version
+        '409':
+          description: Portal is read-only (load-balancer mode)
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /v1/site/layout-import:
+    post:
+      operationId: importSurfaceLayouts
+      summary: Apply one paste covering one or more surfaces
+      description: |
+        Takes the JSON an AI produced from the layout prompt: a `layout` object keyed by
+        surface, each holding blocks and, on a free-form block, its words inline.
+
+        Every surface is checked before any of them is written, so a refusal on the second
+        cannot leave the first applied. Operator-only. Blocked in load-balancer mode.
+
+        Deliberately separate from `POST /v1/site/import`, which keeps the template, portal
+        records and KV pairs: that route is gated on the operator ROLE, and routing a layout
+        through it would mean one capability with two doors, only one of which asks for
+        `site:layout-write`.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [layout]
+              properties:
+                layout:
+                  type: object
+                  additionalProperties:
+                    $ref: '#/components/schemas/SurfaceLayoutSubmission'
+                  description: Keyed by surface name.
+      responses:
+        '200':
+          description: Which surfaces were written
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          surfaces_written:
+                            type: array
+                            items: { type: string }
+        '409':
+          description: Portal is read-only (load-balancer mode)
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /v1/site/blocks:
+    get:
+      operationId: listSurfaceBlocks
+      summary: What this node can put on a surface
+      description: |
+        Every block available on the named surface, with the settings each one takes. Only
+        blocks this node can actually serve are listed, so an operator is never offered
+        something that would render as nothing.
+
+        The admin form draws itself from this and the AI prompt is generated from it, so the
+        two cannot describe different blocks. Operator-only.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: surface
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [portal, home, home-onboarding]
+      responses:
+        '200':
+          description: The blocks this node offers there
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          surface: { type: string }
+                          blocks:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/SurfaceBlockDefinition'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /v1/site/freeform:
+    post:
+      operationId: setSurfaceFreeform
+      summary: Edit one passage on its own
+      description: |
+        Store the words behind one free-form block without rewriting the layout around it.
+        Markdown: script, iframe, object, embed, form, inline event handlers and
+        `javascript:` links are refused, and so is a passage over 64 KB. Operator-only.
+        Blocked in load-balancer mode.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key, body]
+              properties:
+                key:
+                  type: string
+                  description: The passage's storage name — lower-case letters, numbers and dashes.
+                body:
+                  type: string
+                  description: The words, in Markdown.
+      responses:
+        '200':
+          description: Stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          key: { type: string }
+                          bytes: { type: integer }
         '409':
           description: Portal is read-only (load-balancer mode)
         '422':

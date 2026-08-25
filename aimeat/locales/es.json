@@ -6378,6 +6378,9 @@
           "signals": {
             "read": "Ver quién abrió, hizo clic o visitó lo que enviaste y publicaste.",
             "write": "Crear contadores para las campañas, los enlaces y las páginas que quieres medir."
+          },
+          "site": {
+            "layout-write": "Organizar la portada de esta instalación y la página a la que llegan sus miembros: qué partes se muestran, en qué orden y qué texto va entre ellas. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. Cambia lo que ve todo el mundo al llegar, así que \"Acceso total\" no lo incluye."
           }
         },
         "domainAi": "IA",
@@ -6399,7 +6402,8 @@
         "permInvoke": "Ejecutar",
         "domainPackages": "Paquetes",
         "domainCompliance": "Cumplimiento",
-        "domainSignals": "Alcance"
+        "domainSignals": "Alcance",
+        "domainSite": "Las páginas a las que se llega"
       },
       "deviceAuth": {
         "title": "Autorización de dispositivo",

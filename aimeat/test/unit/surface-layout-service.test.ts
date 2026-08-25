@@ -163,7 +163,8 @@ describe('reading a damaged layout', () => {
         const got = await svc.resolve('home');
         expect(got.source).toBe('default');
         expect(got.degraded).toBe(false);
-        expect(got.layout.blocks.map(b => b.id)).toEqual(defaultLayout('home').blocks.map(b => b.id));
+        expect(got.layout.blocks.map(b => b.id)).toEqual(defaultLayout('home', config).blocks.map(b => b.id));
+        expect(got.layout.blocks.length).toBeGreaterThan(0);
     });
 
     it('serves a home rather than a blank page when the stored value is not JSON', async () => {

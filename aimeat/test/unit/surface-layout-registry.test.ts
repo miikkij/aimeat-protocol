@@ -161,11 +161,34 @@ describe('default layouts', () => {
     });
 
     it('are handed out as fresh objects, so a caller editing one cannot change the built-in', () => {
-        const a = defaultLayout('home');
+        const cfg = {} as AimeatConfig;
+        const a = defaultLayout('home', cfg);
+        expect(a.blocks.length, 'the built-in home is not empty on a bare config').toBeGreaterThan(0);
         a.blocks.push({ id: 'home.trust', key: 'extra' });
-        expect(defaultLayout('home').blocks.some(x => x.key === 'extra')).toBe(false);
+        expect(defaultLayout('home', cfg).blocks.some(x => x.key === 'extra')).toBe(false);
         expect(a.meta.source).toBe('default');
         expect(a.binding).toEqual({ kind: 'node' });
+    });
+
+    // The built-in layout has to pass the write gate on the node it is served to, or "start from the
+    // built-in one" is refused for naming a block this node does not have — the default failing its
+    // own validator. That is what happened with the chat door on a node with no chat.
+    it('hold only blocks the node can actually serve', () => {
+        const cfg = {} as AimeatConfig;
+        for (const surface of SURFACE_IDS) {
+            for (const inst of defaultLayout(surface, cfg).blocks) {
+                expect(blockIsPresent(blockById(inst.id)!, cfg), `${surface} offers ${inst.id} it cannot serve`).toBe(true);
+            }
+        }
+    });
+
+    it('drop a block this node cannot serve rather than offering it', () => {
+        // The chat door is gated on a capability a bare config does not have.
+        const declared = DEFAULT_BLOCKS.home.map(b => b.id);
+        expect(declared, 'fixture assumption: the built-in home declares the chat door').toContain('home.chat-door');
+        const served = defaultLayout('home', {} as AimeatConfig).blocks.map(b => b.id);
+        expect(served).not.toContain('home.chat-door');
+        expect(served).toContain('home.feed');
     });
 });
 

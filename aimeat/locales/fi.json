@@ -6527,6 +6527,9 @@
           "signals": {
             "read": "Näe kuka avasi, klikkasi tai kävi lukemassa sen mitä lähetit tai julkaisit.",
             "write": "Luo laskurit kampanjoille, linkeille ja sivuille joiden tavoittavuutta seuraat."
+          },
+          "site": {
+            "layout-write": "Järjestää tämän asennuksen etusivun ja sen sivun jolle jäsenet saapuvat: mitkä osat näkyvät, missä järjestyksessä, ja mitä tekstejä niiden välissä on. Toimii vain sille, joka pyörittää tätä asennusta; millä tahansa muulla tilillä tämä lupa ei tee mitään. Tämä muuttaa sen, mitä jokainen täällä näkee saapuessaan, joten \"Täydet oikeudet\" ei sisällä sitä."
           }
         },
         "domainAi": "Tekoäly",
@@ -6548,7 +6551,8 @@
         "permInvoke": "Aja",
         "domainPackages": "Paketit",
         "domainCompliance": "Vaatimustenmukaisuus",
-        "domainSignals": "Tavoittavuus"
+        "domainSignals": "Tavoittavuus",
+        "domainSite": "Sivut joille saavutaan"
       },
       "deviceAuth": {
         "title": "Laitehyväksyntä",

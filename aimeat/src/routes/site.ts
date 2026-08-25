@@ -27,6 +27,8 @@ import { emitChange } from '../services/event-bus.js';
 import { SiteService, SiteError } from '../services/site.js';
 import { injectCspNonce } from '../utils/csp-nonce.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
+import { siteLayoutRouter } from './site-layout.js';
+import { isReservedSurfaceKey } from '../services/surface-layout/keys.js';
 
 export function siteRouter(config: AimeatConfig, storage: Storage, siteService?: SiteService): Router {
     const router = Router();
@@ -41,6 +43,10 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
         }
         next();
     };
+
+    // The surface layouts live in their own file but on this router, so they inherit the LB guard
+    // and the whole site family answers from one mount.
+    router.use(siteLayoutRouter(config, storage, requireNotLb));
 
     // GET / — Serve the portal HTML (Markdown for Agents: Accept: text/markdown gets a
     // markdown rendering of the same portal content; browsers keep the HTML).
@@ -145,6 +151,16 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
             for (const key of Object.keys(body.memory)) {
                 if (!key.startsWith('portal/')) {
                     res.status(422).json(error(config.nodeId, 'IMPORT_INVALID', `Memory key "${key}" must start with "portal/"`));
+                    return;
+                }
+                // A layout lives under portal/ so it mirrors and imports like any other portal
+                // record — which means this door can reach it, and it must not. The layout is
+                // checked against the block registry before it is stored, and a raw string dropped
+                // in here would be a second way past that check. Same shape as the gate that was
+                // enforced on the tool surface and bypassed on the HTTP route.
+                if (isReservedSurfaceKey(key)) {
+                    res.status(422).json(error(config.nodeId, 'MEMORY_RESERVED',
+                        'That record holds a page layout, which is checked against the blocks this node has before it is stored. Send it as a layout rather than as a portal record.'));
                     return;
                 }
                 if (typeof body.memory[key] !== 'string') {
@@ -269,7 +285,19 @@ export function siteRouter(config: AimeatConfig, storage: Storage, siteService?:
     // DELETE /v1/site/memory/:key — Delete a single portal memory key (operator)
     router.delete('/v1/site/memory/:key', requireAuth(), requireRole('operator'), requireNotLb, async (req, res) => {
         const key = req.params.key as string;
-        const deleted = await site.deletePortalMemory(key, req.auth!.sub);
+        let deleted: boolean;
+        try {
+            deleted = await site.deletePortalMemory(key, req.auth!.sub);
+        } catch (err) {
+            // A reserved key is refused with a reason a person can act on. Without this the refusal
+            // reached the operator as a 500, which reads as "the node is broken" rather than "that
+            // record is not yours to delete here".
+            if (err instanceof SiteError) {
+                res.status(err.httpStatus).json(error(config.nodeId, err.code, err.message));
+                return;
+            }
+            throw err;
+        }
         if (!deleted) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Portal memory key "${key}" not found`));
             return;

@@ -6,6 +6,11 @@
  *   backward-compat invariant: an unguarded namespace behaves exactly as before.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=write-guards
  * @version-history
+ *   v1.1.0 — 2026-08-26 — Surface layouts: who may write the page every visitor and every member
+ *     lands on. Here rather than in e2e-surface-layout because it is a namespace-write boundary,
+ *     and because two of these are only interesting in the blocking tier — a non-operator refused
+ *     at the layout door, and the OPERATOR's own generic portal-memory doors refusing a layout key,
+ *     which is what stops a node's home being cleared by tidying away a record nobody recognised.
  *   v1.0.0 — 2026-07-07 — Initial: create conflict, version mismatch/required, identical
  *     re-publish idempotence, direct-write protection, append-only delete refusal, free-space
  *     regression (doc-pyxoy49 S1/S3; the TARGET-005 overwrite incident is the reason).
@@ -243,6 +248,76 @@ async function run() {
       console.log(`     (the namespace rule refused the forked manifest with ${forked.status} — guard unreachable by this route)`);
     }
   });
+
+  // ── Surface layouts: which principal may write the page everyone lands on ──
+  //
+  // In the guard tier because it is a namespace-write boundary, which is this suite's subject: the
+  // layout under portal/layout.* and the operator's passages under site/free.* are node content, and
+  // the generic portal-memory doors sit right beside them in the admin UI. Two things are asserted
+  // that nothing else does — that a non-operator is refused at the layout door, and that the
+  // operator's OWN generic doors refuse a layout key, which is what stops a node's home being
+  // cleared by tidying away a record nobody recognised.
+  {
+    let B: Awaited<ReturnType<typeof setupOwner>>;
+    const GOOD = { v: 1, blocks: [{ id: 'home.nameplate', key: 'home.nameplate' }] };
+
+    await test('setup: a second owner, who is not the operator', async () => {
+      B = await setupOwner('wgnonop');
+      assert(B.token.length > 0, 'second owner has a token');
+    });
+
+    await test('a non-operator cannot write a surface layout', async () => {
+      const r = await json('/v1/site/layout/home', {
+        method: 'PUT', headers: auth(B.token), body: JSON.stringify(GOOD),
+      });
+      assert(r.status === 403, `expected 403, got ${r.status}`);
+    });
+
+    await test('an unauthenticated caller cannot write a surface layout', async () => {
+      const r = await json('/v1/site/layout/home', { method: 'PUT', body: JSON.stringify(GOOD) });
+      assert(r.status === 401, `expected 401, got ${r.status}`);
+    });
+
+    await test('a non-operator cannot reach the block catalogue', async () => {
+      const r = await json('/v1/site/blocks?surface=home', { headers: auth(B.token) });
+      assert(r.status === 403, `expected 403, got ${r.status}`);
+    });
+
+    await test('the operator cannot write a layout through the generic portal-memory door', async () => {
+      const r = await json('/v1/site/memory', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ key: 'portal/layout.home', value: 'junk' }),
+      });
+      assert(r.status === 422, `expected 422, got ${r.status}`);
+      assert(r.body?.error?.code === 'MEMORY_RESERVED', `code ${r.body?.error?.code}`);
+    });
+
+    await test('the operator cannot delete a layout through the generic portal-memory door', async () => {
+      const r = await json(`/v1/site/memory/${encodeURIComponent('portal/layout.home')}`, {
+        method: 'DELETE', headers: auth(A.token),
+      });
+      assert(r.status === 422, `expected 422, got ${r.status}`);
+      assert(r.body?.error?.code === 'MEMORY_RESERVED', `code ${r.body?.error?.code}`);
+    });
+
+    await test('a passage key cannot be written through the portal-memory door either', async () => {
+      const r = await json('/v1/site/memory', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ key: 'site/free.note', value: 'junk' }),
+      });
+      // Refused twice over: it is a reserved key, and it is not under portal/ at all.
+      assert(r.status === 422, `expected 422, got ${r.status}`);
+    });
+
+    await test('the import bundle cannot smuggle a layout past the validator', async () => {
+      const r = await json('/v1/site/import', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ memory: { 'portal/layout.portal': 'junk' } }),
+      });
+      assert(r.status === 422, `expected 422, got ${r.status}`);
+      assert(r.body?.error?.code === 'MEMORY_RESERVED', `code ${r.body?.error?.code}`);
+    });
+  }
 
   console.log(`\nResults: ${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed > 0) { process.exit(1); }

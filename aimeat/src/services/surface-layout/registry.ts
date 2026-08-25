@@ -186,13 +186,26 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
     ],
 };
 
-/** The built-in layout for a surface. Fresh object every call: callers hand it onward and edit it. */
-export function defaultLayout(surface: SurfaceId): SurfaceLayout {
+/**
+ * The built-in layout for a surface, as THIS node can serve it.
+ *
+ * Filtered by presence rather than handed out whole, and the reason is not cosmetic: the built-in
+ * home names the chat door, which a node with no chat cannot serve. Unfiltered, that node would
+ * render a block with nothing behind it, and "start from the built-in layout" would be refused by
+ * the validator for naming a block this node does not have — the built-in layout failing its own
+ * write gate. It is filtered here, once, so the fallback and the starting point agree.
+ *
+ * Fresh object every call: callers hand it onward and edit it.
+ */
+export function defaultLayout(surface: SurfaceId, config: AimeatConfig): SurfaceLayout {
+    const servable = (list: SurfaceBlockInstance[]): SurfaceBlockInstance[] => list
+        .filter(x => { const def = blockById(x.id); return def ? blockIsPresent(def, config) : false; })
+        .map(x => ({ ...x, ...(x.children ? { children: servable(x.children) } : {}) }));
     return {
         v: 1,
         surface,
         binding: { kind: 'node' },
-        blocks: DEFAULT_BLOCKS[surface].map(x => ({ ...x })),
+        blocks: servable(DEFAULT_BLOCKS[surface]),
         meta: {
             // A time nobody set: the default has no edit history, and stamping "now" on it would
             // make every read look like a fresh change to anything watching updatedAt.
