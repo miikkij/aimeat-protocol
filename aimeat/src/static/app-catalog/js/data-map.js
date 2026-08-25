@@ -20,7 +20,9 @@
  */
 import { t } from './i18n.js';
 import { escapeHtml as esc } from './util.js';
-import { labelKeyFor, orderRows, contradictionOf, placesOf, stateOf } from './data-map-model.js';
+import {
+  labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, DATA_MAP_SPEC,
+} from './data-map-model.js';
 
 /** An axis value in the reader's language, or the raw word when this build does not know it. */
 function label(axis, value) {
@@ -76,7 +78,7 @@ function elsewhereHtml(row) {
 }
 
 function panelHtml(map) {
-  if (!map || map.source === 'none') {
+  if (!map || map.spec !== DATA_MAP_SPEC || map.source === 'none') {
     return '<p class="dtl-desc">' + esc(t('dataMap.panel.missing')) + '</p>';
   }
 

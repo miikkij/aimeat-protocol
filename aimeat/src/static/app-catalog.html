@@ -4811,6 +4811,7 @@
   }
 
   // src/static/app-catalog/js/data-map-model.js
+  var DATA_MAP_SPEC = "aimeat.datamap/2";
   var VALUES = {
     form: [
       "one-person",
@@ -4947,7 +4948,7 @@
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([where, n]) => ({ where, n }));
   }
   function stateOf(map) {
-    if (!map || map.source === "none") return "missing";
+    if (!map || map.spec !== DATA_MAP_SPEC || map.source === "none") return "missing";
     if (contradictionOf(map)) return "contradicted";
     if ((map.held || []).some((r) => !String(r.why || "").trim())) return "unfinished";
     return "stated";
@@ -4979,7 +4980,7 @@
     return '<div class="dtl-dm-row"><div class="dtl-dm-head"><span class="dtl-dm-what">' + escapeHtml(row.what) + '</span><span class="dtl-dm-holds">' + escapeHtml(t("dataMap.elsewhere." + row.status)) + '</span></div><div class="dtl-dm-facts">' + escapeHtml(t("dataMap.elsewhere.whereLabel")) + " " + escapeHtml(row.where) + " · " + escapeHtml(t("dataMap.elsewhere.controlledByLabel")) + " " + escapeHtml(row.controlledBy) + '</div><div class="dtl-dm-why">' + escapeHtml(row.deletion || "") + "</div></div>";
   }
   function panelHtml(map) {
-    if (!map || map.source === "none") {
+    if (!map || map.spec !== DATA_MAP_SPEC || map.source === "none") {
       return '<p class="dtl-desc">' + escapeHtml(t("dataMap.panel.missing")) + "</p>";
     }
     var out = "";

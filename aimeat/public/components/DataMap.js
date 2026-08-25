@@ -23,7 +23,9 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { labelKeyFor, orderRows, contradictionOf, placesOf, stateOf } from '/components/data-map/model.js';
+import {
+  labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, DATA_MAP_SPEC,
+} from '/components/data-map/model.js';
 
 const html = htm.bind(h);
 
@@ -39,7 +41,11 @@ function label(axis, value) {
  * Built from the stamp, so a list of 35 apps renders without opening 35 documents.
  */
 export function DataMapLine({ stamp, onOpen }) {
-  const missing = !stamp || stamp.missing;
+  // A stamp from an older spec is a stamp from the version that GUESSED, and 110 apps on the
+  // production node still carry one. Reading it as a map makes the list say "written" about an app
+  // nobody has described, which is the exact lie this rewrite removed from everywhere else.
+  const current = stamp && stamp.spec === DATA_MAP_SPEC;
+  const missing = !current || stamp.missing;
   // A contradiction is not the same news as an unfinished sentence, and the list is where somebody
   // scanning 35 apps decides which one to open. It must be distinguishable without opening any.
   const state = missing ? 'missing'
@@ -82,7 +88,7 @@ function Row({ row }) {
 
 /** The whole map. The paragraph first, because that is what makes the rows judgeable. */
 export function DataMapPanel({ map, findings, appLabel }) {
-  if (!map || map.source === 'none') {
+  if (!map || map.spec !== DATA_MAP_SPEC || map.source === 'none') {
     return html`
       <div class="dm-panel dm-panel-missing">
         <h3 class="dm-title">${t('dataMap.title')}</h3>
