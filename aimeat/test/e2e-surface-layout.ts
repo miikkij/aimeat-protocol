@@ -167,6 +167,30 @@ await test('GET /v1/site/blocks with a non-operator token → 403', async () => 
     assert(status === 403, `expected 403, got ${status}`);
 });
 
+await test('GET /v1/site/layout-prompt — carries the real block names and the real layout', async () => {
+    const res = await fetch(`${BASE}/v1/site/layout-prompt?surface=home`, { headers: { Authorization: `Bearer ${opToken}` } });
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    // The two generated halves. If either were written into the prompt by hand it would drift the
+    // first time a block was added, and the operator would read the refusal as "the AI is broken".
+    assert(text.includes('home.feed'), 'the catalogue names a real block');
+    assert(text.includes('common.freeform'), 'the catalogue names the free-form block');
+    assert(!text.includes('portal.gallery'), 'and only blocks that belong on this page');
+    assert(text.includes('{{block_catalog}}') === false, 'every variable was filled in');
+    assert(text.includes('{{surface}}') === false, 'including the page name');
+    assert(text.includes('home-onboarding'), 'the prompt explains what the three pages are');
+});
+
+await test('GET /v1/site/layout-prompt with a non-operator token → 403', async () => {
+    const res = await fetch(`${BASE}/v1/site/layout-prompt?surface=home`, { headers: { Authorization: `Bearer ${memberToken}` } });
+    assert(res.status === 403, `expected 403, got ${res.status}`);
+});
+
+await test('GET /v1/site/layout-prompt without naming a page → 422', async () => {
+    const { status } = await json('/v1/site/layout-prompt', op());
+    assert(status === 422, `expected 422, got ${status}`);
+});
+
 // ─── Writing ───
 console.log('\nWriting a layout');
 

@@ -29301,6 +29301,44 @@ paths:
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
 
+  /v1/site/layout-prompt:
+    get:
+      operationId: getSurfaceLayoutPrompt
+      summary: The prompt for arranging a page with your own AI
+      description: |
+        Plain text an operator pastes into their own AI chat. It carries the catalogue of blocks
+        this node can serve on the named page and how that page is arranged now, both rendered in
+        at serve time from the registry rather than written into the prompt — so the vocabulary an
+        AI is handed is the vocabulary the validator will accept.
+
+        This is the road for operators whose AI cannot reach this node over MCP. One that can asks
+        it directly and `aimeat_surface_layout_set` does the work. Operator-only.
+      tags: [Site]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: surface
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [portal, home, home-onboarding]
+        - name: lang
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The prompt
+          content:
+            text/plain:
+              schema:
+                type: string
+        '404':
+          description: This node has not seeded the prompt yet
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
   /v1/site/freeform:
     post:
       operationId: setSurfaceFreeform
