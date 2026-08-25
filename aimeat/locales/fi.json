@@ -2917,7 +2917,16 @@
       "blockTitle": "Pysäytä sovelluksen \"{name}\" näkyminen haussa",
       "blockBody": "Sovellus toimii edelleen, pysyy täällä listalla ja on yhä jaettavissa linkillä. Vain hakukoneet lakkaavat löytämästä sitä. Omistaja ei voi purkaa tätä.",
       "blockReason": "Miksi",
-      "blockReasonHint": "Näytetään omistajalle. Syytä jota hän ei näe hän ei voi korjata."
+      "blockReasonHint": "Näytetään omistajalle. Syytä jota hän ei näe hän ei voi korjata.",
+      "openGsc": "Avaa Google Search Console",
+      "openGscSitemaps": "Avaa Sitemaps Search Consolessa",
+      "openBing": "Avaa Bing Webmaster Tools",
+      "openIndexnow": "Hae IndexNow-avain",
+      "checkTitle": "Tarkista ulkoapäin",
+      "checkIntro": "Mitä hakukone tästä sivustosta oikeasti saa irti, hakukoneiden omilla työkaluilla eikä meidän. Jokainen aukeaa tämä osoite valmiiksi täytettynä.",
+      "checkRich": "Googlen Rich Results Test",
+      "checkSchema": "Schema.org-validaattori",
+      "checkSpeed": "PageSpeed Insights"
     }
   },
   "dev": {

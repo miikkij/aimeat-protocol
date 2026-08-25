@@ -1218,3 +1218,6 @@
    itself must never scroll sideways; only this box does. */
 .adm-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .adm-table-scroll > .adm-table { min-width: 520px; }
+/* The link out to the service a step is performed in. An inline-block button rather than a bare
+   anchor: it is an action in a list of actions, and it has to read as one at a glance. */
+.adm-seo-step-link { display: inline-block; margin: 8px 8px 0 0; text-decoration: none; }

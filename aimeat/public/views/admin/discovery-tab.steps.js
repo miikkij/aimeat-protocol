@@ -50,6 +50,20 @@ function CopyRow({ label, value }) {
   </div>`;
 }
 
+/**
+ * A link out to the service the step is actually performed in, with this node's own address
+ * already in it where the service accepts one.
+ *
+ * Naming a service in prose and leaving the reader to find it is the difference between an
+ * instruction and a step. Every one of these opens in a new tab: the operator is mid-way through a
+ * checklist and losing this page to a navigation would lose their place in it.
+ */
+function StepLink({ href, label }) {
+  return html`<a class="adm-seo-step-link btn-outline" href=${href} target="_blank" rel="noopener">
+    ${label} ↗
+  </a>`;
+}
+
 function Step({ n, title, done, checkable, children }) {
   const mark = done ? '✓' : (checkable ? '✗' : '·');
   const tone = done ? 'done' : (checkable ? 'todo' : 'manual');
@@ -120,6 +134,16 @@ export function DiscoverySteps({ status, onChanged }) {
   }, [google, bing, onChanged, checkServed, showSuccess, showError]);
 
   const base = status.sitemap.url.replace(/\/sitemap\.xml$/, '');
+  // Search Console addresses a site as a "resource"; handing it this node's own URL puts the
+  // operator on the right property instead of a chooser. The check tools all take ?url=.
+  const enc = encodeURIComponent(base);
+  const GSC = `https://search.google.com/search-console/welcome?resource_id=${enc}`;
+  const GSC_SITEMAPS = `https://search.google.com/search-console/sitemaps?resource_id=${enc}`;
+  const BING = 'https://www.bing.com/webmasters/';
+  const INDEXNOW = 'https://www.bing.com/indexnow';
+  const RICH_RESULTS = `https://search.google.com/test/rich-results?url=${enc}`;
+  const SCHEMA_VALIDATOR = `https://validator.schema.org/#url=${enc}`;
+  const PAGESPEED = `https://pagespeed.web.dev/analysis?url=${enc}`;
 
   return html`<section class="adm-card">
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
@@ -131,6 +155,7 @@ export function DiscoverySteps({ status, onChanged }) {
                done=${served.google} checkable=${true}>
         <p>${t('dashboard.seo.step1Body')}</p>
         <p class="adm-muted">${t('dashboard.seo.step1Dns')}</p>
+        <${StepLink} href=${GSC} label=${t('dashboard.seo.openGsc')} />
         <label class="adm-seo-field">
           <span class="adm-seo-field-label">${t('dashboard.seo.googleToken')}</span>
           <input type="text" value=${google} placeholder=${status.verification.google ? t('dashboard.seo.tokenSet') : ''}
@@ -148,11 +173,13 @@ export function DiscoverySteps({ status, onChanged }) {
         <${CopyRow} label=${t('dashboard.seo.rowSitemap')} value=${status.sitemap.url} />
         <${CopyRow} label=${t('dashboard.seo.rowSitemapIndex')} value=${status.sitemap.index_url} />
         <p class="adm-muted">${t('dashboard.seo.step2Why')}</p>
+        <${StepLink} href=${GSC_SITEMAPS} label=${t('dashboard.seo.openGscSitemaps')} />
       <//>
 
       <${Step} n="3" title=${t('dashboard.seo.step3Title')}
                done=${served.bing} checkable=${true}>
         <p>${t('dashboard.seo.step3Body')}</p>
+        <${StepLink} href=${BING} label=${t('dashboard.seo.openBing')} />
         <label class="adm-seo-field">
           <span class="adm-seo-field-label">${t('dashboard.seo.bingToken')}</span>
           <input type="text" value=${bing} placeholder=${status.verification.bing ? t('dashboard.seo.tokenSet') : ''}
@@ -172,6 +199,9 @@ export function DiscoverySteps({ status, onChanged }) {
           ? html`<${CopyRow} label=${t('dashboard.seo.keyFile')} value=${status.indexnow.key_url} />`
           : html`<p class="adm-muted">${t('dashboard.seo.step4NoKey')}</p>`}
         <p class="adm-muted">${t('dashboard.seo.step4Google')}</p>
+        ${status.indexnow.key_configured
+          ? null
+          : html`<${StepLink} href=${INDEXNOW} label=${t('dashboard.seo.openIndexnow')} />`}
       <//>
 
       <${Step} n="5" title=${t('dashboard.seo.step5Title')} done=${false} checkable=${false}>
@@ -190,6 +220,14 @@ export function DiscoverySteps({ status, onChanged }) {
         ${t('dashboard.seo.saveTokens')}
       </button>
       <button class="btn-ghost" onClick=${checkServed}>${t('dashboard.seo.recheck')}</button>
+    </div>
+
+    <h4>${t('dashboard.seo.checkTitle')}</h4>
+    <p class="adm-muted">${t('dashboard.seo.checkIntro')}</p>
+    <div class="adm-seo-actions">
+      <${StepLink} href=${RICH_RESULTS} label=${t('dashboard.seo.checkRich')} />
+      <${StepLink} href=${SCHEMA_VALIDATOR} label=${t('dashboard.seo.checkSchema')} />
+      <${StepLink} href=${PAGESPEED} label=${t('dashboard.seo.checkSpeed')} />
     </div>
   </section>`;
 }
