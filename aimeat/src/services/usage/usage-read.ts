@@ -254,9 +254,20 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
     grain,
     from,
     to: grain === 'hour' ? `${to}T23` : to,
-    // The whole reason owner scoping is safe here: an owner report is a cut that CARRIES ownerGhii,
-    // and the value comes from the route's resolved identity, never from a query parameter.
-    ownerGhii: args.scope === 'owner' ? args.ownerGhii : undefined,
+    // The whole reason owner scoping is safe here: an owner report is a cut that CARRIES the
+    // reader's own identity, and the value comes from the route's resolved identity, never from a
+    // query parameter.
+    //
+    // WHICH dimension carries it depends on the question. Most cuts answer "what did I use" and pin
+    // `ownerGhii`, the account the call was made FROM. A provider cut answers the other one — what
+    // did people use OF MINE — and carries the reader as `counterpartyGhii` instead. Pinning
+    // ownerGhii on that cut matched nothing at all, which is why the "what others bought" report
+    // read zero on a node where 3,696 app opens were attributed over ninety days.
+    ownerGhii: args.scope === 'owner' && cut.dims.includes('ownerGhii')
+      ? args.ownerGhii : undefined,
+    counterpartyGhii: args.scope === 'owner' && !cut.dims.includes('ownerGhii')
+      && cut.dims.includes('counterpartyGhii')
+      ? args.ownerGhii : undefined,
     limit: 50_000,
   }, cut.stream);
 
@@ -280,7 +291,11 @@ export async function readUsageReport(storage: Storage, args: ReadUsageArgs): Pr
   // Derived rather than declared per report, so a new cut gets the right shape with nothing for its
   // author to remember.
   const groupDims = cut.dims.filter(d =>
-    d !== 'outcome' && !(d === 'ownerGhii' && args.scope === 'owner'));
+    d !== 'outcome'
+    && !(d === 'ownerGhii' && args.scope === 'owner')
+    // Same removal for the provider cut: the scope has already pinned the reader, so grouping by it
+    // would label every row with the reader's own identity and distinguish nothing.
+    && !(d === 'counterpartyGhii' && args.scope === 'owner' && !cut.dims.includes('ownerGhii')));
   const isTimeSeries = groupDims.length === 0;
 
   for (const r of rows) {

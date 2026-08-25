@@ -147,4 +147,52 @@ describe('owner scoping', () => {
     });
     expect(report.totals.calls).toBe(5);
   });
+
+  // WHICH dimension carries the reader depends on the question. Most cuts answer "what did I use"
+  // and carry ownerGhii. A provider cut answers the other one — what did people use OF MINE — and
+  // carries the reader as counterpartyGhii. Pinning ownerGhii on it matched nothing, so the report
+  // read zero on a node with 3,696 attributed app opens over ninety days, and every stat card and
+  // the chart beside them drew empty while the data sat right there.
+  it('pins the reader on the dimension the cut actually carries', async () => {
+    await seed([
+      delta({ cut: 'call.provider.coordinate', counterpartyGhii: OWNER,
+        coordinate: 'alice/one.html', outcome: 'ok', calls: 7 }),
+      delta({ cut: 'call.provider.coordinate', counterpartyGhii: 'bob@node',
+        coordinate: 'bob/two.html', outcome: 'ok', calls: 99 }),
+    ]);
+    const report = await readUsageReport(storage, {
+      report: 'sold', scope: 'owner', ownerGhii: OWNER, ...window,
+    });
+    expect(report.totals.calls).toBe(7);
+    expect(report.groups.map(g => g.key)).toEqual(['alice/one.html']);
+  });
+
+  it('does not label every row of a provider report with the reader own identity', async () => {
+    await seed([
+      delta({ cut: 'call.provider.coordinate', counterpartyGhii: OWNER,
+        coordinate: 'alice/one.html', outcome: 'ok', calls: 3 }),
+      delta({ cut: 'call.provider.coordinate', counterpartyGhii: OWNER,
+        coordinate: 'alice/two.html', outcome: 'ok', calls: 4 }),
+    ]);
+    const report = await readUsageReport(storage, {
+      report: 'sold', scope: 'owner', ownerGhii: OWNER, ...window,
+    });
+    // Two apps, two rows — not one row named after the person reading it.
+    expect(report.groups).toHaveLength(2);
+    expect(report.groups.every(g => !g.key.includes(OWNER))).toBe(true);
+  });
+
+  it('still gives the operator the counterparty as a dimension', async () => {
+    await seed([
+      delta({ cut: 'call.provider.coordinate', counterpartyGhii: OWNER,
+        coordinate: 'alice/one.html', outcome: 'ok', calls: 3 }),
+      delta({ cut: 'call.provider.coordinate', counterpartyGhii: 'bob@node',
+        coordinate: 'bob/two.html', outcome: 'ok', calls: 4 }),
+    ]);
+    const report = await readUsageReport(storage, {
+      report: 'provider', scope: 'node', ...window,
+    });
+    expect(report.totals.calls).toBe(7);
+    expect(report.groups).toHaveLength(2);
+  });
 });
