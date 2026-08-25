@@ -12,7 +12,8 @@
  *   import PackagesTab from './profile/packages-tab.js';
  *   <PackagesTab session={session} showToast={showToast} navigate={navigate} locale={locale} />
  * @version-history
- *   2026-08-25 — A data-map strip under the component list: a package's map is its parts' map.
+ *   2026-08-25 — The data-map strip removed: the map describes an APP, and a package is an
+ *     installer rather than the thing somebody opens to work on.
  *   v1.0.0 — 2026-03-15 — initial implementation (Phase 6)
  *   v1.1.0 — 2026-03-16 — restyle to match extensions-tab pattern (grid cards, consistent CSS)
  *   v1.2.0 — 2026-03-17 — add "Open in Generator" / "Edit in Generator" buttons for
@@ -29,7 +30,6 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { EmptyState } from '/components/EmptyState.js';
-import { DataMap } from '/components/DataMap.js';
 import { StatusDot } from '/components/StatusDot.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
@@ -58,42 +58,6 @@ const COMP_TYPE_META = {
   csm:         { icon: '\u{1F4D0}', tabId: 'memory' },
   msm:         { icon: '\u{1F4DC}', tabId: 'memory' },
 };
-
-/**
- * An installed package's components, in the shape the shared map renders.
- *
- * COMP_TYPE_META already types a component as memory-shaped; those are the ones that put something
- * somewhere, and the rest (an app, a translation) put nothing of their own. The basis is the
- * component's own declaration, and the sentence stays empty because nobody wrote one.
- */
-function pkgDataMap(inst) {
-  // `installedComponents` is what the card itself reads, and it is the only one populated. Reading
-  // `components` here made every package on the node say "stores nothing", which is not an empty
-  // answer but a confident wrong one: a browser run showed eight packages all claiming it.
-  const comps = (inst && inst.installedComponents) || [];
-  const storing = comps.filter(c => ['memory', 'csm', 'msm'].includes(c.type));
-  return {
-    spec: 'aimeat.datamap/1',
-    form: 'single-person',
-    source: 'declared',
-    at: inst && (inst.installed_at || inst.updated_at) || null,
-    elsewhere: [],
-    held: storing.map(c => ({
-      grant: { area: 'memory', pattern: c.key_pattern || (c.componentId + '.*'), rights: ['read', 'write'] },
-      basis: { tier: c.key_pattern ? 'schema-locked' : 'declared-space', by: 'package:' + (inst.name || inst.id) },
-      why: '',
-      ownership: 'owner',
-      readers: { visibility: 'owner' },
-      deletion: {
-        effect: 'gone-here-copy-remains',
-        says: 'Removing the package does not remove what it wrote. Those records stay until they are deleted.',
-      },
-      retention: { kind: 'until-deleted' },
-      personalData: 'unstated',
-      source: 'declared',
-    })),
-  };
-}
 
 function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
   const [expanded, setExpanded] = useState(true);
@@ -182,10 +146,6 @@ function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
           `)}
         </ul>
       `}
-      ${/* A package's map is the sum of the parts it installed: the memory-shaped components are
-            the ones that put something somewhere. */ ''}
-      <${DataMap} map=${pkgDataMap(inst)} variant="strip"
-        subject=${{ kind: 'package', id: inst.id, label: inst.name }} />
       <div class="pkg-card-footer">
         <div class="pkg-card-actions">
           <button class="btn-outline btn-sm" onClick=${onCheckUpdate}>${t('packages.checkUpdate') || 'Check Update'}</button>

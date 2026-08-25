@@ -283,6 +283,40 @@ function composeAppPrompt(
   body += '**"Who may act as X" is a different question from "who owns X".** A mail identity, a payment account, a published address: one person registers it and the group uses it. Bind it to the group (the organism), check membership at the moment of use rather than storing an approval, and let removal from the group end the ability with the next request.\n';
   body += '\n';
 
+  // THE DATA MAP. Added 2026-08-25 after a node-wide look found the machinery to store and render a
+  // map on every surface and NOTHING anywhere telling a builder to write one — so 114 apps carried a
+  // guess derived from their permission words, which said `myapp.*` for apps that never wrote a key
+  // there. The parser existed and read a declaration nobody made. This paragraph is the mechanism.
+  body += '### Write the data map — the next AI to open this app has nothing else\n';
+  body += '**When you have decided where things go, write it down.** Somebody — a person or another AI — will open this app later without having built it, and the only way they can find out where its data lives is to read every line of your source. They will not. They will put the new thing wherever they can reach most easily, and that is how a CRM meant for a whole team ended up keeping its campaigns, deal stages and follow-up limits in one person\'s private memory, following that person between accounts and invisible to their own team. Four separate bugs, one cause, and one paragraph would have prevented all four.\n';
+  body += 'The map lives BESIDE the app, not inside it — you write it with the `aimeat_datamap_set` tool (or `PUT /v1/datamap/apps/{owner}/{filename}`), so correcting it later never means republishing:\n';
+  body += '```json\n';
+  body += '{\n';
+  body += '  "spec": "aimeat.datamap/2",\n';
+  body += '  "what": "One paragraph: what this app IS, in the words its user would use.",\n';
+  body += '  "usedFor": "What somebody actually achieves with it.",\n';
+  body += '  "form": "one-person | private | shared-with-named | group | organism-workspace | public-service | static | mixed",\n';
+  body += '  "arrangement": "How the data is laid out, in prose. Name the workspace or the space if there is one.",\n';
+  body += '  "machinery": ["extensions", "ai-generation"],\n';
+  body += '  "leaves": [{ "what": "the follow-up email", "to": "the recipient\'s inbox", "recallable": false }],\n';
+  body += '  "held": [{\n';
+  body += '    "what": "myapp.contacts", "holds": "people and leads",\n';
+  body += '    "kind": "register", "usedFor": "search-and-filter",\n';
+  body += '    "where": "owner-memory-private", "owner": "person", "readers": "owner-only",\n';
+  body += '    "writers": ["the-app-for-the-person"], "shape": "collection-under-one-key",\n';
+  body += '    "keptFor": "until-deleted", "lossRisk": "only-copy", "personalData": "yes",\n';
+  body += '    "why": "These are one salesperson\'s own contacts and the team does not share them."\n';
+  body += '  }],\n';
+  body += '  "elsewhere": []\n';
+  body += '}\n';
+  body += '```\n';
+  body += 'The vocabulary is closed, so pick from these: **kind** settings · user-written · ai-generated · register · event-log · index · computed-or-cache · fetched-copy · foreign-identifier · snapshot · metrics · preferences · draft · outgoing-message · file · link-between-things · permissions · secret. **usedFor** app-cannot-run-without · user-returns-to-read · shown-as-a-list · search-and-filter · calculation-and-reporting · app-resumes-where-it-left · to-share-with-others · to-send-out · evidence-of-what-happened · speed-only · context-for-an-ai · backwards-compatibility. **where** nowhere · browser-only · owner-memory-private · owner-memory-public · someone-elses-memory · organism-workspace · organism-shared · organism-meta · extension-namespace · cortex · file-storage · app-published-record · another-node · external-service. **owner** person · organism · extension · ecosystem-app · someone-else · external-controller · nobody. **readers** owner-only · owner-and-their-agents · named-people · organism-members · anyone · the-app-itself · a-recipient-elsewhere. **writers** person-in-the-ui · the-app-for-the-person · an-agent · a-schedule-unattended · an-extension-server-side · install-seed · a-foreign-system. **shape** one-record · one-per-thing · collection-under-one-key · rolled-up-per-period · index-plus-bodies · files · no-record. **keptFor** until-deleted · ttl · rolling-window · version-capped · append-only · session-only. **lossRisk** only-copy · recoverable-from-source · recomputable · user-can-rewrite · may-vanish.\n';
+  body += 'Three rules that decide whether the map is worth anything:\n';
+  body += '- **`why` is the field this exists for.** It is read at the exact moment somebody is about to move that data. Write the reason, not a restatement of the row: "campaigns belong to the customer, not to whoever sent them" stops a mistake; "campaigns are stored here" does not.\n';
+  body += '- **Leave a `why` you do not know EMPTY.** An empty one shows as unfinished and somebody fills it. A plausible-sounding wrong one is believed and acted on, which is worse than the blank it replaced.\n';
+  body += '- **`form` must match where the rows actually land.** An app you declare as `group` whose every row sits in `owner-memory-private` is flagged on sight — that contradiction is the single check this whole thing exists to make. If it fires, the map is not wrong; the storage is.\n';
+  body += 'A static page that stores nothing declares `"form": "static"` with an empty `held`, and that is a complete map. Nothing here can refuse a publish.\n\n';
+
   // Reading what the owner's AGENTS produced. This is the single most common "my app shows
   // nothing" cause for fleet-facing apps: agent output is NOT in the owner's namespace, and an
   // app-grant token gets no automatic broadening, so an unscoped list() legitimately returns [].

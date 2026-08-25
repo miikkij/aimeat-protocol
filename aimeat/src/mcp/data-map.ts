@@ -30,7 +30,6 @@ import { descriptionFor } from './catalog/shape.js';
 import {
   readProgramMap, stateProgramMap, handsOnKey, type DataMapCaller,
 } from '../services/data-map/data-map-access.js';
-import { buildCoverage } from '../services/data-map/coverage.js';
 import type { DataMap } from '../services/data-map/data-map-types.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
@@ -58,17 +57,15 @@ export function registerDataMapTools(
     'aimeat_datamap_get',
     descriptionFor('aimeat_datamap_get'),
     {
-      app: z.string().optional()
-        .describe('The app, as "owner/filename.html". Leave it out to get this account\'s own coverage instead.'),
+      app: z.string().describe('The app, as "owner/filename.html".'),
     },
     annotationsFor('aimeat_datamap_get'),
     async ({ app }) => {
-      const who = caller();
-      // Two questions, two answers: one app's map, or the whole account's coverage.
-      if (!app) return text(await buildCoverage(storage, config, who.ownerName, new Date().toISOString()));
-      const out = await readProgramMap(storage, config, who, app);
+      const out = await readProgramMap(storage, config, caller(), app, new Date().toISOString());
       if ('refusal' in out) return fail(out.refusal.message);
-      return text({ app: out.app, data_map: out.dataMap, stamp: out.stamp });
+      return text({
+        app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings,
+      });
     },
   );
 
@@ -82,9 +79,10 @@ export function registerDataMapTools(
     },
     annotationsFor('aimeat_datamap_set'),
     async ({ app, data_map }) => {
-      const out = await stateProgramMap(storage, config, caller(), app, data_map as Partial<DataMap>);
+      const out = await stateProgramMap(storage, config, caller(), app,
+        data_map as Partial<DataMap>, new Date().toISOString());
       if ('refusal' in out) return fail(out.refusal.message);
-      return text({ app: out.app, data_map: out.dataMap, hints: out.hints });
+      return text({ app: out.app, data_map: out.dataMap, findings: out.findings });
     },
   );
 

@@ -272,7 +272,7 @@ export function registerPublishRoutes(
             // Where this app puts what. Same split as above: `data_map` is what the node now believes,
             // `data_map_hints` is what to fix, and neither ever turned this into a refusal.
             ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),
-            ...(out.dataMapLint?.hints.length ? { data_map_hints: out.dataMapLint.hints } : {}),
+            ...(out.dataMap ? { data_map: out.dataMap } : {}),
             spec_check: out.specCheck,
             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
             ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),

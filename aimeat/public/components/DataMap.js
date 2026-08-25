@@ -2,220 +2,164 @@
  * @file public/components/DataMap.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description THE data map, wherever one is shown: an app, an extension, an ecosystem app, a
- *   package, an agent, a schedule. One component, so those six cannot drift into six vocabularies
- *   for the same thing — which is the state this replaces, three of them being live already.
+ * @description What an app is, what it is used for, and where its data actually lives.
  *
- *   THE `derived` STATE DECIDES THIS DESIGN. On day one every program's map is a draft the node
- *   worked out, and a corner badge saying so is read as decoration: 169 machine guesses would look
- *   like 169 promises. So it is a banner in the reading path, full width, above the first row, at
- *   body size, carrying both actions. The precedent is the compliance tab, whose own header states
- *   the rule: what needs action goes at the top and the counts are evidence underneath it.
+ *   WHO READS THIS. Somebody — a person or an AI — about to work on an app they did not write. The
+ *   paragraph at the top is what they need first and the rows are second, which is why the paragraph
+ *   is not a caption under a table.
  *
- *   THE BASIS COLUMN CARRIES ITS SENTENCE. A chip reading "Fixed shape" means nothing on its own,
- *   and a tooltip is not an answer for somebody reading on a phone. Every basis renders as chip PLUS
- *   sentence in body text, the same rule AiLabel follows for its icon.
- *
- *   FIXED GRID, NEVER AN `auto` COLUMN. A per-row grid with an auto column drifts out of line by the
- *   width of the longest family name, which is exactly what the alignment check measures.
- * @structure DataMap · DataMapRow · DataMapBanner · basisChip
+ *   THE CONTRADICTION IS THE HEADLINE. An app that says several people share it, whose every row
+ *   lands in one person's own memory, is the defect this whole feature exists to catch. When it is
+ *   there it goes above everything, panel-wide, in body text — never as a corner badge.
+ * @structure DataMapPanel · DataMapLine
  * @usage
- *   import { DataMap } from '/components/DataMap.js';
- *   html`<${DataMap} map=${map} observed=${families} subject=${{ kind: 'app', id, label }} />`
+ *   import { DataMapPanel, DataMapLine } from '/components/DataMap.js';
+ *   <DataMapLine stamp=${app.data_map} onOpen=${...} />
+ *   <DataMapPanel map=${map} findings=${findings} />
  * @version-history
- *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073, the surfaces half.
+ *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2. v1 rendered a key pattern and its
+ *     compliance columns and never said what the app was for, so it answered nobody's question.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { mapState, orderRows, summarise, contradictions, covers } from './data-map/model.js';
+import { labelKeyFor, orderRows, contradictionOf, placesOf, stateOf } from '/components/data-map/model.js';
 
 const html = htm.bind(h);
 
-/** Chip plus its sentence. Both, always — the chip alone is a word nobody outside this repo knows. */
-function basisChip(tier) {
-  const key = ['schema-locked', 'declared-space', 'platform-prefix', 'owner-named'].includes(tier)
-    ? { 'schema-locked': 'locked', 'declared-space': 'declared', 'platform-prefix': 'platform', 'owner-named': 'named' }[tier]
-    : 'unknown';
-  return html`
-    <span class="dm-basis dm-basis-${key}">
-      <span class="dm-basis-chip">${t(`dataMap.basis.${key}`)}</span>
-      <span class="dm-basis-note">${t(`dataMap.basisNote.${key}`)}</span>
-    </span>`;
-}
-
-/** What is unmistakable at a glance, and what the reader is asked to do about it. */
-function DataMapBanner({ state, onCorrect, onConfirm }) {
-  if (state !== 'derived' && state !== 'contradicted') return null;
-  return html`
-    <div class="dm-banner dm-banner-${state}">
-      <div class="dm-banner-text">${t(`dataMap.stateNote.${state}`)}</div>
-      ${onCorrect ? html`
-        <div class="dm-banner-actions">
-          ${state === 'derived' && onConfirm
-            ? html`<button type="button" class="btn-outline btn-sm" onClick=${onConfirm}>${t('dataMap.confirm')}</button>`
-            : null}
-          <button type="button" class="btn-primary btn-sm" onClick=${onCorrect}>${t('dataMap.correct')}</button>
-        </div>` : null}
-    </div>`;
-}
-
-function DataMapRow({ row, disagrees, observed }) {
-  const [open, setOpen] = useState(false);
-  const rights = (row.grant?.rights ?? []).join(', ');
-  const personal = row.personalData === 'yes' ? 'yes' : row.personalData === 'no' ? 'no' : 'unstated';
-  const trace = observed?.find(o => covers(row.grant?.pattern, o.family));
-
-  return html`
-    <div class=${`dm-row${disagrees ? ' dm-row-disagrees' : ''}`}>
-      <button type="button" class="dm-row-head" aria-expanded=${open} onClick=${() => setOpen(!open)}>
-        <span class="dm-family">${row.grant?.pattern}</span>
-        <span class="dm-rights">${rights}</span>
-        ${basisChip(row.basis?.tier)}
-        <span class=${`dm-personal dm-personal-${personal}`}>${t(`dataMap.personal.${personal}`)}</span>
-      </button>
-      <div class="dm-why">
-        ${String(row.why || '').trim()
-          ? row.why
-          : html`<span class="dm-why-missing">${t('dataMap.noWhy')}</span>`}
-      </div>
-      ${open ? html`
-        <dl class="dm-detail">
-          <dt>${t('dataMap.col.where')}</dt><dd>${row.grant?.area}</dd>
-          <dt>${t('dataMap.col.readers')}</dt>
-          <dd>${row.readers?.visibility}${(row.readers?.alsoNamed ?? []).length ? `: ${row.readers.alsoNamed.join(', ')}` : ''}</dd>
-          <dt>${t('dataMap.col.keeps')}</dt><dd>${t(`dataMap.retention.${row.retention?.kind ?? 'unknown'}`)}</dd>
-          <dt>${t('dataMap.col.deleteMeans')}</dt>
-          <dd>
-            ${row.deletion?.says || t(`dataMap.deleteEffect.${row.deletion?.effect ?? 'unknown'}`)}
-            ${(row.deletion?.survives ?? []).length
-              ? html`<div class="dm-survives">${t('dataMap.survives')}: ${row.deletion.survives.join('; ')}</div>`
-              : null}
-          </dd>
-          ${trace ? html`
-            <dt>${t('dataMap.col.seen')}</dt>
-            <dd>${t('dataMap.seenCount', { writes: trace.trace?.writeCount ?? 0, keys: trace.trace?.keyCount ?? 0 })}</dd>` : null}
-          <dt>${t('dataMap.col.basis')}</dt>
-          <dd class="dm-mono">${row.basis?.by || t('dataMap.basisNote.unknown')}</dd>
-        </dl>` : null}
-    </div>`;
-}
-
-export function DataMap({ map, observed = [], subject, variant = 'full', onCorrect, onConfirm }) {
-  const [expanded, setExpanded] = useState(variant !== 'strip');
-  const state = mapState(map, observed);
-  const s = summarise(map, observed);
-
-  if (variant === 'strip' && !expanded) {
-    return html`
-      <button type="button" class=${`dm-strip dm-strip-${state}`} onClick=${() => setExpanded(true)}>
-        <span class="dm-strip-state">${t(`dataMap.state.${state}`)}</span>
-        <span class="dm-strip-summary">
-          ${state === 'empty'
-            ? t('dataMap.emptyStores')
-            : t('dataMap.strip.summary', { groups: s.groups, unexplained: s.unexplained })}
-        </span>
-      </button>`;
-  }
-
-  if (state === 'empty') {
-    return html`
-      <section class="dm-panel dm-panel-empty">
-        <h4 class="dm-title">${t('dataMap.title')}</h4>
-        <p class="dm-empty">
-          ${t('dataMap.emptyStores')}
-          ${map?.at ? html` <span class="dm-checked">${t('dataMap.checkedAt', { at: new Date(map.at).toLocaleDateString() })}</span>` : null}
-        </p>
-      </section>`;
-  }
-
-  const { undeclared, dead } = contradictions(map, observed);
-  const rows = orderRows(map, observed);
-  // Only a real disagreement is marked. `dead` is a note under the rows, not a colour on them.
-  const disagrees = row => undeclared.some(o => covers(row.grant?.pattern, o.family));
-
-  return html`
-    <section class=${`dm-panel dm-panel-${state}`}>
-      <h4 class="dm-title">${t('dataMap.title')}${subject?.label ? ` — ${subject.label}` : ''}</h4>
-      <${DataMapBanner} state=${state} onCorrect=${onCorrect} onConfirm=${onConfirm} />
-
-      ${undeclared.length ? html`
-        <div class="dm-finding">
-          ${t('dataMap.observedNotDeclared', { count: undeclared.length })}
-          <ul class="dm-finding-list">
-            ${undeclared.slice(0, 5).map(o => html`<li class="dm-mono" key=${o.family}>${o.family}</li>`)}
-          </ul>
-        </div>` : null}
-
-      <div class="dm-rows">
-        <div class="dm-head">
-          <span>${t('dataMap.col.family')}</span>
-          <span>${t('dataMap.col.rights')}</span>
-          <span>${t('dataMap.col.basis')}</span>
-          <span>${t('dataMap.col.personal')}</span>
-        </div>
-        ${rows.map(row => html`
-          <${DataMapRow} key=${row.grant?.pattern} row=${row} disagrees=${disagrees(row)} observed=${observed} />`)}
-      </div>
-
-      ${dead.length ? html`
-        <p class="dm-note">${t('dataMap.declaredNeverUsed', { count: dead.length })}</p>` : null}
-
-      ${(map.elsewhere ?? []).length ? html`
-        <h5 class="dm-subtitle">${t('dataMap.elsewhereTitle')}</h5>
-        <div class="dm-rows">
-          ${map.elsewhere.map(row => html`
-            <div class="dm-row dm-row-elsewhere" key=${row.grant?.pattern}>
-              <div class="dm-elsewhere-head">
-                <span class="dm-family">${row.grant?.pattern}</span>
-                <span class="dm-elsewhere-status">${t(`dataMap.elsewhere.${row.status}`)}</span>
-              </div>
-              <div class="dm-why">${row.where}${row.controller ? ` — ${row.controller}` : ''}</div>
-              <div class="dm-why">${row.deletion?.says}</div>
-            </div>`)}
-        </div>` : null}
-
-      ${variant === 'strip'
-        ? html`<button type="button" class="btn-ghost btn-sm dm-collapse" onClick=${() => setExpanded(false)}>${t('dataMap.collapse')}</button>`
-        : null}
-    </section>`;
+/** An axis value in the reader's language, or the raw word when this build does not know it. */
+function label(axis, value) {
+  const key = labelKeyFor(axis, value);
+  return key ? t(key) : String(value || '');
 }
 
 /**
- * The one-line form for a listing, drawn from the manifest STAMP rather than the map.
+ * The one line a list shows: where this app's data is.
  *
- * A stamp is a different input, not a smaller one: it carries counts and the weakest basis and no
- * rows at all, so it is a separate component rather than a mode of the one above. This is what a
- * card in a list of 169 apps shows — fetching and rendering a whole map per card is the shape that
- * took an app subdomain down once already.
- *
- * `href` turns it into a link to wherever the full map lives; without one it is plain text, because
- * a control that does nothing is worse than no control.
+ * Built from the stamp, so a list of 35 apps renders without opening 35 documents.
  */
-export function DataMapStamp({ stamp, href }) {
-  if (!stamp) return null;
-  // A GAP IS NOT A CONTRADICTION, and calling it one was wrong on the first screen it reached. The
-  // stamp is a summary of what the program SAID; whether that disagrees with what it has been seen
-  // doing needs the observed side, which a listing does not have. An unanswered deletion question is
-  // something to finish, not a lie, and the word has to say which.
-  const empty = (stamp.heldRows ?? 0) === 0 && (stamp.elsewhereRows ?? 0) === 0;
-  const state = empty ? 'empty' : (stamp.source === 'derived' ? 'derived' : 'declared');
-  const unfinished = !empty && state !== 'derived' && !!stamp.gap;
-  const text = html`
-    <span class="dm-strip-state">${t(`dataMap.state.${unfinished ? 'needsFinishing' : state}`)}</span>
-    <span class="dm-strip-summary">
-      ${empty
-        ? t('dataMap.emptyStores')
-        : t('dataMap.strip.summary', {
-          groups: (stamp.heldRows ?? 0) + (stamp.elsewhereRows ?? 0),
-          unexplained: stamp.rowsWithoutWhy ?? 0,
-        })}
-    </span>
-    ${stamp.gap ? html`<span class="dm-strip-gap">${t('dataMap.stripGap')}</span>` : null}`;
+export function DataMapLine({ stamp, onOpen }) {
+  const missing = !stamp || stamp.missing;
+  // A contradiction is not the same news as an unfinished sentence, and the list is where somebody
+  // scanning 35 apps decides which one to open. It must be distinguishable without opening any.
+  const state = missing ? 'missing'
+    : stamp.gap?.code === 'DATAMAP_FORM_CONTRADICTED' ? 'contradicted'
+    : stamp.gap ? 'unfinished'
+    : 'stated';
+  const text = missing ? t('dataMap.line.missing') : stamp.summary;
 
-  const cls = `dm-strip dm-strip-${state}${unfinished ? ' dm-strip-unfinished' : ''}`;
-  return href ? html`<a class=${cls} href=${href}>${text}</a>` : html`<div class=${cls}>${text}</div>`;
+  return html`
+    <button type="button" class=${`dm-line dm-line-${state}`} onClick=${onOpen}>
+      <span class="dm-line-state">${t(`dataMap.state.${state}`)}</span>
+      <span class="dm-line-text">${text}</span>
+      <span class="dm-line-open">${t('dataMap.line.open')}</span>
+    </button>`;
 }
 
-export default DataMap;
+/** One row of the first table. Two lines: the address and what it is, then the sentence. */
+function Row({ row }) {
+  return html`
+    <div class=${`dm-row${row.why ? '' : ' dm-row-unexplained'}`}>
+      <div class="dm-row-head">
+        <span class="dm-what">${row.what}</span>
+        <span class="dm-holds">${row.holds}</span>
+        <span class="dm-where">${label('where', row.where)}${row.whereExactly
+          ? html` <span class="dm-where-exact">${row.whereExactly}</span>` : null}</span>
+      </div>
+      <div class="dm-row-facts">
+        <span>${label('kind', row.kind)}</span>
+        <span>${label('use', row.usedFor)}</span>
+        <span>${label('readers', row.readers)}</span>
+        <span>${label('loss', row.lossRisk)}</span>
+        <span>${label('kept', row.keptFor)}</span>
+        ${row.personalData === 'yes' ? html`<span class="dm-personal">${t('dataMap.personal.yes')}</span>` : null}
+      </div>
+      <div class=${`dm-why${row.why ? '' : ' dm-why-missing'}`}>
+        ${row.why || t('dataMap.row.noWhy')}
+      </div>
+    </div>`;
+}
+
+/** The whole map. The paragraph first, because that is what makes the rows judgeable. */
+export function DataMapPanel({ map, findings, appLabel }) {
+  if (!map || map.source === 'none') {
+    return html`
+      <div class="dm-panel dm-panel-missing">
+        <h3 class="dm-title">${t('dataMap.title')}</h3>
+        <p class="dm-missing">${t('dataMap.panel.missing')}</p>
+      </div>`;
+  }
+
+  const contradiction = contradictionOf(map);
+  const places = placesOf(map);
+  const rows = orderRows(map.held || []);
+
+  return html`
+    <div class=${`dm-panel dm-panel-${stateOf(map)}`}>
+      <h3 class="dm-title">${t('dataMap.title')}${appLabel ? ` — ${appLabel}` : ''}</h3>
+
+      ${contradiction ? html`
+        <p class="dm-contradiction">${t(contradiction)}</p>` : null}
+
+      <div class="dm-about">
+        <p class="dm-what-para">${map.what || html`<em>${t('dataMap.panel.noWhat')}</em>`}</p>
+        <p class="dm-used-for"><b>${t('dataMap.usedForLabel')}</b> ${map.usedFor
+          || html`<em>${t('dataMap.panel.noUsedFor')}</em>`}</p>
+        <p class="dm-form"><b>${t('dataMap.formLabel')}</b> ${label('form', map.form)}</p>
+      </div>
+
+      <div class="dm-arrangement">
+        <h4>${t('dataMap.arrangementLabel')}</h4>
+        <p>${map.arrangement || html`<em>${t('dataMap.panel.noArrangement')}</em>`}</p>
+        ${places.length > 0 ? html`
+          <ul class="dm-places">
+            ${places.map(p => html`<li key=${p.where}>${label('where', p.where)} · ${p.n}</li>`)}
+          </ul>` : null}
+      </div>
+
+      ${rows.length > 0 ? html`
+        <div class="dm-rows">
+          <h4>${t('dataMap.rowsLabel')}</h4>
+          ${rows.map((r, i) => html`<${Row} key=${r.what + i} row=${r} />`)}
+        </div>` : null}
+
+      ${(map.machinery || []).length > 0 ? html`
+        <div class="dm-machinery">
+          <h4>${t('dataMap.machineryLabel')}</h4>
+          <p>${map.machinery.join(' · ')}</p>
+        </div>` : null}
+
+      ${(map.leaves || []).length > 0 ? html`
+        <div class="dm-leaves">
+          <h4>${t('dataMap.leavesLabel')}</h4>
+          <ul>
+            ${map.leaves.map((l, i) => html`
+              <li key=${i}>${l.what} → ${l.to}
+                ${l.recallable ? '' : html` <span class="dm-no-recall">${t('dataMap.leaves.noRecall')}</span>`}</li>`)}
+          </ul>
+        </div>` : null}
+
+      ${(map.elsewhere || []).length > 0 ? html`
+        <div class="dm-elsewhere">
+          <h4>${t('dataMap.elsewhereLabel')}</h4>
+          ${map.elsewhere.map((e, i) => html`
+            <div class="dm-else-row" key=${i}>
+              <div class="dm-row-head">
+                <span class="dm-what">${e.what}</span>
+                <span class="dm-holds">${t(`dataMap.elsewhere.${e.status}`)}</span>
+              </div>
+              <div class="dm-row-facts">
+                <span>${t('dataMap.elsewhere.whereLabel')} ${e.where}</span>
+                <span>${t('dataMap.elsewhere.controlledByLabel')} ${e.controlledBy}</span>
+              </div>
+              <div class="dm-why">${e.deletion}</div>
+            </div>`)}
+        </div>` : null}
+
+      ${(findings || []).length > 0 ? html`
+        <div class="dm-findings">
+          <h4>${t('dataMap.findingsLabel')}</h4>
+          <ul>${findings.map(f => html`<li key=${f.code}>${f.message}</li>`)}</ul>
+        </div>` : null}
+    </div>`;
+}

@@ -384,8 +384,7 @@ export const coreTools: ConnectCliToolDefinition[] = [
         // invokes this handler against a recording client to prove each one leaves the process.
         name: 'aimeat_datamap_get',
         handler: ({ client }, input) => {
-            const app = optionalString(input, 'app');
-            if (!app) return client.get('/v1/datamap/coverage');
+            const app = requiredString(input, 'app');
             const slash = app.indexOf('/');
             if (slash <= 0) throw new Error('Name the app as "owner/filename.html".');
             return client.get(`/v1/datamap/apps/${encodeURIComponent(app.slice(0, slash))}`

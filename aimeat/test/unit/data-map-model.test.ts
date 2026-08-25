@@ -1,156 +1,135 @@
 /**
  * @file test/unit/data-map-model.test.ts
- * @description The browser-side data-map vocabulary, and the one thing that keeps its two copies
- *   honest.
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The data map's vocabulary: the two copies say the same thing, and the one check that
+ *   pays for the whole feature actually fires.
  *
- *   The app-catalog is an esbuild bundle with no Preact and no import map, so it cannot import from
- *   /components; the house convention there is to port. A duplicated rule set is a defect unless
- *   something makes drift impossible, so this loads BOTH copies and runs the same table through
- *   each. Change one and the other goes red rather than quietly wrong.
- * @usage pnpm test -- data-map-model
+ *   THE CONTRADICTION TEST IS THE POINT. An app that says several people share it, whose every row
+ *   lands in one person's own memory, is the defect this exists to catch — four separate bugs in one
+ *   CRM that were all the same bug. If that assertion ever goes green by accident, the map is
+ *   decoration.
  * @version-history
- *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073, the surfaces half.
+ *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  labelKeyFor, orderRows, contradictionOf, placesOf, stateOf, VALUES,
+} from '../../public/components/data-map/model.js';
 
-const ROOT = join(import.meta.dirname, '..', '..');
-const SHARED = join(ROOT, 'public', 'components', 'data-map', 'model.js');
-const CATALOG = join(ROOT, 'src', 'static', 'app-catalog', 'js', 'data-map-model.js');
+const ROOT = join(import.meta.dirname, '../..');
 
-const model = await import(`file://${SHARED.replace(/\\/g, '/')}`);
+describe('the two copies of the model are the same file', () => {
+  it('the catalogue copy is byte-identical to the shared one', () => {
+    const shared = readFileSync(join(ROOT, 'public/components/data-map/model.js'));
+    const copy = readFileSync(join(ROOT, 'src/static/app-catalog/js/data-map-model.js'));
+    // Byte-identical, not "equivalent": the catalogue is a separate bundle with no import path back
+    // here, so a copy that drifts is two vocabularies telling a reader different things.
+    expect(copy.equals(shared)).toBe(true);
+  });
+});
 
-const row = (pattern: string, over: Record<string, unknown> = {}) => ({
-    grant: { area: 'memory', pattern, rights: ['read', 'write'] },
-    basis: { tier: 'declared-space', by: 'app:x' },
-    why: 'Because it belongs to the customer.',
-    source: 'declared',
-    ...over,
+describe('labelKeyFor', () => {
+  it('maps a known value to its key', () => {
+    expect(labelKeyFor('where', 'organism-workspace')).toBe('dataMap.where.organism-workspace');
+  });
+  it('returns null for a word this build does not know, so the raw word can be printed', () => {
+    expect(labelKeyFor('where', 'somewhere-a-newer-node-invented')).toBeNull();
+  });
+  it('every axis value has a key', () => {
+    for (const axis of Object.keys(VALUES)) {
+      for (const value of VALUES[axis as keyof typeof VALUES]) {
+        expect(labelKeyFor(axis, value)).toBe(`dataMap.${axis}.${value}`);
+      }
+    }
+  });
+});
+
+/** The shape a real map has, trimmed to what these functions read. */
+const row = (over: Record<string, unknown> = {}) => ({
+  what: 'x.*', holds: 'things', kind: 'register', usedFor: 'shown-as-a-list',
+  where: 'owner-memory-private', owner: 'person', readers: 'owner-only',
+  writers: ['the-app-for-the-person'], shape: 'one-record', keptFor: 'until-deleted',
+  lossRisk: 'only-copy', personalData: 'no', why: 'because.', ...over,
 });
 const map = (over: Record<string, unknown> = {}) => ({
-    spec: 'aimeat.datamap/1', form: 'single-person', source: 'declared',
-    held: [row('cadence.*')], elsewhere: [], at: '2026-08-24T00:00:00.000Z', ...over,
-});
-const seen = (family: string) => ({ family, trace: { writeCount: 1 } });
-
-describe('the four states', () => {
-    it('a map somebody wrote is declared', () => {
-        expect(model.mapState(map(), [])).toBe('declared');
-    });
-
-    it('a map the node worked out is derived, and never claims otherwise', () => {
-        expect(model.mapState(map({ source: 'derived' }), [])).toBe('derived');
-    });
-
-    it('no rows is a STATEMENT, not an absence', () => {
-        // An absent map and an empty one look identical to a person, and only one is a finding.
-        expect(model.mapState(map({ held: [] }), [])).toBe('empty');
-        expect(model.mapState(null, [])).toBe('empty');
-    });
-
-    it('a map that disagrees with reality outranks everything else', () => {
-        const m = map({ source: 'derived' });
-        expect(model.mapState(m, [seen('somewhere.else.*')])).toBe('contradicted');
-    });
+  spec: 'aimeat.datamap/2', what: 'An app.', usedFor: 'Doing a thing.', form: 'one-person',
+  arrangement: 'In your own memory.', machinery: [], leaves: [], held: [row()], elsewhere: [],
+  source: 'declared', at: '2026-08-25T00:00:00.000Z', ...over,
 });
 
-describe('the contradiction rule, both directions', () => {
-    it('a family being written that no row covers', () => {
-        const { undeclared } = model.contradictions(map(), [seen('somewhere.else.*')]);
-        expect(undeclared).toHaveLength(1);
+describe('contradictionOf: the check the whole feature exists for', () => {
+  it('catches a shared app whose every row is in one person own memory', () => {
+    // This is CADENCE's original defect, in one assertion.
+    expect(contradictionOf(map({ form: 'group' }))).toBe('dataMap.contradiction.sharedButPrivate');
+  });
+
+  it.each(['group', 'organism-workspace', 'shared-with-named'])(
+    'fires for form %s', form => {
+      expect(contradictionOf(map({ form }))).toBe('dataMap.contradiction.sharedButPrivate');
     });
 
-    it('a declared row that has never received a write', () => {
-        const { dead } = model.contradictions(map(), [seen('something.other.*')]);
-        expect(dead.map((r: any) => r.grant.pattern)).toEqual(['cadence.*']);
-    });
+  it('does not fire when a shared app really does write where the group can read', () => {
+    const shared = map({ form: 'group', held: [row({ where: 'organism-workspace' })] });
+    expect(contradictionOf(shared)).toBeNull();
+  });
 
-    it('a declared pattern covers the families beneath it', () => {
-        const m = map({ held: [row('uutiset.*')] });
-        const { undeclared, dead } = model.contradictions(m, [seen('uutiset.elokuu.*')]);
-        expect(undeclared).toHaveLength(0);
-        expect(dead).toHaveLength(0);
-    });
+  it('catches a one-person app writing where more than one person reads', () => {
+    const m = map({ form: 'one-person', held: [row({ where: 'organism-workspace' })] });
+    expect(contradictionOf(m)).toBe('dataMap.contradiction.personalButShared');
+  });
 
-    it('says nothing at all when nothing has been observed yet', () => {
-        // A brand-new app has no trace. Reporting every row as dead on day one would fire on
-        // everything, which is how a finding gets ignored.
-        const { undeclared, dead } = model.contradictions(map(), []);
-        expect(undeclared).toHaveLength(0);
-        expect(dead).toHaveLength(0);
-    });
+  it('catches a static page that lists things it stores', () => {
+    expect(contradictionOf(map({ form: 'static' }))).toBe('dataMap.contradiction.staticButStores');
+  });
+
+  it('says nothing about a map with no rows', () => {
+    expect(contradictionOf(map({ held: [] }))).toBeNull();
+  });
 });
 
-describe('the weakest basis is what the whole map is worth', () => {
-    it('reports the weakest row, not the strongest', () => {
-        const m = map({
-            held: [row('a.*', { basis: { tier: 'schema-locked', by: 's' } }), row('b.*', { basis: { tier: 'none', by: '' } })],
-        });
-        expect(model.weakestTier(m.held)).toBe('none');
-    });
+describe('orderRows: what would cost the most comes first', () => {
+  it('puts the only copy of something about a person above a replaceable cache', () => {
+    const cache = row({ what: 'cache.*', lossRisk: 'may-vanish', personalData: 'no' });
+    const people = row({ what: 'people.*', lossRisk: 'only-copy', personalData: 'yes' });
+    expect(orderRows([cache, people])[0].what).toBe('people.*');
+  });
 
-    it('scores an unknown tier lowest, so a bad value cannot look reassuring', () => {
-        expect(model.tierRank('nonsense')).toBe(0);
-        expect(model.tierRank('schema-locked')).toBeGreaterThan(model.tierRank('owner-named'));
-    });
+  it('puts an unexplained row above an explained one of the same weight', () => {
+    const explained = row({ what: 'a.*', why: 'because.' });
+    const not = row({ what: 'b.*', why: '' });
+    expect(orderRows([explained, not])[0].what).toBe('b.*');
+  });
 });
 
-describe('reading order', () => {
-    it('puts what disagrees first, then what nobody explained', () => {
-        // Two of the three rows are covered by something observed. The third declares a write that
-        // has never happened, which is the disagreement, and it leads even though it has a `why`.
-        const m = map({
-            held: [
-                row('seen-a.*', { why: 'A good reason.' }),
-                row('nowhy.*', { why: '' }),
-                row('never-written.*', { why: 'Another reason.' }),
-            ],
-        });
-        const ordered = model.orderRows(m, [seen('seen-a.elokuu.*'), seen('nowhy.elokuu.*')]);
-        expect(ordered[0].grant.pattern).toBe('never-written.*');
-        expect(ordered[1].grant.pattern).toBe('nowhy.*');
-    });
+describe('placesOf', () => {
+  it('counts rows per place, biggest first', () => {
+    const m = map({ held: [
+      row({ where: 'organism-workspace' }),
+      row({ where: 'organism-workspace' }),
+      row({ where: 'owner-memory-private' }),
+    ] });
+    expect(placesOf(m)).toEqual([
+      { where: 'organism-workspace', n: 2 },
+      { where: 'owner-memory-private', n: 1 },
+    ]);
+  });
 });
 
-describe('the summary a one-line strip shows', () => {
-    it('counts the groups, the unexplained and the disagreements', () => {
-        const m = map({ held: [row('a.*', { why: '' }), row('b.*')] });
-        const s = model.summarise(m, [seen('c.*')]);
-        expect(s.groups).toBe(2);
-        expect(s.unexplained).toBe(1);
-        expect(s.contradictions).toBeGreaterThan(0);
-        expect(s.state).toBe('contradicted');
-    });
-});
-
-describe('the catalogue copy cannot drift', () => {
-    it('exists, and answers identically on the whole table', async () => {
-        expect(existsSync(CATALOG), `${CATALOG} is missing — the catalogue must carry a copy`).toBe(true);
-        const ported = await import(`file://${CATALOG.replace(/\\/g, '/')}`);
-
-        const cases: [unknown, unknown][] = [
-            [map(), []],
-            [map({ source: 'derived' }), []],
-            [map({ held: [] }), []],
-            [map(), [seen('somewhere.else.*')]],
-            [map({ held: [row('uutiset.*')] }), [seen('uutiset.elokuu.*')]],
-            [null, []],
-        ];
-        for (const [m, o] of cases) {
-            expect(ported.mapState(m, o), `mapState disagreed on ${JSON.stringify(m)}`)
-                .toBe(model.mapState(m, o));
-            expect(ported.summarise(m, o)).toEqual(model.summarise(m, o));
-        }
-        for (const tier of [...model.TIERS, 'nonsense']) {
-            expect(ported.tierRank(tier)).toBe(model.tierRank(tier));
-        }
-        expect(ported.TIERS).toEqual(model.TIERS);
-        expect(ported.STATES).toEqual(model.STATES);
-    });
-
-    it('is a verbatim copy apart from its header, so a reviewer can diff it by eye', () => {
-        const body = (p: string) => readFileSync(p, 'utf-8').replace(/^\/\*\*[\s\S]*?\*\/\s*/, '').trim();
-        expect(body(CATALOG)).toBe(body(SHARED));
-    });
+describe('stateOf', () => {
+  it('a map nobody wrote is missing, and that is never guessed away', () => {
+    expect(stateOf(null)).toBe('missing');
+    expect(stateOf(map({ source: 'none' }))).toBe('missing');
+  });
+  it('a contradiction outranks an unfinished row', () => {
+    expect(stateOf(map({ form: 'group', held: [row({ why: '' })] }))).toBe('contradicted');
+  });
+  it('a row with no why is unfinished', () => {
+    expect(stateOf(map({ held: [row({ why: '' })] }))).toBe('unfinished');
+  });
+  it('a complete map is written', () => {
+    expect(stateOf(map())).toBe('stated');
+  });
 });

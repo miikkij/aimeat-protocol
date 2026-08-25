@@ -1,122 +1,115 @@
 /**
- * @file src/static/app-catalog/js/data-map-model.js
+ * @file public/components/data-map/model.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description A VERBATIM COPY of public/components/data-map/model.js. The app catalogue is built
- *   by esbuild with no Preact and no import map, so it cannot import from /components; the house
- *   convention here is to port rather than share (see detail.js). Everything below this header is
- *   byte-identical to the shared file, and test/unit/data-map-model.test.ts asserts exactly that as
- *   well as running both copies over the same table. Edit the shared one; copy it here; the test is
- *   what stops the two answering differently.
+ * @description The data map's vocabulary, as a pure module with no imports.
+ *
+ *   Two renderers draw this map — the Preact one in the profile and the esbuild one in the app
+ *   catalogue, which has no Preact and no SSE — so the words and the ordering live here and the
+ *   catalogue copies this file VERBATIM. test/unit/data-map-model.test.ts loads both copies and
+ *   fails when they differ.
+ *
+ *   Every axis maps a stored value to an i18n key. A value the map carries that this file does not
+ *   know is rendered as written rather than dropped: a map from a newer node must degrade to
+ *   "unfamiliar word" and never to a blank cell.
+ * @structure LABEL_KEYS · labelKeyFor · ROW_ORDER · orderRows · placeOf · summaryOf
+ * @usage import { labelKeyFor, orderRows } from '/components/data-map/model.js';
  * @version-history
- *   v1.0.0 - 2026-08-24 - Ported for TARGET-073, the surfaces half.
+ *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2 per docs/datakartta-maaritelma.md.
  */
+
+/** Every axis, value → i18n key suffix. The key is `dataMap.<axis>.<value>`. */
+export const AXES = ['form', 'where', 'kind', 'use', 'owner', 'readers', 'writer', 'shape', 'kept', 'loss'];
+
+export const VALUES = {
+  form: ['one-person', 'private', 'shared-with-named', 'group', 'organism-workspace',
+    'public-service', 'static', 'mixed', 'unstated'],
+  where: ['nowhere', 'browser-only', 'owner-memory-private', 'owner-memory-public',
+    'someone-elses-memory', 'organism-workspace', 'organism-shared', 'organism-meta',
+    'extension-namespace', 'cortex', 'file-storage', 'app-published-record', 'another-node',
+    'external-service'],
+  kind: ['settings', 'user-written', 'ai-generated', 'register', 'event-log', 'index',
+    'computed-or-cache', 'fetched-copy', 'foreign-identifier', 'snapshot', 'metrics',
+    'preferences', 'draft', 'outgoing-message', 'file', 'link-between-things', 'permissions',
+    'secret'],
+  use: ['app-cannot-run-without', 'user-returns-to-read', 'shown-as-a-list', 'search-and-filter',
+    'calculation-and-reporting', 'app-resumes-where-it-left', 'to-share-with-others', 'to-send-out',
+    'evidence-of-what-happened', 'speed-only', 'context-for-an-ai', 'backwards-compatibility'],
+  owner: ['person', 'organism', 'extension', 'ecosystem-app', 'someone-else',
+    'external-controller', 'nobody'],
+  readers: ['owner-only', 'owner-and-their-agents', 'named-people', 'organism-members', 'anyone',
+    'the-app-itself', 'a-recipient-elsewhere'],
+  writer: ['person-in-the-ui', 'the-app-for-the-person', 'an-agent', 'a-schedule-unattended',
+    'an-extension-server-side', 'install-seed', 'a-foreign-system'],
+  shape: ['one-record', 'one-per-thing', 'collection-under-one-key', 'rolled-up-per-period',
+    'index-plus-bodies', 'files', 'no-record'],
+  kept: ['until-deleted', 'ttl', 'rolling-window', 'version-capped', 'append-only', 'session-only'],
+  loss: ['only-copy', 'recoverable-from-source', 'recomputable', 'user-can-rewrite', 'may-vanish'],
+};
+
 /**
- * On what basis a family is known, strongest first. The order is load-bearing: a coverage view sorts
- * by it and `weakestTier` reports what a whole map should be trusted to.
+ * The i18n key for one axis value, or null when the map carries a word this build does not know.
+ * A null tells the renderer to print the raw value: an unfamiliar word beats an empty cell.
  */
-export const TIERS = ['schema-locked', 'declared-space', 'platform-prefix', 'owner-named', 'none'];
-
-/** What a reader is looking at. `derived` is the one that decides the design — see the renderer. */
-export const STATES = ['declared', 'derived', 'contradicted', 'empty'];
-
-/** Higher is stronger. An unknown tier scores lowest, so a bad value can never look reassuring. */
-export function tierRank(tier) {
-  const i = TIERS.indexOf(tier);
-  return i < 0 ? 0 : TIERS.length - i;
+export function labelKeyFor(axis, value) {
+  if (!value) return null;
+  const known = VALUES[axis];
+  if (!known || known.indexOf(value) < 0) return null;
+  return 'dataMap.' + axis + '.' + value;
 }
 
-/** The weakest basis anywhere in the map — what the whole of it should be trusted to. */
-export function weakestTier(rows) {
-  if (!rows || rows.length === 0) return null;
-  return rows.reduce((worst, r) => {
-    const tier = (r && r.basis && r.basis.tier) || 'none';
-    return tierRank(tier) < tierRank(worst) ? tier : worst;
-  }, TIERS[0]);
-}
-
 /**
- * Does an observed family fall under a declared pattern? `uutiset.*` covers `uutiset.elokuu.*`.
+ * Rows in the order a reader needs them.
  *
- * Prefix matching on purpose, and only up to the first `*`: a looser rule would let a near-miss
- * silently satisfy a row, and a contradiction list that under-reports is worse than one that asks
- * about something already covered.
+ * The rows that would cost the most if they were in the wrong place come first: the only copy of
+ * something, then anything about a person, then the rest. A row nobody has explained sorts above an
+ * explained one inside its group, because that is the row somebody has to finish.
  */
-export function covers(pattern, family) {
-  if (typeof pattern !== 'string' || typeof family !== 'string') return false;
-  const star = pattern.indexOf('*');
-  if (star < 0) return pattern === family;
-  return family.startsWith(pattern.slice(0, star));
-}
-
-/**
- * What the program says it writes versus what it has been seen writing.
- *
- * Two directions, and they mean different things. `undeclared` is a family being written that no row
- * covers — either an area nobody declared or a pattern that is wrong. `dead` is a declared row that
- * has never received a write — either the program never did it, or the pattern is wrong in the other
- * direction. Both are findings; neither is an error.
- */
-export function contradictions(map, observed) {
-  const held = (map && map.held) || [];
-  const seen = observed || [];
-  const undeclared = seen.filter(o => !held.some(r => covers(r.grant && r.grant.pattern, o.family)));
-  const dead = held.filter(r => (r.grant && r.grant.rights || []).includes('write')
-    && seen.length > 0
-    && !seen.some(o => covers(r.grant.pattern, o.family)));
-  return { undeclared, dead };
-}
-
-/**
- * Which of the four states this map is in.
- *
- * `contradicted` outranks everything, because a map that disagrees with reality is the one thing a
- * reader has to see first. `empty` is a statement ("this stores nothing") and never an absence — an
- * absent map and an empty one look identical to a person, and only one of them is a finding.
- */
-export function mapState(map, observed) {
-  if (!map) return 'empty';
-  const rows = [...(map.held || []), ...(map.elsewhere || [])];
-  const { undeclared } = contradictions(map, observed);
-  // ONLY `undeclared` decides this, and `dead` deliberately does not. A family being written that no
-  // row covers is proof of a disagreement. A declared row that has not been written is not: the
-  // program may simply not have run that path yet, and treating it as evidence marked every row in
-  // the first real screen this reached — which says "all of this is wrong" and so says nothing.
-  // `dead` stays computed and is reported as a note, where a reader can weigh it.
-  if (undeclared.length > 0) return 'contradicted';
-  if (rows.length === 0) return 'empty';
-  return map.source === 'derived' ? 'derived' : 'declared';
-}
-
-/** The numbers a one-line strip shows without opening anything. */
-export function summarise(map, observed) {
-  const held = (map && map.held) || [];
-  const elsewhere = (map && map.elsewhere) || [];
-  const { undeclared, dead } = contradictions(map, observed);
-  return {
-    state: mapState(map, observed),
-    groups: held.length + elsewhere.length,
-    unexplained: held.filter(r => !String(r.why || '').trim()).length,
-    contradictions: undeclared.length + dead.length,
-    weakest: weakestTier([...held, ...elsewhere]),
+export function orderRows(rows) {
+  const weight = (r) => {
+    let w = 0;
+    if (r.lossRisk === 'only-copy') w -= 4;
+    if (r.personalData === 'yes') w -= 3;
+    if (r.usedFor === 'to-share-with-others') w -= 2;
+    if (!String(r.why || '').trim()) w -= 1;
+    return w;
   };
+  return rows.slice().sort((a, b) => weight(a) - weight(b));
 }
 
 /**
- * Rows in reading order: what disagrees with reality first, then what nobody has explained, then the
- * rest. A reader who stops after three rows should have seen the three that matter.
+ * Does the arrangement contradict what the app says it is?
+ *
+ * The one check that pays for the whole map: an app for several people whose every row lands in one
+ * person's own memory is the defect this exists to catch, and it is readable from two columns.
  */
-export function orderRows(map, observed) {
-  const held = [...((map && map.held) || [])];
-  const { undeclared, dead } = contradictions(map, observed);
-  // Ordering may weigh `dead` — being sorted a little higher costs a reader nothing. Colour may not.
-  const isContradicted = r => dead.includes(r)
-    || undeclared.some(o => covers(r.grant && r.grant.pattern, o.family));
-  return held.sort((a, b) => {
-    const c = Number(isContradicted(b)) - Number(isContradicted(a));
-    if (c !== 0) return c;
-    const w = Number(!String(b.why || '').trim()) - Number(!String(a.why || '').trim());
-    if (w !== 0) return w;
-    return tierRank((a.basis || {}).tier) - tierRank((b.basis || {}).tier);
-  });
+export function contradictionOf(map) {
+  if (!map || !map.held || map.held.length === 0) return null;
+  const inOrganism = map.held.some(r => r.where === 'organism-workspace'
+    || r.where === 'organism-shared' || r.where === 'organism-meta');
+  const allPrivate = map.held.every(r => r.where === 'owner-memory-private');
+  const sharedForm = map.form === 'group' || map.form === 'organism-workspace'
+    || map.form === 'shared-with-named';
+
+  if (sharedForm && allPrivate) return 'dataMap.contradiction.sharedButPrivate';
+  if (map.form === 'one-person' && inOrganism) return 'dataMap.contradiction.personalButShared';
+  if (map.form === 'static') return 'dataMap.contradiction.staticButStores';
+  return null;
+}
+
+/** Which places this map's rows land in, biggest group first: the one line a list shows. */
+export function placesOf(map) {
+  const counts = new Map();
+  for (const row of (map && map.held) || []) {
+    counts.set(row.where, (counts.get(row.where) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([where, n]) => ({ where, n }));
+}
+
+/** The four states a map can be in. The one a reader must not miss is `contradicted`. */
+export function stateOf(map) {
+  if (!map || map.source === 'none') return 'missing';
+  if (contradictionOf(map)) return 'contradicted';
+  if ((map.held || []).some(r => !String(r.why || '').trim())) return 'unfinished';
+  return 'stated';
 }

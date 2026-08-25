@@ -5,8 +5,8 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
- *   v1.12.0 — 2026-08-25 — The shared data map beside the memory-areas editor rather than instead
- *     of it: those rows are a control, and a read-only panel would have taken that away.
+ *   v1.12.0 — 2026-08-25 — The shared data map was added here and removed again the same day: it
+ *     describes an app, and this panel already has the control the owner needs.
  *   v1.11.0 -- 2026-08-24 -- Live update also follows 'agent-directives', which is where the memory
  *     areas this panel edits actually live. routes/agent-directives.ts emits it from three places and
  *     nothing subscribed, so the panel never saw its own writes.
@@ -40,7 +40,6 @@ import { getDirectives, getDataAccessOverview, upsertDirectives } from '/js/serv
 import { updateMemoryFull, deleteMemory, createMemory } from '/js/services/memory.js';
 import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
-import { DataMap } from '/components/DataMap.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -63,37 +62,6 @@ function extractImageUrls(valueText) {
   return out;
 }
 
-/**
- * An agent's declared memory areas, in the shape the shared map renders.
- *
- * { key_prefix, description, access } is the same triple as the ecosystem grammar wearing different
- * field names, which is exactly the drift the shared map exists to end. The description IS the
- * sentence somebody wrote, so unlike every other adapter here this one has a real `why` to pass.
- */
-function agentDataMap(areas, agentName) {
-  return {
-    spec: 'aimeat.datamap/1',
-    form: 'single-person',
-    source: 'declared',
-    at: null,
-    elsewhere: [],
-    held: (areas || []).map(a => ({
-      grant: {
-        area: 'memory',
-        pattern: a.key_prefix || a.key || String(a),
-        rights: a.access === 'read' ? ['read'] : ['read', 'write'],
-      },
-      basis: { tier: a.schema ? 'schema-locked' : 'declared-space', by: 'agent:' + agentName },
-      why: a.description || '',
-      ownership: 'agent',
-      readers: { visibility: 'owner' },
-      deletion: { effect: 'gone', says: 'Deleting removes the record. You can do it; the agent can if you let it.' },
-      retention: { kind: 'until-deleted' },
-      personalData: 'unstated',
-      source: 'declared',
-    })),
-  };
-}
 
 export default function TabDataAccess({ agent, agentName, showToast, allAgents }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -527,11 +495,6 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
         ${(tags.length > 0 || addingTag) && html`<div class="pf-agd-help-text">${t('profile.agents.detail.data_access.tagsHelp')}</div>`}
       </div>
 
-      ${/* The map, beside the editor rather than instead of it. The rows below are a CONTROL - the
-            owner adds, edits and removes areas there - and a read-only panel would have taken that
-            away. This says the same thing in the words every other surface uses. */ ''}
-      ${memoryAreas.length > 0 && html`<${DataMap} map=${agentDataMap(memoryAreas, agentName)} variant="strip"
-        subject=${{ kind: 'agent', id: agentName, label: agentName }} />`}
 
       <!-- MEMORY AREAS -->
       <div class="pf-agd-data-section pf-agd-card">

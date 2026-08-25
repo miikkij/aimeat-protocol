@@ -121,7 +121,6 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { Modal } from '/components/Modal.js';
-import { DataMap } from '/components/DataMap.js';
 import { Spinner } from './shared.js';
 import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubscriptions, subscribe, unsubscribe } from '/js/services/ecosystem.js';
 import { ECO_PRESETS } from './ecosystem-tab.helpers.js';
@@ -129,40 +128,6 @@ import { EcoAutomationSection } from './ecosystem-tab.automation.js';
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
 import { swallowed } from '/js/swallowed.js';
 
-/**
- * A connected app's approved data areas, in the shape the shared map renders.
- *
- * `dataAreas` is the grammar the GEAI approval path already stores — `{ area, pattern, rights }` —
- * and the map's own row is built around that same triple, so this is a wrapper rather than a
- * translation. What it deliberately does NOT do is guess the parts nobody stated: the owner approved
- * an area, they did not write a sentence about why it is there or what deleting it means, and a
- * plausible sentence nobody wrote is worse than a visible blank.
- *
- * No `observed` is passed. What this app actually wrote is the list directly below, and deciding
- * whether the two DISAGREE needs the server's key-family fold — a browser-side guess at it would be
- * a second implementation that quietly answers differently.
- */
-function ecoDataMap(app) {
-  const areas = app.data_areas || [];
-  return {
-    spec: 'aimeat.datamap/1',
-    form: 'shared',
-    source: 'declared',
-    at: app.approved_at || app.created_at || null,
-    elsewhere: [],
-    held: areas.map(g => ({
-      grant: g,
-      basis: { tier: 'declared-space', by: `eco:${app.app}` },
-      why: '',
-      ownership: 'ecosystem',
-      readers: { visibility: 'owner' },
-      deletion: { effect: 'unknown', says: '' },
-      retention: { kind: 'unknown' },
-      personalData: 'unstated',
-      source: 'declared',
-    })),
-  };
-}
 
 export default function EcosystemTab({ onStats, showToast }) {
   const [apps, setApps] = useState([]);
@@ -334,7 +299,6 @@ export default function EcosystemTab({ onStats, showToast }) {
                   ${app.status !== 'revoked' && html`<${EcoAskInClaude} app=${app} />`}
 
                   <div class="pf-eco-section">
-                    <${DataMap} map=${ecoDataMap(app)} subject=${{ kind: 'ecosystem-app', id: app.app, label: app.displayName || app.app }} />
                   </div>
 
                   <div class="pf-eco-section">

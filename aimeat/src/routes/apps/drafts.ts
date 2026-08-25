@@ -452,7 +452,7 @@ export function registerDraftRoutes(
             ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
             ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
             ...(out.manifest.dataMap ? { data_map: out.manifest.dataMap } : {}),
-            ...(out.dataMapLint?.hints.length ? { data_map_hints: out.dataMapLint.hints } : {}),
+            ...(out.dataMap ? { data_map: out.dataMap } : {}),
             spec_check: out.specCheck,
             ...(out.artifactWarnings.length ? { app_hints: out.artifactWarnings } : {}),
             ...(out.nextSteps ? { next_steps: out.nextSteps } : {}),

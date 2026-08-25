@@ -73,10 +73,9 @@ import { lintAppAiDisclosure, type AppAiLintResult } from './app-ai-posture.js';
 import { lintAppArtifact, type AppArtifactFinding } from './app-artifact-lint.js';
 import { evaluateSpecCheck, type AppSpecCheck } from './app-spec-gate.js';
 import { buildPublishNextSteps } from './app-publish-next-steps.js';
-import { parseAppScopes } from './protected-resource.js';
-import { parseDataMapMeta } from './data-map/data-map-meta.js';
-import { collectAppDerivationInput, deriveAndStamp, stampFor, writeAppDataMap } from './data-map/data-map-store.js';
-import { lintDataMap, type DataMapLintResult } from './data-map/data-map-lint.js';
+import { readAppDataMap } from './data-map/data-map-store.js';
+import { stampFor } from './data-map/data-map-check.js';
+import type { DataMapStamp } from './data-map/data-map-types.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { ensureAppSubdomain } from '../routes/subdomains.js';
@@ -162,8 +161,8 @@ export interface PublishAppResult {
   mobileHints: string[];
   /** The AI transparency check, or null for a non-HTML bundle. */
   aiLint: AppAiLintResult | null;
-  /** Where this app puts what, and what the check made of it. Null for a non-HTML bundle. */
-  dataMapLint: DataMapLintResult | null;
+  /** Where this app puts what. Null for a non-HTML bundle. `missing` when nobody has written one. */
+  dataMap: DataMapStamp | null;
   aiProvenanceId?: string;
   /** Did the publisher carry the current build spec? Warns; never refuses. */
   specCheck: AppSpecCheck;
@@ -285,49 +284,20 @@ export async function publishApp(
   const aiLint = isHtml ? lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture) : null;
   if (aiLint) manifest.aiPosture = aiLint.posture;
 
-  // WHERE THIS APP PUTS WHAT, on the same terms as the posture above: the node drafts it from the
-  // permissions the app asks for and the document the owner has written, stamps the SUMMARY on the
-  // manifest, and warns rather than refusing (decision, 2026-08-24). Refusing here would break the
-  // next publish of all 169 apps in production, and a map is a statement about storage rather than a
-  // property of the bytes — the one blocking check on this path refuses things that are broken, not
-  // things that are unfinished.
-  let dataMapLint: DataMapLintResult | null = null;
+  // WHERE THIS APP PUTS WHAT. The node READS the map somebody wrote and stamps its summary on the
+  // manifest. It does NOT draft one: a map guessed from permission words produced the same confident
+  // row on 114 apps, sitting exactly where the answer belonged and reading like one. An app with no
+  // map is stamped as having none, which is the honest answer and the one that gets it written.
+  //
+  // Never refuses. A map is a statement about storage rather than a property of the bytes, and the
+  // one blocking check on this path refuses things that are broken, not things that are unfinished.
+  let dataMap: DataMapStamp | null = null;
   if (isHtml) {
-    const html = data.toString('utf8');
-    const declaredMeta = parseDataMapMeta(html);
     const at = new Date().toISOString();
-    const derivationInput = await collectAppDerivationInput(
-      storage, config,
-      { ownerName, filename, html, scopes: parseAppScopes(html), usesCortex: manifest.usesCortex },
-      at, declaredMeta,
-    );
-    const { map } = deriveAndStamp(derivationInput);
-    dataMapLint = lintDataMap({
-      map,
-      scopes: parseAppScopes(html),
-      programId: filename.replace(/\.html$/i, ''),
-      at,
-      declaresNothing: !declaredMeta && !derivationInput.declaredDoc,
-    });
-    manifest.dataMap = stampFor(dataMapLint.map, filename.replace(/\.html$/i, ''));
-
-    // AND THE DOCUMENT, not only the summary. The stamp names a key; if nothing is at that key the
-    // summary points at nothing, every surface that opens a map says "no data map yet" for an app
-    // that was just stamped, and the promise the stamp makes is empty. Best-effort: a publish that
-    // already happened must not fail because a side record could not be stored, and the next publish
-    // writes it again. The derivation read any existing document first, so an owner's own statement
-    // is carried through here rather than overwritten by a fresh draft.
-    try {
-      await writeAppDataMap(
-        { storage, config },
-        { principal: ownerGhii, targetGaii: ownerGhii, roles: ['owner'], scopes: ['memory:write'] },
-        filename.replace(/\.html$/i, ''), dataMapLint.map,
-      );
-    } catch (err) {
-      logger.warn('publish: the data map document could not be stored, the stamp stands alone', {
-        app: `${ownerName}/${filename}`, error: String(err),
-      });
-    }
+    const appId = filename.replace(/\.html$/i, '');
+    const existing = await readAppDataMap(storage, ownerGhii, appId);
+    dataMap = stampFor(existing, appId, at);
+    manifest.dataMap = dataMap;
   }
 
   // The spec state of THIS publish, kept where the owner can still find it later. Deliberately not
@@ -485,7 +455,7 @@ export async function publishApp(
     forkable,
     downloadUrl,
     mobileHints: isHtml ? lintAppHtmlForMobile(data.toString('utf8')) : [],
-    dataMapLint,
+    dataMap,
     aiLint,
     ...(aiProvenanceId ? { aiProvenanceId } : {}),
     specCheck,
