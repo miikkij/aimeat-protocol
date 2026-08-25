@@ -40,7 +40,6 @@ export const BLOCKS = {
   'home.open-items': () => import('/views/surface/blocks-home.js').then(m => m.OpenItemsBlock),
   'home.install-cta': () => import('/views/surface/blocks-home.js').then(m => m.InstallCtaBlock),
   'home.trust': () => import('/views/surface/blocks-home.js').then(m => m.TrustBlock),
-  'home.settings-door': () => import('/views/surface/blocks-home.js').then(m => m.SettingsDoorBlock),
   'home.steps': () => import('/views/surface/blocks-home.js').then(m => m.StepsBlock),
 
   // ── The node's front page ──

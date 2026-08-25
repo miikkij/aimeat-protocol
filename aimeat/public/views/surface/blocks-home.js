@@ -13,8 +13,7 @@
  *   WHAT THIS CHANGES IS WHEN THINGS ARE READ. The old home ran eleven requests through one loader
  *   and re-ran all eleven on any SSE event whatsoever. Here a mailbox arriving re-reads the mailbox.
  * @structure NameplateBlock · MatBlock · MailboxBlock · ChatDoorBlock · FleetBlock · ThingsBlock ·
- *   PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock · TrustBlock ·
- *   SettingsDoorBlock · StepsBlock
+ *   PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
  *   v1.0.0 — 2026-08-26 — Initial.
@@ -26,6 +25,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
+import { useHomePrefs } from '/views/surface/home-prefs.js';
 import {
   MailboxRow, FleetLine, ChatDoor, Things, FavoriteApps, Playbooks, TrustLine, Achievements,
 } from '/views/home/status-parts.js';
@@ -38,6 +38,10 @@ import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
+/** The session carries the identity either as a string or wrapped; the nameplate wants the string. */
+const identityOf = (session) =>
+  (typeof session?.ghii === 'string' ? session.ghii : (session?.ghii?.ghii ?? null));
+
 // ── The person ──
 
 export function NameplateBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {
@@ -46,20 +50,8 @@ export function NameplateBlock(/** @type {{ ctx?: any, props?: Record<string, an
   return html`<${HomeHeader}
     name=${state.displayName}
     owner=${state.owner}
-    identity=${ctx?.session?.ghii ?? state.ghii}
+    identity=${identityOf(ctx?.session) ?? state.ghii}
     onOpenSettings=${ctx?.openSettings} />`;
-}
-
-export function SettingsDoorBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {
-  // The dialog itself is mounted by the view that owns the page, because it is a modal over the
-  // whole surface rather than a thing in the flow. This block is the way in.
-  if (!ctx?.openSettings) return null;
-  return html`
-    <p class="sf-settings-door">
-      <button type="button" class="btn-ghost" onClick=${ctx.openSettings}>
-        ${tr('home.settings.open', 'Settings')}
-      </button>
-    </p>`;
 }
 
 // ── What they have ──
@@ -69,9 +61,9 @@ export function MatBlock() {
   const url = state?.mat?.standaloneUrl || state?.mat?.url;
   if (!url) return null;
   return html`
-    <p class="koti-mat-line">
+    <p class="koti-matline">
       ${tr('home.webpage', 'Your webpage, made by your AI:')}${' '}
-      <a href=${url} target="_blank" rel="noopener">${url}</a>
+      <a href=${url} target="_blank" rel="noopener">${url.replace('https://', '').replace('http://', '')}</a>
     </p>`;
 }
 
@@ -120,8 +112,7 @@ export function ThingsBlock(/** @type {{ ctx?: any, props?: Record<string, any>,
   const { data: packages } = useShared('knowledge', '/v1/knowledge/tab', ['knowledge', 'memory'],
     (d) => (d?.packages ?? []).filter((p) => String(p.key || '').endsWith('/manifest'))
       .map((p) => ({ key: p.key, name: p.value?.name || p.value?.title || p.key.split('/')[1], updatedAt: p.updated_at })));
-  const { data: prefs } = useShared('home-prefs', '/v1/memory/home.prefs?soft=1', ['memory'],
-    (d) => (d?.exists === false ? {} : (d?.value ?? {})));
+  const { prefs, toggleStar, setAppsMode } = useHomePrefs();
   const { data: favorites } = useShared('app-favorites', '/v1/memory/app-catalog.favorites?soft=1', ['memory'],
     (d) => (d?.exists === false ? { refs: [] } : (d?.value ?? { refs: [] })));
 
@@ -146,10 +137,10 @@ export function ThingsBlock(/** @type {{ ctx?: any, props?: Record<string, any>,
       usage=${rows.includes('assets') ? usage : null}
       orgs=${rows.includes('organisms') ? (orgs ?? []) : []}
       packages=${rows.includes('knowledge') ? (packages ?? []) : []}
-      prefs=${prefs ?? {}}>
+      prefs=${prefs ?? {}} onStar=${toggleStar}>
       ${showApps ? html`<${FavoriteApps}
         apps=${ownApps ?? []} favorites=${favorites ?? { refs: [] }}
-        owner=${owner} prefs=${prefs ?? {}} />` : ''}
+        owner=${owner} prefs=${prefs ?? {}} onMode=${setAppsMode} />` : ''}
     <//>`;
 }
 
@@ -171,13 +162,12 @@ export function AchievementsBlock() {
   const owner = state?.owner ?? '';
   const { data: orgs } = useShared('organisms', owner ? `/v1/organisms?member=${encodeURIComponent(owner)}&include=counts` : '', ['organisms']);
   const { data: packages } = useShared('knowledge', '/v1/knowledge/tab', ['knowledge', 'memory']);
-  const { data: prefs } = useShared('home-prefs', '/v1/memory/home.prefs?soft=1', ['memory'],
-    (d) => (d?.exists === false ? {} : (d?.value ?? {})));
+  const { prefs, markTried } = useHomePrefs();
 
   if (!state || prefs?.hideAchievements) return null;
   return html`<${Achievements}
     state=${state} usage=${usage} markers=${markers} chatStatus=${chatStatus}
-    orgs=${orgs ?? []} packages=${packages ?? []} prefs=${prefs ?? {}} />`;
+    orgs=${orgs ?? []} packages=${packages ?? []} prefs=${prefs ?? {}} onTried=${markTried} />`;
 }
 
 // ── What has happened ──

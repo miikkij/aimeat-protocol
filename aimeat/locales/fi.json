@@ -3702,7 +3702,8 @@
       "toProfile": "Palaa vanhaan profiiliin",
       "hereProfile": "Käytät vanhaa profiilia.",
       "toHome": "Kokeile uutta kotia"
-    }
+    },
+    "loadFailed": "Kotisi ei nyt latautunut. Yritä hetken päästä uudelleen."
   },
   "home.mat.improve": "Tee tervetulosivustani parempi",
   "home.mat.teachDots": "Kortin nurkassa olevat kolme pistettä ovat se, mistä asioita tehdään. Ne ovat joka kortissa, aina samassa nurkassa.",
@@ -10248,9 +10249,6 @@
         },
         "trust": {
           "label": "Tekoälymerkintä ja tietojen omistajuus"
-        },
-        "settings-door": {
-          "label": "Ovi asetuksiin"
         },
         "steps": {
           "label": "Aloittajan polku"
