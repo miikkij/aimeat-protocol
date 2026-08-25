@@ -87,6 +87,14 @@ export interface AppHeadSpec {
   lang?: string;
   /** Lifetime opens, for the JSON-LD interaction count. */
   downloads?: number;
+  /**
+   * The owner's EXPLICIT search title and description, from the app's Search section — set only
+   * when they typed one. These are the two fields allowed to replace what the app already carries,
+   * because they are the same author saying so deliberately rather than the node guessing. Absent
+   * or empty, the app's own tags stand.
+   */
+  seoTitle?: string;
+  seoDescription?: string;
 }
 
 function esc(t: string): string {
@@ -133,6 +141,22 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   }
   if (!has(text, /<meta property="og:title"/i)) {
     add.push(`<meta property="og:title" content="${esc(name)}">`);
+  }
+
+  // THE ONE PLACE THE AUTHOR'S OWN TAG IS REPLACED, and the exception proves the rule rather than
+  // breaking it. Rule 1 protects an author from the NODE guessing at their metadata. An explicit
+  // `seo.title` is not the node guessing: it is the same author, in the app's own Search section,
+  // saying "use this in search results instead". Without this the field was a lie — it reached
+  // og:title and nothing else, so a search engine kept reading the `<title>` the app shipped with,
+  // and an owner who had followed advice to lengthen a short title saw no change at all.
+  //
+  // Only when they typed something. Left empty, the app's own title stands untouched.
+  if (spec.seoTitle && has(text, /<title>[\s\S]*?<\/title>/i)) {
+    text = text.replace(/<title>[\s\S]*?<\/title>/i, `<title>${esc(spec.seoTitle)}</title>`);
+  }
+  if (spec.seoDescription && has(text, /<meta name="description" content="[^"]*"\s*\/?>/i)) {
+    text = text.replace(/<meta name="description" content="[^"]*"\s*\/?>/i,
+      `<meta name="description" content="${esc(spec.seoDescription)}">`);
   }
   if (!has(text, /<meta property="og:description"/i)) {
     add.push(`<meta property="og:description" content="${esc(desc)}">`);

@@ -368,6 +368,9 @@ async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: st
             updatedAt: app.createdAt ?? null,
             indexable,
             keywords: seoMeta.keywords,
+            // Only what the owner TYPED, so an empty field leaves the app's own tags alone.
+            seoTitle: app.manifest?.seo?.title,
+            seoDescription: app.manifest?.seo?.description,
             image: seoMeta.image,
             lang: seoMeta.lang,
           }
