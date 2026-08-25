@@ -21,6 +21,7 @@ import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDet
 import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool, monetizeDeleteTool,
   odpsToggleDefaultsUi, odpsToggleToolUi, odpsSuggestUi, odpsSaveDefaults,
   odpsGenerateSampleUi, odpsUseMeasuredUi } from './monetize.js';
+import { seoToggle, seoSave, seoToggleEditor } from './seo.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, prefillFromHtml, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
@@ -138,6 +139,9 @@ import { toggleFavorite } from './favorites.js';
     detailSkillAttachToggle: detailSkillAttachToggle,
     detailSkillAttach: detailSkillAttach,
     detailSkillDetach: detailSkillDetach,
+    seoToggle: seoToggle,
+    seoSave: seoSave,
+    seoToggleEditor: seoToggleEditor,
     monetizeAddTool: monetizeAddTool,
     monetizeEditTool: monetizeEditTool,
     monetizeCancelEdit: monetizeCancelEdit,

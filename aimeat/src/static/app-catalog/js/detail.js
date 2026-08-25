@@ -42,6 +42,7 @@ import { t, getLang } from './i18n.js';
 import { getPromotion, setPromotion, loadPromoted } from './promote.js';
 import { monetizeSectionInner, monetizeOnOpen, odpsSectionInner } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
+import { seoSectionInner, seoOnOpen } from './seo.js';
 import { appManifestAgents } from './app-agents.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
 
@@ -207,6 +208,7 @@ function openDetailView(appId) {
   monetizeOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   // Cost & contracts (EXCHANGE G3): async-load this app's EXCHANGE entitlements for OWN published apps.
   costOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
+  seoOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   document.getElementById('detail-view').hidden = false;
   renderDetailView();
   // AI availability + published versions load asynchronously and re-render in place.
@@ -609,6 +611,13 @@ function renderDetailView() {
     ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + '</div>'
     : '';
 
+  // ── SEARCH — can this app be found in a search engine, and what does it say about itself.
+  //   Off until its owner asks: publishing makes an app shareable, not findable.
+  //   Stable container: seo.js re-renders #detail-seo in place after a save.
+  var seoHtml = (app.published && detailIsOwnPublished(app))
+    ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + '</div>'
+    : '';
+
   // ── COST & CONTRACTS (EXCHANGE G3 / TARGET-045) — what this app SOURCES (own published apps only) ──
   // Stable container: cost.js re-renders #detail-cost in place after the async load.
   var costHtml = (app.published && detailIsOwnPublished(app))
@@ -649,7 +658,7 @@ function renderDetailView() {
   var dataMapHtml = dataMapSectionHtml();
 
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + dataMapHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + dataMapHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + seoHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
 
   var dmOwner = detailServerOwner(app);
   var dmFile = app.publishedFilename || '';

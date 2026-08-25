@@ -2375,3 +2375,20 @@
     @media (max-width: 640px) {
       .dtl-dm-head { grid-template-columns: minmax(0, 1fr); }
     }
+
+    /* ── Search section of the app detail view (seo.js) ── */
+    /* The state line is the first thing an owner reads, so it carries the answer in colour as well
+       as in words: green when the app is findable, amber while it waits on somebody, red when it
+       has been stopped, and neutral for the ordinary case of not having asked. */
+    .dtl-seo-state { font-size: .88rem; line-height: 1.45; margin: 0 0 12px; padding: 8px 10px;
+      border-radius: 8px; background: var(--bg-subtle); color: var(--text); }
+    .dtl-seo-state-on { background: var(--success-bg, var(--bg-subtle)); }
+    .dtl-seo-state-pending { background: var(--warn-bg, var(--bg-subtle)); }
+    .dtl-seo-state-blocked { background: var(--danger-bg, var(--bg-subtle)); }
+    .dtl-seo-switch, .dtl-seo-wording, .dtl-seo-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+    .dtl-seo-preview { padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; }
+    .dtl-seo-preview-title { color: var(--accent); font-weight: 600; }
+    .dtl-seo-preview-desc { font-size: .85rem; color: var(--text-muted); margin: 2px 0 8px; }
+    .dtl-seo-preview-img { display: block; width: 100%; max-width: 100%; border-radius: 8px; }
+    .dtl-seo-preview-noimg { font-size: .8rem; color: var(--text-muted); padding: 14px;
+      text-align: center; border: 1px dashed var(--border-subtle); border-radius: 8px; }
