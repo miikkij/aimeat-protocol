@@ -83,6 +83,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_package_install',
         'aimeat_app_draft_write', 'aimeat_app_draft_replace', 'aimeat_app_draft_read', 'aimeat_app_draft_seed',
         'aimeat_app_screenshot',
+        'aimeat_app_seo_set', 'aimeat_seo_status',
         'aimeat_image_generate',
         'aimeat_extension_install', 'aimeat_extension_invoke', 'aimeat_extension_get', 'aimeat_extension_list',
         'aimeat_extension_activate', 'aimeat_extension_deactivate', 'aimeat_extension_delete', 'aimeat_iam_define',

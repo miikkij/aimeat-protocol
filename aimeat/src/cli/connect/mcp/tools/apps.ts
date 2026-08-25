@@ -319,4 +319,29 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_app_draft_discard'), async ({ filename }) => {
     return out(await client.delete(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/draft`));
   });
+
+  // → PATCH /v1/apps/:filename — the app owner's own search-visibility switch and wording.
+  //   Only the fields the caller named travel: an absent field means "leave it alone", so flipping
+  //   the switch does not wipe a title written last month.
+  mcp.tool('aimeat_app_seo_set', descriptionFor('aimeat_app_seo_set'), {
+    filename: z.string().describe('The app to change, with its extension (e.g. "notes.html").'),
+    index: z.boolean().optional().describe('true makes the app findable in search engines; false takes it back out. Off until you ask.'),
+    title: z.string().optional().describe('Title for search results and social cards. Empty derives it from the app name.'),
+    description: z.string().optional().describe('Description for search results. Empty derives it from the app description.'),
+    keywords: z.array(z.string()).optional().describe('Keywords. Empty uses the app tags.'),
+    image: z.string().optional().describe('Absolute https URL for the social card. Empty uses the app screenshot.'),
+    lang: z.string().optional().describe('Language tag such as "fi". Empty reads what the app declares about itself.'),
+  }, annotationsFor('aimeat_app_seo_set'), async (args) => {
+    const seo: Record<string, unknown> = {};
+    for (const k of ['index', 'title', 'description', 'keywords', 'image', 'lang'] as const) {
+      if (args[k] !== undefined) seo[k] = args[k];
+    }
+    return out(await client.patch(`/v1/apps/${encodeURIComponent(args.filename)}`, { seo }));
+  });
+
+  // → GET /v1/admin/seo/status — is this node findable, and what is left to do. Operator-only.
+  mcp.tool('aimeat_seo_status', descriptionFor('aimeat_seo_status'), {},
+    annotationsFor('aimeat_seo_status'), async () => {
+      return out(await client.get('/v1/admin/seo/status'));
+    });
 }

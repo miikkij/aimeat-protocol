@@ -24,17 +24,32 @@
  *   whole decision in `owner` mode and a request in `review` mode.
  *
  * @structure
- *   - appSeoIndexable(app, config)  — the single decision
- *   - appSeoState(app, config)      — the same decision, as a reason an operator can read
- *   - appSeoMeta(app, config, ...)  — the descriptive metadata, derived or overridden
+ *   - appSeoIndexable(app, config)     — the single decision
+ *   - appSeoState(app, config)         — the same decision, as a reason an operator can read
+ *   - appSeoMeta(app, opts)            — the descriptive metadata, derived or overridden
+ *   - appDeclaredLocales(bytes)        — what the app says its own language is
+ *   - appScreenshotUrl(storage, ...)   — its own picture, for the social card
+ *   - parseOwnerSeoInput(input)        — what an owner may write, and what is stripped
+ *   - applyOwnerSeoUpdate(...)         — validate, write, announce, and say what happened
+ *   - ownerAppSeo(...)                 — the same, addressed by caller identity (the MCP door)
+ *   - seoNote(state)                   — what to tell the owner about where they ended up
  * @usage
  *   if (!appSeoIndexable(app, config)) return disallowRobots();
  * @version-history
+ *   v1.1.0 — 2026-08-25 — applyOwnerSeoUpdate() and ownerAppSeo(): the WRITE, in one place, so the
+ *     HTTP door and the MCP tool cannot drift on which fields are stripped, whether the update
+ *     merges, what the owner is told, or when IndexNow hears about it. The MCP surface reaches
+ *     storage through ownerAppSeo rather than directly, which is the rule that exists because
+ *     writing a capability twice produced 315 measured differences between that surface and REST.
  *   v1.0.0 — 2026-08-25 — Initial. The gate it absorbs from sitemaps.ts is unchanged; everything
  *     after step 1 is new.
  */
 import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
 import type { AppSeo, AppSummaryRecord } from '../storage/types/apps.js';
+import { submitToIndexNow, appSubmitUrls } from './indexnow.js';
+import { resolveAppOwnerScope } from './app-lifecycle.js';
+import { emitChange } from './event-bus.js';
 
 /**
  * Why an app is or is not search-visible, in terms an operator can act on. `appSeoIndexable` is the
@@ -171,6 +186,81 @@ export function parseOwnerSeoInput(input: unknown): { seo: Partial<AppSeo> } | {
     return { error: 'seo must name at least one of: index, title, description, keywords, image, lang' };
   }
   return { seo };
+}
+
+/**
+ * Apply an owner's search-visibility change: validate, write, announce, and say what actually
+ * happened. THE one implementation, called by the HTTP door and by the MCP tool alike.
+ *
+ * Not because sharing is tidy, but because this sequence has four steps that must not diverge —
+ * the operator fields are stripped, the write MERGES rather than replaces, the note describes the
+ * state after the write rather than what was asked for, and IndexNow is told only when the app
+ * genuinely became findable. A second copy would get one of those wrong, and the one it got wrong
+ * would be invisible until somebody read the two side by side.
+ */
+export async function applyOwnerSeoUpdate(
+  storage: Storage,
+  config: AimeatConfig,
+  target: { ownerGaii: string; ownerName: string; filename: string },
+  input: unknown,
+): Promise<{ state: AppSeoState; note: string; seo: AppSeo } | { error: string }> {
+  const parsed = parseOwnerSeoInput(input);
+  if ('error' in parsed) return parsed;
+
+  await storage.updateAppMeta(target.ownerGaii, target.filename, { seo: parsed.seo });
+
+  const after = await storage.getApp(target.ownerGaii, target.filename);
+  if (!after) return { error: 'The app was not found after the update' };
+  const state = appSeoState(after, config);
+
+  // The catalogue card carries the search-visibility state, so the views watching 'apps' have to
+  // hear about this. Emitted HERE rather than at each door, which is what lets the MCP tool
+  // announce the change without restating it: a tool that hands its write to a silent service is
+  // the same defect as a tool that never emitted, and it hides better.
+  emitChange('apps');
+
+  // Only on the way IN. IndexNow is a "this changed, come look" hint and has no way to say "stop
+  // indexing this" — the robots.txt and the noindex header the same switch flipped are what
+  // withdraw an app, and engines act on those on their own schedule.
+  if (appSeoIndexable(after, config)) {
+    const site = (await storage.listSubdomainSites())
+      .find(s => s.enabled && s.kind === 'app' && s.target === `${target.ownerName}/${target.filename}`);
+    await submitToIndexNow(config, storage,
+      appSubmitUrls(config, { ownerName: target.ownerName, filename: target.filename }, site?.subdomain));
+  }
+
+  return { state, note: seoNote(state), seo: after.manifest?.seo ?? {} };
+}
+
+/**
+ * The same capability addressed the way an AGENT holds it: by the caller's own identity and an app
+ * name, with no owner bucket to resolve and no storage to reach for.
+ *
+ * The MCP surface must not touch storage itself — a tool that does is a second implementation of
+ * the capability, which is what produced 315 measured differences between that surface and REST.
+ * So the lookup, the refusals and the "you named no changes, here is where it stands" answer all
+ * live here, and the tool renders whatever comes back.
+ */
+export async function ownerAppSeo(
+  storage: Storage,
+  config: AimeatConfig,
+  args: { callerGaii: string; filename: string; seo?: Record<string, unknown> },
+): Promise<{ state: AppSeoState; note?: string; seo: AppSeo } | { error: string }> {
+  const scope = await resolveAppOwnerScope(storage, config, args.callerGaii);
+  if (!scope) return { error: 'This connection is not acting for an owner, so it has no app catalogue to change.' };
+
+  const app = await storage.getApp(scope.ownerGhii, args.filename);
+  if (!app) return { error: `No app named "${args.filename}" in your catalogue.` };
+
+  // Named nothing to change: report where the app stands rather than writing an empty update. An
+  // agent asking "is my app findable" and an agent saying "make it findable" are the same call with
+  // and without a field, and answering the first with a write would be surprising.
+  if (!args.seo || Object.keys(args.seo).length === 0) {
+    return { state: appSeoState(app, config), seo: app.manifest?.seo ?? {} };
+  }
+
+  return applyOwnerSeoUpdate(storage, config,
+    { ownerGaii: scope.ownerGhii, ownerName: scope.ownerName, filename: args.filename }, args.seo);
 }
 
 /** What to tell the owner, given where their app actually ended up. */

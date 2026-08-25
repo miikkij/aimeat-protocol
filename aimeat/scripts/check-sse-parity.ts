@@ -121,6 +121,12 @@ const DELEGATES: Record<string, string> = {
         + 'render — the catalogue card is what changes, and it changes for everyone who can see the '
         + 'app rather than only for the caller. Verified by reading the domain out of the service '
         + 'rather than trusting the delegation.',
+    'src/mcp/seo.ts': "services/app-seo.ts, whose applyOwnerSeoUpdate() emits 'apps' right after "
+        + 'the write. The catalogue card carries the search-visibility state, so the views watching '
+        + "that domain are the ones that change, and they change for everyone who can see the app "
+        + 'rather than only for the caller. The REST twin (PATCH /v1/apps/:filename) reaches the '
+        + 'same function, so the two doors emit the same domain by construction rather than by '
+        + 'agreement.',
     'src/mcp/boards.ts': "services/board-write.ts and services/board-post.ts, both emitting 'boards'",
     'src/mcp/chat-instances.ts': "services/chat-instance-write.ts, which emits 'chat'",
     'src/mcp/compliance.ts': "services/compliance-register.ts, whose one write helper emits "

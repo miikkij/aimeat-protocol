@@ -115,6 +115,7 @@ import { registerFlagsTools } from './flags.js';
 import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
+import { registerSeoTools } from './seo.js';
 import { registerAppsTools } from './apps.js';
 import { registerAppDraftEditTools } from './apps-draft-edit.js';
 import { registerAppScreenshotTool } from './apps-screenshot.js';
@@ -302,6 +303,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAppDraftEditTools(mcp, storage, config, () => agentGaii);
         registerAppScreenshotTool(mcp, storage, config, () => agentGaii);
+        registerSeoTools(mcp, storage, config, () => agentGaii);
         registerAiImageTool(mcp, storage, config, () => agentGaii);
         registerSharingGroupTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerAgentTaskTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

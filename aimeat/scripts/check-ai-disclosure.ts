@@ -248,6 +248,17 @@ const AI_PROVENANCE_REVIEWED_WITHOUT = [
   // of the caller's at all: replace names an exact passage, read returns what is already there, and
   // seed copies bytes the publish path already stamped.
   'aimeat_app_draft_write',
+  // DECIDED, 2026-08-25. The fields here — a search title, a meta description, keywords — are the
+  // SAME text as the app's own `name` and `description`, which this project decided long ago need
+  // no provenance and which PATCH /v1/apps/:filename accepts without it. Writing one of them
+  // through this tool rather than that one cannot change the answer, and a tool that demanded a
+  // declaration for the search wording while its neighbour took the catalogue wording silently
+  // would teach callers that the declaration is arbitrary.
+  //
+  // What this tool actually decides is VISIBILITY — whether an existing app is listed — and
+  // visibility is not authorship. The bytes a reader eventually gets are the app's, and
+  // aimeat_app_publish stamps those.
+  'aimeat_app_seo_set',
   'aimeat_app_template_propose',
   'aimeat_appdev_pitfall_report',
   'aimeat_board_create',
