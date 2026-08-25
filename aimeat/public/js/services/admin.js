@@ -120,6 +120,18 @@ export const moderateApp     = (owner, filename, hidden, reason) =>
 export const deleteAppAdmin  = (owner, filename) =>
   apiDelete(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`);
 
+// ── Search visibility ──
+// Status reports what is BEING SERVED, not what the config holds — a verification tag typed in and
+// never reaching the page looks identical to a working one from inside the settings.
+export const getSeoStatus    = ()       => apiGet('/v1/admin/seo/status');
+// Narrower than moderateApp: a blocked app stays published, listed and usable, and only stops
+// being findable in a search engine.
+export const blockAppSeo     = (owner, filename, blocked, reason) =>
+  apiPost(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/seo-block`, { blocked, reason });
+// Only meaningful while apps.seo_mode is "review"; answers 409 otherwise.
+export const approveAppSeo   = (owner, filename, approved) =>
+  apiPost(`/v1/admin/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/seo-approve`, { approved });
+
 // ── Chat Instances ──
 export const getChatInstances = ()      => apiGet('/v1/chat-instances');
 export const createChatChannel = (name, platform) => apiPost('/v1/chat-instances', { app_name: name, platform: platform || 'admin' });

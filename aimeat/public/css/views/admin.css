@@ -1141,3 +1141,80 @@
 .adm-sso-h3 { margin: 12px 0 4px; }
 .adm-sso-lead { color: var(--text-dim); margin: 0 0 16px; }
 .adm-sso-mb0 { margin: 0; }
+
+/* ── Discovery tab: search-engine presence, the steps, and the per-app list ── */
+.adm-seo section + section { margin-top: 16px; }
+.adm-seo-row {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--border-subtle);
+}
+.adm-seo-row:last-of-type { border-bottom: none; }
+.adm-seo-row-label { min-width: 160px; color: var(--text-dim); }
+.adm-seo-row-value { flex: 1; word-break: break-word; }
+.adm-seo-row-link { font-size: .8rem; white-space: nowrap; }
+
+/* The master switch reads as a statement first and a control second: an operator glancing at this
+   page has to learn the answer before they find the button that changes it. */
+.adm-seo-master {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px; margin-bottom: 12px;
+  background: var(--bg-dim); border-radius: var(--radius);
+}
+
+.adm-seo-field { display: block; margin: 12px 0; }
+.adm-seo-field-label { display: block; margin-bottom: 4px; font-weight: 600; }
+.adm-seo-field input[type="text"],
+.adm-seo-field textarea { width: 100%; }
+.adm-seo-field-hint { display: block; margin-top: 4px; font-size: .8rem; color: var(--text-dim); }
+.adm-seo-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* Two previews side by side, stacking on a narrow screen: a search result and a shared link. */
+.adm-seo-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.adm-seo-preview-serp,
+.adm-seo-preview-card {
+  padding: 12px; background: var(--bg-dim);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius);
+}
+.adm-seo-preview-url { font-size: .78rem; color: var(--text-dim); word-break: break-all; }
+.adm-seo-preview-title { color: var(--accent); font-weight: 600; margin: 2px 0; }
+.adm-seo-preview-desc { font-size: .85rem; color: var(--text-dim); }
+.adm-seo-preview-img { display: block; width: 100%; max-width: 100%; border-radius: var(--radius-sm); }
+.adm-seo-preview-img-empty {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 90px; font-size: .8rem; color: var(--text-dim);
+  border: 1px dashed var(--border);
+}
+.adm-seo-preview-card-body { margin-top: 8px; }
+
+.adm-seo-steps { list-style: none; margin: 0; padding: 0; }
+.adm-seo-step { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border-subtle); }
+.adm-seo-step:last-child { border-bottom: none; }
+.adm-seo-step-mark {
+  flex: 0 0 auto; width: 22px; height: 22px; margin-top: 2px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-full); font-size: .8rem;
+}
+.adm-seo-step-done .adm-seo-step-mark { background: var(--success-bg); color: var(--success-fg); }
+.adm-seo-step-todo .adm-seo-step-mark { background: var(--warn-bg); color: var(--warn-fg); }
+/* A step this page cannot check ends somewhere outside it. A neutral dot says so; a cross would
+   claim the step had failed, which we have no way of knowing. */
+.adm-seo-step-manual .adm-seo-step-mark { background: var(--bg-dim); color: var(--text-dim); }
+.adm-seo-step-body { flex: 1; min-width: 0; }
+.adm-seo-step-body h4 { margin: 0 0 6px; }
+.adm-seo-ok { color: var(--success-fg); }
+
+.adm-seo-copy { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.adm-seo-copy-label { min-width: 140px; color: var(--text-dim); font-size: .85rem; }
+.adm-seo-copy-value { flex: 1; font-size: .78rem; word-break: break-all; }
+
+.adm-seo-mode { padding: 12px; margin-bottom: 12px; background: var(--bg-dim); border-radius: var(--radius); }
+.adm-seo-mode-options { display: flex; gap: 8px; margin: 8px 0; }
+.adm-seo-tally { display: flex; flex-wrap: wrap; gap: 12px; margin: 12px 0; font-size: .85rem; }
+.adm-seo-tally-item { display: inline-flex; align-items: center; gap: 6px; }
+.adm-seo-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0; }
+.adm-seo-filter input[type="search"] { flex: 1; min-width: 180px; }
+/* A table wider than a phone scrolls INSIDE its own box. Without this the columns are simply cut
+   off at the viewport edge, which reads as a rendering fault rather than as more table. The page
+   itself must never scroll sideways; only this box does. */
+.adm-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.adm-table-scroll > .adm-table { min-width: 520px; }
