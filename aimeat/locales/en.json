@@ -9854,7 +9854,9 @@
       "statusExpired": "expired",
       "showRevoked": "Show revoked",
       "hideRevoked": "Hide revoked",
-      "status": "Status"
+      "status": "Status",
+      "intro": "Each row is one permission you gave: which of your data it covers, who it reaches, and what they may do with it. The list shows what is in force right now. A permission you withdrew is kept as a record and stays out of the list until you ask to see it.",
+      "scopeHelp": "Scope says how far a permission reaches, not whether it still stands: \"private\" keeps it here, \"federation\" lets it travel to other AIMEAT homes, and \"login access\" is a permission to sign in rather than a permission to your data."
     },
     "audit": {
       "title": "Audit Report",
@@ -9867,7 +9869,8 @@
       "action": "Action",
       "outcome": "Outcome",
       "allowed": "Allowed",
-      "denied": "Denied"
+      "denied": "Denied",
+      "intro": "What happened in the chosen period: who touched which of your data or your permissions, what they did, and whether it was allowed or refused. A denied row means the guard held."
     },
     "export": {
       "title": "GDPR Export",

@@ -1598,6 +1598,7 @@
 .pf .dw-expiring      { background: rgba(245, 158, 11, .08); }
 /* A revoked or expired grant is history: readable, but visibly not part of who has access now. */
 .pf .dw-consent-dead  { opacity: .55; }
+.pf .dw-section-lead  { max-width: 68ch; margin: 0 0 .5rem; }
 .pf .dw-summary-card  { margin-bottom: 1.5rem; padding: 1rem; }
 .pf .dw-stat           { text-align: center; }
 .pf .dw-stat-value     { font-size: 1.4rem; font-weight: 700; color: var(--love1, #E8564A); }

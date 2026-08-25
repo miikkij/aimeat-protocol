@@ -9832,7 +9832,9 @@
       "statusExpired": "caducado",
       "showRevoked": "Ver revocados",
       "hideRevoked": "Ocultar revocados",
-      "status": "Estado"
+      "status": "Estado",
+      "intro": "Cada fila es un permiso que diste: qué dato tuyo cubre, a quién alcanza y qué puede hacer con él. La lista muestra lo que está en vigor ahora mismo. Un permiso que revocaste se guarda como constancia y no aparece hasta que pidas verlo.",
+      "scopeHelp": "El alcance dice hasta dónde llega un permiso, no si sigue en vigor: \"private\" lo mantiene aquí, \"federation\" le permite viajar a otras casas AIMEAT, y \"login access\" es un permiso para entrar en la cuenta, no a tus datos."
     },
     "audit": {
       "title": "Informe de auditoría",
@@ -9845,7 +9847,8 @@
       "action": "Acción",
       "outcome": "Resultado",
       "allowed": "Permitido",
-      "denied": "Denegado"
+      "denied": "Denegado",
+      "intro": "Lo que ocurrió en el periodo elegido: quién tocó qué dato o qué permiso tuyo, qué hizo y si se permitió o se denegó. Una fila denegada significa que la guardia funcionó."
     },
     "export": {
       "title": "Exportación RGPD",

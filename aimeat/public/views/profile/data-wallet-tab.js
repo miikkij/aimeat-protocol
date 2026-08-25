@@ -214,6 +214,8 @@ export default function DataWalletTab({ session, showToast }) {
       <h3 class="dw-section-heading">${t('wallet.consents.title')}</h3>
       <button class="btn-primary" onClick=${() => setShowConsentForm(!showConsentForm)}>${t('permissions.grantBtn')}</button>
     </div>
+    <p class="text-caption dw-section-lead">${t('wallet.consents.intro')}</p>
+    <p class="text-caption dw-section-lead">${t('wallet.consents.scopeHelp')}</p>
 
     ${showConsentForm && html`
       <div class="card dw-consent-card">
@@ -382,6 +384,7 @@ export default function DataWalletTab({ session, showToast }) {
     }
 
     <h3 class="dw-section-heading">${t('wallet.audit.title')}</h3>
+    <p class="text-caption dw-section-lead">${t('wallet.audit.intro')}</p>
     <div class="flex-row mb-1">
       ${[7, 30, 90].map(d => html`
         <button class="audit-day-btn ${auditDays === d ? 'active' : ''}" onClick=${() => { setAuditDays(d); loadAudit(d); }}>${d} ${t('wallet.audit.days')}</button>
