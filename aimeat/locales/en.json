@@ -9848,7 +9848,13 @@
       "scopeAuth": "Login Access",
       "filterAll": "All",
       "filterFederation": "Federation",
-      "filterAuth": "Login Access"
+      "filterAuth": "Login Access",
+      "statusActive": "active",
+      "statusRevoked": "revoked",
+      "statusExpired": "expired",
+      "showRevoked": "Show revoked",
+      "hideRevoked": "Hide revoked",
+      "status": "Status"
     },
     "audit": {
       "title": "Audit Report",
@@ -9857,7 +9863,11 @@
       "what": "Data Key",
       "when": "When",
       "purpose": "Purpose",
-      "days": "days"
+      "days": "days",
+      "action": "Action",
+      "outcome": "Outcome",
+      "allowed": "Allowed",
+      "denied": "Denied"
     },
     "export": {
       "title": "GDPR Export",

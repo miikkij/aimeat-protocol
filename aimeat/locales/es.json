@@ -9826,7 +9826,13 @@
       "scopeAuth": "Acceso de entrada",
       "filterAll": "Todos",
       "filterFederation": "Federación",
-      "filterAuth": "Acceso de entrada"
+      "filterAuth": "Acceso de entrada",
+      "statusActive": "en vigor",
+      "statusRevoked": "revocado",
+      "statusExpired": "caducado",
+      "showRevoked": "Ver revocados",
+      "hideRevoked": "Ocultar revocados",
+      "status": "Estado"
     },
     "audit": {
       "title": "Informe de auditoría",
@@ -9835,7 +9841,11 @@
       "what": "Clave de datos",
       "when": "Cuándo",
       "purpose": "Para qué",
-      "days": "días"
+      "days": "días",
+      "action": "Acción",
+      "outcome": "Resultado",
+      "allowed": "Permitido",
+      "denied": "Denegado"
     },
     "export": {
       "title": "Exportación RGPD",
