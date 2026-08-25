@@ -1,0 +1,71 @@
+/**
+ * @file public/css/views/surface.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The few things the surface layout engine draws itself: the band that groups blocks,
+ *   the frame around a passage the operator wrote, and the way into settings.
+ *
+ *   DELIBERATELY SMALL. Every block on these pages is a component that already had its own styling —
+ *   koti-* on the home, ld-* on the front page — and the engine only orders and groups them. A
+ *   second set of rules for what those components already draw is how two stylesheets start
+ *   disagreeing about one element.
+ * @structure .sf-band · .sf-free · .sf-portal-text · .sf-portal-board · .sf-settings-door
+ * @usage Linked from public/spa.html beside the other view stylesheets.
+ * @version-history
+ *   v1.0.0 — 2026-08-26 — Initial.
+ */
+
+/* A group with a heading. The blocks inside keep their own spacing; this is the frame. */
+.sf-band {
+  margin: 2rem 0;
+}
+
+.sf-band-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* A passage the operator wrote. Three framings, because an aside and a section of the page are
+   not the same thing and an operator can tell which one they meant. */
+.sf-free {
+  margin: 1.25rem 0;
+}
+
+.sf-free-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+}
+
+.sf-free-band {
+  border-left: 3px solid var(--accent);
+  padding-left: 1rem;
+}
+
+.sf-free-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-bright);
+  margin: 0 0 0.5rem;
+}
+
+/* The passage keeps the shared markdown body's own rules; only its outer spacing is set here. */
+.sf-free .md-body {
+  color: var(--text);
+}
+
+.sf-portal-text,
+.sf-portal-board {
+  margin: 1.5rem 0;
+}
+
+.sf-settings-door {
+  margin: 1rem 0;
+}

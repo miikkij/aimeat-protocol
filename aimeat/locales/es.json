@@ -9928,5 +9928,108 @@
   },
   "profile.scheduler.reads": "Lee",
   "profile.scheduler.writes": "Escribe",
-  "profile.scheduler.readsNothing": "nada"
+  "profile.scheduler.readsNothing": "nada",
+  "surface": {
+    "blocks": {
+      "common": {
+        "band": {
+          "label": "Grupo con título"
+        },
+        "freeform": {
+          "label": "Tu propio texto"
+        }
+      },
+      "home": {
+        "nameplate": {
+          "label": "Nombre e imagen"
+        },
+        "mat": {
+          "label": "Enlace a su propia página"
+        },
+        "mailbox": {
+          "label": "Correo sin leer"
+        },
+        "chat-door": {
+          "label": "Entrada al chat"
+        },
+        "fleet": {
+          "label": "Cómo están sus agentes"
+        },
+        "things": {
+          "label": "Lo que han hecho"
+        },
+        "playbooks": {
+          "label": "Lo que podrían montar"
+        },
+        "achievements": {
+          "label": "Lo que han probado"
+        },
+        "feed": {
+          "label": "Lo que ha pasado"
+        },
+        "open-items": {
+          "label": "Asuntos sin terminar"
+        },
+        "install-cta": {
+          "label": "Instalar como aplicación"
+        },
+        "trust": {
+          "label": "Etiquetado de IA y propiedad de los datos"
+        },
+        "settings-door": {
+          "label": "Entrada a los ajustes"
+        },
+        "steps": {
+          "label": "Recorrido para quien empieza"
+        }
+      },
+      "portal": {
+        "welcome-door": {
+          "label": "Puerta de entrada"
+        },
+        "pitch": {
+          "label": "Qué es este sitio, en una línea"
+        },
+        "wish": {
+          "label": "Di qué necesitas"
+        },
+        "build-invite": {
+          "label": "Crear una aplicación"
+        },
+        "connect-invite": {
+          "label": "Conecta tu propia IA"
+        },
+        "changelog": {
+          "label": "Lo que se ha publicado"
+        },
+        "gallery": {
+          "label": "Muro de aplicaciones publicadas"
+        },
+        "totals": {
+          "label": "Cuánto hay aquí"
+        },
+        "hero": {
+          "label": "Propietario o inquilino"
+        },
+        "agent-prompt": {
+          "label": "Crear un agente"
+        },
+        "ask-ai": {
+          "label": "Pregunta a tu propia IA"
+        },
+        "stats": {
+          "label": "Lo que se hizo aquí hoy"
+        },
+        "transparency": {
+          "label": "Cómo se marca el contenido de IA"
+        },
+        "text": {
+          "label": "Un texto que guardas"
+        },
+        "board": {
+          "label": "Últimas publicaciones de un tablón"
+        }
+      }
+    }
+  }
 }

@@ -1,10 +1,11 @@
 import { defineConfig } from 'vitest/config';
 import { fileURLToPath } from 'node:url';
 
-// Frontend modules import each other by ABSOLUTE path ('/views/…', '/js/…') because the browser
-// resolves them against the site root. Node resolves them against the filesystem root and fails,
-// so unit tests that execute a frontend module (e.g. consent-vocab.js) need these two prefixes
-// mapped back to public/. Server code never uses these prefixes, so nothing else is affected.
+// Frontend modules import each other by ABSOLUTE path ('/views/…', '/js/…', '/components/…',
+// '/lib/…') because the browser resolves them against the site root. Node resolves them against the
+// filesystem root and fails, so unit tests that execute a frontend module (e.g. consent-vocab.js, or
+// the surface block map, which loads a component per block) need these prefixes mapped back to
+// public/. Server code never uses these prefixes, so nothing else is affected.
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
 /**
@@ -39,6 +40,14 @@ export default defineConfig({
         alias: {
             '/views': `${publicDir}/views`,
             '/js': `${publicDir}/js`,
+            '/components': `${publicDir}/components`,
+            '/lib': `${publicDir}/lib`,
+            // The browser gets these from the importmap in spa.html, which points at the
+            // vendored copies under public/lib. They are not npm dependencies, so a test that
+            // loads a view has to be told where they live.
+            'preact/hooks': `${publicDir}/lib/preact-hooks.mjs`,
+            preact: `${publicDir}/lib/preact.mjs`,
+            htm: `${publicDir}/lib/htm.mjs`,
         },
     },
     test: {
@@ -58,6 +67,14 @@ export default defineConfig({
                     alias: {
                         '/views': `${publicDir}/views`,
                         '/js': `${publicDir}/js`,
+                        '/components': `${publicDir}/components`,
+                        '/lib': `${publicDir}/lib`,
+                        // The browser gets these from the importmap in spa.html, which points at the
+                        // vendored copies under public/lib. They are not npm dependencies, so a test that
+                        // loads a view has to be told where they live.
+                        'preact/hooks': `${publicDir}/lib/preact-hooks.mjs`,
+                        preact: `${publicDir}/lib/preact.mjs`,
+                        htm: `${publicDir}/lib/htm.mjs`,
                     },
                 },
                 test: {

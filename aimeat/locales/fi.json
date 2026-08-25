@@ -10201,5 +10201,108 @@
   "dataMap.loss.may-vanish": "saa hävitä, appi selviää",
   "profile.scheduler.reads": "Lukee",
   "profile.scheduler.writes": "Kirjoittaa",
-  "profile.scheduler.readsNothing": "ei mitään"
+  "profile.scheduler.readsNothing": "ei mitään",
+  "surface": {
+    "blocks": {
+      "common": {
+        "band": {
+          "label": "Ryhmä otsikolla"
+        },
+        "freeform": {
+          "label": "Oma teksti"
+        }
+      },
+      "home": {
+        "nameplate": {
+          "label": "Nimi ja kuva"
+        },
+        "mat": {
+          "label": "Linkki omaan sivuun"
+        },
+        "mailbox": {
+          "label": "Lukematon posti"
+        },
+        "chat-door": {
+          "label": "Ovi keskusteluun"
+        },
+        "fleet": {
+          "label": "Miten agentit voivat"
+        },
+        "things": {
+          "label": "Mitä on tehty"
+        },
+        "playbooks": {
+          "label": "Mitä voisi ottaa käyttöön"
+        },
+        "achievements": {
+          "label": "Mitä on kokeiltu"
+        },
+        "feed": {
+          "label": "Mitä on tapahtunut"
+        },
+        "open-items": {
+          "label": "Kesken jääneet"
+        },
+        "install-cta": {
+          "label": "Asenna sovelluksena"
+        },
+        "trust": {
+          "label": "Tekoälymerkintä ja tietojen omistajuus"
+        },
+        "settings-door": {
+          "label": "Ovi asetuksiin"
+        },
+        "steps": {
+          "label": "Aloittajan polku"
+        }
+      },
+      "portal": {
+        "welcome-door": {
+          "label": "Etuovi"
+        },
+        "pitch": {
+          "label": "Mikä tämä paikka on, yhdellä rivillä"
+        },
+        "wish": {
+          "label": "Kerro mitä tarvitset"
+        },
+        "build-invite": {
+          "label": "Rakenna sovellus"
+        },
+        "connect-invite": {
+          "label": "Yhdistä oma tekoälysi"
+        },
+        "changelog": {
+          "label": "Mitä on julkaistu"
+        },
+        "gallery": {
+          "label": "Julkaistujen sovellusten seinä"
+        },
+        "totals": {
+          "label": "Paljonko täällä on"
+        },
+        "hero": {
+          "label": "Omistaja vai vuokralainen"
+        },
+        "agent-prompt": {
+          "label": "Rakenna agentti"
+        },
+        "ask-ai": {
+          "label": "Kysy omalta tekoälyltäsi"
+        },
+        "stats": {
+          "label": "Mitä täällä tehtiin tänään"
+        },
+        "transparency": {
+          "label": "Miten tekoälysisältö merkitään"
+        },
+        "text": {
+          "label": "Tallentamasi teksti"
+        },
+        "board": {
+          "label": "Taulun uusimmat viestit"
+        }
+      }
+    }
+  }
 }
