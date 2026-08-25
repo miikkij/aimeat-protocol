@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 -- 2026-08-25 -- aimeat_organism_member_remove handler, so a fleet agent's call reaches the
+ *     same route the two MCP doors use, `ban` included.
  *   v1.3.0 -- 2026-08-13 -- Add the aimeat_schedule_trigger connect-call handler (POST
  *     /v1/schedules/:id/trigger), parity with both MCP surfaces.
  *   v1.2.0 -- 2026-07-31 -- workspace_write takes `items: [...]` (batch, all-or-nothing) through the
@@ -112,6 +114,14 @@ export const organismTools: ConnectCliToolDefinition[] = [
             const role = optionalString(input, 'role'); if (role) body.role = role;
             const workspaces = optionalArray(input, 'workspaces'); if (workspaces) body.workspaces = workspaces;
             return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/members`, body);
+        },
+    },
+    {
+        name: 'aimeat_organism_member_remove',
+        handler: ({ client }, input) => {
+            // `ban` rides the query string, exactly as the web door sends it.
+            const ban = optionalBoolean(input, 'ban') === true ? '?ban=1' : '';
+            return client.delete(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/members/${encodeURIComponent(requiredString(input, 'ghii'))}${ban}`);
         },
     },
     {

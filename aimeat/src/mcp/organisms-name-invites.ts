@@ -11,6 +11,9 @@
  *   aimeat_organism_invitations, aimeat_organism_invitation_respond.
  * @usage registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
  * @version-history
+ *   v1.2.0 — 2026-08-25 — aimeat_organism_member_remove: removal existed on the web door only, so an
+ *     owner asking their own AI to take someone out of an organism had no tool for it while
+ *     member_add had had one since July. Calls services/organism-member-remove.ts, as REST does.
  *   v1.1.0 — 2026-08-11 — invitation_respond's decline path calls declineNameInvitation() instead of
  *     deleting the membership row itself (August 2026 MCP audit step 8), so the delete and the
  *     `organisms` emit stay together with the REST decline route.
@@ -27,6 +30,7 @@ import {
     InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
     acceptNameInvitation, declineNameInvitation, addOrganismMember,
 } from '../services/invitations.js';
+import { removeOrganismMember, MemberRemoveError } from '../services/organism-member-remove.js';
 
 export function registerOrganismNameInviteTools(
     mcp: McpServer,
@@ -105,6 +109,33 @@ export function registerOrganismNameInviteTools(
                 return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'added', organism_id, member: membership.ghii, role: membership.role, workspaces: grantedWorkspaces }, null, 2) }] };
             } catch (e) {
                 return { content: [{ type: 'text' as const, text: invitationErrText(e) }], isError: true };
+            }
+        },
+    );
+
+    // ── Tool: aimeat_organism_member_remove ──
+    // Mirrors DELETE /v1/organisms/:id/members/:ghii and calls the same service, so the refusals,
+    // the agent detach, the workspace-grant revoke and the notice are one implementation.
+    mcp.tool(
+        'aimeat_organism_member_remove',
+        descriptionFor('aimeat_organism_member_remove'),
+        {
+            organism_id: z.string().describe('The organism ID'),
+            ghii: z.string().describe('Bare owner name to remove'),
+            ban: z.boolean().optional().describe('Also block them from being invited or added again'),
+        },
+        annotationsFor('aimeat_organism_member_remove'),
+        async ({ organism_id, ghii, ban }) => {
+            const gate = await inviteAdminGate(organism_id);
+            if (gate.err !== undefined) return { content: [{ type: 'text' as const, text: gate.err }], isError: true };
+            try {
+                const out = await removeOrganismMember(storage, config, {
+                    organism: gate.organism, callerOwner: gate.ownerName, targetRaw: ghii, ban,
+                });
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: out.banned ? 'banned' : 'removed', organism_id, ...out }, null, 2) }] };
+            } catch (e) {
+                if (e instanceof MemberRemoveError) return { content: [{ type: 'text' as const, text: `${e.code}: ${e.message}` }], isError: true };
+                throw e;
             }
         },
     );
