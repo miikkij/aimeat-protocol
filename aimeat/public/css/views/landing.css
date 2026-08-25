@@ -243,6 +243,10 @@
    than printed: "0 opens" on a new app reads as a verdict on it. */
 
 .ld-pitch { max-width: 760px; margin: 2rem auto 1rem; text-align: left; }
+/* The pitch line and the wish box are two blocks now, each one an operator can keep or drop. They
+   wear the same frame so they line up, and the second drops its own top margin so the pair reads
+   as one unit rather than as two sections that happen to be adjacent. */
+.ld-pitch + .ld-pitch { margin-top: 0; }
 .ld-pitch-line { font-size: 1.35rem; line-height: 1.4; font-weight: 700; color: var(--text); margin: 0; }
 .ld-pitch-lead { font-size: .95rem; color: var(--text-muted); margin: .75rem 0 0; }
 
