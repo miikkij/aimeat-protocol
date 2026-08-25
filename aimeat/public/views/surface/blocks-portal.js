@@ -42,11 +42,18 @@ export function WelcomeDoorBlock(/** @type {{ ctx?: any, props?: Record<string, 
   return html`<${WelcomeDoor} onNavigate=${nav(ctx)} />`;
 }
 
+// The pitch line and the wish box were ONE section until the front page became a layout, where each
+// is a block an operator can keep or drop on its own. They keep the same frame so they still line
+// up under each other; landing.css drops the second one's top margin so the pair still reads as one
+// unit. Splitting them without the frame left the line at the page's full width and the box
+// centred, which is visible at a glance and was.
 export function PitchBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { title }) {
   return html`
-    <p class="ld-pitch-line">
-      ${title || tr('landing.pitch', 'AIMEAT — the Linux of AI. An open, federated, self-hosted AI operating system, and everything in it is yours.')}
-    </p>`;
+    <section class="ld-pitch">
+      <p class="ld-pitch-line">
+        ${title || tr('landing.pitch', 'AIMEAT — the Linux of AI. An open, federated, self-hosted AI operating system, and everything in it is yours.')}
+      </p>
+    </section>`;
 }
 
 export function WishBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {

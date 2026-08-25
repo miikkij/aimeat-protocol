@@ -7,13 +7,21 @@
  *   profile Home dashboard. No protocol terms (GHII/GAII/CSM/federation) above the fold;
  *   a working result does the selling.
  *
- *   This file is the ORDER of the page and the arrival redirect. Each section lives in its own
- *   sibling: landing-doors.js (wish box, connect invitation, owner-or-tenant hero),
- *   landing-builder.js (the folded generator), landing-wall.js (published apps + today's numbers),
- *   landing-node-totals.js, landing-changelog.js, landing-prompts.js.
+ *   THE ORDER IS THE OPERATOR'S NOW. The page is a layout rendered by views/surface/renderer.js
+ *   from the blocks this node declares, and the built-in layout is the order below — so a node
+ *   nobody has configured looks unchanged. The tree in this file is the FALLBACK, kept because this
+ *   is the door an anonymous visitor arrives at and a blank front page is the worst thing that can
+ *   happen on the node.
+ *
+ *   Each section lives in its own sibling: landing-doors.js (wish box, connect invitation,
+ *   owner-or-tenant hero), landing-builder.js (the folded generator), landing-wall.js (published
+ *   apps + today's numbers), landing-node-totals.js, landing-changelog.js, landing-prompts.js.
  * @structure default export Landing({ navigate })
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v5.5.0 — 2026-08-26 — The front page renders through the surface layout engine, so an operator
+ *     can arrange it. The built-in layout is this file's own order, and this file's tree stays as
+ *     the fallback for the one case that matters: the layout could not be read at all.
  *   v5.4.0 — 2026-08-26 — Pure extraction, no behaviour change: the page was at 789 of its 800
  *     allowed lines, so StatsPanel + Gallery moved to landing-wall.js, the generator and its
  *     invitation to landing-builder.js, and the wish box, connect invitation and hero to
@@ -84,8 +92,9 @@ import { h } from 'preact';
 import { useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
+import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import NodeTotals from './landing-node-totals.js';
 import NodeChangeLog from './landing-changelog.js';
 import { BuildAgentPrompt, AskYourAI } from './landing-prompts.js';
@@ -99,6 +108,8 @@ import { WelcomeDoor } from '/views/home/welcome-door.js';
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 export default function Landing({ navigate }) {
+  const surface = useSurfaceLayout('portal');
+
   // Logged-in users arriving DIRECTLY (bookmark, external link, address bar) go straight
   // to the Home dashboard. But a deliberate in-app navigation here (brand link, footer)
   // shows the landing — otherwise a logged-in user could never see this page at all.
@@ -154,6 +165,23 @@ export default function Landing({ navigate }) {
     // check that must not re-run (and re-redirect) if navigate's identity changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The front page is a layout the operator can arrange. The server answers with the built-in one
+  // when nobody has configured this node, so the ordinary case needs no decision here.
+  //
+  // THE FALLBACK BELOW IS NOT DEAD CODE. This is the door an anonymous visitor arrives at, and a
+  // page that renders nothing because one fetch failed is the worst outcome on the whole node. If
+  // the layout cannot be read, the sections render in the order this file has always used.
+  if (!surface.failed && surface.layout) {
+    return html`
+      <div class="ld">
+        <${SurfaceRenderer}
+          layout=${surface.layout}
+          freeform=${surface.freeform}
+          ctx=${{ navigate }}
+          locale=${getLocale()} />
+      </div>`;
+  }
 
   return html`
     <div class="ld">

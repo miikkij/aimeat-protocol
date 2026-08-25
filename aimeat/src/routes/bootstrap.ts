@@ -8,6 +8,9 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   v1.4.0 — 2026-08-26 — The markdown answer carries the operator's own passages from the front
+ *     page's layout. Without it, a node whose operator rewrote their front page still described
+ *     the built-in one to every agent, crawler and unfurler that asked.
  *   v1.3.0 — 2026-08-19 — The switch grows a third value: AIMEAT_FRONT_PAGE=os serves the static
  *     OS page (public/front-os.html, .fi sibling), same rules as demo.
  *   v1.2.0 — 2026-08-19 — AIMEAT_FRONT_PAGE=demo: the root's HTML answer becomes the static
@@ -67,6 +70,8 @@ import { buildGettingStarted } from '../data/getting-started.js';
 import { apexOnly } from './agent-docs.js';
 import { mountSitemapRoutes } from './sitemaps.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
+import { SurfaceLayoutService } from '../services/surface-layout/service.js';
+import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -191,7 +196,14 @@ export function bootstrapRouter(
         sendMarkdown(res, htmlToMarkdown(customHtml), customHtml);
         return;
       }
-      sendMarkdown(res, buildLandingMarkdown(config));
+      // No custom template. The authored landing document describes the node; if the operator has
+      // written passages into the front page's layout, those are their own words and a reader that
+      // asked for markdown would otherwise never see them.
+      const layoutSvc = new SurfaceLayoutService(config, storage);
+      const portal = await layoutSvc.resolve('portal');
+      const passages = await layoutSvc.readFreeform(portal.layout);
+      const lang = (_req.query.lang as string | undefined) ?? 'en';
+      sendMarkdown(res, renderLayoutMarkdown(buildLandingMarkdown(config), portal.layout, passages, lang));
       return;
     }
 
