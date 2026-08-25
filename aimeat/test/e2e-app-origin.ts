@@ -767,6 +767,162 @@ async function main() {
             assert(!onApp.body.includes('Content-Signal'), 'the node robots.txt answered on an app origin');
         });
 
+        // ── Search visibility ────────────────────────────────────────────────────────────
+        //
+        // Publishing an app used to be, silently, a decision to have it indexed: every free,
+        // uncoded app went into the node's sitemap index and served `Allow: /` on its own origin,
+        // and its owner's only alternative was parking it out of existence. The switch is off until
+        // its owner turns it on, and an operator can block one app without touching the app itself.
+        //
+        // Four surfaces have to agree about the answer — the origin's robots.txt, the origin's
+        // sitemap, the X-Robots-Tag on the served document, and the meta tag inside it — so each
+        // one is asserted on both sides of every flip. One of them silently disagreeing is the
+        // whole failure mode this is written against.
+        console.log('\nPhase 10: search visibility is the owner\'s decision, and the operator can overrule it');
+
+        const seoPatch = (body: unknown, tok = token) => json(`/v1/apps/${filename}`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${tok}` }, body: JSON.stringify(body),
+        });
+        /** The four answers, read the way a crawler reads them. */
+        async function crawlerView() {
+            const robots = await onAppOrigin('/robots.txt', SUB);
+            const sitemap = await onAppOrigin('/sitemap.xml', SUB);
+            const page = await onAppOrigin('/', SUB);
+            const index = await json('/sitemap-index.xml');
+            return {
+                robotsAllows: robots.body.includes('Allow: /') && !robots.body.includes('Disallow: /'),
+                sitemapStatus: sitemap.status,
+                xRobots: page.header('x-robots-tag') ?? '',
+                metaNoindex: /<meta name="robots" content="noindex/i.test(page.body),
+                inSitemapIndex: String(index.body._raw ?? '').includes(`${SUB}.${APP_HOST}`),
+            };
+        }
+
+        await test('a freshly published app is not findable, on all four surfaces at once', async () => {
+            const v = await crawlerView();
+            assert(!v.robotsAllows, 'the origin robots.txt invites crawlers for an app nobody asked to have found');
+            assert(v.sitemapStatus === 404, `origin sitemap.xml → ${v.sitemapStatus}, expected 404`);
+            assert(v.xRobots.includes('noindex'), `X-Robots-Tag was "${v.xRobots}"`);
+            assert(v.metaNoindex, 'no robots meta in the served document');
+            assert(!v.inSitemapIndex, 'the apex sitemap index lists a host nobody asked to have indexed');
+        });
+
+        await test('the owner switches it on and all four surfaces follow', async () => {
+            const r = await seoPatch({ seo: { index: true } });
+            assert(r.status === 200, `PATCH → ${r.status}: ${JSON.stringify(r.body.error)}`);
+            assert(r.body.data.seo.state === 'on', `state ${r.body.data.seo.state}`);
+            const v = await crawlerView();
+            assert(v.robotsAllows, 'the origin robots.txt still refuses crawlers');
+            assert(v.sitemapStatus === 200, `origin sitemap.xml → ${v.sitemapStatus}`);
+            assert(!v.xRobots.includes('noindex'), `X-Robots-Tag is still "${v.xRobots}"`);
+            assert(!v.metaNoindex, 'the served document still says noindex');
+            assert(v.inSitemapIndex, 'the apex sitemap index does not list the host');
+        });
+
+        await test('the owner\'s own wording reaches the page', async () => {
+            const r = await seoPatch({ seo: { title: 'Origin Demo for teams', keywords: ['demo', 'origin'] } });
+            assert(r.status === 200, `PATCH → ${r.status}: ${JSON.stringify(r.body.error)}`);
+            const page = await onAppOrigin('/', SUB);
+            assert(page.body.includes('content="Origin Demo for teams"'), 'the owner\'s title is not on the page');
+            assert(/<meta name="keywords" content="demo, origin">/.test(page.body), 'the keywords are not on the page');
+        });
+
+        await test('the owner cannot approve their own app, whatever they send', async () => {
+            // In owner mode this changes nothing either way, so the assertion is about the field
+            // never being written: an owner who could set it would approve themselves the moment
+            // the operator switched the node to review mode.
+            const r = await seoPatch({ seo: { approvedBy: 'me', approvedAt: '2026-01-01T00:00:00Z' } });
+            assert(r.status === 400, `expected 400 for a body naming only operator fields, got ${r.status}`);
+            const list = await json(`/v1/apps?limit=200`, { headers: { Authorization: `Bearer ${token}` } });
+            const mine = (list.body.data.apps as any[]).find(a => a.filename === filename);
+            assert(!mine.seo?.approvedBy, `approvedBy was written by the owner: ${mine.seo?.approvedBy}`);
+        });
+
+        await test('an operator blocks this one app, and the app itself keeps working', async () => {
+            // The first owner registered on a fresh node holds the operator role, so `token` is
+            // both here. The cross-owner refusal below is what proves the fence.
+            const r = await json(`/v1/admin/apps/${owner}/${filename}/seo-block`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ blocked: true, reason: 'keyword farming' }),
+            });
+            assert(r.status === 200, `seo-block → ${r.status}: ${JSON.stringify(r.body.error)}`);
+            assert(r.body.data.seo_state === 'blocked', `state ${r.body.data.seo_state}`);
+            const v = await crawlerView();
+            assert(!v.robotsAllows && v.sitemapStatus === 404 && v.xRobots.includes('noindex') && !v.inSitemapIndex,
+                'a blocked app is still findable on at least one surface');
+            // Narrower than hiding it: the app still answers.
+            const page = await onAppOrigin('/', SUB);
+            assert(page.status === 200 && page.body.includes('app origin demo'),
+                'blocking search visibility took the app away from its users');
+        });
+
+        await test('the owner cannot lift an operator block by flipping their own switch', async () => {
+            const r = await seoPatch({ seo: { index: true } });
+            assert(r.status === 200, `PATCH → ${r.status}`);
+            assert(r.body.data.seo.state === 'blocked', `state ${r.body.data.seo.state} — the owner cleared the block`);
+            const v = await crawlerView();
+            assert(!v.robotsAllows, 'the block was lifted by the owner switching their own toggle');
+        });
+
+        await test('the block carries a reason the OWNER can read', async () => {
+            const list = await json(`/v1/apps?limit=200`, { headers: { Authorization: `Bearer ${token}` } });
+            const mine = (list.body.data.apps as any[]).find(a => a.filename === filename);
+            assert(mine.seo_state === 'blocked', `seo_state ${mine.seo_state}`);
+            assert(mine.operator_seo_block_reason === 'keyword farming',
+                `reason "${mine.operator_seo_block_reason}" — a block the owner cannot read is one they cannot fix`);
+        });
+
+        await test('a second owner cannot touch this app\'s search visibility, and no operator door opens for them', async () => {
+            const other = `seostranger${Date.now() % 100000}`;
+            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
+            assert(reg.status === 201, `register → ${reg.status}`);
+            const ts = new Date().toISOString();
+            const sig = await signMsg(reg.body.data.private_key, other + NODE_ID + ts);
+            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: other, timestamp: ts, signature: sig }) });
+            const otherToken = tok.body.data.token;
+
+            // The owner door is scoped to the caller's own bucket, so a stranger's PATCH finds
+            // nothing to patch rather than patching somebody else's app.
+            const patched = await seoPatch({ seo: { index: true } }, otherToken);
+            assert(patched.status === 404, `a stranger's PATCH → ${patched.status}, expected 404`);
+
+            // The operator doors refuse by role, which is the check that matters: this owner exists,
+            // is authenticated, and is not an operator.
+            for (const p of [`/v1/admin/apps/${owner}/${filename}/seo-block`, `/v1/admin/apps/${owner}/${filename}/seo-approve`]) {
+                const r = await json(p, {
+                    method: 'POST', headers: { Authorization: `Bearer ${otherToken}` },
+                    body: JSON.stringify({ blocked: false, approved: true }),
+                });
+                assert(r.status === 403, `${p} → ${r.status}, expected 403 for a non-operator`);
+            }
+            // …and the block is still standing after all of that.
+            const v = await crawlerView();
+            assert(!v.robotsAllows, 'the block did not survive a stranger trying to lift it');
+        });
+
+        await test('the operator lifts the block and the owner\'s own setting decides again', async () => {
+            const r = await json(`/v1/admin/apps/${owner}/${filename}/seo-block`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ blocked: false }),
+            });
+            assert(r.status === 200, `unblock → ${r.status}`);
+            assert(r.body.data.seo_state === 'on', `state ${r.body.data.seo_state}`);
+            const v = await crawlerView();
+            assert(v.robotsAllows && v.sitemapStatus === 200 && !v.xRobots.includes('noindex'),
+                'the app did not come back after the block was lifted');
+        });
+
+        await test('the operator status answer counts what the sitemap will actually list', async () => {
+            const r = await json('/v1/admin/seo/status', { headers: { Authorization: `Bearer ${token}` } });
+            assert(r.status === 200, `status → ${r.status}: ${JSON.stringify(r.body.error)}`);
+            const d = r.body.data;
+            assert(d.indexing === 'on', `indexing ${d.indexing}`);
+            assert(d.apps.mode === 'owner', `mode ${d.apps.mode}`);
+            assert(d.apps.on === 1, `${d.apps.on} apps reported findable, expected exactly the one switched on`);
+            assert(d.apps.off >= 1, 'the sibling app should be counted as off');
+            assert(d.sitemap.app_host_count === d.apps.on, 'the status disagrees with itself about how many hosts are listed');
+        });
+
         console.log('\n─────────────────────────────────────');
         console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
         if (failed === 0) console.log('✅ All tests passed!');

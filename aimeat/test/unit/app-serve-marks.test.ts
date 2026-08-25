@@ -12,6 +12,14 @@
  * @structure one `it` per fixture case, plus the idempotency and never-on-the-way-in guarantees.
  * @usage pnpm exec vitest run test/unit/app-serve-marks.test.ts
  * @version-history
+ *   v1.3.0 — 2026-08-25 — Goldens re-captured for the third intentional output change, and the
+ *     corpus gains two cases. Nine went red because the head-meta pass now stamps
+ *     `<meta name="robots" content="noindex, nofollow">` on an app whose owner has not asked for it
+ *     to be findable, which every existing fixture is. The assertion was right and the behaviour
+ *     changed under it — the third of the three cases, not a broken source and not a stale setup.
+ *     The two new cases are the search-VISIBLE state: the social card, the keywords, the app's own
+ *     declared language and the interaction count exist only there, so without them the goldens
+ *     pinned half the pass.
  *   v1.2.0 — 2026-08-16 — Goldens re-captured for the second intentional output change: the
  *     head-meta pass now also fills in a manifest link, a theme-color and an apple-touch-icon
  *     (installable apps). 9 of 17 cases changed, all of them headMeta cases.

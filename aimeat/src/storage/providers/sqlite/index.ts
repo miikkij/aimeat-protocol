@@ -52,6 +52,7 @@ import { governanceMethods } from './methods/governance.js';
 import { communityMethods } from './methods/community.js';
 import { extensionsNotifyMethods } from './methods/extensions-notify.js';
 import { appsMethods } from './methods/apps.js';
+import { knowledgeLinkMethods } from './methods/knowledge-links.js';
 import { federationOauthMethods } from './methods/federation-oauth.js';
 import { packagesMethods } from './methods/packages.js';
 import { capabilityAgentsMethods } from './methods/capability-agents.js';
@@ -195,6 +196,7 @@ Object.assign(
   communityMethods,
   extensionsNotifyMethods,
   appsMethods,
+  knowledgeLinkMethods,
   federationOauthMethods,
   packagesMethods,
   capabilityAgentsMethods,

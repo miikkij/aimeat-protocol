@@ -102,6 +102,14 @@ export interface AppRepository {
              * apps that are already live.
              */
             dataMap?: import('../interface.js').AppManifest['dataMap'];
+            /**
+             * The OWNER's search-visibility decision and the wording that goes with it. Merged
+             * field by field over whatever is there, so a route can flip `index` without having
+             * to resend the title the owner wrote last month. The operator's half of the decision
+             * is NOT here: `operatorSeoBlocked` is a column, set through
+             * setAppOperatorSeoBlocked, precisely so the owner cannot reach it from this door.
+             */
+            seo?: Partial<import('../interface.js').AppSeo>;
         },
     ): Promise<boolean>;
     /**
@@ -131,6 +139,23 @@ export interface AppRepository {
         ownerGaii: string,
         filename: string,
         hidden: boolean,
+        meta?: { by?: string; at?: string; reason?: string },
+    ): Promise<boolean>;
+    /**
+     * Operator moderation of SEARCH VISIBILITY, and deliberately narrower than
+     * setAppOperatorHidden: a blocked app stays published, listed, usable and
+     * shareable by link, and only stops being findable through a search engine.
+     * That is the proportionate answer to somebody farming keywords on the
+     * operator's domain from an app origin; taking the app away from its users
+     * is not. Sets `operatorSeoBlocked` and its audit fields on EVERY version row
+     * of (ownerGaii, filename). Only an operator may call it — the owner's own
+     * `manifest.seo.index` cannot override it, and republishing does not clear it.
+     * Pass meta on block; cleared on unblock. Returns true if any row was updated.
+     */
+    setAppOperatorSeoBlocked(
+        ownerGaii: string,
+        filename: string,
+        blocked: boolean,
         meta?: { by?: string; at?: string; reason?: string },
     ): Promise<boolean>;
     getAppDownloads(ownerGaii: string, filename: string): Promise<number>;

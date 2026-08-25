@@ -19,7 +19,7 @@
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type {
-  AppRecord, AppSummaryRecord, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection,
+  AppRecord, AppSummaryRecord, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection, AppSeo,
 } from '../../../interface.js';
 import type { App, AppDraft, AppFork } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -46,6 +46,10 @@ function toApp(r: Selectable<App>): AppRecord {
     operatorHiddenBy: r.operatorHiddenBy ?? undefined,
     operatorHiddenAt: isoOpt(r.operatorHiddenAt),
     operatorHideReason: r.operatorHideReason ?? undefined,
+    operatorSeoBlocked: r.operatorSeoBlocked ? true : undefined,
+    operatorSeoBlockedBy: r.operatorSeoBlockedBy ?? undefined,
+    operatorSeoBlockedAt: isoOpt(r.operatorSeoBlockedAt),
+    operatorSeoBlockReason: r.operatorSeoBlockReason ?? undefined,
     aiProvenanceId: r.aiProvenanceId ?? undefined,
     createdAt: iso(r.createdAt),
   };
@@ -61,7 +65,8 @@ function toApp(r: Selectable<App>): AppRecord {
 const SUMMARY_COLUMNS = [
   'ownerGaii', 'ownerName', 'filename', 'versionNumber', 'manifest', 'mimeType', 'size',
   'accessCode', 'parked', 'forkable', 'operatorHidden', 'operatorHiddenBy', 'operatorHiddenAt',
-  'operatorHideReason', 'aiProvenanceId', 'createdAt',
+  'operatorHideReason', 'operatorSeoBlocked', 'operatorSeoBlockedBy', 'operatorSeoBlockedAt',
+  'operatorSeoBlockReason', 'aiProvenanceId', 'createdAt',
 ] as const;
 
 type AppSummaryRow = Pick<Selectable<App>, (typeof SUMMARY_COLUMNS)[number]>;
@@ -82,6 +87,10 @@ function toAppSummary(r: AppSummaryRow): AppSummaryRecord {
     operatorHiddenBy: r.operatorHiddenBy ?? undefined,
     operatorHiddenAt: isoOpt(r.operatorHiddenAt),
     operatorHideReason: r.operatorHideReason ?? undefined,
+    operatorSeoBlocked: r.operatorSeoBlocked ? true : undefined,
+    operatorSeoBlockedBy: r.operatorSeoBlockedBy ?? undefined,
+    operatorSeoBlockedAt: isoOpt(r.operatorSeoBlockedAt),
+    operatorSeoBlockReason: r.operatorSeoBlockReason ?? undefined,
     aiProvenanceId: r.aiProvenanceId ?? undefined,
     createdAt: iso(r.createdAt),
   };
@@ -173,6 +182,10 @@ export const appMethods = {
       operatorHidden: record.operatorHidden ?? false, operatorHiddenBy: record.operatorHiddenBy ?? null,
       operatorHiddenAt: record.operatorHiddenAt ? new Date(record.operatorHiddenAt) : null,
       operatorHideReason: record.operatorHideReason ?? null, createdAt: new Date(record.createdAt),
+      operatorSeoBlocked: record.operatorSeoBlocked ?? false,
+      operatorSeoBlockedBy: record.operatorSeoBlockedBy ?? null,
+      operatorSeoBlockedAt: record.operatorSeoBlockedAt ? new Date(record.operatorSeoBlockedAt) : null,
+      operatorSeoBlockReason: record.operatorSeoBlockReason ?? null,
       aiProvenanceId: record.aiProvenanceId ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
@@ -279,7 +292,7 @@ export const appMethods = {
 
   async updateAppMeta(
     this: PostgresKyselyStorage, ownerGaii: string, filename: string,
-    meta: { name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection; cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap'] },
+    meta: { name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection; cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap']; seo?: Partial<AppSeo> },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue shows). Read the current
     // manifest, merge only the supplied fields, write it back — the URL (owner/filename) is untouched.
@@ -291,6 +304,9 @@ export const appMethods = {
     if (meta.descriptions !== undefined) manifest.descriptions = meta.descriptions;
     if (meta.protection !== undefined) manifest.protection = meta.protection;
     if (meta.dataMap !== undefined) manifest.dataMap = meta.dataMap;
+    // MERGED, not replaced: a route flipping the search-visibility switch must not silently drop
+    // the title and keywords the owner wrote on a previous visit.
+    if (meta.seo !== undefined) manifest.seo = { ...manifest.seo, ...meta.seo };
     // Agent-Bundled Apps: replace the crew-def section in place (null clears it).
     if (meta.cortex !== undefined) {
       if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;
@@ -326,6 +342,21 @@ export const appMethods = {
       operatorHiddenBy: hidden ? (meta?.by ?? null) : null,
       operatorHiddenAt: hidden ? (meta?.at ? new Date(meta.at) : null) : null,
       operatorHideReason: hidden ? (meta?.reason ?? null) : null,
+    }).where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+
+  async setAppOperatorSeoBlocked(
+    this: PostgresKyselyStorage, ownerGaii: string, filename: string, blocked: boolean,
+    meta?: { by?: string; at?: string; reason?: string },
+  ): Promise<boolean> {
+    // Applies to the whole app — flag every version row, as the other three do. On unblock, clear
+    // the audit fields so a stale "blocked by" never lingers next to a live app.
+    const r = await this.db.updateTable('App').set({
+      operatorSeoBlocked: blocked,
+      operatorSeoBlockedBy: blocked ? (meta?.by ?? null) : null,
+      operatorSeoBlockedAt: blocked ? (meta?.at ? new Date(meta.at) : null) : null,
+      operatorSeoBlockReason: blocked ? (meta?.reason ?? null) : null,
     }).where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) > 0;
   },

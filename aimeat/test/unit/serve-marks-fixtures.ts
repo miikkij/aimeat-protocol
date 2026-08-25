@@ -44,11 +44,31 @@ const DISCOVERY: AppDiscoverySpec = {
   baseUrl: 'https://aimeat.io', toolNames: ['search', 'summarise'], webmcp: true,
 };
 
+/**
+ * The default app: published, and NOT search-visible, because that is what an app is until its
+ * owner asks otherwise. `indexable` is absent rather than false on purpose — a caller that has not
+ * thought about search visibility must not opt somebody's app in by omission, and the golden is
+ * what proves that stays true.
+ */
 const HEAD: AppHeadSpec = {
   owner: 'alice', filename: 'demo.html', appName: 'Demo', description: 'A demo app',
   origin: 'https://demo.apps.aimeat.io', baseUrl: 'https://aimeat.io',
   tools: [{ name: 'search', description: 'Search it', morsels: 5 }],
   updatedAt: '2026-07-30T09:00:00.000Z',
+};
+
+/**
+ * The same app after its owner switched search visibility on. The enrichment only exists in this
+ * state — the social card, the keywords, the declared language and the interaction count — so
+ * without a case in this state the goldens would pin only half the head-meta pass.
+ */
+const HEAD_INDEXABLE: AppHeadSpec = {
+  ...HEAD,
+  indexable: true,
+  keywords: ['demo', 'notes'],
+  image: 'https://aimeat.io/v1/apps/alice/demo.html/screenshot',
+  lang: 'fi',
+  downloads: 42,
 };
 
 export interface ServeMarkCase {
@@ -93,6 +113,10 @@ export const SERVE_MARK_CASES: ServeMarkCase[] = [
   { name: 'not-a-document/all-four', html: NOT_A_DOCUMENT, badge: true, prov: 'labelled', visible: true, discovery: DISCOVERY, headMeta: HEAD },
   { name: 'own-jsonld/head-meta', html: OWN_JSONLD, badge: true, discovery: DISCOVERY, headMeta: HEAD },
   { name: 'own-jsonld/prov-then-head-meta', html: OWN_JSONLD, badge: true, prov: 'labelled', discovery: DISCOVERY, headMeta: HEAD },
+  // The search-visible half of the head-meta pass: the card, the keywords, the declared language
+  // and the interaction count, none of which exist in any case above.
+  { name: 'full-doc/head-meta-indexable', html: FULL_DOC, badge: true, discovery: DISCOVERY, headMeta: HEAD_INDEXABLE },
+  { name: 'headless/head-meta-indexable', html: HEADLESS, badge: false, headMeta: HEAD_INDEXABLE },
   { name: 'full-doc/portfolio-badge-no-app-spec', html: FULL_DOC, badge: true },
   { name: 'full-doc/prov-without-badge', html: FULL_DOC, badge: false, prov: 'labelled', visible: true },
 ];

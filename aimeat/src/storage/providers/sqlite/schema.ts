@@ -447,6 +447,10 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('apps', 'operatorHiddenBy', 'TEXT');
   safeAddColumn('apps', 'operatorHiddenAt', 'TEXT');
   safeAddColumn('apps', 'operatorHideReason', 'TEXT');
+  safeAddColumn('apps', 'operatorSeoBlocked', 'INTEGER NOT NULL DEFAULT 0');
+  safeAddColumn('apps', 'operatorSeoBlockedBy', 'TEXT');
+  safeAddColumn('apps', 'operatorSeoBlockedAt', 'TEXT');
+  safeAddColumn('apps', 'operatorSeoBlockReason', 'TEXT');
   // Fork-permission state: when 1, outsiders may fork the app; 0 (default) = only the
   // owner/their agents/operators may. Additive/nullable-default; pre-existing apps are
   // NOT forkable by outsiders (0), matching the new default.

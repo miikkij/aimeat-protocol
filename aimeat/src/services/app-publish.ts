@@ -79,6 +79,8 @@ import type { DataMapStamp } from './data-map/data-map-types.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { ensureAppSubdomain } from '../routes/subdomains.js';
+import { appSeoIndexable } from './app-seo.js';
+import { submitToIndexNow, appSubmitUrls } from './indexnow.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -276,6 +278,17 @@ export async function publishApp(
   if (protection && Object.values(protection).some(Boolean)) manifest.protection = protection;
   // A fork stays a fork: the badge lives on the manifest and nothing in a re-publish restates it.
   if (prev?.forkedFrom) manifest.forkedFrom = prev.forkedFrom;
+  // Search visibility survives a republish, and it has to. No publish door accepts this field —
+  // it is set through PATCH, from the app's own details view — so a manifest rebuilt without it
+  // would silently switch an app back out of search every time its author shipped a new version,
+  // and they would find out weeks later from their traffic.
+  //
+  // The operator's approval carries too, in review mode. What they approved is this app being
+  // findable under this name and this description, not one particular build of its HTML; making
+  // every version bump re-enter the queue would make the mode unusable and would teach owners to
+  // stop shipping. An operator who wants to withdraw it has the seo-approve door, and the block
+  // is a column that a republish cannot touch at all.
+  if (prev?.seo) manifest.seo = prev.seo;
 
   // What the app DECLARES survives a version whose author forgot the meta tag; what the node
   // OBSERVES is re-measured from the bytes being published, never carried. HTML only — there is
@@ -377,6 +390,22 @@ export async function publishApp(
     } catch (err) {
       logger.warn('publishApp: subdomain provisioning failed; the vanity URL will 404 until the canonical path is opened',
         { filename, owner: ownerName, error: String(err) });
+    }
+  }
+
+  // Tell the search engines that participate in IndexNow, instead of waiting to be crawled. Only
+  // when this app is actually search-visible, which for a newly published app it is not — the
+  // switch is off until its owner turns it on. So in practice this fires on the republish of an
+  // app somebody already chose to have found, which is exactly the case where the wait matters.
+  // Best-effort and silent by contract: submitToIndexNow never throws.
+  {
+    const published = await storage.getApp(ownerGhii, filename);
+    if (published && appSeoIndexable(published, config)) {
+      const site = /\.html?$/i.test(filename)
+        ? (await storage.listSubdomainSites())
+          .find(s => s.enabled && s.kind === 'app' && s.target === `${ownerName}/${filename}`)
+        : undefined;
+      await submitToIndexNow(config, storage, appSubmitUrls(config, { ownerName, filename }, site?.subdomain));
     }
   }
 

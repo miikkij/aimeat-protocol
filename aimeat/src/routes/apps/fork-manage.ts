@@ -29,6 +29,8 @@ import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
+import { parseOwnerSeoInput, seoNote, appSeoState, appSeoIndexable } from '../../services/app-seo.js';
+import { submitToIndexNow, appSubmitUrls } from '../../services/indexnow.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerForkManageRoutes(
@@ -303,8 +305,36 @@ export function registerForkManageRoutes(
                 : 'Copy-protection cleared.');
         }
 
+        // Search visibility, and the wording that goes with it. Off by default on every app:
+        // publishing makes an app public and shareable by link, and being findable in a search
+        // engine is a separate decision its owner makes on purpose.
+        if ('seo' in body) {
+            const parsed = parseOwnerSeoInput(body.seo);
+            if ('error' in parsed) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error));
+                return;
+            }
+            await storage.updateAppMeta(effectiveGaii, filename, { seo: parsed.seo });
+            // The state AFTER the write, so the note describes what is true rather than what was
+            // asked for. In review mode an owner switching the toggle on has made a request, not a
+            // decision, and telling them the app is now findable would be false.
+            const after = await storage.getApp(effectiveGaii, filename);
+            notes.push(after ? seoNote(appSeoState(after, config)) : 'Search visibility updated.');
+            // An app that just became findable is announced now rather than at the next crawl.
+            // Only on the way IN: IndexNow is a "this changed, come look" hint, and there is no
+            // way to say "stop indexing this" through it — the robots.txt and the noindex header
+            // this same switch flipped are what withdraw an app, and engines act on those on their
+            // own schedule.
+            if (after && appSeoIndexable(after, config)) {
+                const site = (await storage.listSubdomainSites())
+                    .find(s => s.enabled && s.kind === 'app' && s.target === `${owner}/${filename}`);
+                await submitToIndexNow(config, storage,
+                    appSubmitUrls(config, { ownerName: owner, filename }, site?.subdomain));
+            }
+        }
+
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable or protection).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, parked, forkable, protection or seo).'));
             return;
         }
 
@@ -319,6 +349,9 @@ export function registerForkManageRoutes(
             parked: !!updated?.parked,
             forkable: !!updated?.forkable,
             protection: updated?.manifest?.protection ?? null,
+            // The STATE, not the switch. An owner who turned the switch on in review mode, or on a
+            // blocked app, has to be able to see that the answer is still not "findable".
+            seo: updated ? { state: appSeoState(updated, config), ...(updated.manifest?.seo ?? {}) } : null,
             download_url: `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`,
             note: notes.join(' '),
         }));

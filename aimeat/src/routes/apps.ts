@@ -109,6 +109,7 @@ import { registerPublishRoutes } from './apps/publish.js';
 import { registerDraftRoutes } from './apps/drafts.js';
 import { registerForkManageRoutes } from './apps/fork-manage.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
+import { registerAdminSeoRoutes } from './admin-seo.js';
 
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -134,6 +135,11 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerDraftRoutes(router, config, storage, canonicalOwner);
     registerForkManageRoutes(router, config, storage, canonicalOwner);
     registerAppAgentRoutes(router, config, storage);
+    // The operator's search-visibility surface: the node's own status, and the per-app block and
+    // approval. Registered here rather than in its own mount so it reuses this router's
+    // canonicalOwner closure, which is what turns an authenticated operator into a name for the
+    // audit fields.
+    registerAdminSeoRoutes(router, config, storage, canonicalOwner);
 
     return router;
 }

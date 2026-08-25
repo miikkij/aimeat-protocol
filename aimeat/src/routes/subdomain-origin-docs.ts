@@ -33,6 +33,7 @@ import { appToolNames } from '../services/app-tool-names.js';
 import { buildAppAgentFace } from '../services/agent-face.js';
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
+import { appSeoIndexable } from '../services/app-seo.js';
 
 export interface AppOriginDocDeps {
   resolveApp: (target: string) => Promise<AppRecord | null>;
@@ -90,19 +91,33 @@ export function registerAppOriginDocs(
     const app = await appForOrigin(req);
     if (!app) return next();
     const origin = appOriginFor(req, config);
+    const header = `# ${app.ownerName}/${app.filename} — an application published on AIMEAT\n`;
+    // Search visibility is the app owner's own decision and it is off until they make it. This
+    // document used to say Allow to everyone unconditionally, which meant publishing an app was
+    // also, silently, a decision to have it indexed.
+    //
+    // No Sitemap line on the refusal: naming a sitemap in a document that forbids the crawl is a
+    // contradiction, and the sitemap route below refuses in the same breath so the two answers
+    // cannot drift apart.
+    if (!appSeoIndexable(app, config)) {
+      res.type('text/plain; charset=utf-8').send(
+        `${header}# Its owner has not asked for it to be findable in a search engine.\n`
+        + `User-agent: *\nDisallow: /\n`);
+      return;
+    }
     res.type('text/plain; charset=utf-8').send(
-      `# ${app.ownerName}/${app.filename} — an application published on AIMEAT
-` +
-      `User-agent: *
-Allow: /
-
-Sitemap: ${origin}/sitemap.xml
-`);
+      `${header}User-agent: *\nAllow: /\n\nSitemap: ${origin}/sitemap.xml\n`);
   });
 
   router.get('/sitemap.xml', async (req: Request, res: Response, next) => {
     const app = await appForOrigin(req);
     if (!app) return next();
+    // A sitemap says "index these". On an app whose owner has not asked to be found, that
+    // contradicts the robots.txt above, and the two documents disagreeing about the same host is
+    // worse than either answer alone. The agent-facing documents on this origin — llms.txt, the
+    // MCP card — are unaffected: they address a reader who was sent here, not one deciding what to
+    // crawl, and that reader is welcome either way.
+    if (!appSeoIndexable(app, config)) return next();
     const origin = appOriginFor(req, config);
     const now = new Date().toISOString().split('T')[0];
     const urls = [`${origin}/`, `${origin}/llms.txt`, `${origin}/AGENTS.md`, `${origin}/sitemap.md`];

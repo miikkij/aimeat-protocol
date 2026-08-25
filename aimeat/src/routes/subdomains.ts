@@ -97,6 +97,7 @@ import { applyServeMarks } from '../services/app-serve-marks.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
 import { appToolNames } from '../services/app-tool-names.js';
+import { appSeoIndexable, appSeoMeta, appScreenshotUrl, appDeclaredLocales } from '../services/app-seo.js';
 import { recordAppOpen } from '../services/usage/record-app-open.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { appAccessGranted } from '../services/app-access-token.js';
@@ -287,14 +288,19 @@ function wantsWebmcpBridge(data: Buffer | Uint8Array | string): boolean {
 // server card, the web-app manifest + icon, AGENTS.md, the markdown mirrors) live in
 // ./subdomain-origin-docs.ts — a pure extraction when this file hit the line ceiling.
 
-function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string,
-                  protect?: { config: AimeatConfig; viewer: string },
+async function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string,
+                  apexOrigin: string | undefined,
+                  // Required, unlike the three optional blocks after it. Every call site already
+                  // passed it, and the search-visibility decision below reads config: a default
+                  // would have to invent an answer to "may a search engine index this", and there
+                  // is no safe value to invent.
+                  protect: { config: AimeatConfig; viewer: string },
                   discover?: { baseUrl: string; toolNames: string[]; origin?: string },
                   prov?: ServedProvenance,
                   // TARGET-058: what the VISIBLE label needs. Separate from `protect` because this
                   // one is a compliance mark rather than an owner-chosen protection, and it must not
                   // become conditional on a protection flag by accident.
-                  visible?: { config: AimeatConfig; locale: Locale }): void {
+                  visible?: { config: AimeatConfig; locale: Locale }): Promise<void> {
   // charset=utf-8, via appContentType(): a bare `text/html` falls back to windows-1252 and turns
   // every UTF-8 byte in the document into mojibake. See utils/app-content-type.ts for the corpus
   // scan that had to happen before this could be declared.
@@ -308,7 +314,23 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
   // The lifetime counter above answers "how many"; this answers when, and by whom.
   recordAppOpen({ appOwnerGaii: app.ownerGaii, filename: app.filename, viewer: protect?.viewer });
 
+  // Search visibility, decided once (services/app-seo.ts) and used twice below: the header here,
+  // and the head metadata inside the marks pass. The header is the half that stops a LISTING —
+  // robots.txt on this origin stops the crawl, but a URL somebody else linked to gets indexed
+  // from the link text alone, and a crawler told not to fetch the page cannot read the noindex
+  // inside it. The two are not alternatives.
+  const indexable = appSeoIndexable(app, protect.config);
+  if (!indexable) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+
   if (/text\/html/i.test(app.mimeType)) {
+    // The app's own picture costs one owner-scoped metadata query, so it is fetched only for an
+    // app that is actually search-visible. `documentLocales` reads what the app declares about
+    // itself: the `lang` this used to stamp was the literal 'en', on a corpus that is
+    // substantially Finnish, which told every search engine something plainly false.
+    const seoMeta = appSeoMeta(app, {
+      screenshotUrl: indexable ? await appScreenshotUrl(storage, app, protect.config.baseUrl) : '',
+      documentLocales: appDeclaredLocales(app.data),
+    });
     // Relax the author's CSP meta so the H-2 SSO bridge works (only when apex framing is on),
     // then append the permanent aimeat.io "publish your own app" attribution badge so an
     // external visitor who opens a shared app reaches the project + sees the publish hint.
@@ -337,9 +359,16 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
       headMeta: discover?.origin
         ? {
             owner: app.ownerName, filename: app.filename,
-            appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
+            // The owner's own wording where they wrote one, and what the app already declares
+            // everywhere else. An owner who wants their app found has written its name, its
+            // description and its tags once already.
+            appName: seoMeta.title, description: seoMeta.description,
             origin: discover.origin, baseUrl: discover.baseUrl,
             updatedAt: app.createdAt ?? null,
+            indexable,
+            keywords: seoMeta.keywords,
+            image: seoMeta.image,
+            lang: seoMeta.lang,
           }
         : undefined,
     });
@@ -520,7 +549,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (!companyApp || appIsRestricted(config, companyApp)) return companyNotFound();
       // The front page is an app, so it is served through the app path unchanged: same CSP,
       // same serve-time marks, same download accounting.
-      serveApp(res, storage, companyApp, csp, apexOrigin,
+      await serveApp(res, storage, companyApp, csp, apexOrigin,
         { config, viewer: req.auth?.sub ?? 'anon' },
         { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, companyApp.ownerGaii, companyApp.filename) },
         await loadServedProvenance(storage, config, companyApp.aiProvenanceId),
@@ -603,7 +632,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       toolNames: await appToolNames(storage, app.ownerGaii, app.filename),
       origin: appOriginFor(req, config),
     };
-    serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover,
+    await serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover,
       await loadServedProvenance(storage, config, app.aiProvenanceId),  // the SDK (aimeat-auth.js) does the silent SSO itself
       { config, locale: detectLocale(req.headers['accept-language']) });
   });
@@ -650,7 +679,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
     const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
-    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discoverShared,
+    await serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discoverShared,
       await loadServedProvenance(storage, config, app.aiProvenanceId), // no subdomain available → serve on the shared host (no SSO)
       { config, locale: detectLocale(req.headers['accept-language']) });
   });

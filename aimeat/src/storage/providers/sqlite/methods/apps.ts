@@ -12,7 +12,7 @@
  */
 import type {
   AppRecord, AppSummaryRecord, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
-  AppProtection, SubdomainSiteRecord, AppGrantRecord, MemoryLinkRecord
+  AppProtection, AppSeo, SubdomainSiteRecord, AppGrantRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import { SUMMARY_COLUMNS, runAppListing } from './apps-listing.js';
@@ -43,14 +43,16 @@ export const appsMethods = {
 
   async createApp(this: SqliteStorage, record: AppRecord): Promise<AppRecord> {
     this.db.prepare(
-      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, forkable, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, createdAt, aiProvenanceId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, forkable, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, operatorSeoBlocked, operatorSeoBlockedBy, operatorSeoBlockedAt, operatorSeoBlockReason, createdAt, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.ownerName, record.filename, record.versionNumber,
       JSON.stringify(record.manifest), record.mimeType, record.size, record.data,
       record.accessCode ?? null, record.parked ? 1 : 0, record.forkable ? 1 : 0,
       record.operatorHidden ? 1 : 0, record.operatorHiddenBy ?? null,
       record.operatorHiddenAt ?? null, record.operatorHideReason ?? null,
+      record.operatorSeoBlocked ? 1 : 0, record.operatorSeoBlockedBy ?? null,
+      record.operatorSeoBlockedAt ?? null, record.operatorSeoBlockReason ?? null,
       record.createdAt, record.aiProvenanceId ?? null,
     );
     return record;
@@ -126,7 +128,7 @@ export const appsMethods = {
   async updateAppMeta(this: SqliteStorage,
     ownerGaii: string,
     filename: string,
-    meta: { name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection; cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap'] },
+    meta: { name?: string; description?: string; descriptions?: Record<string, string>; protection?: AppProtection; cortex?: AppManifestCortex | null; dataMap?: AppManifest['dataMap']; seo?: Partial<AppSeo> },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
     // shows). Read the current manifest, merge only the supplied fields, write
@@ -142,6 +144,9 @@ export const appsMethods = {
     if (meta.descriptions !== undefined) manifest.descriptions = meta.descriptions;
     if (meta.protection !== undefined) manifest.protection = meta.protection;
     if (meta.dataMap !== undefined) manifest.dataMap = meta.dataMap;
+    // MERGED, not replaced: a route flipping the search-visibility switch must not silently drop
+    // the title and keywords the owner wrote on a previous visit.
+    if (meta.seo !== undefined) manifest.seo = { ...manifest.seo, ...meta.seo };
     // Agent-Bundled Apps: replace the crew-def section in place (null clears it).
     if (meta.cortex !== undefined) {
       if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;
@@ -182,6 +187,27 @@ export const appsMethods = {
       hidden ? (meta?.by ?? null) : null,
       hidden ? (meta?.at ?? null) : null,
       hidden ? (meta?.reason ?? null) : null,
+      ownerGaii,
+      filename,
+    );
+    return result.changes > 0;
+  },
+
+  async setAppOperatorSeoBlocked(this: SqliteStorage,
+    ownerGaii: string,
+    filename: string,
+    blocked: boolean,
+    meta?: { by?: string; at?: string; reason?: string },
+  ): Promise<boolean> {
+    // Applies to the whole app — flag every version row, as the three setters above do.
+    // On unblock, clear the audit fields so a stale "blocked by" never lingers next to a live app.
+    const result = this.db.prepare(
+      'UPDATE apps SET operatorSeoBlocked = ?, operatorSeoBlockedBy = ?, operatorSeoBlockedAt = ?, operatorSeoBlockReason = ? WHERE ownerGaii = ? AND filename = ?'
+    ).run(
+      blocked ? 1 : 0,
+      blocked ? (meta?.by ?? null) : null,
+      blocked ? (meta?.at ?? null) : null,
+      blocked ? (meta?.reason ?? null) : null,
       ownerGaii,
       filename,
     );
@@ -521,6 +547,12 @@ export const appsMethods = {
       if (row.operatorHiddenAt) record.operatorHiddenAt = row.operatorHiddenAt as string;
       if (row.operatorHideReason) record.operatorHideReason = row.operatorHideReason as string;
     }
+    if (row.operatorSeoBlocked) {
+      record.operatorSeoBlocked = true;
+      if (row.operatorSeoBlockedBy) record.operatorSeoBlockedBy = row.operatorSeoBlockedBy as string;
+      if (row.operatorSeoBlockedAt) record.operatorSeoBlockedAt = row.operatorSeoBlockedAt as string;
+      if (row.operatorSeoBlockReason) record.operatorSeoBlockReason = row.operatorSeoBlockReason as string;
+    }
     if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
     return record;
   },
@@ -545,6 +577,12 @@ export const appsMethods = {
       if (row.operatorHiddenBy) record.operatorHiddenBy = row.operatorHiddenBy as string;
       if (row.operatorHiddenAt) record.operatorHiddenAt = row.operatorHiddenAt as string;
       if (row.operatorHideReason) record.operatorHideReason = row.operatorHideReason as string;
+    }
+    if (row.operatorSeoBlocked) {
+      record.operatorSeoBlocked = true;
+      if (row.operatorSeoBlockedBy) record.operatorSeoBlockedBy = row.operatorSeoBlockedBy as string;
+      if (row.operatorSeoBlockedAt) record.operatorSeoBlockedAt = row.operatorSeoBlockedAt as string;
+      if (row.operatorSeoBlockReason) record.operatorSeoBlockReason = row.operatorSeoBlockReason as string;
     }
     if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
     return record;
@@ -692,71 +730,6 @@ export const appsMethods = {
     const result: Record<string, string> = {};
     for (const r of rows) result[r.key.replace('config:', '')] = r.value;
     return result;
-  },
-
-  // ══════════════════════════════════════════════════════════
-  // ── Knowledge: Memory Links ──
-  // ══════════════════════════════════════════════════════════
-
-  async createLink(this: SqliteStorage, record: MemoryLinkRecord): Promise<MemoryLinkRecord> {
-    this.db.prepare(`
-      INSERT INTO knowledge_links (source, target, relation, description, linked_at, linked_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(source, target) DO UPDATE SET
-        relation = excluded.relation, description = excluded.description,
-        linked_at = excluded.linked_at, linked_by = excluded.linked_by
-    `).run(record.source, record.target, record.relation, record.description, record.linked_at, record.linked_by);
-    return record;
-  },
-
-  async getLink(this: SqliteStorage, source: string, target: string): Promise<MemoryLinkRecord | null> {
-    const row = this.db.prepare('SELECT * FROM knowledge_links WHERE source = ? AND target = ?').get(source, target) as MemoryLinkRecord | undefined;
-    return row ?? null;
-  },
-
-  async listLinks(this: SqliteStorage, key: string, opts?: { direction?: 'outgoing' | 'incoming' | 'both'; relation?: string }): Promise<MemoryLinkRecord[]> {
-    const dir = opts?.direction ?? 'both';
-    let sql: string;
-    const params: string[] = [];
-
-    if (dir === 'outgoing') {
-      sql = 'SELECT * FROM knowledge_links WHERE source = ?';
-      params.push(key);
-    } else if (dir === 'incoming') {
-      sql = 'SELECT * FROM knowledge_links WHERE target = ?';
-      params.push(key);
-    } else {
-      sql = 'SELECT * FROM knowledge_links WHERE source = ? OR target = ?';
-      params.push(key, key);
-    }
-
-    if (opts?.relation) {
-      sql += ' AND relation = ?';
-      params.push(opts.relation);
-    }
-
-    return this.db.prepare(sql).all(...params) as MemoryLinkRecord[];
-  },
-
-  async deleteLink(this: SqliteStorage, source: string, target: string): Promise<boolean> {
-    const result = this.db.prepare('DELETE FROM knowledge_links WHERE source = ? AND target = ?').run(source, target);
-    return result.changes > 0;
-  },
-
-  async findBrokenLinks(this: SqliteStorage, ownerGaii: string): Promise<MemoryLinkRecord[]> {
-    const links = this.db.prepare('SELECT * FROM knowledge_links WHERE linked_by = ?').all(ownerGaii) as MemoryLinkRecord[];
-    const broken: MemoryLinkRecord[] = [];
-    for (const link of links) {
-      const sourceExists = await this.getMemory(ownerGaii, link.source);
-      const targetExists = await this.getMemory(ownerGaii, link.target);
-      if (!sourceExists || !targetExists) broken.push(link);
-    }
-    return broken;
-  },
-
-  async deleteLinksByContributor(this: SqliteStorage, gaii: string): Promise<number> {
-    const result = this.db.prepare('DELETE FROM knowledge_links WHERE linked_by = ?').run(gaii);
-    return result.changes;
   },
 
   // ══════════════════════════════════════════════════════════

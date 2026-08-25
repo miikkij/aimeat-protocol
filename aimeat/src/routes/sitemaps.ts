@@ -21,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { sitemapPages } from '../data/public-pages.js';
 import { apexOnly } from './agent-docs.js';
+import { appSeoIndexable } from '../services/app-seo.js';
 
 /** Register `/sitemap.xml` and `/sitemap-index.xml` on the given router. */
 export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -29,7 +30,13 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
   // are discoverable through the RFC 9727 API catalog, the Link headers on every GET, llms.txt
   // and the bootstrap response. A sitemap advertises pages a crawler should index, and a JSON
   // endpoint listed there only invites HTML checks it can never satisfy.
-  router.get('/sitemap.xml', (_req, res) => {
+  // apexOnly, which it was not until now, and the omission is observable on production today:
+  // `https://apps.aimeat.io/sitemap.xml` answers with the APEX sitemap, every <loc> naming a
+  // different host. A cross-host sitemap is invalid unless the referencing host's robots.txt names
+  // it, which no app origin's does — so the document was both wrong and useless. It also swallowed
+  // the app origin's own refusal: an app whose owner has not asked to be found returns 404 here,
+  // and without this guard that 404 fell through and answered with the node's list instead.
+  router.get('/sitemap.xml', apexOnly, (_req, res) => {
     const b = config.baseUrl;
     const now = new Date().toISOString().split('T')[0];
     const xml = [
@@ -69,10 +76,11 @@ export function mountSitemapRoutes(router: Router, config: AimeatConfig, storage
         if (s.enabled && s.kind === 'app' && s.target) subFor.set(s.target, s.subdomain);
       }
       for (const app of apps) {
-        // A GATED app publishes no agent-facing documents of its own: its origin answers with the
-        // NODE's llms.txt and card, which e2e-app-origin asserts. Listing its sitemap would send a
-        // crawler to a host that refuses to describe the thing we just advertised.
-        if (app.accessCode || (app.manifest?.priceMorsels ?? 0) > 0) continue;
+        // The gate that used to be written out here moved into appSeoIndexable, along with the
+        // three decisions it did not make: the operator's per-app block, the owner's own switch,
+        // and the review mode. Four surfaces ask this question and all four must agree, so none of
+        // them recomputes it. Its first step is the gated-app rule this line used to be.
+        if (!appSeoIndexable(app, config)) continue;
         const owner = app.ownerGaii.split('@')[0].split('#').pop() ?? '';
         const sub = subFor.get(`${owner}/${app.filename}`);
         if (!sub) continue;

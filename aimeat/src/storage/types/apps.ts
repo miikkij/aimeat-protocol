@@ -104,6 +104,49 @@ export interface AppManifest {
   // (noRawDownload), and make a leaked copy traceable (watermark). Real protection is
   // keeping value in a server-side extension. See docs/app-developer-ai-guide.md.
   protection?: AppProtection;
+  /**
+   * Whether this app should be findable in a search engine, and what it should say about itself
+   * when it is. Absent means NOT search-visible — the default is off, deliberately: a published
+   * app is public and shareable by link from the moment it exists, and search visibility is a
+   * separate, later decision its owner makes on purpose. Reach is not a side effect of pressing
+   * publish.
+   *
+   * On the MANIFEST for the same reasons `aiPosture` and `dataMap` are: it is already a JSON blob
+   * on both storage providers, so no migration and no second place to keep in sync, and it travels
+   * with update, fork, backup and purchase snapshot. The OPERATOR's block is not here — it lives on
+   * the record beside `operatorHidden`, because the owner must not be able to lift it by
+   * republishing.
+   *
+   * The four description fields are all optional. Left empty, the serve-time metadata is derived
+   * from what the app already declares: `manifest.name`, `manifest.description`, `manifest.tags`,
+   * and the app's own screenshot. An owner who wants search visibility should not be made to write
+   * a second copy of what they have already written.
+   */
+  seo?: AppSeo;
+}
+
+/** One app's search-visibility decision, and what it says about itself when the answer is yes. */
+export interface AppSeo {
+  /** The OWNER's switch. Absent or false means the app is not search-visible. */
+  index?: boolean;
+  /** When the owner asked, in `review` mode. Set alongside `index` on their request. */
+  requestedAt?: string;
+  /**
+   * The operator who approved, in `review` mode, and when. NEVER writable through the owner's own
+   * update door — otherwise an owner approves themselves and the review mode means nothing.
+   */
+  approvedBy?: string;
+  approvedAt?: string;
+  /** Overrides the derived `<title>` and `og:title`. Empty uses `manifest.name`. */
+  title?: string;
+  /** Overrides the derived meta description. Empty uses `manifest.description`. */
+  description?: string;
+  /** Overrides the derived keywords. Empty uses `manifest.tags`. */
+  keywords?: string[];
+  /** Overrides the social image. Empty uses the app's own screenshot when it has one. */
+  image?: string;
+  /** Overrides the derived `<html lang>`. Empty reads the app's own `aimeat-locales` meta. */
+  lang?: string;
 }
 
 export interface AppProtection {
@@ -146,6 +189,21 @@ export interface AppRecord {
   operatorHiddenBy?: string;   // operator owner name who hid it
   operatorHiddenAt?: string;   // ISO timestamp
   operatorHideReason?: string; // optional operator-supplied reason (shown to owner)
+  /**
+   * Operator moderation of SEARCH VISIBILITY specifically, and a narrower instrument than
+   * `operatorHidden`: the app stays fully usable, listed and shareable, and only stops being
+   * findable through a search engine. That is the proportionate answer to someone using an app
+   * origin to farm keywords on the operator's domain — taking the app away from its users would
+   * not be.
+   *
+   * On the RECORD rather than in `manifest.seo`, for the same reason `operatorHidden` is on the
+   * record: the owner writes the manifest, and a block the owner can lift by republishing is not a
+   * block. Only an operator can set or clear it. Default false = the owner's own switch decides.
+   */
+  operatorSeoBlocked?: boolean;
+  operatorSeoBlockedBy?: string;   // operator owner name who blocked it
+  operatorSeoBlockedAt?: string;   // ISO timestamp
+  operatorSeoBlockReason?: string; // optional operator-supplied reason (shown to owner)
   /**
    * The ATTACHED half of AI provenance (TARGET-058): the id of an `AiProvenanceRecordRow` describing
    * how this app's BYTES were produced. Absent means UNSTATED — never "a human wrote it".
