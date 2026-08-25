@@ -497,6 +497,42 @@ function locs(xml: string): string[] {
         assert(apex.status === 200 && apex.body.includes('Content-Signal'), 'apex robots.txt missing');
     });
 
+    // THE REFUSAL THIS SUITE OWES.
+    //
+    // Every public document here is generated from the public-page registry: the sitemap, the head
+    // metadata, the .md mirrors and the llms.txt index all walk the same list. That is a
+    // convenience until you ask what happens to a path that is NOT on it, and then it is the
+    // access boundary — because the mirror renders a page's content as markdown to anyone, with no
+    // auth, and the authenticated surfaces of this node live under the same /v1/ prefix as the
+    // public ones. A mirror that fell back to "render whatever is at this path" would hand an
+    // anonymous reader /v1/admin and /v1/profile.
+    //
+    // The registry is what stops it: markdownMirrorsRouter registers one route per registry entry
+    // and nothing else, so the refusal is structural. This asserts that it stays structural.
+    await test('a page that is not in the public registry gets no markdown mirror', async () => {
+        for (const p of ['/v1/admin.md', '/v1/profile.md', '/v1/chat.md', '/v1/nonexistent-page.md']) {
+            const r = await text(p);
+            assert(r.status === 404, `${p} → ${r.status}, expected 404: only registry pages are mirrored`);
+        }
+        // …and a registry page still is, so the assertion above is about the registry rather than
+        // about mirrors being broken.
+        const real = await text('/v1/glossary.md');
+        assert(real.status === 200, `/v1/glossary.md → ${real.status}, the mirror machinery is down`);
+    });
+
+    // The other half of the same boundary, and the one that carries a status rather than a
+    // missing route. Everything this suite asserts is that a document is PUBLIC, and a suite that
+    // only ever proves things are reachable cannot tell an open door from a working one. These are
+    // the surfaces the node deliberately does not advertise: no registry entry, no sitemap line,
+    // no llms.txt mention. An anonymous reader has to be refused at each of them, by status.
+    await test('the surfaces the node does not advertise refuse an anonymous reader', async () => {
+        for (const p of ['/v1/admin/config', '/v1/admin/stats', '/v1/memory', '/v1/agents']) {
+            const r = await text(p);
+            assert(r.status === 401 || r.status === 403,
+                `${p} → ${r.status}, expected 401 or 403 for an unauthenticated reader`);
+        }
+    });
+
     await test('the root serves plain text to a plain-text client', async () => {
         const r = await text('/', { Accept: 'text/plain' });
         assert(r.ct.includes('text/plain'), `Accept: text/plain → ${r.ct}`);
@@ -506,7 +542,17 @@ function locs(xml: string): string[] {
     await test('the HTML head points at llms.txt and identifies the organization', async () => {
         const h = await text('/', { Accept: 'text/html' });
         assert(h.body.includes('href="/llms.txt"'), 'no link to llms.txt in the head');
-        assert(h.body.includes('"@type": "Organization"'), 'no Organization JSON-LD');
+        // Whitespace-insensitive, and that is the point of the change rather than a convenience.
+        // This used to match `"@type": "Organization"` with the one space that the hand-written
+        // block in spa.html happened to carry. The block is now built from this node's own config
+        // and serialized by JSON.stringify, which emits no space — so the assertion went red while
+        // the fact it exists to protect was still true. It was pinning the formatting of one
+        // implementation, not the presence of the structured data.
+        const compact = h.body.replace(/"\s*:\s*"/g, '":"');
+        assert(compact.includes('"@type":"Organization"'), 'no Organization JSON-LD');
+        // The node names ITSELF here. A second node used to serve aimeat.io's operator in this
+        // block, so asserting only that the block exists would have passed on the bug.
+        assert(compact.includes('"@type":"SoftwareApplication"'), 'no SoftwareApplication JSON-LD');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

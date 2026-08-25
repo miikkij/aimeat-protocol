@@ -12,56 +12,20 @@
   <title>AIMEAT — AI Memory Exchange and Action Transfer</title>
   <meta name="description" content="AIMEAT — AI Memory Exchange and Action Transfer. Open protocol infrastructure for AI agents: persistent memory, identity, consent, and coordination.">
 
-  <!-- Open Graph -->
+  <!-- og:title, og:description, og:image, the twitter card and the two site-level JSON-LD blocks
+       are NOT here. They are stamped per request by injectSiteHead (src/utils/page-head.ts) from
+       this node's own configuration, and injectPageHead then overrides the title and description
+       for a page that describes itself.
+
+       They used to be literals in this file. Three things were wrong with that. They named
+       aimeat.io and its operator, so every other node running this software announced in its own
+       structured data that it WAS that company. og:image sat in the shell where the per-page
+       injection never reached it, so all ten registry pages shared one social card. And a Search
+       Console verification tag could not be added without editing this file, which is the first
+       thing an operator has to do and was the one door shut to them.
+
+       og:url stays out too: it is per page and injectPageHead writes it. -->
   <meta property="og:type" content="website">
-  <meta property="og:url" content="https://aimeat.io/">
-  <meta property="og:title" content="AIMEAT — AI Memory Exchange and Action Transfer">
-  <meta property="og:description" content="Open protocol infrastructure for AI agents. Persistent memory, GHII/GAII identity, morsel economy, MCP connector, and federation.">
-  <meta property="og:image" content="https://aimeat.io/og-image.png">
-
-  <!-- Twitter/X card -->
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="AIMEAT — AI Memory Exchange and Action Transfer">
-  <meta name="twitter:description" content="Open protocol infrastructure for AI agents. Persistent memory, GHII/GAII identity, morsel economy, MCP connector, and federation.">
-  <meta name="twitter:image" content="https://aimeat.io/og-image.png">
-
-  <!-- Schema.org JSON-LD -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    "name": "AIMEAT",
-    "alternateName": "AI Memory Exchange and Action Transfer",
-    "url": "https://aimeat.io",
-    "description": "Open protocol infrastructure for AI agents: persistent memory, GHII/GAII identity, morsel economy, consent management, MCP connector, and federation.",
-    "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "Any",
-    "offers": {
-      "@type": "Offer",
-      "price": "0",
-      "priceCurrency": "USD"
-    },
-    "sameAs": [
-      "https://github.com/miikkij/aimeat-protocol"
-    ]
-  }
-  </script>
-  <!-- SoftwareApplication above says what the software is; Organization says who stands behind the
-       node. An agent resolving "who is aimeat.io" needs the second, and had only the first. -->
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "AIMEAT",
-    "url": "https://aimeat.io",
-    "logo": "https://aimeat.io/favicon.svg",
-    "description": "Open protocol infrastructure for AI agents: persistent memory, identity, consent, shared workspaces and a usage meter, over REST and MCP.",
-    "sameAs": [
-      "https://github.com/miikkij/aimeat-protocol",
-      "https://www.overscalesolutions.com"
-    ]
-  }
-  </script>
 
   <!-- The agent-facing documents, declared where a reader looks before fetching anything: an
        agent tool that reads the head finds the manual without guessing a path, and a scanner that
