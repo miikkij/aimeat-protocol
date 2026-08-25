@@ -2929,7 +2929,16 @@
       "blockTitle": "Stop \"{name}\" appearing in search",
       "blockBody": "The application keeps working, stays listed here, and can still be shared by link. Only search engines stop finding it. Its owner cannot undo this.",
       "blockReason": "Why",
-      "blockReasonHint": "Shown to the owner. A reason they cannot read is one they cannot fix."
+      "blockReasonHint": "Shown to the owner. A reason they cannot read is one they cannot fix.",
+      "openGsc": "Open Google Search Console",
+      "openGscSitemaps": "Open Sitemaps in Search Console",
+      "openBing": "Open Bing Webmaster Tools",
+      "openIndexnow": "Get an IndexNow key",
+      "checkTitle": "Check it from outside",
+      "checkIntro": "What a search engine actually makes of this site, read by the people who run the search engines rather than by us. Each opens with this address already filled in.",
+      "checkRich": "Google Rich Results Test",
+      "checkSchema": "Schema.org validator",
+      "checkSpeed": "PageSpeed Insights"
     }
   },
   "dev": {
