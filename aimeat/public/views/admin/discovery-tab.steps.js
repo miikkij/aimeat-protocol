@@ -65,6 +65,12 @@ function StepLink({ href, label }) {
 }
 
 function Step({ n, title, done, checkable, children }) {
+  // Three states, not two. A cross says the step FAILED, and for the verification steps that is a
+  // claim this page cannot make: it can see a meta tag on the front page, and it is blind to a DNS
+  // record — which is the BETTER method, the one Google offers first, and the one that covers the
+  // application addresses too. Reporting a domain-verified site as a failure is worse than
+  // reporting nothing. So `checkable` means "we can confirm this one way", and its absence is a
+  // neutral dot rather than a cross.
   const mark = done ? '✓' : (checkable ? '✗' : '·');
   const tone = done ? 'done' : (checkable ? 'todo' : 'manual');
   return html`<li class=${`adm-seo-step adm-seo-step-${tone}`}>
@@ -152,7 +158,7 @@ export function DiscoverySteps({ status, onChanged }) {
 
     <ol class="adm-seo-steps">
       <${Step} n="1" title=${t('dashboard.seo.step1Title')}
-               done=${served.google} checkable=${true}>
+               done=${served.google} checkable=${false}>
         <p>${t('dashboard.seo.step1Body')}</p>
         <p class="adm-muted">${t('dashboard.seo.step1Dns')}</p>
         <${StepLink} href=${GSC} label=${t('dashboard.seo.openGsc')} />
@@ -163,7 +169,7 @@ export function DiscoverySteps({ status, onChanged }) {
         </label>
         <p class=${served.google ? 'adm-seo-ok' : 'adm-muted'}>
           ${served.checked
-            ? (served.google ? t('dashboard.seo.tagServed') : t('dashboard.seo.tagNotServed'))
+            ? (served.google ? t('dashboard.seo.tagServed') : t('dashboard.seo.tagOrDns'))
             : t('dashboard.seo.tagChecking')}
         </p>
       <//>
@@ -177,7 +183,7 @@ export function DiscoverySteps({ status, onChanged }) {
       <//>
 
       <${Step} n="3" title=${t('dashboard.seo.step3Title')}
-               done=${served.bing} checkable=${true}>
+               done=${served.bing} checkable=${false}>
         <p>${t('dashboard.seo.step3Body')}</p>
         <${StepLink} href=${BING} label=${t('dashboard.seo.openBing')} />
         <label class="adm-seo-field">
@@ -187,7 +193,7 @@ export function DiscoverySteps({ status, onChanged }) {
         </label>
         <p class=${served.bing ? 'adm-seo-ok' : 'adm-muted'}>
           ${served.checked
-            ? (served.bing ? t('dashboard.seo.tagServed') : t('dashboard.seo.tagNotServed'))
+            ? (served.bing ? t('dashboard.seo.tagServed') : t('dashboard.seo.tagOrDns'))
             : t('dashboard.seo.tagChecking')}
         </p>
       <//>
