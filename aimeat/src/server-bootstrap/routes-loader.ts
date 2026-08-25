@@ -66,6 +66,7 @@ import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
 import { agentConventionsRouter } from '../routes/agent-conventions.js';
 import { nodeRobotsTxt } from './static-files.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
+import { robotsHeader } from '../middleware/robots-header.js';
 import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
 import { authRouter } from '../routes/auth.js';
 import { accessTokensRouter } from '../routes/access-tokens.js';
@@ -326,6 +327,10 @@ export async function mountRoutes(
   // RFC 8288 discovery Link headers (api-catalog + service-desc) on every GET/HEAD —
   // must precede bootstrapRouter so the root response carries them too.
   app.use(discoveryLinkHeaders());
+  // X-Robots-Tag while discovery is switched off. Mounted here, ahead of every router, because
+  // the point is that NOTHING answers without it — including the app origins served below, whose
+  // own per-app rules are a separate and narrower decision.
+  app.use(robotsHeader(config));
   app.use(setupRouter(config, storage, invalidateHasOwnersCache));
   // Subdomain root serving MUST come before bootstrapRouter — its GET / handles
   // mapped `<sub>.<apex>` requests; apex requests fall through untouched.
@@ -342,6 +347,16 @@ export async function mountRoutes(
       // about somebody else no matter which subdomain asked for it.
       if (req.appOrigin || req.portfolioOrigin) { next(); return; }
       res.set('Cache-Control', 'no-cache');
+      // The master switch is read HERE rather than baked into `robots` at boot, because an
+      // operator can flip seo.indexing from the admin config without a restart, and a robots.txt
+      // still inviting crawlers an hour after they turned discovery off is the wrong answer.
+      // No Sitemap line either: pointing a crawler at a sitemap it may not read is a contradiction.
+      if (config.seoIndexing === 'off') {
+        res.type('text/plain; charset=utf-8').send(
+          '# Search-engine discovery is turned off for this node.\nUser-agent: *\nDisallow: /\n',
+        );
+        return;
+      }
       res.type('text/plain; charset=utf-8').send(robots);
     });
   }

@@ -72,6 +72,12 @@ export interface PublicPage {
    */
   planned?: boolean;
   /**
+   * This page's own social image, absolute or root-relative. Omitted, the page uses the node-wide
+   * one (`seo.og_image`). Worth setting only where the page's picture says something the node's
+   * default does not; a shared card is honest, a wrong one is not.
+   */
+  image?: string;
+  /**
    * The page's own markdown body, served at `<path>.md` and to `Accept: text/markdown`.
    * `{{BASE_URL}}` is substituted at serve time — the same token llms-template.txt uses, so a
    * node that is not aimeat.io renders its own links.

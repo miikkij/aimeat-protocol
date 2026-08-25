@@ -51,6 +51,7 @@
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
 import { parseSiteContacts } from './config-site-contacts.js';
 import { securityDoorDefaults } from './config-security.js';
+import { seoDefaults } from './config-site-presence.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV } from './services/config-schema.js';
 import { sealedKeysFromEnv } from './services/config-sealing.js';
@@ -461,6 +462,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // decision. Denied by default because a personal node holds one person's data. aimeat.io runs
     // 'allow'. Anything other than the literal 'allow' denies.
     aiTraining: process.env.AIMEAT_AI_TRAINING?.trim().toLowerCase() === 'allow' ? 'allow' : 'deny',
+    // Who this node says it is to a search engine or an unfurler, and whether it says it at all
+    // (src/config-site-presence.ts).
+    ...seoDefaults(),
     pushEnabled: process.env.AIMEAT_PUSH_ENABLED !== 'false',
     vapidPublicKey: process.env.AIMEAT_VAPID_PUBLIC_KEY ?? null,
     vapidPrivateKey: process.env.AIMEAT_VAPID_PRIVATE_KEY ?? null,

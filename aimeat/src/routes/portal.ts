@@ -53,9 +53,7 @@
  *     served in English instead of 404. Spanish added.
  */
 import { Router } from 'express';
-import { readFileSync, existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 import type { AimeatConfig } from '../config.js';
 import { missingOperatorConfig, operatorTypeLabel } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -69,7 +67,11 @@ import { getSoftwareVersion } from '../utils/version.js';
 import { injectAgentFooter } from '../utils/agent-footer.js';
 import { findPublicPage } from '../data/public-pages.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
-import { injectPageHead } from '../utils/page-head.js';
+import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
+// Shell serving and public-file lookup live in the sibling; re-exported because bootstrap.ts and
+// static-files.ts have imported them from here since before the split.
+import { BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
+export { serveSpa, resolvePublicFile } from './portal-spa.js';
 import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 
@@ -151,154 +153,6 @@ function renderPrivacyNotConfiguredPage(missing: string[], locale: Locale): stri
     </body></html>`;
 }
 
-/**
- * The site-link block handed to the browser, with empty entries dropped so the injected
- * object only names what this node actually has. Consumers check for presence, so an
- * absent key and an empty string mean the same thing — dropping them keeps the payload
- * small and makes "not configured" unambiguous in devtools.
- *
- * Everything here is already public (they are links printed on public pages). No secret,
- * no internal id, and no operator field beyond the contact details the operator chose to
- * publish may be added to this object — it ships to every anonymous visitor.
- */
-function publicSiteLinks(config: AimeatConfig): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(config.siteLinks)) {
-    if (typeof value === 'string' && value.trim() !== '') out[key] = value.trim();
-  }
-  // The contact list travels as-is when it has anyone in it. Every field of it is already
-  // printed on the public pages, so nothing here is newly disclosed by the injection.
-  if (config.siteLinks.contacts.length > 0) out.contacts = config.siteLinks.contacts;
-  return out;
-}
-
-const __dirname_portal = dirname(fileURLToPath(import.meta.url));
-
-/**
- * Unique token set once when the server process starts.
- * Used as a query-string version stamp on all first-party ES module URLs so
- * that every server restart busts the browser's ES-module cache automatically.
- * (HTTP ETag/no-cache alone is insufficient — browsers keep modules in the
- *  module registry for the entire session regardless of HTTP headers.)
- */
-const BUILD_ID = Date.now().toString(36);
-
-/**
- * Serve spa.html with:
- *  - Cache-Control: no-cache so the browser always revalidates the shell
- *  - window.__B injected so dynamic import() calls can append ?v=BUILD_ID
- *  - importmap entries stamped with BUILD_ID so ALL first-party modules
- *    (static + dynamic imports from any view) get fresh URLs after restart
- *  - CSP nonce injected into all script and style tags
- */
-export function serveSpa(
-  res: import('express').Response,
-  spaPath: string,
-  config: AimeatConfig,
-  /** The route being served, so the head can describe THIS page and not the shell. */
-  routePath?: string,
-): void {
-  const appOriginEnabled = config.appOriginEnabled && !!config.appHost;
-  const v = `?v=${BUILD_ID}`;
-  let html = readFileSync(spaPath, 'utf-8');
-
-  // spa.html is authored with absolute https://aimeat.io URLs in og:url, og:image and the two
-  // site-level JSON-LD blocks, because a crawler needs them absolute and the file has no way to
-  // know its own host. Unrewritten, every OTHER node running this software told every crawler,
-  // unfurler and AI reader that it was aimeat.io: wrong canonical entity, wrong image, wrong
-  // Organization url. Only aimeat.io's own URLs match, so the github.com and operator links in
-  // `sameAs` are left alone. On aimeat.io itself this is a no-op.
-  const canonicalBase = config.baseUrl.replace(/\/$/, '');
-  if (canonicalBase !== 'https://aimeat.io') {
-    html = html.replaceAll('https://aimeat.io', canonicalBase);
-  }
-
-  // Inject CSP nonce into all script and style tags
-  const nonce = res.locals.cspNonce as string || '';
-  if (nonce) {
-    html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
-    html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
-  }
-
-  // Inject window.__B for dynamic import() cache-busting in spa.html scripts, PLUS a tiny
-  // auto-reload watchdog: it polls /v1/build (on tab-visible and every 60s) and, the
-  // moment the server reports a different BUILD_ID (i.e. it restarted with new code), reloads the
-  // page so fresh ES modules are fetched. This kills the recurring "restarted the server but the
-  // open tab still runs old code until a manual hard refresh" problem — no F5 ever needed.
-  const nonceAttr = nonce ? ` nonce="${nonce}"` : '';
-  const bootScript =
-    `window.__B="${v}";` +
-    // H-2: when the app origin is provisioned, the frontend opens published apps TOP-LEVEL
-    // (the apex inline URL 301s to apps.<domain>) — a clean full page on an isolated origin,
-    // no opaque-sandbox overlay. Off → the Phase-0 sandboxed iframe is used instead.
-    `window.__APP_ORIGIN_ENABLED=${appOriginEnabled ? 'true' : 'false'};` +
-    // This node's own public-page links (its academy, marketplace, proof apps, contact).
-    // Injected rather than fetched so the first paint already knows which nav items and
-    // sections exist. Empty on a fresh clone, and every consumer treats empty as "absent".
-    `window.__SITE=${JSON.stringify(publicSiteLinks(config))};` +
-    `(function(){var c="${BUILD_ID}";` +
-    `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
-    `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
-    `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +
-    `setInterval(chk,60000);})();`;
-  html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
-
-  // Per-route head metadata: one spa.html shell answers ten routes, so the canonical link, the
-  // title and the description are stamped per request. Shared with the static info pages.
-  const page = routePath ? findPublicPage(routePath) : undefined;
-  if (page) html = injectPageHead(html, page, config, nonceAttr);
-
-  // Make the running AIMEAT version visible from the page itself — a view-source comment plus a
-  // queryable meta tag. Lets anyone confirm which version a node runs (esp. across federation peers)
-  // without an API call: View Source, or `document.querySelector('meta[name=aimeat-version]').content`.
-  const version = getSoftwareVersion();
-  html = html.replace(
-    '</head>',
-    `<meta name="aimeat-version" content="${version}">\n` +
-    `<meta name="aimeat-build" content="${BUILD_ID}">\n` +
-    `<!-- AIMEAT v${version} · build ${BUILD_ID} -->\n</head>`,
-  );
-
-  // Stamp ALL importmap values with the build version — generic regex replaces
-  // any value starting with "/" (local path), so new importmap entries are
-  // automatically cache-busted without touching this code.
-  html = html.replace(
-    /("imports"\s*:\s*\{)([\s\S]*?)(\})/,
-    (_match, prefix, entries, suffix) => {
-      const stamped = entries.replace(
-        /:\s*"(\/[^"?]+\.(js|mjs))"/g,
-        `: "$1${v}"`,
-      );
-      return prefix + stamped + suffix;
-    },
-  );
-
-  // Stamp all view CSS hrefs (preloaded in spa.html head) with the build version
-  html = html.replace(
-    /(<link rel="stylesheet" href=")(\/css\/views\/[^"?]+\.css)(")/g,
-    `$1$2${v}$3`
-  );
-  // Also stamp theme.css
-  html = html.replace(
-    /(<link rel="stylesheet" href=")(\/css\/theme\.css)(")/,
-    `$1$2${v}$3`
-  );
-
-  res.setHeader('Cache-Control', 'no-cache');
-  res.type('text/html').send(html);
-}
-
-/** Resolve a file from public/ directory (works from both src/ and dist/). */
-export function resolvePublicFile(filename: string): string | null {
-  const candidates = [
-    join(__dirname_portal, '..', '..', 'public', filename),      // dev: src/routes/../../public
-    join(__dirname_portal, '..', '..', '..', 'public', filename), // dist: dist/src/routes/../../../public
-  ];
-  for (const p of candidates) {
-    if (existsSync(p)) return p;
-  }
-  return null;
-}
 
 /* ──────────────────────────────────────────────────────────
    Platform Registry — known AI platforms and their capabilities
@@ -751,8 +605,13 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     // Same head treatment the SPA routes get. These pages ship a canonical and a lang of their own
     // but no og:*, no alternate link and no structured data, which left them describing themselves
     // to a person and to nothing else.
+    //
+    // No nonce attribute is passed on this path, unlike serveSpa: here the nonce regex below runs
+    // AFTER the injection and stamps every script tag, so passing one too would write the
+    // attribute twice.
+    html = injectSiteHead(html, config);
     const infoPage = routePath ? findPublicPage(routePath) : undefined;
-    if (infoPage) html = injectPageHead(html, infoPage, config, nonce ? ` nonce="${nonce}"` : '');
+    if (infoPage) html = injectPageHead(html, infoPage, config, '');
 
     if (nonce) {
       html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
