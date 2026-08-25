@@ -18,6 +18,10 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   v1.6.0 — 2026-08-26 — site:layout-write, in its own domain and outside every wildcard: which
+ *     blocks the node's front page and every member's home are built from. Same operator-only gate
+ *     as the two rows above it, and here for the same reason — the capability is meant to be used
+ *     from a chat, and without a row an operator could not grant it from this page at all.
  *   v1.5.0 — 2026-08-15 — operator:organism-repair, in its own domain and outside every wildcard.
  *     The only word here whose effect depends on who the owner is: the node operator can put an
  *     owner back on an organism whose creator account is unreachable, and on any other account the
@@ -88,6 +92,12 @@ export const NOT_IN_WILDCARD = [
   // them at all.
   'compliance:read',
   'compliance:write',
+  // ── Added 2026-08-26 ─────────────────────────────────────────────────────────────────────────
+  // Arranging the node's front page and the page every member lands on. The widest-reach write here
+  // that is not money or an identity: it changes what everyone SEES on arrival. Asking your own AI
+  // to take the shop off the members' home is the use it exists for, so an agent is not shut out —
+  // it just costs its own tick. Only an operator's own agent can be given it at all.
+  'site:layout-write',
 ];
 
 /**
@@ -220,6 +230,15 @@ export const SCOPE_DOMAINS = [
   //   one because they fail differently — reading is a disclosure of every account's AI activity,
   //   writing changes what the report says about the node.
   { key: 'compliance', permissions: ['read', 'write'] },
+
+  // ── Added 2026-08-26 ─────────────────────────────────────────────────────────────────────────
+  // site:layout-write — arrange the node's front page and the page every member lands on: which
+  //   blocks are shown, in what order, and the operator's own passages between them. Same gate as
+  //   the two above (requireOperatorPrincipal, src/auth/middleware.ts), so the same caveat applies:
+  //   it reads the OWNER's roles first, and on a normal account this box grants nothing. It is here
+  //   because this is meant to be driven from a chat — "take the shop off our home page" — and a
+  //   capability an operator cannot grant from this page is a capability with no door.
+  { key: 'site',       permissions: ['layout-write'] },
 ];
 
 export const SCOPE_TEMPLATES = {

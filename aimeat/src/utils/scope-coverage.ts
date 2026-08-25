@@ -30,6 +30,10 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   v1.4.0 — 2026-08-26 — SURFACE_LAYOUT_WRITE_SCOPE, the word that arranges the node's front page
+ *     and every member's home. Outside the wildcard from the day it exists: it is the widest-reach
+ *     write here that is not money or an identity, because what it changes is what everyone sees on
+ *     arrival, and "Full access" must not carry the node's front door.
  *   v1.3.0 — 2026-08-23 — COMPLIANCE_READ_SCOPE / COMPLIANCE_WRITE_SCOPE (BR-02). The read word is
  *     outside the wildcard as firmly as the write one: the report assembles every account's AI
  *     activity into one document, and that is a disclosure nobody but the operator consented to.
@@ -108,6 +112,30 @@ export const COMPLIANCE_READ_SCOPE = 'compliance:read';
 export const COMPLIANCE_WRITE_SCOPE = 'compliance:write';
 
 /**
+ * Arranging the node's front page and the page every member of it lands on.
+ *
+ * This is the widest-reach write on the node that is not about money or an identity: what it changes
+ * is what every visitor and every member SEES when they arrive. An operator asking their own AI to
+ * take the shop off the members' home is exactly the use this exists for — this platform's answer is
+ * a chat, not a form — so shutting agents out would be the wrong fix. The right one is that it costs
+ * its own tick. "Full access" is one click, and nobody clicking it is deciding that an agent may
+ * rewrite the node's front door.
+ *
+ * One word rather than read and write, because reading a layout gives nothing away: it is a list of
+ * block names, and on the portal it describes a page anyone can already look at.
+ *
+ * Enforced by requireOperatorPrincipal(storage, scope) in auth/middleware.ts on the HTTP door and by
+ * the same resolution on the MCP tools, so the two doors answer alike. requireRole('operator'), which
+ * every older site route uses, would have been the wrong gate here: it reads the TOKEN's roles, so it
+ * admits the operator's browser and refuses the operator's agent — correct for a browser-only tab,
+ * and the opposite of what a capability meant to be driven from a chat needs.
+ *
+ * Nobody is grandfathered onto it (services/scope-vocabulary-migration.ts has no entry): it names a
+ * capability that did not exist before, so no agent can lose one it had.
+ */
+export const SURFACE_LAYOUT_WRITE_SCOPE = 'site:layout-write';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -140,7 +168,7 @@ const OWN_TICK_SCOPES = [
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [
     WRITE_RESERVED_SCOPE, ACCOUNT_SECURITY_SCOPE, OPERATOR_ORGANISM_REPAIR_SCOPE,
-    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, ...OWN_TICK_SCOPES,
+    COMPLIANCE_READ_SCOPE, COMPLIANCE_WRITE_SCOPE, SURFACE_LAYOUT_WRITE_SCOPE, ...OWN_TICK_SCOPES,
 ];
 
 /** True when `scope` is one of the scopes only an exact grant can confer. */

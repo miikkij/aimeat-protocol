@@ -6539,6 +6539,9 @@
           "signals": {
             "read": "See who opened, clicked or visited what you sent and published.",
             "write": "Set up counters for the campaigns, links and pages you want measured."
+          },
+          "site": {
+            "layout-write": "Arrange this installation's front page and the page its members land on: which parts are shown, in what order, and the text between them. Only works for whoever runs this installation; on any other account this permission does nothing. It changes what everyone here sees when they arrive, so \"Full access\" does not include it."
           }
         },
         "domainAi": "AI",
@@ -6560,7 +6563,8 @@
         "permInvoke": "Run",
         "domainPackages": "Packages",
         "domainCompliance": "Compliance",
-        "domainSignals": "Reach"
+        "domainSignals": "Reach",
+        "domainSite": "The pages people arrive on"
       },
       "deviceAuth": {
         "title": "Device Authorization",

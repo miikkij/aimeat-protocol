@@ -42,11 +42,24 @@ import { freeformKey, layoutKey } from './keys.js';
 
 export { LAYOUT_KEY_PREFIX, FREEFORM_KEY_PREFIX, layoutKey, freeformKey, isReservedSurfaceKey } from './keys.js';
 
+/** A checked layout and its passages, accepted but not yet stored. */
+export interface PreparedLayout {
+    surface: SurfaceId;
+    layout: SurfaceLayout;
+    /** Block key → the words that belong behind it. */
+    bodies: Record<string, string>;
+}
+
 /** A layout as it arrives from an operator or their AI, with free-form text still inline. */
 export interface LayoutSubmission {
     v?: number;
     surface?: string;
-    blocks?: Array<Record<string, unknown>>;
+    /**
+     * Untyped on purpose: this is what arrived over the wire, and it may carry a block's words
+     * inline on `body`, which the stored shape has no field for. validateLayout is what decides
+     * whether any of it is a block.
+     */
+    blocks?: unknown[];
     freeform?: Record<string, { ref: string; format: 'markdown' }>;
     meta?: { note?: string };
 }
@@ -78,20 +91,20 @@ export class SurfaceLayoutService {
             // A storage failure must not blank the page. It is loud in the log and invisible to the
             // visitor, who gets the built-in layout.
             return {
-                layout: defaultLayout(surface),
+                layout: defaultLayout(surface, this.config),
                 degraded: true,
                 problems: [`The stored layout could not be read (${(err as Error).message}); the built-in one is being shown.`],
                 source: 'default',
             };
         }
         if (stored === undefined || stored === null) {
-            return { layout: defaultLayout(surface), degraded: false, problems: [], source: 'default' };
+            return { layout: defaultLayout(surface, this.config), degraded: false, problems: [], source: 'default' };
         }
 
         const parsed = parseLayout(stored, surface, this.config);
         if (parsed.layout.blocks.length === 0) {
             return {
-                layout: defaultLayout(surface),
+                layout: defaultLayout(surface, this.config),
                 degraded: true,
                 problems: parsed.problems.length
                     ? parsed.problems
@@ -126,30 +139,48 @@ export class SurfaceLayoutService {
         changedBy: string,
         source: SurfaceLayout['meta']['source'],
     ): Promise<ResolvedLayout> {
+        return this.commit(this.prepare(surface, submission, changedBy, source), changedBy);
+    }
+
+    /**
+     * Everything that can be refused, done and nothing stored. Split out of write() so a paste
+     * covering several surfaces can be checked in full before the first of them is written: half an
+     * import applied leaves a page in a state nobody designed, and the operator with no way to tell
+     * which half.
+     */
+    prepare(
+        surface: SurfaceId,
+        submission: LayoutSubmission,
+        changedBy: string,
+        source: SurfaceLayout['meta']['source'],
+    ): PreparedLayout {
         const bodies = this.extractInlineBodies(submission);
         // `v` is passed through rather than forced: a submission written against a schema this node
         // does not know must be REFUSED, and stamping 1 over it would accept a shape nobody checked.
         // The rule itself lives in validateLayout, so every door gives the same answer.
-        const candidate = validateLayout(
+        const layout = validateLayout(
             { ...submission, v: submission.v ?? 1, surface, meta: { ...submission.meta, updatedBy: changedBy, source } },
             surface,
             this.config,
         );
-
-        // Refuse every body before storing any of them: half-written prose behind a validated layout
-        // is worse than a refusal, because the page then renders with one passage missing.
+        // Every body is refused before any of them is stored, for the same reason.
         for (const [blockKey, body] of Object.entries(bodies)) {
             refuseMarkup(body, `the free-form block "${blockKey}"`);
         }
+        return { surface, layout, bodies };
+    }
+
+    /** Write what prepare() already accepted. Nothing here can refuse. */
+    async commit(prepared: PreparedLayout, changedBy: string): Promise<ResolvedLayout> {
+        const { surface, layout, bodies } = prepared;
         for (const [blockKey, body] of Object.entries(bodies)) {
-            const ref = candidate.freeform?.[blockKey]?.ref;
+            const ref = layout.freeform?.[blockKey]?.ref;
             if (!ref) continue;
             await this.putMemory(freeformKey(ref), body, 'owner', ['site', 'freeform']);
         }
-
-        await this.putMemory(layoutKey(surface), JSON.stringify(candidate), 'public', ['site', 'layout']);
-        await this.log('layout_set', `Set the ${surface} layout (${candidate.blocks.length} blocks)`, changedBy);
-        return { layout: candidate, degraded: false, problems: [], source: 'stored' };
+        await this.putMemory(layoutKey(surface), JSON.stringify(layout), 'public', ['site', 'layout']);
+        await this.log('layout_set', `Set the ${surface} layout (${layout.blocks.length} blocks)`, changedBy);
+        return { layout, degraded: false, problems: [], source: 'stored' };
     }
 
     /** Store one free-form passage on its own, without rewriting the layout around it. */
@@ -215,9 +246,11 @@ export class SurfaceLayoutService {
     private extractInlineBodies(submission: LayoutSubmission): Record<string, string> {
         const bodies: Record<string, string> = {};
         const freeform: Record<string, { ref: string; format: 'markdown' }> = { ...(submission.freeform ?? {}) };
-        const strip = (list: Array<Record<string, unknown>> | undefined): void => {
-            for (const inst of list ?? []) {
-                if (Array.isArray(inst.children)) strip(inst.children as Array<Record<string, unknown>>);
+        const strip = (list: unknown[] | undefined): void => {
+            for (const item of list ?? []) {
+                if (!item || typeof item !== 'object') continue;
+                const inst = item as Record<string, unknown>;
+                if (Array.isArray(inst.children)) strip(inst.children);
                 if (inst.id !== 'common.freeform' || typeof inst.body !== 'string') continue;
                 const key = typeof inst.key === 'string' && inst.key ? inst.key : '';
                 if (!key) continue;
