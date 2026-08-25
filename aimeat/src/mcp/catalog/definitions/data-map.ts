@@ -2,18 +2,19 @@
  * @file src/mcp/catalog/definitions/data-map.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The two data-map tools: read where a program puts what, and state it.
+ * @description The data-map tools: read an app's map before you touch it, and write one.
+ *
+ *   THE FIRST TOOL IS THE POINT OF THE WHOLE FEATURE. An AI opening an app it does not know reads
+ *   the map and learns what the app is for, how its data is arranged and why — instead of
+ *   reconstructing months-old storage decisions from source and guessing wrong.
  *
  *   NO NEW PERMISSION WORD. These read and write a memory record, and memory words already govern
  *   that. A `datamap:*` word would be a permission that has to be enforced on every door or does not
  *   exist (invariant 15), invented for a document the existing words already cover.
- *
- *   The third tool here is the one an agent needs most and the one nothing could answer before: how
- *   many hands have been on a key. An agent about to overwrite something should be able to find out
- *   whether anything else has been writing there.
  * @structure dataMapTools — the three definitions
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v2.0.0 — 2026-08-25 — spec/2 wording; the coverage mode is gone with the Data Wallet list.
  *   v1.0.0 — 2026-08-25 — TARGET-073.
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
@@ -21,21 +22,21 @@ import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 export const dataMapTools: AimeatToolDefinition[] = [
     {
         name: 'aimeat_datamap_get',
-        description: 'Where a published app puts what: which groups of keys it holds, whose they are, who can read them, how long they stay, what deleting one does, and why it is there rather than somewhere else. Read this BEFORE using an app that stores anything, because it is the only place that answers where your data lands. Each row says on what basis it is known — a fixed shape the store enforces, something the app declared, a part of AIMEAT, a name the owner gave it, or nothing at all — and a row saying nothing is a finding rather than a blank. A map the node worked out for itself says so: treat it as a first draft, not the owner\'s statement. Omit `app` for the account\'s own coverage instead: what is stored here that nobody has described, folded into groups.',
-        caller: 'agent',
-        visibility: agentEverywhere,
-        input: {
-            app: { type: 'string', description: 'The app, as "owner/filename.html". Leave it out to get this account\'s own coverage instead.' },
-        },
-    },
-    {
-        name: 'aimeat_datamap_set',
-        description: 'State where an app puts what, replacing whatever the map said before — REPLACES, so read it first and send the whole thing back. This is how a draft the node worked out becomes something a person actually said. The field that matters most is the one-sentence `why` on each row: it is read at the moment somebody is about to move that data, which is exactly when "campaigns belong to the customer, not to whoever sent them" stops a mistake. Leave a `why` you do not know empty rather than filling it with something plausible — an empty one shows as unexplained, and a wrong one is believed. Nothing here can refuse a publish; the map is a statement about storage, not a gate.',
+        description: 'READ THIS BEFORE YOU CHANGE AN APP YOU DID NOT WRITE. An app\'s data map says what the app is for, what people use it for, what shape it is (one person, shared, a group, an organism workspace, static), how its data is actually arranged, what machinery it leans on, and what leaves the house. Then one row per group of keys: what it holds, what kind of thing it is, what it is used for, where it lives, who owns it, who reads it, who writes it, what shape the record is, how long it is kept, whether losing it matters, and ONE SENTENCE saying why it is there rather than somewhere else. That sentence is the reason this exists: without it a new feature\'s data lands wherever was easiest to reach, which is how a shared CRM ended up keeping the team\'s campaigns in one person\'s private memory where nobody else could see them. An app with no map says so plainly — that is a finding, not a blank, and writing one is the fix.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
-            data_map: { type: 'object', required: true, description: 'The whole map document, carrying spec "aimeat.datamap/1". Read the current one first — this replaces it.' },
+        },
+    },
+    {
+        name: 'aimeat_datamap_set',
+        description: 'Write an app\'s data map, replacing whatever it said before — REPLACES, so read it first and send the whole thing back. Write one whenever you build an app or change where it stores something: you are the only one who knows where you put things and why, and the next AI to open it has no other way to find out. Two fields carry the value and neither can be worked out from the code: the paragraph saying what the app is and what it is used for, and the one-sentence `why` on each row. Leave a `why` you do not know EMPTY rather than filling it with something plausible — an empty one shows as unfinished, and a wrong one is believed and acted on. Nothing here can refuse a publish; the map is a statement about storage, not a gate.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            app: { type: 'string', required: true, description: 'The app, as "owner/filename.html".' },
+            data_map: { type: 'object', required: true, description: 'The whole map, carrying spec "aimeat.datamap/2": what, usedFor, form, arrangement, machinery, leaves, held[], elsewhere[].' },
         },
     },
     {

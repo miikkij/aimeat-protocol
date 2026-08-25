@@ -2345,59 +2345,43 @@
 /* Measured delivery time offered as the basis for a commitment (never as the commitment itself). */
 .od-measured { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
-    /* ── The data map, inside App Detail ─────────────────────────────────────────────────────
-       The one screen where a map is read in full. Fixed grid with minmax and never an `auto`
-       column: a per-row auto column re-measures per row and drifts out of line by the width of
-       the longest family name. The basis chip is the only column with a background, which makes
-       it the anchor an alignment check can measure. */
-    .dtl-dm-banner {
+    /* ── The data map, inside App Detail ───────────────────────────────────
+       The one screen where a map is read in full. The paragraph comes first at body size, because
+       what the app is FOR is what makes the rows judgeable; the rows are a fixed grid with minmax
+       and never an `auto` column, which re-measures per row and drifts out of line. */
+    .dtl-dm-contradiction {
       padding: 10px 12px;
-      margin-bottom: 12px;
-      border: 1px dashed var(--border-hover);
-      border-radius: var(--radius-sm, 12px);
+      margin: 0 0 12px;
+      border-left: 3px solid var(--danger, #d94f4f);
       background: var(--bg-subtle);
       color: var(--text);
-      font-size: .85rem;
+      font-size: .95rem;
     }
+    .dtl-dm-what { margin: 0 0 6px; font-size: .95rem; color: var(--text); }
+    .dtl-dm-usedfor, .dtl-dm-form { margin: 0 0 4px; font-size: .85rem; color: var(--text-dim); }
+    .dtl-dm-places { margin: 6px 0 0; padding-left: 18px; font-size: .82rem; color: var(--text-dim); }
 
-    .dtl-dm-rows { display: flex; flex-direction: column; gap: 8px; }
-
-    .dtl-dm-row {
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm, 12px);
-      padding: 10px 12px;
-      background: var(--bg-dim);
-    }
-
-    .dtl-dm-row-off { border-color: var(--border-hover); }
-
+    .dtl-dm-row { padding: 10px 0; border-top: 1px solid var(--border); }
+    .dtl-dm-row-unexplained { border-left: 2px solid var(--warn, #c98a2e); padding-left: 10px; }
     .dtl-dm-head {
       display: grid;
-      grid-template-columns: minmax(8rem, 2fr) minmax(4.5rem, .7fr) minmax(12rem, 2.2fr) minmax(4.5rem, .6fr);
-      gap: 12px;
-      align-items: start;
+      grid-template-columns: minmax(0, 14rem) minmax(0, 1fr) minmax(0, 14rem);
+      gap: 6px 12px;
+      align-items: baseline;
     }
-
-    .dtl-dm-head-simple { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
-
-    .dtl-dm-family { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
-    .dtl-dm-rights { font-size: .78rem; color: var(--text-dim); }
-
-    .dtl-dm-basis { display: flex; flex-direction: column; gap: 2px; align-items: flex-end; text-align: right; }
-    .dtl-dm-chip { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--bg-subtle); font-size: .72rem; color: var(--text-dim); white-space: nowrap; }
-    .dtl-dm-note { font-size: .72rem; color: var(--text-muted); }
-
-    .dtl-dm-personal { font-size: .78rem; color: var(--text-dim); }
-    .dtl-dm-personal-unstated { color: var(--text-muted); font-style: italic; }
-
-    .dtl-dm-why { margin-top: 6px; font-size: .8rem; color: var(--text-dim); }
+    .dtl-dm-what { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .8rem; color: var(--text); overflow-wrap: anywhere; }
+    .dtl-dm-holds { font-size: .85rem; color: var(--text); }
+    .dtl-dm-where { font-size: .85rem; color: var(--text-dim); }
+    .dtl-dm-where-exact { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .72rem; color: var(--text-muted); overflow-wrap: anywhere; }
+    .dtl-dm-facts { margin-top: 4px; font-size: .74rem; color: var(--text-muted); }
+    .dtl-dm-personal { color: var(--warn, #c98a2e); }
+    .dtl-dm-why { margin-top: 4px; font-size: .84rem; color: var(--text-dim); }
     .dtl-dm-why-missing { color: var(--text-muted); font-style: italic; }
-    .dtl-dm-detail { margin-top: 4px; font-size: .76rem; color: var(--text-muted); }
-    .dtl-dm-sub { margin: 14px 0 6px; font-size: .8rem; color: var(--text-dim); }
+    .dtl-dm-leaves, .dtl-dm-findings { margin: 0; padding-left: 18px; font-size: .84rem; color: var(--text-dim); }
+    .dtl-dm-norecall { color: var(--danger, #d94f4f); }
 
     @media (max-width: 640px) {
-      .dtl-dm-head { grid-template-columns: 1fr; gap: 4px; }
-      .dtl-dm-basis { align-items: flex-start; text-align: left; }
+      .dtl-dm-head { grid-template-columns: minmax(0, 1fr); }
     }
 </style>
 </head>
@@ -2890,6 +2874,130 @@
   // src/static/app-catalog/js/i18n-data.js
   var I18N = {
     en: {
+      // ── data map: copied from locales/en.json, which is the source of truth
+      "dataMap.title": "Where this app puts what",
+      "dataMap.usedForLabel": "Used for:",
+      "dataMap.formLabel": "Shape:",
+      "dataMap.arrangementLabel": "How the data is arranged",
+      "dataMap.rowsLabel": "What it holds",
+      "dataMap.machineryLabel": "What it leans on",
+      "dataMap.leavesLabel": "What leaves the house",
+      "dataMap.elsewhereLabel": "Unresolved, or not ours",
+      "dataMap.findingsLabel": "Still missing from this map",
+      "dataMap.line.missing": "No data map yet. Whoever works on this next has to read the source.",
+      "dataMap.line.open": "Open",
+      "dataMap.state.missing": "No map",
+      "dataMap.state.unfinished": "Unfinished",
+      "dataMap.state.stated": "Written",
+      "dataMap.state.contradicted": "Does not add up",
+      "dataMap.panel.missing": "Nobody has written a data map for this app. Whoever builds or edits it next has to read the source to find out where its data goes, which is how data ends up wherever was easiest to reach.",
+      "dataMap.panel.noWhat": "Nobody has said what this app is.",
+      "dataMap.panel.noUsedFor": "Nobody has said what it is used for.",
+      "dataMap.panel.noArrangement": "Nobody has described how the data is arranged.",
+      "dataMap.row.noWhy": "Nobody has said why this is here rather than somewhere else.",
+      "dataMap.personal.yes": "About a person",
+      "dataMap.leaves.noRecall": "cannot be taken back",
+      "dataMap.elsewhere.whereLabel": "The real one is in",
+      "dataMap.elsewhere.controlledByLabel": "Decided by",
+      "dataMap.elsewhere.work-in-progress": "Unfinished work",
+      "dataMap.elsewhere.copy-of-anothers-record": "A copy of somebody else's record",
+      "dataMap.elsewhere.already-left": "Already left the house",
+      "dataMap.elsewhere.account-in-a-foreign-system": "An account in a system we do not run",
+      "dataMap.contradiction.sharedButPrivate": "This says several people share it, and every row lands in one person's own memory where only they can read it. That is the mistake this map exists to catch.",
+      "dataMap.contradiction.personalButShared": "This says it is a one-person app, and it writes where more than one person reads.",
+      "dataMap.contradiction.staticButStores": "This says it is a static page, and it lists things it stores.",
+      "dataMap.form.one-person": "One person's tool",
+      "dataMap.form.private": "Private and sensitive",
+      "dataMap.form.shared-with-named": "Shared with named people",
+      "dataMap.form.group": "A group's shared tool",
+      "dataMap.form.organism-workspace": "Lives in a shared workspace",
+      "dataMap.form.public-service": "A public service",
+      "dataMap.form.static": "A static page",
+      "dataMap.form.mixed": "A mix",
+      "dataMap.form.unstated": "Nobody has said",
+      "dataMap.where.nowhere": "nowhere",
+      "dataMap.where.browser-only": "the browser only",
+      "dataMap.where.owner-memory-private": "your own memory",
+      "dataMap.where.owner-memory-public": "your own memory, readable by anyone",
+      "dataMap.where.someone-elses-memory": "someone else's memory",
+      "dataMap.where.organism-workspace": "a shared workspace",
+      "dataMap.where.organism-shared": "a group's shared area",
+      "dataMap.where.organism-meta": "a group's own registry",
+      "dataMap.where.extension-namespace": "an extension's own space",
+      "dataMap.where.cortex": "a cortex pack",
+      "dataMap.where.file-storage": "file storage",
+      "dataMap.where.app-published-record": "the app's own published record",
+      "dataMap.where.another-node": "another AIMEAT server",
+      "dataMap.where.external-service": "an outside service",
+      "dataMap.kind.settings": "settings",
+      "dataMap.kind.user-written": "written by the user",
+      "dataMap.kind.ai-generated": "written by an AI",
+      "dataMap.kind.register": "a list of things",
+      "dataMap.kind.event-log": "a log of what happened",
+      "dataMap.kind.index": "an index pointing at other records",
+      "dataMap.kind.computed-or-cache": "worked out, kept for speed",
+      "dataMap.kind.fetched-copy": "a copy fetched from outside",
+      "dataMap.kind.foreign-identifier": "an identifier in another system",
+      "dataMap.kind.snapshot": "a snapshot or a version",
+      "dataMap.kind.metrics": "numbers and measurements",
+      "dataMap.kind.preferences": "what the person prefers",
+      "dataMap.kind.draft": "unfinished work",
+      "dataMap.kind.outgoing-message": "something being sent",
+      "dataMap.kind.file": "a file",
+      "dataMap.kind.link-between-things": "what this is attached to",
+      "dataMap.kind.permissions": "who may do what",
+      "dataMap.kind.secret": "a secret or a key",
+      "dataMap.use.app-cannot-run-without": "the app cannot run without it",
+      "dataMap.use.user-returns-to-read": "the person comes back and reads it",
+      "dataMap.use.shown-as-a-list": "shown as a list",
+      "dataMap.use.search-and-filter": "searching and filtering",
+      "dataMap.use.calculation-and-reporting": "working things out and reporting",
+      "dataMap.use.app-resumes-where-it-left": "the app picks up where it left off",
+      "dataMap.use.to-share-with-others": "to share with other people",
+      "dataMap.use.to-send-out": "to send out",
+      "dataMap.use.evidence-of-what-happened": "evidence of what happened",
+      "dataMap.use.speed-only": "speed only, it may vanish",
+      "dataMap.use.context-for-an-ai": "context for an AI",
+      "dataMap.use.backwards-compatibility": "working with an older version",
+      "dataMap.owner.person": "the person",
+      "dataMap.owner.organism": "the group",
+      "dataMap.owner.extension": "the extension",
+      "dataMap.owner.ecosystem-app": "a connected app",
+      "dataMap.owner.someone-else": "somebody else",
+      "dataMap.owner.external-controller": "an outside organisation",
+      "dataMap.owner.nobody": "nobody, it is temporary",
+      "dataMap.readers.owner-only": "only you",
+      "dataMap.readers.owner-and-their-agents": "you and your agents",
+      "dataMap.readers.named-people": "named people",
+      "dataMap.readers.organism-members": "everyone in the group",
+      "dataMap.readers.anyone": "anyone",
+      "dataMap.readers.the-app-itself": "only the app itself",
+      "dataMap.readers.a-recipient-elsewhere": "whoever receives it",
+      "dataMap.writer.person-in-the-ui": "the person, on screen",
+      "dataMap.writer.the-app-for-the-person": "the app, for the person",
+      "dataMap.writer.an-agent": "an agent",
+      "dataMap.writer.a-schedule-unattended": "a scheduled job, with nobody there",
+      "dataMap.writer.an-extension-server-side": "an extension, on the server",
+      "dataMap.writer.install-seed": "the install, as starting data",
+      "dataMap.writer.a-foreign-system": "an outside system",
+      "dataMap.shape.one-record": "one record",
+      "dataMap.shape.one-per-thing": "one record per thing",
+      "dataMap.shape.collection-under-one-key": "a collection in one place",
+      "dataMap.shape.rolled-up-per-period": "gathered per period",
+      "dataMap.shape.index-plus-bodies": "a list plus the texts separately",
+      "dataMap.shape.files": "files",
+      "dataMap.shape.no-record": "nothing stored",
+      "dataMap.kept.until-deleted": "until deleted",
+      "dataMap.kept.ttl": "for a set time",
+      "dataMap.kept.rolling-window": "a rolling window",
+      "dataMap.kept.version-capped": "earlier versions kept",
+      "dataMap.kept.append-only": "never changed, only added to",
+      "dataMap.kept.session-only": "for this visit only",
+      "dataMap.loss.only-copy": "the only copy",
+      "dataMap.loss.recoverable-from-source": "can be fetched again",
+      "dataMap.loss.recomputable": "can be worked out again",
+      "dataMap.loss.user-can-rewrite": "the person can write it again",
+      "dataMap.loss.may-vanish": "may vanish, the app copes",
       "header.title": "My Apps",
       "cta.backHome": "Back to home",
       "cta.publishOwn": "Publish your own app",
@@ -3534,6 +3642,130 @@
       "loading.appsHint": "Fetching the catalogue from this node."
     },
     fi: {
+      // ── data map: copied from locales/fi.json, which is the source of truth
+      "dataMap.title": "Mihin tämä appi panee mitä",
+      "dataMap.usedForLabel": "Mihin käyttöön:",
+      "dataMap.formLabel": "Muoto:",
+      "dataMap.arrangementLabel": "Miten data on järjestetty",
+      "dataMap.rowsLabel": "Mitä se pitää hallussaan",
+      "dataMap.machineryLabel": "Mihin se nojaa",
+      "dataMap.leavesLabel": "Mitä lähtee talosta",
+      "dataMap.elsewhereLabel": "Ratkaisematta, tai ei meidän",
+      "dataMap.findingsLabel": "Tästä kartasta puuttuu vielä",
+      "dataMap.line.missing": "Ei datakarttaa. Seuraavan tekijän on luettava lähdekoodi.",
+      "dataMap.line.open": "Avaa",
+      "dataMap.state.missing": "Ei karttaa",
+      "dataMap.state.unfinished": "Kesken",
+      "dataMap.state.stated": "Kirjoitettu",
+      "dataMap.state.contradicted": "Ei täsmää",
+      "dataMap.panel.missing": "Tälle appille ei ole kirjoitettu datakarttaa. Seuraavan rakentajan on luettava lähdekoodi selvittääkseen minne sen data menee, ja juuri niin data päätyy sinne mihin ylsi helpoiten.",
+      "dataMap.panel.noWhat": "Kukaan ei ole kertonut mikä tämä appi on.",
+      "dataMap.panel.noUsedFor": "Kukaan ei ole kertonut mihin sitä käytetään.",
+      "dataMap.panel.noArrangement": "Kukaan ei ole kuvannut miten data on järjestetty.",
+      "dataMap.row.noWhy": "Kukaan ei ole kertonut miksi tämä on täällä eikä jossain muualla.",
+      "dataMap.personal.yes": "Koskee ihmistä",
+      "dataMap.leaves.noRecall": "ei saa takaisin",
+      "dataMap.elsewhere.whereLabel": "Oikea on",
+      "dataMap.elsewhere.controlledByLabel": "Siitä päättää",
+      "dataMap.elsewhere.work-in-progress": "Kesken jäänyt työ",
+      "dataMap.elsewhere.copy-of-anothers-record": "Kopio jonkun toisen tietueesta",
+      "dataMap.elsewhere.already-left": "Jo lähtenyt talosta",
+      "dataMap.elsewhere.account-in-a-foreign-system": "Tunnus järjestelmään jota emme pyöritä",
+      "dataMap.contradiction.sharedButPrivate": "Tämä sanoo että sitä käyttää useampi, ja jokainen rivi laskeutuu yhden ihmisen omaan muistiin jossa vain hän näkee sen. Juuri tämän virheen takia kartta on olemassa.",
+      "dataMap.contradiction.personalButShared": "Tämä sanoo olevansa yhden hengen appi, ja se kirjoittaa sinne minne useampi näkee.",
+      "dataMap.contradiction.staticButStores": "Tämä sanoo olevansa staattinen sivu, ja se luettelee mitä tallentaa.",
+      "dataMap.form.one-person": "Yhden ihmisen työkalu",
+      "dataMap.form.private": "Yksityinen ja arkaluontoinen",
+      "dataMap.form.shared-with-named": "Jaettu nimetyille",
+      "dataMap.form.group": "Ryhmän yhteinen",
+      "dataMap.form.organism-workspace": "Elää jaetussa työtilassa",
+      "dataMap.form.public-service": "Julkinen palvelu",
+      "dataMap.form.static": "Staattinen sivu",
+      "dataMap.form.mixed": "Sekoitus",
+      "dataMap.form.unstated": "Kukaan ei ole kertonut",
+      "dataMap.where.nowhere": "ei mihinkään",
+      "dataMap.where.browser-only": "vain selaimeen",
+      "dataMap.where.owner-memory-private": "omaan muistiisi",
+      "dataMap.where.owner-memory-public": "omaan muistiisi, kenen tahansa luettavaksi",
+      "dataMap.where.someone-elses-memory": "jonkun toisen muistiin",
+      "dataMap.where.organism-workspace": "jaettuun työtilaan",
+      "dataMap.where.organism-shared": "ryhmän jaettuun alueeseen",
+      "dataMap.where.organism-meta": "ryhmän omaan rekisteriin",
+      "dataMap.where.extension-namespace": "laajennuksen omaan tilaan",
+      "dataMap.where.cortex": "cortex-pakettiin",
+      "dataMap.where.file-storage": "tiedostovarastoon",
+      "dataMap.where.app-published-record": "appin omaan julkaistuun tietueeseen",
+      "dataMap.where.another-node": "toiselle AIMEAT-palvelimelle",
+      "dataMap.where.external-service": "ulkopuoliseen palveluun",
+      "dataMap.kind.settings": "asetuksia",
+      "dataMap.kind.user-written": "käyttäjän kirjoittamaa",
+      "dataMap.kind.ai-generated": "tekoälyn kirjoittamaa",
+      "dataMap.kind.register": "luettelo asioista",
+      "dataMap.kind.event-log": "loki siitä mitä tapahtui",
+      "dataMap.kind.index": "hakemisto joka osoittaa muihin",
+      "dataMap.kind.computed-or-cache": "laskettua, säilytetään nopeuden vuoksi",
+      "dataMap.kind.fetched-copy": "ulkoa haettu kopio",
+      "dataMap.kind.foreign-identifier": "tunniste toisessa järjestelmässä",
+      "dataMap.kind.snapshot": "tilannekuva tai versio",
+      "dataMap.kind.metrics": "lukuja ja mittauksia",
+      "dataMap.kind.preferences": "mitä käyttäjä haluaa",
+      "dataMap.kind.draft": "keskeneräistä työtä",
+      "dataMap.kind.outgoing-message": "lähtevä viesti",
+      "dataMap.kind.file": "tiedosto",
+      "dataMap.kind.link-between-things": "mihin tämä on kiinni",
+      "dataMap.kind.permissions": "kuka saa tehdä mitä",
+      "dataMap.kind.secret": "salaisuus tai avain",
+      "dataMap.use.app-cannot-run-without": "appi ei toimi ilman sitä",
+      "dataMap.use.user-returns-to-read": "käyttäjä palaa ja lukee sen",
+      "dataMap.use.shown-as-a-list": "näytetään listana",
+      "dataMap.use.search-and-filter": "haku ja suodatus",
+      "dataMap.use.calculation-and-reporting": "laskenta ja raportointi",
+      "dataMap.use.app-resumes-where-it-left": "appi jatkaa mihin jäi",
+      "dataMap.use.to-share-with-others": "jaettavaksi muille",
+      "dataMap.use.to-send-out": "lähetettäväksi ulos",
+      "dataMap.use.evidence-of-what-happened": "todiste siitä mitä tapahtui",
+      "dataMap.use.speed-only": "vain nopeuden vuoksi, saa hävitä",
+      "dataMap.use.context-for-an-ai": "konteksti tekoälylle",
+      "dataMap.use.backwards-compatibility": "yhteensopivuus vanhan kanssa",
+      "dataMap.owner.person": "ihminen",
+      "dataMap.owner.organism": "ryhmä",
+      "dataMap.owner.extension": "laajennus",
+      "dataMap.owner.ecosystem-app": "liitetty appi",
+      "dataMap.owner.someone-else": "joku muu",
+      "dataMap.owner.external-controller": "ulkopuolinen organisaatio",
+      "dataMap.owner.nobody": "ei kukaan, se on väliaikaista",
+      "dataMap.readers.owner-only": "vain sinä",
+      "dataMap.readers.owner-and-their-agents": "sinä ja agenttisi",
+      "dataMap.readers.named-people": "nimetyt ihmiset",
+      "dataMap.readers.organism-members": "kaikki ryhmässä",
+      "dataMap.readers.anyone": "kuka tahansa",
+      "dataMap.readers.the-app-itself": "vain appi itse",
+      "dataMap.readers.a-recipient-elsewhere": "se joka sen vastaanottaa",
+      "dataMap.writer.person-in-the-ui": "ihminen ruudulla",
+      "dataMap.writer.the-app-for-the-person": "appi ihmisen puolesta",
+      "dataMap.writer.an-agent": "agentti",
+      "dataMap.writer.a-schedule-unattended": "ajastus, ilman ketään paikalla",
+      "dataMap.writer.an-extension-server-side": "laajennus palvelimella",
+      "dataMap.writer.install-seed": "asennus, aloitusdatana",
+      "dataMap.writer.a-foreign-system": "ulkopuolinen järjestelmä",
+      "dataMap.shape.one-record": "yksi tietue",
+      "dataMap.shape.one-per-thing": "yksi tietue per asia",
+      "dataMap.shape.collection-under-one-key": "kokoelma yhdessä paikassa",
+      "dataMap.shape.rolled-up-per-period": "koottu jaksoittain",
+      "dataMap.shape.index-plus-bodies": "luettelo ja tekstit erikseen",
+      "dataMap.shape.files": "tiedostoja",
+      "dataMap.shape.no-record": "ei tallenna mitään",
+      "dataMap.kept.until-deleted": "kunnes poistetaan",
+      "dataMap.kept.ttl": "määräajan",
+      "dataMap.kept.rolling-window": "liukuva ikkuna",
+      "dataMap.kept.version-capped": "aiemmat versiot säilyvät",
+      "dataMap.kept.append-only": "ei muuteta, vain lisätään",
+      "dataMap.kept.session-only": "vain tämän käynnin ajan",
+      "dataMap.loss.only-copy": "ainoa kappale",
+      "dataMap.loss.recoverable-from-source": "voidaan hakea uudelleen",
+      "dataMap.loss.recomputable": "voidaan laskea uudelleen",
+      "dataMap.loss.user-can-rewrite": "käyttäjä voi kirjoittaa uudelleen",
+      "dataMap.loss.may-vanish": "saa hävitä, appi selviää",
       "header.title": "Omat sovellukset",
       "cta.backHome": "Takaisin etusivulle",
       "cta.publishOwn": "Julkaise oma sovelluksesi",
@@ -4365,9 +4597,9 @@
       if (el.parentNode) el.parentNode.removeChild(el);
     }, 250);
   }
-  function dtlBtn(label, onclick, opts) {
+  function dtlBtn(label2, onclick, opts) {
     opts = opts || {};
-    return '<button class="dtl-btn' + (opts.variant ? " " + opts.variant : "") + '"' + (opts.id ? ' id="' + opts.id + '"' : "") + ' onclick="' + onclick + '"' + (opts.title != null ? ' title="' + escapeHtml(opts.title) + '"' : "") + (opts.disabled ? " disabled" : "") + ">" + label + "</button>";
+    return '<button class="dtl-btn' + (opts.variant ? " " + opts.variant : "") + '"' + (opts.id ? ' id="' + opts.id + '"' : "") + ' onclick="' + onclick + '"' + (opts.title != null ? ' title="' + escapeHtml(opts.title) + '"' : "") + (opts.disabled ? " disabled" : "") + ">" + label2 + "</button>";
   }
 
   // src/static/app-catalog/js/config.js
@@ -4579,112 +4811,231 @@
   }
 
   // src/static/app-catalog/js/data-map-model.js
-  var TIERS = ["schema-locked", "declared-space", "platform-prefix", "owner-named", "none"];
-  function tierRank(tier) {
-    const i = TIERS.indexOf(tier);
-    return i < 0 ? 0 : TIERS.length - i;
+  var VALUES = {
+    form: [
+      "one-person",
+      "private",
+      "shared-with-named",
+      "group",
+      "organism-workspace",
+      "public-service",
+      "static",
+      "mixed",
+      "unstated"
+    ],
+    where: [
+      "nowhere",
+      "browser-only",
+      "owner-memory-private",
+      "owner-memory-public",
+      "someone-elses-memory",
+      "organism-workspace",
+      "organism-shared",
+      "organism-meta",
+      "extension-namespace",
+      "cortex",
+      "file-storage",
+      "app-published-record",
+      "another-node",
+      "external-service"
+    ],
+    kind: [
+      "settings",
+      "user-written",
+      "ai-generated",
+      "register",
+      "event-log",
+      "index",
+      "computed-or-cache",
+      "fetched-copy",
+      "foreign-identifier",
+      "snapshot",
+      "metrics",
+      "preferences",
+      "draft",
+      "outgoing-message",
+      "file",
+      "link-between-things",
+      "permissions",
+      "secret"
+    ],
+    use: [
+      "app-cannot-run-without",
+      "user-returns-to-read",
+      "shown-as-a-list",
+      "search-and-filter",
+      "calculation-and-reporting",
+      "app-resumes-where-it-left",
+      "to-share-with-others",
+      "to-send-out",
+      "evidence-of-what-happened",
+      "speed-only",
+      "context-for-an-ai",
+      "backwards-compatibility"
+    ],
+    owner: [
+      "person",
+      "organism",
+      "extension",
+      "ecosystem-app",
+      "someone-else",
+      "external-controller",
+      "nobody"
+    ],
+    readers: [
+      "owner-only",
+      "owner-and-their-agents",
+      "named-people",
+      "organism-members",
+      "anyone",
+      "the-app-itself",
+      "a-recipient-elsewhere"
+    ],
+    writer: [
+      "person-in-the-ui",
+      "the-app-for-the-person",
+      "an-agent",
+      "a-schedule-unattended",
+      "an-extension-server-side",
+      "install-seed",
+      "a-foreign-system"
+    ],
+    shape: [
+      "one-record",
+      "one-per-thing",
+      "collection-under-one-key",
+      "rolled-up-per-period",
+      "index-plus-bodies",
+      "files",
+      "no-record"
+    ],
+    kept: ["until-deleted", "ttl", "rolling-window", "version-capped", "append-only", "session-only"],
+    loss: ["only-copy", "recoverable-from-source", "recomputable", "user-can-rewrite", "may-vanish"]
+  };
+  function labelKeyFor(axis, value) {
+    if (!value) return null;
+    const known = VALUES[axis];
+    if (!known || known.indexOf(value) < 0) return null;
+    return "dataMap." + axis + "." + value;
   }
-  function covers(pattern, family) {
-    if (typeof pattern !== "string" || typeof family !== "string") return false;
-    const star = pattern.indexOf("*");
-    if (star < 0) return pattern === family;
-    return family.startsWith(pattern.slice(0, star));
+  function orderRows(rows) {
+    const weight = (r) => {
+      let w = 0;
+      if (r.lossRisk === "only-copy") w -= 4;
+      if (r.personalData === "yes") w -= 3;
+      if (r.usedFor === "to-share-with-others") w -= 2;
+      if (!String(r.why || "").trim()) w -= 1;
+      return w;
+    };
+    return rows.slice().sort((a, b) => weight(a) - weight(b));
   }
-  function contradictions(map, observed) {
-    const held = map && map.held || [];
-    const seen = observed || [];
-    const undeclared = seen.filter((o) => !held.some((r) => covers(r.grant && r.grant.pattern, o.family)));
-    const dead = held.filter((r) => (r.grant && r.grant.rights || []).includes("write") && seen.length > 0 && !seen.some((o) => covers(r.grant.pattern, o.family)));
-    return { undeclared, dead };
+  function contradictionOf(map) {
+    if (!map || !map.held || map.held.length === 0) return null;
+    const inOrganism = map.held.some((r) => r.where === "organism-workspace" || r.where === "organism-shared" || r.where === "organism-meta");
+    const allPrivate = map.held.every((r) => r.where === "owner-memory-private");
+    const sharedForm = map.form === "group" || map.form === "organism-workspace" || map.form === "shared-with-named";
+    if (sharedForm && allPrivate) return "dataMap.contradiction.sharedButPrivate";
+    if (map.form === "one-person" && inOrganism) return "dataMap.contradiction.personalButShared";
+    if (map.form === "static") return "dataMap.contradiction.staticButStores";
+    return null;
   }
-  function mapState(map, observed) {
-    if (!map) return "empty";
-    const rows = [...map.held || [], ...map.elsewhere || []];
-    const { undeclared } = contradictions(map, observed);
-    if (undeclared.length > 0) return "contradicted";
-    if (rows.length === 0) return "empty";
-    return map.source === "derived" ? "derived" : "declared";
+  function placesOf(map) {
+    const counts = /* @__PURE__ */ new Map();
+    for (const row of map && map.held || []) {
+      counts.set(row.where, (counts.get(row.where) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([where, n]) => ({ where, n }));
   }
-  function orderRows(map, observed) {
-    const held = [...map && map.held || []];
-    const { undeclared, dead } = contradictions(map, observed);
-    const isContradicted = (r) => dead.includes(r) || undeclared.some((o) => covers(r.grant && r.grant.pattern, o.family));
-    return held.sort((a, b) => {
-      const c = Number(isContradicted(b)) - Number(isContradicted(a));
-      if (c !== 0) return c;
-      const w = Number(!String(b.why || "").trim()) - Number(!String(a.why || "").trim());
-      if (w !== 0) return w;
-      return tierRank((a.basis || {}).tier) - tierRank((b.basis || {}).tier);
-    });
+  function stateOf(map) {
+    if (!map || map.source === "none") return "missing";
+    if (contradictionOf(map)) return "contradicted";
+    if ((map.held || []).some((r) => !String(r.why || "").trim())) return "unfinished";
+    return "stated";
   }
 
   // src/static/app-catalog/js/data-map.js
-  function basisCell(tier) {
-    var key = { "schema-locked": "locked", "declared-space": "declared", "platform-prefix": "platform", "owner-named": "named" }[tier] || "unknown";
-    return '<span class="dtl-dm-basis dtl-dm-basis-' + key + '"><span class="dtl-dm-chip">' + escapeHtml(t("datamap.basis." + key)) + '</span><span class="dtl-dm-note">' + escapeHtml(t("datamap.basisNote." + key)) + "</span></span>";
+  function label(axis, value) {
+    const key = labelKeyFor(axis, value);
+    return escapeHtml(key ? t(key) : String(value || ""));
   }
-  function rowHtml(row, disagrees) {
-    var g = row.grant || {};
-    var personal = row.personalData === "yes" ? "yes" : row.personalData === "no" ? "no" : "unstated";
-    var why = String(row.why || "").trim();
-    return '<div class="dtl-dm-row' + (disagrees ? " dtl-dm-row-off" : "") + '"><div class="dtl-dm-head"><span class="dtl-dm-family">' + escapeHtml(g.pattern || "") + '</span><span class="dtl-dm-rights">' + escapeHtml((g.rights || []).join(", ")) + "</span>" + basisCell((row.basis || {}).tier) + '<span class="dtl-dm-personal dtl-dm-personal-' + personal + '">' + escapeHtml(t("datamap.personal." + personal)) + '</span></div><div class="dtl-dm-why' + (why ? "" : " dtl-dm-why-missing") + '">' + escapeHtml(why || t("datamap.noWhy")) + '</div><div class="dtl-dm-detail"><span>' + escapeHtml(t("datamap.deleteMeans")) + "</span> " + escapeHtml(row.deletion && row.deletion.says || t("datamap.deleteUnknown")) + "</div></div>";
+  function dataMapSectionHtml() {
+    return '<div class="dtl-section" id="detail-data-map"><h3>' + escapeHtml(t("dataMap.title")) + '</h3><div class="dtl-dm-body"><p class="dtl-desc">' + escapeHtml(t("common.loading")) + "</p></div></div>";
   }
-  function dataMapHtmlFor(map) {
-    if (!map) {
-      return '<p class="dtl-desc">' + escapeHtml(t("datamap.none")) + "</p>";
+  function rowHtml(row) {
+    const facts = [
+      label("kind", row.kind),
+      label("use", row.usedFor),
+      label("readers", row.readers),
+      label("loss", row.lossRisk),
+      label("kept", row.keptFor)
+    ];
+    if (row.personalData === "yes") {
+      facts.push('<span class="dtl-dm-personal">' + escapeHtml(t("dataMap.personal.yes")) + "</span>");
     }
-    var held = map.held || [];
-    var elsewhere = map.elsewhere || [];
-    if (held.length === 0 && elsewhere.length === 0) {
-      return '<p class="dtl-desc">' + escapeHtml(t("datamap.storesNothing")) + "</p>";
+    const why = String(row.why || "").trim();
+    return '<div class="dtl-dm-row' + (why ? "" : " dtl-dm-row-unexplained") + '"><div class="dtl-dm-head"><span class="dtl-dm-what">' + escapeHtml(row.what) + '</span><span class="dtl-dm-holds">' + escapeHtml(row.holds || "") + '</span><span class="dtl-dm-where">' + label("where", row.where) + (row.whereExactly ? ' <span class="dtl-dm-where-exact">' + escapeHtml(row.whereExactly) + "</span>" : "") + '</span></div><div class="dtl-dm-facts">' + facts.join(" · ") + '</div><div class="dtl-dm-why' + (why ? "" : " dtl-dm-why-missing") + '">' + escapeHtml(why || t("dataMap.row.noWhy")) + "</div></div>";
+  }
+  function elsewhereHtml(row) {
+    return '<div class="dtl-dm-row"><div class="dtl-dm-head"><span class="dtl-dm-what">' + escapeHtml(row.what) + '</span><span class="dtl-dm-holds">' + escapeHtml(t("dataMap.elsewhere." + row.status)) + '</span></div><div class="dtl-dm-facts">' + escapeHtml(t("dataMap.elsewhere.whereLabel")) + " " + escapeHtml(row.where) + " · " + escapeHtml(t("dataMap.elsewhere.controlledByLabel")) + " " + escapeHtml(row.controlledBy) + '</div><div class="dtl-dm-why">' + escapeHtml(row.deletion || "") + "</div></div>";
+  }
+  function panelHtml(map) {
+    if (!map || map.source === "none") {
+      return '<p class="dtl-desc">' + escapeHtml(t("dataMap.panel.missing")) + "</p>";
     }
-    var state = mapState(map, []);
     var out = "";
-    if (state === "derived") {
-      out += '<div class="dtl-dm-banner">' + escapeHtml(t("datamap.derivedNote")) + "</div>";
+    var contradiction = contradictionOf(map);
+    if (contradiction) {
+      out += '<p class="dtl-dm-contradiction">' + escapeHtml(t(contradiction)) + "</p>";
     }
-    var off = contradictions(map, []);
-    var rows = orderRows(map, []);
-    out += '<div class="dtl-dm-rows">';
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      var bad = off.undeclared.some(function(o) {
-        return covers((r.grant || {}).pattern, o.family);
-      });
-      out += rowHtml(r, bad);
+    out += '<p class="dtl-dm-what">' + escapeHtml(map.what || t("dataMap.panel.noWhat")) + "</p>";
+    out += '<p class="dtl-dm-usedfor"><b>' + escapeHtml(t("dataMap.usedForLabel")) + "</b> " + escapeHtml(map.usedFor || t("dataMap.panel.noUsedFor")) + "</p>";
+    out += '<p class="dtl-dm-form"><b>' + escapeHtml(t("dataMap.formLabel")) + "</b> " + label("form", map.form) + "</p>";
+    out += "<h4>" + escapeHtml(t("dataMap.arrangementLabel")) + "</h4>";
+    out += '<p class="dtl-desc">' + escapeHtml(map.arrangement || t("dataMap.panel.noArrangement")) + "</p>";
+    var places = placesOf(map);
+    if (places.length) {
+      out += '<ul class="dtl-dm-places">' + places.map(function(p) {
+        return "<li>" + label("where", p.where) + " · " + p.n + "</li>";
+      }).join("") + "</ul>";
     }
-    out += "</div>";
-    if (elsewhere.length > 0) {
-      out += '<h4 class="dtl-dm-sub">' + escapeHtml(t("datamap.elsewhereTitle")) + '</h4><div class="dtl-dm-rows">';
-      for (var j = 0; j < elsewhere.length; j++) {
-        var e = elsewhere[j];
-        out += '<div class="dtl-dm-row"><div class="dtl-dm-head-simple"><span class="dtl-dm-family">' + escapeHtml((e.grant || {}).pattern || "") + '</span><span class="dtl-dm-rights">' + escapeHtml(t("datamap.elsewhere." + e.status)) + '</span></div><div class="dtl-dm-why">' + escapeHtml(e.where || "") + '</div><div class="dtl-dm-detail">' + escapeHtml(e.deletion && e.deletion.says || "") + "</div></div>";
-      }
-      out += "</div>";
+    var rows = orderRows(map.held || []);
+    if (rows.length) {
+      out += "<h4>" + escapeHtml(t("dataMap.rowsLabel")) + "</h4>" + rows.map(rowHtml).join("");
+    }
+    if ((map.machinery || []).length) {
+      out += "<h4>" + escapeHtml(t("dataMap.machineryLabel")) + '</h4><p class="dtl-desc">' + escapeHtml(map.machinery.join(" · ")) + "</p>";
+    }
+    if ((map.leaves || []).length) {
+      out += "<h4>" + escapeHtml(t("dataMap.leavesLabel")) + '</h4><ul class="dtl-dm-leaves">' + map.leaves.map(function(l) {
+        return "<li>" + escapeHtml(l.what) + " → " + escapeHtml(l.to) + (l.recallable ? "" : ' <span class="dtl-dm-norecall">' + escapeHtml(t("dataMap.leaves.noRecall")) + "</span>") + "</li>";
+      }).join("") + "</ul>";
+    }
+    if ((map.elsewhere || []).length) {
+      out += "<h4>" + escapeHtml(t("dataMap.elsewhereLabel")) + "</h4>" + map.elsewhere.map(elsewhereHtml).join("");
     }
     return out;
   }
-  function dataMapSectionHtml() {
-    return '<div class="dtl-section" id="detail-data-map"><h3>' + escapeHtml(t("datamap.title")) + '</h3><p class="dtl-desc">' + escapeHtml(t("datamap.loading")) + "</p></div>";
-  }
-  function loadDataMapInto(owner, filename, stamp) {
-    var el = document.getElementById("detail-data-map");
-    if (!el) return;
-    var head = "<h3>" + escapeHtml(t("datamap.title")) + "</h3>";
-    if (!stamp || !stamp.docKey) {
-      el.innerHTML = head + '<p class="dtl-desc">' + escapeHtml(t("datamap.none")) + "</p>";
-      return;
+  async function loadDataMapInto(owner, filename) {
+    const section = document.getElementById("detail-data-map");
+    if (!section) return;
+    const body = section.querySelector(".dtl-dm-body");
+    if (!body) return;
+    try {
+      const res = await fetch("/v1/datamap/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename));
+      const json = await res.json();
+      const map = json && json.data ? json.data.data_map : null;
+      const findings = json && json.data && json.data.findings || [];
+      let html = panelHtml(map);
+      if (findings.length) {
+        html += "<h4>" + escapeHtml(t("dataMap.findingsLabel")) + '</h4><ul class="dtl-dm-findings">' + findings.map(function(f) {
+          return "<li>" + escapeHtml(f.message) + "</li>";
+        }).join("") + "</ul>";
+      }
+      body.innerHTML = html;
+      section.className = "dtl-section dtl-dm-" + stateOf(map);
+    } catch (err) {
+      body.innerHTML = '<p class="dtl-desc">' + escapeHtml(t("dataMap.panel.missing")) + "</p>";
     }
-    var config = loadConfig();
-    var base4 = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
-    fetch(base4 + "/v1/datamap/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename)).then(function(r) {
-      return r.ok ? r.json() : null;
-    }).then(function(j) {
-      var map = j && j.data && j.data.data_map;
-      el.innerHTML = head + dataMapHtmlFor(map);
-    }).catch(function() {
-      el.innerHTML = head + '<p class="dtl-desc">' + escapeHtml(t("datamap.unreadable")) + "</p>";
-    });
   }
 
   // src/static/app-catalog/js/cortex.js
@@ -5076,9 +5427,9 @@
       });
       wrap.innerHTML = "";
       pbPacks.forEach(function(p) {
-        var label = document.createElement("label");
-        label.className = "pb-pack-item";
-        label.title = p.description || "";
+        var label2 = document.createElement("label");
+        label2.className = "pb-pack-item";
+        label2.title = p.description || "";
         var cb = document.createElement("input");
         cb.type = "checkbox";
         cb.className = "pb-pack-cb";
@@ -5089,10 +5440,10 @@
           if (cb.checked) loadPbPackDoc(base4, p.id);
           else updatePbPreview();
         };
-        label.onmouseenter = function() {
+        label2.onmouseenter = function() {
           renderPbPackInfo(p.id);
         };
-        label.onmouseleave = function() {
+        label2.onmouseleave = function() {
           renderPbPackInfo();
         };
         cb.onfocus = function() {
@@ -5103,8 +5454,8 @@
         };
         var span = document.createElement("span");
         span.textContent = p.title;
-        label.appendChild(cb);
-        label.appendChild(span);
+        label2.appendChild(cb);
+        label2.appendChild(span);
         if (p.modelTier) {
           var badge = document.createElement("span");
           badge.className = "pb-pack-tier pb-tier-" + p.modelTier;
@@ -5113,9 +5464,9 @@
             return pr.model + "→" + pr.verdict;
           }).join(", ");
           badge.title = "AEB reliability tier: " + p.modelTier + (proven ? " · proven on " + proven : " · not yet AEB-run") + (p.apiCaveat ? " · ⚠ " + p.apiCaveat : "");
-          label.appendChild(badge);
+          label2.appendChild(badge);
         }
-        wrap.appendChild(label);
+        wrap.appendChild(label2);
       });
       renderPbPackInfo();
       var desc = document.getElementById("pb-description");
@@ -5485,14 +5836,14 @@
       return x.trim();
     }).filter(Boolean);
   }
-  function input(id, label, value, placeholder, type) {
-    return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label><input id="' + id + '" class="modal-input od-input" ' + (type ? 'type="' + type + '" ' : "") + 'value="' + escapeHtml(value || "") + '" placeholder="' + escapeHtml(placeholder || "") + '" />';
+  function input(id, label2, value, placeholder, type) {
+    return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label2) + '</label><input id="' + id + '" class="modal-input od-input" ' + (type ? 'type="' + type + '" ' : "") + 'value="' + escapeHtml(value || "") + '" placeholder="' + escapeHtml(placeholder || "") + '" />';
   }
-  function textarea(id, label, value, placeholder, rows) {
-    return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label><textarea id="' + id + '" class="modal-input od-input" rows="' + (rows || 2) + '" placeholder="' + escapeHtml(placeholder || "") + '">' + escapeHtml(value || "") + "</textarea>";
+  function textarea(id, label2, value, placeholder, rows) {
+    return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label2) + '</label><textarea id="' + id + '" class="modal-input od-input" rows="' + (rows || 2) + '" placeholder="' + escapeHtml(placeholder || "") + '">' + escapeHtml(value || "") + "</textarea>";
   }
-  function select(id, label, options, selected) {
-    var html = '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label><select id="' + id + '" class="modal-input od-input">';
+  function select(id, label2, options, selected) {
+    var html = '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label2) + '</label><select id="' + id + '" class="modal-input od-input">';
     for (var i = 0; i < options.length; i++) {
       var o = options[i];
       html += '<option value="' + escapeHtml(o) + '"' + (selected === o ? " selected" : "") + ">" + escapeHtml(o || "—") + "</option>";
@@ -5545,8 +5896,8 @@
       return '<div class="od-status od-status-none">' + escapeHtml(t("odps.noTools")) + "</div>";
     }
     var cls = live > 0 ? "od-status-on" : "od-status-none";
-    var label = live > 0 ? t("odps.statusOn").replace("{live}", String(live)).replace("{total}", String(tools.length)) : t("odps.statusOff").replace("{total}", String(tools.length));
-    var html = '<div class="od-status ' + cls + '">' + escapeHtml(label) + "</div>";
+    var label2 = live > 0 ? t("odps.statusOn").replace("{live}", String(live)).replace("{total}", String(tools.length)) : t("odps.statusOff").replace("{total}", String(tools.length));
+    var html = '<div class="od-status ' + cls + '">' + escapeHtml(label2) + "</div>";
     if (blocked.length) {
       html += '<div class="dtl-sync none od-note">' + escapeHtml(t("odps.statusBlocked").replace("{n}", String(blocked.length))) + "</div>";
     }
@@ -6344,9 +6695,9 @@
           return rank(a.mode) - rank(b.mode);
         });
         var opts = agents.length ? agents.map(function(a) {
-          var label = a.name + (a.mode === "task-runner" ? " · task-runner" : a.mode ? " · " + a.mode : "");
+          var label2 = a.name + (a.mode === "task-runner" ? " · task-runner" : a.mode ? " · " + a.mode : "");
           var sel = a.name === "crew-forge" ? " selected" : "";
-          return '<option value="' + escapeHtml(a.name) + '"' + sel + ">" + escapeHtml(label) + "</option>";
+          return '<option value="' + escapeHtml(a.name) + '"' + sel + ">" + escapeHtml(label2) + "</option>";
         }).join("") : '<option value="">' + t("agents.noRunnerOption") + "</option>";
         defs.forEach(function(_, i2) {
           var el = document.getElementById("aga-runner-" + i2);
@@ -7557,8 +7908,8 @@
       showNotice("Failed: " + e.message);
     });
   }
-  function metaItem(label, val2) {
-    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val2 || "—") + "</div></div>";
+  function metaItem(label2, val2) {
+    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label2) + '</div><div class="dtl-meta-val">' + escapeHtml(val2 || "—") + "</div></div>";
   }
   function detailAiUnavailableMsg() {
     return getCortexOwnerToken2() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
@@ -9499,7 +9850,7 @@
   function renderBackupResult(s) {
     var body = document.getElementById("backup-import-body");
     document.getElementById("backup-restore-btn").style.display = "none";
-    var section = function(label, items) {
+    var section = function(label2, items) {
       if (!items || items.length === 0) return "";
       var rendered = items.map(function(x) {
         if (typeof x === "string") return escapeHtml(x);
@@ -9507,7 +9858,7 @@
         if (x && x.item) return escapeHtml(x.item) + ": " + escapeHtml(x.message || "");
         return escapeHtml(JSON.stringify(x));
       });
-      return '<div style="font-size:.85rem;font-weight:600;margin-top:8px">' + label + " (" + items.length + ')</div><ul class="backup-result-list">' + rendered.map(function(r) {
+      return '<div style="font-size:.85rem;font-weight:600;margin-top:8px">' + label2 + " (" + items.length + ')</div><ul class="backup-result-list">' + rendered.map(function(r) {
         return "<li>" + r + "</li>";
       }).join("") + "</ul>";
     };
@@ -9780,9 +10131,9 @@
       showNotice("Error: " + (err.message || err));
     });
   }
-  async function deleteServerApp2(filename, label) {
+  async function deleteServerApp2(filename, label2) {
     if (!await showConfirm(t("confirm.deleteFromServer").replace("{file}", function() {
-      return label || filename;
+      return label2 || filename;
     }))) return false;
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");

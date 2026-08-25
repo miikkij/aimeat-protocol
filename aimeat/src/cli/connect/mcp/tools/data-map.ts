@@ -23,12 +23,9 @@ export function registerDataMapTools(mcp: McpServer, registry: AgentRegistry): v
 
   mcp.tool('aimeat_datamap_get', descriptionFor('aimeat_datamap_get'), {
     agent_name: agentNameSchema,
-    app: z.string().optional()
-      .describe('The app, as "owner/filename.html". Leave it out to get this account\'s own coverage instead.'),
+    app: z.string().describe('The app, as "owner/filename.html".'),
   }, annotationsFor('aimeat_datamap_get'), async ({ agent_name, app }) => {
     const { client } = pickAgent(registry, agent_name);
-    // Two doors, because they answer two questions: one app's map, or the whole account's coverage.
-    if (!app) return text(await client.get('/v1/datamap/coverage'));
     const slash = app.indexOf('/');
     if (slash <= 0) return text({ error: 'Name the app as "owner/filename.html".' });
     const owner = encodeURIComponent(app.slice(0, slash));

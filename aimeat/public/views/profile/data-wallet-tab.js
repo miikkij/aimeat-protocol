@@ -39,7 +39,6 @@ import * as consentService from '/js/services/consent.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { DataWalletCoverage } from './data-wallet-coverage.js';
 
 export default function DataWalletTab({ session, showToast }) {
   const [consents, setConsents] = useState(null);
@@ -165,7 +164,6 @@ export default function DataWalletTab({ session, showToast }) {
       ${/* What is stored here that nobody has described. Above the totals, because the summary
             card below counts memory keys without saying which, and this is the drill-down that
             counter is asking for. */ ''}
-      <${DataWalletCoverage} showToast=${showToast} />
 
     ${permSummary && html`
       <div class="card dw-summary-card">

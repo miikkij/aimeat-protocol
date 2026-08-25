@@ -2,235 +2,208 @@
  * @file src/services/data-map/data-map-types.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The data map: what a program stores, where, into whose ownership, who reads it, how
- *   long it is kept, what deleting it means, whether it is personal data, and WHY it is there.
+ * @description The data map: what an app is, what it is used for, where its data actually lives,
+ *   and why there.
  *
- *   The `why` is the field this whole feature exists for. Four separate defects in one app on
- *   2026-08-24 turned out to be one cause: nowhere could anyone read why data was where it was, so a
- *   session reconstructed months-old storage decisions from source and guessed wrong four times the
- *   same way. Source says what a program does, never why. One sentence per row, sitting on the row,
- *   is read exactly when someone is about to change that row — which a separate decision log is not.
+ *   WHO IT IS FOR. An AI that opens an app it does not know. It reads the map and knows in seconds
+ *   what the app is for and how its data is arranged, without reading the source. Without that, it
+ *   puts a new feature's data wherever it can reach most easily — which is the defect this exists to
+ *   prevent: a group CRM whose campaigns, deal stages and follow-up limits all landed in one
+ *   person's own memory, invisible to their team.
  *
- *   THE CORE TRIPLE IS `EcoDataAreaGrant`, BY CONTAINMENT AND NOT BY EXTENSION. That interface is
- *   already persisted on every approved ecosystem app, so adding a required field to it would break
- *   every stored grant against its own reader, and adding optional ones would let a half-filled grant
- *   pass as a map row. `DataMapRow.grant` holds it untouched instead, which means the GEAI approval
- *   path needs no change and a stored `dataAreas` entry lifts into a row with one wrapper.
- * @structure DataMapForm · IdentificationBasis · DeletionAnswer · DataMapRow · ElsewhereRow ·
- *   DataMap · DataMapStamp · DataMapGap · publicDataMap()
+ *   THE AUDITOR IS THE SECOND AUDIENCE, NOT THE FIRST. Retention windows and personal-data marks are
+ *   their columns. They may not crowd out what a builder needs, which is: what is this for, where
+ *   does its data live, and why there.
+ *
+ *   TWO FIELDS CARRY THE VALUE AND NEITHER CAN BE DERIVED: the app's own paragraph (what it is, what
+ *   it is used for) and the per-row `why`. They are written once, by whoever built the app. A guess
+ *   in either is worse than a blank, because it sits where the answer belongs and reads like one.
+ *
+ *   Full definition, including every axis and its values: docs/datakartta-maaritelma.md
+ * @structure DataMap · DataMapRow · ElsewhereRow · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.0.0 — 2026-08-25 — Rewritten to docs/datakartta-maaritelma.md. v1 described a key family and
+ *     its compliance columns and never said what the app was FOR, so the map answered nobody's
+ *     question. The app-level paragraph, `usedFor` on both levels, the machinery list and the
+ *     loss-risk axis are new; the guessed `form` default is gone.
  *   v1.0.0 — 2026-08-24 — Initial creation for TARGET-073 step 2.
  */
-import type { EcoDataAreaGrant } from '../../storage/types/identity.js';
 import type { MemoryRecord } from '../../storage/types/commerce.js';
-import type { IdentificationTier } from '../../utils/key-family.js';
 
 /** The current document version. A map carries its own spec so a newer node can read an older map. */
-export const DATA_MAP_SPEC = 'aimeat.datamap/1' as const;
+export const DATA_MAP_SPEC = 'aimeat.datamap/2' as const;
 
-/**
- * What SHAPE of program this is, which decides what its map has to contain.
- *
- * A one-person app claiming organism rows is describing something it cannot do; a group app with no
- * other readers named has not finished its map. Same document, different obligations.
- */
+/* ── The axes. Every list is open at the point of use: an unknown value is kept verbatim rather
+      than coerced, because coercing is how a map starts lying. ──────────────────────────────── */
+
+/** What shape of program this is. `unstated` is a real answer and NEVER a default we invent. */
 export type DataMapForm =
-  /** One person, their own store, nobody else reads it. */
-  | 'single-person'
-  /** One person, but holding things they would not want read — the map must answer deletion. */
-  | 'private'
-  /** Named individuals read it besides the owner. */
-  | 'shared'
-  /** A group reads it; membership decides, not a name list. */
-  | 'group'
-  /** It lives in an organism workspace, so it outlives the person who wrote it. */
-  | 'organism-workspace'
-  /** More than one of the above. The lint says which row forced it. */
-  | 'mixed';
+  | 'one-person' | 'private' | 'shared-with-named' | 'group'
+  | 'organism-workspace' | 'public-service' | 'static' | 'mixed' | 'unstated';
 
 export const DATA_MAP_FORMS: readonly DataMapForm[] = [
-  'single-person', 'private', 'shared', 'group', 'organism-workspace', 'mixed',
+  'one-person', 'private', 'shared-with-named', 'group',
+  'organism-workspace', 'public-service', 'static', 'mixed', 'unstated',
 ] as const;
 
-/** On what basis we can say what this family is, and the evidence for it. */
-export interface IdentificationBasis {
-  tier: IdentificationTier;
-  /** Checkable evidence: a prefix, `schema:{pattern}`, `space:{organism}/{ws}/{space}`, `app:{name}`. */
-  by: string;
-}
+/** Where a row's data actually lives. */
+export type DataLocation =
+  | 'nowhere' | 'browser-only' | 'owner-memory-private' | 'owner-memory-public'
+  | 'someone-elses-memory' | 'organism-workspace' | 'organism-shared' | 'organism-meta'
+  | 'extension-namespace' | 'cortex' | 'file-storage' | 'app-published-record'
+  | 'another-node' | 'external-service';
 
-/**
- * What deleting actually does. REQUIRED on every row of both tables.
- *
- * A map that lists where things are and cannot answer this is the compliance half-answer that made
- * the feature necessary: a deletion request does not reach an email sent last week, and what is kept
- * of it has to be decided before the feature exists rather than after the request arrives.
- */
-export interface DeletionAnswer {
-  effect:
-    /** Deleting removes it. Nothing else holds a copy. */
-    | 'gone'
-    /** It goes from here, and a copy somewhere else does not. Say where in `says`. */
-    | 'gone-here-copy-remains'
-    /** A marker stays behind on purpose — say what the marker holds. */
-    | 'tombstoned'
-    /** Somebody else controls it. `controller` on the row names who. */
-    | 'not-ours-to-delete'
-    /** Nobody has answered this yet. The lint reports it; it is never a resting state. */
-    | 'unknown';
-  /** The sentence a person reads. Plain words, not a restatement of `effect`. */
-  says: string;
-  /** What else goes with it, when deleting reaches further than the record itself. */
-  alsoRemoves?: ('versions' | 'history' | 'files' | 'derived-index')[];
-  /**
-   * What deliberately SURVIVES the delete. The write tally is always named here when the row is a
-   * memory family, because a permanent count of who touched a key is the point of that ledger and a
-   * map that quietly omitted it would be describing a deletion that does not happen.
-   */
-  survives?: string[];
-}
+/** What kind of thing the data is. */
+export type DataKind =
+  | 'settings' | 'user-written' | 'ai-generated' | 'register' | 'event-log' | 'index'
+  | 'computed-or-cache' | 'fetched-copy' | 'foreign-identifier' | 'snapshot' | 'metrics'
+  | 'preferences' | 'draft' | 'outgoing-message' | 'file' | 'link-between-things'
+  | 'permissions' | 'secret';
 
-/** How long it is kept, and by what mechanism — not a wish, a mechanism. */
-export interface RetentionAnswer {
-  kind:
-    | 'until-deleted'      // it stays until somebody removes it
-    | 'ttl'                // the record carries ttlHours and the sweep removes it
-    | 'rolling-window'     // only the last N days exist
-    | 'version-capped'     // only the last N versions exist
-    | 'unknown';
-  days?: number;
-  note?: string;
-}
+/** What it is there FOR. The axis that keeps getting dropped, which is why it is required. */
+export type DataUse =
+  | 'app-cannot-run-without' | 'user-returns-to-read' | 'shown-as-a-list' | 'search-and-filter'
+  | 'calculation-and-reporting' | 'app-resumes-where-it-left' | 'to-share-with-others'
+  | 'to-send-out' | 'evidence-of-what-happened' | 'speed-only' | 'context-for-an-ai'
+  | 'backwards-compatibility';
 
-/** What the tally observed about a family. NEVER accepted from a declaration — only measured. */
-export interface ObservedTrace {
-  writers: string[];
-  writeCount: number;
-  keyCount: number;
-  firstAt: string;
-  lastAt: string;
-  /**
-   * True when keys exist in this family but no tally row does. A different statement from "no
-   * writers": the node writes to memory from about a hundred places that carry no principal, and
-   * pretending those were nobody would make a coverage number look complete when it is not.
-   */
-  writersUnknown?: boolean;
-}
+export type Ownership =
+  | 'person' | 'organism' | 'extension' | 'ecosystem-app' | 'someone-else' | 'external-controller'
+  | 'nobody';
 
-/** One row of what the node holds. */
+export type Readers =
+  | 'owner-only' | 'owner-and-their-agents' | 'named-people' | 'organism-members' | 'anyone'
+  | 'the-app-itself' | 'a-recipient-elsewhere';
+
+export type Writers =
+  | 'person-in-the-ui' | 'the-app-for-the-person' | 'an-agent' | 'a-schedule-unattended'
+  | 'an-extension-server-side' | 'install-seed' | 'a-foreign-system';
+
+export type RecordShape =
+  | 'one-record' | 'one-per-thing' | 'collection-under-one-key' | 'rolled-up-per-period'
+  | 'index-plus-bodies' | 'files' | 'no-record';
+
+export type Retention =
+  | 'until-deleted' | 'ttl' | 'rolling-window' | 'version-capped' | 'append-only' | 'session-only';
+
+/** What losing it would cost. Decides whether a placement is acceptable at all. */
+export type LossRisk =
+  | 'only-copy' | 'recoverable-from-source' | 'recomputable' | 'user-can-rewrite' | 'may-vanish';
+
+/** Machinery the app leans on. Free-form beyond these; an unknown name is kept as written. */
+export type Machinery =
+  | 'iam-and-roles' | 'workflows' | 'extensions' | 'cortex' | 'ai-generation' | 'scheduling'
+  | 'connections-and-publish' | 'payments' | 'federation';
+
+/* ── The two tables ──────────────────────────────────────────────────────────────────────────── */
+
+/** One key family. Eleven things, and `why` is the one the whole feature exists for. */
 export interface DataMapRow {
-  /** `{ area, pattern, rights }` exactly as the ecosystem approval path already stores it. */
-  grant: EcoDataAreaGrant;
-  basis: IdentificationBasis;
-  /**
-   * Why it is HERE and not somewhere else. One sentence. Empty means the node derived this row and
-   * nobody has said why — which is a finding the lint reports, not a blank to be tidied away.
-   */
-  why: string;
-  ownership: 'owner' | 'agent' | 'extension' | 'ecosystem' | 'organism' | 'foreign';
-  readers: { visibility: MemoryRecord['visibility'] | 'mixed'; alsoNamed?: string[] };
-  deletion: DeletionAnswer;
-  retention: RetentionAnswer;
-  /** Tri-state on purpose: silence is not "no". Same rule the AI posture uses for public interest. */
+  /** The key family or record type. A FAMILY, never one key: `news.<date>.*`, not 300 rows. */
+  what: string;
+  /** In the app's own words, one short line: "people and leads", "meeting transcripts". */
+  holds: string;
+  kind: DataKind;
+  usedFor: DataUse;
+  where: DataLocation;
+  /** Where exactly, when the location alone is not an address: an organism + workspace, a bucket. */
+  whereExactly?: string;
+  owner: Ownership;
+  readers: Readers;
+  writers: Writers[];
+  shape: RecordShape;
+  keptFor: Retention;
+  lossRisk: LossRisk;
+  /** Personal data. Tri-state on purpose: silence is not a considered "no". */
   personalData: 'yes' | 'no' | 'unstated';
-  source: 'declared' | 'derived' | 'observed';
-  observed?: ObservedTrace;
+  /** One sentence: why HERE and not somewhere else. Empty means nobody has said. Never invented. */
+  why: string;
 }
 
-/**
- * One row of what is unresolved, or is not ours.
- *
- * Every map leaves these out and every one of them is where a deletion request goes wrong. The third
- * status is the one to design against: what has already left the building cannot be recalled, so the
- * map states what is kept of it rather than implying it can be undone.
- */
+/** The second table: what is unresolved, or is not ours. */
 export interface ElsewhereRow {
-  grant: EcoDataAreaGrant;
-  basis: IdentificationBasis;
-  why: string;
-  status:
-    | 'work-in-progress'            // half-written, and nobody has decided where it belongs
-    | 'copy-of-anothers-record'     // a copy; the original is somewhere else and moves without us
-    | 'already-left'                // sent, delivered, published — gone from our reach
-    | 'account-in-a-foreign-system'; // a login somewhere we do not run
-  /** Where the real one is, in words a person can act on. */
+  what: string;
+  status: 'work-in-progress' | 'copy-of-anothers-record' | 'already-left' | 'account-in-a-foreign-system';
+  /** Where the real one is. */
   where: string;
-  /** Who to ask, when deleting is not ours to do. */
-  controller?: string;
-  deletion: DeletionAnswer;
-  retention: RetentionAnswer;
-  personalData: 'yes' | 'no' | 'unstated';
-  source: 'declared' | 'derived' | 'observed';
+  /** Who decides about it. */
+  controlledBy: string;
+  /** What deleting our side actually does. */
+  deletion: string;
 }
 
-/** The publish check's finding. OWNER-ONLY — `publicDataMap()` strips it. */
+/** What the app sends out of the house, if anything. */
+export interface LeavesRow {
+  what: string;
+  to: string;
+  /** Whether it can be recalled. Sent mail cannot. */
+  recallable: boolean;
+}
+
+export interface DataMap {
+  spec: typeof DATA_MAP_SPEC;
+
+  /* ── The app level. The first two are the ones that keep getting dropped. ── */
+
+  /** What this app IS, in human words. One paragraph. Not derivable — written once. */
+  what: string;
+  /** What it is USED FOR, and what someone achieves with it. Not derivable — written once. */
+  usedFor: string;
+  form: DataMapForm;
+  /** Where the data is, as prose: the actual arrangement, not an assumed one. */
+  arrangement: string;
+  machinery: (Machinery | string)[];
+  leaves: LeavesRow[];
+
+  /* ── The rows ── */
+
+  held: DataMapRow[];
+  elsewhere: ElsewhereRow[];
+
+  /** Who wrote this map. 'declared' = a person or the app's builder. 'none' = there is no map. */
+  source: 'declared' | 'none';
+  at: string;
+  /** Owner-only. Never stored on the public record; stripped on the way in. */
+  gap?: DataMapGap;
+}
+
 export interface DataMapGap {
   code: string;
   message: string;
   at: string;
 }
 
-export interface DataMap {
-  spec: typeof DATA_MAP_SPEC;
-  form: DataMapForm;
-  /** What the node holds. */
-  held: DataMapRow[];
-  /** What is unresolved or belongs to somebody else. */
-  elsewhere: ElsewhereRow[];
-  source: 'declared' | 'derived' | 'mixed';
-  at: string;
-  gap?: DataMapGap;
-}
-
-/**
- * The summary that rides on the app manifest, so a listing can show the state without opening the
- * document. On the manifest for the reason `aiPosture` is: a JSON blob on both storage providers, so
- * no migration and no second place to keep in sync, and it survives update, fork, backup and the
- * purchase snapshot.
- */
+/** The summary carried on the app manifest, so a list can render without reading the document. */
 export interface DataMapStamp {
   spec: typeof DATA_MAP_SPEC;
   form: DataMapForm;
-  source: 'declared' | 'derived' | 'mixed';
+  /** One line for a list: where this app's data is. Built from the rows, never invented. */
+  summary: string;
   heldRows: number;
-  elsewhereRows: number;
-  /** The weakest basis anywhere in the map — what a reader should trust it to the level of. */
-  weakestTier: IdentificationTier;
-  /** Rows with no `why`. The single number that says how much of this nobody has explained. */
   rowsWithoutWhy: number;
-  /** Where the full document lives, so a reader does not have to guess the key. */
+  /** True when the app carries no map at all. A missing map says so; it is never guessed. */
+  missing: boolean;
   docKey: string;
   at: string;
   gap?: DataMapGap;
 }
 
-/** An empty map, which is a statement ("this stores nothing") and not an absence. */
-export function emptyDataMap(form: DataMapForm, at: string): DataMap {
-  return { spec: DATA_MAP_SPEC, form, held: [], elsewhere: [], source: 'derived', at };
-}
+/** The memory key holding one app's map, beside the app rather than inside it. */
+export const appDataMapKey = (appId: string): string => `apps.${appId}.datamap`;
 
 /**
- * The map as anyone but the owner may see it.
- *
- * The rows are the promise a program makes to whoever installs it, so they stay. The gap is the
- * publish check talking to the owner about their own unfinished work, and it goes — the same split
- * `publicPosture()` makes, for the same reason.
+ * The public form. The rows are the promise the app makes to whoever installs it; the finding is the
+ * owner's own unfinished business, so it is stripped rather than hidden by a reader.
  */
-export function publicDataMap<T extends DataMap | DataMapStamp>(map: T): T {
-  if (!map.gap) return map;
-  const copy = { ...map };
-  delete copy.gap;
-  return copy;
+export function publicDataMap(map: DataMap): DataMap {
+  const { gap, ...rest } = map;
+  void gap;
+  return rest as DataMap;
 }
 
-/** Where an app's full map document lives. A stable address, mirroring `appToolsKey`. */
-export function appDataMapKey(appId: string): string {
-  return `apps.${appId}.datamap`;
-}
-
-/** The app id a data-map key belongs to, or null when the key is not one. */
-export function appIdFromDataMapKey(key: string): string | null {
-  const m = /^apps\.(.+)\.datamap$/.exec(key);
-  return m ? m[1] : null;
+/** True when a stored record is a map of this spec. */
+export function isDataMapRecord(rec: MemoryRecord | null | undefined): boolean {
+  const v = rec?.value as { spec?: unknown } | undefined;
+  return !!v && typeof v === 'object' && v.spec === DATA_MAP_SPEC;
 }

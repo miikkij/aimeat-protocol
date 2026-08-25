@@ -2752,43 +2752,38 @@ components:
     DataMapStamp:
       type: object
       description: >
-        The SUMMARY of where a published program puts what (TARGET-073) — how many rows, on how weak
-        a basis, and how much of it nobody has explained. Stored on the app manifest for the same
-        reason the AI posture is. The map ITSELF, with a sentence per row saying why the data is
-        there and what deleting it means, is a public memory record at the address in `docKey`.
+        The SUMMARY of where a published app puts what — enough for a list to render one line
+        without opening the document. The map ITSELF, with the paragraph saying what the app is for
+        and one sentence per row saying why the data is there, is a public memory record at `docKey`.
+
+        NOTHING HERE IS GUESSED. An app whose builder never wrote a map is stamped `missing: true`,
+        which is the honest answer and the one that gets a map written. An earlier version derived a
+        map from the app's permission words, and the guess then sat exactly where the answer belonged
+        and read like one.
 
         The rows are public: where an app puts data is the promise it makes to whoever installs it,
-        and an agent deciding whether to use it needs that before it touches anything. The `gap`
-        member is OWNER-ONLY and is stripped from every response served to anyone else.
+        and an AI about to change the app needs it before it touches anything. `gap` is OWNER-ONLY
+        and is stripped from every response served to anyone else.
       properties:
-        spec: { type: string, example: aimeat.datamap/1 }
+        spec: { type: string, example: aimeat.datamap/2 }
         form:
           type: string
-          enum: [single-person, private, shared, group, organism-workspace, mixed]
-          description: The shape of the program, which decides what its map has to contain.
-        source:
-          type: string
-          enum: [declared, derived, mixed]
+          enum: [one-person, private, shared-with-named, group, organism-workspace, public-service, static, mixed, unstated]
           description: >
-            `declared` — somebody wrote this. `derived` — the node worked it out from the permissions
-            the app asks for and nobody has confirmed it. The difference is the whole point: a
-            derived map is a draft, and it never presents itself as the owner's statement.
-        heldRows: { type: integer, description: Rows describing what this node holds. }
-        elsewhereRows: { type: integer, description: "Rows for what is unresolved, or is somebody else's." }
-        weakestTier:
-          type: string
-          enum: [schema-locked, declared-space, platform-prefix, owner-named, none]
-          description: The weakest basis anywhere in the map — what a reader should trust the whole of it to.
+            What shape of app this is, which decides what its map has to contain. `unstated` is a
+            real answer and never a default the node invents.
+        summary: { type: string, description: One line for a list, built from the rows. }
+        heldRows: { type: integer, description: Rows describing what this app holds. }
         rowsWithoutWhy: { type: integer, description: Rows that say where data goes and not why it goes there. }
+        missing: { type: boolean, description: True when nobody has written a map for this app. }
         docKey: { type: string, example: apps.cadence.datamap, description: Where the full map lives. }
         at: { type: string, format: date-time }
         gap:
           type: object
           nullable: true
           description: >
-            OWNER-ONLY. The publish check's finding. The publish WARNS and proceeds; it NEVER blocks —
-            a map is a statement about storage rather than a property of the bytes, and a gate that
-            refused would break the next publish of every app already on the node.
+            OWNER-ONLY. The worst thing still missing from this map. The publish WARNS and proceeds;
+            it NEVER blocks — a map is a statement about storage rather than a property of the bytes.
           properties:
             code: { type: string, example: DATAMAP_MISSING }
             message: { type: string }
@@ -9743,7 +9738,11 @@ paths:
         required: true
         content:
           application/json:
-            schema: { type: object, description: The whole map document, carrying spec "aimeat.datamap/1". }
+            schema:
+              type: object
+              description: >
+                The whole map, carrying spec "aimeat.datamap/2". Fields: what, usedFor, form,
+                arrangement, machinery, leaves, held and elsewhere.
       responses:
         '200':
           description: Stored. `hints` says what is still unfinished; it never refuses.
@@ -9751,49 +9750,6 @@ paths:
         '403': { description: Another account's map, or a granted app }
         '404': { description: No such app }
         '422': { description: The map could not be stored }
-
-  /v1/datamap/coverage:
-    get:
-      summary: What is stored here that nobody has described
-      description: |
-        The account's whole keyspace folded into groups, with a count per basis and the unexplained
-        groups biggest first. The fold happens on the server: the heaviest account on this node holds
-        18,446 keys, and what crosses the wire is about 27 rows.
-
-        `notCovered` is part of the answer. A coverage figure that hides its own blind spots reads as
-        complete, which is the failure this whole feature exists to prevent.
-      tags: [Memory]
-      security: [{ bearerAuth: [] }]
-      responses:
-        '200': { description: The report }
-        '403': { description: The session does not carry memory:read }
-
-  /v1/datamap/name:
-    post:
-      summary: Say what one group of keys is
-      description: |
-        The cheapest way to make a coverage number better: a person names one group and it stops
-        being unexplained. Writes ONE memory record and needs no republish of anything, because a map
-        is about the store rather than about a manifest.
-      tags: [Memory]
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [family]
-              properties:
-                family: { type: string, example: 'uutiset.<date>.*' }
-                holds: { type: string }
-                why: { type: string }
-                personal_data: { type: string, enum: [yes, no, unstated] }
-                retention: { type: string }
-                readers: { type: string }
-      responses:
-        '200': { description: Saved }
-        '400': { description: No family named }
 
   /v1/memory/{key}/hands:
     get:

@@ -9,7 +9,7 @@
  *   v1.6.0 — 2026-08-24 — The catalogue carries `data_map`, on exactly the terms the AI posture
  *     travels on: the rows are public, because where an app puts data is the promise it makes to
  *     whoever installs it and an agent needs that before it touches anything; the publish check's
- *     `gap` is the owner's own business and publicDataMap() strips it for everyone else.
+ *     `gap` is the owner's own business and is stripped for everyone else.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — catalogue listing metrics via 3 batch queries (downloads/forks/screenshots), was 3N
  *   v1.2.0 — 2026-07-16 — GET /v1/apps carries has_draft for the viewer's OWN apps (one
@@ -34,7 +34,6 @@ import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import { publicPosture } from '../../services/app-ai-posture.js';
-import { publicDataMap } from '../../services/data-map/data-map-types.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 
@@ -106,9 +105,13 @@ export function registerCatalogueAdminRoutes(
             // Where an app puts what is the promise it makes to whoever installs it, and an agent
             // deciding whether to use it needs that before it touches anything — so the rows are
             // public. The publish check's finding is the owner's own unfinished business, so
-            // publicDataMap() strips it for everyone else.
+            // The stamp is a summary and carries no rows, so the only owner-only thing on it is the
+            // finding. Strip that rather than the whole stamp: a stranger still needs to see WHERE
+            // an app puts data before they install it.
             const dataMap = app.manifest.dataMap;
-            const shownDataMap = isOwn ? dataMap : (dataMap ? publicDataMap(dataMap) : undefined);
+            const shownDataMap = !dataMap ? undefined
+                : isOwn ? dataMap
+                : { ...dataMap, gap: undefined };
             const shownManifest = isOwn ? app.manifest : {
                 ...app.manifest,
                 ...(posture ? { aiPosture: shownPosture } : {}),

@@ -11,7 +11,8 @@
  *     - Install modal      — upload/paste manifest + libs
  * @usage Loaded as a lazy tab in profile.js via dynamic import.
  * @version-history
- *   2026-08-25 — The bespoke "Schemas" list becomes the shared data map (extensions-tab.datamap.js).
+ *   2026-08-25 — The data map belongs to an APP and was removed from here: an extension is not
+ *     what somebody opens when they are about to build something.
  *   v1.3.0 — 2026-06-24 — Secretary P5 (S-C): instance-create form renders per-instance config
  *     fields from configSchema; `type: secret` fields show a masked (password) input + 🔒 tag.
  *   v1.0.0 — 2026-03-10 — Initial implementation with Cortex + Server extension management
@@ -39,8 +40,6 @@ import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { Modal, useConfirm } from '/components/Modal.js';
-import { DataMap } from '/components/DataMap.js';
-import { extDataMap } from './extensions-tab.datamap.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { StatusDot } from '/components/StatusDot.js';
 import { useMaturityLedger, maturityBadge } from './extensions-tab.maturity.js';
@@ -401,7 +400,6 @@ export default function ExtensionsTab({ session, showToast }) {
 
       ${comps.filter(c => c.type === 'schema').length > 0 ? html`
         <div class="ext-detail-section">
-          <${DataMap} map=${extDataMap(ext, comps)} subject=${{ kind: 'extension', id: ext.name, label: ext.name }} />
         </div>` : null}
 
       ${(ext._ontologies || []).map(ont => html`
