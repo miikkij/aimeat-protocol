@@ -14,6 +14,14 @@
  *   product's own rule about empty states at the exact moment the person has finally got excited.
  *   So each room states HOW it is checked, and the two that cannot be inferred are operator flags
  *   defaulting to closed — see the note on the monetising room for what happens when you guess.
+ *
+ *   THE ROOMS ARE NOT COMING BACK AS BLOCKS, and this note exists because the surface layout engine
+ *   makes somebody ask again. No card has rendered them since 2026-08-18; what is still alive is the
+ *   VOCABULARY — `POST /v1/home/room` validates against these ids, and that route is where the
+ *   onboarding funnel's write-once markers are set. So this is not dead weight that the block
+ *   registry replaces: the registry took over the rendering, which was already gone, and left the
+ *   funnel behind. Removing it means deciding what happens to those markers and to the documented
+ *   `rooms` field in the /v1/home/state response, which is a separate decision from arranging pages.
  * @structure ROOMS (with their destinations) · openRooms(storage, config, ownerGhii?)
  * @usage
  *   import { openRooms } from '../services/home-rooms.js';
