@@ -226,6 +226,17 @@ export const triggerLbSync    = ()      => apiPost('/v1/admin/site/sync');
 export const getHeaderNav     = ()      => apiGet('/v1/site/header-nav');
 export const saveHeaderNav    = (order, hidden) => apiPut('/v1/site/header-nav', { order, hidden });
 
+// ── Surface layouts: which blocks the front page and the member home are built from ──
+export const getSurfaceLayout    = (s)          => apiGet(`/v1/site/layout/${encodeURIComponent(s)}`);
+export const saveSurfaceLayout   = (s, layout)  => apiPut(`/v1/site/layout/${encodeURIComponent(s)}`, layout);
+export const revertSurfaceLayout = (s)          => apiDelete(`/v1/site/layout/${encodeURIComponent(s)}`);
+export const resetSurfaceLayout  = (s)          => apiPost(`/v1/site/layout/${encodeURIComponent(s)}/reset`);
+export const listLayoutVersions  = (s)          => apiGet(`/v1/site/layout/${encodeURIComponent(s)}/versions`);
+export const restoreLayout       = (s, version) => apiPost(`/v1/site/layout/${encodeURIComponent(s)}/restore`, { version });
+export const getSurfaceBlocks    = (s)          => apiGet(`/v1/site/blocks?surface=${encodeURIComponent(s)}`);
+export const getLayoutPrompt     = (s)          => apiGetText(`/v1/site/layout-prompt?surface=${encodeURIComponent(s)}`);
+export const importSurfaceLayout = (bundle)     => apiPost('/v1/site/layout-import', bundle);
+
 // ── Memory (for portal memory keys) ──
 export const addMemory       = (key, value) => apiPost('/v1/memory', { key, value, visibility: 'private' });
 export const deleteMemory    = (key)        => apiDelete(`/v1/memory/${encodeURIComponent(key)}`);
