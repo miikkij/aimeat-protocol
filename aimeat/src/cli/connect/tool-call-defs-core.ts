@@ -290,6 +290,26 @@ export const coreTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_admin_config',
         handler: ({ client }) => client.get('/v1/admin/config'),
     },
+    // ── Arranging this node's pages. The third door: a fleet daemon calls this dispatch, not the
+    // MCP surfaces above it, and a parameter that exists on those two and not here is dropped in
+    // silence — the same defect this repo paid for three times in one week.
+    {
+        name: 'aimeat_surface_layout_get',
+        handler: ({ client }, input) => client.get(`/v1/site/layout/${encodeURIComponent(requiredString(input, 'surface'))}`),
+    },
+    {
+        name: 'aimeat_surface_layout_set',
+        handler: ({ client }, input) => client.put(
+            `/v1/site/layout/${encodeURIComponent(requiredString(input, 'surface'))}`,
+            {
+                v: 1,
+                blocks: input.blocks,
+                ...(input.note ? { meta: { note: input.note } } : {}),
+                ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
+                ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
+            },
+        ),
+    },
     // ── BR-04: SSO administration + manual account lifecycle. Every handler forwards the whole
     // declared input; ids and names land in path segments through encodeURIComponent only.
     {

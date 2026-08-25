@@ -33,6 +33,9 @@ import { randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, SiteChangeLogEntry } from '../../storage/interface.js';
 import type { MemoryVersionRecord } from '../../storage/repositories/memory.repository.js';
+import { emitChange } from '../event-bus.js';
+import { provenanceForWrite } from '../ai-provenance.js';
+import type { DeclaredProvenance } from '../ai-provenance.js';
 import { SITE_OWNER_GAII, SiteError } from '../site.js';
 import { defaultLayout } from './registry.js';
 import type { ResolvedLayout, SurfaceId, SurfaceLayout } from './types.js';
@@ -48,6 +51,23 @@ export interface PreparedLayout {
     layout: SurfaceLayout;
     /** Block key → the words that belong behind it. */
     bodies: Record<string, string>;
+}
+
+/**
+ * What the writer said about how a passage was made.
+ *
+ * A free-form passage is prose on a page every member of this node lands on, and an AI is exactly
+ * who an operator asks to write it. That makes it the case AI provenance exists for, so a caller
+ * may declare, and the declaration is minted against the passage's own bytes when it is stored.
+ * Silence stays UNSTATED: absent is never "a human wrote it".
+ */
+export interface PassageProvenance {
+    /** The writer, resolved. A GHII, GAII or GEAI, never a bare owner name. */
+    principal: string;
+    /** An existing record the caller asked to attach. Checked against their own account. */
+    declaredId?: string;
+    /** What the caller said about how the words were produced. */
+    declared?: DeclaredProvenance;
 }
 
 /** A layout as it arrives from an operator or their AI, with free-form text still inline. */
@@ -73,6 +93,19 @@ export class SurfaceLayoutService {
     /** Whether the string names a surface. Routes take it from the path, so it is never trusted. */
     static isSurface(value: string): value is SurfaceId {
         return (SURFACE_IDS as readonly string[]).includes(value);
+    }
+
+    /**
+     * Whether the account acting here runs this node.
+     *
+     * It lives in the service rather than in the tool that needs it, because a capability written
+     * twice is how this surface and REST came to differ in 315 measured places. The HTTP door gets
+     * the same answer from requireOperatorPrincipal; the tool surface asks here.
+     */
+    async callerIsOperator(ownerName: string | null | undefined): Promise<boolean> {
+        if (!ownerName) return false;
+        const owner = await this.storage.getOwner(ownerName);
+        return !!owner && owner.roles.includes('operator');
     }
 
     // ── Reading ──
@@ -138,8 +171,9 @@ export class SurfaceLayoutService {
         submission: LayoutSubmission,
         changedBy: string,
         source: SurfaceLayout['meta']['source'],
+        provenance?: PassageProvenance,
     ): Promise<ResolvedLayout> {
-        return this.commit(this.prepare(surface, submission, changedBy, source), changedBy);
+        return this.commit(this.prepare(surface, submission, changedBy, source), changedBy, provenance);
     }
 
     /**
@@ -171,33 +205,38 @@ export class SurfaceLayoutService {
     }
 
     /** Write what prepare() already accepted. Nothing here can refuse. */
-    async commit(prepared: PreparedLayout, changedBy: string): Promise<ResolvedLayout> {
+    async commit(prepared: PreparedLayout, changedBy: string, provenance?: PassageProvenance): Promise<ResolvedLayout> {
         const { surface, layout, bodies } = prepared;
         for (const [blockKey, body] of Object.entries(bodies)) {
             const ref = layout.freeform?.[blockKey]?.ref;
             if (!ref) continue;
-            await this.putMemory(freeformKey(ref), body, 'owner', ['site', 'freeform']);
+            await this.putMemory(freeformKey(ref), body, 'owner', ['site', 'freeform'],
+                await this.provenanceIdFor(body, provenance));
         }
         await this.putMemory(layoutKey(surface), JSON.stringify(layout), 'public', ['site', 'layout']);
         await this.log('layout_set', `Set the ${surface} layout (${layout.blocks.length} blocks)`, changedBy);
+        emitChange('site');
         return { layout, degraded: false, problems: [], source: 'stored' };
     }
 
     /** Store one free-form passage on its own, without rewriting the layout around it. */
-    async writeFreeform(slug: string, body: string, changedBy: string): Promise<void> {
+    async writeFreeform(slug: string, body: string, changedBy: string, provenance?: PassageProvenance): Promise<void> {
         if (!SLUG_RE.test(slug)) {
             throw new SiteError('FREEFORM_INVALID',
                 `"${slug}" is not a usable name for a passage: lower-case letters, numbers and dashes.`, 422);
         }
         refuseMarkup(body, `the passage "${slug}"`);
-        await this.putMemory(freeformKey(slug), body, 'owner', ['site', 'freeform']);
+        await this.putMemory(freeformKey(slug), body, 'owner', ['site', 'freeform'],
+            await this.provenanceIdFor(body, provenance));
         await this.log('layout_set', `Set the passage ${slug} (${Buffer.byteLength(body, 'utf-8')} bytes)`, changedBy);
+        emitChange('site');
     }
 
     /** Go back to the built-in layout for a surface. The free-form passages are left where they are. */
     async remove(surface: SurfaceId, changedBy: string): Promise<void> {
         await this.storage.deleteMemory(SITE_OWNER_GAII, layoutKey(surface));
         await this.log('layout_delete', `Reverted the ${surface} surface to the built-in layout`, changedBy);
+        emitChange('site');
     }
 
     // ── Versions ──
@@ -233,6 +272,7 @@ export class SurfaceLayoutService {
         );
         await this.putMemory(layoutKey(surface), JSON.stringify(candidate), 'public', ['site', 'layout']);
         await this.log('layout_restore', `Restored the ${surface} layout to version ${version}`, changedBy);
+        emitChange('site');
         return { layout: candidate, degraded: false, problems: [], source: 'stored' };
     }
 
@@ -265,11 +305,29 @@ export class SurfaceLayoutService {
         return bodies;
     }
 
+    /**
+     * Mint a provenance record for a passage when its writer declared one. Undeclared stays
+     * undefined, which the record reads as UNSTATED rather than as a human's work.
+     */
+    private async provenanceIdFor(body: string, provenance?: PassageProvenance): Promise<string | undefined> {
+        if (!provenance || (!provenance.declared && !provenance.declaredId)) return undefined;
+        return provenanceForWrite(this.storage, {
+            principal: provenance.principal,
+            content: body,
+            declaredId: provenance.declaredId,
+            declared: provenance.declared,
+            pipeline: 'surface.freeform',
+            nodeId: this.config.nodeId,
+            baseUrl: this.config.baseUrl,
+        });
+    }
+
     private async putMemory(
         key: string,
         value: string,
         visibility: 'public' | 'owner',
         tags: string[],
+        aiProvenanceId?: string,
     ): Promise<void> {
         const now = new Date().toISOString();
         const existing = await this.storage.getMemory(SITE_OWNER_GAII, key);
@@ -285,6 +343,9 @@ export class SurfaceLayoutService {
             updatedAt: now,
             // The previous value is archived on overwrite, which is where undo comes from.
             trackable: true,
+            // Write-through and never inherited: new words are new content, and carrying the old
+            // record forward would make this assert something about bytes that no longer exist.
+            ...(aiProvenanceId ? { aiProvenanceId } : {}),
         });
     }
 

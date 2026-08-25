@@ -195,6 +195,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_admin_sso_list', 'aimeat_admin_sso_get', 'aimeat_admin_sso_create', 'aimeat_admin_sso_update',
         'aimeat_admin_sso_delete', 'aimeat_admin_sso_idp_metadata', 'aimeat_admin_sso_scim_token',
         'aimeat_admin_owner_disable', 'aimeat_admin_owner_enable',
+        // Arranging this node's front page and the page its members land on.
+        'aimeat_surface_layout_get', 'aimeat_surface_layout_set',
         // The operator's break-glass over an organism whose creator account is unreachable, plus the
         // read that shows the roster before it is re-pointed.
         'aimeat_admin_organism_ownership', 'aimeat_admin_organism_owner_add',

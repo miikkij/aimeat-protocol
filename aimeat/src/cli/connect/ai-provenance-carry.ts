@@ -128,6 +128,12 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
   aimeat_knowledge_contribute: { kind: 'not-carried', route: 'POST /v1/knowledge/:id/contribute' },
   aimeat_message_send: { kind: 'not-carried', route: 'POST /v1/agents/:agent/messages' },
   aimeat_task_complete: { kind: 'not-carried', route: 'POST /v1/agents/:agent/tasks/:id/complete' },
+  // Same shape as aimeat_app_draft_publish above: the node route ACCEPTS a declaration
+  // (routes/site-layout.ts passes it to the layout service, which mints it against the passage's own
+  // bytes), and this side does send the block. What is not proved yet is the echo — telling the
+  // caller `recorded: true` with the record's id — and promoting an entry means proving that, not
+  // asserting it. Only a free-form passage carries prose at all; the rest of a layout is block names.
+  aimeat_surface_layout_set: { kind: 'not-carried', route: 'PUT /v1/site/layout/:surface' },
   aimeat_workspace_comment: { kind: 'not-carried', route: 'POST /v1/organisms/:id/comments' },
   // The batch is the reason, not the route: workspace_write DOES land in POST /v1/memory, which
   // could carry a declaration — but one declaration cannot honestly describe N separately-authored

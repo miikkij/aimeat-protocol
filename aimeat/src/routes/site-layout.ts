@@ -31,9 +31,10 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireOperatorPrincipal } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { emitChange } from '../services/event-bus.js';
 import { SiteError } from '../services/site.js';
-import { SurfaceLayoutService, type LayoutSubmission } from '../services/surface-layout/service.js';
+import { SurfaceLayoutService, type LayoutSubmission, type PassageProvenance } from '../services/surface-layout/service.js';
+import { toDeclaredProvenance, type AiProvenanceToolInput } from '../mcp/ai-provenance-input.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import { blocksForSurface, defaultLayout, operatorLabelKey } from '../services/surface-layout/registry.js';
 import type { SurfaceId } from '../services/surface-layout/types.js';
 import { SURFACE_LAYOUT_WRITE_SCOPE } from '../utils/scope-coverage.js';
@@ -65,6 +66,20 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
             return;
         }
         throw err;
+    }
+
+    /**
+     * What the writer said about how a passage was made. A free-form passage is prose on a page every
+     * member lands on, and an AI is exactly who an operator asks to write one — so the declaration
+     * travels, and silence stays UNSTATED rather than becoming a claim that a person wrote it.
+     */
+    function passageProvenance(req: Parameters<RequestHandler>[0]): PassageProvenance {
+        const body = (req.body ?? {}) as { ai_provenance?: AiProvenanceToolInput; ai_provenance_id?: unknown };
+        return {
+            principal: resolveIdentity(req.auth!, config.nodeId),
+            ...(typeof body.ai_provenance_id === 'string' ? { declaredId: body.ai_provenance_id } : {}),
+            ...(body.ai_provenance ? { declared: toDeclaredProvenance(body.ai_provenance) } : {}),
+        };
     }
 
     function layoutBody(resolved: Awaited<ReturnType<SurfaceLayoutService['resolve']>>, freeform: Record<string, string>) {
@@ -99,11 +114,10 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
         const surface = surfaceOf(req, res);
         if (!surface) return;
         try {
-            const result = await svc.write(surface, (req.body ?? {}) as LayoutSubmission, req.auth!.sub, 'admin');
+            const result = await svc.write(surface, (req.body ?? {}) as LayoutSubmission, req.auth!.sub, 'admin', passageProvenance(req));
             res.json(success(config.nodeId, layoutBody(result, {}), [
                 { description: 'See it', method: 'GET', url: `/v1/site/layout/${surface}` },
             ]));
-            emitChange('site');
         } catch (err) { sendError(res, err); }
     });
 
@@ -115,7 +129,6 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
             await svc.remove(surface, req.auth!.sub);
             const resolved = await svc.resolve(surface);
             res.json(success(config.nodeId, layoutBody(resolved, {})));
-            emitChange('site');
         } catch (err) { sendError(res, err); }
     });
 
@@ -129,7 +142,6 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
             const built = defaultLayout(surface, config);
             const result = await svc.write(surface, { v: 1, blocks: built.blocks, meta: { note: 'Started from the built-in layout' } }, req.auth!.sub, 'admin');
             res.json(success(config.nodeId, layoutBody(result, {})));
-            emitChange('site');
         } catch (err) { sendError(res, err); }
     });
 
@@ -160,7 +172,6 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
         try {
             const result = await svc.restore(surface, version, req.auth!.sub);
             res.json(success(config.nodeId, layoutBody(result, {})));
-            emitChange('site');
         } catch (err) { sendError(res, err); }
     });
 
@@ -216,15 +227,15 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
             // first one applied.
             const prepared = entries.map(([name, submission]) =>
                 svc.prepare(name as SurfaceId, submission, req.auth!.sub, 'import'));
+            const declared = passageProvenance(req);
             const written: string[] = [];
             for (const p of prepared) {
-                await svc.commit(p, req.auth!.sub);
+                await svc.commit(p, req.auth!.sub, declared);
                 written.push(p.surface);
             }
             res.json(success(config.nodeId, { surfaces_written: written }, written.map(s => ({
                 description: `See the ${s} surface`, method: 'GET', url: `/v1/site/layout/${s}`,
             }))));
-            emitChange('site');
         } catch (err) { sendError(res, err); }
     });
 
@@ -236,9 +247,8 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
             return;
         }
         try {
-            await svc.writeFreeform(body.key, body.body, req.auth!.sub);
+            await svc.writeFreeform(body.key, body.body, req.auth!.sub, passageProvenance(req));
             res.json(success(config.nodeId, { key: body.key, bytes: Buffer.byteLength(body.body, 'utf-8') }));
-            emitChange('site');
         } catch (err) { sendError(res, err); }
     });
 
