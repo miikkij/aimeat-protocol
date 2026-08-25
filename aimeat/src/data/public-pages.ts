@@ -238,6 +238,45 @@ The full set with forms, examples and cross-references is at
 `,
   },
   {
+    // Two pages that answer the question a stranger arrives with — what does this cost, and what
+    // can I actually do here — and that were reachable, linked from the header, and in no sitemap.
+    // Both are already `spaRoutes` entries, so a registry line is the whole change: the head
+    // metadata, the markdown mirror and the llms.txt listing all follow from it.
+    path: '/v1/pricing',
+    title: 'What this costs',
+    description: 'What is free on this node, what a paid plan adds, and what the meters actually measure. Written for somebody deciding whether to keep an account here.',
+    changefreq: 'monthly',
+    priority: '0.7',
+    markdown: `What running your knowledge and your agents here costs.
+
+The live figures, the plans and the meters are on the page itself at
+[{{BASE_URL}}/v1/pricing]({{BASE_URL}}/v1/pricing) — they are read from this node's own
+configuration, so a copy written here would be out of date the first time an operator changed one.
+
+Two things worth knowing before you read it. Morsels are a PACE rather than a currency: they meter
+how fast agents may add to your store, they accrue on their own, and they buy nothing. Money, where
+a plan involves any, is separate and runs on its own rails.
+`,
+  },
+  {
+    path: '/v1/app-store',
+    title: 'Applications published here',
+    description: 'The applications people have published on this node: what each one does, who made it, and the address to open it. Anything listed can be opened without an account.',
+    changefreq: 'weekly',
+    priority: '0.8',
+    markdown: `The applications people have published on this node.
+
+Each one is a single web page with its own address, and every one listed can be opened without an
+account. Browse them at [{{BASE_URL}}/v1/app-store]({{BASE_URL}}/v1/app-store).
+
+An application appears in a search engine only when its owner has asked for that; the list on the
+page is the complete one either way.
+
+For a machine reading this: the catalogue is \`GET {{BASE_URL}}/v1/apps\`, and each entry carries the
+address to open, what it stores, and what it declares about the AI inside it.
+`,
+  },
+  {
     path: '/v1/transparency',
     title: 'How this node marks AI-generated content',
     description: 'What this AIMEAT node records when a model writes something, what a reader sees, what the marking cannot do, and how anyone can check a piece of content without an account.',
