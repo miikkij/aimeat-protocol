@@ -27,7 +27,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import { getSoftwareVersion } from '../utils/version.js';
-import { findPublicPage } from '../data/public-pages.js';
+import { findPublicPage, type PublicPage } from '../data/public-pages.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 
 /**
@@ -76,6 +76,12 @@ export function serveSpa(
   config: AimeatConfig,
   /** The route being served, so the head can describe THIS page and not the shell. */
   routePath?: string,
+  /**
+   * A page BUILT for this request rather than looked up in the registry. One route can serve as
+   * many pages as there are people — /v1/portfolio/:username is that case — and the registry
+   * cannot hold those, so the caller composes the description and hands it over.
+   */
+  builtPage?: PublicPage,
 ): void {
   const appOriginEnabled = config.appOriginEnabled && !!config.appHost;
   const v = `?v=${BUILD_ID}`;
@@ -130,7 +136,7 @@ export function serveSpa(
   // Per-route head metadata: one spa.html shell answers ten routes, so the canonical link, the
   // title and the description are stamped per request. Runs second, so a page that describes
   // itself wins over the node-wide fallback just written. Shared with the static info pages.
-  const page = routePath ? findPublicPage(routePath) : undefined;
+  const page = builtPage ?? (routePath ? findPublicPage(routePath) : undefined);
   if (page) html = injectPageHead(html, page, config, nonceAttr);
 
   // Make the running AIMEAT version visible from the page itself — a view-source comment plus a
