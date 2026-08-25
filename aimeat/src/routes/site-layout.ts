@@ -34,6 +34,7 @@ import { success, error } from '../middleware/envelope.js';
 import { SiteError } from '../services/site.js';
 import { SurfaceLayoutService, type LayoutSubmission, type PassageProvenance } from '../services/surface-layout/service.js';
 import { toDeclaredProvenance, type AiProvenanceToolInput } from '../mcp/ai-provenance-input.js';
+import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { blocksForSurface, defaultLayout, operatorLabelKey } from '../services/surface-layout/registry.js';
 import type { SurfaceId } from '../services/surface-layout/types.js';
@@ -237,6 +238,57 @@ export function siteLayoutRouter(config: AimeatConfig, storage: Storage, require
                 description: `See the ${s} surface`, method: 'GET', url: `/v1/site/layout/${s}`,
             }))));
         } catch (err) { sendError(res, err); }
+    });
+
+    // GET /v1/site/layout-prompt — the prompt an operator pastes into their own AI chat.
+    //
+    // For the operators MCP cannot reach. An operator whose AI is connected asks it directly and
+    // aimeat_surface_layout_set does the work; this is the free, AI-agnostic road for everyone else,
+    // and they read the JSON before anything is sent.
+    //
+    // The catalogue and the current layout are rendered in HERE rather than written into the prompt,
+    // so what an AI is handed is what the validator will accept. A hand-written block list drifts
+    // the first time a block is added, and the operator reads the refusal as "the AI is broken".
+    router.get('/v1/site/layout-prompt', ...operator, async (req, res) => {
+        const raw = String(req.query.surface ?? '');
+        if (!SurfaceLayoutService.isSurface(raw)) {
+            res.status(422).json(error(config.nodeId, 'SURFACE_NOT_FOUND',
+                `Name a page: portal, home or home-onboarding. Got "${raw}".`));
+            return;
+        }
+        const record = await storage.getSystemPrompt('surface-layout');
+        if (!record) {
+            res.status(404).json(error(config.nodeId, 'PROMPT_NOT_FOUND',
+                'This installation has no page-layout prompt yet. It is seeded at start-up.'));
+            return;
+        }
+        const catalogue = blocksForSurface(raw, config).map(def => {
+            const settings = Object.entries(def.props)
+                .map(([name, prop]) => `    - \`${name}\` (${prop.type}): ${prop.description}`)
+                .join('\n');
+            const repeat = def.maxPerSurface > 1 ? ` Up to ${def.maxPerSurface} of these on one page.` : '';
+            const holds = def.container ? ' Holds other blocks.' : '';
+            return `- \`${def.id}\` — ${def.summary}${repeat}${holds}${settings ? `\n${settings}` : ''}`;
+        }).join('\n');
+
+        const resolved = await svc.resolve(raw);
+        const passages = await svc.readFreeform(resolved.layout);
+        const current = resolved.source === 'default'
+            ? 'Nobody has arranged this page yet. What follows is what it ships as; changing it makes it theirs.\n\n'
+                + '```json\n' + JSON.stringify({ blocks: resolved.layout.blocks }, null, 2) + '\n```'
+            : '```json\n' + JSON.stringify({ blocks: resolved.layout.blocks, freeform: passages }, null, 2) + '\n```';
+
+        const content = resolvePromptContent(record, (req.query.lang as string | undefined) ?? undefined);
+        res.type('text/plain; charset=utf-8').send(substituteVariables(content, {
+            node_id: config.nodeId,
+            // Same reach the portal prompt uses: nodeName is set from AIMEAT_SITE_* on nodes that
+            // have one and is not on AimeatConfig's declared shape, so it is read the same way there.
+            node_name: (config as unknown as Record<string, unknown>).nodeName as string ?? config.nodeId,
+            node_url: config.baseUrl,
+            surface: raw,
+            block_catalog: catalogue,
+            current_layout: current,
+        }));
     });
 
     // POST /v1/site/freeform — edit one passage without rewriting the layout around it.

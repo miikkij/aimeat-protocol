@@ -77,7 +77,9 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       // removed, a node still serving the old description sends every agent that reads its
       // front door to a dead end, and it stayed wrong for exactly that reason).
       const syncGroups = ['generator', 'builders', 'tiers'];
-      const syncIds = ['site-portal', 'bootstrap-anon'];
+      // 'surface-layout' joins them for the same reason: its block catalogue is generated from the
+      // registry, and a node serving last month's description hands an AI names it no longer has.
+      const syncIds = ['site-portal', 'bootstrap-anon', 'surface-layout'];
       if ((syncGroups.includes(seed.group) || syncIds.includes(seed.id)) && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
         metaUpdate.updatedAt = new Date().toISOString();

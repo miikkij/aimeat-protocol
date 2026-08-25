@@ -54,6 +54,7 @@ import { TIER_EXTENDED_SEEDS } from './prompt-defaults/tiers-extended.js';
 import { TIER_MODE_SEEDS } from './prompt-defaults/tiers-modes.js';
 import { APP_BUILDER_SEEDS } from './prompt-defaults/app-builders.js';
 import { PORTAL_SEEDS } from './prompt-defaults/portal.js';
+import { SURFACE_LAYOUT_SEEDS } from './prompt-defaults/surface-layout.js';
 import { KNOWLEDGE_SEEDS } from './prompt-defaults/knowledge.js';
 import { PLATFORM_SEEDS } from './prompt-defaults/platform.js';
 import { MANIFEST_ARCHITECT_SEEDS } from './prompt-defaults/manifest-architect.js';
@@ -67,6 +68,7 @@ export const PROMPT_SEEDS: PromptSeedEntry[] = [
   ...TIER_MODE_SEEDS,
   ...APP_BUILDER_SEEDS,
   ...PORTAL_SEEDS,
+  ...SURFACE_LAYOUT_SEEDS,
   ...KNOWLEDGE_SEEDS,
   ...PLATFORM_SEEDS,
   ...MANIFEST_ARCHITECT_SEEDS,
