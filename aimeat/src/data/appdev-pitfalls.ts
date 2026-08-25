@@ -12,6 +12,9 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   v1.4.0 — 2026-08-25 — +one-file-past-a-megabyte. The first entry here about what an app
+ *     ACCUMULATES rather than what it gets wrong: measured on a 3.18 MB app whose author felt the
+ *     slowdown for two days while every number that explained it sat on our side, unshown.
  *   v1.3.0 — 2026-08-15 — +app-declared-unused, the id the three new artifact-lint findings carry.
  *   v1.2.0 — 2026-08-11 — +inline-js-does-not-parse, +app-meta-declarations, +namespace-rule. All
  *     three are what the publish-time artifact check (services/app-artifact-lint.ts) reports by id,
@@ -466,6 +469,17 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     docRef: 'docs/pitfalls.md §16',
     updatedAt: '2026-07-19',
+  }),
+  // ---- the app that keeps growing ---------------------------------------
+  E({
+    id: 'one-file-past-a-megabyte',
+    title: 'A single-file app past a megabyte slows every edit, and nothing says so',
+    symptom: 'Changes that used to take five minutes take thirty or forty, and it came on over a couple of days. The node answers normally, other people building the same day are unaffected, and nothing in any response mentions size. Measured on one real app: 3.18 MB, 43 213 lines, 1550 functions, 477 kB of it base64 images inlined into the source, and one line 294 490 characters long — a search that touches that line puts about 70 000 tokens into the conversation in one tool result.',
+    fix: 'An AI edit costs what has to be READ to make it, so the file size IS the edit cost. Three moves, cheapest first: (1) get the assets out — upload each image once (visibility public) and reference https://<node>/v1/pub/<ghii>/<key>, never a data URI in the source; (2) split the sources on your own machine behind a build script that assembles the one HTML file the node serves — start from GET /v1/app-templates/workstation-project, which ships the guards; (3) edit like the file is big: one change per round, name the function, read the region rather than the file. The skill is node:aimeat-app-workstation. The publish response tells you where you stand: next_steps.size carries the bytes, the share of the node ceiling, the growth per day and the date that rate meets the ceiling.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-08-25',
   }),
 ];
 

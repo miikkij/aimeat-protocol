@@ -9,9 +9,11 @@
  *     invariant (schema.ts dedupes + enforces it with a partial unique index).
  *   v1.2.0 — 2026-08-19 — listApps names its columns instead of SELECT a.*, so a listing no longer carries each
  *     app's bytes; the query itself moved to apps-listing.ts (max-file-lines).
+ *   v1.3.0 — 2026-08-25 — listAppVersionSizes: the version line without its payload, for the size
+ *     trend the publish response now states.
  */
 import type {
-  AppRecord, AppSummaryRecord, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
+  AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
   AppProtection, AppSeo, SubdomainSiteRecord, AppGrantRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -95,6 +97,15 @@ export const appsMethods = {
     const rows = this.db.prepare('SELECT * FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC')
       .all(ownerGaii, filename) as Record<string, unknown>[];
     return rows.map(r => this.deserializeApp(r));
+  },
+
+  async listAppVersionSizes(this: SqliteStorage, ownerGaii: string, filename: string): Promise<AppVersionSize[]> {
+    // Three columns by name. `SELECT *` here would read every version's payload, which is the whole
+    // reason this method exists next to listAppVersions.
+    const rows = this.db.prepare(
+      'SELECT versionNumber, size, createdAt FROM apps WHERE ownerGaii = ? AND filename = ? ORDER BY versionNumber DESC'
+    ).all(ownerGaii, filename) as { versionNumber: number; size: number; createdAt: string }[];
+    return rows.map(r => ({ versionNumber: r.versionNumber, size: Number(r.size), createdAt: String(r.createdAt) }));
   },
 
   async getLatestVersionNumber(this: SqliteStorage, ownerGaii: string, filename: string): Promise<number> {

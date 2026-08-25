@@ -33,8 +33,11 @@
  *     badge an owner's apps that have a pending staging draft in one query.
  *   v1.8.0 — 2026-08-19 — listApps returns AppSummaryRecord (no payload) and listAppsWithContent is the
  *     separate door for the operator copy-scan, the one caller that compares bytes.
+ *   v1.9.0 — 2026-08-25 — Add listAppVersionSizes(): the version line without its payload, so the
+ *     publish response can tell an author how fast their app is growing and how near the ceiling
+ *     it is. Reading it through listAppVersions would cost a gigabyte on a long-lived app.
  */
-import type { AppRecord, AppSummaryRecord, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
+import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord } from '../interface.js';
 
 export interface AppRepository {
     createApp(record: AppRecord): Promise<AppRecord>;
@@ -71,6 +74,15 @@ export interface AppRepository {
      */
     listAppsWithContent(opts?: AppListOptions): Promise<{ apps: AppRecord[]; total: number }>;
     listAppVersions(ownerGaii: string, filename: string): Promise<AppRecord[]>;
+    /**
+     * The version line WEIGHED, newest first: version number, size, created-at, no payload.
+     *
+     * Separate from listAppVersions for the reason listApps is separate from listAppsWithContent.
+     * The publish path asks this on every publish to say how fast the app is growing, and the app
+     * that made the question worth asking has 369 versions of about 3 MB each — reading their
+     * bytes to compare three numbers is a gigabyte of I/O per publish.
+     */
+    listAppVersionSizes(ownerGaii: string, filename: string): Promise<AppVersionSize[]>;
     getLatestVersionNumber(ownerGaii: string, filename: string): Promise<number>;
     deleteApp(ownerGaii: string, filename: string, version?: number): Promise<boolean>;
     updateAppAccessCode(ownerGaii: string, filename: string, accessCode?: string): Promise<boolean>;

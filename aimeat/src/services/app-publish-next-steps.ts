@@ -17,6 +17,10 @@
  * @structure buildPublishNextSteps(storage, config, ownerName, filename) -> record | undefined
  * @usage import { buildPublishNextSteps } from './app-publish-next-steps.js';
  * @version-history
+ *   v1.1.0 — 2026-08-25 — `size`: how big the app has become, how fast it is growing, and when that
+ *     meets the node's ceiling (services/app-size-health.ts). The two things this file already said
+ *     are about what the app LACKS; this is the first one about what it has accumulated, and it is
+ *     here for the same reason — the publish response is the surface that gets read.
  *   v1.0.0 — 2026-08-11 — Extracted from mcp/apps.ts (buildNextSteps, 2026-07-19) into the shared
  *     publish path so every door returns it, and the agent-face / bound-skill reminder is stated
  *     rather than folded into a hint about template proposals.
@@ -26,6 +30,7 @@ import type { Storage } from '../storage/interface.js';
 import { agentFaceKey } from './agent-face.js';
 import { getOwnerScopePublicMemory } from './owner-memory.js';
 import { listSkillsByBinding } from './skills.js';
+import { appSizeHealth, type AppSizeHealth } from './app-size-health.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -34,7 +39,7 @@ import { logger } from '../utils/logger.js';
  * is fine, a publish that failed because of it is not.
  */
 export async function buildPublishNextSteps(
-  storage: Storage, config: AimeatConfig, ownerName: string, filename: string,
+  storage: Storage, config: AimeatConfig, ownerName: string, filename: string, publishedBytes?: number,
 ): Promise<Record<string, unknown> | undefined> {
   try {
     // Resolve the face across the owner's whole keyspace (GHII + the owner's agents), matching what
@@ -47,7 +52,22 @@ export async function buildPublishNextSteps(
         .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return []; }),
     ]);
 
+    // How big it has become, and how fast. Best-effort like everything here: an app whose version
+    // line cannot be read still gets its face and skill reminder.
+    let size: AppSizeHealth | undefined;
+    if (typeof publishedBytes === 'number' && publishedBytes > 0) {
+      const history = await storage.listAppVersionSizes(`${ownerName}@${config.nodeId}`, filename)
+        .catch(err => { logger.warn('buildPublishNextSteps: continuing after a suppressed failure', { error: String(err) }); return []; });
+      size = appSizeHealth({
+        bytes: publishedBytes,
+        ceilingBytes: config.appMaxSizeMb * 1024 * 1024,
+        history,
+        at: new Date().toISOString(),
+      });
+    }
+
     return {
+      ...(size ? { size } : {}),
       agent_face_present: !!faceRec,
       bound_skills_count: boundSkills.length,
       // Stated every time, present or not. An app without a face is a page agents have to scrape,

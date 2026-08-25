@@ -11,6 +11,11 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.11.0 -- 2026-08-25 -- aimeat-app-workstation (public): how a large app is kept from the
+ *     author's own machine — assets out of the source, sources split behind a build step, and an
+ *     edit loop that does not re-read the whole file. aimeat-app-builder says "no build step",
+ *     which is true of the node and was read as advice for a 3 MB app; this is the other half.
+ *     Seeding is create-if-missing, so an existing node needs an operator republish to pick it up.
  *   v1.10.0 -- 2026-08-23 -- hatchery-agent-requests (public). aimeat_schedule_create and
  *     aimeat_extension_install have both told the reader to load `node:hatchery-agent-requests`
  *     BEFORE building since July, and the skill did not exist: every agent that obeyed got
@@ -44,6 +49,7 @@
 
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
 import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
+import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -56,6 +62,7 @@ export interface BuiltinSkill {
 export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
   HATCHERY_SKILL_ENTRY,
+  WORKSTATION_SKILL_ENTRY,
   {
     name: 'aimeat-node-guide',
     visibility: 'public',
@@ -655,6 +662,11 @@ and writes their data, and uses node-hosted UI/AI libraries — all from \`<scri
 pointing at the node. There is **no build step and no backend to write**: the node is the
 backend. If you have the \`aimeat_*\` MCP tools, publish directly over MCP — you do not need
 the web UI.
+
+That holds for the node. Past roughly 300 kB it stops holding for YOU: one file is then expensive
+to edit, and the fix is sources split behind a build step on your own machine that assembles the
+same single file. Load \`node:aimeat-app-workstation\` when the app gets there, or when the publish
+response's \`next_steps.size\` says so.
 
 ## The one rule that matters: fetch the canonical spec first
 

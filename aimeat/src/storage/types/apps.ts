@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema, system-prompt, and package/template record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-25 — AppVersionSize: a version's three numbers without its bytes, so the
+ *     publish path can state how fast an app is growing without reading its whole history.
  *   v1.5.0 — 2026-08-24 — AppManifest gains `dataMap` (TARGET-073): the SUMMARY of where this app
  *     puts what. On the manifest for the same reason aiPosture is; the map itself is a public memory
  *     record at the address in `docKey`, because its rows carry a sentence each.
@@ -228,6 +230,20 @@ export interface AppRecord {
  * file at runtime.
  */
 export type AppSummaryRecord = Omit<AppRecord, 'data'>;
+
+/**
+ * One published version WEIGHED rather than read: the three columns a size trend needs.
+ *
+ * `listAppVersions` returns whole records, so asking "how fast is this app growing" through it
+ * reads every version's payload — on the app that prompted this (369 versions at ~3 MB each) that
+ * is a gigabyte of bytes to answer a question about three numbers. The publish path runs this on
+ * every publish, so it has to cost a column scan and nothing more.
+ */
+export interface AppVersionSize {
+  versionNumber: number;
+  size: number;
+  createdAt: string;
+}
 
 /**
  * A single, unpublished DRAFT of an app — the staging slot. At most one draft
