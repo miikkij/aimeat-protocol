@@ -316,6 +316,30 @@ function generateMarkdown(nodeUrl) {
   }
 
   // ── Output Requirements ──
+  // The data map. Short here on purpose — this file is the compact starter, and the full shape and
+  // vocabulary live in the guided prompt. What must survive the compression is WHY it exists and
+  // that it is a step, not a nicety.
+  md += `## Write the data map when you are done\n\n`;
+  md += `If the app stores anything, write down where it puts what and why. Somebody — a person or another AI — will open this app later without having built it, and the only other way to find out where its data lives is to read every line of your source. They will not; they will put the new thing wherever they can reach most easily. That is how a CRM meant for a whole team ended up keeping its shared campaigns in one person's private memory, invisible to their colleagues.\n\n`;
+  md += `The map lives beside the app, so writing or correcting it never means republishing:\n\n`;
+  md += `${SS}\nPUT ${nodeUrl}/v1/datamap/apps/{owner}/{filename}\n${SS}\n\n`;
+  md += `${SS}json\n{\n`;
+  md += `  "spec": "aimeat.datamap/2",\n`;
+  md += `  "what": "One paragraph: what this app IS, in its user's words.",\n`;
+  md += `  "usedFor": "What somebody actually achieves with it.",\n`;
+  md += `  "form": "one-person | private | shared-with-named | group | organism-workspace | public-service | static | mixed",\n`;
+  md += `  "arrangement": "How the data is laid out, in prose.",\n`;
+  md += `  "machinery": [], "leaves": [], "elsewhere": [],\n`;
+  md += `  "held": [{\n`;
+  md += `    "what": "myapp.notes", "holds": "the user's notes",\n`;
+  md += `    "kind": "user-written", "usedFor": "user-returns-to-read",\n`;
+  md += `    "where": "owner-memory-private", "owner": "person", "readers": "owner-only",\n`;
+  md += `    "writers": ["the-app-for-the-person"], "shape": "collection-under-one-key",\n`;
+  md += `    "keptFor": "until-deleted", "lossRisk": "only-copy", "personalData": "no",\n`;
+  md += `    "why": "Nobody else has any business reading somebody's private notes."\n`;
+  md += `  }]\n}\n${SS}\n\n`;
+  md += `The ${S}why${S} is the field the whole thing exists for: it is read at the moment somebody is about to move that data. Leave one you do not know EMPTY — an empty one shows as unfinished and gets filled in, a plausible wrong one is believed and acted on. An app that stores nothing declares ${S}"form": "static"${S} with an empty ${S}held${S}, and that is a complete map. The full vocabulary for every field is in the guided prompt at ${S}${nodeUrl}/v1/prompts/build-app${S}.\n\n`;
+
   md += `## Output Requirements\n\n`;
   md += `Produce a SINGLE HTML file containing:\n`;
   md += `- DaisyUI + Tailwind for styling (CDN links in template)\n`;
