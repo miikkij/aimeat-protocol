@@ -15,6 +15,12 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-25 — ADDITIVE (permission granted 2026-08-25): one paragraph at the end of "Images &
+ *     files" — an app's OWN pictures follow the same rule as a user's, and past roughly 300 kB the
+ *     sources belong behind a build step on the author's machine (skill node:aimeat-app-workstation,
+ *     starter template workstation-project). The section already forbade base64 in memory VALUES and
+ *     said nothing about base64 in the app's own source, which is how one app reached 3.18 MB with
+ *     477 kB of it inlined images. Existing text untouched.
  *   2026-08-12 — ADDITIVE: "Mobile input" section after the mobile safety checklist, plus the
  *     aimeat-input pack in the Ready-made UI list (registry-driven). Everything the prompt said
  *     about phones was LAYOUT — overflow, viewport, the bottom chrome strip, fifteen appdev
@@ -361,7 +367,8 @@ function composeAppPrompt(
   body += 'const url = "' + nodeUrl + '/v1/pub/" + encodeURIComponent(session.ghii) + "/" + key;\n';
   body += "// Save that url (or { owner: session.ghii, key }) in the entry's memory record.\n";
   body += '```\n';
-  body += "Gotcha: `AIMEAT.storage.publicUrl(key)` returns the OWNER's `/v1/storage/...` URL, which requires the owner's auth — it will NOT load for other users. Cross-user image display always uses `/v1/pub/<owner-ghii>/<key>`.\n\n";
+  body += "Gotcha: `AIMEAT.storage.publicUrl(key)` returns the OWNER's `/v1/storage/...` URL, which requires the owner's auth — it will NOT load for other users. Cross-user image display always uses `/v1/pub/<owner-ghii>/<key>`.\n";
+  body += "The same rule covers the app's OWN pictures — logo, background, samples. An asset inlined as a data URI is carried in the source forever and re-uploaded on every publish; one app on this node reached 3.18 MB that way, of which 477 kB was base64 and one line was 294 490 characters long, and its author's small changes went from five minutes to forty. Past roughly 300 kB, keep the sources split behind a build step on your own machine that assembles the one HTML file: skill `node:aimeat-app-workstation`, starter `GET /v1/app-templates/workstation-project`.\n\n";
 
   // AI
   body += '### AI (prompt-driven)\n';

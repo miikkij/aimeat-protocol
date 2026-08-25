@@ -384,6 +384,65 @@ const publish = (token: string, body: Record<string, unknown>) =>
             `the skill reminder must name the binding: ${JSON.stringify(next.bound_skill)}`);
     });
 
+    // ── How big it has become ──────────────────────────────────────────────────────────────────
+    // An app on this node is one file, and a file has no natural brake: one reached 3.18 MB across
+    // 369 publishes while its author only ever felt it as edits getting slower. The numbers travel
+    // on every publish; the SENTENCE is spent only when it is earned, because a response that
+    // lectures the median 39 kB app is a response people stop reading.
+
+    await test('an ordinary app is weighed and told nothing', async () => {
+        const f = `gatesize${Date.now()}.html`;
+        const r = await publish(o.token, {
+            filename: f, mime_type: 'text/html', content: b64(app(f)),
+            name: 'Small', description: 'Ordinary size.', spec_token: specToken,
+        });
+        assert(r.status === 201, `publish ${r.status}`);
+        const size = r.body.data.next_steps?.size;
+        assert(!!size, 'next_steps.size missing from the publish response');
+        assert(size.bytes > 0 && size.ceiling_bytes > size.bytes, `bytes/ceiling wrong: ${JSON.stringify(size)}`);
+        assert(size.level === 'quiet', `a small app must stay quiet, got ${size.level}`);
+        assert(size.note === undefined, `a small app must get no sentence: ${size.note}`);
+    });
+
+    await test('an app near the ceiling is told, in bytes and in words', async () => {
+        const f = `gatebig${Date.now()}.html`;
+        // Past 60% of the 5 MB ceiling. Filler inside a comment so the artifact checks still pass:
+        // the point is the weight, not the content.
+        const filler = '<!-- ' + 'x'.repeat(3_300_000) + ' -->';
+        const r = await publish(o.token, {
+            filename: f, mime_type: 'text/html', content: b64(app(f).replace('</body>', filler + '</body>')),
+            name: 'Large', description: 'Near the ceiling.', spec_token: specToken,
+        });
+        assert(r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const size = r.body.data.next_steps?.size;
+        assert(!!size, 'next_steps.size missing on the large publish');
+        assert(size.share_of_ceiling >= 0.6, `share should be past 0.6, got ${size.share_of_ceiling}`);
+        assert(size.level === 'warn' || size.level === 'at-the-wall', `a big app must speak, got ${size.level}`);
+        assert(/storage/.test(size.note ?? ''), `the note must say where the weight goes: ${size.note}`);
+        assert(/aimeat-app-workstation/.test(size.note ?? ''), `the note must name the skill: ${size.note}`);
+    });
+
+    // ── And who may knock at all ───────────────────────────────────────────────────────────────
+    // Everything above is about what the gate SAYS to a publisher. This is the prior question: the
+    // checks run behind the door, not in front of it, so an unauthenticated caller never reaches
+    // them — no spec check, no artifact finding, no size line, and no row.
+
+    await test('a publish with no token is refused at every door, and writes nothing', async () => {
+        const f = `gatedenied${Date.now()}.html`;
+        const body = JSON.stringify({
+            filename: f, mime_type: 'text/html', content: b64(app(f)),
+            name: 'Denied', description: 'No token.', spec_token: specToken,
+        });
+        const anon = await json('/v1/apps', { method: 'POST', body });
+        assert(anon.status === 401 || anon.status === 403, `an unauthenticated publish must be refused, got ${anon.status}`);
+
+        const anonDraft = await json(`/v1/apps/${o.name}/${f}/publish-draft`, { method: 'POST', body: '{}' });
+        assert(anonDraft.status === 401 || anonDraft.status === 403,
+            `an unauthenticated draft promotion must be refused, got ${anonDraft.status}`);
+
+        assert(!(await appRow(o.name, f, o.token)), 'a refused publish still left a row behind');
+    });
+
     console.log(`\n  ${passed} passed, ${failed} failed`);
     process.exit(failed > 0 ? 1 : 0);
 })();

@@ -491,7 +491,7 @@ export async function publishApp(
     artifactWarnings: artifact.warnings,
     // Every door returns this now. It used to exist only on the MCP inline branch, so the two
     // things an app most often lacks went unmentioned on the door most apps come through.
-    nextSteps: await buildPublishNextSteps(storage, config, ownerName, filename),
+    nextSteps: await buildPublishNextSteps(storage, config, ownerName, filename, data.length),
   };
 }
 

@@ -27,6 +27,10 @@
  *     Program); components: mermaid-diagram + three-scene (demos for the mermaid/three packs).
  *   v1.10.0 — 2026-07-16 — component: public-intake (aimeat-intake) — the anonymous-submission path
  *     (lead/contact/feedback/RSVP/quiz forms) so AI app-builders discover the Public Intake capability.
+ *   v1.11.0 — 2026-08-25 — kind `project` + workstation-project: the layout around an app that
+ *     outgrew one editable file. Every app in aimeat-apps that got there grew its own build script
+ *     with its own set of guards; this hands over the guards. Not listed in the prompt's template
+ *     menu — it applies to a minority of apps and the prompt is charged to every session.
  */
 
 import { SHELL_PURE_CLIENT, SHELL_CORTEX, SHELL_EXTENSION } from './app-templates/shells.js';
@@ -53,11 +57,18 @@ import {
   COMP_FLOW_EDITOR,
 } from './app-templates/components.js';
 import { USECASE_REALTIME_SOCIAL, USECASE_MARKETPLACE, USECASE_HOMEPAGE, USECASE_APP_IAM } from './app-templates/use-cases.js';
+import { PROJECT_WORKSTATION } from './app-templates/workstation.js';
 
 export interface AppTemplate {
   /** Stable id, e.g. "shell-pure-client". */
   id: string;
-  kind: 'app-shell' | 'component' | 'use-case';
+  /**
+   * `project` is the odd one and deliberately so: it is not something the AI copies INTO an app,
+   * it is the layout around an app that has outgrown one editable file — a build script, a publish
+   * script and the guards. Kept out of the prompt's template menu (buildPromptTemplateSections)
+   * because it applies to a minority of apps and the prompt is charged to every session.
+   */
+  kind: 'app-shell' | 'component' | 'use-case' | 'project';
   /** Capability tier for app-shells: T1 pure client · T2 +cortex · T3 +extension. */
   tier?: 'T1' | 'T2' | 'T3';
   title: string;
@@ -156,6 +167,14 @@ const TEMPLATES: AppTemplate[] = [
     libs: ['aimeat-auth', 'aimeat-iam', 'aimeat-data'],
     composes: ['comp-auth-gated'],
     content: USECASE_APP_IAM,
+  },
+  {
+    id: 'workstation-project',
+    kind: 'project',
+    title: 'Big-app project layout (build it on your own machine)',
+    description: 'For an app past roughly 300 kB: sources split into files, a build script that assembles the one HTML file the node serves (with the guards that catch what is otherwise invisible — a file left out of the order, two declarations of one name, a missing marker, a syntax error, a dist that drifted from src), presigned publish, and a size line printed on every build. Pairs with the skill node:aimeat-app-workstation.',
+    libs: ['aimeat-auth', 'aimeat-data'],
+    content: PROJECT_WORKSTATION,
   },
 ];
 

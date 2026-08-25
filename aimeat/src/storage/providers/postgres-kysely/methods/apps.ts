@@ -15,11 +15,13 @@
  *     app, bytes included, and dedupe in JS — a flat 3.5 s per catalogue request on the
  *     production node whatever `limit` said. DISTINCT ON dedupes in SQL, the select names the
  *     metadata columns, and listAppsWithContent is the separate door for the copy-scan.
+ *   v1.2.0 — 2026-08-25 — listAppVersionSizes: the version line without its payload, for the size
+ *     trend the publish response now states.
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type {
-  AppRecord, AppSummaryRecord, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection, AppSeo,
+  AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection, AppSeo,
 } from '../../../interface.js';
 import type { App, AppDraft, AppFork } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -268,6 +270,20 @@ export const appMethods = {
   async listAppVersions(this: PostgresKyselyStorage, ownerGaii: string, filename: string): Promise<AppRecord[]> {
     const rows = await this.db.selectFrom('App').selectAll().where('ownerGaii', '=', ownerGaii).where('filename', '=', filename).orderBy('versionNumber', 'desc').execute();
     return rows.map(toApp);
+  },
+
+  async listAppVersionSizes(this: PostgresKyselyStorage, ownerGaii: string, filename: string): Promise<AppVersionSize[]> {
+    // Three columns by name. `selectAll()` here would read every version's payload, which is the
+    // whole reason this method exists next to listAppVersions.
+    const rows = await this.db.selectFrom('App')
+      .select(['versionNumber', 'size', 'createdAt'])
+      .where('ownerGaii', '=', ownerGaii).where('filename', '=', filename)
+      .orderBy('versionNumber', 'desc').execute();
+    return rows.map(r => ({
+      versionNumber: r.versionNumber,
+      size: Number(r.size),
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    }));
   },
 
   async getLatestVersionNumber(this: PostgresKyselyStorage, ownerGaii: string, filename: string): Promise<number> {

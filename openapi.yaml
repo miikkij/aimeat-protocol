@@ -19347,8 +19347,11 @@ paths:
                               next_steps:
                                 type: object
                                 description: >-
-                                  What the app still lacks: an agent face, a bound skill. Best-effort,
-                                  so it can be absent.
+                                  What the app still lacks: an agent face, a bound skill. Also `size`
+                                  — the bytes just published, the share of this node's ceiling, the
+                                  growth per day and the date that rate meets the ceiling, with a
+                                  `note` once it is worth saying out loud. Best-effort, so it can be
+                                  absent.
         '200':
           description: Presigned upload URL (when mode=presigned)
         '400':
