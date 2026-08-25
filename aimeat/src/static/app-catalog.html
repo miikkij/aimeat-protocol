@@ -2383,6 +2383,23 @@
     @media (max-width: 640px) {
       .dtl-dm-head { grid-template-columns: minmax(0, 1fr); }
     }
+
+    /* ── Search section of the app detail view (seo.js) ── */
+    /* The state line is the first thing an owner reads, so it carries the answer in colour as well
+       as in words: green when the app is findable, amber while it waits on somebody, red when it
+       has been stopped, and neutral for the ordinary case of not having asked. */
+    .dtl-seo-state { font-size: .88rem; line-height: 1.45; margin: 0 0 12px; padding: 8px 10px;
+      border-radius: 8px; background: var(--bg-subtle); color: var(--text); }
+    .dtl-seo-state-on { background: var(--success-bg, var(--bg-subtle)); }
+    .dtl-seo-state-pending { background: var(--warn-bg, var(--bg-subtle)); }
+    .dtl-seo-state-blocked { background: var(--danger-bg, var(--bg-subtle)); }
+    .dtl-seo-switch, .dtl-seo-wording, .dtl-seo-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+    .dtl-seo-preview { padding: 12px; border: 1px solid var(--border-subtle); border-radius: 10px; }
+    .dtl-seo-preview-title { color: var(--accent); font-weight: 600; }
+    .dtl-seo-preview-desc { font-size: .85rem; color: var(--text-muted); margin: 2px 0 8px; }
+    .dtl-seo-preview-img { display: block; width: 100%; max-width: 100%; border-radius: 8px; }
+    .dtl-seo-preview-noimg { font-size: .8rem; color: var(--text-muted); padding: 14px;
+      text-align: center; border: 1px dashed var(--border-subtle); border-radius: 8px; }
 </style>
 </head>
 <body data-active-view="library">
@@ -3457,6 +3474,30 @@
       "monetize.actionIdHint": "Optional. A capability id (e.g. ext:my-extension:summarize) invoked instantly on purchase. Leave empty to fulfill as an agent task instead.",
       "monetize.agent": "Fulfilling agent",
       "monetize.agentHint": "Task path only: the bare name of your agent that receives the order task. Empty = the task lands in your own task space.",
+      // ── Search: can this app be found in a search engine (seo.js) ──
+      "seo.title": "Search",
+      "seo.intro": "Publishing put this app online and made it shareable by link. Being found in a search engine is a separate choice, and it is off until you make it.",
+      "seo.loading": "Checking…",
+      "seo.loadFailed": "Could not read the search setting for this app.",
+      "seo.stateOff": "Not in search engines. The app works and can be shared by link.",
+      "seo.stateOn": "In search engines. It is on the list they read; they usually take a few days.",
+      "seo.statePending": "Requested. Whoever runs this site reviews it before the app appears in search engines.",
+      "seo.stateBlocked": "Whoever runs this site has stopped this app appearing in search engines. The app itself still works",
+      "seo.stateHidden": "The app is hidden, so nothing is findable until it is visible again.",
+      "seo.stateGated": "An app behind an access code or a price is never listed in search engines.",
+      "seo.turnOn": "Let search engines find it",
+      "seo.turnOff": "Take it out of search engines",
+      "seo.editWording": "Change what it says",
+      "seo.hideWording": "Done",
+      "seo.fTitle": "Title in search results",
+      "seo.fDesc": "Sentence in search results",
+      "seo.fKeywords": "Keywords, separated by commas",
+      "seo.wordingHint": "All three are optional. Left empty, they are taken from the name, description and tags you already wrote, which is usually what you want.",
+      "seo.save": "Save wording",
+      "seo.saved": "Saved.",
+      "seo.saveFailed": "That did not save.",
+      "seo.previewTitle": "What people will see",
+      "seo.noShot": "No screenshot yet — take one from Actions and it becomes the picture on a shared link.",
       "monetize.fulfillCall": "Instant call",
       "monetize.fulfillTask": "Agent task",
       "monetize.taskToOwner": "task to you",
@@ -4223,6 +4264,30 @@
       "monetize.actionIdHint": "Valinnainen. Kyvykkyyden id (esim. ext:oma-laajennus:summarize), joka ajetaan heti oston yhteydessä. Jätä tyhjäksi, jos haluat toimittaa agenttitehtävänä.",
       "monetize.agent": "Toimittava agentti",
       "monetize.agentHint": "Vain tehtäväpolku: sen oman agenttisi nimi, jolle tilaustehtävä ohjataan. Tyhjä = tehtävä jää omaan tehtävätilaasi.",
+      // ── Haku: löytyykö tämä sovellus hakukoneesta (seo.js) ──
+      "seo.title": "Haku",
+      "seo.intro": "Julkaisu vei sovelluksen verkkoon ja teki siitä linkillä jaettavan. Hakukoneesta löytyminen on eri asia, ja se on pois päältä kunnes valitset toisin.",
+      "seo.loading": "Tarkistetaan…",
+      "seo.loadFailed": "Hakuasetusta ei saatu luettua.",
+      "seo.stateOff": "Ei hakukoneissa. Sovellus toimii ja sen voi jakaa linkillä.",
+      "seo.stateOn": "Hakukoneissa. Se on listalla jota ne lukevat; yleensä muutama päivä ennen kuin näkyy.",
+      "seo.statePending": "Pyydetty. Sivuston ylläpitäjä katsoo pyynnön ennen kuin sovellus näkyy hakukoneissa.",
+      "seo.stateBlocked": "Sivuston ylläpitäjä on estänyt tämän sovelluksen näkymisen hakukoneissa. Sovellus itse toimii yhä",
+      "seo.stateHidden": "Sovellus on piilotettu, joten mitään ei löydy ennen kuin se on taas näkyvissä.",
+      "seo.stateGated": "Pääsykoodin tai hinnan takana oleva sovellus ei koskaan päädy hakukoneisiin.",
+      "seo.turnOn": "Anna hakukoneiden löytää",
+      "seo.turnOff": "Ota pois hakukoneista",
+      "seo.editWording": "Muuta mitä siinä lukee",
+      "seo.hideWording": "Valmis",
+      "seo.fTitle": "Otsikko hakutuloksessa",
+      "seo.fDesc": "Lause hakutuloksessa",
+      "seo.fKeywords": "Avainsanat pilkuilla eroteltuna",
+      "seo.wordingHint": "Kaikki kolme ovat vapaaehtoisia. Tyhjinä ne otetaan nimestä, kuvauksesta ja tunnisteista jotka jo kirjoitit, ja yleensä juuri niin kannattaa tehdä.",
+      "seo.save": "Tallenna tekstit",
+      "seo.saved": "Tallennettu.",
+      "seo.saveFailed": "Tallennus ei mennyt läpi.",
+      "seo.previewTitle": "Mitä ihmiset näkevät",
+      "seo.noShot": "Kuvakaappausta ei ole. Ota se Toiminnot-kohdasta, niin siitä tulee jaetun linkin kuva.",
       "monetize.fulfillCall": "Välitön kutsu",
       "monetize.fulfillTask": "Agenttitehtävä",
       "monetize.taskToOwner": "tehtävä sinulle",
@@ -6019,7 +6084,7 @@
     var line = "responseTime " + ms + " milliseconds — " + t("odps.measuredNote");
     el.value = el.value.trim() ? el.value.trim() + "\n" + line : line;
   }
-  function odpsGenerateSample(ctx, rerender3) {
+  function odpsGenerateSample(ctx, rerender4) {
     var statusEl = document.getElementById("od-sample-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -6095,15 +6160,15 @@
       }
     });
   }
-  function odpsToggleDefaults(rerender3) {
+  function odpsToggleDefaults(rerender4) {
     odDefaultsOpen = !odDefaultsOpen;
-    if (rerender3) rerender3();
+    if (rerender4) rerender4();
   }
-  function odpsToggleTool(rerender3) {
+  function odpsToggleTool(rerender4) {
     odToolOpen = !odToolOpen;
-    if (rerender3) rerender3();
+    if (rerender4) rerender4();
   }
-  function odpsSuggestForTool(ctx, rerender3) {
+  function odpsSuggestForTool(ctx, rerender4) {
     var statusEl = document.getElementById("od-tool-status");
     var token = getCortexOwnerToken();
     if (!token) {
@@ -6168,7 +6233,7 @@
         st.textContent = "✔ " + t("odps.suggestDone");
       }
       showNotice(t("odps.suggestDone"), "success");
-      if (rerender3) {
+      if (rerender4) {
       }
     }).catch(function(e) {
       odBusy = false;
@@ -6594,6 +6659,163 @@
     var m = cData.totals && cData.totals.morsels || { spent_units: 0, calls: 0 };
     html += '<div class="dtl-sync ok" style="margin:0 0 10px">' + t("cost.summary").replace("{n}", cData.total_contracts).replace("{spent}", m.spent_units).replace("{calls}", m.calls) + "</div>";
     for (var i = 0; i < contracts.length; i++) html += contractRow(contracts[i]);
+    return html;
+  }
+
+  // src/static/app-catalog/js/seo.js
+  var seoOwner = "";
+  var seoAppId = "";
+  var seoState = "off";
+  var seoData = null;
+  var seoBusy = false;
+  var seoOpenEditor = false;
+  function apiBase4() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function rerender3() {
+    var el = document.getElementById("detail-seo");
+    if (el) el.innerHTML = seoSectionInner();
+  }
+  function seoOnOpen(owner, appId, isOwn) {
+    seoBusy = false;
+    seoData = null;
+    seoOpenEditor = false;
+    if (!isOwn || !owner || !appId) {
+      seoState = "off";
+      seoOwner = "";
+      seoAppId = "";
+      return;
+    }
+    seoOwner = owner;
+    seoAppId = appId;
+    seoState = "loading";
+    var token = getCortexOwnerToken();
+    fetch(apiBase4() + "/v1/apps?limit=200", {
+      headers: token ? { "Authorization": "Bearer " + token } : {}
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      var apps = res && res.ok && res.data && res.data.apps || [];
+      var mine = null;
+      for (var i = 0; i < apps.length; i++) {
+        if (apps[i].filename === seoAppId && apps[i].owner === seoOwner) {
+          mine = apps[i];
+          break;
+        }
+      }
+      if (!mine) {
+        seoState = "error";
+        rerender3();
+        return;
+      }
+      seoData = {
+        state: mine.seo_state || "off",
+        seo: mine.seo || {},
+        blockReason: mine.operator_seo_block_reason || "",
+        screenshotUrl: mine.screenshot_url || "",
+        name: mine.manifest && mine.manifest.name || seoAppId,
+        description: mine.manifest && mine.manifest.description || "",
+        tags: mine.manifest && mine.manifest.tags || []
+      };
+      seoState = "ready";
+      rerender3();
+    }).catch(function() {
+      seoState = "error";
+      rerender3();
+    });
+  }
+  function seoToggle() {
+    if (seoBusy || !seoData) return;
+    var next = !(seoData.seo && seoData.seo.index === true);
+    patch({ index: next });
+  }
+  function seoSave() {
+    if (seoBusy || !seoData) return;
+    var val2 = function(id) {
+      var el = document.getElementById(id);
+      return el ? el.value.trim() : "";
+    };
+    patch({
+      title: val2("seo-title"),
+      description: val2("seo-desc"),
+      keywords: val2("seo-keywords").split(",").map(function(s) {
+        return s.trim();
+      }).filter(Boolean)
+    });
+  }
+  function seoToggleEditor() {
+    seoOpenEditor = !seoOpenEditor;
+    rerender3();
+  }
+  function patch(seo) {
+    seoBusy = true;
+    rerender3();
+    var token = getCortexOwnerToken();
+    fetch(apiBase4() + "/v1/apps/" + encodeURIComponent(seoAppId), {
+      method: "PATCH",
+      headers: Object.assign(
+        { "Content-Type": "application/json" },
+        token ? { "Authorization": "Bearer " + token } : {}
+      ),
+      body: JSON.stringify({ seo })
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      seoBusy = false;
+      if (!res || !res.ok) {
+        showNotice(res && res.error && res.error.message || t("seo.saveFailed"));
+        rerender3();
+        return;
+      }
+      var d = res.data || {};
+      seoData.state = d.seo && d.seo.state || seoData.state;
+      seoData.seo = d.seo || seoData.seo;
+      showNotice(d.note || t("seo.saved"));
+      rerender3();
+    }).catch(function(err) {
+      seoBusy = false;
+      showNotice(String(err && err.message ? err.message : err));
+      rerender3();
+    });
+  }
+  function stateLine(state, blockReason) {
+    if (state === "on") return t("seo.stateOn");
+    if (state === "pending") return t("seo.statePending");
+    if (state === "blocked") return t("seo.stateBlocked") + (blockReason ? " — " + escapeHtml(blockReason) : "");
+    if (state === "hidden") return t("seo.stateHidden");
+    if (state === "gated") return t("seo.stateGated");
+    return t("seo.stateOff");
+  }
+  function previewHtml(d) {
+    var title = d.seo && d.seo.title || d.name;
+    var desc = d.seo && d.seo.description || d.description;
+    return '<div class="dtl-seo-preview"><div class="dtl-seo-preview-title">' + escapeHtml(title) + '</div><div class="dtl-seo-preview-desc">' + escapeHtml(desc) + "</div>" + (d.screenshotUrl ? '<img class="dtl-seo-preview-img" src="' + escapeHtml(d.screenshotUrl) + '" alt="" loading="lazy">' : '<div class="dtl-seo-preview-noimg">' + escapeHtml(t("seo.noShot")) + "</div>") + "</div>";
+  }
+  function seoSectionInner() {
+    if (seoState === "off") return "";
+    var head = "<h3>" + escapeHtml(t("seo.title")) + "</h3>";
+    if (seoState === "loading") return head + '<p class="dtl-ai-status">' + escapeHtml(t("seo.loading")) + "</p>";
+    if (seoState === "error" || !seoData) {
+      return head + '<p class="dtl-ai-status">' + escapeHtml(t("seo.loadFailed")) + "</p>";
+    }
+    var d = seoData;
+    var on = !!(d.seo && d.seo.index === true);
+    var gated = d.state === "gated" || d.state === "hidden";
+    var html = head + '<p class="dtl-ai-status">' + escapeHtml(t("seo.intro")) + '</p><p class="dtl-seo-state dtl-seo-state-' + escapeHtml(d.state) + '">' + stateLine(d.state, d.blockReason) + "</p>";
+    if (gated) return html;
+    html += '<div class="dtl-seo-switch">' + dtlBtn(
+      t(on ? "seo.turnOff" : "seo.turnOn"),
+      "window._launcher.seoToggle()",
+      { variant: on ? "" : "primary", disabled: seoBusy }
+    ) + "</div>";
+    if (!on) return html;
+    html += '<div class="dtl-seo-wording">' + dtlBtn(t(seoOpenEditor ? "seo.hideWording" : "seo.editWording"), "window._launcher.seoToggleEditor()") + "</div>";
+    if (seoOpenEditor) {
+      var s = d.seo || {};
+      html += '<label class="dtl-stat-label">' + escapeHtml(t("seo.fTitle")) + '</label><input id="seo-title" type="text" class="modal-input" maxlength="120" value="' + escapeHtml(s.title || "") + '" placeholder="' + escapeHtml(d.name) + '"><label class="dtl-stat-label">' + escapeHtml(t("seo.fDesc")) + '</label><textarea id="seo-desc" class="modal-input" rows="2" maxlength="320" placeholder="' + escapeHtml(d.description) + '">' + escapeHtml(s.description || "") + '</textarea><label class="dtl-stat-label">' + escapeHtml(t("seo.fKeywords")) + '</label><input id="seo-keywords" type="text" class="modal-input" value="' + escapeHtml((s.keywords || []).join(", ")) + '" placeholder="' + escapeHtml((d.tags || []).join(", ")) + '"><p class="dtl-ai-status">' + escapeHtml(t("seo.wordingHint")) + '</p><div class="dtl-seo-actions">' + dtlBtn(t("seo.save"), "window._launcher.seoSave()", { variant: "primary", disabled: seoBusy }) + "</div>";
+    }
+    html += "<h4>" + escapeHtml(t("seo.previewTitle")) + "</h4>" + previewHtml(d);
     return html;
   }
 
@@ -7032,6 +7254,7 @@
     detailHasWorkCopy = !!(wcState && wcState.hasDraft);
     monetizeOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     costOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
+    seoOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     document.getElementById("detail-view").hidden = false;
     renderDetailView();
     detailCheckAiAvailability();
@@ -7214,6 +7437,7 @@
     }
     var odpsHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-odps">' + odpsSectionInner() + "</div>" : "";
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
+    var seoHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-seo">' + seoSectionInner() + "</div>" : "";
     var costHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + "</div>" : "";
     var promoteHtml = app.published && detailIsOwnPublished(app) ? buildPromoteSection(app) : "";
     var agentsHtml = "";
@@ -7231,7 +7455,7 @@
       }
     }
     var dataMapHtml = dataMapSectionHtml();
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + dataMapHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + dataMapHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + seoHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
     var dmOwner = detailServerOwner(app);
     var dmFile = app.publishedFilename || "";
     if (dmOwner && dmFile) loadDataMapInto(dmOwner, dmFile, { docKey: "apps." + dmFile.replace(/\.html$/i, "") + ".datamap" });
@@ -10890,6 +11114,9 @@
     detailSkillAttachToggle,
     detailSkillAttach,
     detailSkillDetach,
+    seoToggle,
+    seoSave,
+    seoToggleEditor,
     monetizeAddTool,
     monetizeEditTool,
     monetizeCancelEdit,
