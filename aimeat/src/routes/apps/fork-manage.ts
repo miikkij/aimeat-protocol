@@ -29,8 +29,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { forkApp, deleteOwnedApp } from '../../services/app-lifecycle.js';
 import { resolveIdentity, ownerGhiiOf } from '../../utils/gaii.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
-import { parseOwnerSeoInput, seoNote, appSeoState, appSeoIndexable } from '../../services/app-seo.js';
-import { submitToIndexNow, appSubmitUrls } from '../../services/indexnow.js';
+import { applyOwnerSeoUpdate, appSeoState } from '../../services/app-seo.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerForkManageRoutes(
@@ -309,28 +308,18 @@ export function registerForkManageRoutes(
         // publishing makes an app public and shareable by link, and being findable in a search
         // engine is a separate decision its owner makes on purpose.
         if ('seo' in body) {
-            const parsed = parseOwnerSeoInput(body.seo);
-            if ('error' in parsed) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.error));
+            // The whole sequence — strip the operator fields, merge rather than replace, describe
+            // the state AFTER the write, announce only a genuine arrival — lives in one function
+            // that the MCP door calls too. The note matters: in review mode an owner switching the
+            // toggle on has made a request rather than a decision, and telling them the app is now
+            // findable would be false.
+            const out = await applyOwnerSeoUpdate(storage, config,
+                { ownerGaii: effectiveGaii, ownerName: owner, filename }, body.seo);
+            if ('error' in out) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', out.error));
                 return;
             }
-            await storage.updateAppMeta(effectiveGaii, filename, { seo: parsed.seo });
-            // The state AFTER the write, so the note describes what is true rather than what was
-            // asked for. In review mode an owner switching the toggle on has made a request, not a
-            // decision, and telling them the app is now findable would be false.
-            const after = await storage.getApp(effectiveGaii, filename);
-            notes.push(after ? seoNote(appSeoState(after, config)) : 'Search visibility updated.');
-            // An app that just became findable is announced now rather than at the next crawl.
-            // Only on the way IN: IndexNow is a "this changed, come look" hint, and there is no
-            // way to say "stop indexing this" through it — the robots.txt and the noindex header
-            // this same switch flipped are what withdraw an app, and engines act on those on their
-            // own schedule.
-            if (after && appSeoIndexable(after, config)) {
-                const site = (await storage.listSubdomainSites())
-                    .find(s => s.enabled && s.kind === 'app' && s.target === `${owner}/${filename}`);
-                await submitToIndexNow(config, storage,
-                    appSubmitUrls(config, { ownerName: owner, filename }, site?.subdomain));
-            }
+            notes.push(out.note);
         }
 
         if (notes.length === 0) {

@@ -45,6 +45,7 @@ import { schedulesTasksMemoryTools } from './definitions/schedules-tasks-memory.
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
+import { extensionsCortexTools } from './definitions/extensions-cortex.js';
 import { packagesTools } from './definitions/packages.js';
 import { commerceTools } from './definitions/commerce.js';
 import { exchangeTools } from './definitions/exchange.js';
@@ -57,6 +58,12 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,
+    // Extensions, the per-app IAM door and the cortex packs. They used to sit inside the slice
+    // above and moved out when that file passed the line ceiling. One entry changes relative
+    // position as a result — the operator-only aimeat_admin_mint, which used to come after them and
+    // now comes before. The catalog is read as a set by every consumer that matters (the parity
+    // audits compare names, the surfaces filter by visibility), so the order is a listing detail.
+    ...extensionsCortexTools,
     ...packagesTools,
     ...commerceTools,
     ...companyTools,
