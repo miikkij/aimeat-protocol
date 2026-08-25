@@ -31,6 +31,7 @@ import {
   importSiteBundle, triggerLbSync, getHeaderNav, saveHeaderNav,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
+import { SurfaceLayoutEditor } from './surfaces-layout.js';
 import { swallowed } from '/js/swallowed.js';
 
 // Public header link ids → their nav i18n label key (mirror of PUBLIC_NAV_LINKS in spa.html
@@ -49,7 +50,23 @@ const HEADER_LINK_LABELS = {
   help: 'nav.help',
 };
 
+/**
+ * The three pages an operator can arrange. The front page is the one this tab always had; the two
+ * member pages arrived with the layout engine, and they live here rather than in a tab of their own
+ * because the editor, the prompt, the history and the change log are byte-identical between them.
+ * Two tabs would be one component rendered twice with a prop, and an operator wondering which one
+ * the change log belonged to.
+ */
+const SURFACES = [
+  { id: 'portal', key: 'dashboard.surfaceTabPortal', fallback: 'Front page' },
+  { id: 'home', key: 'dashboard.surfaceTabHome', fallback: 'Member home' },
+  { id: 'home-onboarding', key: 'dashboard.surfaceTabOnboarding', fallback: 'Home (setting up)' },
+];
+
+const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
 export default function PortalTab({ data, reload }) {
+  const [surface, setSurface] = useState('portal');
   const [toast, showErr, showOk, clearToast] = useToast();
   const p = data.portal || {};
   const meta = p.meta || {};
@@ -229,8 +246,30 @@ export default function PortalTab({ data, reload }) {
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
     <p class="adm-text-dim adm-mb-lg">${t('dashboard.portalDesc')}</p>
 
+    <!-- Which page. The front page keeps everything this tab always had; the member pages get the
+         layout editor alone, because a template, header links and KV pairs are the front page's own
+         furniture and mean nothing on a page only members see. -->
+    <div class="adm-flex adm-mb-lg">
+      ${SURFACES.map(s => html`
+        <button key=${s.id}
+          class=${surface === s.id ? 'adm-btn-action' : 'adm-btn-sm'}
+          onClick=${() => setSurface(s.id)}>
+          ${tr(s.key, s.fallback)}
+        </button>`)}
+    </div>
+
+    <${SurfaceLayoutEditor} surface=${surface} onChanged=${bumpPreview} />
+
+    ${surface !== 'portal' && html`
+      <div class="adm-card">
+        <h3>${tr('dashboard.surfacePreviewTitle', 'Seeing it')}</h3>
+        <p class="adm-text-dim adm-text-base">
+          ${tr('dashboard.surfacePreviewMember', 'This is a page members see once they have signed in. Open your own home in another tab to look at it.')}
+        </p>
+      </div>`}
+
     <!-- LB mode banner -->
-    ${isLb && html`
+    ${surface === 'portal' && isLb && html`
       <div class="adm-card adm-mb-lg" style="border:1px solid #eab308">
         <h3>\u{1F504} ${t('dashboard.portalLbMode')}</h3>
         <p class="adm-text-dim adm-mb-sm">${t('dashboard.portalLbReadOnly')}</p>
@@ -241,6 +280,11 @@ export default function PortalTab({ data, reload }) {
       </div>
     `}
 
+    <!-- Everything below belongs to the FRONT PAGE and to nothing else: its preview, the public
+         header links, the raw HTML template, the portal records that template reads, and the KV
+         pairs. A member's home has none of those, so the switch hides them rather than showing an
+         operator controls that would do nothing where they are standing. -->
+    ${surface === 'portal' && html`
     <!-- Preview -->
     <div class="adm-card">
       <h3>${t('dashboard.portalPreview')}</h3>
@@ -381,7 +425,10 @@ export default function PortalTab({ data, reload }) {
       </div>
     </div>
 
-    <!-- Changelog -->
+    `}
+
+    <!-- The change log is the NODE's, not the front page's: arranging a member home writes to it
+         too, so it stays visible whichever page the switch is on. -->
     <div class="adm-card">
       <h3>${t('dashboard.portalChangelog')}</h3>
       ${changes.length === 0

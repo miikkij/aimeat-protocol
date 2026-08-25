@@ -83,7 +83,9 @@ const COMMON_BLOCKS: readonly SurfaceBlockDef[] = [
             },
         },
         maxPerSurface: 12,
-        summary: 'Whatever the registry does not cover: the operator writes the words, in markdown.',
+        // The summary is read by an operator picking a block and by an AI composing a page, so it
+        // says what the thing IS rather than what it is not covered by.
+        summary: 'A passage in your own words, written in Markdown, for anything the other parts do not say.',
     },
 ];
 
