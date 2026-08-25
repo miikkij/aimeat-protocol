@@ -7,6 +7,9 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-25 — The member-removal rules move to services/organism-member-remove.ts so the
+ *     MCP surfaces can remove a member through the same refusals, agent detach, grant revoke and
+ *     notice. The route keeps its gate and its envelope and decides nothing else.
  *   v1.4.0 — 2026-08-15 — The transfer route's three writes moved into
  *     services/organism-ownership.ts, which the operator's break-glass repair also calls. It had one
  *     caller until an organism arrived whose creator account was unreachable and nothing on any
@@ -32,9 +35,10 @@ import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
 import { handOverOwnership, addOrganismOwner, removeOrganismOwner, isOrganismOwner } from '../../services/organism-ownership.js';
+import { removeOrganismMember, MemberRemoveError } from '../../services/organism-member-remove.js';
 import {
   InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
-  acceptNameInvitation, declineNameInvitation, addOrganismMember, revokeDepartedMemberAccess,
+  acceptNameInvitation, declineNameInvitation, addOrganismMember,
 } from '../../services/invitations.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
@@ -282,63 +286,23 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
 
-    const callerIsCreator = isOrganismOwner(organism, callerGhii);
-    const callerIsAdmin = callerIsCreator || organism.admins.includes(callerGhii);
-    if (!callerIsAdmin) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can remove members'));
-      return;
-    }
-
-    if (isOrganismOwner(organism, targetGhii)) {
-      res.status(400).json(error(config.nodeId, 'CANNOT_REMOVE_CREATOR', 'The creator cannot be removed. Delete the organism instead.'));
-      return;
-    }
-
-    // Only the creator can remove an admin.
-    if (organism.admins.includes(targetGhii) && !callerIsCreator) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator can remove an admin'));
-      return;
-    }
-
-    const membership = await storage.getMembership(id, targetGhii);
-    if (!membership || membership.status !== 'active') {
-      res.status(404).json(error(config.nodeId, 'NOT_MEMBER', 'Target is not an active member'));
-      return;
-    }
-
     // `?ban=1` (or body { ban: true }) blocks the member from re-joining / being re-invited:
     // keep the membership row but flip it to `banned` instead of deleting it. Plain remove just
-    // deletes the row (they can request to join again).
+    // deletes the row (they can request to join again). The rules, the access revoke and the
+    // notice live in services/organism-member-remove.ts, which the MCP tool calls as well.
     const ban = req.query.ban === '1' || req.query.ban === 'true' || req.body?.ban === true;
-    const now = new Date().toISOString();
-    if (ban) {
-      await storage.updateMembership(membership.id, { status: 'banned', role: 'member' });
-    } else {
-      await storage.deleteMembership(membership.id);
+    try {
+      const out = await removeOrganismMember(storage, config, {
+        organism, callerOwner: callerGhii, targetRaw: targetGhii, ban,
+      });
+      res.json(success(config.nodeId, out));
+    } catch (e) {
+      if (e instanceof MemberRemoveError) {
+        res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      throw e;
     }
-    await storage.updateOrganism(id, {
-      members: organism.members.filter(m => m !== targetGhii),
-      admins: organism.admins.filter(a => a !== targetGhii),
-      updatedAt: now,
-    });
-    // Two things survive the membership row, and both of them are access: the removed person's agents
-    // stay listed on the organism, where every membership gate reads them as members in their own
-    // right, and their workspace-role consents are owned by each workspace's creator, so the writes
-    // above reach neither. They go with the membership, on a ban as much as on a plain remove.
-    await revokeDepartedMemberAccess(storage, config, { organism, departing: targetGhii });
-
-    // Let the removed member know their access was revoked.
-    await notify(storage, `${targetGhii}@${config.nodeId}`, {
-      type: ban ? 'organism_member_banned' : 'organism_member_removed',
-      title: ban
-        ? `You were blocked from "${organism.name}"`
-        : `Your access to "${organism.name}" was revoked`,
-      link: '/v1/profile#organisms',
-    });
-    emitChange('notifications');
-
-    res.json(success(config.nodeId, { removed: targetGhii, banned: ban }));
-    emitChange('organisms');
   });
 
   /* ── POST /v1/organisms/:id/members/:ghii/unban — Lift a ban ──

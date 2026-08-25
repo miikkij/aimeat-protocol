@@ -5,6 +5,8 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   v1.7.0 -- 2026-08-25 -- aimeat_organism_member_remove (DELETE /v1/organisms/:id/members/:ghii,
+ *     ?ban=1), parity with the server MCP and the CLI dispatch.
  *   v1.6.1 -- 2026-08-15 -- owner_add / owner_remove: plural organism ownership over the
  *     connector, mirroring POST/DELETE /v1/organisms/:id/owners. Ships in aimeat@3.2.0.
  *   v1.6.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_workspace_comment carries
@@ -175,6 +177,16 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     if (role) body.role = role;
     if (workspaces) body.workspaces = workspaces;
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/members`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_member_remove', descriptionFor('aimeat_organism_member_remove'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ghii: z.string().describe('Bare owner name to remove'),
+    ban: z.boolean().optional().describe('Also block them from being invited or added again'),
+  }, annotationsFor('aimeat_organism_member_remove'), async ({ organism_id, ghii, ban }) => {
+    const path = `/v1/organisms/${encodeURIComponent(organism_id)}/members/${encodeURIComponent(ghii)}${ban ? '?ban=1' : ''}`;
+    const resp = await client.delete(path);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 

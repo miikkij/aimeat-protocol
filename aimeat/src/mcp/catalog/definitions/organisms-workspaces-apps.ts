@@ -95,6 +95,17 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_organism_member_remove',
+        description: 'Take a member off an organism: their membership goes, their agents drop off the organism, and their per-workspace grants are revoked, all in one step. Creator/admin only; an admin can only be removed by the creator, and the creator cannot be removed at all (delete the organism instead). Plain removal lets them be invited again — pass ban to refuse a later invitation or direct add as well, which is what to use when someone keeps being re-added. Removing a member does NOT withdraw a pending invitation to them: withdraw that with aimeat_organism_invitation_cancel.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ghii: { type: 'string', required: true, description: 'Bare owner name to remove (e.g. "alice").' },
+            ban: { type: 'boolean', description: 'Also block them from re-joining, being invited or being added again (default false).' },
+        },
+    },
+    {
         name: 'aimeat_organism_owner_add',
         description: 'Make an existing active member a co-owner of an organism you own. ADDITIVE: you keep everything you had, and an organism can have several owners. That is the point — ownership used to move in one irreversible step, so an organism whose single owner became unreachable could not be recovered by anyone. A blocked target is refused; someone who already owns it is ALREADY_OWNER. To hand it over and step back in one call instead, use the transfer route.',
         caller: 'agent',

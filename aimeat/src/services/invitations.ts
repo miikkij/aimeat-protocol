@@ -21,6 +21,10 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   v1.8.0 — 2026-08-25 — Withdraw and edit find a pending invitation through
+ *     services/invitation-lookup.ts, which also matches a legacy row keyed by the full GHII. Such a
+ *     row was listed as pending and refused as absent, and the VIP organism on prod held one since
+ *     2026-07-11. The withdraw notice goes to the owner behind the row, not to name@node@node.
  *   v1.7.0 — 2026-08-15 — revokeDepartedMemberAccess() also withdraws the departing member's OPEN
  *     workspace access requests. A request outlives the membership it was made under, and the
  *     reviewer's panel read a request with no grant as pending, so an ejected member went on asking
@@ -53,6 +57,7 @@ import { emitChange } from './event-bus.js';
 import { getActiveEmailService } from './email.js';
 import { registrationInviteEmail } from './email-templates.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
+import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { isValidEmail } from '../utils/email-validator.js';
 
@@ -638,8 +643,8 @@ export async function updateNameInvitation(
   input: { organism: OrganismRecord; inviteeRaw: string; role?: unknown; workspaces?: unknown },
 ): Promise<OrganismMembershipRecord> {
   const invitee = normalizeInviteeName(input.inviteeRaw, config.nodeId);
-  const membership = invitee ? await storage.getMembership(input.organism.id, invitee) : null;
-  if (!membership || membership.status !== 'invited') {
+  const membership = invitee ? await findPendingInvitation(storage, input.organism.id, invitee) : null;
+  if (!membership) {
     throw new InvitationError(404, 'NO_INVITATION', 'No pending invitation for that owner');
   }
   const updates: Partial<OrganismMembershipRecord> = {};
@@ -660,17 +665,19 @@ export async function cancelNameInvitation(
   input: { organism: OrganismRecord; cancellerGhii: string; inviteeRaw: string },
 ): Promise<void> {
   const invitee = normalizeInviteeName(input.inviteeRaw, config.nodeId);
-  const membership = invitee ? await storage.getMembership(input.organism.id, invitee) : null;
-  if (!membership || membership.status !== 'invited') {
+  const membership = invitee ? await findPendingInvitation(storage, input.organism.id, invitee) : null;
+  if (!membership) {
     throw new InvitationError(404, 'NO_INVITATION', 'No pending invitation for that owner');
   }
   await storage.deleteMembership(membership.id);
-  await notify(storage, `${membership.ghii}@${config.nodeId}`, {
+  // The row may store the bare name or the full GHII; the person is the same either way.
+  const target = `${membershipOwner(membership.ghii)}@${config.nodeId}`;
+  await notify(storage, target, {
     type: 'organism_invitation_cancelled',
     title: `Your invitation to "${input.organism.name}" was withdrawn`,
     link: '/v1/profile#organisms',
   });
-  emitChange('notifications', `${membership.ghii}@${config.nodeId}`);
+  emitChange('notifications', target);
   emitChange('organisms');
 }
 

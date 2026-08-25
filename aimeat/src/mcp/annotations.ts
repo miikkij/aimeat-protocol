@@ -138,6 +138,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_organism_archive: { title: 'Archive / Unarchive Organism Content', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_invite: { title: 'Invite to Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_organism_member_add: { title: 'Add Organism Member', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_organism_member_remove: { title: 'Remove Organism Member', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_organism_invitation_update: { title: 'Edit Pending Invitation', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_invitation_cancel: { title: 'Withdraw Invitation', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_organism_invitations: { title: 'List My Invitations', readOnlyHint: true },

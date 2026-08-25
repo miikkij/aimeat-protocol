@@ -218,6 +218,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_organism_invite:                   'organism:invite',
     aimeat_organism_invite_email:             'organism:invite',
     aimeat_organism_member_add:               'organism:invite',
+    aimeat_organism_member_remove:            'organism:invite',
     aimeat_organism_owner_add:                'organism:invite',
     aimeat_organism_owner_remove:             'organism:invite',
     aimeat_workspace_access:                  'organism:invite',
