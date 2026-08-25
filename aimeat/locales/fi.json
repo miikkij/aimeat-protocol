@@ -9836,7 +9836,13 @@
       "scopeAuth": "Kirjautumisoikeus",
       "filterAll": "Kaikki",
       "filterFederation": "Federaatio",
-      "filterAuth": "Kirjautumisoikeus"
+      "filterAuth": "Kirjautumisoikeus",
+      "statusActive": "voimassa",
+      "statusRevoked": "peruttu",
+      "statusExpired": "vanhentunut",
+      "showRevoked": "Näytä perutut",
+      "hideRevoked": "Piilota perutut",
+      "status": "Tila"
     },
     "audit": {
       "title": "Auditointiraportti",
@@ -9845,7 +9851,11 @@
       "what": "Data-avain",
       "when": "Milloin",
       "purpose": "Tarkoitus",
-      "days": "päivää"
+      "days": "päivää",
+      "action": "Toimenpide",
+      "outcome": "Lopputulos",
+      "allowed": "Sallittu",
+      "denied": "Estetty"
     },
     "export": {
       "title": "GDPR-vienti",

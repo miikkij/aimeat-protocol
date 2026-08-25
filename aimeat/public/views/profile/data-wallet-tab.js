@@ -10,6 +10,13 @@
  *     audit log with day-range selector, GDPR export button
  * @usage Loaded by profile.js route as a lazy tab component.
  * @version-history
+ *   v1.7.0 — 2026-08-25 — Both tables told the owner something untrue. The consent table listed
+ *     REVOKED grants alongside live ones and stamped every non-expired row `active`, so a grant the
+ *     owner had withdrawn read as still standing; it now reads `status`, shows revoked rows only
+ *     behind a toggle, and offers Revoke on a row that still has something to revoke. The audit
+ *     table read `data_key` and `purpose`, which the audit API has never returned (it sends
+ *     `memory_key`, `action`, `allowed`), so two of its four columns were a dash on every row and
+ *     the one fact that matters, whether the read was allowed or denied, was not shown at all.
  *   v1.6.0 — 2026-08-25 — The coverage view, above the permission summary. That card counts memory
  *     keys without saying which, and this is the drill-down it is asking for.
  *   v1.5.0 — 2026-08-24 — Live update is filtered and split by concern. It was a raw
@@ -48,6 +55,8 @@ export default function DataWalletTab({ session, showToast }) {
   const [showConsentForm, setShowConsentForm] = useState(false);
   const [consentFilter, setConsentFilter] = useState('');
   const [scopeFilter, setScopeFilter] = useState('all');
+  // Revoked grants are history, not access. They stay out of the list until the owner asks for them.
+  const [showRevoked, setShowRevoked] = useState(false);
   const [selectedConsents, setSelectedConsents] = useState(new Set());
   const [recipientValue, setRecipientValue] = useState('');
 
@@ -146,7 +155,15 @@ export default function DataWalletTab({ session, showToast }) {
     } catch (err) { swallowed('data-wallet-tab', err); showToast(t('profile.error'), true); }
   }
 
+  /** A grant the owner withdrew, or one the node expired: neither gives access any more. */
+  const isRevoked = (c) => c.status === 'revoked';
+  const isExpiredConsent = (c) => c.status === 'expired'
+    || !!((c.expires_at || c.expires) && new Date(c.expires_at || c.expires) < new Date());
+  const isLive = (c) => !isRevoked(c) && !isExpiredConsent(c);
+
   const filteredConsents = consents?.filter(c => {
+    // Status: what is live is the answer to "who has access"; the rest is history, behind the toggle.
+    if (!showRevoked && !isLive(c)) return false;
     // Scope filter
     if (scopeFilter === 'federation' && c.scope !== 'federation') return false;
     if (scopeFilter === 'auth' && c.scope !== 'auth') return false;
@@ -284,6 +301,11 @@ export default function DataWalletTab({ session, showToast }) {
             onClick=${() => { setScopeFilter('auth'); setSelectedConsents(new Set()); }}>
             ${t('wallet.consents.filterAuth')}
           </button>
+          <button class="btn-sm ${showRevoked ? 'btn-primary' : 'btn-ghost'}"
+            onClick=${() => { setShowRevoked(!showRevoked); setSelectedConsents(new Set()); }}>
+            ${showRevoked ? t('wallet.consents.hideRevoked') : t('wallet.consents.showRevoked')}
+            ${' '}(${consents.filter(c => !isLive(c)).length})
+          </button>
         </div>
         ${selectedConsents.size > 0 && html`
           <button class="btn-danger text-meta" onClick=${() => handleBulkRevoke(selectedConsents)}>
@@ -301,7 +323,8 @@ export default function DataWalletTab({ session, showToast }) {
               checked=${filteredConsents.length > 0 && filteredConsents.every(c => selectedConsents.has(c.id || c.consent_id))}
               onChange=${(e) => {
                 if (e.target.checked) {
-                  setSelectedConsents(new Set(filteredConsents.map(c => c.id || c.consent_id)));
+                  // Select-all means "everything I could revoke here", so it skips what is already gone.
+                  setSelectedConsents(new Set(filteredConsents.filter(isLive).map(c => c.id || c.consent_id)));
                 } else {
                   setSelectedConsents(new Set());
                 }
@@ -309,6 +332,7 @@ export default function DataWalletTab({ session, showToast }) {
             <th>${t('wallet.consents.pattern')}</th>
             <th>${t('wallet.consents.recipient')}</th>
             <th>${t('wallet.consents.purpose')}</th>
+            <th>${t('wallet.consents.status')}</th>
             <th>${t('wallet.consents.scope')}</th>
             <th>${t('wallet.consents.granted')}</th>
             <th>${t('wallet.consents.expires')}</th>
@@ -316,21 +340,28 @@ export default function DataWalletTab({ session, showToast }) {
           </tr></thead><tbody>
             ${filteredConsents.map(c => {
               const cId = c.id || c.consent_id;
-              const isExpired = c.expires_at && new Date(c.expires_at) < new Date();
-              const expSoon = isExpiringSoon(c.expires_at);
-              return html`<tr class=${expSoon ? 'dw-expiring' : ''}>
-                <td><input type="checkbox" checked=${selectedConsents.has(cId)}
+              const revoked = isRevoked(c);
+              const isExpired = isExpiredConsent(c);
+              const live = isLive(c);
+              const expSoon = live && isExpiringSoon(c.expires_at);
+              return html`<tr class=${[expSoon ? 'dw-expiring' : '', live ? '' : 'dw-consent-dead'].filter(Boolean).join(' ')}>
+                <td>${live && html`<input type="checkbox" checked=${selectedConsents.has(cId)}
                   onChange=${(e) => {
                     const next = new Set(selectedConsents);
                     if (e.target.checked) next.add(cId); else next.delete(cId);
                     setSelectedConsents(next);
-                  }} /></td>
+                  }} />`}</td>
                 <td><span class="dw-code-accent">${escHtml(c.data_pattern || c.pattern || '-')}</span></td>
                 <td class="dw-recipient-cell">${recipientBadge(c.recipient_gaii || c.recipient)} <span class="text-meta">${escHtml(c.recipient_gaii || c.recipient || '-')}</span></td>
                 <td>${escHtml(c.purpose || '-')}</td>
                 <td>
-                  ${isExpired ? html`<span class="badge badge-muted">expired</span>` : html`<span class="badge badge-success">active</span>`}
-                  ${' '}
+                  ${revoked
+                    ? html`<span class="badge badge-muted">${t('wallet.consents.statusRevoked')}</span>`
+                    : isExpired
+                    ? html`<span class="badge badge-muted">${t('wallet.consents.statusExpired')}</span>`
+                    : html`<span class="badge badge-success">${t('wallet.consents.statusActive')}</span>`}
+                </td>
+                <td>
                   ${c.scope === 'federation'
                     ? html`<span class="badge badge-info">${t('wallet.consents.scopeFederation')}</span>`
                     : c.scope === 'auth'
@@ -342,7 +373,8 @@ export default function DataWalletTab({ session, showToast }) {
                   ${expSoon && html`<span class="dw-expiring-icon" title=${t('permissions.expiringWarning')}>\u26A0\uFE0F</span>`}
                   ${c.expires_at ? new Date(c.expires_at).toLocaleDateString() : t('wallet.consents.never')}
                 </td>
-                <td>${!isExpired && html`<button class="btn-danger-solid btn-sm" onClick=${() => handleRevoke(cId)}>${t('wallet.consents.revoke')}</button>`}</td>
+                <td>${live && html`<button class="btn-danger-solid btn-sm" onClick=${() => handleRevoke(cId)}>${t('wallet.consents.revoke')}</button>`}
+                  ${revoked && c.revoked_at && html`<span class="text-meta">${new Date(c.revoked_at).toLocaleDateString()}</span>`}</td>
               </tr>`;
             })}
           </tbody></table>
@@ -359,13 +391,23 @@ export default function DataWalletTab({ session, showToast }) {
       : auditEntries.length === 0 ? html`<div class="empty">${t('wallet.audit.empty')}</div>`
       : html`<div class="card scroll-x">
           <${DataTable}
-            headers=${[t('wallet.audit.who'), t('wallet.audit.what'), t('wallet.audit.when'), t('wallet.audit.purpose')]}
-            rows=${auditEntries.map(e => [
-              escHtml(e.accessor_gaii || e.accessed_by || e.who || '-'),
-              html`<span class="dw-code-accent">${escHtml(e.data_key || e.key || e.what || '-')}</span>`,
-              html`<span class="text-meta">${e.accessed_at ? timeAgo(e.accessed_at) : (e.timestamp ? timeAgo(e.timestamp) : '-')}</span>`,
-              escHtml(e.purpose || '-'),
-            ])}
+            headers=${[t('wallet.audit.who'), t('wallet.audit.what'), t('wallet.audit.action'), t('wallet.audit.when'), t('wallet.audit.outcome')]}
+            rows=${auditEntries.map(e => {
+              // Both doors (GET /v1/consent/audit and the /v1/data-wallet mount) send the same shape.
+              const key = e.memory_key || '-';
+              const action = e.action || '-';
+              const when = e.timestamp;
+              const allowed = e.allowed === true || e.allowed === 1;
+              return [
+                escHtml(e.accessor_gaii || '-'),
+                html`<span class="dw-code-accent">${escHtml(key)}</span>`,
+                escHtml(action),
+                html`<span class="text-meta">${when ? timeAgo(when) : '-'}</span>`,
+                allowed
+                  ? html`<span class="badge badge-success">${t('wallet.audit.allowed')}</span>`
+                  : html`<span class="badge badge-danger">${t('wallet.audit.denied')}</span>`,
+              ];
+            })}
           />
         </div>`
     }
