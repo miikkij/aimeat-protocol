@@ -11,6 +11,13 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.12.0 -- 2026-08-25 -- aimeat-app-builder moves to its own module AND comes back from the
+ *     node. Seeding is create-if-missing, which means a built-in skill can be edited in two places
+ *     and reconciled in neither: the node's copy had gained a 2.9 kB section on 2026-08-16 ("Say it
+ *     in their words" plus the support@operators escalation) that never came back here, and this
+ *     file had just gained a pointer the node never saw. A republish either way would have deleted
+ *     the other side's work. builtin-skills.app-builder.ts is the merge, and it is a file because
+ *     this one was at 789 of its 800 lines.
  *   v1.11.0 -- 2026-08-25 -- aimeat-app-workstation (public): how a large app is kept from the
  *     author's own machine — assets out of the source, sources split behind a build step, and an
  *     edit loop that does not re-read the whole file. aimeat-app-builder says "no build step",
@@ -50,6 +57,7 @@
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
 import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
 import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
+import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -63,6 +71,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   OPEN_ITEMS_SKILL_ENTRY,
   HATCHERY_SKILL_ENTRY,
   WORKSTATION_SKILL_ENTRY,
+  APP_BUILDER_SKILL_ENTRY,
   {
     name: 'aimeat-node-guide',
     visibility: 'public',
@@ -641,149 +650,6 @@ Published AIMEAT apps are one HTML file — avoid external asset files entirely:
 2. Works at mobile width (Phaser Scale.FIT / p5 windowResized / pixi resizeTo).
 3. Pauses when the tab hides (battery): phaser \`game.loop.sleep()/wake()\`.
 4. High-score write → read back → visible on the leaderboard without a reload.
-`,
-  },
-  {
-    name: 'aimeat-app-builder',
-    visibility: 'public',
-    skillMd: `---
-name: aimeat-app-builder
-description: Build and publish apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. The paved path for any "build/make/publish an app, game or tool on AIMEAT" request — fetch the canonical build spec first, research what already exists, build a single-file app from a template, verify, publish, and report the live URL. Use whenever an owner asks for an app on the node.
-license: MIT
-metadata:
-  audience: agent
----
-
-# Building AIMEAT apps
-
-An **AIMEAT app** is a **single self-contained HTML file**. The node hosts it and serves it
-on its own subdomain (e.g. \`https://<name>.apps.<node-domain>/\`). It logs the user in, reads
-and writes their data, and uses node-hosted UI/AI libraries — all from \`<script>\` tags
-pointing at the node. There is **no build step and no backend to write**: the node is the
-backend. If you have the \`aimeat_*\` MCP tools, publish directly over MCP — you do not need
-the web UI.
-
-That holds for the node. Past roughly 300 kB it stops holding for YOU: one file is then expensive
-to edit, and the fix is sources split behind a build step on your own machine that assembles the
-same single file. Load \`node:aimeat-app-workstation\` when the app gets there, or when the publish
-response's \`next_steps.size\` says so.
-
-## The one rule that matters: fetch the canonical spec first
-
-The node serves the **authoritative, always-current build-app specification** — the single
-source of truth for available libraries, allowed script URLs, required \`<meta>\` tags,
-auth/data APIs, and templates. **Before writing any app, fetch it and follow it exactly:**
-
-\`\`\`
-GET /v1/prompts/build-app        ← the spec (law; re-fetch every time, it changes)
-GET /v1/app-templates            ← starter templates (start from one, do not invent structure)
-GET /v1/appdev/pitfalls          ← curated "what bites app builders" registry
-\`\`\`
-
-Everything the app loads at runtime — CSS, auth, data, UI libraries — must be a URL
-**listed in that spec**. Never invent script/style \`src\` URLs; they 404 and break the app.
-
-**Carry the spec token.** The response includes \`spec_token\`, the digest of the spec you just
-read. Pass it as \`spec_token\` on \`aimeat_app_publish\`; the publish answers \`spec_check\`
-(\`ok\` | \`stale\` | \`missing\`), so a spec that moved under you says so instead of surfacing as a
-broken app later. If the owner tells you to skip the spec, send \`spec_ack: "skipped-by-owner"\` —
-that is recorded rather than silent.
-
-## Research before building (research → frame → propose → build → finish)
-
-Before writing code, look at what already exists on the node and reuse it. ONE call gives
-the big picture: \`aimeat_appdev_overview\` (pass your OWN model id — you know which model you are; self-identify, never ask the user) — the owner's existing apps
-and **template proposals** (often the fastest correct starting point: fork or copy their
-patterns), library packs with per-model proofs, T1/T2/T3 templates, and the pitfalls
-(curated + learned) for the areas you will touch. Drill down from there:
-\`GET /v1/library-packs/{id}\` (per-pack AI doc), \`GET /v1/appdev/pitfalls\` (curated
-registry), \`aimeat_appdev_pitfall_list\` (learned, model-filterable), \`aimeat_skill_list\`
-\`binding=app:{owner}/{file}\` (how existing apps want to be driven).
-
-Frame the build from the research (tier T1/T2/T3, packs, whether the app needs its own
-users → the aimeat-iam pack for the gate + AIMEAT.iam for the panel, decided NOW; a role
-belongs to the PERSON so a member's agents inherit it, and can() only paints while the extension
-enforces), propose the frame to the user in 3-5 lines, then build.
-If the user says to just build it the usual way, skip the research and go.
-
-## Finish — this is where the acceleration compounds
-
-After a successful publish (the publish response's \`next_steps\` shows what is missing):
-1. Publish the app's **agent face** + bind a **skill** (\`metadata.binding\`
-   \`app:{owner}/{filename}\`) so the app is agent-facing by default.
-2. If anything generalizes, record a template: \`aimeat_app_template_propose\`
-   (your own model id required — self-identify) — the next build starts from it.
-3. Report what bit you: \`aimeat_appdev_pitfall_report\` (model required; upserts by slug;
-   \`share: true\` publishes it platform-wide) — the next builder skips your mistake.
-
-## Workflow
-
-1. **Fetch the spec** (above). Skim the templates; pick the closest one.
-2. **Build one HTML file.** Single file, no bundler. Include the required meta tags the
-   spec lists (at minimum \`aimeat-app\` + \`aimeat-scopes\`, plus \`aimeat-ai\` when the app
-   generates content). Use
-   \`AIMEAT.auth.mountLoginButton(...)\` + \`AIMEAT.auth.login()\` for sign-in,
-   \`AIMEAT.data.get/set(key, value, { visibility })\` for storage, and the node UI helpers.
-   Respect the light/dark theme via \`data-theme\` + CSS variables — never hardcode colors.
-3. **Verify locally before publishing.** Syntax-check the inline JS, then verify the script
-   tags resolve to real node URLs. Use a check that names the file explicitly:
-   \`\`\`bash
-   node -e 'const f=process.argv[1],s=require("fs").readFileSync(f,"utf8");new (require("vm").Script)(s,{filename:f});console.log("parsed:",f)' app-script.js
-   \`\`\`
-   Do **not** use bare \`node --check $VAR\`: with an empty or unset variable it reads empty
-   stdin, parses that, and exits 0 printing nothing — which reads exactly like a pass for a
-   file nobody looked at.
-4. **Publish over MCP.** \`aimeat_app_publish\` (with \`spec_token\`) — for any file over ~1 KB
-   use **presigned upload** (omit the content param → PUT the raw HTML to the returned
-   \`upload_url\`). Re-publishing the same \`filename\` bumps the version — it does not duplicate.
-   The node checks the bytes and **refuses** two things outright: an inline \`<script>\` that does
-   not parse, and a script/stylesheet URL it answers 404 for. Both come back as
-   \`APP_ARTIFACT_BROKEN\` with a pitfall id per finding — fix and publish again. Anything else it
-   notices (theme tokens, the head declarations, unscoped reads of agent-written data) arrives as
-   \`app_hints\` on a successful publish; read them, they are the same three defects that put a
-   broken app live on 2026-08-11.
-5. **Return the live URL** and confirm with \`aimeat_app_list\` if unsure.
-
-## When the app generates content, say so — it is two lines
-
-An app that generates text, images, audio or video is, in EU AI Act terms, a system whose
-PROVIDER is the app owner. You do not have to read the law; the SDK carries it:
-
-\`\`\`javascript
-const r = await AIMEAT.ai.complete({ app_id: 'my-app', prompt });
-render(r.content);
-AIMEAT.ai.disclose(r.provenance, { target: '#ai-label' });   // official EU label, your theme
-await AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance));  // record follows the content
-AIMEAT.ai.chatNotice({ target: '#chat-top' });               // a chat says so first thing
-\`\`\`
-
-Declare it in the head so the catalogue can show it:
-\`<meta name="aimeat-ai" content="generates=text,image; discloses=yes; public-interest=no">\`.
-\`disclose()\` draws nothing when no label is owed — the node decides, you pass the object.
-Publishing warns (never blocks) when an app asks for \`ai:use\` and says nothing at all, and the
-warning names the exact call to add.
-
-**Emotion, mood, attention or any biometric inference about a person** is the app owner's OWN
-duty to declare to the people exposed, in their own words, before the inference happens.
-\`AIMEAT.ai.chatNotice({ title, body })\` renders your wording; it cannot write it for you.
-
-## When the app needs external data (an extension)
-
-A third-party API call belongs in an **AIMEAT extension** (sandboxed server-side function),
-not in the browser: it owns its \`ext:<name>\` memory namespace, makes outbound HTTP via
-\`ctx.fetch()\`, and exports actions as \`export default async function (ctx, input) {...}\`.
-The app reads it **through** the node's cortex libs, never directly. Most apps need NO
-extension — just auth + data + UI libs.
-
-## Do / Don't
-
-- **Do** fetch \`/v1/prompts/build-app\` every time — it is canonical and it changes.
-- **Do** research existing apps/packs/pitfalls first; start from a template.
-- **Do** verify locally, publish over MCP (presigned for >1 KB), hand back the live URL.
-- **Do** call \`AIMEAT.ai.disclose()\` and declare \`aimeat-ai\` in any app that generates content.
-- **Don't** invent library/script URLs or reference files the spec doesn't list.
-- **Don't** build a separate backend, a bundler, or a multi-file app.
-- **Don't** hardcode brand colors or bypass the AIMEAT auth/data/UI libraries.
 `,
   },
 ];
