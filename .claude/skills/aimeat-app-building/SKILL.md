@@ -19,6 +19,7 @@ Four node-side stores answer almost everything, and they are shared by every ses
 - **`aimeat_skill_list`** then **`aimeat_skill_get`**: most published apps carry their own operating guide as a skill (`user:{owner}/{app}-agent-guide`, `cadence-crm`, `operate-exchange`, `node:origami-boards`, …). If you are working on or against a named app, load its skill instead of reconstructing how it works.
 - **App Development Notes**: the dev organism's workspace `fbb51de5-56d5-4143-9871-b998a1187655` / `ws-mslr8u99kzk`, one `appnote` document per app: locked design decisions, prod organism/workspace ids, traps hit while building, open questions the developer still owns. Read the app's note before changing it; write back what the next session would want.
 - **`aimeat_appdev_pitfall_list`**: the app-building trap catalogue (curated plus what other sessions learned).
+- **`node:aimeat-app-workstation`**, once the app is past roughly 300 kB or a few thousand lines. One file has no natural brake and the cost lands on the edit loop: a 3.18 MB app on this node turned five-minute changes into forty-minute ones, and 477 kB of it was base64 images inlined into the source. The skill is the way out (assets to storage, sources split behind a build script that assembles the one file, `GET /v1/app-templates/workstation-project` for the scaffold). The publish response's `next_steps.size` says when you are there.
 
 Where a new lesson goes depends on who needs it, and the three are not interchangeable:
 
