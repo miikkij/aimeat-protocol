@@ -37,6 +37,7 @@ import type { Storage, SiteChangeLogEntry } from '../storage/interface.js';
 import { getSiteSyncState } from './site-sync.js';
 import { substituteVariables, resolvePromptContent } from './prompt-variables.js';
 import { extractTags, findUnresolvableTags, resolveTags, type TagDeps } from './site-tags.js';
+import { isReservedSurfaceKey } from './surface-layout/keys.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname_site = dirname(fileURLToPath(import.meta.url));
@@ -57,8 +58,13 @@ const SPA_HTML_PATH = resolveSpaHtmlPath();
 
 // Reserved storage key for the portal template
 const SITE_TEMPLATE_KEY = '__site_template__';
-// System owner GAII used for site template storage
-const SITE_OWNER_GAII = '__site__';
+/**
+ * System owner GAII used for site template storage, and for every other piece of node-level content
+ * that belongs to nobody in particular: the `portal/*` records, the email templates, and the surface
+ * layouts. Exported because the surface-layout service stores under the same pseudo-owner and a
+ * second copy of the string is a second thing to keep in step.
+ */
+export const SITE_OWNER_GAII = '__site__';
 // Portal memory key holding the header navigation configuration (order + hidden)
 const HEADER_NAV_KEY = 'portal/header-nav';
 // Canonical ids of the public header links an operator may show/hide/reorder.
@@ -257,6 +263,14 @@ export class SiteService {
         if (!key.startsWith('portal/')) {
             throw new SiteError('MEMORY_INVALID', 'Portal memory key must start with "portal/"', 422);
         }
+        // A surface layout lives under `portal/` so it mirrors and imports like any other portal
+        // record, which means this generic door can reach it. It must not: the layout is validated
+        // against the block registry before it is written, and a raw string dropped in here would
+        // be a second way past that. The same applies to a passage's storage key.
+        if (isReservedSurfaceKey(key)) {
+            throw new SiteError('MEMORY_RESERVED',
+                `"${key}" belongs to a page layout and is written through the layout editor, not as a portal record.`, 422);
+        }
         const now = new Date().toISOString();
         await this.storage.setMemory({
             key,
@@ -275,6 +289,13 @@ export class SiteService {
 
     /** Delete a single portal memory key. Returns false if the key did not exist. */
     async deletePortalMemory(key: string, changedBy: string): Promise<boolean> {
+        // The Memory Keys card lists every `portal/*` record with a delete cross beside it. Without
+        // this an operator clears their node's home by tidying away a JSON blob they did not
+        // recognise, and nothing would tell them what they had done.
+        if (isReservedSurfaceKey(key)) {
+            throw new SiteError('MEMORY_RESERVED',
+                `"${key}" belongs to a page layout. Revert the surface to its built-in layout instead of deleting the record.`, 422);
+        }
         const deleted = await this.storage.deleteMemory(SITE_OWNER_GAII, key);
         if (deleted) {
             this.invalidateCache();
