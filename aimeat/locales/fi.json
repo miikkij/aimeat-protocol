@@ -9842,7 +9842,9 @@
       "statusExpired": "vanhentunut",
       "showRevoked": "Näytä perutut",
       "hideRevoked": "Piilota perutut",
-      "status": "Tila"
+      "status": "Tila",
+      "intro": "Jokainen rivi on yksi antamasi lupa: mitä tietoasi se koskee, kenelle se ulottuu ja mitä sillä saa tehdä. Lista näyttää sen mikä on voimassa juuri nyt. Perumasi lupa jää talteen tositteeksi eikä näy listalla ennen kuin pyydät sen esiin.",
+      "scopeHelp": "Ulottuvuus kertoo kuinka kauas lupa yltää, ei sitä onko se yhä voimassa: \"private\" pitää sen täällä, \"federation\" sallii sen kulkea toisiin AIMEAT-taloihin, ja \"login access\" on lupa kirjautua sisään eikä lupa tietoihisi."
     },
     "audit": {
       "title": "Auditointiraportti",
@@ -9855,7 +9857,8 @@
       "action": "Toimenpide",
       "outcome": "Lopputulos",
       "allowed": "Sallittu",
-      "denied": "Estetty"
+      "denied": "Estetty",
+      "intro": "Mitä valitulla jaksolla tapahtui: kuka kosketti mitä tietoasi tai lupaasi, mitä hän teki ja sallittiinko vai estettiinkö se. Estetty rivi tarkoittaa että vahti piti."
     },
     "export": {
       "title": "GDPR-vienti",
