@@ -3,14 +3,20 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description SiteService — serves the portal HTML (custom operator template or default spa.html
- *   fallback, cached), resolving {{config|memory|storage|kv|board:*}} tags and header-nav config.
+ *   fallback, cached), and holds the operator's portal content: the template file, the `portal/*`
+ *   memory records and the header-nav config. The {{...}} tag grammar itself lives in site-tags.ts.
  *
  * @structure
  *   - SiteService.getPortalHtml(): returns portal HTML with tag substitution and TTL caching
  *   - HeaderNavConfig / PUBLIC_NAV_LINK_IDS: operator-configurable public header link order/visibility
- *   - CONFIG_WHITELIST + TAG_REGEX: safe config keys and the {{...}} tag grammar for substitution
+ *   - validateTemplate(): the refusals an uploaded template must survive, script-tag rule included
  *
  * @version-history
+ *   v1.4.0 — 2026-08-26 — Pure extraction: the tag grammar (CONFIG_WHITELIST, TAG_REGEX, escapeHtml)
+ *     and its resolver (resolveTemplate, resolveBoardTag, getConfigValue, extractTags,
+ *     findUnresolvableTags) move to site-tags.ts as free functions, so a second surface can resolve
+ *     tags without reaching into this class. No behaviour change; validateTemplate stays here
+ *     because the trust boundary it guards belongs to the template, not to the grammar.
  *   v1.3.0 — 2026-08-09 — PUBLIC_NAV_LINK_IDS drops `try` (it pointed at /v1/portal, where the brand
  *     link already goes) and `devView` (moved to the SPA's site footer). A stored order or hidden
  *     list naming either is filtered out by getHeaderNav, so no node needs a migration.
@@ -30,6 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, SiteChangeLogEntry } from '../storage/interface.js';
 import { getSiteSyncState } from './site-sync.js';
 import { substituteVariables, resolvePromptContent } from './prompt-variables.js';
+import { extractTags, findUnresolvableTags, resolveTags, type TagDeps } from './site-tags.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname_site = dirname(fileURLToPath(import.meta.url));
@@ -73,19 +80,6 @@ export interface HeaderNavConfig {
     hidden: string[];
 }
 
-// Config keys safe to expose via {{config:*}} tags
-const CONFIG_WHITELIST = new Set([
-    'nodeId', 'nodeType', 'baseUrl', 'nodeName', 'nodeDescription',
-    'federationName', 'locale', 'version',
-]);
-
-const TAG_REGEX = /\{\{(config|memory|storage|kv|board):([^}]+)\}\}/g;
-
-function escapeHtml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 export class SiteService {
     private cache: { html: string; expiresAt: number } | null = null;
 
@@ -93,6 +87,11 @@ export class SiteService {
         private config: AimeatConfig,
         private storage: Storage,
     ) { }
+
+    /** What site-tags.ts needs to answer a {{...}} tag on this node's behalf. */
+    private get tagDeps(): TagDeps {
+        return { config: this.config, storage: this.storage, ownerGaii: SITE_OWNER_GAII };
+    }
 
     /**
      * WebMCP bridge (TARGET-034 phase C): every served homepage — operator-custom template or the
@@ -127,7 +126,7 @@ export class SiteService {
         }
 
         const raw = templateRecord.data.toString('utf-8');
-        const html = this.withWebmcpTag(await this.resolveTemplate(raw));
+        const html = this.withWebmcpTag(await resolveTags(raw, this.tagDeps));
 
         // Cache resolved HTML
         this.cache = {
@@ -148,7 +147,7 @@ export class SiteService {
         const record = await this.storage.getStorageFile(SITE_OWNER_GAII, SITE_TEMPLATE_KEY);
         if (!record) return null;
         const template = record.data.toString('utf-8');
-        const tags = this.extractTags(template);
+        const tags = extractTags(template);
         return {
             template,
             sizeBytes: record.size,
@@ -174,8 +173,8 @@ export class SiteService {
             createdAt: new Date().toISOString(),
         });
 
-        const tags = this.extractTags(template);
-        const unresolvable = await this.findUnresolvableTags(tags);
+        const tags = extractTags(template);
+        const unresolvable = await findUnresolvableTags(tags, this.tagDeps);
         this.invalidateCache();
 
         await this.addChangeLog('template_upload', `Updated portal template (${(data.length / 1024).toFixed(1)} KB)`, changedBy);
@@ -429,109 +428,6 @@ export class SiteService {
     }
 
     // ── Internal ──
-
-    /** Resolve a {{board:slug}} tag to HTML of recent posts. */
-    private async resolveBoardTag(slug: string): Promise<string> {
-        // Find board by name or ID
-        const boards = await this.storage.listBoards();
-        const board = boards.find(b => b.name === slug || b.id === slug);
-        if (!board) return '';
-
-        // Only system and public boards can be rendered in the portal
-        if (board.visibility !== 'system' && board.visibility !== 'public') return '';
-
-        const posts = await this.storage.listPosts(board.id, { limit: 5 });
-        if (posts.length === 0) return '<div class="board-posts"><p class="board-empty">No posts yet.</p></div>';
-
-        const articles = posts.map(p => {
-            const date = new Date(p.createdAt);
-            const dateStr = date.toISOString().slice(0, 10);
-            return [
-                '<article class="board-post">',
-                `  <h3>${escapeHtml(p.title)}</h3>`,
-                `  <time datetime="${date.toISOString()}">${dateStr}</time>`,
-                `  <p>${escapeHtml(p.body)}</p>`,
-                '</article>',
-            ].join('\n');
-        });
-
-        return `<div class="board-posts">\n${articles.join('\n')}\n</div>`;
-    }
-
-    private async resolveTemplate(template: string): Promise<string> {
-        const matches = [...template.matchAll(TAG_REGEX)];
-        if (matches.length === 0) return template;
-
-        // Batch memory lookups
-        const memoryKeys = [...new Set(matches.filter(m => m[1] === 'memory').map(m => m[2]))];
-        const memoryValues = new Map<string, string>();
-        for (const key of memoryKeys) {
-            const record = await this.storage.getMemory(SITE_OWNER_GAII, key);
-            if (record) {
-                memoryValues.set(key, typeof record.value === 'string' ? record.value : JSON.stringify(record.value));
-            }
-        }
-
-        // Batch storage URL lookups
-        const storageKeys = [...new Set(matches.filter(m => m[1] === 'storage').map(m => m[2]))];
-        const storageUrls = new Map<string, string>();
-        for (const key of storageKeys) {
-            // Storage files resolve to the download URL
-            storageUrls.set(key, `${this.config.baseUrl}/v1/storage/${encodeURIComponent(SITE_OWNER_GAII)}/${encodeURIComponent(key)}`);
-        }
-
-        // Batch board post lookups
-        const boardSlugs = [...new Set(matches.filter(m => m[1] === 'board').map(m => m[2]))];
-        const boardHtmlMap = new Map<string, string>();
-        for (const slug of boardSlugs) {
-            boardHtmlMap.set(slug, await this.resolveBoardTag(slug));
-        }
-
-        return template.replace(TAG_REGEX, (_full, type: string, key: string) => {
-            switch (type) {
-                case 'config': return escapeHtml(this.getConfigValue(key));
-                case 'memory': return memoryValues.get(key) ?? '';
-                case 'storage': return escapeHtml(storageUrls.get(key) ?? '');
-                case 'kv': return escapeHtml(this.config.siteKv[key] ?? '');
-                case 'board': return boardHtmlMap.get(key) ?? '';
-                default: return '';
-            }
-        });
-    }
-
-    private getConfigValue(key: string): string {
-        if (!CONFIG_WHITELIST.has(key)) return '';
-        const val = (this.config as unknown as Record<string, unknown>)[key];
-        return val != null ? String(val) : '';
-    }
-
-    private extractTags(template: string): string[] {
-        const tags: string[] = [];
-        for (const match of template.matchAll(TAG_REGEX)) {
-            tags.push(`${match[1]}:${match[2]}`);
-        }
-        return [...new Set(tags)];
-    }
-
-    private async findUnresolvableTags(tags: string[]): Promise<string[]> {
-        const unresolvable: string[] = [];
-        for (const tag of tags) {
-            const [type, key] = tag.split(':');
-            if (type === 'memory') {
-                const record = await this.storage.getMemory(SITE_OWNER_GAII, key);
-                if (!record) unresolvable.push(tag);
-            } else if (type === 'config') {
-                if (!CONFIG_WHITELIST.has(key)) unresolvable.push(tag);
-            } else if (type === 'board') {
-                // kv and storage are always "resolvable" (might just be empty)
-                // board tags are resolvable if the board exists
-                const boards = await this.storage.listBoards();
-                const found = boards.some(b => b.name === key || b.id === key);
-                if (!found) unresolvable.push(tag);
-            }
-        }
-        return unresolvable;
-    }
 
     private validateTemplate(template: string): void {
         const maxBytes = this.config.siteMaxTemplateSizeKb * 1024;
