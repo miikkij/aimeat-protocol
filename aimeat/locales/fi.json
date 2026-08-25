@@ -2926,7 +2926,8 @@
       "checkIntro": "Mitä hakukone tästä sivustosta oikeasti saa irti, hakukoneiden omilla työkaluilla eikä meidän. Jokainen aukeaa tämä osoite valmiiksi täytettynä.",
       "checkRich": "Googlen Rich Results Test",
       "checkSchema": "Schema.org-validaattori",
-      "checkSpeed": "PageSpeed Insights"
+      "checkSpeed": "PageSpeed Insights",
+      "tagOrDns": "Tällä sivulla ei ole tagia. Se ei haittaa jos vahvistit verkkotunnuksen toisella tavalla — DNS-tietue on parempi tapa ja kattaa myös sovellusten osoitteet. Tämä sivu ei näe DNS-tietuetta, vain tagin."
     }
   },
   "dev": {

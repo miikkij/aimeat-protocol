@@ -2938,7 +2938,8 @@
       "checkIntro": "What a search engine actually makes of this site, read by the people who run the search engines rather than by us. Each opens with this address already filled in.",
       "checkRich": "Google Rich Results Test",
       "checkSchema": "Schema.org validator",
-      "checkSpeed": "PageSpeed Insights"
+      "checkSpeed": "PageSpeed Insights",
+      "tagOrDns": "No tag on this page. That is fine if you verified the domain another way — a DNS record is the better method and covers the application addresses too. This page cannot see a DNS record, only a tag."
     }
   },
   "dev": {
