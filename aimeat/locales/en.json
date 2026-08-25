@@ -10213,5 +10213,108 @@
   "dataMap.loss.may-vanish": "may vanish, the app copes",
   "profile.scheduler.reads": "Reads",
   "profile.scheduler.writes": "Writes",
-  "profile.scheduler.readsNothing": "nothing"
+  "profile.scheduler.readsNothing": "nothing",
+  "surface": {
+    "blocks": {
+      "common": {
+        "band": {
+          "label": "Group with a heading"
+        },
+        "freeform": {
+          "label": "Your own text"
+        }
+      },
+      "home": {
+        "nameplate": {
+          "label": "Name and picture"
+        },
+        "mat": {
+          "label": "Link to their own webpage"
+        },
+        "mailbox": {
+          "label": "Unread mail"
+        },
+        "chat-door": {
+          "label": "Way into the chat"
+        },
+        "fleet": {
+          "label": "How their agents are doing"
+        },
+        "things": {
+          "label": "What they have made"
+        },
+        "playbooks": {
+          "label": "Things they could set up"
+        },
+        "achievements": {
+          "label": "What they have tried"
+        },
+        "feed": {
+          "label": "What has happened"
+        },
+        "open-items": {
+          "label": "Unfinished business"
+        },
+        "install-cta": {
+          "label": "Install as an app"
+        },
+        "trust": {
+          "label": "AI labelling and data ownership"
+        },
+        "settings-door": {
+          "label": "Way into settings"
+        },
+        "steps": {
+          "label": "Setup path for someone new"
+        }
+      },
+      "portal": {
+        "welcome-door": {
+          "label": "Front door"
+        },
+        "pitch": {
+          "label": "What this place is, in one line"
+        },
+        "wish": {
+          "label": "Say what you need"
+        },
+        "build-invite": {
+          "label": "Build an app"
+        },
+        "connect-invite": {
+          "label": "Connect your own AI"
+        },
+        "changelog": {
+          "label": "What shipped lately"
+        },
+        "gallery": {
+          "label": "Wall of published apps"
+        },
+        "totals": {
+          "label": "How much is here"
+        },
+        "hero": {
+          "label": "Owner or tenant"
+        },
+        "agent-prompt": {
+          "label": "Build an agent"
+        },
+        "ask-ai": {
+          "label": "Ask your own AI about this"
+        },
+        "stats": {
+          "label": "What this place did today"
+        },
+        "transparency": {
+          "label": "How AI content is marked"
+        },
+        "text": {
+          "label": "A passage you keep as a record"
+        },
+        "board": {
+          "label": "Latest posts from a board"
+        }
+      }
+    }
+  }
 }

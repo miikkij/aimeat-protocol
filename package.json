@@ -22,6 +22,7 @@
     "typecheck:frontend": "cd aimeat && pnpm typecheck:frontend",
     "typecheck:sdk": "cd aimeat && pnpm typecheck:sdk",
     "check:importmap": "cd aimeat && pnpm check:importmap",
+    "check:surface-blocks": "cd aimeat && pnpm check:surface-blocks",
     "check:profile-tabs": "cd aimeat && pnpm check:profile-tabs",
     "check:config-coverage": "cd aimeat && pnpm check:config-coverage",
     "check:no-max-tokens": "cd aimeat && pnpm check:no-max-tokens",
