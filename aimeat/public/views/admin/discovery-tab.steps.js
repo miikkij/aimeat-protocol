@@ -143,7 +143,13 @@ export function DiscoverySteps({ status, onChanged }) {
   // Search Console addresses a site as a "resource"; handing it this node's own URL puts the
   // operator on the right property instead of a chooser. The check tools all take ?url=.
   const enc = encodeURIComponent(base);
-  const GSC = `https://search.google.com/search-console/welcome?resource_id=${enc}`;
+  // The bare welcome page, NOT ?resource_id=<url>. Prefilling the URL drops the operator into the
+  // URL-prefix form, which covers this host and nothing under it — so the application and portfolio
+  // addresses, which are subdomains, stay invisible to that property and its sitemap index reports
+  // zero children. Measured on aimeat.io: 29 entries in the index, 0 discovered. The DOMAIN property
+  // is the right one and it verifies from the same DNS record, so pushing somebody into the wrong
+  // half of that dialog costs them a second setup and a stretch of believing they had finished.
+  const GSC = 'https://search.google.com/search-console/welcome';
   const GSC_SITEMAPS = `https://search.google.com/search-console/sitemaps?resource_id=${enc}`;
   const BING = 'https://www.bing.com/webmasters/';
   const INDEXNOW = 'https://www.bing.com/indexnow';
@@ -160,6 +166,7 @@ export function DiscoverySteps({ status, onChanged }) {
       <${Step} n="1" title=${t('dashboard.seo.step1Title')}
                done=${served.google} checkable=${false}>
         <p>${t('dashboard.seo.step1Body')}</p>
+        <p class="adm-muted">${t('dashboard.seo.step1Domain')}</p>
         <p class="adm-muted">${t('dashboard.seo.step1Dns')}</p>
         <${StepLink} href=${GSC} label=${t('dashboard.seo.openGsc')} />
         <label class="adm-seo-field">

@@ -2939,7 +2939,8 @@
       "checkRich": "Google Rich Results Test",
       "checkSchema": "Schema.org validator",
       "checkSpeed": "PageSpeed Insights",
-      "tagOrDns": "No tag on this page. That is fine if you verified the domain another way — a DNS record is the better method and covers the application addresses too. This page cannot see a DNS record, only a tag."
+      "tagOrDns": "No tag on this page. That is fine if you verified the domain another way — a DNS record is the better method and covers the application addresses too. This page cannot see a DNS record, only a tag.",
+      "step1Domain": "Choose \"Domain\" rather than \"URL prefix\" in that dialog, and type the bare address with no https:// in front. A URL-prefix property covers this host alone, so the applications and portfolios published here — which live on their own subdomains — would stay invisible to it, and the list in step 2 would report no entries."
     }
   },
   "dev": {

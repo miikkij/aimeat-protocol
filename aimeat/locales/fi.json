@@ -2927,7 +2927,8 @@
       "checkRich": "Googlen Rich Results Test",
       "checkSchema": "Schema.org-validaattori",
       "checkSpeed": "PageSpeed Insights",
-      "tagOrDns": "Tällä sivulla ei ole tagia. Se ei haittaa jos vahvistit verkkotunnuksen toisella tavalla — DNS-tietue on parempi tapa ja kattaa myös sovellusten osoitteet. Tämä sivu ei näe DNS-tietuetta, vain tagin."
+      "tagOrDns": "Tällä sivulla ei ole tagia. Se ei haittaa jos vahvistit verkkotunnuksen toisella tavalla — DNS-tietue on parempi tapa ja kattaa myös sovellusten osoitteet. Tämä sivu ei näe DNS-tietuetta, vain tagin.",
+      "step1Domain": "Valitse dialogissa \"Domain\" eikä \"URL prefix\", ja kirjoita pelkkä osoite ilman https://-alkua. URL-prefix kattaa vain tämän osoitteen, joten täällä julkaistut sovellukset ja portfoliot — jotka ovat omissa alidomaineissaan — jäisivät sen ulkopuolelle, ja askeleen 2 lista näyttäisi nolla kohdetta."
     }
   },
   "dev": {
