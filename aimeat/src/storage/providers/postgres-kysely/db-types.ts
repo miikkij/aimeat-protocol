@@ -680,6 +680,10 @@ export interface App {
   operatorHiddenAt: Timestamp | null;
   operatorHiddenBy: string | null;
   operatorHideReason: string | null;
+  operatorSeoBlocked: Generated<boolean>;
+  operatorSeoBlockedAt: Timestamp | null;
+  operatorSeoBlockedBy: string | null;
+  operatorSeoBlockReason: string | null;
   ownerGaii: string;
   ownerName: string;
   parked: Generated<boolean>;

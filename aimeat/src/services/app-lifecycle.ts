@@ -353,6 +353,13 @@ export async function forkApp(
   // fork, and it is owner-only besides — copying it hands one owner's note about their own working
   // habits to whoever forked them, which is what the MCP fork did.
   delete forkedManifest.specCheck;
+  // Search visibility is NOT inherited, and this is the one place it could have been. The manifest
+  // spread above would otherwise hand a brand-new fork the source's `index: true` — and, on a node
+  // in review mode, the operator's approval of a different app along with it. Whoever forked this
+  // makes their own decision about being findable, on their own copy, the same way they would for
+  // an app they wrote. It also stops the obvious abuse: forking a well-ranked app fifty times and
+  // having fifty indexed copies appear on the operator's domain without anyone approving one.
+  delete forkedManifest.seo;
   // A FORK OF A GENERATIVE APP IS STILL A GENERATIVE APP. The manifest spread above brings the
   // posture across, and this re-measures the observed half against the bytes actually being stored
   // while keeping what the source DECLARED — so the statement neither resets to silence nor becomes

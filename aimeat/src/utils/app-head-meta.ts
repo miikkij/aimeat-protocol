@@ -72,6 +72,21 @@ export interface AppHeadSpec {
   updatedAt?: string | null;
   /** CSP nonce attribute for the JSON-LD script tag, or ''. */
   nonceAttr?: string;
+  /**
+   * Whether a search engine should index this app (services/app-seo.ts). False stamps a robots
+   * meta and skips the descriptive tags: an app nobody asked to have found does not need keywords.
+   * Defaults to false, so a caller that has not thought about it does not accidentally opt an
+   * owner's app in.
+   */
+  indexable?: boolean;
+  /** Keywords, from the owner's override or the app's own tags. Only used when indexable. */
+  keywords?: string[];
+  /** Absolute URL of the social image (the app's own screenshot, usually). */
+  image?: string;
+  /** BCP-47 tag the app declares for itself. Empty leaves the document's own `lang` alone. */
+  lang?: string;
+  /** Lifetime opens, for the JSON-LD interaction count. */
+  downloads?: number;
 }
 
 function esc(t: string): string {
@@ -98,6 +113,21 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   const origin = spec.origin.replace(/\/$/, '');
   const add: string[] = [];
 
+  // Search visibility is the app owner's own decision and it is off until they make one. The
+  // robots meta is added even though the serving route also sends X-Robots-Tag, because the two
+  // reach different readers: the header travels with THIS response, the meta travels with the
+  // document however it was obtained. Neither is redundant, and unlike every other tag here this
+  // one OVERWRITES an author's own robots meta — an app author cannot opt their app into the
+  // node's search index by writing a tag, because that is the operator's and the owner's decision
+  // to make through the switch, not the document's.
+  if (!spec.indexable) {
+    const noindex = `<meta name="robots" content="noindex, nofollow">`;
+    text = has(text, /<meta name="robots"[^>]*>/i)
+      ? text.replace(/<meta name="robots"[^>]*>/i, noindex)
+      : text;
+    if (!has(text, /<meta name="robots"/i)) add.push(noindex);
+  }
+
   if (!has(text, /<meta name="description"/i)) {
     add.push(`<meta name="description" content="${esc(desc)}">`);
   }
@@ -112,6 +142,24 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   }
   if (!has(text, /<meta property="og:type"/i)) {
     add.push(`<meta property="og:type" content="website">`);
+  }
+  // The app's own picture. Every published app can have a screenshot and none of them had a social
+  // card, while the image sat one unauthenticated route away — a shared app link unfurled as a bare
+  // URL everywhere it was posted. Only when the app is search-visible: the query behind
+  // `spec.image` is not worth spending on an app nobody asked to have found.
+  if (spec.indexable && spec.image) {
+    if (!has(text, /<meta property="og:image"/i)) {
+      add.push(`<meta property="og:image" content="${esc(spec.image)}">`);
+    }
+    if (!has(text, /<meta name="twitter:card"/i)) {
+      add.push(`<meta name="twitter:card" content="summary_large_image">`);
+    }
+    if (!has(text, /<meta name="twitter:image"/i)) {
+      add.push(`<meta name="twitter:image" content="${esc(spec.image)}">`);
+    }
+  }
+  if (spec.indexable && spec.keywords?.length && !has(text, /<meta name="keywords"/i)) {
+    add.push(`<meta name="keywords" content="${esc(spec.keywords.join(', '))}">`);
   }
   if (!has(text, /<link rel="canonical"/i)) {
     // The app's OWN origin, never the apex. The app is the page here.
@@ -163,6 +211,21 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
       author: { '@type': 'Person', name: spec.owner },
       isPartOf: { '@type': 'WebSite', name: 'AIMEAT', url: `${spec.baseUrl.replace(/\/$/, '')}/` },
       dateModified: (spec.updatedAt ?? new Date().toISOString()).split('T')[0],
+      ...(spec.image ? { image: spec.image } : {}),
+      ...(spec.keywords?.length ? { keywords: spec.keywords.join(', ') } : {}),
+      ...(spec.lang ? { inLanguage: spec.lang } : {}),
+      // How many times this app has actually been opened. A real number rather than a rating: this
+      // node counts opens and does not collect stars, and inventing an aggregateRating to win a
+      // richer search result would be inventing the one thing here nobody measured.
+      ...(spec.downloads
+        ? {
+            interactionStatistic: {
+              '@type': 'InteractionCounter',
+              interactionType: 'https://schema.org/DownloadAction',
+              userInteractionCount: spec.downloads,
+            },
+          }
+        : {}),
       ...(offers.length ? { offers } : {}),
     };
     add.push(`<script type="application/ld+json"${spec.nonceAttr ?? ''}>${JSON.stringify(ld)}</script>`);
@@ -179,8 +242,15 @@ export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   }
 
   // `lang` only when the author left it off — an app in Finnish must not be relabelled English.
+  //
+  // Which is what happened for a year, because the value here was the literal 'en'. Most app
+  // authors omit the attribute, and this node's apps are substantially Finnish, so the tag was
+  // asserting something plainly false to every search engine and screen reader that read it.
+  // `spec.lang` carries what the app declares about ITSELF — its own `aimeat-locales` meta, or the
+  // owner's override. 'en' is the last resort it always was, not the first answer.
   if (hasHtmlEl && !/<html[^>]*\slang=/i.test(out)) {
-    out = out.replace(/<html(\s|>)/i, (m, tail: string) => `<html lang="en"${tail === '>' ? '>' : ' '}`);
+    const lang = esc(spec.lang?.trim() || 'en');
+    out = out.replace(/<html(\s|>)/i, (m, tail: string) => `<html lang="${lang}"${tail === '>' ? '>' : ' '}`);
   }
 
   return out;

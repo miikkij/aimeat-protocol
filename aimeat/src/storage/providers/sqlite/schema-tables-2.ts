@@ -222,6 +222,14 @@ export function applySchemaTables2(db: Database.Database): void {
       operatorHiddenBy   TEXT,
       operatorHiddenAt   TEXT,
       operatorHideReason TEXT,
+      -- Operator moderation of SEARCH VISIBILITY only, and narrower than operatorHidden: the app
+      -- stays usable, listed and shareable, and merely stops being findable through a search
+      -- engine. Here on the record rather than in the manifest for the same reason operatorHidden
+      -- is: the owner writes the manifest, so a block they can lift by republishing is not a block.
+      operatorSeoBlocked INTEGER NOT NULL DEFAULT 0,
+      operatorSeoBlockedBy     TEXT,
+      operatorSeoBlockedAt     TEXT,
+      operatorSeoBlockReason   TEXT,
       createdAt      TEXT NOT NULL,
       PRIMARY KEY (ownerGaii, filename, versionNumber)
     );

@@ -230,6 +230,52 @@ components:
       description: One-time key for Tier 0.5 operations
 
   schemas:
+    AppSeoState:
+      type: string
+      description: >-
+        Whether a published app is findable in a search engine, and when it is not, WHY — because
+        "not indexed" has five different causes and only one of them is a switch anybody can flip.
+        `off` is the default for every app: publishing makes an app public and shareable by link,
+        and being findable in a search engine is a separate decision its owner makes on purpose.
+      enum: [on, off, pending, blocked, hidden, gated]
+      x-enum-descriptions:
+        on: Findable. Listed in the node's sitemap index, and its own origin invites crawlers.
+        off: Its owner has not asked for it to be findable. The default.
+        pending: Its owner asked and the operator has not answered yet (apps.seo_mode = review).
+        blocked: An operator blocked this app's search visibility. The app itself still works.
+        hidden: Parked or operator-hidden, so there is nothing to find either way.
+        gated: Behind an access code or a price. Never listed, and not a switch its owner controls.
+    AppSeo:
+      type: object
+      description: >-
+        An app owner's own search-visibility decision and the wording that goes with it. Every
+        description field is optional: left empty, the metadata is derived from what the app already
+        declares — its name, its description, its tags and its own screenshot — because an owner who
+        wants their app found has written all of that once already.
+      properties:
+        index:
+          type: boolean
+          description: The owner's switch. Absent or false means the app is not search-visible.
+        requestedAt:
+          type: string
+          format: date-time
+          description: Server-stamped when the switch was turned on. Never accepted from a caller.
+        approvedBy:
+          type: string
+          description: >-
+            The operator who approved, in review mode. Read-only on the owner's own update door —
+            an owner who could set this would approve themselves and the mode would enforce nothing.
+          readOnly: true
+        approvedAt: { type: string, format: date-time, readOnly: true }
+        title: { type: string, maxLength: 120, description: Overrides the derived title. Empty uses the app's name. }
+        description: { type: string, maxLength: 320, description: Overrides the derived meta description. }
+        keywords:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 40 }
+          description: Overrides the derived keywords. Empty uses the app's tags.
+        image: { type: string, description: Absolute https URL. Empty uses the app's own screenshot. }
+        lang: { type: string, description: 'BCP-47 tag. Empty reads the app''s own aimeat-locales meta.' }
     AccountEvent:
       type: object
       description: >-
@@ -19521,6 +19567,204 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /v1/admin/seo/status:
+    get:
+      operationId: getSeoStatus
+      summary: Is this node findable, and what is still undone
+      description: |
+        Operator-only. One answer assembled from every surface that decides whether this node can be
+        found: the discovery master switch, the node's own identity as it appears in structured data
+        and social cards, what robots.txt is actually serving, the two sitemaps, which search-engine
+        verification tags are being served, the IndexNow key and last submission, and how many
+        published apps are search-visible.
+
+        It reports what is BEING SERVED rather than what the configuration holds, wherever the two
+        could differ — a verification token that never reaches the page looks exactly like a working
+        one from inside the config.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Discovery status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          indexing:
+                            type: string
+                            enum: [on, off]
+                            description: The node-wide discovery master switch (seo.indexing)
+                          identity:
+                            type: object
+                            properties:
+                              site_name: { type: string }
+                              site_description: { type: string }
+                              organization_name: { type: string }
+                              organization_url: { type: string }
+                              og_image: { type: string, description: Absolute URL }
+                              same_as: { type: array, items: { type: string } }
+                          robots:
+                            type: object
+                            properties:
+                              url: { type: string }
+                              content_signal: { type: string, description: The directive as served, not the raw config value }
+                              ai_training: { type: string, enum: [allow, deny] }
+                              training_crawlers_blocked: { type: boolean }
+                          sitemap:
+                            type: object
+                            properties:
+                              url: { type: string }
+                              index_url: { type: string }
+                              page_count: { type: integer }
+                              app_host_count: { type: integer, description: App hosts the sitemap index will list }
+                          verification:
+                            type: object
+                            properties:
+                              google: { type: boolean }
+                              bing: { type: boolean }
+                              extra: { type: array, items: { type: string }, description: Meta tag names of any other verifications }
+                          indexnow:
+                            type: object
+                            properties:
+                              key_configured: { type: boolean }
+                              key_url: { type: string, nullable: true }
+                              auto: { type: boolean }
+                              last_submitted_at: { type: string, nullable: true, format: date-time }
+                              last_url_count: { type: integer, nullable: true }
+                          apps:
+                            type: object
+                            description: How many published apps are in each search-visibility state
+                            properties:
+                              mode: { type: string, enum: [owner, review] }
+                              total: { type: integer }
+                              on: { type: integer }
+                              off: { type: integer }
+                              pending: { type: integer }
+                              blocked: { type: integer }
+                              hidden: { type: integer }
+                              gated: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/admin/apps/{owner}/{filename}/seo-block:
+    post:
+      operationId: blockAppSeo
+      summary: Block or unblock one app's search visibility (operator)
+      description: |
+        Operator-only, and deliberately narrower than `moderate`: a blocked app stays published,
+        listed, usable and shareable by link, and only stops being findable through a search engine.
+        That is the proportionate answer to an app origin being used to farm keywords on the
+        operator's domain.
+
+        The block lives on the app record, not in its manifest, so the owner cannot lift it by
+        flipping their own switch or by re-publishing. The reason is shown to the OWNER as well as
+        recorded: a block whose reason the owner cannot read is one they cannot fix.
+      tags: [Apps, Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [blocked]
+              properties:
+                blocked: { type: boolean, description: True to block search visibility, false to lift the block }
+                reason: { type: string, description: Optional reason shown to the owner (max 500 chars) }
+      responses:
+        '200':
+          description: Search-visibility block updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          filename: { type: string }
+                          seo_state: { $ref: '#/components/schemas/AppSeoState' }
+                          note: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/admin/apps/{owner}/{filename}/seo-approve:
+    post:
+      operationId: approveAppSeo
+      summary: Approve an app's request to be findable (operator, review mode only)
+      description: |
+        Operator-only, and only on a node whose `apps.seo_mode` is `review` — where an app owner's
+        own switch is a request rather than the decision. On a node in `owner` mode there is nothing
+        to approve and this answers 409.
+
+        The approval survives a re-publish. What was approved is this app being findable under this
+        name and description, not one particular build of its HTML, and sending every version bump
+        back to the queue would teach owners to stop shipping.
+      tags: [Apps, Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [approved]
+              properties:
+                approved: { type: boolean, description: True to approve, false to withdraw an approval }
+      responses:
+        '200':
+          description: Approval updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          owner: { type: string }
+                          filename: { type: string }
+                          seo_state: { $ref: '#/components/schemas/AppSeoState' }
+                          note: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: This node lets app owners decide their own search visibility, so there is nothing to approve
+
   /v1/admin/apps/{owner}/{filename}:
     delete:
       operationId: deleteAppAdmin
@@ -19624,6 +19868,15 @@ paths:
                       type: array
                       maxItems: 5
                       items: { $ref: '#/components/schemas/CrewDef' }
+                seo:
+                  allOf:
+                    - $ref: '#/components/schemas/AppSeo'
+                  description: >-
+                    Search visibility, off until you switch it on. Merged field by field over what is
+                    already there, so flipping `index` does not drop a title you wrote last month.
+                    `approvedBy` and `approvedAt` are the operator's answer in review mode and are
+                    dropped from this body rather than rejected, so a client may safely echo back the
+                    object it just read.
       responses:
         '200':
           description: App updated

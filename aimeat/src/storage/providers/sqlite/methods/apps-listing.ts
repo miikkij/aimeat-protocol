@@ -23,7 +23,9 @@ import type { SqliteStorage } from '../index.js';
 export const SUMMARY_COLUMNS = [
   'a.ownerGaii', 'a.ownerName', 'a.filename', 'a.versionNumber', 'a.manifest', 'a.mimeType',
   'a.size', 'a.accessCode', 'a.parked', 'a.forkable', 'a.operatorHidden', 'a.operatorHiddenBy',
-  'a.operatorHiddenAt', 'a.operatorHideReason', 'a.aiProvenanceId', 'a.createdAt',
+  'a.operatorHiddenAt', 'a.operatorHideReason',
+  'a.operatorSeoBlocked', 'a.operatorSeoBlockedBy', 'a.operatorSeoBlockedAt', 'a.operatorSeoBlockReason',
+  'a.aiProvenanceId', 'a.createdAt',
 ].join(', ');
 
 /**

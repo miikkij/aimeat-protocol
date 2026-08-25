@@ -36,6 +36,7 @@ import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import { publicPosture } from '../../services/app-ai-posture.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
+import { appSeoState } from '../../services/app-seo.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -57,6 +58,9 @@ export function registerCatalogueAdminRoutes(
             const { ownerGhii } = await canonicalOwner(req);
             viewerGhii = ownerGhii;
         }
+        // An operator sees the reason behind their own per-app search block on every row, which is
+        // what makes the moderation list in the admin dashboard readable. It grants nothing else.
+        const isOperator = req.auth?.roles?.includes('operator') ?? false;
         const opts = {
             category: req.query.category as string | undefined,
             q: req.query.q as string | undefined,
@@ -139,6 +143,19 @@ export function registerCatalogueAdminRoutes(
                 has_draft: viewerGhii ? (app.ownerGaii === viewerGhii && viewerDraftFilenames.has(app.filename)) : false,
                 operator_hidden: !!app.operatorHidden,
                 operator_hide_reason: app.operatorHideReason ?? null,
+                // Search visibility, as the STATE rather than the switch: 'off' | 'on' | 'pending'
+                // | 'blocked' | 'hidden' | 'gated'. Public, because whether an app is findable in a
+                // search engine is observable from outside anyway — its own robots.txt says so.
+                seo_state: appSeoState(app, config),
+                // The reason for an operator's block goes to the OWNER as well as the operator: a
+                // block whose reason the owner cannot read is one they cannot fix. Everyone else
+                // sees only that it is blocked, which the state above already says.
+                ...(isOwn || isOperator
+                  ? { operator_seo_block_reason: app.operatorSeoBlockReason ?? null }
+                  : {}),
+                // The owner's own wording, and only theirs to read: it is a draft of what the app
+                // will say about itself, and it is not interesting to anybody else.
+                ...(isOwn ? { seo: app.manifest?.seo ?? null } : {}),
                 has_screenshot: hasScreenshot,
                 downloads,
                 forks,
