@@ -46,18 +46,39 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   // again, and the user can never reach the profile home (bounce loop).
   // Forward to the builder once cfg resolves to "not published". Keyed on cfg only: navigate is a
   // prop function of uncertain stability, and adding it could re-fire the forward before unmount.
+  // Unpublished but PREVIOUSLY PUBLISHED is its own state, and it used to have no page at all.
+  // The forward below sent anyone whose portfolio was switched off straight into the builder, where
+  // nothing said the old page still existed — so pressing Unpublish read as having destroyed the
+  // work. It never did: unpublishing writes `enabled: false` and does not touch the stored HTML.
+  // `publishedAt` is the evidence that a page is sitting there, and it earns a card of its own.
+  const wasPublished = !!(cfg && (cfg.publishedAt || cfg.htmlSizeKb));
+
   useEffect(() => {
-    if (cfg !== undefined && !cfg?.enabled) {
+    if (cfg !== undefined && !cfg?.enabled && !wasPublished) {
       try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
       navigate('/v1/portfolio');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cfg]);
+  }, [cfg, wasPublished]);
 
   if (cfg === undefined) return html`<${Spinner} text=${t('loading') || 'Loading…'} />`;
-  if (!cfg?.enabled) return null; // forwarding to the builder
+  if (!cfg?.enabled && !wasPublished) return null; // nothing here yet — forwarding to the builder
 
   const url = `${window.location.origin}/v1/portfolio/${encodeURIComponent(session.owner)}`;
+
+  const handleRepublish = async () => {
+    setSeoBusy(true);
+    try {
+      // The stored HTML was never touched, so this is the whole restore: one field back to true.
+      await apiPut('/v1/portfolio/config', { ...cfg, enabled: true, tags: ['portfolio'] });
+      setCfg({ ...cfg, enabled: true });
+      showToast?.(tr('portfolio.builder.republished', 'Your portfolio is public again.'));
+    } catch (e) {
+      showToast?.(e.message || 'Failed', true);
+    } finally {
+      setSeoBusy(false);
+    }
+  };
 
   const handleSeoToggle = async () => {
     setSeoBusy(true);
@@ -78,14 +99,56 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   };
 
   const handleUnpublish = () => {
-    confirm(tr('portfolio.builder.unpublishConfirm', 'Unpublish your portfolio? The public page stops working until you publish again.'), async () => {
+    confirm(tr('portfolio.builder.unpublishConfirm', 'Take your portfolio off the web? Nothing is deleted \u2014 the page stays stored here and you can make it public again from this tab whenever you like.'), async () => {
       try {
         await apiPut('/v1/portfolio/config', { ...cfg, enabled: false, tags: ['portfolio'] });
-        showToast?.(tr('portfolio.builder.unpublished', 'Portfolio unpublished'));
-        navigate('/v1/portfolio');
+        // Stay here. Forwarding to the builder is what made this act read as destructive: the
+        // page vanished, the builder said nothing about it, and the way back did not exist. The
+        // card this now falls through to says the page is still stored and offers to restore it.
+        setCfg({ ...cfg, enabled: false });
+        showToast?.(tr('portfolio.builder.unpublished',
+          'Taken off the web. The page is still stored here — you can make it public again below.'));
       } catch (e) { showToast?.(e.message || 'Failed', true); }
     }, { danger: true });
   };
+
+  // Switched off, with a page still sitting there. Says so, and offers the one thing that was
+  // missing: the way back. Everything else on this tab describes a live page, so it stays hidden.
+  if (!cfg.enabled) {
+    return html`
+      <div class="tab-content">
+        <div class="section-title">${t('portfolio.builder.heading')}</div>
+        <div class="card">
+          <div class="mem-item">
+            <span class="mem-key">${tr('portfolio.builder.offLabel', 'Status')}</span>
+            <span>${tr('portfolio.builder.offBody',
+              'Your portfolio is not public right now. It has not been deleted — the page you built is still stored here, exactly as it was.')}</span>
+          </div>
+          ${cfg.publishedAt && html`
+            <div class="mem-item">
+              <span class="mem-key">${tr('portfolio.builder.lastUpdated', 'Last updated')}</span>
+              <span>${new Date(cfg.publishedAt).toLocaleString(getLocale() === 'fi' ? 'fi-FI' : undefined)}</span>
+            </div>
+          `}
+          ${cfg.htmlSizeKb && html`
+            <div class="mem-item">
+              <span class="mem-key">${tr('portfolio.builder.sizeLabel', 'Size')}</span>
+              <span>${cfg.htmlSizeKb} KB</span>
+            </div>
+          `}
+          <div class="card-actions">
+            <button class="btn-primary btn-sm" disabled=${seoBusy} onClick=${handleRepublish}>
+              ${tr('portfolio.builder.republish', 'Make it public again')}
+            </button>
+            <button class="btn-outline btn-sm" onClick=${() => navigate('/v1/portfolio')}>
+              ${tr('portfolio.builder.editBtn', 'Edit in builder')}
+            </button>
+          </div>
+        </div>
+        <${ConfirmUI} />
+      </div>
+    `;
+  }
 
   return html`
     <div class="tab-content">
