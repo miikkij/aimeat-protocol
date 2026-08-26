@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-26",
+      "kind": "feature",
+      "title": {
+        "en": "Decide what your front page shows, and what your people land on",
+        "fi": "Päätä mitä etusivullasi näkyy, ja mihin väkesi laskeutuu"
+      },
+      "body": {
+        "en": "If you run a node, its front page was already yours to replace, but only by writing a whole HTML page by hand and keeping it in step yourself. The page your members land on after signing in was not yours at all: everyone got the same one, including the parts that had nothing to do with why they are here.\n\nBoth are built from parts you choose now. Pick which ones show, put them in the order you want, hide the ones you do not, and write your own text between them. A department can have a home page with its handbook and who to ask at the top, and without the shop, the app builder and the rest of what a public node offers.\n\nYou do not have to come to the admin screen for it. Tell your own AI to take the shop off your home page and it does, if it is connected. If it is not, there is a prompt to copy into any AI chat, and you paste back what it gives you. Either way you read the result before anyone else sees it.\n\nOn an installation nobody has touched nothing changes: the built-in arrangement is exactly what these pages already showed. Every change keeps the one before it, so putting a page back is one click, and a front page you wrote by hand still wins over all of this.\n\nYour own passages are written the way a message is, with bold, lists and links. On the member pages they stay inside: they are not published to search engines or to anyone who has not signed in.",
+        "fi": "Jos ylläpidät nodea, sen etusivun sai jo korvata omalla, mutta vain kirjoittamalla koko HTML-sivun käsin ja pitämällä se itse ajan tasalla. Sivu jolle jäsenesi laskeutuvat kirjautumisen jälkeen ei ollut sinun lainkaan: kaikki saivat saman, mukaan lukien osat joilla ei ollut mitään tekemistä sen kanssa miksi he ovat täällä.\n\nMolemmat kootaan nyt osista jotka valitset itse. Valitse mitkä näkyvät, laita ne haluamaasi järjestykseen, piilota ne joita et halua, ja kirjoita omat tekstisi niiden väliin. Osastolla voi olla aloitussivu jonka ylälaidassa on käsikirja ja keneltä kysyt, ja josta puuttuvat kauppa, sovellusrakentaja ja muu mitä julkinen node tarjoaa.\n\nHallintaruutuun ei tarvitse tulla sitä varten. Sano omalle tekoälyllesi että ota kauppa pois aloitussivulta, niin se tekee sen, jos se on kytketty. Jos ei ole, kehotteen voi kopioida mihin tahansa tekoälykeskusteluun ja liittää vastauksen takaisin. Kummassakin tapauksessa luet lopputuloksen ennen kuin kukaan muu näkee sen.\n\nAsennuksessa johon kukaan ei koske ei muutu mitään: sisäänrakennettu järjestys on täsmälleen se mitä nämä sivut jo näyttivät. Jokainen muutos säilyttää edellisen, joten sivun palauttaminen on yhden klikkauksen päässä, ja käsin kirjoittamasi etusivu voittaa yhä kaiken tämän.\n\nOmat tekstisi kirjoitetaan samalla tavalla kuin viesti, lihavointeineen, listoineen ja linkkeineen. Jäsensivuilla ne pysyvät sisällä: niitä ei julkaista hakukoneille eikä kenellekään joka ei ole kirjautunut."
+      }
+    },
+    {
       "date": "2026-08-25",
       "kind": "feature",
       "title": {
