@@ -15,6 +15,8 @@
  * @structure LABEL_KEYS · labelKeyFor · ROW_ORDER · orderRows · placeOf · summaryOf
  * @usage import { labelKeyFor, orderRows } from '/components/data-map/model.js';
  * @version-history
+ *   v2.1.0 — 2026-08-26 — `organism-rows` in the where vocabulary and in the organism test. Kept
+ *     byte-identical to src/static/app-catalog/js/data-map-model.js, which a unit test enforces.
  *   v2.0.0 — 2026-08-25 — Rewritten for aimeat.datamap/2 per docs/datakartta-maaritelma.md.
  */
 
@@ -32,7 +34,7 @@ export const VALUES = {
   form: ['one-person', 'private', 'shared-with-named', 'group', 'organism-workspace',
     'public-service', 'static', 'mixed', 'unstated'],
   where: ['nowhere', 'browser-only', 'owner-memory-private', 'owner-memory-public',
-    'someone-elses-memory', 'organism-workspace', 'organism-shared', 'organism-meta',
+    'someone-elses-memory', 'organism-workspace', 'organism-rows', 'organism-shared', 'organism-meta',
     'extension-namespace', 'cortex', 'file-storage', 'app-published-record', 'another-node',
     'external-service'],
   kind: ['settings', 'user-written', 'ai-generated', 'register', 'event-log', 'index',
@@ -93,7 +95,7 @@ export function orderRows(rows) {
 export function contradictionOf(map) {
   if (!map || !map.held || map.held.length === 0) return null;
   const inOrganism = map.held.some(r => r.where === 'organism-workspace'
-    || r.where === 'organism-shared' || r.where === 'organism-meta');
+    || r.where === 'organism-rows' || r.where === 'organism-shared' || r.where === 'organism-meta');
   const allPrivate = map.held.every(r => r.where === 'owner-memory-private');
   const sharedForm = map.form === 'group' || map.form === 'organism-workspace'
     || map.form === 'shared-with-named';

@@ -10166,6 +10166,7 @@
   "dataMap.where.owner-memory-public": "omaan muistiisi, kenen tahansa luettavaksi",
   "dataMap.where.someone-elses-memory": "jonkun toisen muistiin",
   "dataMap.where.organism-workspace": "jaettuun työtilaan",
+  "dataMap.where.organism-rows": "jaetun työtilan rivivarastoon",
   "dataMap.where.organism-shared": "ryhmän jaettuun alueeseen",
   "dataMap.where.organism-meta": "ryhmän omaan rekisteriin",
   "dataMap.where.extension-namespace": "laajennuksen omaan tilaan",

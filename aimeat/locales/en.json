@@ -10178,6 +10178,7 @@
   "dataMap.where.owner-memory-public": "your own memory, readable by anyone",
   "dataMap.where.someone-elses-memory": "someone else's memory",
   "dataMap.where.organism-workspace": "a shared workspace",
+  "dataMap.where.organism-rows": "a shared workspace's row store",
   "dataMap.where.organism-shared": "a group's shared area",
   "dataMap.where.organism-meta": "a group's own registry",
   "dataMap.where.extension-namespace": "an extension's own space",

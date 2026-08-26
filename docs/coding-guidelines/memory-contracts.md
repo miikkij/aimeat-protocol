@@ -5,6 +5,10 @@
   five parts, when to use / what to keep behind the contract, and points to Tracked Response as the
   reference implementation.
 @version-history
+  v1.1.0 — 2026-08-26 — The row store, and the one multiplication that decides between it and a
+    memory key. The repo said "prefer a memory record over a new table" and said nothing about the
+    case where neither is right, so streams that arrive in volume kept landing in memory and were
+    found later by an audit rather than by a limit.
   v1.0.0 — 2026-06-21 — Initial guideline, extracted from the Tracked Response feature.
 -->
 
@@ -29,6 +33,37 @@ Any valuable, refined, **event-driven coordination**: cross-system / cross-node 
 
 ## Keep behind the contract (not in it)
 High-write-rate or high-volume data, transactional/relational workloads, latency-critical paths, large blobs. These are not forbidden — they live in the **honoring system behind the contract**, which surfaces only the refined state we react to. The contract stays small, valuable, and legible.
+
+## A row, a memory key, or a table
+
+The repo's standing default is to prefer a memory record over a new table. There is a third answer, and reaching for it early is cheaper than discovering it: a **row store** on an organism workspace — `backing: 'rows'` on an objectType, appended through `/v1/organisms/:org/workspace/rows/:space`.
+
+**One multiplication decides it, and it is worth doing before writing anything that writes on a schedule:**
+
+> **If `keys_per_day × 365` exceeds 1000, the shape is wrong.**
+
+1000 is the default key ceiling per principal (`src/config.ts`). Anything that writes a key per item per day crosses it inside a year, and the crossing is silent right up to the refusal. aimeat.io runs the ceiling at 100 000, which no other node does, so the node this was built on will not be the node that teaches you — build against 1000.
+
+| | memory key | row store | its own table |
+|---|---|---|---|
+| one thing a person opens, or one collection they read whole | ✓ | | |
+| a stream that arrives in volume and does not stop | | ✓ | |
+| versioned, searchable, patchable, federatable | ✓ | | |
+| appended, never edited, no version history | | ✓ | |
+| charged to the member who wrote it | ✓ | | |
+| charged to the organism | | ✓ | |
+| needs SQL the app cannot express as a filter | | | ✓ |
+
+**Four properties of the row store, each of which is why it exists:**
+
+- **The quota is the organism's.** A memory key under `organism.*` is charged to the GHII of whoever wrote it, so ten members sharing a workspace draw on ten separate personal budgets and a member's own `user:` records share the same ceiling. Group data on one person's account is the asymmetry this fixes.
+- **No version history.** Publishing a workspace record writes a full copy under `.version.N` with a window of 20. For a stream, twenty retained copies of every row is the whole problem restated.
+- **Rows never enter the workspace index read.** That read materialises every value it touches and truncates at 5000 with no error and no flag. A `rows` space shows a count and a newest timestamp there, and nothing else.
+- **Three timestamps, because they are three different questions.** `occurredAt` is when the thing happened in the world and is the query axis (`since`, `until`) and the default order; `createdAt` is when the row was written here and is what retention prunes on, because a retention promise is about how long WE keep it; `updatedAt` answers "what changed since I last looked" and is what any incremental sync needs. One column would force a choice, and the wrong choice shows up when somebody asks what arrived in August and is told when it was indexed.
+
+**Filtering is on declared columns only.** A space names up to three fields in `indexOn`; they are denormalised into real indexed columns, and filtering and ordering happen on those. A field that was not declared is readable but not filterable, and the route **refuses** an undeclared filter rather than ignoring it — the generic `(scope, key, metrics JSONB)` table this repo already rejected once was unqueryable precisely because it did not have this.
+
+**What does NOT belong in a row store**, because each already has a home that does the job better: opens and clicks (signals streams, with monthly rollups and a 24-month retention), send attempts and bounces (`OutboundMessage`, append-only with paging), email addresses even at 50 000 (`OutboundContact` is a real table with no row ceiling, a unique key on owner-plus-address, and the opt-out beside it), files and attachments (file storage), and a list published outward (a data package: CSV, a permanent public address, an OData feed).
 
 ## The mechanics (shared scaffolding)
 The reusable pieces are generic, keyed on the contract `type`:

@@ -76,8 +76,21 @@ describe('contradictionOf: the check the whole feature exists for', () => {
     expect(contradictionOf(shared)).toBeNull();
   });
 
+  it('does not fire when the only shared space is a ROW store', () => {
+    // The row store is a separate `where` from the workspace it sits in, so a check that only knew
+    // about 'organism-workspace' would accuse an app whose team data all lives in rows of keeping it
+    // in one person's memory — which is the opposite of true.
+    const shared = map({ form: 'group', held: [row({ where: 'organism-rows' })] });
+    expect(contradictionOf(shared)).toBeNull();
+  });
+
   it('catches a one-person app writing where more than one person reads', () => {
     const m = map({ form: 'one-person', held: [row({ where: 'organism-workspace' })] });
+    expect(contradictionOf(m)).toBe('dataMap.contradiction.personalButShared');
+  });
+
+  it('catches a one-person app writing into a shared ROW store', () => {
+    const m = map({ form: 'one-person', held: [row({ where: 'organism-rows' })] });
     expect(contradictionOf(m)).toBe('dataMap.contradiction.personalButShared');
   });
 

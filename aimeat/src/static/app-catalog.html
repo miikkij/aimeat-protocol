@@ -4896,6 +4896,7 @@
       "owner-memory-public",
       "someone-elses-memory",
       "organism-workspace",
+      "organism-rows",
       "organism-shared",
       "organism-meta",
       "extension-namespace",
@@ -4997,7 +4998,7 @@
   }
   function contradictionOf(map) {
     if (!map || !map.held || map.held.length === 0) return null;
-    const inOrganism = map.held.some((r) => r.where === "organism-workspace" || r.where === "organism-shared" || r.where === "organism-meta");
+    const inOrganism = map.held.some((r) => r.where === "organism-workspace" || r.where === "organism-rows" || r.where === "organism-shared" || r.where === "organism-meta");
     const allPrivate = map.held.every((r) => r.where === "owner-memory-private");
     const sharedForm = map.form === "group" || map.form === "organism-workspace" || map.form === "shared-with-named";
     if (sharedForm && allPrivate) return "dataMap.contradiction.sharedButPrivate";

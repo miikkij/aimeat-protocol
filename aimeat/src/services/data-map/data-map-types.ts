@@ -23,6 +23,10 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.1.0 — 2026-08-26 — `organism-rows` joins the location vocabulary. A workspace's row store is
+ *     a DIFFERENT answer from the workspace it sits in — appended rather than edited, no version
+ *     history, charged to the organism instead of to whoever wrote the row — and a reader told only
+ *     "an organism workspace" would expect all three the other way round.
  *   v2.0.0 — 2026-08-25 — Rewritten to docs/datakartta-maaritelma.md. v1 described a key family and
  *     its compliance columns and never said what the app was FOR, so the map answered nobody's
  *     question. The app-level paragraph, `usedFor` on both levels, the machinery list and the
@@ -50,8 +54,8 @@ export const DATA_MAP_FORMS: readonly DataMapForm[] = [
 /** Where a row's data actually lives. */
 export type DataLocation =
   | 'nowhere' | 'browser-only' | 'owner-memory-private' | 'owner-memory-public'
-  | 'someone-elses-memory' | 'organism-workspace' | 'organism-shared' | 'organism-meta'
-  | 'extension-namespace' | 'cortex' | 'file-storage' | 'app-published-record'
+  | 'someone-elses-memory' | 'organism-workspace' | 'organism-rows' | 'organism-shared'
+  | 'organism-meta' | 'extension-namespace' | 'cortex' | 'file-storage' | 'app-published-record'
   | 'another-node' | 'external-service';
 
 /** What kind of thing the data is. */
