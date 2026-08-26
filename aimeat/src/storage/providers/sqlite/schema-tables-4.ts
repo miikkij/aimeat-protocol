@@ -6,6 +6,8 @@
  *   domain and the outbound door). Split from schema-tables-3.ts at the max-file-lines
  *   boundary; idempotent (IF NOT EXISTS), applied after part 3.
  * @version-history
+ *   v1.4.0 — 2026-08-26 — Workspace row spaces: rows a group accumulates, as a table rather than as
+ *     memory keys, with the three declared index columns and the three times. Mirrors Postgres 0052.
  *   v1.3.0 — 2026-08-24 — The memory write tally: who has had their hands on a key, and how
  *     often. Permanent, no prune. Mirrors Postgres 0050.
  *   v1.2.0 — 2026-08-17 — Account events: the per-owner "what has happened" window and its archive.
@@ -487,6 +489,56 @@ export function applySchemaTables4(db: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_mft_owner_family ON memory_family_tally(ownerGaii, keyFamily);
     CREATE INDEX IF NOT EXISTS idx_mft_writer ON memory_family_tally(writerPrincipal);
+
+    -- ── Workspace row spaces ───────────────────────────────────────────────────
+    -- Rows a group accumulates in a workspace, as a table rather than as memory keys.
+    -- Full rationale in Postgres 0052; the four measurements in short: an organism.* memory key
+    -- counts against the MEMBER who wrote it, a versioned record keeps 20 copies, memory has no
+    -- partial read or write, and the workspace index truncates at 5000 rows with no signal.
+    --
+    -- k1/k2/k3 are the manifest's indexOn fields denormalised into real columns, which is the
+    -- answer to 0036's objection that a value inside JSONB cannot be ordered by in SQL.
+    --
+    -- occurredAt is when it happened in the world and is the search axis; createdAt is when it
+    -- landed here and is what retention keys on; updatedAt answers "what changed since I looked".
+    CREATE TABLE IF NOT EXISTS workspace_rows (
+      id          TEXT    PRIMARY KEY,
+      organismId  TEXT    NOT NULL,
+      wsId        TEXT    NOT NULL,
+      namespace   TEXT    NOT NULL,
+      rowId       TEXT    NOT NULL,
+      k1          TEXT    NOT NULL DEFAULT '',
+      k2          TEXT    NOT NULL DEFAULT '',
+      k3          TEXT    NOT NULL DEFAULT '',
+      occurredAt  TEXT    NOT NULL,
+      createdAt   TEXT    NOT NULL,
+      updatedAt   TEXT    NOT NULL,
+      createdBy   TEXT    NOT NULL DEFAULT '',
+      body        TEXT    NOT NULL DEFAULT '{}',
+      bytes       INTEGER NOT NULL DEFAULT 0
+    );
+    -- The identity a caller names. UNIQUE because a repeated rowId REPLACES rather than duplicates,
+    -- so re-running an ingest that already landed is idempotent.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_wsrows_space_rowid
+      ON workspace_rows(organismId, wsId, namespace, rowId);
+    -- THE read. The id is in the index rather than left to a sort: keyset pagination walks
+    -- (occurredAt, id), and a page boundary between two rows of the same instant would otherwise
+    -- skip or repeat one.
+    CREATE INDEX IF NOT EXISTS idx_wsrows_space_occurred
+      ON workspace_rows(organismId, wsId, namespace, occurredAt DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_wsrows_space_created
+      ON workspace_rows(organismId, wsId, namespace, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_wsrows_space_updated
+      ON workspace_rows(organismId, wsId, namespace, updatedAt);
+    -- Each declared column carries occurredAt, so a filtered read stays ordered without a sort.
+    CREATE INDEX IF NOT EXISTS idx_wsrows_space_k1
+      ON workspace_rows(organismId, wsId, namespace, k1, occurredAt DESC) WHERE k1 <> '';
+    CREATE INDEX IF NOT EXISTS idx_wsrows_space_k2
+      ON workspace_rows(organismId, wsId, namespace, k2, occurredAt DESC) WHERE k2 <> '';
+    CREATE INDEX IF NOT EXISTS idx_wsrows_space_k3
+      ON workspace_rows(organismId, wsId, namespace, k3, occurredAt DESC) WHERE k3 <> '';
+    -- The quota gate's read: COUNT(*) and SUM(bytes) per organism, or per workspace inside it.
+    CREATE INDEX IF NOT EXISTS idx_wsrows_org_ws ON workspace_rows(organismId, wsId);
 
   `);
 }

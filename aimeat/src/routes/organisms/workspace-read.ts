@@ -30,6 +30,7 @@ import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { isMemoryBackedSpace } from '../../services/workspace-meta.js';
+import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js';
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
 import { scanOrganismDanglingRefs } from '../../services/dangling-refs.js';
@@ -232,7 +233,17 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       logger.warn('withMeta: continuing after a suppressed failure', { error: String(err) });
     }
 
-    res.json(success(config.nodeId, { manifest, readme, apps, objects, drafts, decisions, resources, todos }, [
+    // ROW SPACES ANSWER WITH A COUNT, NEVER WITH ROWS. This read returns every memory value it
+    // touches and caps at 5000 rows with no truncation signal, which is exactly what a space
+    // holding a group's accumulated rows must not be subject to. One aggregate per row space
+    // instead; the rows are read through /workspace/rows/:space.
+    // Only inside a named workspace: a row space belongs to one, never to the organism at large.
+    const rowSpaces = ws ? await workspaceRowIndex({ storage, config }, id, ws, objectTypes) : {};
+
+    res.json(success(config.nodeId, {
+      manifest, readme, apps, objects, drafts, decisions, resources, todos,
+      ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
+    }, [
       { description: 'Read the manifest directly', method: 'GET', url: `/v1/memory/${encodeURIComponent(`${nsRoot}meta.manifest`)}` },
       { description: 'Write a draft record', method: 'POST', url: '/v1/memory' },
       { description: 'Publish a draft', method: 'POST', url: `/v1/organisms/${id}/publish` },

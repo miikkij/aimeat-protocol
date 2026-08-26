@@ -163,6 +163,13 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_workspace_publish: { title: 'Publish Workspace Draft', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_workspace_revert_to_draft: { title: 'Reopen Published Record', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_workspace_object_delete: { title: 'Delete Workspace Object', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    // Row spaces. The append is idempotent BY THE CALLER'S CHOICE: supplying row_id makes a repeat
+    // replace that row, omitting it makes every call a new row. Marked non-idempotent because the
+    // hint has to describe the call a client might retry blindly, and that one has no row_id.
+    aimeat_workspace_rows_append: { title: 'Append Workspace Rows', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_workspace_rows_read: { title: 'Read Workspace Rows', readOnlyHint: true },
+    aimeat_workspace_rows_stats: { title: 'Workspace Row Space Stats', readOnlyHint: true },
+    aimeat_workspace_rows_delete: { title: 'Delete Workspace Rows', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_workspace_update: { title: 'Update Workspace', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_overview: { title: 'Organism Structure Overview', readOnlyHint: true },
     aimeat_workspace_overview: { title: 'Workspace Structure Overview', readOnlyHint: true },

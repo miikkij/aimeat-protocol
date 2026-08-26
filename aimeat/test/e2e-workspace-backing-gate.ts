@@ -177,6 +177,42 @@ await test('5. write + publish → the document is visible in MCP workspace_read
     assert(restDocs.some((d: any) => d.id === 'vision-and-pillars'), `REST read must list the published doc: ${JSON.stringify(Object.keys(rest.body.data.objects || {}))}`);
 });
 
+// ── The other principal. Everything above drives one owner, and "visible" is only half a property:
+//    a space that is visible to its creator AND to a stranger is a different bug from the one this
+//    suite exists for, and just as quiet. ──
+
+await test('5b. a SECOND owner is refused the same published document, on both surfaces', async () => {
+    const B = await setupAgent('b');
+    const authB = { Authorization: `Bearer ${B.ownerToken}` };
+
+    // REST: the read that renders the UI.
+    const rest = await json(`/v1/organisms/${orgId}/workspace?ws=${wsId}`, { headers: authB });
+    if (rest.status === 200) {
+        const docs = rest.body.data.objects?.['design-doc'] ?? [];
+        assert(docs.length === 0,
+            `a stranger must not see the workspace's documents: ${JSON.stringify(docs.map((d: any) => d.id))}`);
+    } else {
+        assert(rest.status === 403 || rest.status === 404, `expected a refusal, got ${rest.status}`);
+    }
+
+    // MCP: the surface that returned an empty objects map for a month during the incident, so an
+    // empty answer here has to be checked for the RIGHT reason — refused, not silently skipped.
+    const rd = await B.client.call('aimeat_workspace_read', { organism_id: orgId, ws: wsId }, 220);
+    if (!mcpErr(rd)) {
+        const docs = mcpData(rd).index?.['design-doc'] ?? [];
+        assert(docs.length === 0, `a stranger's MCP read must not list the doc: ${JSON.stringify(docs)}`);
+    }
+
+    // And a stranger cannot write into it either.
+    const w = await B.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: wsId, space: 'design-doc', id: 'intrusion',
+        value: { title: 'Intrusion', markdown: '# no' },
+    }, 221);
+    assert(mcpErr(w), `a stranger's write must be refused: ${mcpText(w)}`);
+
+    await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: authB });
+});
+
 // ── tasks backing: declarable, listed in the manifest, but not writable as workspace records ──
 
 await test('6. tasks-backed space: read skips its objects map entry, write is refused with a pointer to the task tools', async () => {
@@ -247,7 +283,14 @@ await test('9. version-aware seed: a stale system-seeded schema is upgraded, an 
     const upgraded = await storage.getSchema(MANIFEST_SCHEMA_KEY, 'prefix');
     assert(seededVersionOf(upgraded!.schemaJson) === MANIFEST_SEED_VERSION, `marker present after upgrade: ${JSON.stringify(upgraded!.schemaJson.$comment)}`);
     const backing = (upgraded!.schemaJson as any).properties.objectTypes.items.properties.backing.enum;
-    assert(JSON.stringify(backing) === JSON.stringify(['memory', 'tasks']), `enum narrowed: ${JSON.stringify(backing)}`);
+    // The property under test is that the two DEAD values are gone, not that the enum never grows.
+    // 'rows' joined it on 2026-08-26 with a full read path shipped in the same change, which is the
+    // condition 'storage' and 'knowledge' failed. Asserting the exact list made this test fail on a
+    // legitimate addition while saying nothing about the bug it exists for.
+    assert(!backing.includes('storage') && !backing.includes('knowledge'),
+        `the dead backings stay out: ${JSON.stringify(backing)}`);
+    assert(backing.includes('memory') && backing.includes('tasks'),
+        `the working backings stay in: ${JSON.stringify(backing)}`);
 
     const custom = await storage.getSchema(MANIFEST_WS_SCHEMA_KEY, 'prefix');
     assert(custom!.lockedBy === 'operator@test-node' && seededVersionOf(custom!.schemaJson) === 1, 'operator-customized record left alone');

@@ -26421,6 +26421,176 @@ paths:
         '403': { description: Missing organism:read scope (app/agent sessions) }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/workspace/rows/{space}:
+    post:
+      operationId: appendWorkspaceRows
+      summary: Append rows to a workspace row space
+      description: |
+        Adds rows to a space the manifest declares with `backing: 'rows'` — the shape for what a
+        GROUP accumulates (received messages, events, readings, a log) rather than for records a
+        person authors one by one.
+
+        WHY IT IS NOT MEMORY. An `organism.*` memory key counts against the MEMBER who wrote it, so a
+        shared workspace's rows eat one colleague's 1000-key / 10 MB budget; a versioned record keeps
+        20 full copies; memory has no partial write, so appending one item to an array rewrites the
+        whole value and reindexes it; and the workspace index materialises every value and truncates
+        at 5000 rows with no signal. Row spaces are charged to the workspace and the organism, keep
+        no version history, and never appear row-by-row in an index read.
+
+        Body is either one row (`{ body, row_id?, occurred_at? }`) or many (`{ rows: [...] }`), up to
+        500 per call. `row_id` is optional and makes the append IDEMPOTENT: repeating it REPLACES the
+        stored row and keeps its original `created_at`, so re-running an ingest that already landed
+        updates rather than duplicates. `occurred_at` is when the thing happened in the world and
+        defaults to now; it is the search axis, and it is deliberately not the same as when the row
+        landed here, which is what retention keys on.
+
+        Refuses before writing: the space must exist and be a row space, the caller must pass the
+        organism namespace rule and the space's `writeRole`, every row must be inside
+        `quota.ws_rows_max_row_kb`, and the workspace row count and organism byte quota are measured
+        against what this call would add. The space's declared retention is applied afterwards.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space, by objectType name or namespace }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body: { type: object, description: 'The row, for the single-row form' }
+                row_id: { type: string, description: 'Optional caller id; repeating one replaces that row' }
+                occurred_at: { type: string, description: 'ISO 8601; when it happened in the world. Defaults to now' }
+                rows:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [body]
+                    properties:
+                      body: { type: object }
+                      row_id: { type: string }
+                      occurred_at: { type: string }
+      responses:
+        '200': { description: '{ written, row_ids, pruned } — pruned is what the retention sweep removed' }
+        '400': { description: No rows, a batch over 500, a malformed row, or a space that is not a row space }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, no consent, or the space's writeRole refuses this caller }
+        '404': { description: No such workspace or space }
+        '413': { description: A row over quota.ws_rows_max_row_kb, or the workspace/organism quota reached }
+    get:
+      operationId: readWorkspaceRows
+      summary: Read one page of a workspace row space
+      description: |
+        Newest first by `occurred_at`, keyset-cursored so a page boundary can neither skip nor repeat
+        a row even when many rows share one instant. Follow `cursor` for the next page; a null cursor
+        is the last page.
+
+        FILTERING IS ONLY ON DECLARED FIELDS. A row space's manifest names up to three fields in
+        `indexOn`; those are real indexed columns and any other query parameter is REFUSED with the
+        list of fields that do work, rather than being ignored — an ignored filter returns a
+        plausible page the caller believes was filtered. The answer carries `indexed` so a caller
+        learns the list from the response.
+
+        `since`/`until` bound `occurred_at` inclusively. `changed_since` bounds `updated_at`
+        exclusively and is what an incremental sync follows.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+        - { name: since, in: query, required: false, schema: { type: string }, description: 'occurred_at >= this ISO timestamp' }
+        - { name: until, in: query, required: false, schema: { type: string }, description: 'occurred_at <= this ISO timestamp' }
+        - { name: changed_since, in: query, required: false, schema: { type: string }, description: 'updated_at > this ISO timestamp' }
+        - { name: limit, in: query, required: false, schema: { type: integer, default: 100, maximum: 500 } }
+        - { name: cursor, in: query, required: false, schema: { type: string }, description: Opaque cursor from a previous page }
+        - { name: order, in: query, required: false, schema: { type: string, enum: [asc, desc], default: desc } }
+      responses:
+        '200': { description: '{ space, namespace, rows, cursor, indexed }' }
+        '400': { description: A filter on a field the space does not index, or an unreadable timestamp }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, or no consent for this workspace }
+        '404': { description: No such workspace or space }
+    delete:
+      operationId: deleteWorkspaceRowsBefore
+      summary: Retention delete by age
+      description: |
+        Removes every row that LANDED here before `before`. It keys on when the row was written to
+        this node, never on when the event happened, because a retention promise is about how long we
+        keep a row — so a five-year-old message ingested today is not swept on arrival.
+
+        `before` is required. A collection DELETE that emptied the space when the parameter was
+        forgotten would be one typo away from destroying it.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+        - { name: before, in: query, required: true, schema: { type: string }, description: 'ISO timestamp; rows created before this are removed' }
+      responses:
+        '200': { description: '{ removed }' }
+        '400': { description: Missing or unreadable `before` }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, or the space's writeRole refuses this caller }
+        '404': { description: No such workspace or space }
+
+  /v1/organisms/{id}/workspace/rows/{space}/stats:
+    get:
+      operationId: getWorkspaceRowStats
+      summary: What a row space holds, without reading a row
+      description: |
+        Count, bytes, the oldest and newest `occurred_at`, and when anything last landed. This is
+        what a workspace index shows for a row space instead of its rows, and it is one aggregate
+        rather than a scan, so it stays honest at any size.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: '{ stats: { namespace, rows, bytes, oldest, newest, lastWriteAt } }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, or no consent for this workspace }
+        '404': { description: No such workspace or space }
+
+  /v1/organisms/{id}/workspace/rows/{space}/{rowId}:
+    get:
+      operationId: getWorkspaceRow
+      summary: Read one row by the id it was named with
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
+        - { name: rowId, in: path, required: true, schema: { type: string }, description: The caller-visible row id }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: '{ row }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, or no consent for this workspace }
+        '404': { description: No such workspace, space or row }
+    delete:
+      operationId: deleteWorkspaceRow
+      summary: Remove one row
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: space, in: path, required: true, schema: { type: string }, description: The row space }
+        - { name: rowId, in: path, required: true, schema: { type: string }, description: The caller-visible row id }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+      responses:
+        '200': { description: '{ deleted: true }' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not a member, or the space's writeRole refuses this caller }
+        '404': { description: No such workspace, space or row }
+
   /v1/organisms/{id}/export:
     get:
       operationId: exportOrganism

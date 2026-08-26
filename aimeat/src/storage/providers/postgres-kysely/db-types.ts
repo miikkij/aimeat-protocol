@@ -396,6 +396,30 @@ export interface AccountEventArchive {
   archivedAt: string;
 }
 
+/**
+ * One row in a workspace row space. Migration 0052.
+ *
+ * k1/k2/k3 are the manifest's `indexOn` fields denormalised into real columns — the answer to the
+ * objection that a value inside JSONB cannot be ordered by in SQL. The three timestamps are three
+ * different questions: when it happened, when it landed here, when it last changed.
+ */
+export interface WorkspaceRow {
+  id: string;
+  organismId: string;
+  wsId: string;
+  namespace: string;
+  rowId: string;
+  k1: Generated<string>;
+  k2: Generated<string>;
+  k3: Generated<string>;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: Generated<string>;
+  body: Generated<unknown>;
+  bytes: Generated<number>;
+}
+
 export interface AiProvenance {
   contentHash: string | null;
   createdAt: string;
@@ -2057,6 +2081,7 @@ export interface DB {
   MemoryWriteTally: MemoryWriteTally;
   MemoryFamilyTally: MemoryFamilyTally;
   AccountEventArchive: AccountEventArchive;
+  WorkspaceRow: WorkspaceRow;
   SsoConnection: SsoConnection;
   AiProvenance: AiProvenance;
   App: App;

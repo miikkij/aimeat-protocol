@@ -17,6 +17,12 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.20.0 -- 2026-08-26 -- Workspace ROW spaces. The index read reports a row space as a COUNT and
+ *     a span rather than as rows, which is the property the whole backing exists for: this read
+ *     materialises every memory value to derive a title and truncates at 5000 with no signal, so a
+ *     space holding a group's accumulated rows would be both expensive and quietly incomplete here.
+ *     The four row TOOLS are ./workspace-rows.ts — a pure extraction at the max-file-lines boundary,
+ *     calling the same service the REST routes call.
  *   v1.19.0 -- 2026-08-11 -- August 2026 audit step 8: the WRITE moves out. _publish and
  *     _revert_to_draft call the same publishDraft / revertToDraft that POST /v1/organisms/:id/publish
  *     and /revert call, so the copy that refused a co-member's draft, wrote no decision-log entry and
@@ -117,6 +123,9 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { canWriteNamespaceRule, readOrganismConfig, createOrganismHelpers, fresherRec } from '../routes/organisms/shared.js';
 import { registerWorkspaceCreateTool } from './workspace-create.js';
 import { checkOrganismNamespaceAccess } from '../services/organism-namespace-access.js';
+import { workspaceRowIndex } from '../services/workspace-rows/row-service.js';
+import type { RowObjectType } from '../services/workspace-rows/row-space.js';
+import { registerWorkspaceRowTools } from './workspace-rows.js';
 import { archivedRefusal, checkWorkspaceWriteLimits } from '../services/workspace-write-guards.js';
 import { parseGAII, isSameOwner } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
@@ -404,8 +413,20 @@ export function registerWorkspaceTools(
                 index[name] = entries;
                 counts[name] = entries.length;
             }
+
+            // ROW SPACES ANSWER WITH A COUNT, NEVER WITH ROWS. That is the whole reason the backing
+            // exists: this index materialises every memory value to derive a title and silently
+            // truncates at 5000 rows, so a space holding a group's accumulated rows would be both
+            // expensive and quietly incomplete here. One aggregate per space instead, honest at any
+            // size, and the rows themselves are read through aimeat_workspace_rows_read.
+            const rowSpaces = await workspaceRowIndex({ storage, config }, organism_id, ws,
+                manifest.objectTypes as RowObjectType[] | undefined);
+            for (const [name, s] of Object.entries(rowSpaces)) counts[name] = s.rows;
+
             return ok({ organism_id, ws, mode: 'index', manifest, apps, counts, index,
-                hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.' });
+                ...(Object.keys(rowSpaces).length ? { row_spaces: rowSpaces } : {}),
+                hint: 'Titles only. Open the ones you need with aimeat_workspace_read(ids:["<id>", ...]) to get their full values.'
+                    + (Object.keys(rowSpaces).length ? ' Row spaces show a count and a span here; read their rows with aimeat_workspace_rows_read.' : '') });
         });
 
     // ── aimeat_organism_overview ── (OKF-style structure map of the whole organism)
@@ -658,6 +679,11 @@ export function registerWorkspaceTools(
         });
 
     // ── aimeat_workspace_object_delete ──
+    // The four ROW-space tools live in ./workspace-rows.ts — a pure extraction at the
+    // max-file-lines boundary. They call services/workspace-rows/row-service.ts, which is what
+    // the REST routes call too, so neither door can answer differently from the other.
+    registerWorkspaceRowTools(mcp, { storage, config, agentGaii, writerGaii, ownerName });
+
     mcp.tool('aimeat_workspace_object_delete', descriptionFor('aimeat_workspace_object_delete'),
         { organism_id: z.string(), ws: z.string(), namespace: z.string(), id: z.string() },
         annotationsFor('aimeat_workspace_object_delete'),

@@ -177,6 +177,65 @@ export const organismTools: ConnectCliToolDefinition[] = [
         name: 'aimeat_workspace_comments',
         handler: ({ client }, input) => client.get(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/comments${query({ ws: requiredString(input, 'ws'), space: requiredString(input, 'space'), instance_id: requiredString(input, 'instance_id') })}`),
     },
+    // ── Workspace ROW spaces. This is the door a fleet daemon actually calls, and it is the one a
+    //    parameter added to the other two has historically failed to reach. ──
+    {
+        name: 'aimeat_workspace_rows_append',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            const rows = Array.isArray(input.rows) ? input.rows : null;
+            const payload: JsonObject = rows?.length
+                ? { rows }
+                : { body: input.body, row_id: input.row_id, occurred_at: input.occurred_at };
+            return client.post(`/v1/organisms/${org}/workspace/rows/${space}${query({ ws: requiredString(input, 'ws') })}`, payload);
+        },
+    },
+    {
+        name: 'aimeat_workspace_rows_read',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            // Every declared field in `where` rides the query string as itself: the route reads any
+            // non-reserved parameter as a filter, and refuses one the space does not index.
+            const params: Record<string, string | undefined> = { ws: requiredString(input, 'ws') };
+            const where = input.where;
+            if (where && typeof where === 'object' && !Array.isArray(where)) {
+                for (const [k, v] of Object.entries(where as JsonObject)) if (v != null) params[k] = String(v);
+            }
+            params.since = optionalString(input, 'since');
+            params.until = optionalString(input, 'until');
+            params.changed_since = optionalString(input, 'changed_since');
+            params.cursor = optionalString(input, 'cursor');
+            params.order = optionalString(input, 'order');
+            if (typeof input.limit === 'number') params.limit = String(input.limit);
+            return client.get(`/v1/organisms/${org}/workspace/rows/${space}${query(params)}`);
+        },
+    },
+    {
+        name: 'aimeat_workspace_rows_stats',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            return client.get(`/v1/organisms/${org}/workspace/rows/${space}/stats${query({ ws: requiredString(input, 'ws') })}`);
+        },
+    },
+    {
+        name: 'aimeat_workspace_rows_delete',
+        handler: ({ client }, input) => {
+            const org = encodeURIComponent(requiredString(input, 'organism_id'));
+            const space = encodeURIComponent(requiredString(input, 'space'));
+            const ws = requiredString(input, 'ws');
+            const rowId = optionalString(input, 'row_id');
+            const before = optionalString(input, 'before');
+            if (!!rowId === !!before) {
+                throw new Error('Pass exactly one of `row_id` (remove that row) or `before` (remove everything created before that ISO timestamp).');
+            }
+            return rowId
+                ? client.delete(`/v1/organisms/${org}/workspace/rows/${space}/${encodeURIComponent(rowId)}${query({ ws })}`)
+                : client.delete(`/v1/organisms/${org}/workspace/rows/${space}${query({ ws, before })}`);
+        },
+    },
     // ── Agent SCHEDULES (parity with the agent MCP surface; routes enforce ownership). create/list/
     //    update/delete wrap /v1/schedules; report_internal is a structured memory write (no REST route). ──
     {

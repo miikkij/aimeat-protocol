@@ -32,6 +32,11 @@
  *     provision) used to backfill only id+status, so a manifest built from the tool's own documented
  *     example — which never showed manifestVersion — was rejected on the first call and agents had to
  *     iterate. A create with just objectTypes now validates first try.
+ *   v1.7.0 — 2026-08-26 — backing:'rows' joins the supported set, with isRowBackedSpace() as its
+ *     shared predicate and normalizeObjectTypes() refusing the three ways a row space can be
+ *     declared wrong (indexOn/retention on a memory space, more than three indexed fields, and
+ *     versioned:true). readWorkspaceManifest() is lifted here from the MCP tool's local copy so
+ *     every surface resolves a space through one read.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -45,10 +50,14 @@ export class WorkspaceMetaError extends Error {
 }
 
 /** Backings the workspace tooling actually implements. 'memory' spaces hold records/documents as
- *  workspace memory keys; 'tasks' is a declarative POINTER to the task system (no workspace records).
- *  'storage'/'knowledge' are intentionally NOT here: files and knowledge packages attach to a
- *  workspace via Sources or embedded document images, never as a backed space. */
-export const SUPPORTED_BACKINGS = new Set(['memory', 'tasks']);
+ *  workspace memory keys; 'tasks' is a declarative POINTER to the task system (no workspace records);
+ *  'rows' spaces hold many rows in a table, for what a GROUP accumulates rather than what one person
+ *  authored. 'storage'/'knowledge' are intentionally NOT here: files and knowledge packages attach to
+ *  a workspace via Sources or embedded document images, never as a backed space. */
+export const SUPPORTED_BACKINGS = new Set(['memory', 'tasks', 'rows']);
+
+/** How many fields a row space may promote to indexed columns. Three is the whole budget. */
+export const MAX_INDEX_ON = 3;
 
 /** Does this space's data live in workspace memory keys (so reads must list them)? A missing
  *  backing counts as memory — the write path stores memory keys regardless. This is THE shared
@@ -58,17 +67,77 @@ export function isMemoryBackedSpace(ot: { backing?: unknown }): boolean {
   return !ot.backing || ot.backing === 'memory';
 }
 
+/** Does this space's data live in the row table? THE shared predicate, for the same reason as above:
+ *  a read surface that hand-rolls this check is a surface a row space eventually goes missing from. */
+export function isRowBackedSpace(ot: { backing?: unknown }): boolean {
+  return ot.backing === 'rows';
+}
+
+/** The manifest as a caller resolving a space needs it. Everything else in it is somebody else's. */
+export type WorkspaceManifest = { objectTypes?: Array<Record<string, unknown>> } & Record<string, unknown>;
+
+/**
+ * Read a workspace's manifest from whichever member created it.
+ *
+ * The prefix read rather than a single-owner get is the point: the registry is per creator, so a
+ * member who did not create the workspace must still be able to resolve its spaces. Every surface
+ * that resolves a space shares this, because two copies is two chances for one door to see a space
+ * the other does not.
+ */
+export async function readWorkspaceManifest(
+  storage: Storage, organismId: string, wsId: string,
+): Promise<WorkspaceManifest | null> {
+  const key = `organism.${organismId}.w.${wsId}.meta.manifest`;
+  const { items } = await storage.listAllMemory({ prefix: key, limit: 100 });
+  const rec = items.find(r => r.key === key);
+  return rec ? (rec.value as WorkspaceManifest) : null;
+}
+
 /** Gate + normalize a manifest's objectTypes before any manifest write (create, full replace,
  *  additive). Rejects unsupported backings with an instructive error instead of accepting a space
  *  no read path will ever show, and infers mode:'document' when an objectType declares
  *  kind:'document' without a mode. Returns a new array; throws WorkspaceMetaError. */
 export function normalizeObjectTypes(objectTypes: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
   return objectTypes.map(ot => {
+    const name = String(ot?.name ?? '?');
     const backing = ot?.backing;
     if (typeof backing === 'string' && backing && !SUPPORTED_BACKINGS.has(backing)) {
       throw new WorkspaceMetaError('INVALID_MANIFEST',
-        `objectType "${String(ot.name ?? '?')}": backing '${backing}' is not supported. Workspace spaces are memory-backed — use backing:'memory' (records or documents). Files and knowledge packages attach via workspace Sources or embedded document images, not as a backed space; the task system is referenced with backing:'tasks'.`);
+        `objectType "${name}": backing '${backing}' is not supported. A space holding records or documents is backing:'memory'; a space accumulating many rows a group adds to is backing:'rows'; the task system is referenced with backing:'tasks'. Files and knowledge packages attach via workspace Sources or embedded document images, not as a backed space.`);
     }
+
+    // indexOn and retention are row-space vocabulary. Accepting them on a memory space would
+    // advertise filtering and a retention promise that nothing implements — the same "a space no
+    // read path serves" mistake that removed 'storage' and 'knowledge' from the backing enum.
+    const isRows = isRowBackedSpace(ot);
+    if (!isRows && (ot.indexOn !== undefined || ot.retention !== undefined)) {
+      throw new WorkspaceMetaError('INVALID_MANIFEST',
+        `objectType "${name}": indexOn and retention belong to a row space. Set backing:'rows' if this space accumulates rows, or drop them — on a memory space they would promise filtering and a retention window that nothing enforces.`);
+    }
+    if (isRows && ot.indexOn !== undefined) {
+      const cols = ot.indexOn;
+      if (!Array.isArray(cols) || cols.some(c => typeof c !== 'string' || !c.trim())) {
+        throw new WorkspaceMetaError('INVALID_MANIFEST',
+          `objectType "${name}": indexOn is the list of field names to promote to indexed columns, so every entry must be a non-empty field name.`);
+      }
+      if (cols.length > MAX_INDEX_ON) {
+        // A refusal rather than a silent truncation: dropping the fourth would leave a caller
+        // filtering on a field that is quietly never indexed, and finding out by watching it be slow.
+        throw new WorkspaceMetaError('INVALID_MANIFEST',
+          `objectType "${name}": a row space may promote at most ${MAX_INDEX_ON} fields to columns, and this one names ${cols.length}. Pick the three a reader actually filters by; the rest stay readable inside the row.`);
+      }
+      if (new Set(cols.map(c => String(c))).size !== cols.length) {
+        throw new WorkspaceMetaError('INVALID_MANIFEST',
+          `objectType "${name}": indexOn names the same field twice, which spends one of only ${MAX_INDEX_ON} columns on nothing.`);
+      }
+    }
+    // A row space is never versioned: history is what 20 full copies per row would be, and that
+    // multiplier is one of the four reasons this backing exists.
+    if (isRows && ot.versioned === true) {
+      throw new WorkspaceMetaError('INVALID_MANIFEST',
+        `objectType "${name}": a row space keeps no version history. Twenty copies of every row is the cost this backing exists to avoid; a row that must not change belongs in a memory space.`);
+    }
+
     if (!ot.mode && ot.kind === 'document') return { ...ot, mode: 'document' };
     return ot;
   });
