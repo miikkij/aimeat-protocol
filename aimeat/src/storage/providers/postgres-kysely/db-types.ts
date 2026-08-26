@@ -479,6 +479,8 @@ export interface ProviderClient {
   /** Null = the node's own registration. Non-null = a principal brought their own app. */
   principal: string | null;
   provider: string;
+  /** Microsoft only: which directory a principal's own app is registered in. Migration 0053. */
+  tenant: Generated<string | null>;
   registeredAt: string;
 }
 

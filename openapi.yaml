@@ -3546,6 +3546,14 @@ components:
           type: string
         clientId:
           type: string
+        tenant:
+          type: string
+          nullable: true
+          description: >
+            Microsoft only: which Entra directory this app is registered in. Not a secret, and
+            returned on purpose — it decides whether the sign-in reaches the right directory at all,
+            so whoever set it can read back what they set. Null when none was given, which means the
+            node's own setting applies.
         registeredAt:
           type: string
           format: date-time
@@ -39198,6 +39206,22 @@ paths:
                 client_secret:
                   type: string
                   description: Stored encrypted. Never returned by any endpoint.
+                tenant:
+                  type: string
+                  description: >
+                    Microsoft only: which Entra directory your app is registered in. It goes into the
+                    authorize and token URLs, so it must match the registration.
+
+
+                    The Entra portal's DEFAULT for a new app is "Accounts in this organizational
+                    directory only", which is a single tenant and needs its GUID here — find it on
+                    the registration's Overview page as "Directory (tenant) ID". Omit it only if you
+                    registered a multi-tenant app, in which case the node's own setting applies.
+
+
+                    Accepted: "common", "organizations", "consumers", or a directory id. Anything
+                    else is refused rather than corrected, because a wrong tenant fails at Microsoft
+                    with a message about the application and names nothing you can act on.
       responses:
         '200':
           description: Stored.
@@ -39215,8 +39239,9 @@ paths:
                             $ref: '#/components/schemas/PublicProviderClient'
         '400':
           description: >
-            Missing id or secret, or a provider that is connected by supplying a credential rather
-            than by registering an app, which has no client to register.
+            Missing id or secret, a provider that is connected by supplying a credential rather than
+            by registering an app (which has no client to register), or a `tenant` that is not
+            "common", "organizations", "consumers" or a directory id.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':

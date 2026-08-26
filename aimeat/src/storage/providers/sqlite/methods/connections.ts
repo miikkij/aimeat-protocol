@@ -108,6 +108,7 @@ function toProviderClient(r: Row): ProviderClientRecord {
     principal: (r.principal as string | null) ?? null,
     clientId: r.clientId as string,
     clientSecret: r.clientSecret as string,
+    tenant: (r.tenant as string | null) ?? null,
     registeredAt: r.registeredAt as string,
   };
 }
@@ -466,12 +467,12 @@ export const connectionMethods = {
     this: SqliteStorage, row: ProviderClientRecord,
   ): Promise<ProviderClientRecord> {
     this.db.prepare(`
-      INSERT INTO provider_clients (id, provider, instance, principal, clientId, clientSecret, registeredAt)
-      VALUES (?, ?, NULL, ?, ?, ?, ?)
+      INSERT INTO provider_clients (id, provider, instance, principal, clientId, clientSecret, tenant, registeredAt)
+      VALUES (?, ?, NULL, ?, ?, ?, ?, ?)
       ON CONFLICT(provider, principal) WHERE principal IS NOT NULL
         DO UPDATE SET clientId = excluded.clientId, clientSecret = excluded.clientSecret,
-                      registeredAt = excluded.registeredAt
-    `).run(row.id, row.provider, row.principal, row.clientId, row.clientSecret, row.registeredAt);
+                      tenant = excluded.tenant, registeredAt = excluded.registeredAt
+    `).run(row.id, row.provider, row.principal, row.clientId, row.clientSecret, row.tenant, row.registeredAt);
     const r = this.db.prepare(
       'SELECT * FROM provider_clients WHERE provider = ? AND principal = ?',
     ).get(row.provider, row.principal) as Row;

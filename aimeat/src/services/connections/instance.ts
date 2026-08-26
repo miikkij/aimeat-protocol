@@ -151,6 +151,9 @@ export async function registerAtInstance(
     id: randomUUID(),
     provider,
     instance: origin,
+    // A tenant is Microsoft's, and Microsoft is not instance-scoped: nothing registered at an
+    // instance has one.
+    tenant: null,
     clientId,
     clientSecret: sealCredential({ shape: 'static', accessToken: clientSecret }, key),
     registeredAt: new Date().toISOString(),

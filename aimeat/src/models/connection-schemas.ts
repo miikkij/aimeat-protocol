@@ -251,6 +251,17 @@ export interface ProviderClientRecord {
   principal: string | null;
   clientId: string;
   clientSecret: string;
+  /**
+   * Microsoft only, and only on a principal's own row: WHICH DIRECTORY the app is registered in.
+   *
+   * It belongs to the CLIENT rather than to the connection because that is what it is a property
+   * of. The Entra portal's default for a new registration is "this organizational directory only",
+   * so a customer who follows the defaults has a single-tenant app, and its authorize and token URLs
+   * carry that tenant's GUID instead of 'common'. Without this the node would send them to 'common'
+   * and Microsoft would refuse with a message about the application, naming nothing they could act
+   * on. Null everywhere else, including on the node's own row, which uses the configured tenant.
+   */
+  tenant: string | null;
   registeredAt: string;
 }
 
@@ -288,6 +299,12 @@ export interface PublishMetricSample {
 export interface PublicProviderClient {
   provider: string;
   clientId: string;
+  /**
+   * Microsoft only: which directory this app is registered in. NOT a secret, and shown deliberately
+   * — it decides whether the sign-in works at all, so the person who set it has to be able to see
+   * what they set. Null when it was never given, which means the node's own setting applies.
+   */
+  tenant: string | null;
   registeredAt: string;
   /** How many of this principal's connections were minted by it, so deleting is an informed act. */
   connectionCount: number;

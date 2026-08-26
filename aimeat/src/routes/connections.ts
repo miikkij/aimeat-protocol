@@ -232,6 +232,9 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     return {
       provider: row.provider,
       clientId: row.clientId,
+      // Not a secret, and visible on purpose: the tenant decides whether the sign-in reaches the
+      // right directory at all, so whoever set it must be able to read back what they set.
+      tenant: row.tenant ?? null,
       registeredAt: row.registeredAt,
       connectionCount,
     };
@@ -249,10 +252,13 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   router.put('/v1/connections/clients', requireAuth(), requireScope('connections:write'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
-    const body = req.body as { provider?: unknown; client_id?: unknown; client_secret?: unknown };
+    const body = req.body as {
+      provider?: unknown; client_id?: unknown; client_secret?: unknown; tenant?: unknown;
+    };
     const providerId = typeof body.provider === 'string' ? body.provider : '';
     const clientId = typeof body.client_id === 'string' ? body.client_id.trim() : '';
     const clientSecret = typeof body.client_secret === 'string' ? body.client_secret.trim() : '';
+    const tenant = typeof body.tenant === 'string' ? body.tenant.trim() : '';
 
     const provider = findProvider(providers, providerId);
     if (!provider) {
@@ -267,6 +273,15 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     if (!clientId || !clientSecret) {
       return res.status(400).json(error(config.nodeId, 'INVALID_CLIENT',
         'both client_id and client_secret are required'));
+    }
+    // A tenant goes into a URL PATH, so it is checked here rather than at the point it is
+    // interpolated: 'common', 'organizations', 'consumers', or a directory GUID. Refused rather
+    // than silently corrected, because a wrong tenant fails at Microsoft with a message about the
+    // application and names nothing the person can act on — the correction would just move the
+    // confusion further away.
+    if (tenant && !/^[A-Za-z0-9-]{1,64}$/.test(tenant)) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_TENANT',
+        'tenant is your Entra directory: "common", "organizations", "consumers", or the directory id (a GUID). It is on the app registration\'s Overview page as "Directory (tenant) ID".'));
     }
 
     const key = requireEncryptionKey(config);
@@ -284,6 +299,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       // Sealed exactly like a user token. It is the caller's secret, not the node's, and a table
       // that holds one in the clear teaches the next one to do the same.
       clientSecret: sealCredential({ shape: 'oauth2', accessToken: clientSecret }, key),
+      tenant: tenant || null,
       registeredAt: new Date().toISOString(),
     });
 

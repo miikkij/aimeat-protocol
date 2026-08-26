@@ -117,6 +117,7 @@ function toProviderClient(r: Selectable<ProviderClientRow>): ProviderClientRecor
     principal: r.principal ?? null,
     clientId: r.clientId,
     clientSecret: r.clientSecret,
+    tenant: r.tenant ?? null,
     registeredAt: r.registeredAt,
   };
 }
@@ -508,6 +509,7 @@ export const connectionMethods = {
       principal: row.principal,
       clientId: row.clientId,
       clientSecret: row.clientSecret,
+      tenant: row.tenant,
       registeredAt: row.registeredAt,
     }).onConflict((oc) => oc
       .columns(['provider', 'principal'])
@@ -515,6 +517,9 @@ export const connectionMethods = {
       .doUpdateSet({
         clientId: row.clientId,
         clientSecret: row.clientSecret,
+        // Replaced with the rest: a re-entered app that moved to another directory would otherwise
+        // keep pointing at the old one, and the sign-in would fail somewhere else entirely.
+        tenant: row.tenant,
         registeredAt: row.registeredAt,
       })).execute();
 

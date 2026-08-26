@@ -89,7 +89,7 @@ export function callbackUrl(config: AimeatConfig): string {
  */
 async function resolveClient(
   ctx: ConnectContext, provider: OutboundProvider, instance: string | null, principal: string,
-): Promise<(InstanceClient & { recordId: string | null }) | { error: string }> {
+): Promise<(InstanceClient & { recordId: string | null; tenant: string | null }) | { error: string }> {
   const own = await ctx.storage.getPrincipalProviderClient(provider.id, principal);
   if (own) {
     const secret = openCredential(own.clientSecret, ctx.key);
@@ -98,11 +98,13 @@ async function resolveClient(
       // and quietly using someone else's is the wrong answer to an unreadable secret.
       return { error: 'your own app credentials for this provider could not be read; re-enter them' };
     }
-    return { clientId: own.clientId, clientSecret: secret.accessToken, recordId: own.id };
+    // The tenant rides with the credentials because it is a property of the SAME registration:
+    // a principal who brought a single-tenant Entra app brought its directory with it.
+    return { clientId: own.clientId, clientSecret: secret.accessToken, recordId: own.id, tenant: own.tenant ?? null };
   }
   if (!provider.instanceScoped) {
     if (!provider.client) return { error: provider.disabledReason ?? 'provider is not configured' };
-    return { clientId: provider.client.id, clientSecret: provider.client.secret, recordId: null };
+    return { clientId: provider.client.id, clientSecret: provider.client.secret, recordId: null, tenant: null };
   }
   if (!instance) return { error: 'this provider needs an instance address' };
   const registered = await registerAtInstance(ctx.storage, ctx.key, provider.id, instance, {
@@ -115,7 +117,9 @@ async function resolveClient(
   // recordId stays null for an instance registration: the connection already carries its instance,
   // and the refresh path finds the same row by (provider, instance). Only a principal's own client
   // needs to be pinned by id, because nothing else on the row points at it.
-  return { ...registered, recordId: null };
+  // A tenant is Microsoft's, and Microsoft is not instance-scoped: nothing registered at an instance
+  // has one.
+  return { ...registered, recordId: null, tenant: null };
 }
 
 /**
@@ -155,7 +159,10 @@ export async function startAuthorization(
   const client = await resolveClient(ctx, provider, instance, input.principal);
   if ('error' in client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: client.error };
 
-  const endpoints = provider.endpoints(instance);
+  // The tenant comes from the CLIENT, not from the request: the app registration decides which
+  // directory it belongs to, and letting a caller name one would let them send this node's
+  // authorize round somewhere the app was never registered.
+  const endpoints = provider.endpoints(instance, client.tenant);
   if (!endpoints) return { ok: false, code: 'NO_ENDPOINTS', reason: 'provider has no authorization endpoint' };
 
   const state = b64url(randomBytes(24));
@@ -294,6 +301,63 @@ async function fetchAccountIdentity(
       if (!sub) return { error: 'LinkedIn returned no member id' };
       return { externalId: sub, accountLabel: typeof j.name === 'string' ? j.name : sub };
     }
+    if (provider.id === 'google-mail') {
+      // WHICH MAILBOX THIS IS. Missing until 2026-08-26: the provider shipped with `resources` and a
+      // skill describing the flow, and every attempt to connect it ended at IDENTITY_FAILED because
+      // there was no branch here. It went unnoticed because the capability is off by default and the
+      // Google client is usually unset, so nobody reached the last step.
+      const r = await safeFetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+        headers: auth, signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) {
+        return { error: r.status === 403
+          ? 'Google accepted the sign-in but would not say which mailbox it is for. Disconnect and connect again so the read permission is granted.'
+          : `Google rejected the token (HTTP ${r.status})` };
+      }
+      const j = await r.json() as { emailAddress?: unknown };
+      const email = typeof j.emailAddress === 'string' ? j.emailAddress : '';
+      if (!email) return { error: 'Google returned no mailbox address' };
+      // The address IS the dedupe key here: one Google account is one mailbox, and the address is
+      // also what the owner reads in the panel, so there is nothing to gain from a separate id.
+      return { externalId: email, accountLabel: email };
+    }
+    if (provider.id === 'google-mail-send') {
+      // NOT the Gmail profile: `gmail.send` grants the write and nothing else, so users.getProfile
+      // answers 403 with a perfectly valid token. `userinfo.email` is in this provider's scopes for
+      // exactly this call, and it is why the scope is there.
+      const r = await safeFetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: auth, signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) {
+        return { error: r.status === 403
+          ? 'Google accepted the sign-in but would not say which account it is for. Check that the app requests the userinfo.email scope.'
+          : `Google rejected the token (HTTP ${r.status})` };
+      }
+      const j = await r.json() as { sub?: unknown; email?: unknown };
+      const sub = typeof j.sub === 'string' ? j.sub : '';
+      if (!sub) return { error: 'Google returned no account id' };
+      const email = typeof j.email === 'string' ? j.email : sub;
+      return { externalId: sub, accountLabel: email };
+    }
+    if (provider.id === 'microsoft-mail' || provider.id === 'microsoft-mail-send') {
+      const r = await safeFetch('https://graph.microsoft.com/v1.0/me', {
+        headers: auth, signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) {
+        return { error: r.status === 403
+          ? 'Microsoft accepted the sign-in but would not say which mailbox it is for. Check that the app requests the User.Read permission.'
+          : `Microsoft rejected the token (HTTP ${r.status})` };
+      }
+      const j = await r.json() as { id?: unknown; mail?: unknown; userPrincipalName?: unknown };
+      const id = typeof j.id === 'string' ? j.id : '';
+      if (!id) return { error: 'Microsoft returned no account id' };
+      // `mail` is empty on an account with no mailbox licence, and userPrincipalName is then all
+      // there is to show. Both are the person's own address as they know it.
+      const label = typeof j.mail === 'string' && j.mail
+        ? j.mail
+        : (typeof j.userPrincipalName === 'string' ? j.userPrincipalName : id);
+      return { externalId: id, accountLabel: label };
+    }
     if (provider.id === 'fake') {
       // Test-only, and reached only when a base URL is configured. It goes through the same
       // safeFetch + shape-checking path as the real ones so the tests exercise that code rather
@@ -346,7 +410,9 @@ export async function completeAuthorization(
   }
   const client = await resolveClient(ctx, provider, payload.instance, nonce.owner);
   if ('error' in client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: client.error };
-  const endpoints = provider.endpoints(payload.instance);
+  // Same client, same tenant as the authorize round. A token exchange against a different directory
+  // than the one that issued the code is a refusal whose message names neither.
+  const endpoints = provider.endpoints(payload.instance, client.tenant);
   if (!endpoints) return { ok: false, code: 'NO_ENDPOINTS', reason: 'provider has no token endpoint' };
 
   const req = tokenRequest(provider, client, {

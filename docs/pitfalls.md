@@ -322,3 +322,11 @@ nothing on the way to the person carried it.
 - **`tsc --noEmit -p tsconfig.json` does not read `test/`** (`"exclude": [… "test" …]`), so a unit test calling a changed function is never typechecked. On 2026-08-26 `defaultLayout(surface)` gained a required `config` argument; two tests kept calling it with one, the missing argument made every block fail its presence check, and the function returned an empty layout. One test compared that empty result against another empty result and passed. Both assertions were vacuous and nothing anywhere went red.
 - **The tell is a test that keeps passing through a change that should have touched it.** After changing a signature, grep `test/` for the name rather than trusting the typecheck; `pnpm lint:tests` reads that directory but does not typecheck it either.
 - **When a test compares two things the same bug can empty, assert the thing is non-empty as well.** `expect(a).toEqual(b)` is satisfied by `[] === []`, and that is exactly what a shared failure produces.
+
+## 27. A backtick inside SQL that lives in a template literal
+
+*Symptoms: a `.ts` file holding DDL suddenly fails to parse, and the error points at a line of SQL that reads perfectly well.*
+
+- **The SQLite schema is SQL inside `db.exec(\`…\`)`, so a backtick anywhere in it ends the template literal.** A comment written the way this project writes comments everywhere else — naming a field as `` `indexOn` `` or `` `instance` `` — closes the string, and everything after it is parsed as TypeScript. On 2026-08-26 this happened twice inside one change, in `schema-tables-4.ts` and then in `schema-tables-3.ts`, both times in a prose comment explaining a column.
+- **`tsc` catches it, but the message names the symptom rather than the cause**: `TS1005: ',' expected` on the first line that stops looking like an expression, which can be dozens of lines below the backtick. Search the block for a backtick before reading the reported line.
+- **The rule inside a SQL template literal: quote a field name by not quoting it.** Write `the indexOn fields`, not `` the `indexOn` fields ``. The Postgres migrations are plain `.sql` files and have no such constraint, so the same sentence is fine there — which is exactly why it is easy to write once in each and only notice in one.
