@@ -49,6 +49,7 @@ import { packageTools } from './tool-call-defs-packages.js';
 import { workflowTools } from './tool-call-defs-workflows.js';
 import { appDraftEditTools } from './tool-call-defs-app-draft-edit.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
+import { connectionCliTools } from './tool-call-defs-connections.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -68,6 +69,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...workflowTools,
     ...appDraftEditTools,
     ...exchangeTools,
+    ...connectionCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

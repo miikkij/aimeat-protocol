@@ -47,6 +47,7 @@ import {
   buildOutboundProviders, listProviderMeta, findProvider,
 } from '../services/connections/providers.js';
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
+import { listOwnConnections, requireOwnConnection, toPublicConnection } from '../services/connections/access.js';
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { readResource } from '../services/connections/read.js';
@@ -56,14 +57,14 @@ import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import { runOwnPublish } from '../services/connections/publish-run.js';
 import type {
-  ConnectionRecord, PublicConnection, ConnectionMode, ModerationMode,
+  ConnectionMode, ModerationMode,
   ProviderClientRecord, PublicProviderClient,
 } from '../models/connection-schemas.js';
 
-/** The ONLY shape a connection leaves this file in. */
-function toPublic(c: ConnectionRecord): PublicConnection {
-  return { id: c.id, provider: c.provider, mode: c.mode, accountLabel: c.accountLabel, status: c.status };
-}
+// The projection and the two access sentences live in services/connections/access.ts, so the MCP
+// door cannot carry a second copy of them. `toPublic` stays as the local name every handler below
+// already uses.
+const toPublic = toPublicConnection;
 
 const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
 
@@ -354,8 +355,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   router.get('/v1/connections', requireAuth(), requireAnyScope('connections:read', 'connections:use'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
-    const rows = await storage.listConnections({ principal });
-    res.json(success(config.nodeId, { connections: rows.map(toPublic) }));
+    res.json(success(config.nodeId, { connections: await listOwnConnections(storage, principal) }));
   });
 
   // ── POST /v1/connections/start ──
@@ -720,9 +720,9 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   router.post('/v1/connections/:id/read/:resource', requireAuth(), requireScope('connections:use'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
-    const connection = await storage.getConnection(req.params.id as string);
     // Absent and not-yours answer alike, as everywhere else in this file.
-    if (!connection || connection.principal !== principal) {
+    const connection = await requireOwnConnection(storage, principal, req.params.id as string);
+    if (!connection) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such connection of yours'));
     }
 

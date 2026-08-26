@@ -114,6 +114,13 @@ const DELEGATES: Record<string, string> = {
         + 'change it makes: storing a layout, reverting one, restoring a version and writing a passage. '
         + 'The HTTP routes used to emit for themselves and the tool did not, which is what this gate '
         + 'found; the emit moved to the one place both doors go through.',
+    'src/mcp/connections.ts': "services/outbound/outbound-service.ts, which emits 'outbound' after "
+        + 'the send — to the BOOK the message belongs to, and to the caller as well when those '
+        + 'differ, so neither the company\'s log view nor the person\'s own screen goes stale. That '
+        + 'is the only write these tools make: starting an authorization creates a pending nonce '
+        + 'that becomes a connection at the CALLBACK, which is a browser round the person is '
+        + 'already watching, and the reads make none. Verified by reading the domain out of the '
+        + 'service rather than trusting the delegation.',
     'src/mcp/workspace-rows.ts': "services/workspace-rows/row-service.ts, which emits 'organisms' "
         + 'after each of the three writes it owns — appendRows, deleteRow and deleteRowsBefore. Same '
         + 'service, same emit, as the REST routes in routes/organisms/workspace-rows.ts, which is the '
