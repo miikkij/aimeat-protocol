@@ -273,6 +273,17 @@ function wrapHtml(heading: string, bodyHtml: string, locale?: string, opts?: { b
   // brand/footer are trusted constants (never user input) — brand may carry inline HTML (e.g. a heart).
   const brand = opts?.brand ?? 'AIMEAT';
   const footer = opts?.footer ?? t(locale, 'footer');
+  // WHO IS WRITING DECIDES WHAT THE FOOTER MAY SAY. When this node writes in its own name — a
+  // verification code, a magic link, an invitation — the reader has an account here and the profile
+  // line is useful. When a CALLER supplies its own footer it is somebody's business mailing their
+  // own customer, and that reader has no profile here: telling them to manage settings in it is our
+  // plumbing leaking into their sales mail. An empty footer drops the block entirely, which is what
+  // the outbound door asks for, because its unsubscribe link belongs in the message body where a
+  // recipient (and the law) expects to find it.
+  const profileNote = opts?.footer === undefined ? `\n      <p>${t(locale, 'footerUnsubscribe')}</p>` : '';
+  const footerHtml = footer
+    ? `<div class="footer">\n      <p>${footer}</p>${profileNote}\n    </div>`
+    : '';
   return `<!DOCTYPE html>
 <html lang="${emailLang(locale)}">
 <head>
@@ -305,10 +316,7 @@ function wrapHtml(heading: string, bodyHtml: string, locale?: string, opts?: { b
       <h1>${heading}</h1>
       ${bodyHtml}
     </div>
-    <div class="footer">
-      <p>${footer}</p>
-      <p>${t(locale, 'footerUnsubscribe')}</p>
-    </div>
+    ${footerHtml}
   </div>
 </body>
 </html>`;
@@ -703,6 +711,11 @@ export function matchSuggestionEmailHtml(matches: MatchSuggestion[], locale?: st
  * `brand` (trusted constant or validated business name) shows in place of the AIMEAT wordmark.
  */
 export function outboundEmailHtml(heading: string, bodyHtml: string, textBody: string, locale?: string, opts?: { brand?: string }): { html: string; text: string } {
-  const html = wrapHtml(heading, bodyHtml, locale, opts?.brand ? { brand: esc(opts.brand) } : undefined);
+  // footer: '' on purpose. A message somebody sends to their own customer carries no line about this
+  // node: the recipient has no account here, and the unsubscribe they need is already in the body.
+  const html = wrapHtml(heading, bodyHtml, locale, {
+    ...(opts?.brand ? { brand: esc(opts.brand) } : {}),
+    footer: '',
+  });
   return { html, text: textBody };
 }
