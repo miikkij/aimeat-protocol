@@ -53,10 +53,18 @@ Kartta kuvaa sen mikä tämän appin järjestely sattuu olemaan. Ei yhtä oletet
 
 ei missään (staattinen appi) · selaimessa vain (localStorage, ei lähde laitteelta) · omistajan
 muistissa yksityisenä · omistajan muistissa julkisena · jonkun toisen muistissa (luetaan
-`getPublic`) · organismin työtilassa (skeema lukittu) · organismin jaetussa alueessa · organismin
-metassa · laajennuksen omassa nimiavaruudessa (`ext:`) · cortexin hallinnassa · tiedostovarastossa ·
-appin omassa julkaistussa tietueessa (app-tools, ODPS) · toisella nodella (federaatio) · vieraassa
-palvelussa
+`getPublic`) · organismin työtilassa (skeema lukittu) · organismin työtilan rivivarastossa (lisätään
+perään, ei versiohistoriaa, kiintiö organismin eikä kirjoittajan) · organismin jaetussa alueessa ·
+organismin metassa · laajennuksen omassa nimiavaruudessa (`ext:`) · cortexin hallinnassa ·
+tiedostovarastossa · appin omassa julkaistussa tietueessa (app-tools, ODPS) · toisella nodella
+(federaatio) · vieraassa palvelussa
+
+Työtila ja sen rivivarasto ovat eri vastauksia, ja ero on se mitä lukija olettaa väärin jos ne
+niputetaan: rivi lisätään perään eikä muokata, versiohistoriaa ei kerry, ja tila lasketaan
+organismin kiintiöstä eikä sen jäsenen, joka rivin kirjoitti. Rivivarasto on oikea koti
+tapahtumavirralle jota tulee paljon eikä lopu — vastaanotettu posti, ilmoitukset, bouncet,
+aikasarjat. Testi on yksi kertolasku: **jos `avaimia_päivässä × 365` ylittää 1000, muoto on väärä**
+ja rivit kuuluvat rivivarastoon.
 
 ### Mitä data on
 

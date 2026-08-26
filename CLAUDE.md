@@ -277,6 +277,7 @@ curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file
 | [App Developer AI Guide](docs/app-developer-ai-guide.md) | Apps using the user's OpenRouter key via `AIMEAT.ai.complete()` |
 | [Building an Agent](docs/building-an-aimeat-compatible-agent.md) | Offer descriptor, pricing, workflow signals |
 | [Building an Ecosystem App](docs/building-an-aimeat-compatible-ecosystem-app.md) | GEAI, hello→approve→token flow |
+| [Connecting an Outside Account](docs/connecting-an-outside-account.md) | Gmail and Outlook read/send pairs, the Google alias, bring-your-own app, the AI-disclosure header |
 | [Organisation Node Sign-In](docs/organisation-node-sign-in.md) | Entra tenant allowlist + registration mode: one node for your company and the partners you approve |
 | [Getting Started](docs/coding-guidelines/getting-started.md) | Install, setup, dev workflow |
 | [Known Gaps](docs/known_gaps.md) | Deferred technical gaps (developer-approved entries only) |

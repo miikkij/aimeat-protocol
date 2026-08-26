@@ -15,6 +15,9 @@
  * @structure summariseMap · checkMap · noMapStamp · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.1.0 — 2026-08-26 — `organism-rows` gets its own words, and counts as being in an organism for
+ *     the form contradiction — without that, an app whose only shared space is a row store would be
+ *     accused of keeping the team's data in one person's memory.
  *   v1.0.0 — 2026-08-25 — Replaces data-map-derive.ts and data-map-lint.ts.
  */
 import {
@@ -43,6 +46,11 @@ const PLACE_WORDS: Record<DataLocation, string> = {
   'owner-memory-public': 'your own memory, readable by anyone',
   'someone-elses-memory': "someone else's memory",
   'organism-workspace': 'an organism workspace',
+  // The row store is a DIFFERENT answer from the workspace it sits in, and saying so is the point:
+  // rows are appended rather than edited, keep no version history, and are charged to the organism
+  // instead of to whichever member wrote them. A reader who sees only "an organism workspace" would
+  // expect all three to be the other way round.
+  'organism-rows': "an organism workspace's row store",
   'organism-shared': "an organism's shared area",
   'organism-meta': "an organism's registry",
   'extension-namespace': "an extension's own space",
@@ -82,7 +90,8 @@ export function summariseMap(map: DataMap): string {
 /** Rows the form implies but that are not there, and rows it forbids. */
 function formContradiction(map: DataMap): string | null {
   const inWorkspace = map.held.some(r =>
-    r.where === 'organism-workspace' || r.where === 'organism-shared' || r.where === 'organism-meta');
+    r.where === 'organism-workspace' || r.where === 'organism-rows'
+    || r.where === 'organism-shared' || r.where === 'organism-meta');
   const sharedForm = map.form === 'group' || map.form === 'organism-workspace'
     || map.form === 'shared-with-named';
 
