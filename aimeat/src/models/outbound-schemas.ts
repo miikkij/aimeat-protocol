@@ -98,6 +98,21 @@ export interface OutboundMessageRecord {
    * their companies, which is every send made before 2026-08-23.
    */
   organismId: string | null;
+  /**
+   * WHO PRESSED SEND, as an exact principal (GHII / GAII / GEAI).
+   *
+   * `ownerGhii` above is the BOOK this send belongs to — the company's owner once a company is
+   * named — which is right for opt-outs, suppression and the allowance, and is not a person. So
+   * until this column existed, a team of three sending from one shared registry produced a log in
+   * which every row looked identical and "what have I sent" had no answer, not even to the person
+   * asking about themselves.
+   *
+   * It matters more now that a message can leave through the sender's OWN mailbox: the recipient
+   * sees one person's address, and the log has to agree with the recipient's inbox.
+   *
+   * Null for everything sent before 2026-08-26, and for a send with no authenticated caller.
+   */
+  sentBy: string | null;
   contactId: string;
   channel: OutboundChannel;
   kind: OutboundKind;
@@ -124,6 +139,12 @@ export interface OutboundLogQuery {
   contactId?: string;
   kind?: OutboundKind;
   status?: OutboundStatus;
+  /**
+   * WHO pressed send. This is what makes "what have I sent" answerable inside a shared book: the
+   * book belongs to the company, and without this filter a colleague reading it sees the team's
+   * whole sending with no way to find their own.
+   */
+  sentBy?: string;
   limit?: number;
   offset?: number;
 }

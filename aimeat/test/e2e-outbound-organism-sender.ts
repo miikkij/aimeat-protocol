@@ -188,6 +188,31 @@ await test('6. the colleague sending as the company reaches that same recipient'
   assert(r.body.data.status === 'failed', `expected a delivery failure against the fake host, got ${r.body.data.status}`);
 });
 
+await test("6b. the colleague's send lands in the COMPANY's log, attributed to her", async () => {
+  // THE BOOK IS THE COMPANY'S AND THE PERSON IS THE COLLEAGUE, and until 2026-08-26 the successful
+  // path wrote the row under the CALLER while every refusal, the daily-allowance count and this
+  // very read used the company. The consequences were two: "what has this company sent" answered
+  // with the owner's own sends and nobody else's, and the per-company allowance counted a book
+  // that only ever received refusals, so it never bound at all.
+  const log = await json('/v1/outbound/log?per_page=200', { headers: authed(heidi.token) });
+  assert(log.status === 200, `log: ${log.status}`);
+  const rows = log.body.data.messages as Array<{ subject: string; sentBy: string | null; organismId: string | null }>;
+  const row = rows.find(m => m.subject === 'Kevät');
+  assert(!!row, `the company's owner must see the colleague's send: ${rows.map(r => r.subject).join(', ')}`);
+  assert(typeof row!.sentBy === 'string' && row!.sentBy.includes('anne'),
+    `the row must name WHO pressed send, got ${String(row!.sentBy)}`);
+  assert(row!.organismId !== null, 'and which company spoke');
+
+  // The colleague can find her own work inside the shared book without seeing only it.
+  const hers = await json('/v1/outbound/log?sent_by=me&per_page=200', { headers: authed(anne.token) });
+  assert(hers.status === 200, `her log: ${hers.status}`);
+  // Her OWN book is empty of this row — the send belongs to the company — which is the same fact
+  // read from the other side.
+  const hersRows = hers.body.data.messages as Array<{ subject: string }>;
+  assert(!hersRows.some(m => m.subject === 'Kevät'),
+    'the row belongs to the company book, not to the colleague');
+});
+
 await test('7. an unsubscribe collected by one member stops the other member', async () => {
   const off = await json(`/v1/outbound/contacts/${sharedContactId}/opt-out`, {
     method: 'POST', headers: authed(heidi.token),

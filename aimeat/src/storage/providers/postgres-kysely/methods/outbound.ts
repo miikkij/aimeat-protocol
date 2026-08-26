@@ -49,6 +49,7 @@ function toMessage(r: Selectable<MessageRow>): OutboundMessageRecord {
     id: r.id,
     ownerGhii: r.ownerGhii,
     organismId: r.organismId ?? null,
+    sentBy: r.sentBy ?? null,
     contactId: r.contactId,
     channel: r.channel as OutboundChannel,
     kind: r.kind as OutboundKind,
@@ -144,7 +145,8 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
 
   async createOutboundMessage(this: PostgresKyselyStorage, row: OutboundMessageRecord): Promise<void> {
     await this.db.insertInto('OutboundMessage').values({
-      id: row.id, ownerGhii: row.ownerGhii, organismId: row.organismId ?? null, contactId: row.contactId,
+      id: row.id, ownerGhii: row.ownerGhii, organismId: row.organismId ?? null,
+      sentBy: row.sentBy ?? null, contactId: row.contactId,
       channel: row.channel, kind: row.kind, subject: row.subject,
       templateId: row.templateId, status: row.status, error: row.error,
       invoiceId: row.invoiceId, createdAt: row.createdAt,
@@ -156,6 +158,7 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
     if (query.contactId) q = q.where('contactId', '=', query.contactId);
     if (query.kind) q = q.where('kind', '=', query.kind);
     if (query.status) q = q.where('status', '=', query.status);
+    if (query.sentBy) q = q.where('sentBy', '=', query.sentBy);
     q = q.orderBy('createdAt', 'desc');
     if (query.limit !== undefined) q = q.limit(query.limit);
     if (query.offset !== undefined) q = q.offset(query.offset);
@@ -168,6 +171,7 @@ export const outboundMethods: OutboundRepository & ThisType<PostgresKyselyStorag
     if (query.contactId) q = q.where('contactId', '=', query.contactId);
     if (query.kind) q = q.where('kind', '=', query.kind);
     if (query.status) q = q.where('status', '=', query.status);
+    if (query.sentBy) q = q.where('sentBy', '=', query.sentBy);
     const r = await q.executeTakeFirst();
     return Number(r?.n ?? 0);
   },
