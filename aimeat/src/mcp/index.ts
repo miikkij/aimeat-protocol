@@ -136,6 +136,7 @@ import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
 import { scopeAllowsTool } from './catalog/scopes.js';
+import { registerConnectionTools } from './connections.js';
 import { wrapToolHandler } from './tool-usage-wrap.js';
 import { toolsForSurface, isV2Role, V2_ROLES, type SurfaceRole } from './catalog/surfaces.js';
 import { instructionsFor } from './instructions.js';
@@ -279,6 +280,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerConnectionTools(mcp, storage, config, () => agentGaii, scopes);
         registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, scopes);
         registerAppdevResearchTools(mcp, storage, config, () => agentGaii);

@@ -201,7 +201,17 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Removes a stored record.
     aimeat_workspace_object_delete:           'memory:delete',
 
-    // Workspace ROW spaces. `organism:write` rather than `memory:write`, because these rows are NOT
+    // Outbound connections. Three words, and the distinction between them is the design: READING the
+  // list of accounts you attached is knowing what you have, STARTING one is attaching another, and
+  // reading or sending THROUGH one is spending it. An app granted only the first must not be able
+  // to open the mailbox.
+  aimeat_connection_start:                  'connections:write',
+  // Sending needs `connections:use` AND `outbound:send`; the tool is not registered without both,
+  // so a session holding one never sees a control whose only possible answer is a refusal. This map
+  // carries the mailbox half, because that is the surprising permission of the two.
+  aimeat_mail_send:                         'connections:use',
+
+  // Workspace ROW spaces. `organism:write` rather than `memory:write`, because these rows are NOT
     // memory records: they live in their own table, are charged to the organism rather than to the
     // member, and are governed by workspace membership. The word also matches what the REST routes
     // enforce for the same capability — a tool gated on one word while its route enforces another is
@@ -410,6 +420,15 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_contact_resolve_email: 'messages:read',
     aimeat_contact_add: 'messages:send',
     aimeat_contact_remove: 'messages:send',
+
+    // Outbound connections, read side. `connections:read` is knowing WHAT you attached;
+    // `connections:use` is spending it, which is what reaching into a mailbox actually is. An app
+    // granted only the first must not be able to read the mail — that split is why there are two
+    // words rather than one, and it is enforced identically on the REST door.
+    aimeat_connection_list: 'connections:read',
+    aimeat_mail_search: 'connections:use',
+    aimeat_mail_read: 'connections:use',
+    aimeat_mail_aliases: 'connections:use',
 
     // Commerce (TARGET-033/034 over MCP). NOTE: the REST commerce routes are requireAuth-only
     // today — these MCP tools are gated STRICTER than REST on purpose (selling config touches

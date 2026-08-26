@@ -52,6 +52,7 @@ import { exchangeTools } from './definitions/exchange.js';
 import { complianceTools } from './definitions/compliance.js';
 import { dataMapTools } from './definitions/data-map.js';
 import { surfaceLayoutTools } from './definitions/surface-layout.js';
+import { connectionTools } from './definitions/connections.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...agentMessagingTools,
@@ -72,6 +73,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...complianceTools,
     ...dataMapTools,
     ...surfaceLayoutTools,
+    ...connectionTools,
 ];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));
