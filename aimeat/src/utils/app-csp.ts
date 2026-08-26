@@ -13,6 +13,14 @@
  *   res.setHeader('Content-Security-Policy', appCsp(apexOrigin));   // app origin
  *   res.setHeader('Content-Security-Policy', appCsp());             // inline / draft preview
  * @version-history
+ *   v1.2.0 — 2026-08-26 — media-src 'self' blob: data: https:. Same shape as the manifest-src bug
+ *     below and found the same way — on a live app: <video> and <audio> are fetched under this
+ *     directive, it had no entry, so it fell back to default-src 'none' and NO published app could
+ *     play any video or audio from anywhere, including a file the app had just produced itself.
+ *     Measured in KANSI: a 1 MB MP4 assembled in the page failed with "MEDIA_ELEMENT_ERROR: Media
+ *     load rejected by URL safety check". `blob:` is the case that matters — an object the page
+ *     created and already holds — and `'self'`/`https:` cover the node's own files; img-src is
+ *     already `*`, so this grants no destination an app did not effectively have.
  *   v1.1.0 — 2026-08-16 — manifest-src 'self': the per-app web-app manifest (installable apps) is
  *     fetched under this directive, which has no entry of its own and therefore fell back to
  *     default-src 'none' — the browser refused /manifest.webmanifest on every app origin and
@@ -60,6 +68,9 @@ export function appCsp(apexOrigin = '', grantedOrigin = ''): string {
     + "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https: http://localhost:*; "
     + "style-src 'self' 'unsafe-inline' https: http://localhost:*; "
     + 'img-src * data: blob:; '
+    // <video>/<audio> load under media-src. With no entry it fell back to default-src 'none' and an
+    // app could not play a file it had made itself, one line after making it.
+    + "media-src 'self' data: blob: https: http://localhost:*; "
     + "font-src 'self' data: https:; "
     + `connect-src 'self' https: http://localhost:* wss: ws: data: blob:${apexAllow}; `
     + 'worker-src blob:; '
