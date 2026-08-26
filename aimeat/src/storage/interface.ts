@@ -32,6 +32,7 @@ export * from './types/agents-messaging.js';
 export * from './types/ai-provenance.js';
 export * from './types/usage.js';
 export * from './types/account-events.js';
+export * from './types/workspace-rows.js';
 export * from './types/sso.js';
 
 // ── Domain Repository Interfaces ────────────────────────────────────
@@ -86,6 +87,7 @@ import type { AgentActivityRepository } from './repositories/agent-activity.repo
 import type { AgentUsageRepository } from './repositories/agent-usage.repository.js';
 import type { UsageRepository } from './repositories/usage.repository.js';
 import type { AccountEventRepository } from './repositories/account-event.repository.js';
+import type { WorkspaceRowRepository } from './repositories/workspace-row.repository.js';
 export type { UsageFoldCursor } from './repositories/usage.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
 import type { DirectMessageRepository } from './repositories/direct-message.repository.js';
@@ -121,6 +123,7 @@ export interface Storage extends
   AgentUsageRepository,
   UsageRepository,
   AccountEventRepository,
+  WorkspaceRowRepository,
   AgentMessageRepository,
   DirectMessageRepository,
   AgentTelemetryRepository, AgentWebhookRepository,

@@ -293,6 +293,76 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
   const out = (resp: { data?: unknown; ok?: boolean }) =>
     ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
 
+  // ── Workspace ROW spaces ──────────────────────────────────────────────────────────────────────
+  // The connector half of the four row tools. Each is a thin call to the same REST route the node
+  // MCP reaches through the service, so the manifest gate, the access rule and the quotas are the
+  // node's answer on this door too.
+  const rowsPath = (organism_id: string, space: string, ws: string, extra: Record<string, string> = {}) =>
+    `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/rows/${encodeURIComponent(space)}`
+    + `?${new URLSearchParams({ ws, ...extra }).toString()}`;
+
+  mcp.tool('aimeat_workspace_rows_append', descriptionFor('aimeat_workspace_rows_append'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The row space, by objectType name or namespace'),
+    body: z.record(z.string(), z.unknown()).optional().describe('The row, for the single-row form'),
+    row_id: z.string().optional().describe('Optional caller id; repeating one REPLACES that row'),
+    occurred_at: z.string().optional().describe('ISO 8601: when it happened in the world'),
+    rows: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 500 rows, each { body, row_id?, occurred_at? }'),
+  }, annotationsFor('aimeat_workspace_rows_append'), async ({ organism_id, ws, space, body, row_id, occurred_at, rows }) => {
+    const payload = rows?.length ? { rows } : { body, row_id, occurred_at };
+    return out(await client.post(rowsPath(organism_id, space, ws), payload));
+  });
+
+  mcp.tool('aimeat_workspace_rows_read', descriptionFor('aimeat_workspace_rows_read'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The row space, by objectType name or namespace'),
+    where: z.record(z.string(), z.unknown()).optional().describe('Filter as { field: value }, only on fields the space declares in indexOn'),
+    since: z.string().optional().describe('ISO 8601: occurred_at at or after this'),
+    until: z.string().optional().describe('ISO 8601: occurred_at at or before this'),
+    changed_since: z.string().optional().describe('ISO 8601: updated_at strictly after this'),
+    limit: z.number().optional().describe('Rows per page, default 100, max 500'),
+    cursor: z.string().optional().describe('Opaque cursor from the previous page'),
+    order: z.enum(['asc', 'desc']).optional().describe("'desc' (default) or 'asc'"),
+  }, annotationsFor('aimeat_workspace_rows_read'), async ({ organism_id, ws, space, where, since, until, changed_since, limit, cursor, order }) => {
+    // A declared field rides the query string as itself, which is the shape the route reads: every
+    // parameter that is not reserved is a filter.
+    const extra: Record<string, string> = {};
+    for (const [k, v] of Object.entries(where ?? {})) if (v != null) extra[k] = String(v);
+    if (since) extra.since = since;
+    if (until) extra.until = until;
+    if (changed_since) extra.changed_since = changed_since;
+    if (limit) extra.limit = String(limit);
+    if (cursor) extra.cursor = cursor;
+    if (order) extra.order = order;
+    return out(await client.get(rowsPath(organism_id, space, ws, extra)));
+  });
+
+  mcp.tool('aimeat_workspace_rows_stats', descriptionFor('aimeat_workspace_rows_stats'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The row space, by objectType name or namespace'),
+  }, annotationsFor('aimeat_workspace_rows_stats'), async ({ organism_id, ws, space }) => out(
+    await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace/rows/${encodeURIComponent(space)}/stats?${new URLSearchParams({ ws }).toString()}`),
+  ));
+
+  mcp.tool('aimeat_workspace_rows_delete', descriptionFor('aimeat_workspace_rows_delete'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ws: z.string().describe('Workspace id'),
+    space: z.string().describe('The row space, by objectType name or namespace'),
+    row_id: z.string().optional().describe('Remove this one row'),
+    before: z.string().optional().describe('ISO 8601: remove every row created before this'),
+  }, annotationsFor('aimeat_workspace_rows_delete'), async ({ organism_id, ws, space, row_id, before }) => {
+    if (!!row_id === !!before) {
+      return { content: [{ type: 'text' as const, text: 'Pass exactly one of `row_id` (remove that row) or `before` (remove everything created before that ISO timestamp).' }], isError: true };
+    }
+    const path = row_id
+      ? `/v1/organisms/${encodeURIComponent(organism_id)}/workspace/rows/${encodeURIComponent(space)}/${encodeURIComponent(row_id)}?${new URLSearchParams({ ws }).toString()}`
+      : rowsPath(organism_id, space, ws, { before: before! });
+    return out(await client.delete(path));
+  });
+
   // → POST /v1/organisms/:id/(archive|unarchive) — archive/restore an organism or a scoped subtree.
   mcp.tool('aimeat_organism_archive', descriptionFor('aimeat_organism_archive'), {
     organism_id: z.string().describe('The organism id.'),

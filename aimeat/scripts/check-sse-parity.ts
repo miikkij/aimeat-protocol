@@ -114,6 +114,11 @@ const DELEGATES: Record<string, string> = {
         + 'change it makes: storing a layout, reverting one, restoring a version and writing a passage. '
         + 'The HTTP routes used to emit for themselves and the tool did not, which is what this gate '
         + 'found; the emit moved to the one place both doors go through.',
+    'src/mcp/workspace-rows.ts': "services/workspace-rows/row-service.ts, which emits 'organisms' "
+        + 'after each of the three writes it owns — appendRows, deleteRow and deleteRowsBefore. Same '
+        + 'service, same emit, as the REST routes in routes/organisms/workspace-rows.ts, which is the '
+        + 'point: the tool holds no write of its own to be silent about. Verified by reading the '
+        + 'domain out of the service rather than trusting the delegation.',
     'src/mcp/agent-capabilities.ts': "services/agent-profile-write.ts, which emits 'agent-capabilities'",
     'src/mcp/agent-management.ts': "services/agent-profile-write.ts, which emits 'agents'",
     'src/mcp/appdev-pitfalls.ts': "services/memory-write.ts and services/appdev-kb.ts, both emitting 'memory'",

@@ -33,7 +33,23 @@ Required: manifestVersion, id, name, kind, status, objectTypes (at least one).
 - status ∈ active | paused | done | archived
 - kind = a free template name (project, research-study, campaign, tutkimus, anything)
 - entry: { readme:<memory key>, loadHint:<string>, primaryGoal?:<instanceId> }
-- objectTypes[] each: { name, description, schemaRef, namespace, cardinality:one|many, backing:memory|tasks|storage|knowledge, writeRole:owner|admin|member, append?:bool }
+- objectTypes[] each: { name, description, schemaRef, namespace, cardinality:one|many, backing:memory|tasks|rows, writeRole:owner|admin|member, append?:bool }
+- backing decides where a space's data lives, and picking wrong is expensive later:
+    memory — the default. Records a person opens and owns, or free-form documents. Versioned,
+             searchable, and each key counts against the MEMBER who wrote it.
+    rows   — many rows the group accumulates and nobody authored one by one: received messages,
+             events, readings, a log. Held in a table, charged to the workspace and the organism
+             rather than to the writer, never versioned, and it never appears row-by-row in a
+             workspace index read.
+    tasks  — not storage at all, a pointer to the task system.
+  The test: if ordinary use writes more than a handful of instances a day and nobody will open one
+  on its own, it is rows. If a person opens it, names it and edits it, it is memory.
+- a rows space may also carry:
+    indexOn:[<field>,...]  up to THREE fields promoted to indexed columns. Only these can be
+                           filtered or ordered by; everything else stays readable inside the row.
+                           Choose them from what a reader actually searches by.
+    retention:{ maxRows?, maxDays? }  maxDays counts from when the row LANDED here, not from when
+                           the event happened, so old material ingested today is not swept on arrival.
 - flow?: { stages[], gates[], branches[] }   (stored + validated now; executed in a later phase)
 - sharing?: { publicEntries:[<key>], sharingGroups:[{ groupId, governs:[<pattern>], permissions:read|read-write }] }
 - policy?: { agentAutonomy:L1..L5, alwaysGate:[<string>], budget?, synthesis? }

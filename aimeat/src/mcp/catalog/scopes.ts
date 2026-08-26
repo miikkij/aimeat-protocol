@@ -201,6 +201,14 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Removes a stored record.
     aimeat_workspace_object_delete:           'memory:delete',
 
+    // Workspace ROW spaces. `organism:write` rather than `memory:write`, because these rows are NOT
+    // memory records: they live in their own table, are charged to the organism rather than to the
+    // member, and are governed by workspace membership. The word also matches what the REST routes
+    // enforce for the same capability — a tool gated on one word while its route enforces another is
+    // the drift invariant 15 exists for.
+    aimeat_workspace_rows_append:             'organism:write',
+    aimeat_workspace_rows_delete:             'organism:write',
+
     // These write memory records underneath, whatever the tool is called: a workspace
     // document, a skill manifest, a schedule report, a knowledge contribution.
     aimeat_knowledge_contribute:              'memory:write',

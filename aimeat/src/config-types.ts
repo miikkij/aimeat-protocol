@@ -329,6 +329,22 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
    *  manifest objectType's `maxVersions` overrides per space; append-only `create_only` spaces are
    *  NEVER pruned). 0 = keep all history. */
   workspaceMaxVersions: number;
+  /**
+   * Workspace ROW spaces (`backing: 'rows'`), whose whole point is that a group's accumulated rows
+   * do not draw on the individual member's memory budget. So these three are charged to the
+   * workspace and the organism, never to whoever pressed the button.
+   *
+   * `wsRowsMaxPerWorkspace` — how many rows one workspace may hold across all its row spaces.
+   * `wsRowsQuotaMb` — how many megabytes of row bodies one ORGANISM may hold. Deliberately the same
+   *   number as `storageQuotaMb`: both answer "how much bulk may one party keep here", and an
+   *   operator who has already decided that number should not have to decide it twice.
+   * `wsRowsMaxRowKb` — the biggest single row. A row is a row: the 1024 kB memory value ceiling is
+   *   for a record a person opens, and anything approaching it here is a document that wants a
+   *   different home.
+   */
+  wsRowsMaxPerWorkspace: number;
+  wsRowsQuotaMb: number;
+  wsRowsMaxRowKb: number;
   storageQuotaMb: number;
   storageMaxFileSizeMb: number;
   storageMaxChunkedFileSizeGb: number;

@@ -41,6 +41,15 @@
  *     absent objectives stay valid, but the defined subschema enforces the kind/op enums when present.
  *     Seed version bumped 3→4 so the stored system schema upgrades in place. Design:
  *     docs/internal/2026-06-23-organism-measurability-design.md.
+ *   v1.6.0 -- 2026-08-26 -- backing gains 'rows': a space whose instances live in a real table
+ *     rather than as workspace memory keys, for what a GROUP accumulates. It exists because an
+ *     `organism.*` memory key counts against the MEMBER who wrote it, so a shared workspace's rows
+ *     eat one person's 1000-key / 10 MB budget; a versioned record multiplies that by 20; and the
+ *     workspace index materialises every value and truncates at 5000 rows with no signal. Two
+ *     row-only fields come with it: `indexOn` (up to three fields promoted to indexed columns —
+ *     without them a row space would be unqueryable, which is v1.2.0's lesson one enum over) and
+ *     `retention` (maxRows and maxDays, where age counts from when the row LANDED). Seed version
+ *     bumped 4→5 so the stored system schema upgrades in place.
  */
 import type { Storage } from '../storage/interface.js';
 
@@ -62,7 +71,7 @@ export const MANIFEST_WS_SCHEMA_KEY = 'organism.*.w.*.meta.manifest';
  */
 /** Bump when the seeded schema changes in a way existing nodes must pick up (e.g. the backing
  *  enum). seedManifestSchema() upgrades any system-seeded record carrying an older version. */
-export const MANIFEST_SEED_VERSION = 4;
+export const MANIFEST_SEED_VERSION = 5;
 
 export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
   // Standard JSON Schema annotation (safe under ajv strict mode) doubling as the seed-version
@@ -100,9 +109,24 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           schemaRef: { type: 'string' },
           namespace: { type: 'string' },
           cardinality: { enum: ['one', 'many'] },
-          backing: { enum: ['memory', 'tasks'] },  // spaces are memory-backed; 'tasks' = pointer to the task system. Files/knowledge attach via Sources or document images — never as a backed space.
+          backing: { enum: ['memory', 'tasks', 'rows'] },  // 'memory' = records/documents as workspace memory keys (default); 'tasks' = pointer to the task system; 'rows' = many rows in a table, for what a group accumulates. Files/knowledge attach via Sources or document images — never as a backed space.
           writeRole: { enum: ['owner', 'admin', 'member'] },
           mode: { enum: ['records', 'document'] },  // 'records' (schema-locked form, default) | 'document' (free-form markdown pages)
+          // Row spaces only. Up to three fields of the row promoted to real, indexed columns, which
+          // is what makes a row space filterable and orderable at all: a value left inside the JSON
+          // body cannot be ordered by in SQL. Naming a fourth is a refusal, not a silent drop —
+          // three is the budget, and a space that needs more is asking for a different shape.
+          indexOn: { type: 'array', items: { type: 'string' }, maxItems: 3 },
+          // Row spaces only. Both optional and independent: maxRows caps the size, maxDays caps the
+          // age. Age counts from when the row LANDED here, never from when the event happened, so a
+          // five-year-old message ingested today is not swept on arrival.
+          retention: {
+            type: 'object',
+            properties: {
+              maxRows: { type: 'number' },
+              maxDays: { type: 'number' },
+            },
+          },
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
           maxVersions: { type: 'number' },  // per-space history retention window (overrides AIMEAT_WS_MAX_VERSIONS; 0 = keep all; create_only spaces never pruned)

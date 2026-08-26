@@ -359,6 +359,7 @@ const ALL_SUITES = [
     'test/e2e-workspace-publish-guard.ts',
     'test/e2e-workspace-retention.ts',
     'test/e2e-workspace-backing-gate.ts',
+    'test/e2e-workspace-rows.ts',
     'test/e2e-workspace-public-sharing.ts',
     'test/e2e-workspace-public-records.ts',
     'test/e2e-workspace-member-records.ts',
