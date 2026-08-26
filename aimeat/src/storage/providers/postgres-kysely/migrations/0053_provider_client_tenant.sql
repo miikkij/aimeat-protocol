@@ -1,0 +1,23 @@
+-- 0053_provider_client_tenant.sql
+--
+-- Which DIRECTORY a principal's own Microsoft app is registered in.
+--
+-- WHY IT BELONGS TO THE CLIENT AND NOT TO THE CONNECTION. It is a property of the app registration,
+-- not of the account that authorised through it: every connection minted by one app uses the same
+-- tenant, and the same person's Google connections have none at all. Putting it on the connection
+-- would copy one fact onto every row that shares it and let two of those rows disagree.
+--
+-- WHY IT IS NOT THE EXISTING `instance` COLUMN, which is also null on a principal's row and would
+-- have fitted. An instance is a different SERVER — a Mastodon host, reached over the network,
+-- validated as an origin because it arrives from a user and is therefore an SSRF vector. A tenant is
+-- a different directory on the SAME server. Overloading one column with two meanings would put a
+-- bare word like 'common' through an origin validator, and the first person to read the code would
+-- have to work out which of the two a given row meant.
+--
+-- WHY IT IS NEEDED AT ALL. The Entra portal's default for a new app registration is "Accounts in
+-- this organizational directory only". A customer who follows the defaults therefore has a
+-- single-tenant app whose authorize and token URLs carry that directory's GUID, not 'common'. Send
+-- them to 'common' and Microsoft refuses with a message about the application, naming nothing they
+-- can act on — which is the shape of failure this whole subsystem is written against.
+
+ALTER TABLE "ProviderClient" ADD COLUMN IF NOT EXISTS "tenant" TEXT;

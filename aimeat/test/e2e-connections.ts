@@ -1048,6 +1048,52 @@ async function main(): Promise<void> {
       assert(r.status === 404 && r.data.error.code === 'UNKNOWN_PROVIDER', `${r.status} ${r.data?.error?.code}`);
     });
 
+    // A tenant is Microsoft's alone, and it goes into a URL PATH. It is refused here rather than
+    // corrected: a wrong tenant fails at Microsoft with a message about the application that names
+    // nothing the person can act on, so silently substituting a working one would only move the
+    // confusion somewhere they cannot see it.
+    await test('a malformed tenant is refused with a sentence naming where to find the right one', async () => {
+      for (const bad of ['../../evil.com', 'a/b', 'https://login.microsoftonline.com', 'x'.repeat(100)]) {
+        const r = await api('/v1/connections/clients', {
+          method: 'PUT', bearer: jwtB,
+          body: { provider: 'fake', client_id: 'x', client_secret: 'y', tenant: bad },
+        });
+        assert(r.status === 400 && r.data.error.code === 'INVALID_TENANT',
+          `tenant "${bad.slice(0, 20)}" was accepted: ${r.status} ${r.data?.error?.code}`);
+        assert(/Directory \(tenant\) ID/.test(r.data.error.message),
+          `the refusal must say where to find it: ${r.data.error.message}`);
+      }
+    });
+
+    await test('a well-formed tenant is stored, and an omitted one stays empty', async () => {
+      const guid = '72f988bf-86f1-41af-91ab-2d7cd011db47';
+      const withTenant = await api('/v1/connections/clients', {
+        method: 'PUT', bearer: jwtB,
+        body: { provider: 'fake', client_id: 'b-app', client_secret: 'b-secret', tenant: guid },
+      });
+      assert(withTenant.status === 200, `put with tenant: ${withTenant.status} ${withTenant.data?.error?.message}`);
+
+      // Re-registering WITHOUT one clears it rather than keeping the old value: an app that moved to
+      // another directory would otherwise keep pointing at the one it left, and the sign-in would
+      // fail somewhere else entirely.
+      assert(withTenant.data.data.client.tenant === guid,
+        `the tenant must be readable back, got ${String(withTenant.data.data.client.tenant)}`);
+      const listed = await api('/v1/connections/clients', { method: 'GET', bearer: jwtB });
+      assert((listed.data.data.clients as any[])[0].tenant === guid,
+        'the tenant must be on the listing too, not only on the write response');
+
+      // Re-registering WITHOUT one clears it rather than keeping the old value: an app that moved to
+      // another directory would otherwise keep pointing at the one it left, and the sign-in would
+      // fail somewhere else entirely.
+      const withoutTenant = await api('/v1/connections/clients', {
+        method: 'PUT', bearer: jwtB,
+        body: { provider: 'fake', client_id: 'b-app', client_secret: 'b-secret' },
+      });
+      assert(withoutTenant.status === 200, `put without tenant: ${withoutTenant.status}`);
+      assert(withoutTenant.data.data.client.tenant === null,
+        `re-registering without a tenant must clear it, got ${String(withoutTenant.data.data.client.tenant)}`);
+    });
+
     console.log('\nPhase 13 — What a granted app may and may not do');
 
     await test('an app holding only connections:use can NAME a connection but not create one', async () => {

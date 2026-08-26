@@ -296,6 +296,28 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Quotas (mutable, additional) ──
   { key: 'memoryMaxValueSizeKb', dotPath: 'quota.memory_max_value_size_kb', envVar: 'AIMEAT_MEMORY_MAX_VALUE_SIZE_KB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory value size in KB', range: '1-10240' },
   { key: 'memoryMaxKeysPerAgent', dotPath: 'quota.memory_max_keys_per_agent', envVar: 'AIMEAT_MEMORY_MAX_KEYS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max memory keys per agent', range: '1-100000' },
+  // ── Outbound connections (aimeat-connect) ──
+  // The applications this node registers AS, so a person can connect their own account elsewhere.
+  // Deliberately NOT the sign-in credentials: signing in here and acting in somebody's mailbox
+  // there are different consent. The client ids are not secrets and show as themselves; the secrets
+  // show only as configured-or-not, and are immutable so a running node cannot have one swapped
+  // under connections that were minted with it.
+  { key: 'connectionsEnabled', dotPath: 'connections.enabled', envVar: 'AIMEAT_CONNECTIONS_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Outbound connections master switch: off offers nothing, whoever brought what' },
+  { key: 'connectGoogleClientId', dotPath: 'connections.google_client_id', envVar: 'AIMEAT_CONNECT_GOOGLE_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'Google app for YouTube and both halves of Gmail (NOT the sign-in client)' },
+  { key: 'connectGoogleClientSecret', dotPath: 'connections.google_client_secret', envVar: 'AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'Google app secret (secret)', adminDisplay: 'configured' },
+  { key: 'connectMicrosoftClientId', dotPath: 'connections.microsoft_client_id', envVar: 'AIMEAT_CONNECT_MICROSOFT_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'Microsoft (Entra) app for reading and sending Outlook mail (NOT the sign-in app)' },
+  { key: 'connectMicrosoftClientSecret', dotPath: 'connections.microsoft_client_secret', envVar: 'AIMEAT_CONNECT_MICROSOFT_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'Microsoft app secret (secret)', adminDisplay: 'configured' },
+  // Goes into the authorize and token URL PATHS, so a wrong value fails at Microsoft rather than
+  // here. Validated to the same shape the route accepts from a user.
+  { key: 'connectMicrosoftTenant', dotPath: 'connections.microsoft_tenant', envVar: 'AIMEAT_CONNECT_MICROSOFT_TENANT', type: 'string', validate: v => typeof v === 'string' && /^[A-Za-z0-9-]{1,64}$/.test(v), immutable: false, description: 'Entra directory: common | organizations | consumers | a directory id' },
+  { key: 'connectLinkedinClientId', dotPath: 'connections.linkedin_client_id', envVar: 'AIMEAT_CONNECT_LINKEDIN_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'LinkedIn app client id' },
+  { key: 'connectLinkedinClientSecret', dotPath: 'connections.linkedin_client_secret', envVar: 'AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'LinkedIn app secret (secret)', adminDisplay: 'configured' },
+  { key: 'connectXClientId', dotPath: 'connections.x_client_id', envVar: 'AIMEAT_CONNECT_X_CLIENT_ID', type: 'string', validate: () => true, immutable: false, description: 'X app client id (pay-per-use: every post is a charge)' },
+  { key: 'connectXClientSecret', dotPath: 'connections.x_client_secret', envVar: 'AIMEAT_CONNECT_X_CLIENT_SECRET', type: 'string', validate: () => true, immutable: true, description: 'X app secret (secret)', adminDisplay: 'configured' },
+  // Must match every provider registration byte for byte. A mismatch surfaces only at the
+  // provider's own consent screen, as redirect_uri_mismatch, so it is worth being able to read.
+  { key: 'connectRedirectUri', dotPath: 'connections.redirect_uri', envVar: 'AIMEAT_CONNECT_REDIRECT_URI', type: 'string', validate: () => true, immutable: false, description: 'OAuth callback URL; empty derives it from baseUrl' },
+
   // Workspace row spaces. Charged to the workspace and the organism, never to the member who wrote
   // the row — that asymmetry is the reason the row store exists at all, so it is visible here
   // beside the memory ceilings rather than buried in an env var nobody reads.

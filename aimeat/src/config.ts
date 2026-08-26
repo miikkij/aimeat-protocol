@@ -518,6 +518,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     connectionsEnabled: process.env.AIMEAT_CONNECTIONS_ENABLED === 'true',
     connectGoogleClientId: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_ID ?? '',
     connectGoogleClientSecret: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET ?? '',
+    connectMicrosoftClientId: process.env.AIMEAT_CONNECT_MICROSOFT_CLIENT_ID ?? '',
+    connectMicrosoftClientSecret: process.env.AIMEAT_CONNECT_MICROSOFT_CLIENT_SECRET ?? '',
+    // 'common' admits work, school and personal accounts; 'organizations' only work and school. A
+    // GUID pins one directory. This is the tenant the NODE's own app is registered in; a principal
+    // who brings their own single-tenant app supplies its tenant with the client credentials.
+    connectMicrosoftTenant: process.env.AIMEAT_CONNECT_MICROSOFT_TENANT ?? 'common',
     connectLinkedinClientId: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_ID ?? '',
     connectLinkedinClientSecret: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET ?? '',
     connectXClientId: process.env.AIMEAT_CONNECT_X_CLIENT_ID ?? '',

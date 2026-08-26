@@ -23,6 +23,16 @@
  *   - findProvider(list, id) / listProviderMeta(list) — lookup + the safe public projection
  * @usage const providers = buildOutboundProviders(config);
  * @version-history
+ *   v1.4.0 — 2026-08-26 — Mail grows from one provider to four, in READ/SEND pairs: `google-mail-send`
+ *     joins `google-mail`, and Microsoft arrives as `microsoft-mail` + `microsoft-mail-send`. The
+ *     pairing is the rule v1.3.0 wrote down and this is its first application — a permission that is
+ *     never requested cannot be misused or need explaining. Microsoft brings a THIRD axis to
+ *     `endpoints()`: a tenant, which is a different directory on the same server, where an instance
+ *     is a different server. It also inverts YouTube's trap — `offline_access` is a scope there, not
+ *     the `access_type=offline` parameter `offlineAccess: true` emits — so its providers set that
+ *     field false WITH the scope in the list. Gmail's read side gains a `sendAs` resource: the
+ *     verified addresses a mailbox may send as, which is the alias people mean by "just press a
+ *     button", and it needs no scope beyond the `gmail.readonly` already asked for.
  *   v1.3.0 — 2026-08-17 — A provider may declare `resources`: things that can be READ from a
  *     connected account, by name, with the node building every URL. Gmail is the first, read-only,
  *     because mail is the connector everybody already has and nothing of theirs can see it.
@@ -36,9 +46,17 @@
 
 import type { AimeatConfig } from '../../config.js';
 import type { CredentialShape } from '../../models/connection-schemas.js';
+import { googleMail, googleMailSend, microsoftMail, microsoftMailSend } from './providers-mail.js';
 
 /** Stable provider identifiers. Also the value stored in `Connection.provider`. */
-export type OutboundProviderId = 'mastodon' | 'youtube' | 'linkedin' | 'x' | 'bluesky' | 'google-mail' | 'fake' | 'fake-static';
+export type OutboundProviderId =
+  | 'mastodon' | 'youtube' | 'linkedin' | 'x' | 'bluesky'
+  // Mail comes in READ/SEND pairs rather than as one provider with both scopes. Reading somebody's
+  // mail and writing in their name are different consent, and a permission that is never requested
+  // cannot be misused, leaked, or need explaining to a person who only wanted one of the two.
+  | 'google-mail' | 'google-mail-send'
+  | 'microsoft-mail' | 'microsoft-mail-send'
+  | 'fake' | 'fake-static';
 
 /**
  * What a user must supply for a provider that has NO authorization round.
@@ -171,8 +189,16 @@ export interface OutboundProvider {
    * is how a "Connect" button appears that cannot work.
    */
   attachFields: AttachField[] | null;
-  /** Endpoints. `instance` is required exactly when `instanceScoped` is true. */
-  endpoints(instance: string | null): OAuthEndpoints | null;
+  /**
+   * Endpoints. `instance` is required exactly when `instanceScoped` is true.
+   *
+   * `tenant` is Microsoft's alone and is a SECOND axis, not a rename of the first: an instance is a
+   * different SERVER (Mastodon), while a tenant is a different directory on the same one. It arrives
+   * from the client credentials rather than from the connection, because it is a property of the app
+   * registration: a principal who brings a single-tenant Entra app brings its tenant with it, and
+   * the node's own app uses the configured one. Every other provider ignores it.
+   */
+  endpoints(instance: string | null, tenant?: string | null): OAuthEndpoints | null;
 }
 
 /** What discovery may show. Deliberately free of anything an app could not act on. */
@@ -593,118 +619,9 @@ export function tokenRequest(
  * answer "why can I not connect YouTube" with the reason instead of a bare absence — an operator
  * staring at an empty list has nothing to act on.
  */
-/**
- * Gmail, read-only.
- *
- * THE FIRST CONNECTION THAT EXISTS TO BE READ RATHER THAN WRITTEN TO, and the reason the read
- * direction was built at all: mail is the connector everybody already has. A person forwards
- * themselves an invoice, a booking, a meter reading, and it sits in a mailbox no tool of theirs can
- * see.
- *
- * `gmail.readonly` and NOTHING else. Google offers scopes that send, delete and modify, and none of
- * them are asked for: a permission that is never requested cannot be misused, cannot be leaked and
- * does not have to be explained to the person on the consent screen. If sending ever becomes a
- * feature it becomes a SECOND provider entry with its own consent, not a wider scope on this one.
- *
- * Shares the Google client with YouTube, because they are one registered application at Google. The
- * scopes are what differ, and the consent screen names them.
- */
-function googleMail(clientId: string, clientSecret: string, capabilityOn: boolean): OutboundProvider {
-  const configured = Boolean(clientId && clientSecret);
-  const enabled = capabilityOn && configured;
-  const READ = 'https://www.googleapis.com/auth/gmail.readonly';
-  const API = 'https://gmail.googleapis.com/gmail/v1/users/me';
-
-  return {
-    id: 'google-mail',
-    label: 'Gmail',
-    credentialShape: 'oauth2',
-    instanceScoped: false,
-    enabled,
-    capabilityOn,
-    disabledReason: enabled
-      ? null
-      : !capabilityOn
-        ? 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)'
-        : 'no client credentials (AIMEAT_CONNECT_GOOGLE_CLIENT_ID / _SECRET)',
-    client: configured ? { id: clientId, secret: clientSecret } : null,
-    scopes: [READ],
-    pkce: true,
-    tokenAuth: 'body',
-    offlineAccess: true,
-    // Reading is all it does. It carries no publish capability, so no surface offers it a post box.
-    capabilities: ['read-mail'],
-    sharedDailyLimit: null,
-    attachFields: null,
-    resources: {
-      messages: {
-        label: 'the list of messages',
-        requiresScopes: [READ],
-        url(params) {
-          const limit = clampLimit(params.limit, 25, 100);
-          const q = typeof params.query === 'string' ? params.query.slice(0, 500) : '';
-          const page = typeof params.page_token === 'string' ? params.page_token.slice(0, 200) : '';
-          const u = new URL(`${API}/messages`);
-          u.searchParams.set('maxResults', String(limit));
-          if (q) u.searchParams.set('q', q);
-          if (page) u.searchParams.set('pageToken', page);
-          return u.toString();
-        },
-      },
-      message: {
-        label: 'one message',
-        requiresScopes: [READ],
-        url(params) {
-          const id = typeof params.id === 'string' ? params.id.trim() : '';
-          // The id goes into the PATH, so it is checked rather than trusted: Gmail ids are
-          // hexadecimal, and anything else here is either a mistake or an attempt to walk the URL
-          // somewhere this node never meant to send a token.
-          if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
-            throw new Error('Name which message to open. The id comes from the message list.');
-          }
-          const u = new URL(`${API}/messages/${id}`);
-          u.searchParams.set('format', params.format === 'raw' ? 'raw' : 'full');
-          return u.toString();
-        },
-      },
-      attachment: {
-        label: 'a file attached to a message',
-        requiresScopes: [READ],
-        url(params) {
-          // Gmail hands back attachments by REFERENCE rather than inline, so a message with a
-          // 3 MB invoice on it is still a small answer and the bytes are fetched only when
-          // somebody wants them. Both ids go into the path, so both are checked.
-          const message = typeof params.message_id === 'string' ? params.message_id.trim() : '';
-          const attachment = typeof params.attachment_id === 'string' ? params.attachment_id.trim() : '';
-          if (!/^[A-Za-z0-9_-]{1,128}$/.test(message)) {
-            throw new Error('Name which message the attachment is on. The id comes from the message list.');
-          }
-          if (!/^[A-Za-z0-9_-]{1,512}$/.test(attachment)) {
-            throw new Error('Name which attachment. The id is on the message, under its parts.');
-          }
-          return `${API}/messages/${message}/attachments/${attachment}`;
-        },
-      },
-      profile: {
-        label: 'which mailbox this is',
-        requiresScopes: [READ],
-        url() { return `${API}/profile`; },
-      },
-    },
-    endpoints: () => ({
-      authorize: 'https://accounts.google.com/o/oauth2/v2/auth',
-      token: 'https://oauth2.googleapis.com/token',
-      revoke: 'https://oauth2.googleapis.com/revoke',
-    }),
-  };
-}
-
-/** A caller-supplied count, made safe without an error: a silly number is a small number. */
-function clampLimit(value: unknown, fallback: number, max: number): number {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 1) return fallback;
-  return Math.min(Math.floor(n), max);
-}
+// The four MAIL providers live in ./providers-mail.ts — a pure extraction at the
+// max-file-lines boundary. They are a coherent group: two read/send pairs, one shared tenant
+// helper, and the only providers here that exist to be READ rather than published to.
 
 export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[] {
   const on = config.connectionsEnabled;
@@ -714,6 +631,9 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
     linkedin(config.connectLinkedinClientId, config.connectLinkedinClientSecret, on),
     x(config.connectXClientId, config.connectXClientSecret, on),
     googleMail(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
+    googleMailSend(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
+    microsoftMail(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on),
+    microsoftMailSend(config.connectMicrosoftClientId, config.connectMicrosoftClientSecret, config.connectMicrosoftTenant, on),
     bluesky(on),
   ];
   // Appended only when configured, so a production node's list is exactly the three above.

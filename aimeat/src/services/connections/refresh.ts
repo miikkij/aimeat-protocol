@@ -132,7 +132,7 @@ async function clientThatIssued(
   ctx: ConnectContext,
   provider: OutboundProvider,
   conn: ConnectionRecord,
-): Promise<{ clientId: string; clientSecret: string } | { error: string }> {
+): Promise<{ clientId: string; clientSecret: string; tenant: string | null } | { error: string }> {
   if (conn.providerClientId) {
     const own = await ctx.storage.getProviderClientById(conn.providerClientId);
     if (!own) {
@@ -140,7 +140,10 @@ async function clientThatIssued(
     }
     const secret = openCredential(own.clientSecret, ctx.key);
     if (!secret) return { error: 'the app credentials this connection was made with cannot be read' };
-    return { clientId: own.clientId, clientSecret: secret.accessToken };
+    // The tenant comes from the SAME row as the credentials, for the same reason the credentials do:
+    // a renewal against a different directory than the one that issued the token is an invalid_grant
+    // nobody can read, hours later, indistinguishable from a revoked account.
+    return { clientId: own.clientId, clientSecret: secret.accessToken, tenant: own.tenant ?? null };
   }
   if (provider.instanceScoped) {
     const pc = conn.instance
@@ -149,10 +152,10 @@ async function clientThatIssued(
     if (!pc) return { error: 'no client registration for this instance' };
     const secret = openCredential(pc.clientSecret, ctx.key);
     if (!secret) return { error: 'the stored registration for this instance cannot be read' };
-    return { clientId: pc.clientId, clientSecret: secret.accessToken };
+    return { clientId: pc.clientId, clientSecret: secret.accessToken, tenant: null };
   }
   if (!provider.client) return { error: 'no client credentials for this provider' };
-  return { clientId: provider.client.id, clientSecret: provider.client.secret };
+  return { clientId: provider.client.id, clientSecret: provider.client.secret, tenant: null };
 }
 
 async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Promise<FreshResult> {
@@ -178,13 +181,16 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
     return { ok: false, code: 'NEEDS_REAUTH', reason: 'this account needs to be reconnected' };
   }
 
-  const endpoints = provider.endpoints(conn.instance);
+  // The client comes FIRST now, because the token endpoint depends on it: a Microsoft app registered
+  // in one directory has its own authorize and token URLs, and building them before knowing which
+  // app issued the token would renew against the wrong directory.
+  const client = await clientThatIssued(ctx, provider, conn);
+  if ('error' in client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: client.error };
+
+  const endpoints = provider.endpoints(conn.instance, client.tenant);
   if (!endpoints) {
     return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this node' };
   }
-
-  const client = await clientThatIssued(ctx, provider, conn);
-  if ('error' in client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: client.error };
 
   // Same builder as the first exchange. A refresh that authenticated differently from the exchange
   // is a connection that links successfully and then cannot renew -- visible only hours later.

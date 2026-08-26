@@ -7,6 +7,11 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.5.0 — 2026-08-26 — ConnectionsConfig mixed in (config-types-connections.ts): the OUTBOUND
+ *     connect credentials moved verbatim when the Microsoft mail registration took this file over
+ *     the 800-line ceiling again. It sits beside SocialLoginConfig on purpose and is not the same
+ *     thing: those decide who may sign IN here, these decide which application this node presents
+ *     when a person connects their own account THERE.
  *   v1.4.0 — 2026-08-22 — proactiveGuidanceEnabled (services/proactive-mode.ts).
  *   v1.3.0 — 2026-08-21 — SocialLoginConfig mixed in (config-types-social-login.ts): the Google,
  *     Casdoor and Entra sign-in blocks moved verbatim when the Entra tenant allowlist took this
@@ -184,9 +189,10 @@ export interface SiteLinksConfig {
 import type { AiCapabilityConfig } from './config-types-ai.js';
 import type { SitePresenceConfig } from './config-site-presence.js';
 import type { SocialLoginConfig } from './config-types-social-login.js';
+import type { ConnectionsConfig } from './config-types-connections.js';
 import type { EnterpriseSsoConfig } from './config-types-enterprise-sso.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, EnterpriseSsoConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, EnterpriseSsoConfig {
   port: number;
   baseUrl: string;
   /**
@@ -585,28 +591,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
 
   // Social login (Google, Casdoor, Entra ID) → SocialLoginConfig in config-types-social-login.ts
 
-  // ── OUTBOUND connections (TARGET-057, aimeat-connect) ──
-  // The other direction entirely from the sign-in blocks above, and deliberately its own client:
-  // signing IN with Google and PUBLISHING to a Google account are different consent and must be
-  // separately revocable. Off by default — the safe PUBLIC value — and switched on per node.
-  connectionsEnabled: boolean;
-  // Fixed-endpoint provider credentials. Identify the APPLICATION, one per node, the same for every
-  // user. The USER's tokens never come near config: they live encrypted in Connection.credential.
-  // An instance-scoped provider (Mastodon) has nothing here at all — its client credentials are
-  // per instance and acquired at runtime (storage ProviderClient).
-  connectGoogleClientId: string;
-  connectGoogleClientSecret: string;
-  /** LinkedIn app client id. Consumer tier, self-serve: no product review to wait on. */
-  connectLinkedinClientId: string;
-  connectLinkedinClientSecret: string;
-  /** X app client id. Pay-per-use: every post is a charge, capped by a spend limit set at X. */
-  connectXClientId: string;
-  connectXClientSecret: string;
-  connectRedirectUri: string;        // empty = derive from baseUrl
-  // TEST ONLY, empty everywhere else. Base URL of a local stand-in provider, so the E2E can drive
-  // the REAL authorization round -- state, PKCE, exchange, identity, rotating refresh, revoke --
-  // against a server it controls. Mocking the service layer instead would test the mock.
-  connectFakeBaseUrl: string;
+  // OUTBOUND connections (the applications this node registers AS, so a person can connect
+  // their own account elsewhere) → ConnectionsConfig in config-types-connections.ts
 
   // Cross-Federation (Phase 3.4)
   crossFederationEnabled: boolean;

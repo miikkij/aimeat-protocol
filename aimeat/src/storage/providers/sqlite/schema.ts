@@ -560,6 +560,10 @@ export function initializeSchema(db: Database.Database): void {
   } else {
     safeAddColumn('provider_clients', 'principal', 'TEXT');
   }
+  // Which directory a principal's own Microsoft app lives in. Added in BOTH branches: the rebuild
+  // above only runs on a database old enough to still have instance NOT NULL, so a database that
+  // already went through it would otherwise never get this column. Mirrors Postgres 0053.
+  safeAddColumn('provider_clients', 'tenant', 'TEXT');
 
   // Indexes AFTER the columns exist, in both branches. A partial index on (provider, instance) so
   // that principal rows -- which carry no instance -- do not collapse into one row per provider,

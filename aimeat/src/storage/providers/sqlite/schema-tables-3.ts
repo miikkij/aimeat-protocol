@@ -695,6 +695,12 @@ export function applySchemaTables3(db: Database.Database): void {
       principal    TEXT,
       clientId     TEXT NOT NULL,
       clientSecret TEXT NOT NULL,
+      -- Microsoft only, and only on a principal's own row: WHICH DIRECTORY the app is registered in.
+      -- A property of the app registration rather than of the connection, and deliberately not the
+      -- instance column above: an instance is a different SERVER (validated as an origin because
+      -- it arrives from a user), a tenant is a different directory on the same one. Mirrors
+      -- Postgres 0053.
+      tenant       TEXT,
       registeredAt TEXT NOT NULL
     );
     -- idx_provider_clients_key and idx_provider_clients_principal are created in schema.ts, AFTER
