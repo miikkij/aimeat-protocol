@@ -6,6 +6,8 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.22.0 -- 2026-08-26 -- The board mini-card's ID plate opens below the card instead of over
+ *     it; covering the card hid what the pointer was about to click.
  *   v1.21.0 -- 2026-08-13 -- The card-footer host link truncates instead of wrapping: a hostname is
  *     one unbreakable token, and wrapping it took the footer row from 31px to 54px at 390px.
  *   v1.20.0 -- 2026-07-17 -- Generalize the card scheme: .pf-agd-card (standalone or
@@ -1398,16 +1400,17 @@
   box-shadow: 0 0 0 2px var(--agd-state, var(--accent, #E8564A));
 }
 
-/* ── Agent ID card (hover/focus-revealed identity plate over a board mini-card) ──
+/* ── Agent ID card (hover/focus-revealed identity plate under a board mini-card) ──
    The default face (name + one figure) is untouched; the ID card is absolutely
-   positioned over the card so revealing it causes NO layout shift in the grid.
-   It lifts slightly larger than the card (negative insets) with a shadow so it
-   reads as the card "flipping" to its identity face. */
+   positioned so revealing it causes NO layout shift in the grid. It hangs BELOW
+   the mini-card rather than over it: covering the card hid the very thing the
+   pointer was about to click. The 1px overlap keeps the card and the plate one
+   continuous hover target, so there is no gap where :hover drops. */
 .pf .pf-agd-idcard {
   position: absolute;
-  top: -3px;
-  left: -3px;
-  right: -3px;
+  top: calc(100% - 1px);
+  left: -3px;  /* the card's 3px state stripe: the plate's outer edges line up with the card's */
+  right: -1px;
   z-index: 30;
   display: flex;
   flex-direction: column;
