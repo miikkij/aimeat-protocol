@@ -64,7 +64,7 @@ export interface EmailService {
   sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean>;
   sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
   /** Attachment-carrying send (outbound door / invoice PDFs). Envelope from stays the node's; fromName + replyTo carry the business identity. */
-  sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string }): Promise<boolean>;
+  sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string; headers?: Record<string, string> }): Promise<boolean>;
 }
 
 /**
@@ -209,7 +209,7 @@ export function createEmailService(config: AimeatConfig): EmailService {
       return send(to, subject, rawHtml, rawText, 'group_send');
     },
 
-    async sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string }): Promise<boolean> {
+    async sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string; headers?: Record<string, string> }): Promise<boolean> {
       try {
         // Display name is quoted-escaped; the address itself is always the node's configured from.
         const fromHeader = opts?.fromName ? `"${opts.fromName.replaceAll('"', "'")}" <${from}>` : from;

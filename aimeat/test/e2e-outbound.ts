@@ -425,6 +425,50 @@ await test('15e. the send log records WHO pressed send, and can be filtered by i
     'filtering by a principal who sent nothing must return nothing');
 });
 
+await test('15f. the AI mark is optional, and a word outside the vocabulary is refused', async () => {
+  const created = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ name: 'Disclosure', email: `disc-${Date.now()}@example.com` }),
+  });
+  const cid = created.body.data.contact.id as string;
+
+  // Declaring nothing is the ordinary case and must not be refused: the law does not oblige a mark
+  // on a message to one customer, so a node that demanded one would be inventing an obligation.
+  const plain = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject: 'plain', body: 'y' }),
+  });
+  assert(plain.status === 200, `undeclared send: ${plain.status} ${JSON.stringify(plain.body?.error)}`);
+
+  const declared = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({
+      contact_id: cid, kind: 'transactional', subject: 'declared', body: 'y',
+      ai_disclosure: 'ai-generated',
+    }),
+  });
+  assert(declared.status === 200, `declared send: ${declared.status} ${JSON.stringify(declared.body?.error)}`);
+
+  const withRecord = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({
+      contact_id: cid, kind: 'transactional', subject: 'declared with record', body: 'y',
+      ai_disclosure: { level: 'ai-assisted', provenance_id: 'prov-1' },
+    }),
+  });
+  assert(withRecord.status === 200, `declared with record: ${withRecord.status} ${JSON.stringify(withRecord.body?.error)}`);
+
+  // A near-miss is refused rather than coerced to the nearest word: quietly turning 'ai' into
+  // 'ai-generated' would make the field mean whatever the caller happened to type.
+  for (const bad of ['ai', 'generated', 'AI-GENERATED']) {
+    const r = await json('/v1/outbound/send', {
+      method: 'POST', headers: authed(B.token),
+      body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject: 'x', body: 'y', ai_disclosure: bad }),
+    });
+    assert(r.status === 400, `"${bad}" was accepted: ${r.status}`);
+  }
+});
+
 await test('16. the public unsubscribe answers identically for unknown tokens (no enumeration)', async () => {
   const res = await fetch(`${BASE}/v1/outbound/unsubscribe?token=definitely-not-a-token`);
   assert(res.status === 200, `expected 200, got ${res.status}`);
