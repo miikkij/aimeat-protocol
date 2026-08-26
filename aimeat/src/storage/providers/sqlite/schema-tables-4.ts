@@ -184,6 +184,11 @@ export function applySchemaTables4(db: Database.Database): void {
       -- A NEW database gets the column here; an EXISTING one gets it from safeAddColumn in
       -- schema.ts, and both are needed or one of the two roads boots without it.
       organismId TEXT,
+      -- WHO pressed send, as an exact principal. ownerGhii above is the BOOK (the company's owner
+      -- once a company is named) and is shared by everyone sending for it, so without this a team
+      -- of three produced a log in which every row looked identical. Same new/existing pair as
+      -- organismId. Mirrors Postgres 0054.
+      sentBy     TEXT,
       contactId  TEXT NOT NULL,
       channel    TEXT NOT NULL,
       kind       TEXT NOT NULL,

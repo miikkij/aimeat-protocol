@@ -48,6 +48,7 @@ function toMessage(r: Row): OutboundMessageRecord {
     id: r.id as string,
     ownerGhii: r.ownerGhii as string,
     organismId: (r.organismId as string | null) ?? null,
+    sentBy: (r.sentBy as string | null) ?? null,
     contactId: r.contactId as string,
     channel: r.channel as OutboundChannel,
     kind: r.kind as OutboundKind,
@@ -78,6 +79,7 @@ function logWhere(query: OutboundLogQuery): { sql: string; params: unknown[] } {
   if (query.contactId) { clauses.push('contactId = ?'); params.push(query.contactId); }
   if (query.kind) { clauses.push('kind = ?'); params.push(query.kind); }
   if (query.status) { clauses.push('status = ?'); params.push(query.status); }
+  if (query.sentBy) { clauses.push('sentBy = ?'); params.push(query.sentBy); }
   return { sql: clauses.join(' AND '), params };
 }
 
@@ -158,10 +160,10 @@ export const outboundMethods: OutboundRepository & ThisType<SqliteStorage> = {
 
   async createOutboundMessage(this: SqliteStorage, row: OutboundMessageRecord): Promise<void> {
     this.db.prepare(`
-      INSERT INTO outbound_messages (id, ownerGhii, organismId, contactId, channel, kind, subject, templateId, status, error, invoiceId, createdAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      INSERT INTO outbound_messages (id, ownerGhii, organismId, sentBy, contactId, channel, kind, subject, templateId, status, error, invoiceId, createdAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
     `).run(
-      row.id, row.ownerGhii, row.organismId ?? null, row.contactId, row.channel, row.kind, row.subject,
+      row.id, row.ownerGhii, row.organismId ?? null, row.sentBy ?? null, row.contactId, row.channel, row.kind, row.subject,
       row.templateId, row.status, row.error, row.invoiceId, row.createdAt,
     );
   },

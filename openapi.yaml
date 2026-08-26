@@ -48454,6 +48454,8 @@ paths:
                 reply_to: { type: string, format: email }
                 from_name: { type: string, maxLength: 140 }
                 company_id: { type: string, maxLength: 80, description: 'Send AS this registered company: with its own SMTP identity the mail leaves through ITS server, from ITS domain, and the send log records which company spoke.' }
+                connection_id: { type: string, maxLength: 80, description: 'Send THROUGH the caller''s own connected mailbox, so the message really leaves their Gmail or Outlook, arrives from their own address with their own domain''s SPF and DKIM, and lands in their own Sent Items. It wins over a company''s SMTP and over the node''s shared sender: a message a person sends is theirs, and it should look like it in the recipient''s inbox and in their own Sent folder. Must be the caller''s OWN connection and must carry the sending permission — both checked against the connection store, never taken from the request — and the session needs connections:use as well as outbound:send.' }
+                from_alias: { type: string, format: email, maxLength: 200, description: 'Send as this verified alias of that mailbox rather than as its own address. Checked against what the provider says the mailbox may send as, never taken on trust: an unverified From header is one the caller chose, and the whole point of sending through somebody''s own mailbox is that the address really is theirs. Gmail aliases come from the mailbox''s send-as list, which needs no permission beyond the reading one; Microsoft has no equivalent a delegated scope can read, so an alias there is refused rather than guessed at.' }
                 links:
                   type: array
                   maxItems: 10
@@ -48486,6 +48488,22 @@ paths:
         - { name: contact_id, in: query, schema: { type: string } }
         - { name: kind, in: query, schema: { type: string, enum: [transactional, marketing, invoice] } }
         - { name: status, in: query, schema: { type: string, enum: [sent, failed, suppressed, skipped] } }
+        - name: sent_by
+          in: query
+          schema: { type: string }
+          description: >
+            WHO pressed send. The log belongs to the BOOK — the company's owner once a company is
+            named — and is deliberately shared by everyone sending for it, so without this a
+            colleague reading it sees the team's whole sending with no way to find their own.
+
+
+            Pass `me` and the server resolves it to the calling principal. That is not a
+            convenience: a client composing its own principal string gets it wrong for an agent,
+            whose sends are recorded under the agent's own GAII and not its owner's. Any other value
+            filters as given, which is how an owner reads one colleague.
+
+
+            Rows sent before 2026-08-26 carry no sender and match nothing.
         - { name: page, in: query, schema: { type: integer, default: 1 } }
         - { name: per_page, in: query, schema: { type: integer, default: 50, maximum: 200 } }
       responses:

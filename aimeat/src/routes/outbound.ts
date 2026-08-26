@@ -22,6 +22,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
@@ -48,6 +49,14 @@ const SendSchema = z.object({
   from_name: z.string().max(140).optional(),
   /** Send as this company: its own SMTP identity is used when it has one. */
   company_id: z.string().max(80).optional(),
+  /**
+   * Send THROUGH the caller's own connected mailbox, so the message really leaves their Gmail or
+   * Outlook and lands in their Sent Items. Must be their OWN connection and must carry the sending
+   * permission; both are checked against the connection store, never taken from the request.
+   */
+  connection_id: z.string().max(80).optional(),
+  /** A verified alias of that mailbox to send as. Checked against the provider, never trusted. */
+  from_alias: z.string().email().max(200).optional(),
   /** Buttons, as data. The server builds the anchors; see SendInput.links for why. */
   links: z.array(z.object({
     label: z.string().max(120),
@@ -175,6 +184,25 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── Send ──────────────────────────────────────────────────────────────────
 
+  /**
+   * Does this session hold `connections:use`?
+   *
+   * It reuses `scopeIsCovered` rather than comparing strings, because scope coverage understands
+   * families and a hand-rolled `includes()` would quietly refuse a caller holding a broader word.
+   * An owner session that is not acting as an agent or an app bypasses scopes, which is the same
+   * rule every requireScope door keeps — written out here because this check is inside a handler
+   * rather than in the middleware chain, and an exception the middleware makes has to be made here
+   * too or the two doors disagree.
+   */
+  function holdsConnectionsUse(req: Request): boolean {
+    const auth = req.auth;
+    if (!auth) return false;
+    if (auth.roles.includes('owner') && !auth.roles.includes('agent') && !auth.roles.includes('ecosystem')) {
+      return true;
+    }
+    return scopeIsCovered(auth.scopes, 'connections:use');
+  }
+
   router.post('/v1/outbound/send', requireAuth(), requireScope('outbound:send'), sendLimit, async (req, res) => {
     try {
       const parsed = SendSchema.safeParse(req.body);
@@ -183,12 +211,22 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       const b = parsed.data;
+      // TWO WORDS FOR TWO ACTS. `outbound:send` says this caller may send in their owner's name;
+      // using somebody's connected MAILBOX is the separate thing `connections:use` governs, and a
+      // caller granted only the first must not reach the second by naming a connection here. Owner
+      // sessions bypass scopes, as everywhere.
+      if (b.connection_id && !holdsConnectionsUse(req)) {
+        res.status(403).json(error(config.nodeId, 'SCOPE_REQUIRED',
+          'Sending through a connected mailbox needs the connections:use permission as well as outbound:send.'));
+        return;
+      }
       const result = await sendOutbound(config, storage, resolve(req), {
         contactId: b.contact_id, kind: b.kind,
         subject: b.subject, body: b.body,
         templateId: b.template_id, variables: b.variables,
         invoiceId: b.invoice_id, replyTo: b.reply_to, fromName: b.from_name,
         companyId: b.company_id,
+        connectionId: b.connection_id, fromAlias: b.from_alias,
         links: b.links, signalStreamId: b.signal_stream_id, signalSubject: b.signal_subject,
       });
       res.json(success(config.nodeId, {
@@ -210,6 +248,13 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
       contactId: typeof req.query.contact_id === 'string' ? req.query.contact_id : undefined,
       kind: (['transactional', 'marketing', 'invoice'] as const).find((k) => k === req.query.kind),
       status: (['sent', 'failed', 'suppressed', 'skipped'] as const).find((s) => s === req.query.status),
+      // `sent_by=me` is the question a colleague actually asks, and it is resolved here rather
+      // than by the caller: a client that had to compose its own principal string would get it
+      // wrong for an agent, whose sends are recorded under the agent's own GAII and not its
+      // owner's. Any other value filters as given, which is how an owner reads one colleague.
+      sentBy: req.query.sent_by === 'me'
+        ? owner
+        : (typeof req.query.sent_by === 'string' ? req.query.sent_by : undefined),
     };
     const [messages, total] = await Promise.all([
       storage.listOutboundMessages({ ...query, limit: perPage, offset: (page - 1) * perPage }),

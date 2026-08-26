@@ -584,6 +584,8 @@ export function initializeSchema(db: Database.Database): void {
   // "no such column" on the other. The index comes after the column, in the same block, because
   // an index created before its column has taken down the boot here twice.
   safeAddColumn('outbound_messages', 'organismId', 'TEXT');
+  // Who pressed send. Mirrors Postgres 0054.
+  safeAddColumn('outbound_messages', 'sentBy', 'TEXT');
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_outbound_messages_company
       ON outbound_messages(ownerGhii, organismId, createdAt);

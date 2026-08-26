@@ -50,6 +50,12 @@ import { renderInvoicePdf } from '../finance/invoice-pdf.js';
 import { buildFinvoiceXml } from '../finance/finvoice.js';
 import { requireOwnInvoice } from '../finance/invoice-service.js';
 import { resolveCompanySender, sendAsCompany } from '../company/company-smtp.js';
+import { buildOutboundProviders } from '../connections/providers.js';
+import { requireEncryptionKey } from '../connections/credential.js';
+import type { ConnectContext } from '../connections/oauth.js';
+import {
+  resolveMailboxSender, sendThroughMailbox, type MailboxSender,
+} from '../connections/send-mail.js';
 import { resolveSendingCompany } from './company-sender-access.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { getStream } from '../signals/signal-service.js';
@@ -240,6 +246,27 @@ export interface SendInput {
    */
   companyId?: string;
   /**
+   * Send THROUGH this connected mailbox: the message leaves the caller's own Gmail or Outlook, from
+   * their own address, and lands in their own Sent Items.
+   *
+   * IT MUST BE THE CALLER'S OWN CONNECTION, checked against the connection store rather than taken
+   * from the request. Sending in somebody else's name is the exact harm this could otherwise cause,
+   * and a connection id is guessable enough that "the caller said so" is not an answer.
+   *
+   * It wins over a company's SMTP and over the node's shared sender. That order is the point: a
+   * message a person sends is theirs, and it should look like it in the recipient's inbox and in
+   * their own Sent folder.
+   */
+  connectionId?: string;
+  /**
+   * Send as this verified alias of that mailbox rather than as its own address.
+   *
+   * Checked against what the provider says the mailbox may send as, never taken on trust. An
+   * unverified From header is a From header the caller chose, and the whole point of sending
+   * through somebody's own mailbox is that the address really is theirs.
+   */
+  fromAlias?: string;
+  /**
    * Buttons the message carries, as DATA rather than as markup.
    *
    * The body is escaped on its way into the layout, deliberately, so a caller cannot put an anchor
@@ -280,6 +307,27 @@ async function loadTemplate(storage: Storage, ownerGhii: string, templateId: str
 }
 
 /** The send. Every outcome is logged; only policy violations throw. */
+/**
+ * The caller's own mailbox, if they named one, with the context the transport needs.
+ *
+ * A refusal from here is THROWN rather than logged and swallowed: naming a mailbox you may not use,
+ * or one that was connected for reading only, is a mistake in the request, and the caller needs the
+ * sentence that names the fix before anything is written.
+ */
+async function resolveMailbox(
+  config: AimeatConfig, storage: Storage, callerGhii: string, connectionId: string, alias?: string,
+): Promise<{ sender: MailboxSender; ctx: ConnectContext }> {
+  const key = requireEncryptionKey(config);
+  if (!key) {
+    throw new OutboundError('NO_ENCRYPTION_KEY', 503,
+      'This node is not set up to keep secrets safely yet, so it cannot open a connected mailbox. Whoever runs it can switch that on.');
+  }
+  const ctx: ConnectContext = { config, storage, providers: buildOutboundProviders(config), key };
+  const sender = await resolveMailboxSender(ctx, callerGhii, connectionId, alias);
+  if ('code' in sender) throw new OutboundError(sender.code, sender.status, sender.message);
+  return { sender, ctx };
+}
+
 export async function sendOutbound(config: AimeatConfig, storage: Storage, ownerGhii: string, input: SendInput): Promise<SendResult> {
   // WHICH COMPANY IS SPEAKING, resolved before anything else, because it decides WHOSE BOOK this
   // send belongs to and every gate below reads that book.
@@ -299,6 +347,17 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   }
   const organismId = sender ? sender.company.organismId : null;
 
+  // WHICH MAILBOX IS SPEAKING, resolved here for the same reason the company is: before the first
+  // gate, so a refused send is logged with the sender it would have used, and so a caller naming a
+  // mailbox they may not use is told immediately rather than after the message was almost sent.
+  //
+  // `ownerGhii` is the CALLER — the identity that pressed send — which is what a connection belongs
+  // to. It is deliberately not `bookOwner`: the book may be the company's, but the mailbox is the
+  // person's, and those are the two halves this feature exists to keep apart.
+  const mailbox = input.connectionId
+    ? await resolveMailbox(config, storage, ownerGhii, input.connectionId, input.fromAlias)
+    : null;
+
   // THE BOOK. Recipients, opt-outs, suppression, the daily allowance and the log all belong to the
   // company once one is named, not to whoever pressed send. Without this a person who unsubscribed
   // from one member's campaign is mailed by the next member, who has no way of knowing — a promise
@@ -309,13 +368,13 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
 
   // Gate 2: suppression beats everything.
   if (contact.suppressedAt) {
-    const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(suppressed)', input.templateId ?? null, 'suppressed', `Address suppressed after ${contact.bounceCount} bounces`, input.invoiceId ?? null, organismId);
+    const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(suppressed)', input.templateId ?? null, 'suppressed', `Address suppressed after ${contact.bounceCount} bounces`, input.invoiceId ?? null, organismId, ownerGhii);
     throw Object.assign(new OutboundError('SUPPRESSED', 422, 'Recipient address is suppressed (bounces); clear it on the contact first'), { log });
   }
 
   // Gate 3: opt-out blocks marketing only.
   if (contact.optedOut && input.kind === 'marketing') {
-    const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(opted out)', input.templateId ?? null, 'skipped', 'Recipient has opted out of marketing', input.invoiceId ?? null, organismId);
+    const log = await writeLog(storage, bookOwner, contact.id, 'email', input.kind, input.subject ?? '(opted out)', input.templateId ?? null, 'skipped', 'Recipient has opted out of marketing', input.invoiceId ?? null, organismId, ownerGhii);
     throw Object.assign(new OutboundError('OPTED_OUT', 422, 'Recipient has opted out of marketing messages'), { log });
   }
 
@@ -399,7 +458,10 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     const companySender = sender
       ? await resolveCompanySender(config, storage, sender.company)
       : null;
-    if (!companySender && !emailSvc?.enabled) {
+    // A caller's own mailbox needs neither the node's transport nor a company server: "the node
+    // cannot send", "this company cannot send" and "this person cannot send" are three facts, and
+    // conflating them refuses a send that would have worked.
+    if (!mailbox && !companySender && !emailSvc?.enabled) {
       status = 'failed';
       error = 'EMAIL_DISABLED';
     } else {
@@ -416,8 +478,23 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
         trackingUrl: await openPixelUrl(config, storage, ownerGhii, input),
       });
       const { html, text } = outboundEmailHtml(subject, htmlBody, textBody, 'fi', input.fromName ? { brand: input.fromName } : undefined);
-      // A company's own sending identity wins over the node's shared sender.
-      if (companySender) {
+      // THE ORDER IS THE FEATURE. The caller's own mailbox first, then the company's server, then
+      // the node's shared sender. A message a person sends is theirs, and it should look like it in
+      // the recipient's inbox and in their own Sent folder; a company's server is the next best
+      // thing; the node's shared address is the fallback, not the destination.
+      if (mailbox) {
+        const res = await sendThroughMailbox(
+          mailbox.ctx, mailbox.sender,
+          {
+            to: contact.email, subject, html, text,
+            ...(input.replyTo ? { replyTo: input.replyTo } : {}),
+            ...(input.fromName ? { fromName: input.fromName } : {}),
+            ...(attachments.length ? { attachments } : {}),
+          },
+        );
+        status = res.ok ? 'sent' : 'failed';
+        if (!res.ok) error = res.error ?? 'MAILBOX_SEND_FAILED';
+      } else if (companySender) {
         const res = await sendAsCompany(companySender, contact.email, subject, html, text, attachments);
         status = res.ok ? 'sent' : 'failed';
         if (!res.ok) error = res.error;
@@ -439,19 +516,35 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
     await storage.setInvoiceStatus(invoiceId, (await storage.getInvoice(invoiceId))!.status, { deliveryStatus: 'delivered' });
   }
 
-  const log = await writeLog(storage, ownerGhii, contact.id, channel, input.kind, subject, input.templateId ?? null, status, error, invoiceId, organismId);
-  emitChange('outbound', ownerGhii);
+  // THE BOOK, NOT THE CALLER — and this line said `ownerGhii` until 2026-08-26, which meant a
+  // SUCCESSFUL send by a colleague of the company's owner was filed under the colleague while every
+  // refusal, the daily-allowance count and the log read were filed under the company. The per-company
+  // allowance therefore counted a book that only ever received refusals and never bound at all, and
+  // "what has this company sent" answered with the owner's own sends and nobody else's. WHO pressed
+  // send is `sentBy`, which is what that value was actually being used for.
+  const log = await writeLog(storage, bookOwner, contact.id, channel, input.kind, subject, input.templateId ?? null, status, error, invoiceId, organismId, ownerGhii);
+  emitChange('outbound', bookOwner);
+  // The caller's own surfaces are watching too when the book is somebody else's, and an event that
+  // reached only the book would leave the person who pressed send looking at a stale screen.
+  if (bookOwner !== ownerGhii) emitChange('outbound', ownerGhii);
   return { log, channel, status };
 }
 
+/**
+ * One row in the append-only send log.
+ *
+ * `ownerGhii` here is the BOOK — the company's owner once a company is named — and `sentBy` is the
+ * PERSON. Both are required, and `sentBy` deliberately has no default: it was added on 2026-08-26
+ * and a defaulted parameter is how one of five call sites keeps writing null forever.
+ */
 async function writeLog(
   storage: Storage, ownerGhii: string, contactId: string, channel: OutboundChannel,
   kind: OutboundKind, subject: string, templateId: string | null,
   status: OutboundStatus, error: string | null, invoiceId: string | null,
-  organismId: string | null = null,
+  organismId: string | null, sentBy: string | null,
 ): Promise<OutboundMessageRecord> {
   const log: OutboundMessageRecord = {
-    id: randomUUID(), ownerGhii, organismId, contactId, channel, kind,
+    id: randomUUID(), ownerGhii, organismId, sentBy, contactId, channel, kind,
     subject: subject.slice(0, 300), templateId, status, error, invoiceId,
     createdAt: new Date().toISOString(),
   };

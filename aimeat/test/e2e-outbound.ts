@@ -345,6 +345,86 @@ await test('15. an agent without outbound:send gets 403', async () => {
   assert(s.status === 403, `send should be 403, got ${s.status}`);
 });
 
+// ── Sending through the caller's OWN connected mailbox ───────────────────────────────────────
+// The transport itself needs a real Google or Microsoft account and cannot be driven here. What CAN
+// be driven, and is what would actually go wrong, is every refusal on the way to it: a mailbox that
+// is not yours, one that does not exist, one connected for reading only, and a session that holds
+// outbound:send but not connections:use. Each of those is a way to send in somebody else's name.
+
+await test('15b. naming a mailbox that does not exist is refused, and says nothing about whose it might be', async () => {
+  const r = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      contact_id: plainContactId, kind: 'transactional', subject: 'x', body: 'y',
+      connection_id: '00000000-0000-4000-8000-000000000000',
+    }),
+  });
+  assert(r.status === 404 && r.body.error.code === 'NO_SUCH_MAILBOX',
+    `expected 404 NO_SUCH_MAILBOX, got ${r.status} ${r.body?.error?.code}`);
+  // "No such connection" and "not yours" answer identically on purpose: telling one owner that
+  // another owner's connection exists is a disclosure, and neither answer helps them.
+  assert(!/belongs|another|owner/i.test(r.body.error.message),
+    `the refusal must not hint at ownership: ${r.body.error.message}`);
+});
+
+await test('15c. a malformed request is refused before anything is sent', async () => {
+  const r = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      contact_id: plainContactId, kind: 'transactional', subject: 'x', body: 'y',
+      connection_id: 'x'.repeat(200),
+    }),
+  });
+  assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+  const log = await json('/v1/outbound/log?per_page=200', { headers: authed(A.token) });
+  const rows = log.body.data.messages as Array<{ subject: string }>;
+  assert(!rows.some(m => m.subject === 'x' && rows.filter(z => z.subject === 'x').length > 2),
+    'a refused request must not multiply rows in the log');
+});
+
+await test('15d. outbound:send alone does not reach a connected mailbox', async () => {
+  // The narrow agent has neither word, so it is refused before the mailbox is even looked up. The
+  // property under test is that naming a connection cannot ROUTE AROUND a missing permission.
+  const r = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(narrowAgentToken),
+    body: JSON.stringify({
+      contact_id: plainContactId, kind: 'transactional', subject: 'x', body: 'y',
+      connection_id: '00000000-0000-4000-8000-000000000000',
+    }),
+  });
+  assert(r.status === 403, `expected 403, got ${r.status}`);
+});
+
+await test('15e. the send log records WHO pressed send, and can be filtered by it', async () => {
+  // Owner B, whose own book is untouched: A's allowance was deliberately exhausted by test 13, and
+  // a 429 here would say nothing about attribution.
+  const created = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ name: 'Attribution', email: `attrib-${Date.now()}@example.com` }),
+  });
+  assert(created.status === 201, `contact: ${created.status} ${JSON.stringify(created.body?.error)}`);
+  const bContactId = created.body.data.contact.id as string;
+
+  const send = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: bContactId, kind: 'transactional', subject: 'attributed', body: 'y' }),
+  });
+  assert(send.status === 200, `send: ${send.status} ${JSON.stringify(send.body?.error)}`);
+  assert(typeof send.body.data.message.sentBy === 'string' && send.body.data.message.sentBy.length > 0,
+    `the log row must name the sender, got ${String(send.body.data.message.sentBy)}`);
+
+  // `me` is resolved server-side: a client composing its own principal string gets it wrong for an
+  // agent, whose sends are recorded under the agent's own GAII.
+  const mine = await json('/v1/outbound/log?sent_by=me&per_page=200', { headers: authed(B.token) });
+  assert(mine.status === 200, `log: ${mine.status}`);
+  const subjects = (mine.body.data.messages as Array<{ subject: string }>).map(m => m.subject);
+  assert(subjects.includes('attributed'), `sent_by=me must find my own send: ${subjects.join(', ')}`);
+
+  const someoneElse = await json('/v1/outbound/log?sent_by=nobody@nowhere&per_page=200', { headers: authed(B.token) });
+  assert((someoneElse.body.data.messages as unknown[]).length === 0,
+    'filtering by a principal who sent nothing must return nothing');
+});
+
 await test('16. the public unsubscribe answers identically for unknown tokens (no enumeration)', async () => {
   const res = await fetch(`${BASE}/v1/outbound/unsubscribe?token=definitely-not-a-token`);
   assert(res.status === 200, `expected 200, got ${res.status}`);

@@ -687,6 +687,8 @@ export interface OutboundMessage {
   /** Which company sent it, as its organism. Null before 0049 and for owners with one company. */
   organismId: string | null;
   ownerGhii: string;
+  /** WHO pressed send, as an exact principal. Null before 0054. Migration 0054. */
+  sentBy: string | null;
   status: string;
   subject: string;
   templateId: string | null;
