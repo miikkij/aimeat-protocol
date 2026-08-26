@@ -60,6 +60,7 @@ import { resolveSendingCompany } from './company-sender-access.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { getStream } from '../signals/signal-service.js';
 import { buildOutboundBody } from './email-body.js';
+import { disclosureHeaders, type AiDisclosure } from './ai-disclosure.js';
 
 export class OutboundError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {
@@ -266,6 +267,22 @@ export interface SendInput {
    * through somebody's own mailbox is that the address really is theirs.
    */
   fromAlias?: string;
+  /**
+   * Optionally say, in a header, that a machine wrote this.
+   *
+   * OPTIONAL BECAUSE NOTHING HERE OBLIGES IT. Article 50(4) covers text published to inform the
+   * PUBLIC on matters of PUBLIC INTEREST, and exempts even that when a person has reviewed it and
+   * holds editorial responsibility — which is what pressing send is. A sentence added to
+   * somebody's sales mail that the law does not ask for is a product decision nobody made.
+   *
+   * A HEADER BECAUSE THE AUDIENCE IS MACHINES. Nobody reading their inbox follows a link to a
+   * hash; the value of the mark is that a filter, an archive or the recipient's own tooling can
+   * see it. It goes on ALL THREE send paths, because a disclosure that appeared only when
+   * somebody happened to use their own mailbox would make the ones without it look human.
+   *
+   * A caller that declares it CANNOT then suppress it: there is no parameter for that.
+   */
+  aiDisclosure?: AiDisclosure;
   /**
    * Buttons the message carries, as DATA rather than as markup.
    *
@@ -478,6 +495,8 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
         trackingUrl: await openPixelUrl(config, storage, ownerGhii, input),
       });
       const { html, text } = outboundEmailHtml(subject, htmlBody, textBody, 'fi', input.fromName ? { brand: input.fromName } : undefined);
+      // One place, three paths. Empty when nothing was declared, and then nothing is added.
+      const extraHeaders = disclosureHeaders(input.aiDisclosure, config);
       // THE ORDER IS THE FEATURE. The caller's own mailbox first, then the company's server, then
       // the node's shared sender. A message a person sends is theirs, and it should look like it in
       // the recipient's inbox and in their own Sent folder; a company's server is the next best
@@ -490,17 +509,19 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
             ...(input.replyTo ? { replyTo: input.replyTo } : {}),
             ...(input.fromName ? { fromName: input.fromName } : {}),
             ...(attachments.length ? { attachments } : {}),
+            ...(Object.keys(extraHeaders).length ? { headers: extraHeaders } : {}),
           },
         );
         status = res.ok ? 'sent' : 'failed';
         if (!res.ok) error = res.error ?? 'MAILBOX_SEND_FAILED';
       } else if (companySender) {
-        const res = await sendAsCompany(companySender, contact.email, subject, html, text, attachments);
+        const res = await sendAsCompany(companySender, contact.email, subject, html, text, attachments, extraHeaders);
         status = res.ok ? 'sent' : 'failed';
         if (!res.ok) error = res.error;
       } else if (emailSvc?.enabled) {
         const ok = await emailSvc.sendWithAttachments(contact.email, subject, html, text, attachments, {
           replyTo: input.replyTo, fromName: input.fromName,
+          ...(Object.keys(extraHeaders).length ? { headers: extraHeaders } : {}),
         });
         status = ok ? 'sent' : 'failed';
         if (!ok) error = 'SMTP_SEND_FAILED';

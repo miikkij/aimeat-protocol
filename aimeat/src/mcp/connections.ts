@@ -212,9 +212,11 @@ export function registerConnectionTools(
                 from_alias: z.string().optional().describe('A verified alias of that mailbox to send as.'),
                 kind: z.enum(['transactional', 'marketing']).optional().describe("Default 'transactional'. 'marketing' is blocked by an opt-out and carries the unsubscribe link."),
                 reply_to: z.string().optional().describe('Where a reply should go, when it is not the sending address.'),
+                ai_disclosure: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']).optional()
+                    .describe("Say in a header that a machine wrote this. If YOU wrote the body, declare it: 'ai-generated' when you produced the text, 'ai-assisted' when a person wrote it and you edited. Optional, because the law does not oblige it for a message to one customer, and it goes in a header rather than the text because the audience for it is machines."),
             },
             annotationsFor('aimeat_mail_send'),
-            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to }): Promise<TextResult> => {
+            async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure }): Promise<TextResult> => {
                 try {
                     // THE OUTBOUND DOOR, NOT AROUND IT. Saved contact, suppression, opt-out, the
                     // daily allowance, the unsubscribe link and the append-only log all happen in
@@ -226,6 +228,7 @@ export function registerConnectionTools(
                         ...(connection_id ? { connectionId: connection_id } : {}),
                         ...(from_alias ? { fromAlias: from_alias } : {}),
                         ...(reply_to ? { replyTo: reply_to } : {}),
+                        ...(ai_disclosure ? { aiDisclosure: { level: ai_disclosure } } : {}),
                     });
                     return ok({
                         status: result.status, channel: result.channel, message_id: result.log.id,

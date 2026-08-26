@@ -144,6 +144,9 @@ export async function resolveCompanySender(
 export async function sendAsCompany(
   sender: CompanySender, to: string, subject: string, html: string, text: string,
   attachments: EmailAttachment[] = [],
+  // Extra headers the caller wants on the wire. Today that is the optional AI disclosure, and
+  // it rides here rather than in the body because its audience is machines.
+  headers: Record<string, string> = {},
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const { smtp, password } = sender;
   const transporter = createTransport({
@@ -156,6 +159,7 @@ export async function sendAsCompany(
     const from = smtp.fromName ? `"${smtp.fromName.replaceAll('"', "'")}" <${smtp.fromAddress}>` : smtp.fromAddress;
     await transporter.sendMail({
       from, to, subject, html, text,
+      ...(Object.keys(headers).length ? { headers } : {}),
       replyTo: smtp.replyTo ?? undefined,
       attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
     });

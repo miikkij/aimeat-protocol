@@ -48456,6 +48456,45 @@ paths:
                 company_id: { type: string, maxLength: 80, description: 'Send AS this registered company: with its own SMTP identity the mail leaves through ITS server, from ITS domain, and the send log records which company spoke.' }
                 connection_id: { type: string, maxLength: 80, description: 'Send THROUGH the caller''s own connected mailbox, so the message really leaves their Gmail or Outlook, arrives from their own address with their own domain''s SPF and DKIM, and lands in their own Sent Items. It wins over a company''s SMTP and over the node''s shared sender: a message a person sends is theirs, and it should look like it in the recipient''s inbox and in their own Sent folder. Must be the caller''s OWN connection and must carry the sending permission — both checked against the connection store, never taken from the request — and the session needs connections:use as well as outbound:send.' }
                 from_alias: { type: string, format: email, maxLength: 200, description: 'Send as this verified alias of that mailbox rather than as its own address. Checked against what the provider says the mailbox may send as, never taken on trust: an unverified From header is one the caller chose, and the whole point of sending through somebody''s own mailbox is that the address really is theirs. Gmail aliases come from the mailbox''s send-as list, which needs no permission beyond the reading one; Microsoft has no equivalent a delegated scope can read, so an alias there is refused rather than guessed at.' }
+                ai_disclosure:
+                  description: >
+                    Optionally mark the message as machine-written, in a HEADER rather than in the
+                    text. A level on its own, or an object with `level` and the `provenance_id` of
+                    the record this node minted for the completion.
+
+
+                    OPTIONAL BECAUSE NOTHING OBLIGES IT HERE. EU AI Act Article 50(4) covers text
+                    published to inform the PUBLIC on matters of PUBLIC INTEREST, and exempts even
+                    that where the content had human review and somebody holds editorial
+                    responsibility — which is what a person pressing send is. A message to one
+                    customer is neither. Article 50(2) does want a machine-readable mark on
+                    generated text, but that is the obligation of whoever provides the generating
+                    system about its outputs, and this node already mints a provenance record for
+                    every completion it runs.
+
+
+                    A HEADER BECAUSE THE AUDIENCE IS MACHINES: nobody reading their inbox follows a
+                    link to a hash. It goes out as `X-AI-Disclosure`, with `X-AI-Disclosure-Record`
+                    carrying the resolvable address when a provenance id is given. The four values
+                    are the IETF AI-Disclosure draft's, borrowed rather than invented; the `X-`
+                    prefix is there because Microsoft Graph accepts a custom header only in that
+                    form, and one header that works on both providers beats two that each work on
+                    one. It is added on ALL THREE send paths, because a mark that appeared only when
+                    somebody happened to use their own mailbox would make the others look human.
+
+
+                    `none` is an answer and not a mark: it adds no header at all. A word outside the
+                    four is refused rather than coerced to the nearest one. Declaring a level and
+                    then asking for the header to be left off is not possible — there is no
+                    parameter for that.
+                  oneOf:
+                    - type: string
+                      enum: [none, ai-assisted, ai-generated, autonomous]
+                    - type: object
+                      required: [level]
+                      properties:
+                        level: { type: string, enum: [none, ai-assisted, ai-generated, autonomous] }
+                        provenance_id: { type: string, maxLength: 80 }
                 links:
                   type: array
                   maxItems: 10

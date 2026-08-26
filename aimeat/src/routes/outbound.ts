@@ -23,6 +23,7 @@ import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { parseDisclosure } from '../services/outbound/ai-disclosure.js';
 import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
@@ -57,6 +58,18 @@ const SendSchema = z.object({
   connection_id: z.string().max(80).optional(),
   /** A verified alias of that mailbox to send as. Checked against the provider, never trusted. */
   from_alias: z.string().email().max(200).optional(),
+  /**
+   * Optionally mark the message as machine-written, in a header. A level on its own, or a level
+   * with the provenance record this node minted for the completion. Declaring it and then asking
+   * for it to be left out is not possible: there is no parameter for that.
+   */
+  ai_disclosure: z.union([
+    z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']),
+    z.object({
+      level: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']),
+      provenance_id: z.string().max(80).optional(),
+    }).strict(),
+  ]).optional(),
   /** Buttons, as data. The server builds the anchors; see SendInput.links for why. */
   links: z.array(z.object({
     label: z.string().max(120),
@@ -211,6 +224,12 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       const b = parsed.data;
+      const parsedDisclosure = parseDisclosure(b.ai_disclosure);
+      if (parsedDisclosure && 'error' in parsedDisclosure) {
+        res.status(400).json(error(config.nodeId, 'INVALID_DISCLOSURE', parsedDisclosure.error));
+        return;
+      }
+      const disclosure = parsedDisclosure;
       // TWO WORDS FOR TWO ACTS. `outbound:send` says this caller may send in their owner's name;
       // using somebody's connected MAILBOX is the separate thing `connections:use` governs, and a
       // caller granted only the first must not reach the second by naming a connection here. Owner
@@ -227,6 +246,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         invoiceId: b.invoice_id, replyTo: b.reply_to, fromName: b.from_name,
         companyId: b.company_id,
         connectionId: b.connection_id, fromAlias: b.from_alias,
+        ...(disclosure ? { aiDisclosure: disclosure } : {}),
         links: b.links, signalStreamId: b.signal_stream_id, signalSubject: b.signal_subject,
       });
       res.json(success(config.nodeId, {

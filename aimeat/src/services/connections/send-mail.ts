@@ -67,6 +67,8 @@ export interface MailboxMessage {
   replyTo?: string;
   fromName?: string;
   attachments?: EmailAttachment[];
+  /** Extra headers on the wire. Today: the optional AI disclosure. */
+  headers?: Record<string, string>;
 }
 
 /**
@@ -224,6 +226,12 @@ export async function sendThroughMailbox(
             body: { contentType: 'HTML', content: message.html },
             toRecipients: [{ emailAddress: { address: message.to } }],
             ...(message.replyTo ? { replyTo: [{ emailAddress: { address: message.replyTo } }] } : {}),
+            // Graph accepts a CUSTOM header only when its name begins with x-, which is why the
+            // disclosure header carries that prefix rather than the IETF draft's bare name: one
+            // header that works on both providers beats two that each work on one.
+            ...(message.headers && Object.keys(message.headers).length
+              ? { internetMessageHeaders: Object.entries(message.headers).map(([name, value]) => ({ name, value })) }
+              : {}),
             ...(message.attachments?.length ? {
               attachments: message.attachments.map(a => ({
                 '@odata.type': '#microsoft.graph.fileAttachment',
@@ -263,6 +271,7 @@ async function buildMime(sender: MailboxSender, message: MailboxMessage): Promis
     subject: message.subject,
     text: message.text,
     html: message.html,
+    ...(message.headers && Object.keys(message.headers).length ? { headers: message.headers } : {}),
     ...(message.replyTo ? { replyTo: message.replyTo } : {}),
     ...(message.attachments?.length ? {
       attachments: message.attachments.map(a => ({
