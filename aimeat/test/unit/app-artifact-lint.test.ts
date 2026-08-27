@@ -266,6 +266,20 @@ describe('lintAppArtifact — the two tracks never mix', () => {
     expect(classic.ids).not.toContain('track-mixing');
   });
 
+  it('knows the Atelier shell mounts the pill itself', async () => {
+    // The shell mounts the login pill inside atelier.app(), so neither mount verb appears in the
+    // app's bytes. The first AEB bench run flagged all three correct Atelier builds on this.
+    const html = ATELIER.replace("AIMEAT.auth.mountLoginButton('#login', { onLogin: start });", '');
+    const { ids } = await findings(html);
+    expect(ids).not.toContain('app-declared-unused');
+
+    // The same, with the namespace held in an alias — the fourth bench build wrote it this way.
+    const aliased = html.replace('const a = AIMEAT.atelier.app({ title: \'Ate\' });',
+      'var K = AIMEAT.atelier; const a = K.app({ title: \'Ate\' });');
+    const alias = await findings(aliased);
+    expect(alias.ids).not.toContain('app-declared-unused');
+  });
+
   it('flags the Atelier kit loaded in an app that declares Classic', async () => {
     const html = ATELIER.replace('content="atelier"', 'content="classic"');
     const { ids, messages } = await findings(html);
