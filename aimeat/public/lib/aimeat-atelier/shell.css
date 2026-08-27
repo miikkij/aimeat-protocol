@@ -54,7 +54,11 @@
   display: flex;
   flex-direction: column;
   overflow-x: clip;
-  background: var(--ak-bg);
+  background-color: var(--ak-bg);
+  /* The ambient: the page ground carries the spectrum, whisper-quiet. Flat turns it off. */
+  background-image: var(--ak-page-image);
+  background-size: cover;
+  background-attachment: local;
 }
 .ak-app__bar {
   display: flex;
@@ -63,7 +67,12 @@
   gap: var(--ak-gap);
   min-height: var(--ak-touch);
   padding: 8px var(--ak-pad);
-  background: var(--ak-surface);
+  /* Chrome floats on glass: the content scrolling beneath shows through, blurred and
+   * saturated. Looks that mean flatness set --ak-glass to the solid surface and blur to 0. */
+  background: var(--ak-glass);
+  backdrop-filter: blur(var(--ak-blur)) saturate(1.35);
+  -webkit-backdrop-filter: blur(var(--ak-blur)) saturate(1.35);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
   box-shadow: var(--ak-elev-1);
   position: relative;
   z-index: 3;
@@ -123,17 +132,44 @@
   align-items: flex-end;
   border-radius: var(--ak-radius);
   overflow: hidden;
-  background-image: var(--ak-hero-image), var(--ak-grad);
+  background-image: var(--ak-grad);
   background-size: cover;
   background-position: center;
   box-shadow: var(--ak-elev-2);
 }
-.ak-hero--image { background-image: var(--ak-hero-image); background-color: var(--ak-surface-2); }
+.ak-hero--image { background-color: var(--ak-surface-2); }
+/* THE LIVING LAYER STACK, all painted before the text so nothing ever covers a word.
+ * ::before carries ONLY the aurora mesh, oversized and slowly wandering — one background-size
+ * value then applies to however many gradient layers the mesh token holds (the token is a LIST,
+ * and a per-layer size list cycles out of phase against it: the first spectrum screenshot
+ * showed one lobe tiling in 160px columns for exactly that reason). The scrim and the grain
+ * live on their own layer element (hero.js renders it) so they STAY PUT over the drift.
+ * The drift is a compositor-cheap background-position tween: it mutates no DOM (the mutation
+ * gate still reads zero) and collapses under prefers-reduced-motion via the kit-wide block.
+ * An image hero rides the same slot, so a real picture gets the same slow life. */
 .ak-hero::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 18%, var(--ak-scrim) 62%, var(--ak-scrim));
+  background-image: var(--ak-hero-image);
+  background-size: 170% 170%;
+  background-position: 18% 26%;
+  background-repeat: no-repeat;
+  animation: ak-hero-drift 46s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes ak-hero-drift {
+  from { background-position: 10% 20%; }
+  to   { background-position: 84% 74%; }
+}
+.ak-hero__scrim {
+  position: absolute;
+  inset: 0;
+  background-image:
+    var(--ak-grain),
+    linear-gradient(180deg, transparent 18%, var(--ak-scrim) 62%, var(--ak-scrim));
+  background-size: 160px 160px, 100% 100%;
+  background-repeat: repeat, no-repeat;
   pointer-events: none;
 }
 .ak-hero__inner {
@@ -249,7 +285,9 @@
   z-index: 4;
   display: flex;
   justify-content: space-around;
-  background: var(--ak-surface);
+  background: var(--ak-glass);
+  backdrop-filter: blur(var(--ak-blur)) saturate(1.35);
+  -webkit-backdrop-filter: blur(var(--ak-blur)) saturate(1.35);
   border-top: var(--ak-line-w) solid var(--ak-line);
   box-shadow: var(--ak-elev-2);
 }

@@ -1149,8 +1149,13 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
         'the main region must reserve the bottom chrome strip');
     assert(/bottom:\s*var\(--ak-chrome-bottom\)/.test(parts),
         'the bottom navigation must sit above the chrome strip, never under it');
-    // Motion is finite: no infinite animation anywhere, so an idle surface repaints zero times.
-    assert(!/animation[^;]*infinite/.test(css + parts), 'no animation may run forever');
+    // Motion is finite — with ONE named exception, decided 2026-08-27 on the developer's
+    // direction: the hero's aurora drift (a compositor background tween that mutates no DOM,
+    // so the idle-mutation measurement still reads zero, and reduced-motion collapses it).
+    // The claim narrows, it does not vanish: exactly one infinite animation, and it is the drift.
+    const infinites = (css + parts).match(/animation[^;]*infinite/g) || [];
+    assert(infinites.length === 1 && /ak-hero-drift/.test(infinites[0]!),
+        `exactly one infinite animation (the hero drift) — found ${infinites.length}: ${infinites.join(' | ')}`);
     // A dark-theme-only wash breaks every light look, in the entry and in the parts alike.
     assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css + parts), 'must not use rgba(255,255,255,…)');
 });

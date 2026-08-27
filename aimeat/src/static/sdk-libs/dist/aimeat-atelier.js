@@ -768,11 +768,12 @@
     const sub = el("p", { class: "ak-hero__sub" });
     const actions = el("div", { class: "ak-hero__actions" });
     const inner = el("div", { class: "ak-hero__inner" }, [title, sub, actions]);
+    const scrim = el("span", { class: "ak-hero__scrim", "aria-hidden": "true" });
     const root = el("div", {
       class: "ak-root ak-hero",
       "data-ak-hero": true,
       "aria-labelledby": titleId
-    }, [inner]);
+    }, [scrim, inner]);
     const layer = imageLayer(spec.image);
     if (layer) {
       root.style.setProperty("--ak-hero-image", layer);
@@ -2074,7 +2075,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.5.0",
+    version: "0.6.0",
     // ── Shell and navigation ──
     app,
     section,

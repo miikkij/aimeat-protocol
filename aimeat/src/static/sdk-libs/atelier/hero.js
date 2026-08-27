@@ -18,6 +18,9 @@
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
  * @version-history
+ *   v0.6.0 — 2026-08-27 — The scrim becomes a child layer (.ak-hero__scrim): the aurora mesh
+ *     drifts on ::before and the scrim + grain must paint above it and below the text — a
+ *     pseudo cannot sit between another pseudo and the children, a child can.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
 import { el, clear, resolve, uid, enter, countUp } from './dom.js';
@@ -63,11 +66,14 @@ export function hero(spec) {
   const sub = el('p', { class: 'ak-hero__sub' });
   const actions = el('div', { class: 'ak-hero__actions' });
   const inner = el('div', { class: 'ak-hero__inner' }, [title, sub, actions]);
+  // The scrim+grain layer: a child, not a pseudo, so it paints ABOVE the drifting aurora
+  // (::before) and BELOW the text — the readable zone stays put while the colour wanders.
+  const scrim = el('span', { class: 'ak-hero__scrim', 'aria-hidden': 'true' });
   const root = el('div', {
     class: 'ak-root ak-hero',
     'data-ak-hero': true,
     'aria-labelledby': titleId,
-  }, [inner]);
+  }, [scrim, inner]);
 
   const layer = imageLayer(spec.image);
   if (layer) { root.style.setProperty('--ak-hero-image', layer); root.classList.add('ak-hero--image'); }
