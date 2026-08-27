@@ -20,6 +20,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.14.0 -- 2026-08-28 -- The four Design Book tools (TARGET-074 phase 5): search/get ->
+ *     memory:read, propose/adopt -> memory:write, mirroring the REST requireScope gates on
+ *     /v1/designbook. Adoption writes the caller's own app layout, which is exactly memory:write.
  *   v1.13.0 -- 2026-08-23 -- aimeat_package_install -> packages:write, the scope
  *     POST /v1/packages/:groupId/install already requires. Installing registers an app, a cortex, an
  *     extension and any @activate cron the manifest declares, all under the owner's identity.
@@ -324,6 +327,10 @@ export const TOOL_SCOPES: Record<string, string> = {
     // memory words gate it, no new scope word.
     aimeat_app_ui_get: 'memory:read',
     aimeat_app_ui_set: 'memory:write',
+    aimeat_designbook_search: 'memory:read',
+    aimeat_designbook_get: 'memory:read',
+    aimeat_designbook_propose: 'memory:write',
+    aimeat_designbook_adopt: 'memory:write',
     aimeat_memory_hands: 'memory:read',
 
     // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it

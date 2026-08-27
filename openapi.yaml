@@ -20439,6 +20439,136 @@ paths:
         '404': { description: No such stored version }
         '422': { description: The archived layout no longer validates against the registry }
 
+  /v1/designbook:
+    get:
+      operationId: listDesignbookParts
+      summary: Browse the Design Book
+      description: >-
+        The node's shared library of PROVEN screen arrangements (TARGET-074 phase 5). Each part is
+        a `layout` (a complete Atelier mosaic arrangement) or a `fill` (the same shape with
+        <placeholder> slots — a starting shape), with its lifecycle status and how many builds
+        have adopted it. Published parts are what everyone builds from.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill] } }
+        - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
+        - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200': { description: "{ parts: [{ id, kind, title, summary, tags, status, proposed_by, updated_at, version, usage }], count }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: proposeDesignbookPart
+      summary: Propose a part (the bench runs first)
+      description: >-
+        Propose a part into the Book, or update one you already proposed. The body goes through
+        the SAME layout validator every app layout passes, before anything lands — a refusal is
+        worded, with the nearest real name suggested. A new part lands as `proposed`; publishing
+        it into the shared catalogue is the node operator's call. A part id is a node-wide
+        address: once claimed, it answers the same part for everyone, forever, and updating your
+        own re-runs the bench and flows as a minor. Requires memory:write.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [part]
+              properties:
+                part:
+                  type: object
+                  description: "{ id, kind: layout|fill, title, summary, body, tags? } — body is a whole mosaic layout"
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: >-
+                    How this part was made — its title and summary are gallery text people read,
+                    so the write is stamped: declared when present, node-stamped for a silent agent.
+                ai_provenance_id: { type: string }
+      responses:
+        '201': { description: "First proposal of this id: { id, status, version, replaced_version: null }" }
+        '200': { description: "Update of your own part: { id, status, version, replaced_version }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { description: The id is another proposer's address, or the part is retired }
+        '422': { description: The bench refusal, in the validator's words }
+
+  /v1/designbook/{id}:
+    get:
+      operationId: getDesignbookPart
+      summary: One part, whole
+      description: >-
+        The part's body is exactly what an adopt writes into an app, so reading it IS the
+        preview. Carries the record version (the part's evolution is its version history) and the
+        adoption count.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: "{ part, version, usage, owner }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/designbook/{id}/adopt:
+    post:
+      operationId: adoptDesignbookPart
+      summary: Adopt a part into one of your apps
+      description: >-
+        The part's body becomes the named app's stored mosaic layout, through the same validated,
+        versioned, provenance-stamped write every layout takes — the replaced layout is archived,
+        so putting it back is one restore. Published parts are adoptable by anyone; a proposed
+        one only by its own proposer. Adopting is the usage signal that keeps a part alive.
+        Requires memory:write, and the app must belong to the caller's owner.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename]
+              properties:
+                filename: { type: string, description: The caller's published app file the layout lands in }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                ai_provenance_id: { type: string }
+      responses:
+        '200': { description: "{ id, filename, version, replaced_version, kind }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Not published and not yours, or the app belongs to another owner }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/designbook/{id}/status:
+    post:
+      operationId: setDesignbookPartStatus
+      summary: Move a part through its lifecycle
+      description: >-
+        The operator's door — publish a proposed part, mark an unused one aging, demote a broken
+        one back to proposed. A proposer may RETIRE their own part, nothing more; a retired
+        address stays retired. This is how the Book stays curated and how it forgets.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [proposed, published, aging, retired] }
+      responses:
+        '200': { description: "{ id, status, previous }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Lifecycle moves belong to the operator (retiring your own part excepted) }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/apps/{owner}/{filename}/members:
     get:
       operationId: appMembersList

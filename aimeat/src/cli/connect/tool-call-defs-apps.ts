@@ -8,6 +8,9 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   v1.3.0 -- 2026-08-28 -- The four Design Book tools (TARGET-074 phase 5) join the CLI dispatch,
+ *     same third-door rule as the mosaic pair: a parameter that exists on the MCP surfaces and not
+ *     here is dropped in silence, so all of them land in the same change.
  *   v1.2.0 -- 2026-08-11 -- proof_attach APPENDS to the ledger instead of replacing it, writes the
  *     ContributionProof shape routes/library-packs.ts actually reads, and lands in the owner
  *     namespace where services/contribution-proofs.ts keeps both records. The append logic is
@@ -427,6 +430,42 @@ export const appTools: ConnectCliToolDefinition[] = [
                 },
             );
         },
+    },
+    // ── The Design Book (TARGET-074 phase 5). Same third-door rule as the mosaic pair above. ──
+    {
+        name: 'aimeat_designbook_search',
+        handler: ({ client }, input) => {
+            const params = new URLSearchParams();
+            const kind = optionalString(input, 'kind');
+            const status = optionalString(input, 'status');
+            const q = optionalString(input, 'q');
+            if (kind) params.set('kind', kind);
+            if (status) params.set('status', status);
+            if (q) params.set('q', q);
+            if (typeof input.limit === 'number') params.set('limit', String(input.limit));
+            const qs = params.toString();
+            return client.get(`/v1/designbook${qs ? `?${qs}` : ''}`);
+        },
+    },
+    {
+        name: 'aimeat_designbook_get',
+        handler: ({ client }, input) => client.get(`/v1/designbook/${encodeURIComponent(requiredString(input, 'id'))}`),
+    },
+    {
+        name: 'aimeat_designbook_propose',
+        handler: ({ client }, input) => client.post('/v1/designbook', {
+            part: input.part,
+            ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
+            ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
+        }),
+    },
+    {
+        name: 'aimeat_designbook_adopt',
+        handler: ({ client }, input) => client.post(`/v1/designbook/${encodeURIComponent(requiredString(input, 'id'))}/adopt`, {
+            filename: requiredString(input, 'filename'),
+            ...(input.ai_provenance ? { ai_provenance: input.ai_provenance } : {}),
+            ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
+        }),
     },
     // ── App drafts (staging): edit + test the next version without touching the live app ──
     {

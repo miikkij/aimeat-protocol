@@ -15,6 +15,9 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.2.0 — 2026-08-28 — +'designbook' (TARGET-074 phase 5). NOTE: mcp/core.ts holds a hand-copied
+ *     duplicate of this union (VALID_DISCOVER_TYPES) — a new word lands in both or the type never
+ *     reaches the MCP door.
  *   v0.1.0 — 2026-06-23 — Phase 0: initial contract (design doc 2026-06-23-master-directory-discovery).
  */
 
@@ -33,6 +36,7 @@ export type DiscoveryType =
   | 'app'
   | 'template'
   | 'skill'
+  | 'designbook'
   | 'memory';
 
 /** Canonical visibility ladder; every domain's native enum collapses into this (design §5). */

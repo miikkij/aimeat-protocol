@@ -21,6 +21,7 @@ import { createRegistry, type DiscoveryRegistry } from './registry.js';
 import { createMemorySource } from './sources/memory-source.js';
 import { createCapabilitiesSource, createAppsSource, createAgentTasksSource } from './sources/table-sources.js';
 import { createTemplatesSource } from './sources/templates-source.js';
+import { createDesignbookSource } from './sources/designbook-source.js';
 
 export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): DiscoveryRegistry {
   const registry = createRegistry();
@@ -29,5 +30,6 @@ export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): 
   registry.register(createAppsSource(storage, config));          // apps table
   registry.register(createAgentTasksSource(storage, config));    // agent_tasks table
   registry.register(createTemplatesSource(storage, config));     // agent-proposed app templates (template.catalog.*)
+  registry.register(createDesignbookSource(storage, config));    // Design Book parts (atelier.book.part.*)
   return registry;
 }
