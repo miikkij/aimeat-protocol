@@ -16,6 +16,10 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.1.1 — 2026-08-28 — SECURITY (CodeQL js/loop-bound-injection): nearest() ran the O(m*n)
+ *     Levenshtein against the caller-supplied name at full length, so a huge submitted look/nav/block
+ *     value was a DoS. The name is capped at 64 chars before the distance loop; a real name is far
+ *     shorter and a long one is never a typo away, so no real suggestion changes.
  *   v1.1.0 — 2026-08-27 — Per-block `span` (composition grid placement), validated against
  *     BLOCK_SPANS with the same did-you-mean refusal every other name gets.
  *   v1.0.0 — 2026-08-27 — Initial (TARGET-074 phase 2).
@@ -76,7 +80,10 @@ function distance(a: string, b: string): number {
 export function nearest(given: string, known: Iterable<string>): string | null {
   let best: string | null = null;
   let bestD = SUGGEST_MAX_DISTANCE + 1;
-  const lower = given.toLowerCase();
+  // Bound the caller-supplied name before the O(m*n) Levenshtein below (js/loop-bound-injection):
+  // a real look/nav/block name is a handful of characters, and a long input is never "one typo
+  // away" from a known short name, so capping it changes no real suggestion.
+  const lower = given.toLowerCase().slice(0, 64);
   for (const k of known) {
     const d = distance(lower, k.toLowerCase());
     if (d < bestD) { bestD = d; best = k; }
