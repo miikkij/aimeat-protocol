@@ -26,6 +26,11 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.3.0 — 2026-08-27 — The content and data components arrive: list (keyed rows, live-change
+ *     motion), listDetail (container-query master–detail), cardGrid + mediaCard (deterministic
+ *     monogram washes where no image exists), form (declared fields with the accessibility
+ *     wiring built in), table (scrolls in its own box, sortable, tabular numerals), searchBar
+ *     and timeline.
  *   v0.2.0 — 2026-08-27 — The look system arrives: seven presets (vivid · calm-card · editorial ·
  *     sticker · neon-dense · poster · flat) in the stylesheet, verified by pnpm check:atelier —
  *     the full 70-combination preset × palette × mode matrix, run arithmetically. No JS surface
@@ -39,6 +44,11 @@ import { i18n } from './i18n.js';
 import { app, section, tabs, bottomNav } from './shell.js';
 import { hero, statRow } from './hero.js';
 import { emptyState, skeleton } from './state.js';
+import { list, listDetail } from './list.js';
+import { cardGrid, mediaCard } from './grid.js';
+import { form } from './form.js';
+import { table, searchBar } from './table.js';
+import { timeline } from './timeline.js';
 
 const atelier = {
   /**
@@ -46,13 +56,19 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.2.0',
+  version: '0.3.0',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,
 
   // ── Focal content ──
   hero, statRow,
+
+  // ── Content ──
+  list, listDetail, cardGrid, mediaCard, timeline,
+
+  // ── Data ──
+  form, table, searchBar,
 
   // ── Designed states ──
   emptyState, skeleton,

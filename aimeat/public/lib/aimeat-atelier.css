@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.3.0 — 2026-08-27 — The content and data parts arrive (content.css: keyed list,
+ *     master–detail with a container-query split, card grid with deterministic monogram
+ *     washes, timeline; data.css: the declared form, the table that scrolls in its own box,
+ *     the search bar), plus .ak-badge and .ak-sr-only in the shared primitives.
  *   v0.2.0 — 2026-08-27 — The full preset set: calm-card, editorial, sticker, neon-dense and
  *     poster join vivid and flat, every block tagged @preset-block for pnpm check:atelier (the
  *     70-combination arithmetic matrix, TARGET-074's growth rule). Display-treatment tokens
@@ -46,6 +50,8 @@
  */
 
 @import url('./aimeat-atelier/shell.css');
+@import url('./aimeat-atelier/content.css');
+@import url('./aimeat-atelier/data.css');
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    THE CONTRACT — light. Set these to author a look; do not override component selectors.

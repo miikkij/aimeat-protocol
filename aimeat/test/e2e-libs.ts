@@ -1043,6 +1043,8 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
     for (const part of [
         'app', 'section', 'tabs', 'bottomNav',
         'hero', 'statRow', 'emptyState', 'skeleton',
+        'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline',
+        'form', 'table', 'searchBar',
         'injectStyle', 'guardButtons', 'whileBusy', 'enter', 'countUp',
     ]) {
         assert(text.includes(part), `should export ${part}`);
@@ -1127,7 +1129,7 @@ await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, 
     assert(text.includes('@preset-block vivid'), 'the base contract must carry the vivid @preset-block tag');
     // The parts the entry imports must actually be reachable, or the kit renders unstyled.
     let parts = '';
-    for (const part of ['shell.css']) {
+    for (const part of ['shell.css', 'content.css', 'data.css']) {
         assert(css.includes(part), `should import ${part}`);
         const partRes = await fetch(`${BASE}/lib/aimeat-atelier/${part}`);
         assert(partRes.ok, `/lib/aimeat-atelier/${part} failed: ${partRes.status}`);
