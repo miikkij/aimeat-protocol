@@ -36,6 +36,10 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.2.0 — 2026-08-27 — The full preset set: calm-card, editorial, sticker, neon-dense and
+ *     poster join vivid and flat, every block tagged @preset-block for pnpm check:atelier (the
+ *     70-combination arithmetic matrix, TARGET-074's growth rule). Display-treatment tokens
+ *     arrive in the contract: --ak-display-shadow, --ak-display-stroke, --ak-tilt.
  *   v0.1.0 — 2026-08-27 — Initial slice: the --ak-* token contract (surfaces, colour, shape,
  *     type, motion, chrome reserve), vivid-as-default values, the flat preset, dark
  *     re-declaration, and the shell part (TARGET-074 phase 1, slice 1).
@@ -45,18 +49,23 @@
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    THE CONTRACT — light. Set these to author a look; do not override component selectors.
+   The base values ARE the vivid preset.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
+/* @preset-block vivid */
 :root {
   /* ── Surfaces and ink ─────────────────────────────────────────────────────────────────── */
   --ak-bg:            var(--color-base-100, #f3f5f8);   /* the page                          */
   --ak-surface:       var(--color-base-200, #ffffff);   /* cards, bars, panels               */
   --ak-surface-2:     var(--color-base-100, #eceff4);   /* rows nested inside a surface      */
-  /* Vivid: a card is tinted toward the brand, never flat. Flat zeroes this. */
+  /* Vivid: a card is tinted toward the brand, never flat. Flat zeroes this. 4% is the
+     check:atelier ceiling in practice: at 5% the mist palette's tinted card no longer
+     stepped off the page. */
   --ak-surface-image: linear-gradient(180deg,
-                        color-mix(in oklab, var(--ak-accent) 5%, var(--ak-surface)),
+                        color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)),
                         var(--ak-surface));
   --ak-ink:           var(--color-base-content, #151a21);
-  --ak-ink-dim:       color-mix(in oklab, var(--ak-ink) 62%, var(--ak-surface));
+  /* 68%: the check:atelier floor — at 62% the mist palette's dimmed text fell to 4.37:1. */
+  --ak-ink-dim:       color-mix(in oklab, var(--ak-ink) 68%, var(--ak-surface));
   --ak-line:          var(--color-base-300, #d7dce4);   /* hairlines, card edges             */
   --ak-line-w:        var(--border-w, 1px);
 
@@ -97,6 +106,9 @@
   --ak-text-body:     var(--text-body, 0.95rem);
   --ak-text-fine:     var(--text-fine, 0.8125rem);     /* 13px floor                         */
   --ak-weight-display: 750;
+  --ak-display-shadow: none;                            /* extrusion under display type      */
+  --ak-display-stroke: 0;                               /* outline width around display type */
+  --ak-tilt:          0deg;                             /* per-tile rotation (sticker looks) */
 
   /* ── Density, space, motion ───────────────────────────────────────────────────────────── */
   --ak-gap:           var(--gap-card, 14px);
@@ -119,6 +131,7 @@
 /* ══════════════════════════════════════════════════════════════════════════════════════════
    THE CONTRACT — dark. Same names, dark literals. A look re-declares only what it changes.
    ══════════════════════════════════════════════════════════════════════════════════════════ */
+/* @preset-block vivid-dark */
 :root[data-theme='dark'] {
   --ak-bg:          var(--color-base-100, #0f1218);
   --ak-surface:     var(--color-base-200, #171b23);
@@ -147,11 +160,99 @@
 [data-ak-look='flat'] {
   --ak-surface-image: none;
   --ak-hero-image:    none;
-  --ak-grad:          var(--ak-accent);
+  /* Flat still darkens the action fill: body-size text on the RAW accent is 3.58:1 on the
+     aimeat palette (the theme's own pair is a large-text pair), and a flat look is not a
+     licence to ship an unreadable button. */
+  --ak-grad:          linear-gradient(135deg,
+                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)),
+                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
   --ak-enter-distance: 0px;
   --ak-enter-stagger:  0ms;
   --ak-elev-2:        var(--ak-elev-1);
   --ak-weight-display: 650;
+}
+
+/* @preset-block calm-card — the quiet product: a whisper of tint, hairlines over shadows,
+   a lower hero, a shorter entrance. Calm, not flat. */
+[data-ak-look='calm-card'] {
+  --ak-surface-image: linear-gradient(180deg,
+                        color-mix(in oklab, var(--ak-accent) 3%, var(--ak-surface)),
+                        var(--ak-surface));
+  --ak-hero-image:    radial-gradient(at 30% 20%, color-mix(in oklab, var(--ak-accent) 8%, var(--ak-bg)), transparent 60%);
+  --ak-grad:          linear-gradient(135deg,
+                        color-mix(in oklab, var(--ak-accent) 80%, var(--ak-ink)),
+                        color-mix(in oklab, var(--ak-accent) 70%, var(--ak-ink)));
+  --ak-elev-2:        var(--ak-elev-1);
+  --ak-enter-distance: 8px;
+  --ak-enter-stagger:  30ms;
+  --ak-hero-min:      18dvh;
+  --ak-weight-display: 650;
+}
+
+/* @preset-block editorial — the magazine: a big display step, rules instead of shadows,
+   squarer corners, a slow fade. Structure carries the page, not depth. */
+[data-ak-look='editorial'] {
+  --ak-surface-image: none;
+  --ak-hero-image:    none;
+  --ak-grad:          linear-gradient(135deg,
+                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)),
+                        color-mix(in oklab, var(--ak-accent) 82%, var(--ak-ink)));
+  --ak-elev-1:        none;
+  --ak-elev-2:        none;
+  --ak-radius:        8px;
+  --ak-radius-sm:     6px;
+  --ak-text-hero:     clamp(2.2rem, 7vw, 3.4rem);
+  --ak-weight-display: 800;
+  --ak-enter-distance: 0px;
+  --ak-enter-stagger:  60ms;
+  --ak-motion:        var(--motion-slow, 320ms);
+}
+
+/* @preset-block sticker — the playful form language the game kit proved: pill corners, a tilt,
+   extruded display type, a springier entrance. */
+[data-ak-look='sticker'] {
+  --ak-radius:        22px;
+  --ak-radius-sm:     14px;
+  /* 3%: the secondary hue runs darker than the accent on several palettes, and at 4% the
+     aimeat palette's near-white card sank into the page (check:atelier, step 1.09). */
+  --ak-surface-image: linear-gradient(180deg,
+                        color-mix(in oklab, var(--ak-accent-2) 3%, var(--ak-surface)),
+                        var(--ak-surface));
+  --ak-display-shadow: 0 3px 0 color-mix(in oklab, var(--ak-ink) 28%, var(--ak-surface));
+  --ak-tilt:          -1.2deg;
+  --ak-enter-distance: 18px;
+  --ak-enter-stagger:  50ms;
+  --ak-weight-display: 800;
+}
+
+/* @preset-block neon-dense — the operator console: tight radii and gaps, the mono face on
+   display type, a fast short entrance, an accent-tinted working surface. */
+[data-ak-look='neon-dense'] {
+  --ak-radius:        8px;
+  --ak-radius-sm:     6px;
+  --ak-gap:           8px;
+  --ak-pad:           12px;
+  --ak-font-display:  var(--ak-font-mono);
+  --ak-surface-image: linear-gradient(180deg,
+                        color-mix(in oklab, var(--ak-accent) 4%, var(--ak-surface)),
+                        var(--ak-surface));
+  --ak-hero-min:      18dvh;
+  --ak-enter-distance: 6px;
+  --ak-enter-stagger:  20ms;
+  --ak-motion:        var(--motion-fast, 120ms);
+  --ak-weight-display: 700;
+}
+
+/* @preset-block poster — one giant focal statement: the hero owns the first viewport and
+   everything else recedes to bordered lists. */
+[data-ak-look='poster'] {
+  --ak-hero-min:      42dvh;
+  --ak-text-hero:     clamp(2.6rem, 9vw, 4.2rem);
+  --ak-weight-display: 850;
+  --ak-surface-image: none;
+  --ak-elev-1:        none;
+  --ak-enter-distance: 20px;
+  --ak-enter-stagger:  60ms;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════

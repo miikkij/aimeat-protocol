@@ -16,6 +16,9 @@
  *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
  * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
  * @version-history
+ *   v0.2.0 — 2026-08-27 — The display-treatment tokens land on the components: the hero title
+ *     carries --ak-display-shadow and --ak-display-stroke, and KPI tiles alternate by
+ *     --ak-tilt — so the sticker preset reads as a different form language, not a recolour.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
 
@@ -127,6 +130,8 @@
   line-height: 1.08;
   letter-spacing: -0.01em;
   overflow-wrap: anywhere;
+  text-shadow: var(--ak-display-shadow);
+  -webkit-text-stroke: var(--ak-display-stroke);
 }
 .ak-hero__sub { margin: 0; font-size: var(--ak-text-body); color: var(--ak-ink-dim); }
 .ak-hero__sub[hidden] { display: none; }
@@ -150,7 +155,9 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  transform: rotate(var(--ak-tilt));
 }
+.ak-statrow__tile:nth-child(even) { transform: rotate(calc(var(--ak-tilt) * -1)); }
 .ak-statrow__value {
   font-family: var(--ak-font-display);
   font-weight: var(--ak-weight-display);

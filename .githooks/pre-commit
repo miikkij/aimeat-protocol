@@ -14,6 +14,7 @@
 #   8. app-catalog.html ↔ its sources    — pnpm check:app-catalog
 #   8b. Landing change log is well-formed — pnpm check:changelog
 #   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
+#   8c. Atelier preset × palette matrix  — pnpm check:atelier
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #   9b. MCP tool input-schema parity      — pnpm check:mcp-schemas
 #   9c. Plain language for a person       — pnpm check:plain-language
@@ -86,6 +87,9 @@ pnpm -s check:changelog
 
 echo "[pre-commit] SDK-libs dist ↔ sources in sync (check:sdk)…"
 pnpm -s check:sdk
+
+echo "[pre-commit] Atelier look matrix — every preset × palette × mode (check:atelier)…"
+pnpm -s check:atelier
 
 echo "[pre-commit] MCP tool surface/handler parity (check:mcp-tools)…"
 pnpm -s check:mcp-tools

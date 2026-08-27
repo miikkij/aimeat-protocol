@@ -102,6 +102,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:sdk
 
+      - name: Atelier look matrix — every preset × palette × mode (check:atelier)
+        working-directory: aimeat
+        run: pnpm check:atelier
+
       - name: No silent exception handlers in the cleaned areas (check:silent-catch)
         working-directory: .
         run: pnpm check:silent-catch -- --strict
