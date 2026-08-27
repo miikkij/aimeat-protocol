@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-27",
+      "kind": "feature",
+      "title": {
+        "en": "The top-left corner goes to one place, and the profile is now Settings & Controls",
+        "fi": "Vasen ylänurkka vie yhteen paikkaan, ja profiili on nyt Asetukset ja hallinta"
+      },
+      "body": {
+        "en": "Pressing the AIMEAT mark in the top-left corner takes you home when you are signed in, and to the front page when you are not. It used to depend on which tab you happened to be in.\n\nThe header row now carries Home, Chat, Apps and Settings & Controls side by side. Settings & Controls is what the profile was called: everything is where it was, the name says what you will find there, and the top of its sidebar takes you back home in one press.\n\nThe switch between \"the new home\" and \"the old profile\" is gone. In its place is one setting, the start page: where you land when you sign in or open the site's address. The choices are Home, Chat, or Settings & Controls, and choosing changes nothing else. Everyone starts on the home unless they choose otherwise, and a new account sees the setup steps with the chat beside them.\n\nThe chat's back button goes home.",
+        "fi": "Kun olet kirjautunut sisään, AIMEAT-merkki vasemmassa ylänurkassa vie kotiin, ja kirjautumattomana etusivulle. Aiemmin lopputulos riippui siitä, missä välilehdessä satuit olemaan.\n\nYläpalkissa ovat nyt rinnakkain Koti, Chat, Sovellukset sekä Asetukset ja hallinta. Asetukset ja hallinta on entinen profiili: kaikki on siellä missä ennenkin, nimi vain kertoo mitä sieltä löytyy, ja sen sivupalkin yläreunasta pääsee takaisin kotiin yhdellä painalluksella.\n\nKytkin uuden kodin ja vanhan profiilin välillä on poistettu. Sen tilalla on yksi asetus, aloitussivu: sivu, jolle päädyt kirjautuessasi tai avatessasi sivuston osoitteen. Vaihtoehdot ovat Koti, Chat sekä Asetukset ja hallinta, eikä valinta muuta mitään muuta. Jokainen aloittaa kodista, ellei valitse toisin, ja uusi tili näkee käyttöönoton askeleet ja chatin rinnakkain.\n\nChatin takaisin-nappi vie kotiin."
+      }
+    },
+    {
       "date": "2026-08-26",
       "kind": "feature",
       "title": {
