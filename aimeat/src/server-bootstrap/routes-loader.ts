@@ -194,6 +194,7 @@ import { settingsProactiveRouter } from '../routes/settings-proactive.js';
 import { attestationsRouter } from '../routes/attestations.js';
 import { trackedResponsesRouter } from '../routes/tracked-responses.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
+import { agentCrewRouter } from '../routes/agent-crew.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { ledgerRouter } from '../routes/ledger.js';
 import { appsCostRouter } from '../routes/apps-cost.js';
@@ -454,6 +455,7 @@ export async function mountRoutes(
   app.use(attestationsRouter(config, storage));   // Dual-signed attestations (TINKI) — co-signed deeds
   app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));
+  app.use(agentCrewRouter(config, storage));     // Crew tab — a JSON crew definition, validated by the agent's own runtime
   app.use(agentTelemetryRouter(config, storage));
   app.use(ledgerRouter(config, storage));         // LEDGER (TARGET-016) — agent LLM usage/cost read API
   app.use(appsCostRouter(config, storage));       // EXCHANGE G3 (TARGET-045) — per-app cost & contracts

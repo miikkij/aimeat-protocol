@@ -5,6 +5,8 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.23.0 -- 2026-08-28 -- Crew tab (tab-crew.js): a JSON crew definition for the agent, validated
+ *     and tried by the agent's own runtime over the tunnel, published to crews.registry.<agent>.
  *   v1.22.0 -- 2026-08-13 -- Footer link through to wherever the agent actually runs, when its host
  *     has reported the address (agent.console_url). An agent created from a chat lives in a runtime
  *     this node has never heard of, so the card described something the owner could not reach. The
@@ -94,6 +96,7 @@ import TabUsage from './tab-usage.js';
 import TabSchedules from './tab-schedules.js';
 import TabQuality from './tab-quality.js';
 import TabServices from './tab-services.js';
+import TabCrew from './tab-crew.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -118,6 +121,7 @@ const TABS = [
   { id: 'usage', key: 'profile.agents.detail.tabs.usage' },
   { id: 'schedules', key: 'profile.agents.detail.tabs.schedules' },
   { id: 'directives', key: 'profile.agents.detail.tabs.directives' },
+  { id: 'crew', key: 'profile.agents.detail.tabs.crew' },
   { id: 'agent-config', key: 'profile.agents.detail.tabs.agent_config' },
   { id: 'services', key: 'profile.agents.detail.tabs.services' },
 ];
@@ -756,6 +760,7 @@ function renderTabContent(activeTab, agent, onboarding, session, showToast, allA
     case 'schedules': return html`<${TabSchedules} ...${props} />`;
     case 'quality': return html`<${TabQuality} ...${props} />`;
     case 'services': return html`<${TabServices} ...${props} />`;
+    case 'crew': return html`<${TabCrew} ...${props} />`;
     default: return null;
   }
 }

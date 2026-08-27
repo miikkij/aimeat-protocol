@@ -25,6 +25,10 @@
  *   mgr.startHeartbeatMonitor();
  *   mgr.handleConnection(ws, verifiedToken, rawToken);
  * @version-history
+ *   v1.12.0 -- 2026-08-28 -- `invoke` carries `timeout_ms` so the connector daemon can drop a call the
+ *     server has stopped waiting for. invokeOnPrincipal now also serves GAII targets (the Crew tab
+ *     asks a running crew to validate or try a definition); the method was principal-agnostic
+ *     already, only its callers were ecosystem-only.
  *   v1.11.0 -- 2026-08-23 -- closeForOwner(): account deactivation (owner-lifecycle.ts, BR-04)
  *     closes every live socket acting for that owner, because upgrade-time verification is the
  *     only one a tunnel gets.
@@ -448,7 +452,7 @@ export class ConnectTunnelManager {
         reject,
         timer,
       });
-      this.send(conn.ws, { type: 'invoke', id, capability: payload.capability, input: payload.input, caller: payload.caller });
+      this.send(conn.ws, { type: 'invoke', id, capability: payload.capability, input: payload.input, caller: payload.caller, timeout_ms: ttl });
     });
   }
 

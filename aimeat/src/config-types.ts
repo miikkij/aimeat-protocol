@@ -513,6 +513,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   connectTunnelHeartbeatIntervalMs: number;
   connectTunnelOfflineThresholdMs: number;
   connectTunnelRequestTimeoutMs: number;
+  /** How long the Crew tab's "Try" waits for a running crew to finish one trial run (invoke over the tunnel). */
+  crewTryTimeoutMs: number;
 
   // Email / SMTP (Phase 1.1)
   smtpHost: string | null;

@@ -37,6 +37,11 @@
  *     after each (re)connect so the serve daemon re-subscribes (per-socket subscriptions) and the
  *     consumer catches up; `subscribed` ack logged. workspace.record delivers ride the existing
  *     onDeliver path (auto-acked like any deliver).
+ *   v1.2.0 — 2026-08-28 — Server-initiated `invoke`: the frame the node sends when it wants THIS
+ *     principal to run something (Crew tab: validate or try a crew definition) is handed to
+ *     `onInvoke`, answered with `replyInvoke()`, and refused at once as UNSUPPORTED when the
+ *     consumer registered no handler — the node must not wait a full timeout on a client that
+ *     cannot answer.
  */
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
@@ -86,6 +91,13 @@ export interface ConnectTunnelClientOptions {
   label?: string;
   /** Realtime reverse delivery (the client acks automatically). */
   onDeliver?: (kind: string, payload: unknown, id: string) => void;
+  /**
+   * A server-initiated `invoke` (the node asks THIS principal to run a capability and waits for
+   * `invoke_result`). The handler answers through `replyInvoke(id, ok, result)`, now or later. With
+   * no handler the frame is refused at once as `ok:false, result.code = UNSUPPORTED`, so the node
+   * does not sit on its timeout for a client that cannot answer.
+   */
+  onInvoke?: (frame: { id: string; capability: string; input: unknown; caller?: string; timeout_ms?: number }) => void;
   /** On-connect snapshot of queued tasks + pending messages. */
   onBacklog?: (payload: { tasks: unknown[]; messages: unknown[] }) => void;
   /**
@@ -126,6 +138,13 @@ interface TunnelFrame {
   code?: string;
   message?: string;
   timestamp?: string;
+  // ── invoke (S→C) / invoke_result (C→S) ──
+  capability?: string;
+  input?: unknown;
+  caller?: string;
+  timeout_ms?: number;
+  ok?: boolean;
+  result?: unknown;
 }
 
 /**
@@ -236,6 +255,16 @@ export class ConnectTunnelClient {
     if (!spaces.length) return;
     try { this.ws.send(JSON.stringify({ type: 'subscribe', id: randomUUID(), spaces })); }
     catch (err) { console.error(`[${this.label}] subscribe send failed: ${(err as Error).message}`); }
+  }
+
+  /**
+   * Answer a server-initiated `invoke` by correlation id. Best-effort: with the socket gone the
+   * node has already timed the call out on its side, so there is nothing left to tell it.
+   */
+  replyInvoke(id: string, ok: boolean, result: unknown): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    try { this.ws.send(JSON.stringify({ type: 'invoke_result', id, ok, result })); }
+    catch (err) { console.error(`[${this.label}] invoke_result send failed: ${(err as Error).message}`); }
   }
 
   /** Graceful shutdown: `disconnect` frame + socket close + timers cleared. */
@@ -434,6 +463,21 @@ export class ConnectTunnelClient {
         catch (err) { console.error(`[${this.label}] onDeliver handler error: ${(err as Error).message}`); }
         if (id && this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({ type: 'ack', id }));
+        }
+        break;
+      }
+      case 'invoke': {
+        const id = frame.id ?? '';
+        const capability = frame.capability ?? '';
+        if (!id) break;
+        if (!this.opts.onInvoke) {
+          this.replyInvoke(id, false, { code: 'UNSUPPORTED', message: `This client does not answer "${capability}" calls.` });
+          break;
+        }
+        try { this.opts.onInvoke({ id, capability, input: frame.input, caller: frame.caller, timeout_ms: frame.timeout_ms }); }
+        catch (err) {
+          console.error(`[${this.label}] onInvoke handler error: ${(err as Error).message}`);
+          this.replyInvoke(id, false, { code: 'HANDLER_ERROR', message: (err as Error).message });
         }
         break;
       }

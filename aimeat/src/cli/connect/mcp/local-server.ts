@@ -60,6 +60,12 @@
  *     task queue, so the level check returned 200 forever after one push — a zero-length idle wait
  *     that cost ~56% of a core per affected agent and 28 req/s against the node from one stuck agent.
  *     AgentChannel is exported for the unit tests (serve-wake-watermark.test.ts).
+ *   v1.7.0 — 2026-08-28 — Server-initiated `invoke` reaches a crew: the tunnel's `invoke` frame (the
+ *     one ecosystem apps already answer) is queued per agent and offered on `GET /local/invoke/next`
+ *     + `POST /local/invoke/:id/result` (./local-invoke.ts), the same long-poll shape as tasks,
+ *     records and DMs. This is what lets the node ask a running crew to validate or try a crew
+ *     definition without creating a task. AgentChannel moved to ./local-channel.ts (pure extraction,
+ *     this file had reached the 800-line cap); re-exported here.
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
@@ -73,10 +79,14 @@ import { ConnectTunnelClient } from '../tunnel-client.js';
 import { getToken } from '../keychain.js';
 import { getConfigDir } from '../config.js';
 import type { AgentRegistry, RegisteredAgent } from '../agent-registry.js';
-import { wakeAgent } from './wakeup.js';
-import { startPollerForAgent, legacyWakeAdapter } from './poller.js';
-import { launchTaskRunner, isRunner } from '../task-runner.js';
+import { startPollerForAgent } from './poller.js';
+import { AgentChannel, type SpaceRef } from './local-channel.js';
+import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
 import { CONNECT_CLI_TOOLS } from '../tool-call.js';
+
+// Re-exported so the unit test (serve-wake-watermark.test.ts) and any importer keep resolving
+// after the class moved to ./local-channel.ts.
+export { AgentChannel } from './local-channel.js';
 import { logger } from '../../../utils/logger.js';
 import { checkBuildFreshness, announceBuild, buildIdentity } from '../../../utils/build-stamp.js';
 
@@ -117,221 +127,6 @@ export function serveDiscoveryPath(): string {
   return join(getConfigDir(), 'serve.json');
 }
 
-interface QueuedTask {
-  task: Record<string, unknown>;
-  via: 'deliver' | 'backlog';
-  receivedAt: string;
-}
-
-type Waiter = (item: QueuedTask | null) => void;
-
-/** A workspace record-change event pushed over the tunnel (`workspace.record` deliver). */
-interface QueuedRecord { event: Record<string, unknown>; receivedAt: string }
-type RecordWaiter = (item: QueuedRecord | null) => void;
-
-/** One (organism, ws, space) the agent subscribes to for record push. */
-interface SpaceRef { organism_id: string; ws: string; space: string }
-
-/**
- * Per-agent push state. Fed by the tunnel's `deliver` (live) and `backlog`
- * (on-connect snapshot) frames; tasks are deduped by id across both sources so
- * a live-pushed-then-backlogged task fires the wake/runner/long-poll exactly
- * once per daemon lifetime. (Storage stays the source of truth — a consumer
- * that missed a long-poll window can always list tasks via the REST proxy.)
- */
-export class AgentChannel {
-  transportMode: ServeDiscoveryAgent['transport'] = 'direct';
-  tunnel: ConnectTunnelClient | null = null;
-  /** Tunnel (re)connect count (mirrors the client's connectCount). A consumer that sees this change
-   *  between cycles knows the socket reconnected and does its one catch-up read (record push is
-   *  per-socket; events during the disconnect window are not replayed). */
-  reconnects = 0;
-  private seenTaskIds = new Set<string>();
-  private seenMessageIds = new Set<string>();
-  private queue: QueuedTask[] = [];
-  private waiters: Waiter[] = [];
-  private recordQueue: QueuedRecord[] = [];
-  private recordWaiters: RecordWaiter[] = [];
-  private dmQueue: QueuedRecord[] = [];
-  private dmWaiters: RecordWaiter[] = [];
-  /** One-shot waiters for the unified /local/wake/next signal (see nextWake/signalWake). */
-  private wakeWaiters: Array<(woke: boolean) => void> = [];
-  /** Wake watermark: `wakeSeq` advances on every wake-worthy event, `wakeSeen` on every report of
-   *  one. The signal is edge-triggered on this pair and NEVER level-read from the queues: the daemon
-   *  parked on /local/wake/next lists its work from the node store and does not drain the local task
-   *  queue, so a queue-length check stays true forever after the first push and turns the idle wait
-   *  into a hot loop (one stuck agent measured at 28 req/s and 76% node CPU). An event landing
-   *  between the consumer's listing and its park still wakes it once: the counter already moved. */
-  private wakeSeq = 0;
-  private wakeSeen = 0;
-  /** Task ids the node pushed as cancelled (P3) — checked by the daemon instead of polling the
-   *  owner-scoped `agents.cancel.*` memory before every dispatch. Bounded by a daemon's task volume. */
-  private cancelledIds = new Set<string>();
-  /** Spaces the agent asked to subscribe to — held so the daemon re-sends them on each reconnect. */
-  private subscriptions: SpaceRef[] = [];
-
-  constructor(readonly entry: RegisteredAgent) {}
-
-  setSubscriptions(spaces: SpaceRef[]): void { this.subscriptions = spaces; }
-  getSubscriptions(): SpaceRef[] { return this.subscriptions; }
-
-  /** Record a pushed task cancellation (P3 `task.cancelled` deliver). */
-  handleCancelled(payload: unknown): void {
-    const id = (payload as { id?: unknown })?.id;
-    if (typeof id === 'string' && id) this.cancelledIds.add(id);
-  }
-  getCancelledIds(): string[] { return [...this.cancelledIds]; }
-
-  /** A `workspace.record` event arrived — surface it on the record long-poll (no dedup: each write
-   *  is a distinct wake; storage stays the source of truth for content via an authorized read). */
-  handleRecord(payload: unknown): void {
-    if (!payload || typeof payload !== 'object') return;
-    const item: QueuedRecord = { event: payload as Record<string, unknown>, receivedAt: new Date().toISOString() };
-    const waiter = this.recordWaiters.shift();
-    if (waiter) waiter(item);
-    else this.recordQueue.push(item);
-    this.signalWake();
-  }
-
-  /** Long-poll: next undelivered record event, or null after `waitMs` with none. */
-  nextRecord(waitMs: number): Promise<QueuedRecord | null> {
-    const queued = this.recordQueue.shift();
-    if (queued) return Promise.resolve(queued);
-    if (waitMs <= 0) return Promise.resolve(null);
-    return new Promise<QueuedRecord | null>((resolve) => {
-      const waiter: RecordWaiter = (item) => { clearTimeout(timer); resolve(item); };
-      const timer = setTimeout(() => {
-        const i = this.recordWaiters.indexOf(waiter);
-        if (i >= 0) this.recordWaiters.splice(i, 1);
-        resolve(null);
-      }, waitMs);
-      this.recordWaiters.push(waiter);
-    });
-  }
-
-  /** A `dm.inbound` event arrived — surface it on the DM long-poll. Separate queue from tasks/records so
-   *  federated-inbox wakes never intermix with task or workspace-record wakes (same philosophy as records).
-   *  No dedup: each DM is a distinct wake; full body/attachments are read via aimeat_dm_thread. */
-  handleDm(payload: unknown): void {
-    if (!payload || typeof payload !== 'object') return;
-    const item: QueuedRecord = { event: payload as Record<string, unknown>, receivedAt: new Date().toISOString() };
-    const waiter = this.dmWaiters.shift();
-    if (waiter) waiter(item);
-    else this.dmQueue.push(item);
-    this.signalWake();
-  }
-
-  /** Long-poll: next undelivered DM event, or null after `waitMs` with none. */
-  nextDm(waitMs: number): Promise<QueuedRecord | null> {
-    const queued = this.dmQueue.shift();
-    if (queued) return Promise.resolve(queued);
-    if (waitMs <= 0) return Promise.resolve(null);
-    return new Promise<QueuedRecord | null>((resolve) => {
-      const waiter: RecordWaiter = (item) => { clearTimeout(timer); resolve(item); };
-      const timer = setTimeout(() => {
-        const i = this.dmWaiters.indexOf(waiter);
-        if (i >= 0) this.dmWaiters.splice(i, 1);
-        resolve(null);
-      }, waitMs);
-      this.dmWaiters.push(waiter);
-    });
-  }
-
-  handleTask(payload: unknown, via: QueuedTask['via']): void {
-    const task = payload as Record<string, unknown> | null;
-    const id = typeof task?.id === 'string' ? task.id : null;
-    if (!task || !id || this.seenTaskIds.has(id)) return;
-    this.seenTaskIds.add(id);
-
-    // Same side effects the poll loop used to produce on a new queued task.
-    void wakeAgent(legacyWakeAdapter(this.entry), 'task_new', `task ${id} via ${via}`);
-    if (isRunner(this.entry)) {
-      launchTaskRunner(this.entry, {
-        id,
-        title: typeof task.title === 'string' ? task.title : undefined,
-        description: typeof task.description === 'string' ? task.description : undefined,
-      }).catch(err => {
-        console.error(`[serve:${this.entry.agent}] runner launch failed for ${id}: ${(err as Error).message}`);
-      });
-    }
-
-    const item: QueuedTask = { task, via, receivedAt: new Date().toISOString() };
-    const waiter = this.waiters.shift();
-    if (waiter) waiter(item);
-    else this.queue.push(item);
-    this.signalWake();
-  }
-
-  handleMessages(messages: unknown[]): void {
-    let fresh = 0;
-    for (const m of messages) {
-      const id = typeof (m as { id?: unknown })?.id === 'string' ? (m as { id: string }).id : null;
-      if (!id || this.seenMessageIds.has(id)) continue;
-      this.seenMessageIds.add(id);
-      fresh++;
-    }
-    if (fresh > 0) {
-      void wakeAgent(legacyWakeAdapter(this.entry), 'message_new', `${fresh} new message(s)`);
-      // Also fire the unified wake so a daemon parked on /local/wake/next re-polls its inbox now
-      // (messages have no drainable queue -- the wake just triggers the cycle's _poll_messages).
-      this.signalWake();
-    }
-  }
-
-  /** Long-poll: next undelivered task, or null after `waitMs` with none. */
-  nextTask(waitMs: number): Promise<QueuedTask | null> {
-    const queued = this.queue.shift();
-    if (queued) return Promise.resolve(queued);
-    if (waitMs <= 0) return Promise.resolve(null);
-    return new Promise<QueuedTask | null>((resolve) => {
-      const waiter: Waiter = (item) => { clearTimeout(timer); resolve(item); };
-      const timer = setTimeout(() => {
-        const i = this.waiters.indexOf(waiter);
-        if (i >= 0) this.waiters.splice(i, 1);
-        resolve(null);
-      }, waitMs);
-      this.waiters.push(waiter);
-    });
-  }
-
-  /** Fire every pending unified-wake signal. One-shot: a `nextWake` waiter is removed once resolved.
-   *  Called whenever ANY push source arrives (task/record/dm/message) so a consumer parked on
-   *  /local/wake/next wakes on all of them, not just its single queue. Purely a SIGNAL — it does not
-   *  consume anything; the woken cycle drains each queue + re-lists tasks/messages as usual. */
-  private signalWake(): void {
-    this.wakeSeq++;
-    // Resolving a parked waiter IS the report; without this line the next park would fire again
-    // for an event the consumer already woke on.
-    if (this.wakeWaiters.length > 0) this.wakeSeen = this.wakeSeq;
-    for (const w of this.wakeWaiters.splice(0)) w(true);
-  }
-
-  /** Unified long-poll SIGNAL: resolves true the instant any push source arrives (or arrived,
-   *  unreported, before the park), or false after `waitMs`. Unlike nextTask/nextRecord/nextDm it does
-   *  NOT consume — the caller drains the individual queues / re-lists from the node. One report per
-   *  event: see the wakeSeq/wakeSeen comment. */
-  nextWake(waitMs: number): Promise<boolean> {
-    if (this.wakeSeq > this.wakeSeen) { this.wakeSeen = this.wakeSeq; return Promise.resolve(true); }
-    if (waitMs <= 0) return Promise.resolve(false);
-    return new Promise<boolean>((resolve) => {
-      const w = (woke: boolean) => { clearTimeout(timer); resolve(woke); };
-      const timer = setTimeout(() => {
-        const i = this.wakeWaiters.indexOf(w);
-        if (i >= 0) this.wakeWaiters.splice(i, 1);
-        resolve(false);
-      }, waitMs);
-      this.wakeWaiters.push(w);
-    });
-  }
-
-  drainWaiters(): void {
-    for (const w of this.waiters.splice(0)) w(null);
-    for (const w of this.recordWaiters.splice(0)) w(null);
-    for (const w of this.dmWaiters.splice(0)) w(null);
-    for (const w of this.wakeWaiters.splice(0)) w(false);
-  }
-}
-
 export interface ServeDaemonOptions {
   registry: AgentRegistry;
   /** Fresh, fully tool-registered MCP server (one per Streamable-HTTP session). */
@@ -370,19 +165,27 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
 
   const startedAt = new Date().toISOString();
   const channels = new Map<string, AgentChannel>();
+  const invokeChannels = new Map<string, InvokeChannel>();
 
   // ── One tunnel client per agent, with graceful degradation ──
   for (const entry of registry.list()) {
     const ch = new AgentChannel(entry);
     channels.set(entry.agent, ch);
+    // Server-initiated invokes (Crew tab validate/try) queue here and are answered back over the
+    // same socket. `tunnel` is assigned just below; the reply closure only runs after it exists.
+    const inv = new InvokeChannel((id, ok, result) => tunnel.replyInvoke(id, ok, result));
+    invokeChannels.set(entry.agent, inv);
 
     const tunnel = new ConnectTunnelClient({
       nodeUrl: entry.config.node_url,
       getToken: () => getToken(entry.agent, entry.owner),
       label: `tunnel:${entry.agent}`,
+      onInvoke: (frame) => inv.handleInvoke(frame),
       onDeliver: (kind, payload) => {
         if (kind === 'task_assigned') ch.handleTask(payload, 'deliver');
         else if (kind === 'workspace.record') ch.handleRecord(payload);
+        // A published crew definition: the runtime parked on records/wake reads its key and reloads.
+        else if (kind === 'crew.def_updated') ch.handleRecord(payload);
         else if (kind === 'dm.inbound') ch.handleDm(payload);
         else if (kind === 'task.cancelled') ch.handleCancelled(payload);
       },
@@ -434,6 +237,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       || undefined;
     return registry.resolve(name || undefined);
   };
+
+  // GET /local/invoke/next + POST /local/invoke/:id/result — the invoke surface (./local-invoke.ts).
+  registerLocalInvokeRoutes(app, resolveAgent, invokeChannels);
 
   // ── Local MCP (Streamable HTTP) — mirrors the node's session plumbing, no auth ──
   const transports = new Map<string, StreamableHTTPServerTransport>();
@@ -682,6 +488,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
           // that sees `reconnects` increase between cycles does its one catch-up read (per-socket subs).
           subscriptions: channels.get(e.agent)!.getSubscriptions().length,
           reconnects: channels.get(e.agent)!.reconnects,
+          // Server-initiated invokes queued or being worked on, and whether a runtime is collecting them.
+          invokes_pending: invokeChannels.get(e.agent)?.pendingCount() ?? 0,
+          invoke_handler: invokeChannels.get(e.agent)?.hasHandler() ?? false,
         })),
       },
     });
@@ -778,6 +587,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     try { if (existsSync(discoveryFile)) unlinkSync(discoveryFile); } catch (err) { logger.warn('shutdown: best effort', { error: String(err) }); }
     for (const ch of channels.values()) {
       ch.drainWaiters();
+      invokeChannels.get(ch.entry.agent)?.drainWaiters();
       try { await ch.tunnel?.close(); } catch (err) { logger.warn('shutdown: ignore', { error: String(err) }); }
     }
     await new Promise<void>((resolve) => {
