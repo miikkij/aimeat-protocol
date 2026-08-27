@@ -2121,6 +2121,24 @@
     .pb-mode-row { display: flex; gap: 12px; margin-bottom: 14px; }
     .pb-mode-radio { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: .88rem; }
     .pb-mode-radio input { accent-color: #E8564A; }
+    /* The track choice: two cards, one decision, made before anything else (TARGET-074). */
+    .pb-track { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+    @media (max-width: 560px) { .pb-track { grid-template-columns: 1fr; } }
+    .pb-trackcard {
+      position: relative; display: block; cursor: pointer;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+      border-radius: 10px; padding: 12px 14px;
+    }
+    .pb-trackcard.is-on { border-color: #E8564A; box-shadow: 0 0 0 1px #E8564A; }
+    .pb-trackcard input { position: absolute; opacity: 0; pointer-events: none; }
+    .pb-trackcard:has(input:focus-visible) { outline: 2px solid #E8564A; outline-offset: 2px; }
+    .pb-trackname { font-weight: 700; font-size: .92rem; margin-right: 6px; }
+    .pb-tracknew {
+      display: inline-block; padding: 1px 8px; border-radius: 999px;
+      background: #E8564A; color: #fff; font-size: .7rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .04em; vertical-align: 2px;
+    }
+    .pb-trackdesc { display: block; margin-top: 4px; font-size: .8rem; opacity: .75; line-height: 1.45; }
     .pb-desc-area {
       width: 100%; min-height: 60px; max-height: 120px; resize: vertical;
       background: var(--bg-subtle); border: 1px solid var(--border-subtle);

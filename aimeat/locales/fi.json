@@ -4568,6 +4568,13 @@
     "promptHasTemplate": "valitsemasi aloituspohjan",
     "promptHasPacks": "kyvykkyyspakettia käyttöohjeineen",
     "promptHasPitfalls": "talon kirjastot ja valmiiksi kirjatut sudenkuopat",
+    "promptHasAtelier": "Atelier-työkalupakin: elävät tyylit, asettelut ja liikkeen, joista tekoäly kokoaa appisi",
+    "trackTitle": "Miten appisi rakennetaan?",
+    "trackClassic": "Perinteinen",
+    "trackClassicDesc": "Tuttu ja varma tapa: aloituspohjat, kyvykkyyspaketit, siisti perustyyli.",
+    "trackAtelier": "Atelier",
+    "trackAtelierDesc": "Uusi rata: elävät tyylit (sanomalehti, galleria, neonkonsoli…), asettelut joita tekoälysi voi järjestellä myöhemmin julkaisematta uudelleen, liike valmiina.",
+    "trackNew": "uusi",
     "promptHasPack": "yhden kyvykkyyspaketin käyttöohjeineen",
     "tier": {
       "any": "KAIKILLE MALLEILLE",

@@ -14,10 +14,19 @@
  *   The image value reaches CSS as a custom property; a data: URI is refused here for the same
  *   reason the publish gate refuses it — inlined image bytes are the documented way an app file
  *   bloats past its edit loop.
- * @structure hero(spec) → { el, set, destroy } · statRow(spec) → { el, set, destroy }
+ * @structure hero(spec) → { el, set, destroy } · statRow(spec) → { el, set, destroy } ·
+ *   figure(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
  * @version-history
+ *   v0.10.0 — 2026-08-28 — A hero that repeats the app's title claims it: when the hero title
+ *     equals the shell bar's, the bar heading goes screen-reader-only and the masthead carries the
+ *     name alone. All three first-AEB Atelier builds printed the name twice, stacked.
+ *   v0.9.0 — 2026-08-27 — figure(): one giant number as the focal point (the Cape Town move —
+ *     the data itself is the hero). Counts up on set(), like every figure in the kit.
+ *   v0.6.0 — 2026-08-27 — The scrim becomes a child layer (.ak-hero__scrim): the aurora mesh
+ *     drifts on ::before and the scrim + grain must paint above it and below the text — a
+ *     pseudo cannot sit between another pseudo and the children, a child can.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
 import { el, clear, resolve, uid, enter, countUp } from './dom.js';
@@ -63,16 +72,33 @@ export function hero(spec) {
   const sub = el('p', { class: 'ak-hero__sub' });
   const actions = el('div', { class: 'ak-hero__actions' });
   const inner = el('div', { class: 'ak-hero__inner' }, [title, sub, actions]);
+  // The scrim+grain layer: a child, not a pseudo, so it paints ABOVE the drifting aurora
+  // (::before) and BELOW the text — the readable zone stays put while the colour wanders.
+  const scrim = el('span', { class: 'ak-hero__scrim', 'aria-hidden': 'true' });
   const root = el('div', {
     class: 'ak-root ak-hero',
     'data-ak-hero': true,
     'aria-labelledby': titleId,
-  }, [inner]);
+  }, [scrim, inner]);
 
   const layer = imageLayer(spec.image);
   if (layer) { root.style.setProperty('--ak-hero-image', layer); root.classList.add('ak-hero--image'); }
 
   if (spec.target) resolve(spec.target).appendChild(root);
+
+  // The masthead claims a repeated name. When this hero's title is the same text the shell bar
+  // already shows, the bar heading is made screen-reader-only (the class is on the app root; the
+  // stylesheet does the hiding) so the name appears once, at display size. Checked on the next
+  // frame so it also covers a hero the host mounts after construction (mosaic does).
+  requestAnimationFrame(function () {
+    const appRoot = root.closest('.ak-app');
+    if (!appRoot) return;
+    const barTitle = appRoot.querySelector('.ak-app__bar .ak-app__title');
+    if (!barTitle) return;
+    const same = (barTitle.textContent || '').trim().toLowerCase()
+      === String(state.title || '').trim().toLowerCase();
+    if (same) appRoot.classList.add('ak-app--hero-titled');
+  });
 
   function render() {
     title.textContent = state.title;
@@ -183,5 +209,50 @@ export function statRow(spec) {
       stopLang();
       if (root.parentNode) root.parentNode.removeChild(root);
     },
+  };
+}
+
+/**
+ * The FIGURE: one giant number as the focal point — the Cape Town move, where the data itself
+ * is the hero. A display-face numeral at hero scale, a mono small-caps label above it, a context
+ * line under it, an optional delta. `set()` counts the value up or down to the new figure.
+ * @param {{
+ *   target?: string|Element, value: number, label: string, sub?: string, delta?: string,
+ *   format?: (n: number) => string,
+ * }} spec
+ * @returns {{ el: HTMLElement, set: (patch: any) => void, destroy: () => void }}
+ */
+export function figure(spec) {
+  const state = { value: spec.value || 0, label: spec.label || '', sub: spec.sub, delta: spec.delta };
+  const fmt = spec.format || function (n) { return String(Math.round(n)); };
+
+  const label = el('span', { class: 'ak-figure__label', text: state.label });
+  const value = el('span', { class: 'ak-figure__value', text: fmt(state.value) });
+  const delta = el('span', { class: 'ak-figure__delta', text: state.delta || '' });
+  delta.hidden = !state.delta;
+  const sub = el('p', { class: 'ak-figure__sub', text: state.sub || '' });
+  sub.hidden = !state.sub;
+  const root = el('div', { class: 'ak-root ak-figure' }, [
+    label,
+    el('div', { class: 'ak-figure__row' }, [value, delta]),
+    sub,
+  ]);
+  if (spec.target) resolve(spec.target).appendChild(root);
+  enter(root);
+
+  return {
+    el: root,
+    /** @param {{ value?: number, label?: string, sub?: string, delta?: string }} patch */
+    set(patch) {
+      if (!patch) return;
+      if (patch.label != null) { state.label = patch.label; label.textContent = state.label; }
+      if (patch.sub !== undefined) { state.sub = patch.sub; sub.textContent = state.sub || ''; sub.hidden = !state.sub; }
+      if (patch.delta !== undefined) { state.delta = patch.delta; delta.textContent = state.delta || ''; delta.hidden = !state.delta; }
+      if (patch.value != null && patch.value !== state.value) {
+        countUp(value, state.value, patch.value, { format: fmt });
+        state.value = patch.value;
+      }
+    },
+    destroy() { if (root.parentNode) root.parentNode.removeChild(root); },
   };
 }

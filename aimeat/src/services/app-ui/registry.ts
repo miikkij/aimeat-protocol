@@ -25,6 +25,10 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.3.0 — 2026-08-27 — COMPOSITION arrives (append-only): per-block `span` (full/main/side/
+ *     half) turns the stack into a composed page, and `rail` joins the nav modes — the
+ *     desktop-grade left rail. The developer's award-site references made the gap plain: the
+ *     missing axis was layout, not colour.
  *   v1.2.0 — 2026-08-27 — The catalogue carries the layout presets (layouts.ts): a first layout
  *     starts from a finished shape, not from nothing (TARGET-074, leiskat v1).
  *   v1.1.0 — 2026-08-27 — Append-only: every unit-forming component gains an optional `title` —
@@ -34,6 +38,7 @@
  *     (TARGET-074 phase 2).
  */
 import type { BlockPropDef } from '../surface-layout/registry-types.js';
+import { LOOKS as LOOK_REGISTRY, STRUCTURES } from '../../data/atelier-looks.js';
 import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
 
 /** A mosaic prop: the shared grammar, plus whether a layout must supply it. */
@@ -54,11 +59,21 @@ export interface AppUiComponentDef {
 }
 
 /** Every navigation projection a layout may ask for — all supported on every screen size
- *  (decided 2026-08-27); the renderer carries each mode's own ergonomics. */
-export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow'] as const;
+ *  (decided 2026-08-27); the renderer carries each mode's own ergonomics. `rail` is the
+ *  desktop-grade left rail that folds to a strip on a narrow screen; `overlay` is the
+ *  award-site move — one Menu control opening a full-screen list in display type (both
+ *  append-only additions, 2026-08-27). */
+export const NAV_MODES = ['tabs', 'bottom-bar', 'canvas', 'deck', 'flow', 'rail', 'overlay'] as const;
 
-/** The look presets the stylesheet ships — check:atelier verifies every one arithmetically. */
-export const LOOKS = ['vivid', 'calm-card', 'editorial', 'sticker', 'neon-dense', 'poster', 'flat'] as const;
+/** How much of the composition grid one block takes. The default is the full line; the other
+ *  values are what turn a stack of cards into a COMPOSED PAGE — an asymmetric editorial split
+ *  is two blocks, `main` beside `side`. */
+export const BLOCK_SPANS = ['full', 'main', 'side', 'half'] as const;
+
+/** The look presets the stylesheet ships — DERIVED from the look registry
+ *  (src/data/atelier-looks.ts), the same source the generated stylesheet and the build prompt
+ *  read, so the three can never disagree. check:atelier verifies every one arithmetically. */
+export const LOOKS: readonly string[] = LOOK_REGISTRY.map((l) => l.id);
 
 const text = (description: string, maxLength = 200): AppUiPropDef => ({ type: 'string', maxLength, description });
 const requiredText = (description: string, maxLength = 200): AppUiPropDef => ({ type: 'string', maxLength, description, required: true });
@@ -82,6 +97,11 @@ export const UI_COMPONENTS: readonly AppUiComponentDef[] = [
   {
     id: 'statRow',
     summary: 'The KPI strip; figures count up when the bound data changes.',
+    props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
+  },
+  {
+    id: 'figure',
+    summary: 'The data IS the hero: ONE giant display numeral with its label and a context line, counting up on change. The source resolves to { value, label, sub?, delta? }.',
     props: { source: source(), title: text('The block\'s name in tabs, decks and canvas tiles.', 80) },
   },
   {
@@ -175,6 +195,9 @@ export function buildUiCatalogue(): {
   components: Array<{ id: string; summary: string; props: Record<string, AppUiPropDef>; max_per_layout?: number }>;
   nav_modes: readonly string[];
   looks: readonly string[];
+  spans: { values: readonly string[]; summary: string };
+  look_sheets: Array<{ id: string; feel: string; structures: string[] }>;
+  structures: Array<{ id: string; summary: string }>;
   layouts: readonly AppUiLayoutPreset[];
 } {
   return {
@@ -186,6 +209,17 @@ export function buildUiCatalogue(): {
     })),
     nav_modes: NAV_MODES,
     looks: LOOKS,
+    spans: {
+      values: BLOCK_SPANS,
+      summary: 'Optional per-block `span`: how much of the composition grid the block takes. '
+        + '`full` (the default) is the whole line; `main` + `side` side by side make the '
+        + 'asymmetric editorial split; two `half` blocks share a line. Narrow screens stack '
+        + 'everything, so a span is layout ambition, never a mobile risk.',
+    },
+    // The look data sheets: what each look feels like and which page structures it carries —
+    // enough for an AI to pick by intent instead of by trying them all.
+    look_sheets: LOOK_REGISTRY.map((l) => ({ id: l.id, feel: l.feel, structures: l.structures })),
+    structures: STRUCTURES.map((s) => ({ id: s.id, summary: s.summary })),
     layouts: UI_LAYOUT_PRESETS,
   };
 }

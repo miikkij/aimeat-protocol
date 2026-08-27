@@ -92,7 +92,7 @@ const GOOD_LAYOUT = {
         assert(r.status === 200, `catalogue ${r.status}`);
         const cat = r.body.data.catalogue;
         const ids = cat.components.map((c: any) => c.id);
-        for (const expected of ['hero', 'statRow', 'list', 'cardGrid', 'table', 'searchBar', 'tabs', 'section', 'emptyState', 'timeline', 'mediaCard']) {
+        for (const expected of ['hero', 'statRow', 'figure', 'list', 'cardGrid', 'table', 'searchBar', 'tabs', 'section', 'emptyState', 'timeline', 'mediaCard']) {
             assert(ids.includes(expected), `catalogue should carry ${expected} (got: ${ids.join(', ')})`);
         }
         const hero = cat.components.find((c: any) => c.id === 'hero');
@@ -124,6 +124,23 @@ const GOOD_LAYOUT = {
             assert(v.status === 200 && v.body.data.ok === true,
                 `preset "${preset.id}" must validate as-is: ${v.body.data.message ?? v.status}`);
         }
+    });
+
+    await test('a block span composes the grid — validated, with the nearest name on a typo', async () => {
+        const bad = await validate({ v: 1, blocks: [{ id: 'a', component: 'list', props: { source: 'x' }, span: 'mian' }] });
+        assert(bad.status === 200 && bad.body.data.ok === false, 'a bad span must refuse');
+        assert(bad.body.data.message.includes('Did you mean "main"?'),
+            `the refusal must suggest the nearest span: ${bad.body.data.message}`);
+        const good = await validate({
+            v: 1,
+            nav: 'rail',
+            blocks: [
+                { id: 'a', component: 'list', props: { source: 'x' }, span: 'main' },
+                { id: 'b', component: 'timeline', props: { source: 'y' }, span: 'side' },
+            ],
+        });
+        assert(good.status === 200 && good.body.data.ok === true,
+            `main+side on the rail must validate: ${JSON.stringify(good.body.data)}`);
     });
 
     await test('an unknown component is refused with the NEAREST real name suggested', async () => {

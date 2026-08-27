@@ -7,6 +7,9 @@
  *   modules, holds its own module state, has no back-dependency on the entry module. Carved from main.js.
  * @usage import { loadCortexExtensions, openCortexEditor, openPromptBuilder, getCortexOwnerToken } from './cortex.js'
  * @version-history
+ *   v1.1.0 — 2026-08-27 — The prompt builder gains the TRACK choice (TARGET-074): Classic or
+ *     Atelier as the first decision, each fetching its own node-served guide, never mixed.
+ *     Improving an app inherits its recorded track and hides the picker.
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 8).
  */
 import { jsArg, currentOwnerName } from './util.js';
@@ -341,6 +344,19 @@ function closeCortexEditor() {
 // ── Prompt Builder Panel ──────────────────────────
 
 var pbSourceApp = null; // app being improved (null = new app mode)
+// The TRACK is the first decision and the guides never mix (TARGET-074): Classic reads
+// /v1/prompts/build-app, Atelier reads /v1/prompts/build-app-atelier. Classic stays the
+// default until measured evidence says otherwise.
+var pbTrack = 'classic';
+
+function pbApplyTrackUi() {
+  var classicExtras = document.getElementById('pb-classic-extras');
+  if (classicExtras) classicExtras.style.display = pbTrack === 'atelier' ? 'none' : '';
+  var cardC = document.getElementById('pb-track-classic');
+  var cardA = document.getElementById('pb-track-atelier');
+  if (cardC) cardC.classList.toggle('is-on', pbTrack === 'classic');
+  if (cardA) cardA.classList.toggle('is-on', pbTrack === 'atelier');
+}
 
 function openPromptBuilder(app) {
   pbSourceApp = app || null;
@@ -352,6 +368,21 @@ function openPromptBuilder(app) {
   window.pbTemplate = null;
   var tplSel0 = document.getElementById('pb-template');
   if (tplSel0) tplSel0.value = '';
+
+  // The track: improving an app inherits ITS track (recorded in the manifest at publish);
+  // a new app starts on Classic and the person chooses. The picker hides in improve mode,
+  // because an existing app's track is a fact, not a choice.
+  pbTrack = (pbSourceApp && pbSourceApp.track === 'atelier') ? 'atelier' : 'classic';
+  var trackRow = document.getElementById('pb-track');
+  if (trackRow) {
+    trackRow.style.display = pbSourceApp ? 'none' : '';
+    var radios2 = trackRow.querySelectorAll('input[name="pb-track"]');
+    radios2.forEach(function (r) {
+      r.checked = r.value === pbTrack;
+      r.onchange = function () { pbTrack = r.value; pbApplyTrackUi(); updatePbPreview(); };
+    });
+  }
+  pbApplyTrackUi();
 
   // Mode is implicit: "improve" when opened from an app, else "new". The radios
   // stay in the DOM (hidden) so buildPromptFromBuilder reads the right mode; instead
@@ -391,6 +422,9 @@ function closePbPanel() {
 // the node is the single source of truth; the inline text in buildPromptFromBuilder is only the
 // offline / older-node fallback). Keyed by mode; refreshed each time the builder opens.
 var pbCore = { new: null, improve: null };
+// The Atelier guide, same shape. The FULL prompt is used (it carries its own interview),
+// because the Classic interview below teaches Classic mechanics the Atelier track forbids.
+var pbCoreAtelier = { new: null, improve: null };
 function loadPbCore() {
   var config = loadConfig();
   if (!config.aimeatUrl) return;
@@ -403,6 +437,13 @@ function loadPbCore() {
         if (body && typeof body === 'string') { pbCore[mode] = body; updatePbPreview(); }
       })
       .catch(function () { /* older node without the endpoint — inline fallback is used */ });
+    fetch(base + '/v1/prompts/build-app-atelier?mode=' + mode + '&lang=' + encodeURIComponent(getLang()))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var full = d && d.data && d.data.prompt;
+        if (full && typeof full === 'string') { pbCoreAtelier[mode] = full; updatePbPreview(); }
+      })
+      .catch(function () { /* older node without the Atelier track — the picker still shows, the preview says loading */ });
   });
 }
 
@@ -584,6 +625,21 @@ function buildPromptFromBuilder() {
   var description = document.getElementById('pb-description').value.trim();
 
   var prompt = '';
+
+  // ATELIER: the node-served guide IS the whole prompt (it carries its own interview and its
+  // own vocabulary), plus the idea line. Nothing Classic — no templates, no packs, no inline
+  // fallback — because the two guides never mix (TARGET-074).
+  if (pbTrack === 'atelier') {
+    var aCore = pbCoreAtelier[(mode === 'improve' && pbSourceApp) ? 'improve' : 'new'];
+    if (!aCore) return t('pb.atelierLoading') || 'Fetching the Atelier build guide from your node…';
+    var aOut = description
+      ? "The app idea, in the owner's words: " + description + '\n\n' + aCore
+      : aCore;
+    if (mode === 'improve' && pbSourceApp && pbSourceApp.blob) {
+      aOut += '\n## The app to improve\n--- Source Code ---\n' + decodeURIComponent(escape(atob(pbSourceApp.blob)));
+    }
+    return aOut;
+  }
 
   // Converse + build the UI in the language the user is browsing in (the build
   // instructions below stay in English, but the conversation + app text should match).
