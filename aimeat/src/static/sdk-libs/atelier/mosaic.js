@@ -290,21 +290,44 @@ export function mosaic(spec) {
   }
 
   /** The overlay: ONE Menu control opening a full-screen list in display type — the award-site
-   *  move. Escape closes; the pick swaps the visible unit through a transition. */
+   *  move. Escape, the close control and a backdrop tap all leave it (a phone has no Escape,
+   *  and an exit that exists only on a keyboard is no exit — first design review's finding).
+   *  The CURRENT section is marked persistently (aria-current + class), because a hover that is
+   *  the only differentiated state reads as "you are here" when it is only the mouse. */
   function projectOverlay(units) {
     const box = el('div', { class: 'ak-mosaic__units' });
     for (const u of units) { u.el.hidden = true; box.appendChild(u.el); }
     let current = 0;
     let open = false;
+    const items = [];
 
-    const panel = el('div', { class: 'ak-mosaic__overlay', role: 'dialog', 'aria-label': t('menu') });
+    const heading = el('h2', { class: 'ak-mosaic__unittitle' });
+    const panel = el('div', {
+      class: 'ak-mosaic__overlay', role: 'dialog', 'aria-label': t('menu'),
+      on: { click: function (ev) { if (ev.target === panel) close(); } },
+    });
     panel.hidden = true;
 
     const trigger = el('button', {
-      type: 'button', class: 'ak-btn ak-btn--ghost ak-mosaic__overlaytrigger',
+      type: 'button', class: 'ak-mosaic__overlaytrigger',
       'aria-expanded': 'false', 'data-ak-noguard': true,
       on: { click: function () { if (open) { close(); } else { show(); } } },
     }, t('menu'));
+
+    const closeBtn = el('button', {
+      type: 'button', class: 'ak-mosaic__overlayclose', 'aria-label': t('close'), 'data-ak-noguard': true,
+      on: { click: function () { close(); } },
+    }, '×');
+    panel.appendChild(closeBtn);
+
+    function mark() {
+      items.forEach(function (btn, i) {
+        btn.classList.toggle('ak-mosaic__overlayitem--on', i === current);
+        if (i === current) btn.setAttribute('aria-current', 'true');
+        else btn.removeAttribute('aria-current');
+      });
+      heading.textContent = units[current] ? units[current].label : '';
+    }
 
     function show(index) {
       if (typeof index === 'number') {
@@ -312,6 +335,7 @@ export function mosaic(spec) {
           units[current].el.hidden = true;
           current = index;
           units[current].el.hidden = false;
+          mark();
           enter(units[current].el);
         });
         close();
@@ -321,8 +345,8 @@ export function mosaic(spec) {
       panel.hidden = false;
       trigger.setAttribute('aria-expanded', 'true');
       enter(panel);
-      const first = panel.querySelector('button');
-      if (first) first.focus();
+      const on = /** @type {HTMLElement|null} */ (panel.querySelector('.ak-mosaic__overlayitem--on') || panel.querySelector('button'));
+      if (on) on.focus();
     }
     function close() {
       open = false;
@@ -335,18 +359,21 @@ export function mosaic(spec) {
     alive.cleanup.push(function () { document.removeEventListener('keydown', onKey); });
 
     units.forEach(function (u, i) {
-      panel.appendChild(el('button', {
+      const btn = el('button', {
         type: 'button', class: 'ak-mosaic__overlayitem', 'data-ak-noguard': true,
         on: { click: function () { show(i); } },
       }, [
         el('span', { class: 'ak-mosaic__overlaynum', text: String(i + 1).padStart(2, '0') }),
         u.label,
-      ]));
+      ]);
+      items.push(btn);
+      panel.appendChild(btn);
     });
     if (units.length) units[0].el.hidden = false;
+    mark();
 
     return el('div', { class: 'ak-mosaic__overlaywrap' }, [
-      el('div', { class: 'ak-mosaic__overlaybar' }, trigger),
+      el('div', { class: 'ak-mosaic__overlaybar' }, [heading, trigger]),
       box, panel,
     ]);
   }

@@ -1583,6 +1583,9 @@
 
   // src/static/sdk-libs/atelier/timeline.js
   function fmtTs(ts) {
+    if (typeof ts === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+      return (/* @__PURE__ */ new Date(ts + "T12:00:00")).toLocaleDateString(void 0, { dateStyle: "medium" });
+    }
     const d = ts instanceof Date ? ts : new Date(ts);
     if (Number.isNaN(d.getTime())) return String(ts);
     return d.toLocaleString(void 0, { dateStyle: "medium", timeStyle: "short" });
@@ -1841,11 +1844,20 @@
       }
       let current2 = 0;
       let open = false;
-      const panel = el("div", { class: "ak-mosaic__overlay", role: "dialog", "aria-label": t("menu") });
+      const items = [];
+      const heading = el("h2", { class: "ak-mosaic__unittitle" });
+      const panel = el("div", {
+        class: "ak-mosaic__overlay",
+        role: "dialog",
+        "aria-label": t("menu"),
+        on: { click: function(ev) {
+          if (ev.target === panel) close();
+        } }
+      });
       panel.hidden = true;
       const trigger = el("button", {
         type: "button",
-        class: "ak-btn ak-btn--ghost ak-mosaic__overlaytrigger",
+        class: "ak-mosaic__overlaytrigger",
         "aria-expanded": "false",
         "data-ak-noguard": true,
         on: { click: function() {
@@ -1856,12 +1868,31 @@
           }
         } }
       }, t("menu"));
+      const closeBtn = el("button", {
+        type: "button",
+        class: "ak-mosaic__overlayclose",
+        "aria-label": t("close"),
+        "data-ak-noguard": true,
+        on: { click: function() {
+          close();
+        } }
+      }, "×");
+      panel.appendChild(closeBtn);
+      function mark() {
+        items.forEach(function(btn, i) {
+          btn.classList.toggle("ak-mosaic__overlayitem--on", i === current2);
+          if (i === current2) btn.setAttribute("aria-current", "true");
+          else btn.removeAttribute("aria-current");
+        });
+        heading.textContent = units[current2] ? units[current2].label : "";
+      }
       function show(index) {
         if (typeof index === "number") {
           transition(function() {
             units[current2].el.hidden = true;
             current2 = index;
             units[current2].el.hidden = false;
+            mark();
             enter(units[current2].el);
           });
           close();
@@ -1871,8 +1902,11 @@
         panel.hidden = false;
         trigger.setAttribute("aria-expanded", "true");
         enter(panel);
-        const first = panel.querySelector("button");
-        if (first) first.focus();
+        const on = (
+          /** @type {HTMLElement|null} */
+          panel.querySelector(".ak-mosaic__overlayitem--on") || panel.querySelector("button")
+        );
+        if (on) on.focus();
       }
       function close() {
         open = false;
@@ -1888,7 +1922,7 @@
         document.removeEventListener("keydown", onKey);
       });
       units.forEach(function(u, i) {
-        panel.appendChild(el("button", {
+        const btn = el("button", {
           type: "button",
           class: "ak-mosaic__overlayitem",
           "data-ak-noguard": true,
@@ -1898,11 +1932,14 @@
         }, [
           el("span", { class: "ak-mosaic__overlaynum", text: String(i + 1).padStart(2, "0") }),
           u.label
-        ]));
+        ]);
+        items.push(btn);
+        panel.appendChild(btn);
       });
       if (units.length) units[0].el.hidden = false;
+      mark();
       return el("div", { class: "ak-mosaic__overlaywrap" }, [
-        el("div", { class: "ak-mosaic__overlaybar" }, trigger),
+        el("div", { class: "ak-mosaic__overlaybar" }, [heading, trigger]),
         box,
         panel
       ]);

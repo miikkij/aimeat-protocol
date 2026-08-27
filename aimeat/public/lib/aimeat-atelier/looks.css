@@ -61,7 +61,7 @@
   --ak-enter-stagger:   60ms;
   --ak-motion:          var(--motion-slow, 320ms);
 }
-/* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh. */
+/* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
 [data-ak-look='editorial'] .ak-hero {
   min-height: unset;
   border-radius: 0;
@@ -96,6 +96,24 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-family: var(--ak-font-mono);
+}
+[data-ak-look='editorial'] .ak-list__row {
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding-inline: 0;
+}
+[data-ak-look='editorial'] .ak-list .ak-badge {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ak-ink-dim);
 }
 /* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
 [data-ak-look='editorial'] .ak-mosaic__units--grid {
@@ -198,7 +216,7 @@
   --ak-enter-stagger:   70ms;
   --ak-motion:          var(--motion-slow, 320ms);
 }
-/* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh. */
+/* structure: masthead — The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review's finding). */
 [data-ak-look='broadsheet'] .ak-hero {
   min-height: unset;
   border-radius: 0;
@@ -233,6 +251,24 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-family: var(--ak-font-mono);
+}
+[data-ak-look='broadsheet'] .ak-list__row {
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding-inline: 0;
+}
+[data-ak-look='broadsheet'] .ak-list .ak-badge {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ak-ink-dim);
 }
 /* structure: joined — Cells share hairlines inside one bordered frame — a laid-out page, not floating cards. */
 [data-ak-look='broadsheet'] .ak-mosaic__units--grid {

@@ -58,7 +58,7 @@ export interface AtelierLook {
 export const STRUCTURES: readonly AtelierStructure[] = [
   {
     id: 'masthead',
-    summary: 'The hero is a front-page masthead: giant display type on rules, no card, no mesh.',
+    summary: 'The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review\'s finding).',
     css: (sel) => `
 ${sel} .ak-hero {
   min-height: unset;
@@ -94,6 +94,24 @@ ${sel} .ak-statrow__label {
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-family: var(--ak-font-mono);
+}
+${sel} .ak-list__row {
+  border: 0;
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding-inline: 0;
+}
+${sel} .ak-list .ak-badge {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ak-ink-dim);
 }`,
   },
   {

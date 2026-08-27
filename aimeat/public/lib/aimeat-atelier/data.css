@@ -58,7 +58,10 @@
   background: var(--ak-surface);
   background-image: var(--ak-surface-image);
 }
-.ak-table__table { width: 100%; border-collapse: collapse; font-size: var(--ak-text-body); }
+/* min-width max-content: the table lays out at its NATURAL width and the wrapper scrolls —
+ * squeezed into a phone it used to shrink instead, wrapping "409" into two lines that read as
+ * two numbers (first design review, 390px registry). */
+.ak-table__table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: var(--ak-text-body); }
 .ak-table__table[hidden] { display: none; }
 .ak-table th {
   text-align: left;

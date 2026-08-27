@@ -8,6 +8,8 @@
  * @usage  AIMEAT.atelier.timeline({ target: host, items: [
  *           { id: 'e1', ts: '2026-08-27T10:00:00Z', title: 'Published', tone: 'ok' } ] });
  * @version-history
+ *   v0.10.0 — 2026-08-27 — Date-only timestamps render as dates: "2026-08-26" no longer becomes
+ *     "3:00 AM" through the midnight-UTC parse (first design review).
  *   v0.3.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 3).
  */
 import { el, clear, resolve, enter } from './dom.js';
@@ -23,8 +25,13 @@ import { emptyState } from './state.js';
  * @property {'ok'|'warn'|'err'|'plain'} [tone]
  */
 
-/** Default moment wording: date + time in the viewer's locale. */
+/** Default moment wording: date + time in the viewer's locale — except DATE-ONLY input, which
+ *  renders as a date. A bare "2026-08-26" parsed as a moment lands on midnight UTC and told
+ *  every reader something happened at 3:00 AM (the first design review's finding). */
 function fmtTs(ts) {
+  if (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts)) {
+    return new Date(ts + 'T12:00:00').toLocaleDateString(undefined, { dateStyle: 'medium' });
+  }
   const d = ts instanceof Date ? ts : new Date(ts);
   if (Number.isNaN(d.getTime())) return String(ts);
   return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
