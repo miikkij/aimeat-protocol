@@ -32,6 +32,11 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   v1.2.0 — 2026-08-27 — checkTrackMixing (TARGET-074): the two build tracks have separate guides
+ *     that never cross-reference, and this is the seam where a mixed app would land unnoticed. Four
+ *     warnings, same declared-vs-actual shape as v1.1.0: Classic declared with the Atelier kit
+ *     loaded, Atelier declared with the kit missing, daisyUI class markup in an Atelier app outside
+ *     the section escape hatch, and the kit loaded with no track declared at all.
  *   v1.1.0 — 2026-08-15 — checkDeclaredButUnused: an auth library loaded with no pill mounted, a
  *     locales meta with nothing that switches language, daisyUI linked with no daisyUI class. One
  *     run shipped all three at once, and the two findings the publish DID return were fixed on the
@@ -93,8 +98,72 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   warnings.push(...checkMetas(html));
   warnings.push(...checkAgentDataReads(html));
   warnings.push(...checkDeclaredButUnused(html));
+  warnings.push(...checkTrackMixing(html));
 
   return { blocking, warnings };
+}
+
+/**
+ * The two build tracks stay separate, and this is where a mixed app gets told.
+ *
+ * Classic and Atelier have their own guides, and neither teaches the other's mechanics — so an app
+ * carrying both vocabularies was built from two guides at once, and the next edit session will load
+ * ONE of them and half-understand the file. All four findings are the same declared-versus-actual
+ * shape as checkDeclaredButUnused, and all four warn rather than block: a track declaration is
+ * advice to the next builder, and a page that mixes still renders.
+ *
+ * The section escape check is deliberately permissive about what counts as using the hatch: any
+ * `section(` call silences it. A missed warning costs nothing; a warning on a correct app teaches
+ * people to ignore the check.
+ */
+function checkTrackMixing(html: string): AppArtifactFinding[] {
+  const out: AppArtifactFinding[] = [];
+  const head = html.slice(0, SCAN_BYTES);
+
+  const track = /<meta\b[^>]*name\s*=\s*["']aimeat-track["'][^>]*content\s*=\s*["'](classic|atelier)["']/i
+    .exec(head)?.[1]?.toLowerCase();
+  const loadsAtelier = /aimeat-atelier\.(js|css)/i.test(html);
+
+  if (track === 'classic' && loadsAtelier) {
+    out.push(finding('track-mixing', 'warn',
+      'The head declares the Classic track and the page loads the Atelier kit. The two tracks have '
+      + 'separate guides that never reference each other, so the next edit session will load the '
+      + 'Classic guide and not know what half this file is. If this is an Atelier app, declare '
+      + '`<meta name="aimeat-track" content="atelier">`; if it is Classic, drop the aimeat-atelier '
+      + 'script and stylesheet.'));
+  }
+
+  if (track === 'atelier' && !loadsAtelier) {
+    out.push(finding('track-mixing', 'warn',
+      'The head declares the Atelier track and the page never loads the Atelier kit '
+      + '(/v1/libs/aimeat-atelier.js + /lib/aimeat-atelier.css), so future edit sessions will read '
+      + 'this as an Atelier app while nothing on the page is one. Load the kit, or declare '
+      + '`content="classic"` and build with that guide.'));
+  }
+
+  if (track === 'atelier') {
+    // The escape hatch for raw markup in an Atelier app is a section body the app fills itself.
+    // daisyUI-shaped class strings with no section call anywhere means the raw markup has no
+    // declared home, which is the class soup the track separation exists to prevent.
+    const daisyClasses = /class\s*=\s*["'][^"']*\b(btn|card|navbar|modal|drawer|badge|alert|menu|tabs|table|input|select|toggle|stat)\b/i.test(html);
+    const usesSection = /\bsection\s*\(/.test(html);
+    if (daisyClasses && !usesSection) {
+      out.push(finding('track-mixing', 'warn',
+        'This Atelier app carries daisyUI-style class markup and never uses the section escape '
+        + 'hatch. On the Atelier track the kit is the vocabulary; raw daisyUI belongs only inside a '
+        + 'body the app fills itself via `AIMEAT.atelier.section(...)`. Move the markup into a '
+        + 'section body, or express it with kit components.'));
+    }
+  }
+
+  if (!track && loadsAtelier) {
+    out.push(finding('track-mixing', 'warn',
+      'The page loads the Atelier kit and declares no build track. Without '
+      + '`<meta name="aimeat-track" content="atelier">` in the head, a later edit session reads '
+      + 'this app as Classic and loads the wrong guide. One line fixes it.'));
+  }
+
+  return out;
 }
 
 /**

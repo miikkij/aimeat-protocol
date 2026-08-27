@@ -17,6 +17,9 @@
  *   the check can decide from the bytes alone, plus the classification the probe depends on.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.2.0 — 2026-08-27 — The track-mixing quartet (TARGET-074). The silence cases matter most
+ *     here: a correct Atelier shell app and the suite's own CLEAN app must both stay quiet, or the
+ *     first thing the new track teaches its builders is to ignore the gate.
  *   v1.1.0 — 2026-08-15 — The declared-but-unused trio. Two bugs of my own are recorded in these
  *     cases: the first version reused an existing pitfall id for a new defect (which broke three
  *     passing tests, correctly), and it detected the pill by an API name I guessed instead of the
@@ -234,5 +237,65 @@ describe('lintAppArtifact — reading data the agents wrote', () => {
   it('says nothing about any of the three for the clean app', async () => {
     const { ids } = await findings(CLEAN);
     expect(ids).not.toContain('app-declared-unused');
+  });
+});
+
+describe('lintAppArtifact — the two tracks never mix', () => {
+  /** A correct Atelier shell app in miniature: track declared, kit loaded, body filled by the kit. */
+  const ATELIER = `<!DOCTYPE html><html lang="en"><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="aimeat-app" content="ate.html">
+    <meta name="aimeat-scopes" content="memory:read memory:write">
+    <meta name="aimeat-track" content="atelier">
+    <meta name="aimeat-locales" content="en fi">
+    <link rel="stylesheet" href="/lib/aimeat-atelier.css">
+    </head><body>
+    <script src="/v1/libs/aimeat-auth.js"></script>
+    <script src="/v1/libs/aimeat-atelier.js"></script>
+    <script>
+      const a = AIMEAT.atelier.app({ title: 'Ate' });
+      AIMEAT.auth.mountLoginButton('#login', { onLogin: start });
+      async function start() { await AIMEAT.data.set('ate.seen', 1); }
+    </script></body></html>`;
+
+  it('stays quiet on a correct Atelier app and on the clean Classic app', async () => {
+    const ate = await findings(ATELIER);
+    expect(ate.ids).not.toContain('track-mixing');
+    const classic = await findings(CLEAN);
+    expect(classic.ids).not.toContain('track-mixing');
+  });
+
+  it('flags the Atelier kit loaded in an app that declares Classic', async () => {
+    const html = ATELIER.replace('content="atelier"', 'content="classic"');
+    const { ids, messages } = await findings(html);
+    expect(ids).toContain('track-mixing');
+    expect(messages.join(' ')).toContain('declares the Classic track');
+  });
+
+  it('flags an Atelier declaration with no kit behind it', async () => {
+    const html = ATELIER
+      .replace('<link rel="stylesheet" href="/lib/aimeat-atelier.css">', '')
+      .replace('<script src="/v1/libs/aimeat-atelier.js"></script>', '')
+      .replace('AIMEAT.atelier.app({ title: \'Ate\' })', '({})');
+    const { messages } = await findings(html);
+    expect(messages.join(' ')).toContain('never loads the Atelier kit');
+  });
+
+  it('flags daisyUI class markup in an Atelier app with no section escape, and stays quiet inside one', async () => {
+    const soup = ATELIER.replace('</body>', '<div class="card"><button class="btn btn-primary">Go</button></div></body>');
+    const flagged = await findings(soup);
+    expect(flagged.messages.join(' ')).toContain('section escape');
+
+    const escaped = soup.replace('const a = AIMEAT.atelier.app',
+      'const s = AIMEAT.atelier.section({ title: \'Raw\' }); const a = AIMEAT.atelier.app');
+    const quiet = await findings(escaped);
+    expect(quiet.messages.join(' ')).not.toContain('section escape');
+  });
+
+  it('flags the kit loaded with no track declared', async () => {
+    const html = ATELIER.replace('<meta name="aimeat-track" content="atelier">', '');
+    const { messages } = await findings(html);
+    expect(messages.join(' ')).toContain('declares no build track');
   });
 });
