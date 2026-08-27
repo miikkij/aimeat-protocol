@@ -92,7 +92,7 @@ const GOOD_LAYOUT = {
         assert(r.status === 200, `catalogue ${r.status}`);
         const cat = r.body.data.catalogue;
         const ids = cat.components.map((c: any) => c.id);
-        for (const expected of ['hero', 'statRow', 'list', 'cardGrid', 'table', 'searchBar', 'tabs', 'section', 'emptyState', 'timeline', 'mediaCard']) {
+        for (const expected of ['hero', 'statRow', 'figure', 'list', 'cardGrid', 'table', 'searchBar', 'tabs', 'section', 'emptyState', 'timeline', 'mediaCard']) {
             assert(ids.includes(expected), `catalogue should carry ${expected} (got: ${ids.join(', ')})`);
         }
         const hero = cat.components.find((c: any) => c.id === 'hero');

@@ -881,6 +881,53 @@
       }
     };
   }
+  function figure(spec) {
+    const state = { value: spec.value || 0, label: spec.label || "", sub: spec.sub, delta: spec.delta };
+    const fmt = spec.format || function(n) {
+      return String(Math.round(n));
+    };
+    const label = el("span", { class: "ak-figure__label", text: state.label });
+    const value = el("span", { class: "ak-figure__value", text: fmt(state.value) });
+    const delta = el("span", { class: "ak-figure__delta", text: state.delta || "" });
+    delta.hidden = !state.delta;
+    const sub = el("p", { class: "ak-figure__sub", text: state.sub || "" });
+    sub.hidden = !state.sub;
+    const root = el("div", { class: "ak-root ak-figure" }, [
+      label,
+      el("div", { class: "ak-figure__row" }, [value, delta]),
+      sub
+    ]);
+    if (spec.target) resolve(spec.target).appendChild(root);
+    enter(root);
+    return {
+      el: root,
+      /** @param {{ value?: number, label?: string, sub?: string, delta?: string }} patch */
+      set(patch) {
+        if (!patch) return;
+        if (patch.label != null) {
+          state.label = patch.label;
+          label.textContent = state.label;
+        }
+        if (patch.sub !== void 0) {
+          state.sub = patch.sub;
+          sub.textContent = state.sub || "";
+          sub.hidden = !state.sub;
+        }
+        if (patch.delta !== void 0) {
+          state.delta = patch.delta;
+          delta.textContent = state.delta || "";
+          delta.hidden = !state.delta;
+        }
+        if (patch.value != null && patch.value !== state.value) {
+          countUp(value, state.value, patch.value, { format: fmt });
+          state.value = patch.value;
+        }
+      },
+      destroy() {
+        if (root.parentNode) root.parentNode.removeChild(root);
+      }
+    };
+  }
 
   // src/static/sdk-libs/atelier/list.js
   function fillRow(row, item) {
@@ -1636,6 +1683,7 @@
   function patchFor(kind, data) {
     if (kind === "statRow") return { tiles: Array.isArray(data) ? data : [] };
     if (kind === "table") return { rows: Array.isArray(data) ? data : data && data.rows || [] };
+    if (kind === "figure") return data && typeof data === "object" ? data : { value: 0 };
     return { items: Array.isArray(data) ? data : [] };
   }
   function derivedColumns(rows) {
@@ -1684,6 +1732,11 @@
         case "statRow":
           return bound("statRow", function(data) {
             return statRow({ target: into, tiles: patchFor("statRow", data).tiles });
+          });
+        case "figure":
+          return bound("figure", function(data) {
+            const d = patchFor("figure", data);
+            return figure({ target: into, value: d.value, label: d.label || p.title || "", sub: d.sub, delta: d.delta });
           });
         case "list":
           return bound("list", function(data) {
@@ -2119,7 +2172,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.8.0",
+    version: "0.9.0",
     // ── Shell and navigation ──
     app,
     section,
@@ -2131,6 +2184,7 @@
     // ── Focal content ──
     hero,
     statRow,
+    figure,
     // ── Content ──
     list,
     listDetail,

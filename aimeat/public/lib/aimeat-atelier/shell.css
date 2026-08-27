@@ -447,5 +447,30 @@
   outline-offset: 2px;
 }
 
+/* ── Figure: the data IS the hero ─────────────────────────────────────────────────────────── */
+.ak-figure { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ak-figure__label {
+  font-family: var(--ak-font-mono);
+  font-size: var(--ak-text-fine);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--ak-ink-dim);
+}
+.ak-figure__row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.ak-figure__value {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: clamp(3.4rem, 11vw, 6.8rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: var(--ak-display-shadow);
+  color: var(--ak-accent-text);
+}
+.ak-figure__delta { font-size: var(--ak-text-title); font-weight: 700; color: var(--ak-ink-dim); }
+.ak-figure__delta[hidden], .ak-figure__sub[hidden] { display: none; }
+.ak-figure__sub { margin: 4px 0 0; font-size: var(--ak-text-body); color: var(--ak-ink-dim); max-width: 34rem; }
+
 /* Structure-by-look rules (the masthead, the joined frame, the full-bleed band) are GENERATED
    per look into ./looks.css from src/data/atelier-looks.ts — one recipe, any look. */

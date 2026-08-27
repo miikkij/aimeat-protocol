@@ -14,10 +14,13 @@
  *   The image value reaches CSS as a custom property; a data: URI is refused here for the same
  *   reason the publish gate refuses it — inlined image bytes are the documented way an app file
  *   bloats past its edit loop.
- * @structure hero(spec) → { el, set, destroy } · statRow(spec) → { el, set, destroy }
+ * @structure hero(spec) → { el, set, destroy } · statRow(spec) → { el, set, destroy } ·
+ *   figure(spec) → { el, set, destroy }
  * @usage  AIMEAT.atelier.hero({ target: a.main, title: 'Errands', sub: '3 open',
  *           actions: [{ id: 'add', label: 'Add', kind: 'primary', onClick }] });
  * @version-history
+ *   v0.9.0 — 2026-08-27 — figure(): one giant number as the focal point (the Cape Town move —
+ *     the data itself is the hero). Counts up on set(), like every figure in the kit.
  *   v0.6.0 — 2026-08-27 — The scrim becomes a child layer (.ak-hero__scrim): the aurora mesh
  *     drifts on ::before and the scrim + grain must paint above it and below the text — a
  *     pseudo cannot sit between another pseudo and the children, a child can.
@@ -189,5 +192,50 @@ export function statRow(spec) {
       stopLang();
       if (root.parentNode) root.parentNode.removeChild(root);
     },
+  };
+}
+
+/**
+ * The FIGURE: one giant number as the focal point — the Cape Town move, where the data itself
+ * is the hero. A display-face numeral at hero scale, a mono small-caps label above it, a context
+ * line under it, an optional delta. `set()` counts the value up or down to the new figure.
+ * @param {{
+ *   target?: string|Element, value: number, label: string, sub?: string, delta?: string,
+ *   format?: (n: number) => string,
+ * }} spec
+ * @returns {{ el: HTMLElement, set: (patch: any) => void, destroy: () => void }}
+ */
+export function figure(spec) {
+  const state = { value: spec.value || 0, label: spec.label || '', sub: spec.sub, delta: spec.delta };
+  const fmt = spec.format || function (n) { return String(Math.round(n)); };
+
+  const label = el('span', { class: 'ak-figure__label', text: state.label });
+  const value = el('span', { class: 'ak-figure__value', text: fmt(state.value) });
+  const delta = el('span', { class: 'ak-figure__delta', text: state.delta || '' });
+  delta.hidden = !state.delta;
+  const sub = el('p', { class: 'ak-figure__sub', text: state.sub || '' });
+  sub.hidden = !state.sub;
+  const root = el('div', { class: 'ak-root ak-figure' }, [
+    label,
+    el('div', { class: 'ak-figure__row' }, [value, delta]),
+    sub,
+  ]);
+  if (spec.target) resolve(spec.target).appendChild(root);
+  enter(root);
+
+  return {
+    el: root,
+    /** @param {{ value?: number, label?: string, sub?: string, delta?: string }} patch */
+    set(patch) {
+      if (!patch) return;
+      if (patch.label != null) { state.label = patch.label; label.textContent = state.label; }
+      if (patch.sub !== undefined) { state.sub = patch.sub; sub.textContent = state.sub || ''; sub.hidden = !state.sub; }
+      if (patch.delta !== undefined) { state.delta = patch.delta; delta.textContent = state.delta || ''; delta.hidden = !state.delta; }
+      if (patch.value != null && patch.value !== state.value) {
+        countUp(value, state.value, patch.value, { format: fmt });
+        state.value = patch.value;
+      }
+    },
+    destroy() { if (root.parentNode) root.parentNode.removeChild(root); },
   };
 }

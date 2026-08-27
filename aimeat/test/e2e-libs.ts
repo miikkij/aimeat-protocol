@@ -1042,7 +1042,7 @@ await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every
     // rather than as a missing screen in somebody's app.
     for (const part of [
         'app', 'section', 'tabs', 'bottomNav',
-        'hero', 'statRow', 'emptyState', 'skeleton',
+        'hero', 'statRow', 'figure', 'emptyState', 'skeleton',
         'list', 'listDetail', 'cardGrid', 'mediaCard', 'timeline',
         'form', 'table', 'searchBar',
         'mosaic', 'appRef',
