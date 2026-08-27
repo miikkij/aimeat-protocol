@@ -26,6 +26,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.2.0 — 2026-08-27 — The first move is a layout preset: the catalogue's `layouts` are the
+ *     starting shapes, filled rather than composed (TARGET-074, leiskat v1).
  *   v1.1.0 — 2026-08-27 — The mosaic section: apps render through AIMEAT.atelier.mosaic() and
  *     declare sources; the arrangement is the stored layout record (TARGET-074 phase 2). The
  *     spec token moves with the body, as designed.
@@ -203,7 +205,12 @@ function composeBody(config: AimeatConfig): string {
     + '```\n\n'
     + 'The layout\'s `nav` field projects the same blocks as stacked sections, a tab row, a bottom '
     + 'bar, a swipeable deck, a step-by-step flow or a pan-zoom canvas — all five work on every '
-    + 'screen size, so never build navigation by hand.\n\n';
+    + 'screen size, so never build navigation by hand.\n\n'
+    + 'THE FIRST MOVE IS A PRESET, not a blank page: `GET ' + base + '/v1/apps/ui/catalogue` '
+    + 'carries `layouts` — finished, fillable shapes (cover, dashboard, browse, work-queue, '
+    + 'story-deck, guided-flow). Pick the one nearest the app, replace every <angle-bracketed> '
+    + 'value with the app\'s own words and source names, and use it as the fallback — and as the '
+    + 'first stored layout when the owner wants one.\n\n';
 
   body += '## The look\n\n';
   body += 'One field chooses the whole art direction: `app({ look: … })`. Vivid is the default '

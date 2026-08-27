@@ -25,6 +25,8 @@
  * @usage
  *   import { UI_COMPONENTS, componentById, buildUiCatalogue } from './registry.js';
  * @version-history
+ *   v1.2.0 — 2026-08-27 — The catalogue carries the layout presets (layouts.ts): a first layout
+ *     starts from a finished shape, not from nothing (TARGET-074, leiskat v1).
  *   v1.1.0 — 2026-08-27 — Append-only: every unit-forming component gains an optional `title` —
  *     the block's name in tabs, decks and canvas tiles. The first real-browser run showed
  *     component ids leaking into tab labels because most blocks had no prop to name them with.
@@ -32,6 +34,7 @@
  *     (TARGET-074 phase 2).
  */
 import type { BlockPropDef } from '../surface-layout/registry-types.js';
+import { UI_LAYOUT_PRESETS, type AppUiLayoutPreset } from './layouts.js';
 
 /** A mosaic prop: the shared grammar, plus whether a layout must supply it. */
 export type AppUiPropDef = BlockPropDef & {
@@ -163,14 +166,16 @@ export function componentById(id: string): AppUiComponentDef | undefined {
 }
 
 /**
- * The catalogue every read answers with: ids, summaries and full prop schemas, plus the nav
- * modes and looks — the whole vocabulary in one payload, so an AI asked to change a layout
- * never has to guess at names.
+ * The catalogue every read answers with: ids, summaries and full prop schemas, the nav modes
+ * and looks, and the LAYOUT PRESETS — the whole vocabulary in one payload, so an AI asked to
+ * change a layout never has to guess at names, and one asked to write a first layout starts
+ * from a finished shape rather than from nothing.
  */
 export function buildUiCatalogue(): {
   components: Array<{ id: string; summary: string; props: Record<string, AppUiPropDef>; max_per_layout?: number }>;
   nav_modes: readonly string[];
   looks: readonly string[];
+  layouts: readonly AppUiLayoutPreset[];
 } {
   return {
     components: UI_COMPONENTS.map((c) => ({
@@ -181,5 +186,6 @@ export function buildUiCatalogue(): {
     })),
     nav_modes: NAV_MODES,
     looks: LOOKS,
+    layouts: UI_LAYOUT_PRESETS,
   };
 }
