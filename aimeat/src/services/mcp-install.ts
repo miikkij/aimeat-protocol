@@ -25,6 +25,9 @@
  *   import { mcpConfigFile, mcpInstallLink } from '../services/mcp-install.js';
  *   const file = mcpConfigFile('vscode', `${config.baseUrl}/v1/mcp`, 'aimeat');
  * @version-history
+ *   v1.0.1 — 2026-08-26 — SECURITY (CodeQL js/polynomial-redos): normalizeServerName trimmed edge
+ *     dashes with `/^-+|-+$/g` and `/-+$/g`, which backtrack quadratically on a long caller-supplied
+ *     name. Replaced with single-character trims, linear and equivalent after the run-collapse.
  *   v1.0.0 — 2026-08-27 — Initial: the config files and one-click links behind GET
  *     /v1/connect/mcp.json and the install row on the setup guide.
  */
@@ -59,9 +62,12 @@ export function normalizeServerName(raw: unknown): string {
         .toLowerCase()
         .replace(/[^a-z0-9-]+/g, '-')
         .replace(/-{2,}/g, '-')
-        .replace(/^-+|-+$/g, '')
+        // The run-collapse above leaves single dashes only, so a one-character edge trim finishes
+        // it. Written without `-+` before/after an anchor: `/^-+|-+$/g` backtracks quadratically on
+        // a long run and `raw` is caller-supplied (js/polynomial-redos).
+        .replace(/^-/, '').replace(/-$/, '')
         .slice(0, 32)
-        .replace(/-+$/g, '');
+        .replace(/-$/, '');
     return cleaned || DEFAULT_SERVER_NAME;
 }
 
