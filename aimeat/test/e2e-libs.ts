@@ -5,6 +5,12 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.5.0 — 2026-08-27 — aimeat-atelier.js coverage (TARGET-074 phase 1): every component
+ *     exported, the NO-NETWORK and NO-HARDCODED-COLOUR boundary guards, the EN+FI+ES strings and
+ *     platform-language wiring, the --ak-* theming contract (dark re-declaration, the flat
+ *     preset, the chrome-bottom reserve, the finite shimmer), the JS↔CSS version pin, the
+ *     /lib/aimeat-boot.js synchronous-safety guards, and the registry entry declaring no
+ *     dependencies and no Classic-prompt presence.
  *   v1.4.0 — 2026-08-16 — August 2026 test-quality audit, three findings, and a setup bug the fix
  *     uncovered. wallet.request asked for 10 and asserted only that new_balance was a NUMBER, so an
  *     uncapped credit passed; it now measures the balance across each grant, shows the ask clamped
@@ -1025,6 +1031,140 @@ await test('GET /v1/libs — catalogue lists markdown, organism, editor, commerc
     // Registered wrong = invisible to every AI-facing surface, which is the failure this catches.
     assert(exchange?.requires?.includes('aimeat-auth') && exchange?.requires?.includes('aimeat-commerce'),
         `aimeat-exchange must declare both dependencies, got "${exchange?.requires}"`);
+});
+
+await test('GET /v1/libs/aimeat-atelier.js — serves the Atelier kit with every component', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-atelier.js`);
+    assert(res.ok, `atelier lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
+    // One assertion per component: a component that silently stops being exported fails here
+    // rather than as a missing screen in somebody's app.
+    for (const part of [
+        'app', 'section', 'tabs', 'bottomNav',
+        'hero', 'statRow', 'emptyState', 'skeleton',
+        'injectStyle', 'guardButtons', 'whileBusy', 'enter', 'countUp',
+    ]) {
+        assert(text.includes(part), `should export ${part}`);
+    }
+    // The imagery rule is enforced at the component boundary, not just at publish time.
+    assert(text.includes('data: URIs are refused'),
+        'a hero image data: URI must be refused with words, not painted');
+    // The look is one attribute the preset blocks key on.
+    assert(text.includes('data-ak-look'), 'the look must be selected via data-ak-look');
+});
+
+await test('GET /v1/libs/aimeat-atelier.js — the version an app prints moves with the library', async () => {
+    const [js, css] = await Promise.all([
+        fetch(`${BASE}/v1/libs/aimeat-atelier.js`).then((r) => r.text()),
+        fetch(`${BASE}/lib/aimeat-atelier.css`).then((r) => r.text()),
+    ]);
+    // Same pin as aimeat-game: the constant follows the artefact that carries a changelog, and
+    // this fails the moment the two drift.
+    const shipped = js.match(/version:\s*["']([\d.]+)["']/)?.[1];
+    const newest = css.match(/@version-history\s*\n\s*\*\s*v([\d.]+)/)?.[1];
+    assert(shipped, 'the library must expose a version');
+    assert(newest, 'the stylesheet must carry a version history');
+    assert(shipped === newest,
+        `AIMEAT.atelier.version (${shipped}) must match the newest stylesheet version (${newest})`);
+});
+
+await test('GET /v1/libs/aimeat-atelier.js — makes no network calls and hardcodes no colour', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-atelier.js`);
+    const code = withoutComments(await res.text());
+    // THE BOUNDARY. This library renders; the host supplies the data. The one outward glance is
+    // feature-detecting window.AIMEAT.auth for the pill mount — never a transport of its own.
+    assert(!/\bfetch\s*\(/.test(code), 'must not call fetch — the host supplies the data');
+    assert(!/XMLHttpRequest|EventSource|WebSocket/.test(code), 'must not open any other transport either');
+    assert(!code.includes('/v1/'), 'must not reference a node API path');
+    // THE THEMING CONTRACT. Every colour is a CSS variable; a hex in the JS cannot be re-skinned.
+    assert(!/#[0-9a-fA-F]{6}\b/.test(code), 'must not hardcode a colour in JavaScript');
+    assert(!/rgba?\s*\(\s*\d/.test(code), 'must not hardcode a colour in JavaScript');
+});
+
+await test('GET /v1/libs/aimeat-atelier.js — ships EN, FI and ES for its own words', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-atelier.js`);
+    const text = await res.text();
+    // The kit's own strings, in all three languages. Finnish written as Finnish, ä/ö intact.
+    for (const word of ['Loading', 'Ladataan', 'Cargando', 'Yritä uudelleen',
+        'Täällä ei ole vielä mitään', 'Aquí todavía no hay nada']) {
+        assert(text.includes(word), `should ship the string "${word}"`);
+    }
+    // It follows the platform language control instead of inventing a second one.
+    assert(text.includes('aimeat-lang'), 'should read the platform language key');
+    assert(text.includes('aimeat-lang-change'), 'should react to the platform language event');
+});
+
+await test('GET /lib/aimeat-atelier.css — serves the theming contract, light, dark and flat', async () => {
+    const res = await fetch(`${BASE}/lib/aimeat-atelier.css`);
+    assert(res.ok, `atelier stylesheet failed: ${res.status}`);
+    const text = await res.text();
+    const css = withoutComments(text);
+    // The contract itself. A look sets these and nothing else, so a token that disappears
+    // silently breaks every look an author has already written.
+    for (const token of [
+        '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-surface-image', '--ak-ink', '--ak-ink-dim',
+        '--ak-line', '--ak-line-w', '--ak-accent', '--ak-accent-2', '--ak-accent-ink', '--ak-accent-text',
+        '--ak-ok', '--ak-warn', '--ak-err', '--ak-focus', '--ak-grad', '--ak-scrim', '--ak-hero-image',
+        '--ak-radius', '--ak-radius-sm', '--ak-radius-pill', '--ak-elev-1', '--ak-elev-2',
+        '--ak-font', '--ak-font-display', '--ak-font-mono',
+        '--ak-text-hero', '--ak-text-title', '--ak-text-body', '--ak-text-fine', '--ak-weight-display',
+        '--ak-gap', '--ak-pad', '--ak-touch', '--ak-motion', '--ak-ease',
+        '--ak-enter-distance', '--ak-enter-stagger', '--ak-chrome-bottom', '--ak-main-max', '--ak-hero-min',
+    ]) {
+        assert(css.includes(token), `the theming contract must declare ${token}`);
+    }
+    // Light is the default and dark is a re-declaration of the same names.
+    assert(css.includes(':root[data-theme=\'dark\']'), 'dark mode must re-declare the same tokens');
+    // Vivid is the default and flat is the deliberate opt-out, present as a preset block.
+    assert(css.includes('[data-ak-look=\'flat\']'), 'the flat preset must exist as the opt-out');
+    // The parts the entry imports must actually be reachable, or the kit renders unstyled.
+    let parts = '';
+    for (const part of ['shell.css']) {
+        assert(css.includes(part), `should import ${part}`);
+        const partRes = await fetch(`${BASE}/lib/aimeat-atelier/${part}`);
+        assert(partRes.ok, `/lib/aimeat-atelier/${part} failed: ${partRes.status}`);
+        parts += withoutComments(await partRes.text());
+    }
+    // The node's injected bottom controls: both the scroller and the fixed bar reserve the strip.
+    assert(/padding-bottom:\s*calc\(var\(--ak-chrome-bottom\)/.test(parts),
+        'the main region must reserve the bottom chrome strip');
+    assert(/bottom:\s*var\(--ak-chrome-bottom\)/.test(parts),
+        'the bottom navigation must sit above the chrome strip, never under it');
+    // Motion is finite: no infinite animation anywhere, so an idle surface repaints zero times.
+    assert(!/animation[^;]*infinite/.test(css + parts), 'no animation may run forever');
+    // A dark-theme-only wash breaks every light look, in the entry and in the parts alike.
+    assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css + parts), 'must not use rgba(255,255,255,…)');
+});
+
+await test('GET /lib/aimeat-boot.js — the first-paint restore is synchronous-safe and self-contained', async () => {
+    const res = await fetch(`${BASE}/lib/aimeat-boot.js`);
+    assert(res.ok, `boot script failed: ${res.status}`);
+    const text = await res.text();
+    const code = withoutComments(text);
+    // It restores BOTH axes before first paint and follows other tabs afterwards.
+    for (const marker of ['data-theme', 'data-palette', 'aimeat-theme', 'aimeat-palette',
+        'prefers-color-scheme', "addEventListener('storage'"]) {
+        assert(text.includes(marker), `boot must carry ${marker}`);
+    }
+    // Loaded synchronously in <head>: a module, an import or an await would defer it and flash.
+    assert(!/\bimport\b/.test(code), 'must not import — it loads as a plain synchronous script');
+    assert(!/\bawait\b/.test(code), 'must not await — the restore happens before first paint');
+    // No gate lints public/lib JavaScript, so the no-network discipline is asserted here.
+    assert(!/\bfetch\s*\(/.test(code) && !/XMLHttpRequest/.test(code), 'must not touch the network');
+});
+
+await test('GET /v1/libs — catalogue lists aimeat-atelier with no dependencies', async () => {
+    const res = await fetch(`${BASE}/v1/libs`);
+    assert(res.ok, `libs catalogue failed: ${res.status}`);
+    const data = await res.json() as any;
+    const names = (data.libraries ?? []).map((l: any) => l.name);
+    assert(names.includes('aimeat-atelier'), `catalogue should list aimeat-atelier (got: ${names.join(', ')})`);
+    const atelier = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-atelier');
+    // It depends on nothing, and saying otherwise would make an app load libraries it never uses.
+    assert(!atelier?.requires, `aimeat-atelier must declare no dependencies, got "${atelier?.requires}"`);
+    assert(atelier?.include?.includes('/lib/aimeat-atelier.css'),
+        'aimeat-atelier must include its stylesheet — the JS alone renders unstyled');
 });
 
 // ─── Results ───

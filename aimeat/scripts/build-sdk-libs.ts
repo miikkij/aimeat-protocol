@@ -15,6 +15,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.4.0 — 2026-08-27 — Register aimeat-atelier (the Atelier track's UI kit, TARGET-074).
  *   v1.3.0 — 2026-08-01 — `.css` files import as TEXT. aimeat-ai's disclose() needs the platform's
  *     own public/css/components/ai-label.css rather than a second copy of it, and a text import is
  *     what makes one stylesheet serve both the apex SPA and an app on its own origin. Without the
@@ -74,6 +75,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'datapackage', entry: 'datapackage/index.js' },
   { name: 'events', entry: 'events/index.js' },
   { name: 'auth', entry: 'auth/index.js' },
+  { name: 'atelier', entry: 'atelier/index.js' },
 ];
 
 function banner(name: string): string {

@@ -1,0 +1,356 @@
+/*
+ * @file aimeat-atelier/shell.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description Component styles for the aimeat-atelier shell slice: the app frame, hero, KPI
+ *   row, section, tabs, bottom navigation, empty state, skeleton, and the shared primitives
+ *   (button, scroll region, focus). Every value comes from the --ak-* contract declared in
+ *   ../aimeat-atelier.css — no colour, radius, font or duration is written here directly except
+ *   as a var() with that contract's fallback already applied upstream.
+ *
+ *   THE MAIN REGION IS THE ONLY SCROLLER. The app frame is a fixed-height column; the bar,
+ *   status and bottom navigation never move; the page never scrolls horizontally; and both the
+ *   scroller and the fixed bottom bar reserve the node's injected chrome strip
+ *   (--ak-chrome-bottom), so nothing ever draws under the platform's own controls.
+ * @structure ak-app · ak-hero · ak-statrow · ak-section · ak-tabs · ak-bottomnav · ak-empty ·
+ *   ak-loading · ak-skeleton · shared primitives (ak-btn, ak-scroll, focus, ak-busy)
+ * @usage  Imported by ../aimeat-atelier.css — never link this part directly.
+ * @version-history
+ *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
+ */
+
+/* ── Base ─────────────────────────────────────────────────────────────────────────────────── */
+.ak-root {
+  font-family: var(--ak-font);
+  font-size: var(--ak-text-body);
+  color: var(--ak-ink);
+  box-sizing: border-box;
+}
+.ak-root *, .ak-root *::before, .ak-root *::after { box-sizing: inherit; }
+
+/* ── The app frame ────────────────────────────────────────────────────────────────────────── */
+.ak-app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: clip;
+  background: var(--ak-bg);
+}
+.ak-app__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ak-gap);
+  min-height: var(--ak-touch);
+  padding: 8px var(--ak-pad);
+  background: var(--ak-surface);
+  box-shadow: var(--ak-elev-1);
+  position: relative;
+  z-index: 3;
+}
+.ak-app__title {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ak-app__pill { flex: none; }
+.ak-app__status { padding: 0 var(--ak-pad); }
+.ak-app__status[hidden] { display: none; }
+.ak-app__main {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: var(--ak-main-max);
+  margin: 0 auto;
+  padding: var(--ak-pad);
+  padding-bottom: calc(var(--ak-chrome-bottom) + var(--ak-pad));
+  display: flex;
+  flex-direction: column;
+  gap: var(--ak-gap);
+}
+.ak-app--bottomnav .ak-app__main {
+  padding-bottom: calc(var(--ak-chrome-bottom) + var(--ak-touch) + var(--ak-pad));
+}
+.ak-app__foot {
+  padding: 8px var(--ak-pad);
+  text-align: center;
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+
+/* ── The scroll region (the one scroller) ─────────────────────────────────────────────────── */
+.ak-scroll {
+  overflow-y: auto;
+  overflow-x: clip;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Hero: the one focal band ─────────────────────────────────────────────────────────────── */
+.ak-hero {
+  position: relative;
+  min-height: var(--ak-hero-min);
+  display: flex;
+  align-items: flex-end;
+  border-radius: var(--ak-radius);
+  overflow: hidden;
+  background-image: var(--ak-hero-image), var(--ak-grad);
+  background-size: cover;
+  background-position: center;
+  box-shadow: var(--ak-elev-2);
+}
+.ak-hero--image { background-image: var(--ak-hero-image); background-color: var(--ak-surface-2); }
+.ak-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 18%, var(--ak-scrim) 62%, var(--ak-scrim));
+  pointer-events: none;
+}
+.ak-hero__inner {
+  position: relative;
+  width: 100%;
+  padding: calc(var(--ak-pad) * 1.5) var(--ak-pad) var(--ak-pad);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ak-hero__title {
+  margin: 0;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-hero);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.ak-hero__sub { margin: 0; font-size: var(--ak-text-body); color: var(--ak-ink-dim); }
+.ak-hero__sub[hidden] { display: none; }
+.ak-hero__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.ak-hero__actions[hidden] { display: none; }
+
+/* ── KPI row ──────────────────────────────────────────────────────────────────────────────── */
+.ak-statrow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(9.5rem, 100%), 1fr));
+  gap: var(--ak-gap);
+}
+.ak-statrow__tile {
+  min-width: 0;
+  padding: var(--ak-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ak-statrow__value {
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+  font-variant-numeric: tabular-nums;
+}
+.ak-statrow__label { font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-statrow__hint { font-size: var(--ak-text-fine); color: var(--ak-accent-text); }
+.ak-statrow__hint[hidden] { display: none; }
+
+/* ── Section (and the escape hatch) ───────────────────────────────────────────────────────── */
+.ak-section {
+  padding: var(--ak-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ak-section--flush { padding: 0; background: none; background-image: none; border: 0; box-shadow: none; }
+.ak-section__title {
+  margin: 0;
+  font-family: var(--ak-font-display);
+  font-weight: var(--ak-weight-display);
+  font-size: var(--ak-text-title);
+}
+.ak-section__hint { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); }
+.ak-section__body { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────────────────────── */
+.ak-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: clip;
+  padding-bottom: 2px;
+}
+.ak-tab {
+  flex: none;
+  min-height: var(--ak-touch);
+  padding: 0 14px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  font-size: var(--ak-text-fine);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background var(--ak-motion) var(--ak-ease), color var(--ak-motion) var(--ak-ease);
+}
+.ak-tab--active {
+  background: var(--ak-accent);
+  border-color: var(--ak-accent);
+  color: var(--ak-accent-ink);
+}
+
+/* ── Bottom navigation: fixed above the node's chrome strip ───────────────────────────────── */
+.ak-bottomnav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--ak-chrome-bottom);
+  z-index: 4;
+  display: flex;
+  justify-content: space-around;
+  background: var(--ak-surface);
+  border-top: var(--ak-line-w) solid var(--ak-line);
+  box-shadow: var(--ak-elev-2);
+}
+.ak-bottomnav__item {
+  flex: 1;
+  min-height: var(--ak-touch);
+  border: 0;
+  background: none;
+  color: var(--ak-ink-dim);
+  font: inherit;
+  font-size: var(--ak-text-fine);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.ak-bottomnav__item--active { color: var(--ak-accent-text); font-weight: 650; }
+
+/* ── The designed empty / error state ─────────────────────────────────────────────────────── */
+.ak-empty {
+  padding: calc(var(--ak-pad) * 1.5) var(--ak-pad);
+  border-radius: var(--ak-radius);
+  background: var(--ak-surface);
+  background-image: var(--ak-surface-image);
+  border: var(--ak-line-w) solid var(--ak-line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+.ak-empty--error { border-color: color-mix(in oklab, var(--ak-err) 45%, var(--ak-line)); }
+.ak-empty__mark { position: relative; width: 56px; height: 56px; margin-bottom: 4px; }
+.ak-empty__mark span { position: absolute; border-radius: var(--ak-radius-pill); }
+.ak-empty__mark-a {
+  inset: 0;
+  background: color-mix(in oklab, var(--ak-accent) 14%, var(--ak-surface));
+}
+.ak-empty__mark-b {
+  inset: 12px 8px 8px 12px;
+  background: color-mix(in oklab, var(--ak-accent-2) 22%, var(--ak-surface));
+}
+.ak-empty__mark-c {
+  inset: 24px 24px 12px 12px;
+  background: color-mix(in oklab, var(--ak-accent) 38%, var(--ak-surface));
+}
+.ak-empty--error .ak-empty__mark-a { background: color-mix(in oklab, var(--ak-err) 12%, var(--ak-surface)); }
+.ak-empty--error .ak-empty__mark-c { background: color-mix(in oklab, var(--ak-err) 32%, var(--ak-surface)); }
+.ak-empty__title { margin: 0; font-family: var(--ak-font-display); font-size: var(--ak-text-title); }
+.ak-empty__hint { margin: 0; font-size: var(--ak-text-fine); color: var(--ak-ink-dim); max-width: 34ch; }
+.ak-empty__hint[hidden], .ak-empty__actions[hidden] { display: none; }
+
+/* ── Loading line ─────────────────────────────────────────────────────────────────────────── */
+.ak-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--ak-touch);
+  font-size: var(--ak-text-fine);
+  color: var(--ak-ink-dim);
+}
+.ak-loading__pulse {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--ak-radius-pill);
+  background: var(--ak-accent);
+  animation: ak-pulse calc(var(--ak-motion) * 4) var(--ak-ease) 8;
+}
+@keyframes ak-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.55); opacity: 0.45; }
+}
+
+/* ── Skeleton: shimmer with a finite iteration count ──────────────────────────────────────── */
+.ak-skeleton { display: flex; flex-direction: column; gap: 10px; }
+.ak-skeleton__row { display: flex; flex-direction: column; gap: 6px; }
+.ak-skeleton__line {
+  height: 0.9em;
+  width: 82%;
+  border-radius: var(--ak-radius-sm);
+  background: color-mix(in oklab, var(--ak-ink) 9%, var(--ak-surface));
+  animation: ak-shimmer calc(var(--ak-motion) * 6) var(--ak-ease) 6;
+}
+.ak-skeleton__line--lead { width: 46%; height: 1.05em; }
+@keyframes ak-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ── Shared primitives ────────────────────────────────────────────────────────────────────── */
+.ak-btn {
+  min-height: var(--ak-touch);
+  padding: 0 16px;
+  border: var(--ak-line-w) solid var(--ak-line);
+  border-radius: var(--ak-radius-sm);
+  background: var(--ak-surface);
+  color: var(--ak-ink);
+  font: inherit;
+  font-size: var(--ak-text-body);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: filter var(--ak-motion) var(--ak-ease), box-shadow var(--ak-motion) var(--ak-ease);
+}
+.ak-btn:hover { filter: brightness(1.04); }
+.ak-btn:active { filter: brightness(0.97); }
+.ak-btn--primary {
+  background: var(--ak-grad);
+  border-color: transparent;
+  color: var(--ak-accent-ink);
+  box-shadow: var(--ak-elev-1);
+  font-weight: 650;
+}
+.ak-btn--ghost { background: none; border-color: transparent; color: var(--ak-accent-text); }
+.ak-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
+.ak-busy { position: relative; pointer-events: none; }
+.ak-busy::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 0.85em;
+  height: 0.85em;
+  margin-top: -0.425em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: var(--ak-radius-pill);
+  animation: ak-spin 700ms linear 12;
+}
+@keyframes ak-spin { to { transform: rotate(360deg); } }
+
+/* ── Focus is always visible ──────────────────────────────────────────────────────────────── */
+.ak-root :is(button, [role='button'], [role='tab'], a, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ak-focus);
+  outline-offset: 2px;
+}

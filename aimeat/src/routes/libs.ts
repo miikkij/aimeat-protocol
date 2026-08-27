@@ -8,6 +8,10 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.3.0 - 2026-08-27 - New library aimeat-atelier.js: the Atelier track's UI kit (app shell,
+ *   hero, KPI row, tabs, bottom navigation, designed empty/loading states). It makes no network
+ *   calls; its look comes entirely from the --ak-* contract in /lib/aimeat-atelier.css.
+ *   Registered as a route and in the library-pack registry (TARGET-074).
  * v2.0.0 - 2026-08-24 - The auth lib's provider prelude also carries the LISTED SSO connections
  *   (BR-04 R12), read from storage at serve time — hidden connections never reach the modal.
  * v2.2.0 - 2026-07-28 - New library aimeat-game.js: the general-purpose gamification UI kit
@@ -172,6 +176,7 @@ const SDK_LIB_NAMES = [
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
   'webmcp', 'markdown', 'audio', 'tunnel', 'game', 'iam', 'connect', 'datapackage', 'events',
+  'atelier',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {
