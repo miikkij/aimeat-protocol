@@ -28,6 +28,9 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.4.1 — 2026-08-27 — Kit release marker (the JS↔CSS pin): the stylesheet imports its own
+ *     token upstream, so palette accents, webfonts and display personalities reach every app.
+ *     Stylesheet-only fix.
  *   v0.4.0 — 2026-08-27 — The mosaic renderer (TARGET-074 phase 2): `mosaic(spec)` reads the
  *     app's stored layout record and renders it from the kit's own components — the app binds
  *     sources by name, the layout arranges. All five navigation projections from day one: stack,
@@ -74,7 +77,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.4.0',
+  version: '0.4.1',
 
   // ── Shell and navigation ──
   app, section, tabs, bottomNav,

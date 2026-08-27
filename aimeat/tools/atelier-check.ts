@@ -220,6 +220,42 @@ function mixPercents(expr: string): number[] {
   return out;
 }
 
+/**
+ * The mesh budget's own scan: only the percentages mixed OVER THE PAGE GROUND count as pigment.
+ * A nested hue blend between two accents (55% of one accent into the other) is vocabulary, not
+ * coverage — what the cap bounds is how much of ANY colour lands on the bg. Balanced scan, since
+ * the first argument may itself be a color-mix.
+ */
+function groundMixPercents(expr: string, groundVar: string): number[] {
+  const out: number[] = [];
+  let at = expr.indexOf('color-mix(');
+  while (at !== -1) {
+    let depth = 0;
+    let end = at;
+    for (let i = at; i < expr.length; i++) {
+      if (expr[i] === '(') depth++;
+      else if (expr[i] === ')') { depth--; if (depth === 0) { end = i; break; } }
+    }
+    const inner = expr.slice(at + 'color-mix('.length, end);
+    // Split the top level: "in oklab, <colour1> N%, <colour2>".
+    const parts: string[] = [];
+    let d = 0;
+    let start = 0;
+    for (let i = 0; i < inner.length; i++) {
+      if (inner[i] === '(') d++;
+      else if (inner[i] === ')') d--;
+      else if (inner[i] === ',' && d === 0) { parts.push(inner.slice(start, i).trim()); start = i + 1; }
+    }
+    parts.push(inner.slice(start).trim());
+    if (parts.length === 3 && parts[2] === `var(${groundVar})`) {
+      const pct = parts[1]!.match(/\s(\d+(?:\.\d+)?)%$/);
+      if (pct) out.push(Number(pct[1]));
+    }
+    at = expr.indexOf('color-mix(', at + 1);
+  }
+  return out;
+}
+
 // ── Parse the two stylesheets ────────────────────────────────────────────────────────────────
 
 function parseDecls(body: string): Map<string, string> {
@@ -300,8 +336,12 @@ const MIN_EDGE_VS_CARD = 1.30;
 const MIN_EDGE_VS_PAGE = 1.15;
 /** A card tint may mix at most this much of anything into the surface. */
 const SURFACE_TINT_CAP = 8;
-/** The hero mesh budget is wider: text never sits on raw mesh (AK-SCRIM covers text). */
-const HERO_MESH_CAP = 18;
+/** The hero mesh budget is wider: text never sits on raw mesh (AK-SCRIM covers text). Raised
+ *  from 18 on 2026-08-27 by the developer's direction — the 18% mesh read as a washed tint in
+ *  the first real-browser screenshots, and the focal band is the one place the system COMMITS
+ *  to colour. This cap is an aesthetic bound (a mesh, not a solid poster fill); the readability
+ *  guarantee is AK-SCRIM, which is unchanged and still arithmetic. */
+const HERO_MESH_CAP = 36;
 /** Tokens the base contract must declare — a look can never inherit half its identity. */
 const REQUIRED_BASE = [
   '--ak-bg', '--ak-surface', '--ak-surface-2', '--ak-surface-image', '--ak-ink', '--ak-ink-dim',
@@ -430,7 +470,9 @@ for (const preset of presetNames) {
       for (const ground of heroGrounds) {
         add(combo, 'AK-SCRIM ink over scrim', ratio(ink, over(scrim, ground)), MIN_TEXT, 'hero text on the scrimmed ground');
       }
-      for (const p of mixPercents(heroRaw)) {
+      // Only pigment laid over the page ground counts against the mesh budget — a nested hue
+      // blend between two accents is vocabulary, not coverage (see groundMixPercents).
+      for (const p of groundMixPercents(heroRaw, '--ak-bg')) {
         if (p <= HERO_MESH_CAP) pass(combo, 'AK-CAP hero mesh %');
         else fail(combo, 'AK-CAP hero mesh %', `the hero mesh above ${HERO_MESH_CAP}% stops being a wash (uses ${p}%)`);
       }

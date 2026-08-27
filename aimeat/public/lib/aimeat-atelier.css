@@ -36,6 +36,11 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.4.1 — 2026-08-27 — The stylesheet imports its own token upstream (aimeat-theme.css):
+ *     palette accents, real webfonts and each palette's display personality now reach every
+ *     Atelier app through the one link the shell already has. Found in a real browser: the login
+ *     pill's palette control did nothing, because the --ak-* chains fell through to their
+ *     literal fallbacks with no theme tokens on the page.
  *   v0.4.0 — 2026-08-27 — The mosaic part arrives (mosaic.css): the five navigation projections
  *     of one stored layout — stacked units, the tabs/bottom-bar picker, the scroll-snap deck
  *     with dots, the flow stepper, and the pan-zoom canvas whose tiles expand to full view.
@@ -60,6 +65,12 @@
  *     type, motion, chrome reserve), vivid-as-default values, the flat preset, dark
  *     re-declaration, and the shell part (TARGET-074 phase 1, slice 1).
  */
+
+/* The token UPSTREAM: the platform theme (palette accents, light/dark grounds, the self-hosted
+ * faces — Inter, Space Grotesk, Fraunces, JetBrains Mono — and each palette's display
+ * personality). Every --ak-* value chains to these; without them the literal fallbacks win and
+ * the login pill's palette control does nothing. The kit owns its composition: one link. */
+@import url('./aimeat-theme.css');
 
 @import url('./aimeat-atelier/shell.css');
 @import url('./aimeat-atelier/content.css');
@@ -104,10 +115,14 @@
                         color-mix(in oklab, var(--ak-accent-2) 70%, var(--ak-accent)));
   /* The scrim hero TEXT sits on — mode-following, composited over image or gradient. */
   --ak-scrim:         color-mix(in oklab, var(--ak-bg) 78%, transparent);
-  /* The zero-image hero ground: a gradient mesh from brand tokens. An image replaces it. */
-  --ak-hero-image:    radial-gradient(at 20% 18%, color-mix(in oklab, var(--ak-accent) 16%, var(--ak-bg)), transparent 55%),
-                      radial-gradient(at 82% 8%,  color-mix(in oklab, var(--ak-accent-2) 13%, var(--ak-bg)), transparent 50%),
-                      radial-gradient(at 62% 92%, color-mix(in oklab, var(--ak-accent) 10%, var(--ak-bg)), transparent 55%);
+  /* The zero-image hero ground: a gradient mesh from brand tokens. An image replaces it.
+   * Four lobes, real chroma — the first bench screenshots read as a washed tint, and a focal
+   * band that does not commit is exactly the dryness this system exists to end. The scrim under
+   * the text is what AK-SCRIM verifies, so the mesh may carry colour. */
+  --ak-hero-image:    radial-gradient(at 18% 20%, color-mix(in oklab, var(--ak-accent) 32%, var(--ak-bg)), transparent 52%),
+                      radial-gradient(at 84% 10%, color-mix(in oklab, color-mix(in oklab, var(--ak-accent) 55%, var(--ak-accent-2)) 26%, var(--ak-bg)), transparent 52%),
+                      radial-gradient(at 64% 96%, color-mix(in oklab, var(--ak-accent) 24%, var(--ak-bg)), transparent 55%),
+                      radial-gradient(at 8% 88%,  color-mix(in oklab, var(--ak-accent-2) 14%, var(--ak-bg)), transparent 45%);
 
   /* ── Shape and depth ──────────────────────────────────────────────────────────────────── */
   --ak-radius:        var(--radius-box, 14px);
@@ -120,7 +135,7 @@
   --ak-font:          var(--font-body, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
   --ak-font-display:  var(--font-display, var(--ak-font));
   --ak-font-mono:     var(--font-mono, ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace);
-  --ak-text-hero:     var(--text-hero, clamp(1.9rem, 6vw, 2.9rem));
+  --ak-text-hero:     var(--text-hero, clamp(2.2rem, 7vw, 3.6rem));
   --ak-text-title:    var(--text-title, clamp(1.1rem, 2.6vw, 1.4rem));
   --ak-text-body:     var(--text-body, 0.95rem);
   --ak-text-fine:     var(--text-fine, 0.8125rem);     /* 13px floor                         */
@@ -144,7 +159,7 @@
 
   /* ── Component sizing (one sizing everywhere — instances never override these) ────────── */
   --ak-main-max:      52rem;                            /* measure cap for the main column   */
-  --ak-hero-min:      24dvh;                            /* the focal band's minimum height   */
+  --ak-hero-min:      30dvh;                            /* the focal band's minimum height   */
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════════════
