@@ -170,6 +170,11 @@
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
 }
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+[data-ak-look='poster'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+}
 
 /* @preset-block broadsheet — the big paper: an even bigger masthead than editorial, heavy rules, joined columns, ink on paper.
    Editorial's bigger sibling: square everything, darker hairlines, a masthead that owns the fold. */
@@ -274,6 +279,11 @@
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
 }
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+[data-ak-look='gallery'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
+}
 
 /* @preset-block brutalist — loud and square: thick ink borders, hard offset shadows, maximum weight, no apologies.
    Depth as printed offset, never blur; the accent appears as the display type's hard shadow. */
@@ -358,4 +368,9 @@
   border-radius: 0;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
+}
+/* The band escapes the column; its TEXT stays aligned to it — found in the first
+ * real-data experiment run, where the title clipped at the viewport edge. */
+[data-ak-look='aurora'] .ak-mosaic__band .ak-hero .ak-hero__inner {
+  padding-inline: max(var(--ak-pad), calc((100vw - min(var(--ak-main-max), 100vw)) / 2 + var(--ak-pad)));
 }
