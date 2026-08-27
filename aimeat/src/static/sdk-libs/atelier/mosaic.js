@@ -34,6 +34,8 @@
  *   });
  *   // later, when the app's data changed:  m.refresh('errands.');
  * @version-history
+ *   v0.7.0 — 2026-08-27 — Composition: the stack projection places blocks on a six-column grid
+ *     by their `span`, and the `rail` projection arrives (desktop left rail, phone strip).
  *   v0.4.0 — 2026-08-27 — Initial (TARGET-074 phase 2, the client renderer).
  */
 import { el, clear, resolve, enter, reducedMotion } from './dom.js';
@@ -250,11 +252,47 @@ export function mosaic(spec) {
 
   // ── The five projections ─────────────────────────────────────────────────────────────────────
 
-  /** Stacked: every unit in order; the layout with no nav. */
+  /** Stacked: every unit in order on the COMPOSITION GRID — a block's `span` places it (full
+   *  line, the main column, the side column, a half), so the record composes a page instead of
+   *  piling cards. Narrow screens stack everything (the stylesheet folds the grid). */
   function projectStack(units) {
-    const box = el('div', { class: 'ak-mosaic__units' });
-    for (const u of units) box.appendChild(u.el);
+    const box = el('div', { class: 'ak-mosaic__units ak-mosaic__units--grid' });
+    for (const u of units) {
+      u.el.classList.add('ak-mosaic__unit--' + (u.block.span || 'full'));
+      box.appendChild(u.el);
+    }
     return box;
+  }
+
+  /** The rail: a desktop-grade left rail picking one unit at a time; on a narrow screen the
+   *  stylesheet folds the rail into a top strip. Same blocks, another projection. */
+  function projectRail(units) {
+    const box = el('div', { class: 'ak-mosaic__units' });
+    for (const u of units) { u.el.hidden = true; box.appendChild(u.el); }
+    let current = 0;
+    const items = [];
+    function show(index) {
+      if (index === current && !units[index].el.hidden) return;
+      transition(function () {
+        units[current].el.hidden = true;
+        current = index;
+        units[current].el.hidden = false;
+        items.forEach(function (btn, i) { btn.classList.toggle('ak-mosaic__railitem--on', i === index); });
+        enter(units[current].el);
+      });
+    }
+    const rail = el('nav', { class: 'ak-mosaic__rail' }, units.map(function (u, i) {
+      const btn = el('button', {
+        type: 'button',
+        class: 'ak-mosaic__railitem' + (i === 0 ? ' ak-mosaic__railitem--on' : ''),
+        'data-ak-noguard': true,
+        on: { click: function () { show(i); } },
+      }, u.label);
+      items.push(btn);
+      return btn;
+    }));
+    if (units.length) units[0].el.hidden = false;
+    return el('div', { class: 'ak-mosaic__railwrap' }, [rail, box]);
   }
 
   /** One unit shown at a time; the chrome (tabs or bottom bar) picks. */
@@ -486,6 +524,7 @@ export function mosaic(spec) {
     else if (nav === 'deck') root.appendChild(projectDeck(units));
     else if (nav === 'flow') root.appendChild(projectFlow(units));
     else if (nav === 'canvas') root.appendChild(projectCanvas(units));
+    else if (nav === 'rail') root.appendChild(projectRail(units));
     else root.appendChild(projectStack(units));
   }
 

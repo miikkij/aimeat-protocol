@@ -446,3 +446,63 @@
   outline: 2px solid var(--ak-focus);
   outline-offset: 2px;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   STRUCTURE BY LOOK. A look is a form language, and two of them reshape the page itself —
+   the axis the award-site references made plain: composition, not colour.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+
+/* Editorial: the MASTHEAD, not a floating card. Rules above and below, giant display type on
+   the bare page, no mesh, no scrim, no shadow — the front page of a paper. */
+[data-ak-look='editorial'] .ak-hero {
+  min-height: unset;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  border-top: 3px solid var(--ak-ink);
+  border-bottom: var(--ak-line-w) solid var(--ak-line);
+  overflow: visible;
+}
+[data-ak-look='editorial'] .ak-hero::before,
+[data-ak-look='editorial'] .ak-hero__scrim { display: none; }
+[data-ak-look='editorial'] .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
+[data-ak-look='editorial'] .ak-hero__title {
+  font-size: clamp(2.8rem, 9vw, 5.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.02em;
+}
+[data-ak-look='editorial'] .ak-hero__sub { font-size: var(--ak-text-title); }
+
+/* Editorial figures: giant numerals separated by hairlines, joined into one strip. */
+[data-ak-look='editorial'] .ak-statrow { gap: 0; }
+[data-ak-look='editorial'] .ak-statrow__tile {
+  border: 0;
+  border-right: var(--ak-line-w) solid var(--ak-line);
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: calc(var(--ak-pad) * 1.25) var(--ak-pad);
+  transform: none;
+}
+[data-ak-look='editorial'] .ak-statrow__tile:last-child { border-right: 0; }
+[data-ak-look='editorial'] .ak-statrow__value { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 1; }
+[data-ak-look='editorial'] .ak-statrow__label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--ak-font-mono);
+}
+
+/* Editorial sections shed their card skin inside the joined frame — the frame IS the surface. */
+[data-ak-look='editorial'] .ak-mosaic .ak-section {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
+
+/* Poster: the statement band runs EDGE TO EDGE — it escapes the measure column entirely. */
+[data-ak-look='poster'] .ak-mosaic__band .ak-hero {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}

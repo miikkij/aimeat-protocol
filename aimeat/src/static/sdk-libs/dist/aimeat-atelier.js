@@ -1751,9 +1751,47 @@
       }
     }
     function projectStack(units) {
-      const box = el("div", { class: "ak-mosaic__units" });
-      for (const u of units) box.appendChild(u.el);
+      const box = el("div", { class: "ak-mosaic__units ak-mosaic__units--grid" });
+      for (const u of units) {
+        u.el.classList.add("ak-mosaic__unit--" + (u.block.span || "full"));
+        box.appendChild(u.el);
+      }
       return box;
+    }
+    function projectRail(units) {
+      const box = el("div", { class: "ak-mosaic__units" });
+      for (const u of units) {
+        u.el.hidden = true;
+        box.appendChild(u.el);
+      }
+      let current2 = 0;
+      const items = [];
+      function show(index) {
+        if (index === current2 && !units[index].el.hidden) return;
+        transition(function() {
+          units[current2].el.hidden = true;
+          current2 = index;
+          units[current2].el.hidden = false;
+          items.forEach(function(btn, i) {
+            btn.classList.toggle("ak-mosaic__railitem--on", i === index);
+          });
+          enter(units[current2].el);
+        });
+      }
+      const rail = el("nav", { class: "ak-mosaic__rail" }, units.map(function(u, i) {
+        const btn = el("button", {
+          type: "button",
+          class: "ak-mosaic__railitem" + (i === 0 ? " ak-mosaic__railitem--on" : ""),
+          "data-ak-noguard": true,
+          on: { click: function() {
+            show(i);
+          } }
+        }, u.label);
+        items.push(btn);
+        return btn;
+      }));
+      if (units.length) units[0].el.hidden = false;
+      return el("div", { class: "ak-mosaic__railwrap" }, [rail, box]);
     }
     function projectPicker(units, mode) {
       const box = el("div", { class: "ak-mosaic__units" });
@@ -2009,6 +2047,7 @@
       else if (nav === "deck") root.appendChild(projectDeck(units));
       else if (nav === "flow") root.appendChild(projectFlow(units));
       else if (nav === "canvas") root.appendChild(projectCanvas(units));
+      else if (nav === "rail") root.appendChild(projectRail(units));
       else root.appendChild(projectStack(units));
     }
     let currentLayout = null;
@@ -2075,7 +2114,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.6.0",
+    version: "0.7.0",
     // ── Shell and navigation ──
     app,
     section,
