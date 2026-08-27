@@ -48452,6 +48452,15 @@ paths:
                 variables: { type: object, additionalProperties: { type: string } }
                 invoice_id: { type: string }
                 reply_to: { type: string, format: email }
+                theme:
+                  type: string
+                  maxLength: 40
+                  description: >-
+                    What the message looks like. A built-in id (clean, space, warm, paper) or one of
+                    the caller's own, stored as the memory record outbound.theme.{id}; the caller's
+                    own wins where both exist. An id that matches nothing is the DEFAULT rather than
+                    an error, because decoration never refuses a send. Read the list, already
+                    validated, from GET /v1/outbound/themes.
                 from_name: { type: string, maxLength: 140 }
                 company_id: { type: string, maxLength: 80, description: 'Send AS this registered company: with its own SMTP identity the mail leaves through ITS server, from ITS domain, and the send log records which company spoke.' }
                 connection_id: { type: string, maxLength: 80, description: 'Send THROUGH the caller''s own connected mailbox, so the message really leaves their Gmail or Outlook, arrives from their own address with their own domain''s SPF and DKIM, and lands in their own Sent Items. It wins over a company''s SMTP and over the node''s shared sender: a message a person sends is theirs, and it should look like it in the recipient''s inbox and in their own Sent folder. Must be the caller''s OWN connection and must carry the sending permission — both checked against the connection store, never taken from the request — and the session needs connections:use as well as outbound:send.' }
@@ -48516,6 +48525,51 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/AimeatError' }
         '429': { $ref: '#/components/responses/AimeatError' }
+  /v1/outbound/themes:
+    get:
+      operationId: listOutboundThemes
+      tags: [Outbound]
+      summary: The looks a campaign can leave in
+      description: >-
+        The built-in themes plus any the caller has stored under the memory prefix
+        outbound.theme., each already VALIDATED. That validation is the point of the route: the send
+        path never refuses over decoration, so without somewhere that says which value is unusable a
+        broken theme is discovered by a recipient. Every theme carries `ok` and, when it is false,
+        the fields that fell back to the default and why. A caller's own id WINS over a built-in of
+        the same name, and the list reflects that rather than showing both.
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: Themes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  default: { type: string, description: 'The id used when a send names none.' }
+                  fonts:
+                    type: array
+                    description: 'The font names a theme may choose. No web fonts: Outlook drops them.'
+                    items: { type: string }
+                  themes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string }
+                        source: { type: string, enum: [built-in, own] }
+                        ok: { type: boolean }
+                        tokens:
+                          type: object
+                          description: 'Colours (hex), a font name and a 0-24 corner radius. Nothing else: a theme is data, not CSS.'
+                        problems:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              field: { type: string }
+                              why: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /v1/outbound/log:
     get:
       operationId: listOutboundLog

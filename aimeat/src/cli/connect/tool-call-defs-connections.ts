@@ -83,6 +83,7 @@ export const connectionCliTools: ConnectCliToolDefinition[] = [
             const alias = optionalString(input, 'from_alias'); if (alias) body.from_alias = alias;
             const replyTo = optionalString(input, 'reply_to'); if (replyTo) body.reply_to = replyTo;
             const disc = optionalString(input, 'ai_disclosure'); if (disc) body.ai_disclosure = disc;
+            const theme = optionalString(input, 'theme'); if (theme) body.theme = theme;
             return client.post('/v1/outbound/send', body);
         },
     },

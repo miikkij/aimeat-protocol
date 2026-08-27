@@ -83,9 +83,11 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
     from_alias: z.string().optional().describe('A verified alias of that mailbox to send as.'),
     kind: z.enum(['transactional', 'marketing']).optional().describe("Default 'transactional'."),
     reply_to: z.string().optional().describe('Where a reply should go.'),
+    theme: z.string().optional()
+      .describe("What the message looks like: a built-in id (clean, space, warm, paper) or one of the owner's own."),
     ai_disclosure: z.enum(['none', 'ai-assisted', 'ai-generated', 'autonomous']).optional()
       .describe('Say in a header that a machine wrote this. Declare it if you wrote the body.'),
-  }, annotationsFor('aimeat_mail_send'), async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure }) => out(
+  }, annotationsFor('aimeat_mail_send'), async ({ contact_id, subject, body, connection_id, from_alias, kind, reply_to, ai_disclosure, theme }) => out(
     // The outbound door, not around it: every gate lives behind this one route.
     await client.post('/v1/outbound/send', {
       contact_id, subject, body,
@@ -94,6 +96,7 @@ export function registerConnectionTools(mcp: McpServer, registry: AgentRegistry)
       ...(from_alias ? { from_alias } : {}),
       ...(reply_to ? { reply_to } : {}),
       ...(ai_disclosure ? { ai_disclosure } : {}),
+      ...(theme ? { theme } : {}),
     }),
   ));
 }

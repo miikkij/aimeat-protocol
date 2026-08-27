@@ -24,6 +24,9 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { parseDisclosure } from '../services/outbound/ai-disclosure.js';
+import {
+  BUILT_IN_THEMES, BUILT_IN_THEME_IDS, DEFAULT_THEME_ID, FONT_NAMES, isThemeId, validateTheme,
+} from '../services/outbound/email-theme.js';
 import { success, error } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { emitChange } from '../services/event-bus.js';
@@ -47,6 +50,12 @@ const SendSchema = z.object({
   variables: z.record(z.string(), z.string().max(2000)).optional(),
   invoice_id: z.string().max(80).optional(),
   reply_to: z.string().email().max(200).optional(),
+  /**
+   * What the message looks like: a built-in id or one of the owner's own themes. Validated at
+   * SHAPE only here; whether it exists is answered by GET /v1/outbound/themes, because a theme
+   * that is missing is the default look rather than a refused send.
+   */
+  theme: z.string().max(40).optional(),
   from_name: z.string().max(140).optional(),
   /** Send as this company: its own SMTP identity is used when it has one. */
   company_id: z.string().max(80).optional(),
@@ -244,6 +253,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         subject: b.subject, body: b.body,
         templateId: b.template_id, variables: b.variables,
         invoiceId: b.invoice_id, replyTo: b.reply_to, fromName: b.from_name,
+        theme: b.theme,
         companyId: b.company_id,
         connectionId: b.connection_id, fromAlias: b.from_alias,
         ...(disclosure ? { aiDisclosure: disclosure } : {}),
@@ -255,6 +265,39 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }
+  });
+
+  // ── Themes ────────────────────────────────────────────────────────────────
+  //
+  // What a picker reads. The built-ins plus whatever the caller has stored under
+  // `outbound.theme.*`, each already validated, so a surface can show "this one has a bad value"
+  // BEFORE somebody sends with it. That is the whole reason this route exists rather than leaving
+  // themes to a plain memory list: the send path deliberately never refuses over decoration, so
+  // without a place that says what is wrong, a broken theme would be discovered by a customer.
+
+  router.get('/v1/outbound/themes', requireAuth(), requireScope('outbound:send'), async (req, res) => {
+    const owner = resolve(req);
+    const own = await storage.listMemory(owner, { prefix: 'outbound.theme.' });
+    const mine = own.map((rec) => {
+      const id = rec.key.slice('outbound.theme.'.length);
+      const { tokens, problems } = validateTheme(rec.value);
+      return { id, source: 'own' as const, tokens, ok: problems.length === 0, problems };
+    }).filter((t) => isThemeId(t.id));
+    // An owner's own name WINS over a built-in of the same id, exactly as the send path resolves it.
+    // Listing both would show a person two rows and no way to know which one they would get.
+    const overridden = new Set(mine.map((t) => t.id));
+    const builtIn = BUILT_IN_THEME_IDS
+      .filter((id) => !overridden.has(id))
+      .map((id) => ({ id, source: 'built-in' as const, tokens: BUILT_IN_THEMES[id], ok: true, problems: [] }));
+    res.json(success(config.nodeId, {
+      default: DEFAULT_THEME_ID,
+      fonts: FONT_NAMES,
+      themes: [...builtIn, ...mine],
+    }, [{
+      description: 'Store your own theme',
+      method: 'PUT',
+      url: '/v1/memory/outbound.theme.{id}',
+    }]));
   });
 
   // ── Send log ──────────────────────────────────────────────────────────────
