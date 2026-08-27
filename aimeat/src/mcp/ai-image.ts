@@ -15,6 +15,8 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-08-28 — The returned url is the service's fetchUrl (anonymous /v1/pub/ for a
+ *     public image), not a hand-built /v1/storage/ path that only the owner could open.
  *   v1.0.0 — 2026-08-16 — Initial.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -61,7 +63,11 @@ export function registerAiImageTool(
                     publicVisibility: isPublic === true, model, appId: app_id,
                 });
                 const base = config.baseUrl.replace(/\/+$/, '');
-                const path = `/v1/storage/${r.storageKey.split('/').map(encodeURIComponent).join('/')}`;
+                // The service builds the URL that actually loads for the visibility's audience —
+                // /v1/pub/ when public, /v1/storage/ when private. This tool used to hand back the
+                // owner-authenticated form with a note calling it publicly readable, and the first
+                // imagery-pipeline demo shipped it into an app where it answered 401 to visitors.
+                const path = r.fetchUrl;
                 return {
                     content: [{
                         type: 'text' as const,

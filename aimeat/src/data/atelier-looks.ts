@@ -25,6 +25,10 @@
  * @usage
  *   import { LOOKS, STRUCTURES } from '../data/atelier-looks.js';
  * @version-history
+ *   v1.1.0 — 2026-08-28 — An explicit hero image survives the masthead: the structure's hero
+ *     flattening (no band, no scrim, zero inline padding) scopes to :not(.ak-hero--image), so an
+ *     editorial or broadsheet page with a generated cover keeps the photographic band and its
+ *     scrim. Found by the first imagery-pipeline demo: the picture was paid for and never painted.
  *   v1.0.0 — 2026-08-27 — Initial: the seven hand-written presets become entries, five new looks
  *     arrive as proof the factory works (broadsheet, gallery, brutalist, terminal, aurora), and
  *     the three structures extracted from editorial/poster become shared vocabulary.
@@ -60,7 +64,7 @@ export const STRUCTURES: readonly AtelierStructure[] = [
     id: 'masthead',
     summary: 'The hero is a front-page masthead: giant display type on rules, no card, no mesh — and the news under it separates with RULES, not boxes (a card widget inside a newspaper was the first design review\'s finding).',
     css: (sel) => `
-${sel} .ak-hero {
+${sel} .ak-hero:not(.ak-hero--image) {
   min-height: unset;
   border-radius: 0;
   box-shadow: none;
@@ -69,9 +73,9 @@ ${sel} .ak-hero {
   border-bottom: var(--ak-line-w) solid var(--ak-line);
   overflow: visible;
 }
-${sel} .ak-hero::before,
-${sel} .ak-hero__scrim { display: none; }
-${sel} .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
+${sel} .ak-hero:not(.ak-hero--image)::before,
+${sel} .ak-hero:not(.ak-hero--image) .ak-hero__scrim { display: none; }
+${sel} .ak-hero:not(.ak-hero--image) .ak-hero__inner { padding: calc(var(--ak-pad) * 1.25) 0; }
 ${sel} .ak-hero__title {
   font-size: clamp(2.8rem, 9vw, 5.6rem);
   line-height: 0.98;
