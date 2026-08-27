@@ -39,6 +39,9 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.5.0 — 2026-08-27 — The build track (TARGET-074): `<meta name="aimeat-track">` in the app's
+ *     head is parsed into `manifest.track` and carried forward on silent updates, so a later edit
+ *     session loads the guide the app was built with instead of mixing Classic and Atelier.
  *   v1.4.0 — 2026-08-25 — The publish writes the map DOCUMENT as well as stamping the summary.
  *     The stamp names a key, and with nothing at that key every surface that opens a map said "no
  *     data map yet" about an app it had just stamped. Best-effort: a publish that already happened
@@ -214,8 +217,9 @@ export async function publishApp(
   // "published". Everything else the check notices is a warning further down. Refusing here rather
   // than after createApp is what keeps a rejected publish from leaving a half-written version.
   const isHtml = /html/i.test(mimeType);
+  const html = isHtml ? data.toString('utf8') : '';
   const artifact = isHtml
-    ? await lintAppArtifact(data.toString('utf8'), config)
+    ? await lintAppArtifact(html, config)
     : { blocking: [], warnings: [] };
   if (artifact.blocking.length > 0) {
     return {
@@ -260,6 +264,14 @@ export async function publishApp(
   };
   const descriptions = sanitizeDescriptions(requested.descriptions) ?? prev?.descriptions;
   if (descriptions) manifest.descriptions = descriptions;
+  // The build track (TARGET-074), read from the app's own head declaration — the same
+  // bytes-on-demand pattern as `aimeat-scopes`, but persisted so an edit session months later
+  // loads the guide this app was built with. Silence carries the previous answer forward; an app
+  // that never declared either reads as classic, because every pre-track app is one.
+  const declaredTrack = /<meta\s+name=["']aimeat-track["']\s+content=["'](classic|atelier)["']/i
+    .exec(html.slice(0, 4096))?.[1] as 'classic' | 'atelier' | undefined;
+  const track = declaredTrack ?? prev?.track;
+  if (track) manifest.track = track;
   const icon = requested.icon ?? prev?.icon;
   if (icon) manifest.icon = icon;
   // An explicit `cortexAgents` replaces the section (send `[]` to clear it); omitted carries forward.

@@ -7,6 +7,9 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.4.0 — 2026-08-27 — SHELL_ATELIER (TARGET-074): the Atelier track's shell. Eight-line head
+ *     (aimeat-boot.js replaces the inline theme-restore IIFE), the ceremony lives in the served
+ *     kit's app() call, and the aimeat-track meta records which guide built the file.
  *   v1.3.0 — 2026-07-25 — Theme system v2: the head snippet restores the user's PALETTE
  *     (data-palette / 'aimeat-palette') next to the light/dark mode, so a generated app opens in
  *     the chosen look with no flash and no app code.
@@ -274,6 +277,56 @@ entry: index.html
     AIMEAT.auth.mountLoginButton('#login', { onLogin: function () { tryBoot(); }, onLogout: function () { booted = false; setStatus('Log in to continue.', 'alert-warning'); } });
     var _iv = setInterval(function () { tryBoot(); if (booted) clearInterval(_iv); }, 300);
     tryBoot();
+  </script>
+</body>
+</html>`;
+
+// ── ATELIER track shell ──────────────────────────────────────────────
+// The Atelier track's starting point (TARGET-074): the ceremony lives in the served kit, so the
+// head is a handful of lines and the app is the spec calls plus its own logic. Guided by
+// GET /v1/prompts/build-app-atelier and node:aimeat-app-builder-atelier — NEVER by the Classic
+// spec; the aimeat-track meta records which guide built this file.
+export const SHELL_ATELIER = `<!DOCTYPE html>
+<!-- AIMEAT App Manifest
+name: {{app-name}}
+version: 1.0.0
+description: {{one-line description — REQUIRED for publishing}}
+entry: index.html
+-->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="aimeat-track" content="atelier" />
+  <meta name="aimeat-locales" content="en fi" />
+  <title>{{App Title}}</title>
+  <link href="/lib/aimeat-atelier.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/aimeat-boot.js"></script>
+</head>
+<body>
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-data.js"></script>
+  <script src="/v1/libs/aimeat-atelier.js"></script>
+  <script>
+    // The shell carries the ceremony: login pill + boot, language re-render, loading/empty/error
+    // states, the bottom chrome reserve, the one scrolling region. You fill a.main with the kit's
+    // components and your own logic — see GET /v1/prompts/build-app-atelier for the catalogue.
+    var a = AIMEAT.atelier.app({
+      title: '{{App Title}}',
+      look: 'vivid', // vivid | calm-card | editorial | sticker | neon-dense | poster | flat
+      footer: '{{footer text}}',
+      onReady: function (session) { render(session); },
+    });
+
+    function render(session) {
+      // {{BUILD YOUR VIEWS HERE — hero/list/cardGrid/form/table into a.main, e.g.:
+      //   AIMEAT.atelier.hero({ target: a.main, title: '{{App Title}}', sub: '…' });
+      //   var l = AIMEAT.atelier.list({ target: a.main, items: [], onPick: open });
+      //   load data with AIMEAT.data.get/list, then l.set({ items: rows });
+      // Handle empty/loading/error with a.status(...) — never a bare string.}}
+    }
+
+    window.addEventListener('aimeat-lang-change', function () { /* {{RE-RENDER app strings}} */ });
   </script>
 </body>
 </html>`;

@@ -52,12 +52,15 @@
  *   v1.1.0 -- 2026-07-14 -- aimeat-node-guide: the public "start here" skill (visibility public,
  *     listed in the /.well-known/agent-skills discovery index) + per-skill visibility field
  *   v1.0.0 -- 2026-07-05 -- Initial: 4 runbooks (Skills feature Phase 2b)
+ *   (2026-08-27) aimeat-app-builder-atelier joins from its own file (TARGET-074): the Atelier
+ *   track's paved path, separate from aimeat-app-builder because the two guides never mix.
  */
 
 import { OPEN_ITEMS_SKILL_ENTRY } from './builtin-skills.open-items.js';
 import { HATCHERY_SKILL_ENTRY } from './builtin-skills.hatchery.js';
 import { WORKSTATION_SKILL_ENTRY } from './builtin-skills.workstation.js';
 import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
+import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
 
 export interface BuiltinSkill {
   name: string;
@@ -72,6 +75,7 @@ export const BUILTIN_SKILLS: BuiltinSkill[] = [
   HATCHERY_SKILL_ENTRY,
   WORKSTATION_SKILL_ENTRY,
   APP_BUILDER_SKILL_ENTRY,
+  APP_BUILDER_ATELIER_SKILL_ENTRY,
   {
     name: 'aimeat-node-guide',
     visibility: 'public',

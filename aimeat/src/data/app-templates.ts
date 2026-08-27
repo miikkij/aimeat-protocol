@@ -27,13 +27,15 @@
  *     Program); components: mermaid-diagram + three-scene (demos for the mermaid/three packs).
  *   v1.10.0 — 2026-07-16 — component: public-intake (aimeat-intake) — the anonymous-submission path
  *     (lead/contact/feedback/RSVP/quiz forms) so AI app-builders discover the Public Intake capability.
+ *   v1.12.0 — 2026-08-27 — shell-atelier (TARGET-074): the Atelier track's shell, deliberately
+ *     tierless — Atelier is the other build track, not a rung on the T1–T3 ladder.
  *   v1.11.0 — 2026-08-25 — kind `project` + workstation-project: the layout around an app that
  *     outgrew one editable file. Every app in aimeat-apps that got there grew its own build script
  *     with its own set of guards; this hands over the guards. Not listed in the prompt's template
  *     menu — it applies to a minority of apps and the prompt is charged to every session.
  */
 
-import { SHELL_PURE_CLIENT, SHELL_CORTEX, SHELL_EXTENSION } from './app-templates/shells.js';
+import { SHELL_PURE_CLIENT, SHELL_CORTEX, SHELL_EXTENSION, SHELL_ATELIER } from './app-templates/shells.js';
 import {
   COMP_AUTH_GATED,
   COMP_PRIVATE_STORE,
@@ -112,6 +114,18 @@ const TEMPLATES: AppTemplate[] = [
     libs: ['aimeat-auth', 'aimeat-data'],
     content: SHELL_EXTENSION,
   },
+  {
+    // The ATELIER TRACK's shell (TARGET-074) — deliberately carries no tier: Atelier is the other
+    // build track, not a capability rung on the Classic ladder. Its guide is its own prompt and
+    // skill, and the description says so because this registry also feeds the shared picker.
+    id: 'shell-atelier',
+    kind: 'app-shell',
+    title: 'Atelier app — the component-kit track (vivid by default)',
+    description: 'The Atelier build track: an eight-line head, the served component kit (app shell, hero, lists, forms, tables, seven look presets) and structural mobile/accessibility guarantees. Guided by GET /v1/prompts/build-app-atelier and node:aimeat-app-builder-atelier — not by the standard build spec.',
+    libs: ['aimeat-auth', 'aimeat-data', 'aimeat-atelier'],
+    packs: ['aimeat-atelier'],
+    content: SHELL_ATELIER,
+  },
   { id: 'comp-auth-gated', kind: 'component', title: 'Auth-gated section', description: 'Show/hide a section based on login state.', libs: ['aimeat-auth'], content: COMP_AUTH_GATED },
   { id: 'comp-private-store', kind: 'component', title: 'Private store', description: 'Save / list / remove a per-owner private collection.', libs: ['aimeat-data'], content: COMP_PRIVATE_STORE },
   { id: 'comp-shared-feed', kind: 'component', title: 'Shared feed', description: 'A public community feed — each user writes their own key, everyone reads.', libs: ['aimeat-data'], content: COMP_SHARED_FEED },
@@ -186,6 +200,7 @@ const TRANSLATIONS: Record<string, Record<string, { title: string; description?:
     'shell-pure-client': { title: 'Vakiosovellus — kirjautuminen + tallentaa tietosi' },
     'shell-cortex': { title: 'Datasovellus — valmiit taulukot, lomakkeet & kaaviot' },
     'shell-extension': { title: 'Yhdistetty sovellus — hakee ulkoista dataa / ajastetut tehtävät (edistynyt)' },
+    'shell-atelier': { title: 'Atelier-sovellus — komponenttikitin rata (vibrantti oletuksena)', description: 'Atelier-rakennusrata: kahdeksan rivin head, servattu komponenttikitti (shell, hero, listat, lomakkeet, taulukot, seitsemän ulkoasupresettiä) ja rakenteelliset mobiili- ja saavutettavuustakuut. Ohjeena GET /v1/prompts/build-app-atelier ja node:aimeat-app-builder-atelier, ei vakiorakennusohje.' },
     'usecase-realtime-social': { title: 'Reaaliaikainen yhteisöhuone', description: 'Live-huone: kirjautuneet käyttäjät saavat live-läsnäolon + chatin pysyvällä historialla. Chatit, läsnäolotaulut, moninpeliaulat.' },
     'usecase-marketplace': { title: 'Kauppapaikka (yhden myyjän myymälä)', description: 'Kuka tahansa selaa + hakee julkisia ilmoituksia ja avaa yksityiskohdat; myyjä lisää ilmoituksia kuvilla.' },
     'usecase-homepage': { title: 'Kotisivu / henkilökohtainen sivusto', description: 'Yhden kirjoittajan julkinen sivusto: kuka tahansa katselee profiilia + blogia; omistaja muokkaa ja julkaisee.' },
