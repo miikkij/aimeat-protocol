@@ -68,6 +68,7 @@ import { injectAgentFooter } from '../utils/agent-footer.js';
 import { findPublicPage } from '../data/public-pages.js';
 import { renderPageMarkdown } from './markdown-mirrors.js';
 import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
+import { mcpInstallLink } from '../services/mcp-install.js';
 // Shell serving and public-file lookup live in the sibling; re-exported because bootstrap.ts and
 // static-files.ts have imported them from here since before the split.
 import { BUILD_ID, serveSpa, resolvePublicFile } from './portal-spa.js';
@@ -86,9 +87,11 @@ import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } f
  * Includes:
  *  - nodeName / nodeUrl / nodeId -- this node's identity
  *  - mcpUrl -- the public Streamable HTTP MCP endpoint
- *  - cursorDeeplinkConfig -- base64 of `{"url": mcpUrl}` for the
- *    `cursor://anysphere.cursor-deeplink/mcp/install?config=...` button
- *    on the connect page
+ *  - cursorInstallHref / vscodeInstallHref -- the whole one-click install links,
+ *    built by services/mcp-install.ts so the connect page and the setup table
+ *    cannot disagree about what a one-click install writes
+ *  - claudeCodeConfigUrl / vscodeConfigUrl -- the downloadable config file
+ *    (GET /v1/connect/mcp.json), for the clients with no install link
  *  - operator* -- privacy-page legal fields from `config.operator`
  */
 function templateVars(config: AimeatConfig, locale: Locale): Record<string, string> {
@@ -98,14 +101,21 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
   try { nodeName = new URL(config.baseUrl).host; } catch { /* keep nodeId fallback */ }
 
   const mcpUrl = `${config.baseUrl}/v1/mcp`;
-  const cursorDeeplinkConfig = Buffer.from(JSON.stringify({ url: mcpUrl })).toString('base64');
+  // The whole install links, from the one place that knows each client's format. This page used to
+  // build Cursor's base64 itself, which meant the connect page and the setup table could disagree
+  // about what a one-click install writes.
+  const cursorInstallHref = mcpInstallLink('cursor', mcpUrl) ?? '';
+  const vscodeInstallHref = mcpInstallLink('vscode', mcpUrl) ?? '';
 
   return {
     nodeName,
     nodeUrl: config.baseUrl,
     nodeId: config.nodeId,
     mcpUrl,
-    cursorDeeplinkConfig,
+    cursorInstallHref,
+    vscodeInstallHref,
+    claudeCodeConfigUrl: `${config.baseUrl}/v1/connect/mcp.json?client=claude-code`,
+    vscodeConfigUrl: `${config.baseUrl}/v1/connect/mcp.json?client=vscode`,
     operatorName: config.operator.name,
     operatorTypeLabel: operatorTypeLabel(config.operator.type, locale),
     operatorBusinessId: config.operator.businessId,

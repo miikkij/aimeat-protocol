@@ -32,6 +32,12 @@
  *   remake's branch decision, kept beside the list it reads rather than in the calling code.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.5.0 — 2026-08-27 — `mcp.install` on Claude Code, VS Code and Cursor: the one-click link and
+ *     the config file GET /v1/connect/mcp.json serves. Both come from services/mcp-install.ts, so
+ *     what this table advertises and what that route hands over cannot drift. The steps stay: a
+ *     link is blocked often enough, and a person who wants to read the file before saving it is
+ *     not doing anything wrong. The VS Code `code --add-mcp` line gains the explicit
+ *     `"type":"http"` its own config format requires, matching the file and the link.
  *   v1.4.0 — 2026-08-17 — A model recommendation on every chat-app tool (claude.ai, Claude
  *     Desktop, ChatGPT, Grok, goose): pick the strongest model, thinking on. Watched in
  *     production: onboarding on a mid-tier default model wanders and stalls; the same steps on a
@@ -54,6 +60,7 @@
  *     as the default selection in the pickers.
  */
 import type { AimeatConfig } from '../config.js';
+import { mcpConfigFile, mcpInstallLink, type McpInstallClientId } from './mcp-install.js';
 
 export interface AiToolParam {
     /** The field label as the tool's own UI spells it. */
@@ -70,6 +77,21 @@ export interface AiToolParam {
  */
 export type McpCapability = 'yes' | 'plan-dependent';
 
+/**
+ * The short way in, for the clients that have one: a link that installs the server in one click,
+ * and a configuration file this node serves ready to save.
+ *
+ * It sits BESIDE the steps rather than replacing them. The steps are what a person falls back on
+ * when the link is blocked, when they are on a machine where the client is not installed, or when
+ * they want to see what is being written before it is written. Both are always true at once.
+ */
+export interface AiToolInstall {
+    /** Opens the client with the server pre-filled. Absent for a client with no such link. */
+    link?: { label: string; href: string; note: string };
+    /** The client's own config file, from GET /v1/connect/mcp.json. Carries no credential. */
+    file?: { label: string; url: string; filename: string; where: string };
+}
+
 export interface AiTool {
     id: string;
     label: string;
@@ -80,6 +102,8 @@ export interface AiTool {
         steps: string[];
         /** A literal command line, when the tool is attached from a terminal instead of a form. */
         command?: string;
+        /** The one-click link and the ready-made config file, for the clients that have them. */
+        install?: AiToolInstall;
         params: AiToolParam[];
         /**
          * Whether the free tier can do this. Defaults to 'yes' when absent. Derived from `plans`
@@ -115,6 +139,32 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
         note: s(l, 'Free text. It is only the label you will see in the connector list.',
             'Vapaa teksti. Se on vain nimi jonka näet konnektorilistassa.'),
     });
+    /**
+     * The short way in for one client. The shapes and the link format live in mcp-install.ts, which
+     * the download route reads too, so what this table advertises and what that route serves cannot
+     * drift apart. Only the words are written here.
+     */
+    const install = (id: McpInstallClientId, where: string, linkLabel?: string): AiToolInstall => {
+        const href = mcpInstallLink(id, mcpUrl);
+        const { filename } = mcpConfigFile(id, mcpUrl);
+        return {
+            ...(href && linkLabel ? {
+                link: {
+                    label: linkLabel,
+                    href,
+                    note: s(l, 'The client asks you to confirm, then the sign-in opens in your browser.',
+                        'Sovellus pyytää vahvistuksen, ja kirjautuminen avautuu sen jälkeen selaimessa.'),
+                },
+            } : {}),
+            file: {
+                label: s(l, `Download ${filename}`, `Lataa ${filename}`),
+                url: `${node}/v1/connect/mcp.json?client=${id}`,
+                filename,
+                where,
+            },
+        };
+    };
+
     const oauthParam = (): AiToolParam => ({
         label: 'Advanced settings: OAuth Client ID / Client Secret',
         value: '',
@@ -197,6 +247,9 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                         'Claude Coden sisällä kirjoita /mcp, niin näet palvelimen ja sen työkalujen määrän.'),
                 ],
                 command: `claude mcp add --transport http aimeat ${mcpUrl}`,
+                install: install('claude-code',
+                    s(l, 'Save it as .mcp.json at the root of a project. Claude Code offers the server to whoever opens that project, and it can be committed: there is nothing private in it.',
+                        'Tallenna se nimellä .mcp.json projektin juureen. Claude Code tarjoaa palvelinta jokaiselle joka avaa projektin, ja tiedoston voi committoida: siinä ei ole mitään yksityistä.')),
                 params: [
                     {
                         label: '--transport', value: 'http',
@@ -300,6 +353,10 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     s(l, 'By hand instead: Settings > MCP > Add new MCP server, transport HTTP, with the values below.',
                         'Käsin sen sijaan: Settings > MCP > Add new MCP server, kuljetus HTTP, alla olevilla arvoilla.'),
                 ],
+                install: install('cursor',
+                    s(l, 'Save it as mcp.json in the .cursor folder of your home directory, or in .cursor inside a project to keep it to that project.',
+                        'Tallenna se nimellä mcp.json kotihakemistosi .cursor-kansioon, tai projektin .cursor-kansioon jos haluat sen vain siihen projektiin.'),
+                    s(l, 'Add to Cursor', 'Lisää Cursoriin')),
                 params: [
                     { label: s(l, 'Server name', 'Palvelimen nimi'), value: 'aimeat' },
                     {
@@ -330,7 +387,11 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     s(l, 'Complete the sign-in in the browser, then open Agent mode and check the node is in the tool list.',
                         'Vie kirjautuminen loppuun selaimessa, avaa sitten Agent mode ja tarkista että node on työkalulistassa.'),
                 ],
-                command: `code --add-mcp '{"name":"aimeat","url":"${mcpUrl}"}'`,
+                command: `code --add-mcp '{"name":"aimeat","type":"http","url":"${mcpUrl}"}'`,
+                install: install('vscode',
+                    s(l, 'Save it as .vscode/mcp.json in a project. For every project at once, run MCP: Open User Configuration and put the same servers block in the file it opens.',
+                        'Tallenna se projektiin nimellä .vscode/mcp.json. Kaikkiin projekteihin kerralla: aja MCP: Open User Configuration ja lisää sama servers-lohko avautuvaan tiedostoon.'),
+                    s(l, 'Add to VS Code', 'Lisää VS Codeen')),
                 params: [
                     { label: s(l, 'Server name', 'Palvelimen nimi'), value: 'aimeat' },
                     { label: 'URL', value: mcpUrl },

@@ -171,6 +171,10 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
     ],
     home: [
         b('home.nameplate'),
+        // Directly under the nameplate, because on the days it appears at all it is the most
+        // important thing on the page: nothing else here works over chat until it is done. On every
+        // other day it renders nothing and the mat line moves up into its place.
+        b('home.mcp-connect'),
         b('home.mat'),
         b('home.mailbox'),
         b('home.chat-door'),

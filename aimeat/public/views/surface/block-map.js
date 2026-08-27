@@ -16,6 +16,7 @@
  * @structure BLOCKS · blockFor
  * @usage const load = BLOCKS['home.feed']; const Component = await load();
  * @version-history
+ *   v1.1.0 — 2026-08-27 — home.mcp-connect.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 
@@ -29,6 +30,7 @@ export const BLOCKS = {
 
   // ── A member's home ──
   'home.nameplate': () => import('/views/surface/blocks-home.js').then(m => m.NameplateBlock),
+  'home.mcp-connect': () => import('/views/surface/blocks-home.js').then(m => m.McpConnectBlock),
   'home.mat': () => import('/views/surface/blocks-home.js').then(m => m.MatBlock),
   'home.mailbox': () => import('/views/surface/blocks-home.js').then(m => m.MailboxBlock),
   'home.chat-door': () => import('/views/surface/blocks-home.js').then(m => m.ChatDoorBlock),

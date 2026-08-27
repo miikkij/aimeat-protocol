@@ -6,6 +6,11 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.10.0 -- 2026-08-27 -- The short way into an MCP connection, on both halves of this tab: above
+ *     the onboarding checklist (none of which can be ticked before the agent reaches this node) and
+ *     inside the production Connection card (the same agent on a second machine is the same
+ *     attachment made again). The server is named after the agent, so a person running several can
+ *     tell the entries apart in their own client's list.
  *   v1.9.0 -- 2026-08-09 -- Reads the server's agent state instead of computing one.
  *   v1.8.0 -- 2026-07-17 -- Card scheme generalized: pf-agd-prod-grid renamed to the
  *     shared pf-agd-card-grid; production sections carry pf-agd-card / --full.
@@ -52,6 +57,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t, tOr } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { McpQuickConnect } from '/components/McpInstall.js';
 import { agentState } from './state-detector.js';
 import { swallowed } from '/js/swallowed.js';
 import {
@@ -256,6 +262,15 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, cur
 
   return html`
     <div>
+      <!-- Before the checklist, because none of it can be ticked from a browser: the agent has to
+           reach this node from the tool it runs in first. The server is named after the agent, so
+           a person running several of them can tell the entries apart in their own client. -->
+      <div class="pf-agd-section">
+        <${McpQuickConnect} serverName=${agentName}
+          title=${tOr('mcpInstall.agentTitle', 'Attach this agent to the tool it runs in')}
+          lead=${tOr('mcpInstall.agentLead', 'The steps below are things the agent does over that connection, so it comes first.')} />
+      </div>
+
       <div class="pf-agd-section">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-label">
@@ -415,6 +430,12 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
           <span class="pf-agd-info-label">${t('profile.agents.detail.lastSeen')}</span>
           <span class="pf-agd-info-value">${agent.last_seen ? timeAgo(agent.last_seen) : '--'}</span>
         </div>
+        <!-- A working agent still needs this: the same agent on a second machine, or in a second
+             tool, is the same attachment made again. A lead line rather than a title, because the
+             card already says Connection and a second heading inside it reads as a second subject.
+             Without the line the buttons arrive under "Last seen" with nothing saying what they do. -->
+        <${McpQuickConnect} serverName=${agent.name}
+          lead=${tOr('mcpInstall.agentAgain', 'Attach this agent in another tool, or on another machine:')} />
       </div>
 
       <!-- PLATFORM & SKILL -->

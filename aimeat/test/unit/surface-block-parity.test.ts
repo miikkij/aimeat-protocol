@@ -21,6 +21,9 @@
  * @structure declared-vs-mapped · loader invocation · operator labels
  * @usage pnpm check:surface-blocks
  * @version-history
+ *   v1.1.0 — 2026-08-27 — The loader-invocation case gets a 30s timeout. It is the only test here
+ *     that imports anything, and vitest's 5s default was thin for pulling every block's module
+ *     through vite: 0.7s idle, over 5s twice under the full suite. No assertion changed.
  *   v1.0.0 — 2026-08-26 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -65,6 +68,12 @@ describe('the two halves of the block registry', () => {
         expect(mapped.length, 'the browser maps no blocks — the block-map import is broken').toBeGreaterThan(20);
     });
 
+    // 30s, not vitest's default 5s. This is the one test in the file that IMPORTS anything: it pulls
+    // every block's module through vite's transform, which is ~0.7s of real work on an idle machine
+    // and can pass 5s when the full 218-file suite is saturating the runner. Measured 2026-08-27,
+    // where it timed out twice under the pre-commit hook and passed standalone in 1.3s, and no
+    // single block load exceeded 20ms. The budget is what is wrong, not the work: nothing here is
+    // skipped or sampled, every declared block is still loaded and checked.
     it('every block the server declares has a component the browser can load', async () => {
         const missing: string[] = [];
         for (const id of declared) {
@@ -73,7 +82,7 @@ describe('the two halves of the block registry', () => {
             if (typeof Cmp !== 'function') missing.push(id);
         }
         expect(missing, 'declared blocks with no component: an operator could add these and see nothing').toEqual([]);
-    });
+    }, 30_000);
 
     it('every component the browser maps is a block the server declares', () => {
         const orphans = mapped.filter(id => !declared.includes(id));

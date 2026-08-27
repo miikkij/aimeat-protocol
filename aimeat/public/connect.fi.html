@@ -244,7 +244,7 @@
       <div class="client-card">
         <h3>Cursor <span class="badge">1-klikki</span></h3>
         <p class="subtitle">URL-skeema-deeplink. Cursor avaa vahvistusikkunan.</p>
-        <a class="deeplink" href="cursor://anysphere.cursor-deeplink/mcp/install?name=aimeat&amp;config={{cursorDeeplinkConfig}}">Lisää Cursoriin</a>
+        <a class="deeplink" href="{{cursorInstallHref}}">Lisää Cursoriin</a>
       </div>
 
       <div class="client-card">
@@ -253,12 +253,14 @@
         <pre>claude mcp add aimeat \
   --transport http \
   {{mcpUrl}}</pre>
+        <p class="subtitle">Tai tallenna tiedosto: <a href="{{claudeCodeConfigUrl}}"><code>.mcp.json</code></a> projektin juureen. Siinä ei ole tokenia, joten sen voi committoida.</p>
       </div>
 
       <div class="client-card">
-        <h3>VS Code (Copilot) <span class="badge">1 rivi</span></h3>
-        <p class="subtitle">Lisää palvelimen käyttäjätason MCP-konfiguraatioon.</p>
-        <pre>code --add-mcp '{"name":"aimeat","url":"{{mcpUrl}}"}'</pre>
+        <h3>VS Code (Copilot) <span class="badge">1 klikki</span></h3>
+        <p class="subtitle">Avaa VS Coden palvelin valmiiksi täytettynä.</p>
+        <a class="deeplink" href="{{vscodeInstallHref}}">Lisää VS Codeen</a>
+        <p class="subtitle">Käsin: <code>code --add-mcp '{"name":"aimeat","type":"http","url":"{{mcpUrl}}"}'</code>, tai tallenna <a href="{{vscodeConfigUrl}}"><code>mcp.json</code></a> nimellä <code>.vscode/mcp.json</code>.</p>
       </div>
 
       <div class="client-card">
