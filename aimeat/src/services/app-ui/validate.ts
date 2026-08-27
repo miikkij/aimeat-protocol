@@ -16,6 +16,10 @@
  *   import { validateUiLayout, AppUiError } from './validate.js';
  *   const layout = validateUiLayout(req.body);   // throws AppUiError(422) with words
  * @version-history
+ *   v1.2.0 — 2026-08-28 — The SIGNATURE: optional top-level `tokens`, validated against the
+ *     registry allowlist (shape/typography/density/motion — a colour name is refused with the
+ *     reason, not just the list), values bounded and vehicle-proof (no urls, no declaration
+ *     characters). TARGET-074 phase 4, signature-look.
  *   v1.1.1 — 2026-08-28 — SECURITY (CodeQL js/loop-bound-injection): nearest() ran the O(m*n)
  *     Levenshtein against the caller-supplied name at full length, so a huge submitted look/nav/block
  *     value was a DoS. The name is capped at 64 chars before the distance loop; a real name is far
@@ -26,7 +30,7 @@
  */
 import type { BlockPropValue } from '../surface-layout/types.js';
 import { propProblem } from '../surface-layout/validate.js';
-import { componentById, NAV_MODES, LOOKS, BLOCK_SPANS, UI_COMPONENTS } from './registry.js';
+import { componentById, NAV_MODES, LOOKS, BLOCK_SPANS, UI_COMPONENTS, SIGNATURE_TOKENS } from './registry.js';
 
 /** More blocks than this is a page nobody reads — and a payload nobody meant. */
 const MAX_BLOCKS = 40;
@@ -55,9 +59,16 @@ export interface AppUiLayout {
   v: 1;
   look?: string;
   nav?: string;
+  /** The app's SIGNATURE: bounded token overrides (shape, typography, density, motion). */
+  tokens?: Record<string, string>;
   blocks: AppUiBlockInstance[];
   meta?: { note?: string };
 }
+
+/** A token value is a short CSS value, never a sentence and never a vehicle: no urls, no
+ *  declaration or block characters that could smuggle a second property past the allowlist. */
+const TOKEN_VALUE_MAX = 120;
+const TOKEN_VALUE_FORBIDDEN = /url\s*\(|[;{}<>@\\]|\/\*/i;
 
 /** Plain Levenshtein — the vocabulary is dozens of short names, so brute force is fine. */
 function distance(a: string, b: string): number {
@@ -126,6 +137,30 @@ export function validateUiLayout(raw: unknown): AppUiLayout {
       unknownName('navigation mode', String(input.nav), [...NAV_MODES]);
     }
     out.nav = input.nav;
+  }
+
+  if (input.tokens !== undefined) {
+    if (input.tokens === null || typeof input.tokens !== 'object' || Array.isArray(input.tokens)) {
+      fail('tokens is one object of { "--ak-…": "value" } overrides — the catalogue\'s signature_tokens lists the legal names.');
+    }
+    const legal = Object.keys(SIGNATURE_TOKENS);
+    out.tokens = {};
+    for (const [name, value] of Object.entries(input.tokens as Record<string, unknown>)) {
+      if (!legal.includes(name)) {
+        if (/color|accent|bg|ink|surface|scrim|grad/i.test(name)) {
+          fail(`"${name}" is a colour token, and colour overrides wait for the contrast bench — an unproven colour is how a signature stops being readable. The signature covers shape, typography, density and motion: ${legal.join(', ')}.`);
+        }
+        unknownName('signature token', name, legal);
+      }
+      if (typeof value !== 'string' || !value.trim() || value.length > TOKEN_VALUE_MAX) {
+        fail(`the value of ${name} must be a short CSS value string (at most ${TOKEN_VALUE_MAX} characters).`);
+      }
+      if (TOKEN_VALUE_FORBIDDEN.test(value)) {
+        fail(`the value of ${name} may not carry urls, comments or declaration characters — a token is one value, never a vehicle.`);
+      }
+      out.tokens[name] = value;
+    }
+    if (Object.keys(out.tokens).length === 0) delete out.tokens;
   }
 
   if (!Array.isArray(input.blocks)) fail('blocks must be a list of block instances.');

@@ -1114,13 +1114,34 @@
     }
     function select(id) {
       selected = id;
-      for (const row of root.querySelectorAll(".ak-list__row")) {
-        const on = row.getAttribute("data-ak-id") === id;
-        row.classList.toggle("ak-list__row--selected", on);
-        if (on) row.setAttribute("aria-current", "true");
-        else row.removeAttribute("aria-current");
+      const mark = function() {
+        for (const row of root.querySelectorAll(".ak-list__row")) {
+          const on = row.getAttribute("data-ak-id") === id;
+          row.classList.toggle("ak-list__row--selected", on);
+          if (on) row.setAttribute("aria-current", "true");
+          else row.removeAttribute("aria-current");
+        }
+        renderDetail();
+      };
+      const picked = (
+        /** @type {HTMLElement|null} */
+        id != null ? Array.from(root.querySelectorAll(".ak-list__row")).find(function(r) {
+          return r.getAttribute("data-ak-id") === id;
+        }) ?? null : null
+      );
+      if (picked && typeof document.startViewTransition === "function" && !reducedMotion()) {
+        picked.style.viewTransitionName = "ak-morph";
+        const vt = document.startViewTransition(function() {
+          picked.style.viewTransitionName = "";
+          detail.style.viewTransitionName = "ak-morph";
+          mark();
+        });
+        vt.finished.finally(function() {
+          detail.style.viewTransitionName = "";
+        });
+      } else {
+        mark();
       }
-      renderDetail();
       if (id != null) {
         requestAnimationFrame(function() {
           const box = detail.getBoundingClientRect();
@@ -1854,6 +1875,17 @@
         run();
       }
     }
+    function morph(moving, run) {
+      if (typeof document.startViewTransition !== "function" || reducedMotion()) {
+        run();
+        return;
+      }
+      moving.style.viewTransitionName = "ak-morph";
+      const vt = document.startViewTransition(run);
+      vt.finished.finally(function() {
+        moving.style.viewTransitionName = "";
+      });
+    }
     function projectStack(units) {
       const box = el("div", { class: "ak-mosaic__units ak-mosaic__units--grid" });
       for (const u of units) {
@@ -2165,7 +2197,7 @@
         } }
       }, "↩ " + t("back"));
       function focus(u) {
-        transition(function() {
+        morph(u.el, function() {
           focused = u;
           focusHost.hidden = false;
           viewport.hidden = true;
@@ -2179,7 +2211,7 @@
       function unfocus() {
         if (!focused) return;
         const u = focused;
-        transition(function() {
+        morph(u.el, function() {
           focused = null;
           u.tile.insertBefore(u.el, u.tile.lastChild);
           focusHost.hidden = true;
@@ -2255,6 +2287,21 @@
       if (!layout || !Array.isArray(layout.blocks)) return;
       if (layout.look && spec.app && spec.app.set) spec.app.set({ look: layout.look });
       root.setAttribute("data-ak-nav", layout.nav || "stack");
+      const tokenHost = (
+        /** @type {any} */
+        spec.app && spec.app.el ? spec.app.el : root
+      );
+      if (tokenHost.__akTokens) {
+        for (const name of tokenHost.__akTokens) tokenHost.style.removeProperty(name);
+      }
+      tokenHost.__akTokens = [];
+      if (layout.tokens && typeof layout.tokens === "object") {
+        for (const name of Object.keys(layout.tokens)) {
+          if (name.indexOf("--ak-") !== 0) continue;
+          tokenHost.style.setProperty(name, String(layout.tokens[name]));
+          tokenHost.__akTokens.push(name);
+        }
+      }
       const visible = layout.blocks.filter(function(b) {
         return !b.hidden;
       });
@@ -2344,7 +2391,7 @@
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.11.0",
+    version: "0.12.0",
     // ── Shell and navigation ──
     app,
     section,

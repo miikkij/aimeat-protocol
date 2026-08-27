@@ -14,6 +14,8 @@
  * @structure list(spec) → { el, set, destroy } · listDetail(spec) → { el, set, select, destroy }
  * @usage  AIMEAT.atelier.list({ target: a.main, items, onPick(item) { open(item); } });
  * @version-history
+ *   v0.5.0 — 2026-08-28 — The row-to-detail MORPH: the picked row opens into the detail pane via
+ *     a shared view-transition-name (plain swap without View Transitions or under reduced motion).
  *   v0.4.0 — 2026-08-28 — A pick is visible: the clicked row keeps a selected mark (class +
  *     aria-current) in the plain list too, and listDetail scrolls its detail pane into view when
  *     the pane sits outside the viewport — the first AEB review clicked a row, saw nothing change,
@@ -219,13 +221,33 @@ export function listDetail(spec) {
   /** @param {string|null} id */
   function select(id) {
     selected = id;
-    for (const row of root.querySelectorAll('.ak-list__row')) {
-      const on = row.getAttribute('data-ak-id') === id;
-      row.classList.toggle('ak-list__row--selected', on);
-      if (on) row.setAttribute('aria-current', 'true');
-      else row.removeAttribute('aria-current');
+    const mark = function () {
+      for (const row of root.querySelectorAll('.ak-list__row')) {
+        const on = row.getAttribute('data-ak-id') === id;
+        row.classList.toggle('ak-list__row--selected', on);
+        if (on) row.setAttribute('aria-current', 'true');
+        else row.removeAttribute('aria-current');
+      }
+      renderDetail();
+    };
+    // The ROW-TO-DETAIL morph: the picked row carries the morph name in the old state, the detail
+    // pane carries it in the new one, and the browser animates one into the other — the row opens
+    // into its detail instead of the detail merely appearing. Plain swap without View Transitions
+    // or under reduced motion.
+    const picked = /** @type {HTMLElement|null} */ (id != null
+      ? Array.from(root.querySelectorAll('.ak-list__row')).find(function (r) { return r.getAttribute('data-ak-id') === id; }) ?? null
+      : null);
+    if (picked && typeof document.startViewTransition === 'function' && !reducedMotion()) {
+      picked.style.viewTransitionName = 'ak-morph';
+      const vt = document.startViewTransition(function () {
+        picked.style.viewTransitionName = '';
+        detail.style.viewTransitionName = 'ak-morph';
+        mark();
+      });
+      vt.finished.finally(function () { detail.style.viewTransitionName = ''; });
+    } else {
+      mark();
     }
-    renderDetail();
     // The detail must be seen to have answered the click. When the pane sits outside the
     // viewport (wide layout, detail below the fold), bring it in; when it is visible, leave the
     // scroll position alone.

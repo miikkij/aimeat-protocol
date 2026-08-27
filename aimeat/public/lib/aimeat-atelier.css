@@ -36,6 +36,9 @@
  * @usage  AIMEAT.atelier.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-atelier.css">
  * @version-history
+ *   v0.12.0 — 2026-08-28 — The signature and the morphs (JS side: mosaic tokens + shared-element
+ *     view transitions). No stylesheet change beyond this pin line — the version moves with the
+ *     kit it is pinned to.
  *   v0.11.0 — 2026-08-28 — The first AEB review's seven kit fixes (shell.css + content.css +
  *     shell/hero/list/i18n JS): a designed sign-in state after the boot grace instead of an
  *     endless "Loading…", the bar heading yielding when a hero carries the same name, the bar

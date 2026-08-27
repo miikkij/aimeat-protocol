@@ -26,6 +26,9 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.5.0 — 2026-08-28 — The signature section: bounded token overrides, the design pass
+ *     (compose three, dry-run, the owner picks) and reference-derived shape reading — colour
+ *     explicitly excluded until the contrast bench can prove it (TARGET-074 phase 4).
  *   v1.4.0 — 2026-08-28 — "Two details the review always catches": edit mode says so, and counters
  *     share their source with the lists beside them. Both are the first AEB review's app-level
  *     findings, stated once here instead of waiting to be re-found per app.
@@ -245,6 +248,19 @@ function composeBody(config: AimeatConfig): string {
     + '`atelier.img.<slot>.<look>.<subject-slug>` holding a previous URL means reuse it. A `data:` '
     + 'URI is refused by the components and by the publish gate. With zero images the app still '
     + 'looks finished — the fallbacks are designed — so imagery is polish, never a blocker.\n\n';
+
+  body += '## The signature: this app\'s own hand\n\n';
+  body += 'A stored layout may carry a top-level `tokens` object: bounded overrides of shape, '
+    + 'typography, density and motion on top of the look (the catalogue\'s `signature_tokens` '
+    + 'lists every legal name — colour is deliberately absent until the contrast bench can prove '
+    + 'an override readable). This is how one app stops looking like every other app on the same '
+    + 'look. THE DESIGN PASS, when the owner asks for a distinctive style: compose two or three '
+    + 'candidate signatures as whole layouts (same blocks, different `tokens`), dry-run each with '
+    + 'the validate endpoint, describe each in one sentence of plain words ("sharp corners, heavy '
+    + 'masthead, snappy motion"), and store the one the owner picks. FROM A REFERENCE: when the '
+    + 'owner shows a page or picture they like, read its shapes — corner rounding, type weight, '
+    + 'density, how much things move — and translate THOSE into the token vocabulary; never copy '
+    + 'colours you cannot prove.\n\n';
 
   body += '## Data, in short\n\n';
   body += 'Login and data come from `aimeat-auth` and `aimeat-data` exactly as on the rest of the '
