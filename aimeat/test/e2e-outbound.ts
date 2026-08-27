@@ -469,6 +469,68 @@ await test('15f. the AI mark is optional, and a word outside the vocabulary is r
   }
 });
 
+await test('15g. themes are listed already validated, and a bad one never reaches a recipient', async () => {
+  // THE LIST IS WHERE A BROKEN THEME IS CAUGHT, because the send path deliberately will not refuse
+  // over decoration. Without this route an owner's typo is discovered by their customer.
+  const before = await json('/v1/outbound/themes', { headers: authed(B.token) });
+  assert(before.status === 200, `themes: ${before.status}`);
+  const ids = (before.body.data.themes as { id: string }[]).map(t => t.id);
+  for (const want of ['clean', 'space', 'warm', 'paper']) {
+    assert(ids.includes(want), `built-in "${want}" missing: ${ids.join(', ')}`);
+  }
+  assert(before.body.data.default === 'clean', 'the default must stay the pre-themes look');
+  assert((before.body.data.themes as { ok: boolean }[]).every(t => t.ok), 'a built-in reported a problem');
+
+  // An owner's own theme, with one field that is a second CSS declaration rather than a colour.
+  const stored = await json('/v1/memory', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({
+      key: 'outbound.theme.house',
+      value: { card: '#101820', accent: '#fff;background:url(x)' },
+      visibility: 'private',
+    }),
+  });
+  assert(stored.status === 200 || stored.status === 201, `theme write failed: ${stored.status}`);
+
+  const after = await json('/v1/outbound/themes', { headers: authed(B.token) });
+  const house = (after.body.data.themes as { id: string; source: string; ok: boolean; tokens: Record<string, string>; problems: { field: string }[] }[])
+    .find(t => t.id === 'house');
+  assert(house, 'a theme this owner stored is not listed');
+  assert(house!.source === 'own', `source: ${house!.source}`);
+  assert(house!.ok === false, 'a theme carrying a second declaration was reported as fine');
+  assert(house!.problems.some(p => p.field === 'accent'), `problems: ${JSON.stringify(house!.problems)}`);
+  // The good field survives; only the unusable one falls back.
+  assert(house!.tokens.card === '#101820', `card: ${house!.tokens.card}`);
+  assert(!house!.tokens.accent.includes('url('), `the bad value reached the tokens: ${house!.tokens.accent}`);
+
+  const created = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ name: 'Theme', email: `theme-${Date.now()}@example.com` }),
+  });
+  const cid = created.body.data.contact.id as string;
+
+  // Naming that half-broken theme still SENDS: a bad shade of grey is not a reason for somebody's
+  // customer to hear nothing.
+  const sent = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject: 'themed', body: 'y', theme: 'house' }),
+  });
+  assert(sent.status === 200, `themed send: ${sent.status} ${JSON.stringify(sent.body?.error)}`);
+
+  // And so does a theme nobody has. An unknown id is the default look, not an error.
+  const unknown = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(B.token),
+    body: JSON.stringify({ contact_id: cid, kind: 'transactional', subject: 'x', body: 'y', theme: 'no-such-theme' }),
+  });
+  assert(unknown.status === 200, `unknown theme: ${unknown.status} ${JSON.stringify(unknown.body?.error)}`);
+});
+
+await test('15h. another owner does not see or inherit my themes', async () => {
+  const mine = await json('/v1/outbound/themes', { headers: authed(A.token) });
+  const ids = (mine.body.data.themes as { id: string; source: string }[]);
+  assert(!ids.some(t => t.source === 'own'), `owner A sees somebody else's theme: ${JSON.stringify(ids)}`);
+});
+
 await test('16. the public unsubscribe answers identically for unknown tokens (no enumeration)', async () => {
   const res = await fetch(`${BASE}/v1/outbound/unsubscribe?token=definitely-not-a-token`);
   assert(res.status === 200, `expected 200, got ${res.status}`);

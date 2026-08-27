@@ -44,7 +44,6 @@ import type { OutboundContactRecord, OutboundContactLink, OutboundKind, Outbound
 import { getActiveEmailService, type EmailAttachment } from '../email.js';
 import { inviteEmailHash } from '../invitations.js';
 import { sendDirectMessage } from '../message-send.js';
-import { outboundEmailHtml } from '../email-templates.js';
 import { emitChange } from '../../services/event-bus.js';
 import { renderInvoicePdf } from '../finance/invoice-pdf.js';
 import { buildFinvoiceXml } from '../finance/finvoice.js';
@@ -59,7 +58,8 @@ import {
 import { resolveSendingCompany } from './company-sender-access.js';
 import { isValidEmail } from '../../utils/email-validator.js';
 import { getStream } from '../signals/signal-service.js';
-import { buildOutboundBody } from './email-body.js';
+import { renderCampaignEmail } from './campaign-email.js';
+import { resolveTheme, isThemeId, themeKey } from './email-theme.js';
 import { disclosureHeaders, type AiDisclosure } from './ai-disclosure.js';
 
 export class OutboundError extends Error {
@@ -236,6 +236,15 @@ export interface SendInput {
   variables?: Record<string, string>;
   /** Attach this invoice (PDF + Finvoice XML) and mark its delivery state. */
   invoiceId?: string;
+  /**
+   * What the message LOOKS like: a built-in id (clean, space, warm, paper) or one of the owner's
+   * own, stored under the memory key `outbound.theme.{id}`. The owner's is preferred where both
+   * exist, so a business can name its house style whatever it likes.
+   *
+   * An id that matches nothing is the default rather than an error. Decoration does not refuse a
+   * send — see services/outbound/email-theme.ts.
+   */
+  theme?: string;
   /** Reply-To for the email channel (the business's own address). */
   replyTo?: string;
   /** Display name on the email From header (envelope address stays the node's). */
@@ -321,6 +330,20 @@ async function loadTemplate(storage: Storage, ownerGhii: string, templateId: str
     throw new OutboundError('TEMPLATE_NOT_FOUND', 404, `Template "${templateId}" not found (memory key outbound.template.${templateId} with { subject, body })`);
   }
   return { subject: value.subject, body: value.body };
+}
+
+/**
+ * The owner's OWN theme under this id, or nothing.
+ *
+ * Looked up BEFORE the built-ins, so a business can call its house style 'clean' and get its own.
+ * Unlike loadTemplate this never throws: a template that is missing means the message has no text
+ * and there is nothing to send, while a theme that is missing means the message has the default
+ * look. One is an empty envelope; the other is a different shade of grey.
+ */
+async function loadOwnTheme(storage: Storage, ownerGhii: string, id: string | undefined): Promise<unknown> {
+  if (!isThemeId(id)) return undefined;
+  const rec = await storage.getMemory(ownerGhii, themeKey(id));
+  return rec?.value ?? undefined;
 }
 
 /** The send. Every outcome is logged; only policy violations throw. */
@@ -486,15 +509,20 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
       // The two halves are built by services/outbound/email-body.ts, which is pure and therefore
       // testable: the escaping and the scheme check are the parts that must not drift, and they
       // get their own unit test rather than being reachable only through a configured SMTP server.
-      const { htmlBody, textBody } = buildOutboundBody({
-        body, kind: input.kind, unsubscribeUrl,
-        links: input.links,
-        // The counter belongs to whoever set it up, which is the caller: they created the stream
-        // under their own identity and their campaign report reads it back. Sharing the book does
-        // not mean sharing the measurement.
-        trackingUrl: await openPixelUrl(config, storage, ownerGhii, input),
+      // The counter belongs to whoever set it up, which is the caller: they created the stream
+      // under their own identity and their campaign report reads it back. Sharing the book does
+      // not mean sharing the measurement.
+      const trackingUrl = await openPixelUrl(config, storage, ownerGhii, input);
+      // A theme the caller NAMED is looked up under their own memory before the built-ins, so an
+      // owner can call their house style 'clean' if they want to. An id that matches nothing is the
+      // default rather than a refusal — see email-theme.ts on why decoration never fails a send.
+      const theme = resolveTheme(input.theme, await loadOwnTheme(storage, ownerGhii, input.theme));
+      const { html, text } = renderCampaignEmail({
+        subject, body, kind: input.kind, unsubscribeUrl, theme,
+        ...(input.links ? { links: input.links } : {}),
+        ...(input.fromName ? { brand: input.fromName } : {}),
+        ...(trackingUrl ? { trackingUrl } : {}),
       });
-      const { html, text } = outboundEmailHtml(subject, htmlBody, textBody, 'fi', input.fromName ? { brand: input.fromName } : undefined);
       // One place, three paths. Empty when nothing was declared, and then nothing is added.
       const extraHeaders = disclosureHeaders(input.aiDisclosure, config);
       // THE ORDER IS THE FEATURE. The caller's own mailbox first, then the company's server, then

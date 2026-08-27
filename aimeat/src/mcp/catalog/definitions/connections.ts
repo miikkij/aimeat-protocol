@@ -84,6 +84,7 @@ export const connectionTools: AimeatToolDefinition[] = [
             from_alias: { type: 'string', description: 'A verified alias of that mailbox to send as.' },
             kind: { type: 'string', description: "'transactional' (default) or 'marketing', which an opt-out blocks and which carries the unsubscribe link." },
             reply_to: { type: 'string', description: 'Where a reply should go, when it is not the sending address.' },
+            theme: { type: 'string', description: "Optional: what the message LOOKS like. A built-in id (clean, space, warm, paper) or one of the owner's own, and theirs wins where both exist. 'clean' is the default and is what went out before themes existed, so a send that names nothing looks exactly as it always did. An id that matches nothing falls back to the default rather than failing — decoration never refuses a send. Read the list, already validated, from GET /v1/outbound/themes." },
             ai_disclosure: { type: 'string', description: "Optional: mark the message as machine-written in a header. One of none | ai-assisted | ai-generated | autonomous. If YOU wrote the body, declare it — 'ai-generated' when you produced the text, 'ai-assisted' when a person wrote it and you edited. It goes in a HEADER and not in the text, because the audience for it is machines: nobody reading their inbox follows a link to a hash. Declaring it and then asking for it to be left out is not possible." },
         },
     },
